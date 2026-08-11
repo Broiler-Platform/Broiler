@@ -106,6 +106,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // CSS Overflow 4 §5: the clamp runs once the children are laid out (the
+        // line count it cuts on exists only then) and before the height is
+        // resolved, so the container is sized to the lines it kept.
+        ApplyLineClamp(g);
+
         ApplyMultiColumnPostLayout();
         ResolveUsedBlockHeight();
         ApplyMinMaxHeightConstraints();

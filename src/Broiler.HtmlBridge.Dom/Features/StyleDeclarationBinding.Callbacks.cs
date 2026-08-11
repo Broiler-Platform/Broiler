@@ -227,7 +227,7 @@ internal static partial class StyleDeclarationBinding
             var prop = a[0].ToString();
             var removed = TryGetStylePropertyRawValue(styleMap, prop, out var val) ? CssPriority.Strip(val) : string.Empty;
             styleMap.Remove(prop);
-            styleMap.Remove(CssPropertyNames.ToCssPropertyName(prop));
+            styleMap.Remove(ToCssPropertyName(prop));
             return new JSString(removed);
         }
 
@@ -282,7 +282,7 @@ internal static partial class StyleDeclarationBinding
                 return new JSString(CssPriority.Strip(val));
 
             // Try kebab-case conversion for camelCase input
-            var kebab = CssPropertyNames.ToCssPropertyName(name);
+            var kebab = ToCssPropertyName(name);
             if (kebab != name && computed.TryGetValue(kebab, out val))
                 return new JSString(CssPriority.Strip(val));
 

@@ -949,6 +949,72 @@ internal abstract partial class CssBoxProperties
     public string WhiteSpace { get; set; } = "normal";
 
     /// <summary>
+    /// CSS Overflow 4 §5 <c>line-clamp</c>: the shorthand that clamps a block
+    /// container to a number of lines. <c>none</c> (the initial value) does not
+    /// clamp; a positive integer sets <c>max-lines</c> to that count,
+    /// <c>block-ellipsis</c> to <c>auto</c> and <c>continue</c> to
+    /// <c>discard</c>. Not inherited — the clamp applies to the block container
+    /// it is set on, and the lines it counts are the ones in that container's
+    /// own block formatting context (including those of its descendants).
+    /// </summary>
+    public string LineClamp { get; set; } = CssConstants.None;
+
+    /// <summary>
+    /// CSS Overflow 3 §6 <c>-webkit-line-clamp</c>: the legacy WebKit spelling.
+    /// It clamps only when the box is a legacy <c>-webkit-box</c> /
+    /// <c>-webkit-inline-box</c> whose <c>-webkit-box-orient</c> is vertical —
+    /// unlike <see cref="LineClamp"/>, which needs no such opt-in. See
+    /// <see cref="CssBox.ResolveLineClamp"/>.
+    /// </summary>
+    public string WebkitLineClamp { get; set; } = CssConstants.None;
+
+    /// <summary>
+    /// CSS Overflow 4 §5 <c>max-lines</c>: the longhand <see cref="LineClamp"/>
+    /// expands to. Set on its own it clamps the line count without implying an
+    /// ellipsis, so <see cref="BlockEllipsis"/> stays at its own initial value.
+    /// </summary>
+    public string MaxLines { get; set; } = CssConstants.None;
+
+    /// <summary>
+    /// CSS Overflow 4 §4 <c>block-ellipsis</c>: what to place at the end of the
+    /// last line a clamp keeps. <c>none</c> places nothing, <c>auto</c> places
+    /// U+2026 HORIZONTAL ELLIPSIS, and a <c>&lt;string&gt;</c> places that
+    /// string. Inherited, per spec.
+    /// </summary>
+    public string BlockEllipsis { get; set; } = CssConstants.None;
+
+    /// <summary>
+    /// The legacy <c>-webkit-box-orient</c>: <c>horizontal</c>/<c>inline-axis</c>
+    /// (the initial value) stacks a <c>-webkit-box</c>'s children along the
+    /// inline axis, <c>vertical</c>/<c>block-axis</c> along the block axis.
+    /// Inherited, matching the original WebKit property, and read both when
+    /// approximating the legacy box display and when deciding whether
+    /// <see cref="WebkitLineClamp"/> applies.
+    /// </summary>
+    public string WebkitBoxOrient { get; set; } = "horizontal";
+
+    /// <summary>
+    /// The legacy display keyword (<c>-webkit-box</c> / <c>-webkit-inline-box</c>)
+    /// this box's <see cref="Display"/> was mapped from, or <c>null</c>. Kept
+    /// because the mapping depends on <see cref="WebkitBoxOrient"/>, which the
+    /// cascade often applies after <c>display</c>, and because
+    /// <see cref="CssBox.ResolveLineClamp"/> needs to know the box opted into the
+    /// legacy <c>-webkit-line-clamp</c> after the keyword itself is gone.
+    /// </summary>
+    public string LegacyWebkitBoxDisplay { get; set; }
+
+    /// <summary>
+    /// Set by <see cref="CssBox.ApplyLineClamp"/> on a box whose content was
+    /// entirely discarded by a line clamp. The fragment tree skips such a box
+    /// and its subtree, so nothing it would have painted — text, background,
+    /// border — reaches the display list, which is what <c>continue: discard</c>
+    /// asks for. Layout still ran for it: the clamp is applied after the
+    /// container's children are laid out, because the line count it cuts on is
+    /// only known then.
+    /// </summary>
+    public bool ClampedAway { get; set; }
+
+    /// <summary>
     /// CSS Text 3 §2.1 <c>text-transform</c>. An inherited property applied to a
     /// box's text when its words are parsed (see <see cref="CssBox.ParseToWords"/>).
     /// The default <c>none</c> leaves text unchanged.
@@ -2552,6 +2618,11 @@ internal abstract partial class CssBoxProperties
         Direction = p.Direction;
         WritingMode = p.WritingMode;
         TextShadow = p.TextShadow;
+        // CSS Overflow 4 §4: block-ellipsis is inherited, so the string a clamp
+        // places is the one in force at the clamped container. -webkit-box-orient
+        // is inherited too, matching the original WebKit property.
+        BlockEllipsis = p.BlockEllipsis;
+        WebkitBoxOrient = p.WebkitBoxOrient;
 
         if (!everything)
             return;

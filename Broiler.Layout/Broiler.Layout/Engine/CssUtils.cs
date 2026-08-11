@@ -112,6 +112,11 @@ internal static partial class CssUtils
             "text-decoration-style" => cssBox.TextDecorationStyle,
             "text-decoration-color" => cssBox.TextDecorationColor,
             "white-space" => cssBox.WhiteSpace,
+            "line-clamp" => cssBox.LineClamp,
+            "-webkit-line-clamp" => cssBox.WebkitLineClamp,
+            "max-lines" => cssBox.MaxLines,
+            "block-ellipsis" => cssBox.BlockEllipsis,
+            "-webkit-box-orient" => cssBox.WebkitBoxOrient,
             "word-break" => cssBox.WordBreak,
             "line-break" => cssBox.LineBreak,
             "visibility" => cssBox.Visibility,
@@ -594,6 +599,13 @@ internal static partial class CssUtils
                 cssBox.Content = value;
                 break;
             case "display":
+                // Remember a legacy `-webkit-box` before it is mapped away: the
+                // mapping depends on -webkit-box-orient, and the two declarations
+                // arrive in author order, so `display` is frequently applied first.
+                cssBox.LegacyWebkitBoxDisplay =
+                    value.Trim().Equals("-webkit-box", StringComparison.OrdinalIgnoreCase) ? "-webkit-box"
+                    : value.Trim().Equals("-webkit-inline-box", StringComparison.OrdinalIgnoreCase) ? "-webkit-inline-box"
+                    : null;
                 cssBox.Display = NormalizeDisplayValue(value, cssBox);
                 break;
             case "direction":
@@ -665,6 +677,26 @@ internal static partial class CssUtils
                 break;
             case "white-space":
                 cssBox.WhiteSpace = NormalizeWhiteSpaceValue(value);
+                break;
+            case "line-clamp":
+                cssBox.LineClamp = value;
+                break;
+            case "-webkit-line-clamp":
+                cssBox.WebkitLineClamp = value;
+                break;
+            case "max-lines":
+                cssBox.MaxLines = value;
+                break;
+            case "block-ellipsis":
+                cssBox.BlockEllipsis = value;
+                break;
+            case "-webkit-box-orient":
+                cssBox.WebkitBoxOrient = value;
+                // Orientation decides how a legacy box is approximated, so a
+                // `display: -webkit-box` already applied on this box has to be
+                // re-mapped now that the axis is known.
+                if (cssBox.LegacyWebkitBoxDisplay is { } legacyBox)
+                    cssBox.Display = NormalizeDisplayValue(legacyBox, cssBox);
                 break;
             case "text-transform":
                 cssBox.TextTransform = value;
@@ -889,6 +921,31 @@ internal static partial class CssUtils
         if (Array.Exists(parts, static p => p.Equals("grid-lanes", StringComparison.OrdinalIgnoreCase)))
             return DefaultDisplayForElement(box);
 
+        // The legacy WebKit flexible box. Every browser still supports it, and it
+        // is how `-webkit-line-clamp` is opted into, so it cannot be dropped the
+        // way grid-lanes is — an unmapped value is neither IsBlock nor IsInline
+        // and the box then lays out and paints nothing at all.
+        //
+        // It is approximated by a block container rather than by `flex`, because
+        // the clamp opts in through `-webkit-box-orient: vertical`, and a vertical
+        // legacy box stacks its children in the block direction exactly as a block
+        // container does. That is also the shape the css-overflow/line-clamp
+        // *references* assume: they draw the clamped result with a plain
+        // `display: -webkit-box` (31 of them) or `display: inline-block`
+        // (webkit-line-clamp-024-ref) and pre-typed ellipsis text. A horizontally
+        // oriented legacy box keeps the closest flex mapping instead; orientation
+        // is inherited, so it is read off the box rather than this value.
+        if (parts.Length == 1)
+        {
+            bool vertical = IsVerticalWebkitBoxOrient(box?.WebkitBoxOrient);
+
+            if (v.Equals("-webkit-box", StringComparison.OrdinalIgnoreCase))
+                return vertical ? CssConstants.Block : "flex";
+
+            if (v.Equals("-webkit-inline-box", StringComparison.OrdinalIgnoreCase))
+                return vertical ? CssConstants.InlineBlock : "inline-flex";
+        }
+
         if (parts.Length != 2)
             return v;
 
@@ -988,6 +1045,21 @@ internal static partial class CssUtils
             ("preserve-spaces", "wrap") => CssConstants.PreWrap,
             _ => CssConstants.Normal,
         };
+    }
+
+    /// <summary>
+    /// Whether a <c>-webkit-box-orient</c> value selects the block axis. The
+    /// legacy property spells it <c>vertical</c>; the CSS-aligned aliases
+    /// <c>block-axis</c> and <c>inline-axis</c> mean the same two things and are
+    /// accepted alongside it. Anything else (including the initial
+    /// <c>horizontal</c>) is the inline axis.
+    /// </summary>
+    internal static bool IsVerticalWebkitBoxOrient(string value)
+    {
+        string v = value?.Trim();
+        return v != null
+            && (v.Equals("vertical", StringComparison.OrdinalIgnoreCase)
+                || v.Equals("block-axis", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
