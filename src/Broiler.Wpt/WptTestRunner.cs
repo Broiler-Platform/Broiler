@@ -629,6 +629,21 @@ internal sealed partial class WptTestRunner
   __broilerEnsureAnimate(document.body);
   var test_driver = window.test_driver || {};
   window.test_driver = test_driver;
+  // testdriver `bless(name, action)`: in wptrunner this grants transient user activation and then
+  // runs the action, so a test can call an API that requires a user gesture — requestFullscreen()
+  // in fullscreen/rendering, showPicker() in the customizable-select tests. There is no user here
+  // and nothing checks activation, so the activation half is a no-op and the action is what
+  // matters: without it the callback never runs and the test renders its un-activated state.
+  // Returns a promise resolving to the action's result, which is what callers await.
+  if (typeof test_driver.bless === 'undefined') {
+    test_driver.bless = function(name, action) {
+      try {
+        return Promise.resolve(typeof action === 'function' ? action() : undefined);
+      } catch (e) {
+        return Promise.reject(e);
+      }
+    };
+  }
   if (typeof test_driver.Actions === 'undefined') {
     function Actions() {
       this._pointers = Object.create(null);

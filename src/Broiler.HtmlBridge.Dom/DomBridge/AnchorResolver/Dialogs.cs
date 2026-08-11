@@ -59,6 +59,19 @@ public sealed partial class DomBridge
     {
         foreach (var el in elements)
         {
+            // Fullscreen §user-agent level style sheet defaults: the fullscreen element is a
+            // top-layer box laid out over the whole viewport. Applied before the dialog branch
+            // because an element taken fullscreen is sized by *this* rule whatever its tag is —
+            // including a <dialog>, whose modal centring it replaces.
+            if (DialogStateFor(el).Fullscreen.TryGet(out var fs) && fs is true)
+            {
+                if (NativeTopLayer)
+                    StampTopLayerOrder(el, TopLayerOrderOf(el));
+
+                ApplyFullscreenUAGeometry(el);
+                continue;
+            }
+
             if (!string.Equals(el.TagName, "dialog", StringComparison.OrdinalIgnoreCase))
                 continue;
             if (!HasAttr(el, "open"))
@@ -89,6 +102,32 @@ public sealed partial class DomBridge
             // viewport (Broiler.Layout CssBox.ResolveOverconstrainedAutoMargins).
             ApplyModalCenteringDefaults(el);
         }
+    }
+
+    /// <summary>
+    /// The Fullscreen UA style sheet's geometry for the fullscreen element:
+    /// <c>position: fixed; inset: 0; margin: 0; width: 100%; height: 100%;</c> — a box covering the
+    /// viewport, above everything, with no box-model inset of its own.
+    /// </summary>
+    /// <remarks>
+    /// Written as baked inline style rather than as a cascade rule for the same reason the modal
+    /// dialog defaults are: the renderer has no notion of the fullscreen flag, so the state has to
+    /// reach it as geometry. Author declarations are not consulted — unlike <c>dialog:modal</c>
+    /// centring, this UA rule is <c>!important</c> in the Fullscreen spec precisely so a page
+    /// cannot leave the fullscreen element the wrong size.
+    /// </remarks>
+    private void ApplyFullscreenUAGeometry(DomElement el)
+    {
+        var style = BakedInlineStyle(el);
+        style["position"] = "fixed";
+        style["top"] = "0";
+        style["left"] = "0";
+        style["right"] = "0";
+        style["bottom"] = "0";
+        style["margin"] = "0";
+        style["width"] = "100%";
+        style["height"] = "100%";
+        style["box-sizing"] = "border-box";
     }
 
     // The HTML UA `dialog:modal` inset/margin properties (checked both as their shorthands and
@@ -222,6 +261,17 @@ public sealed partial class DomBridge
     // Dialog backdrop insertion
     // -----------------------------------------------------------------
 
+    /// <summary>
+    /// The UA <c>::backdrop</c> background for a top-layer element, before any author
+    /// <c>::backdrop</c> declaration overrides it: opaque black behind a fullscreen element
+    /// (Fullscreen §user-agent level style sheet defaults), the dimming scrim behind a modal
+    /// dialog, and nothing behind a popover.
+    /// </summary>
+    private string DefaultBackdropBackground(DomElement element, bool isPopover) =>
+        DialogStateFor(element).Fullscreen.TryGet(out var fs) && fs is true
+            ? "black"
+            : isPopover ? "transparent" : "rgb(229, 229, 229)";
+
     private void InsertDialogBackdrops(
         DomElement root, int vpW, int vpH,
         Dictionary<string, AnchorInfo> anchorRegistry,
@@ -230,6 +280,7 @@ public sealed partial class DomBridge
         var modals = new List<(DomElement dialog, DomElement parent, bool isPopover)>();
         FindModalDialogs(root, modals);
         FindOpenPopovers(root, modals);
+        FindFullscreenElements(root, modals);
 
         foreach (var (dialog, parent, isPopover) in modals)
         {
@@ -239,8 +290,7 @@ public sealed partial class DomBridge
             // A modal dialog's ::backdrop defaults to the UA dimming scrim; a
             // popover's ::backdrop defaults to transparent (no scrim) — either
             // is overridden by an author `background`/`background-color`.
-            var backdropBg = GetBackdropBackground(
-                dialog, isPopover ? "transparent" : "rgb(229, 229, 229)");
+            var backdropBg = GetBackdropBackground(dialog, DefaultBackdropBackground(dialog, isPopover));
 
             // Author ::backdrop position-try-fallbacks are not yet reproduced by the native
             // ::backdrop box (it overlays author geometry from the cascade but does not run the
@@ -519,6 +569,49 @@ public sealed partial class DomBridge
         // tolerates that — same idiom as the other anchor-resolver tree walks.
         foreach (var child in SnapshotChildren(element))
             FindModalDialogs(child, results);
+    }
+
+    /// <summary>
+    /// Fullscreen §<c>fullscreen element</c>: the element whose <c>requestFullscreen()</c> ran and
+    /// has not been exited, or <c>null</c>. The spec keeps a stack; this returns its top, which is
+    /// the element with the highest top-layer order among those still flagged.
+    /// </summary>
+    internal DomElement? FindFullscreenElement()
+    {
+        DomElement? best = null;
+        int bestOrder = int.MinValue;
+
+        foreach (var el in Elements)
+        {
+            if (!(DialogStateFor(el).Fullscreen.TryGet(out var fs) && fs is true))
+                continue;
+
+            int order = TopLayerOrderOf(el);
+            if (best is null || order >= bestOrder)
+            {
+                best = el;
+                bestOrder = order;
+            }
+        }
+
+        return best;
+    }
+
+    // Fullscreen §top layer: a fullscreen element is in the top layer and generates a ::backdrop,
+    // the same as a modal dialog. Collected alongside them so one pass materialises all three.
+    private void FindFullscreenElements(DomElement element, List<(DomElement, DomElement, bool)> results)
+    {
+        if (ParentEl(element) != null &&
+            DialogStateFor(element).Fullscreen.TryGet(out var fs) &&
+            fs is true &&
+            // A modal dialog taken fullscreen is one top-layer box with one ::backdrop, not two.
+            !results.Exists(r => ReferenceEquals(r.Item1, element)))
+        {
+            results.Add((element, ParentEl(element), false));
+        }
+
+        foreach (var child in SnapshotChildren(element))
+            FindFullscreenElements(child, results);
     }
 
     // Popover API (HTML §popover): an element whose showPopover() ran (and whose

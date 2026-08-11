@@ -20,6 +20,22 @@ public sealed partial class DomBridge
         // standards mode so it's always the <html> element).
         document.FastAddProperty((KeyString)"scrollingElement", new JSFunction((in _) => ToJSObject(DocumentElement), "get scrollingElement"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // Fullscreen §document API. `fullscreenElement` is a getter over the per-element fullscreen
+        // flag rather than a stored reference, so it stays correct when the element is exited or
+        // detached. `fullscreenEnabled` is constant here: the runner has no user-permission model
+        // and nothing in the corpus needs it to be false.
+        document.FastAddProperty((KeyString)"fullscreenElement",
+            new JSFunction((in _) => FindFullscreenElement() is { } el ? ToJSObject(el) : JSNull.Value, "get fullscreenElement"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"webkitFullscreenElement",
+            new JSFunction((in _) => FindFullscreenElement() is { } el ? ToJSObject(el) : JSNull.Value, "get webkitFullscreenElement"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddValue((KeyString)"fullscreenEnabled", JavaScript.BuiltIns.Boolean.JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"exitFullscreen",
+            new JSFunction((in _) => _dialogs.ExitFullscreen(), "exitFullscreen", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"webkitExitFullscreen",
+            new JSFunction((in _) => _dialogs.ExitFullscreen(), "webkitExitFullscreen", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
         // document structural accessors — body/head/title, co-located in the DocumentStructureBinding
         // feature module (Phase 3).
         document.FastAddProperty((KeyString)"body", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetBody(this, in a), "get body"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
