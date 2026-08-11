@@ -288,13 +288,13 @@ themselves named `-print` (`block-page-break-inside-avoid-1-print.html` matches
 test and carried into the reference render.
 
 **It is off because it is not yet a better answer than not paginating at all.**
-Over the 409 print reftests: **252 pass unpaginated, 213 paged.** That is not the
+Over the 409 print reftests: **252 pass unpaginated, 212 paged.** That is not the
 paging being wrong so much as it being partial. Where the flow is not paginated,
 a test and its reference are wrong in the *same* way and agree — this is the
 suite's blind spot working in the corpus's favour — and each unimplemented piece
 of paged media separates the pairs that rest on it. What is missing, in order of
-size in the current failures: `@page` margin boxes (29), fragmentation of flex
-and table content (34), per-name `@page` sizes, and monolithic content in grid.
+size in the current failures: fragmentation of flex and table content (34),
+per-name `@page` sizes, and monolithic content in grid.
 
 **The lever is still worth having, because without it every paged-media fix
 scores exactly zero.** It is what turned "the print tests need paged media" into
@@ -308,6 +308,43 @@ count wrong reports 0.0% — the images are different sizes — so the ranked fa
 list fills with 0.0% entries that are all the same defect. Read the dimensions out
 of the message (`actual 480×576 vs baseline 480×864` is two pages against three)
 before reading anything into the percentage.
+
+### `@page` margin boxes, and what actually gates them
+
+The sixteen margin boxes of CSS Paged Media 3 §5 are implemented and reachable
+through the same lever. A box's slot is computed here — the ring of four corners
+and four edge strips, an edge's length shared out by §5.3.2 — and the box itself
+is emitted as ordinary markup laid over the page, because that is all it is: a box
+with a background, a border, a font and an alignment. Sharing an edge takes a
+measure render first (each box on its own, read back by the colour it is painted),
+since §5.3.2 divides the unused length *in proportion to max-content sizes* and
+counts a sized box's border and padding besides.
+
+**The cluster does not move, and the reason is not margin boxes.** It went 15/37
+to 13/37: one genuine new pass (`content-001`, at 100%) against three passes that
+were never real — `dimensions-003` and `-005` were passing at 99.5% and 99.2%
+*with none of their margin boxes drawn*, because the boxes are under 1% of a
+1024×768 page, and `dimensions-010`'s reference renders blank. What blocks the
+rest is in the **references**, and it is two engine gaps that have nothing to do
+with paged media:
+
+- **Flex items are never stretched on the cross axis.** 26 of the 36 references
+  state the margin ring as a grid whose edge strips are flex containers, and every
+  box in them is sized by the default `align-items: stretch`. Broiler leaves flex
+  items at their content size — a row item with a width and no height comes out
+  zero-tall and paints nothing — so those references render blank or nearly so.
+  `CssBox.Flex.cs` only *shifts* items for `center`/`end`; there is no stretch
+  step at all.
+- **Generated `content` takes a single quoted string and nothing else.**
+  `content: "a" "b"` renders as `a" "b` and `content: counter(page)` renders as
+  the text `counter(page)`. Both sides of a comparison share the gap, so it costs
+  nothing today — and it is why the page counters are deliberately *not* evaluated
+  on the test side: doing so alone would separate the eight margin-box tests that
+  use one from references that still render the literal text.
+
+Fixing the first would unblock most of this cluster and is a `Broiler.Layout`
+change with a suite-wide blast radius (`css/css-flexbox` is ~206 failures of its
+own), so it wants its own measured pass rather than being folded into paged media.
 
 ## Quirks mode reaches the render, as of the doctype round-trip fix
 

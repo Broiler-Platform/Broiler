@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
+using System.Linq;
 using Broiler.CSS;
 
 namespace Broiler.Wpt;
@@ -58,20 +59,33 @@ internal readonly record struct WptPageBox(
     internal static WptPageBox Resolve(string html, SizeF defaultBoxSize)
     {
         var box = new WptPageBox(defaultBoxSize, 0, 0, 0, 0);
+        double? areaWidth = null, areaHeight = null;
 
-        foreach (var declarations in EnumerateUnconditionalPageRules(html))
+        foreach (var (declarations, _) in EnumerateUnconditionalPageBlocks(html))
         {
+            double fontSize = FontSizeOf(declarations.Declarations.ToList());
+
             foreach (var declaration in declarations.Declarations)
             {
                 var value = declaration.Value.Text.Trim();
                 switch (declaration.Name.ToLowerInvariant())
                 {
+                    // `width` and `height` size the page *area* — the box less its margins — the
+                    // way they size any other box's content. margin-boxes/dimensions-011 states the
+                    // same page as `width: 20em; height: 16em; margin: 6em` and its reference as
+                    // `size: 32em 28em; margin: 0`, which only agree if the margins are added on.
+                    case "width":
+                        areaWidth = TryLength(value, defaultBoxSize.Width, fontSize) ?? areaWidth;
+                        break;
+                    case "height":
+                        areaHeight = TryLength(value, defaultBoxSize.Height, fontSize) ?? areaHeight;
+                        break;
                     case "size":
-                        if (TryParseSize(value, defaultBoxSize, out var size))
+                        if (TryParseSize(value, defaultBoxSize, fontSize, out var size))
                             box = box with { BoxSize = size };
                         break;
                     case "margin":
-                        if (TryParseMarginShorthand(value, box.BoxSize, out var m))
+                        if (TryParseMarginShorthand(value, box.BoxSize, fontSize, out var m))
                             box = box with
                             {
                                 MarginTop = m.Top, MarginRight = m.Right,
@@ -79,30 +93,44 @@ internal readonly record struct WptPageBox(
                             };
                         break;
                     case "margin-top":
-                        if (TryParseLength(value, box.BoxSize.Height, out var mt))
+                        if (TryParseLength(value, box.BoxSize.Height, fontSize, out var mt))
                             box = box with { MarginTop = mt };
                         break;
                     case "margin-right":
-                        if (TryParseLength(value, box.BoxSize.Width, out var mr))
+                        if (TryParseLength(value, box.BoxSize.Width, fontSize, out var mr))
                             box = box with { MarginRight = mr };
                         break;
                     case "margin-bottom":
-                        if (TryParseLength(value, box.BoxSize.Height, out var mb))
+                        if (TryParseLength(value, box.BoxSize.Height, fontSize, out var mb))
                             box = box with { MarginBottom = mb };
                         break;
                     case "margin-left":
-                        if (TryParseLength(value, box.BoxSize.Width, out var ml))
+                        if (TryParseLength(value, box.BoxSize.Width, fontSize, out var ml))
                             box = box with { MarginLeft = ml };
                         break;
                 }
             }
         }
 
+        if (areaWidth is { } aw)
+            box = box with { BoxSize = new SizeF((float)(aw + box.MarginLeft + box.MarginRight), box.BoxSize.Height) };
+        if (areaHeight is { } ah)
+            box = box with { BoxSize = new SizeF(box.BoxSize.Width, (float)(ah + box.MarginTop + box.MarginBottom)) };
+
         return box;
     }
 
-    /// <summary>The declaration blocks of the document's <c>@page</c> rules that carry no page selector.</summary>
-    private static IEnumerable<CssDeclarationBlock> EnumerateUnconditionalPageRules(string html)
+    /// <summary>
+    /// The document's <c>@page</c> rules that carry no page selector: each one's declarations, and
+    /// its block as written.
+    /// </summary>
+    /// <remarks>
+    /// The raw text comes with them because the parser does not descend into the at-rules nested
+    /// inside an <c>@page</c> — the sixteen margin boxes of CSS Paged Media 3 §5 are left in it,
+    /// and <see cref="WptPageMarginBoxes"/> reads them from there.
+    /// </remarks>
+    internal static IEnumerable<(CssDeclarationBlock Declarations, string BlockText)>
+        EnumerateUnconditionalPageBlocks(string html)
     {
         foreach (var source in EnumerateStyleSources(html))
         {
@@ -127,7 +155,7 @@ internal readonly record struct WptPageBox(
                 if (split >= 0 || !string.IsNullOrWhiteSpace(atRule.Prelude))
                     continue;
 
-                yield return declarations;
+                yield return (declarations, atRule.BlockText ?? string.Empty);
             }
         }
     }
@@ -163,7 +191,7 @@ internal readonly record struct WptPageBox(
     /// CSS Paged Media 3 §3.1 <c>size</c>: one or two lengths, a named page size, and/or an
     /// orientation keyword. <c>auto</c> keeps the default.
     /// </summary>
-    private static bool TryParseSize(string value, SizeF defaultBoxSize, out SizeF size)
+    private static bool TryParseSize(string value, SizeF defaultBoxSize, double fontSize, out SizeF size)
     {
         size = defaultBoxSize;
 
@@ -184,7 +212,7 @@ internal readonly record struct WptPageBox(
 
             if (NamedPageSizes.TryGetValue(token, out var namedSize)) { named = namedSize; continue; }
 
-            if (TryParseLength(token, 0, out var length) && length > 0)
+            if (TryParseLength(token, 0, fontSize, out var length) && length > 0)
                 lengths.Add(length);
             else
                 return false;
@@ -215,7 +243,7 @@ internal readonly record struct WptPageBox(
     private readonly record struct Margins(float Top, float Right, float Bottom, float Left);
 
     /// <summary>The <c>margin</c> shorthand: one to four lengths, in the usual TRBL order.</summary>
-    private static bool TryParseMarginShorthand(string value, SizeF boxSize, out Margins margins)
+    private static bool TryParseMarginShorthand(string value, SizeF boxSize, double fontSize, out Margins margins)
     {
         margins = default;
 
@@ -229,7 +257,7 @@ internal readonly record struct WptPageBox(
             // Percentages on the block-axis margins resolve against the page width, as elsewhere in
             // CSS; the axis only matters for a percentage, and using width for all of them is the
             // rule rather than a shortcut.
-            if (!TryParseLength(tokens[i], boxSize.Width, out parsed[i]))
+            if (!TryParseLength(tokens[i], boxSize.Width, fontSize, out parsed[i]))
                 return false;
         }
 
@@ -244,15 +272,28 @@ internal readonly record struct WptPageBox(
     }
 
     /// <summary>An absolute CSS length in pixels, or a percentage of <paramref name="percentBasis"/>.</summary>
-    private static bool TryParseLength(string token, float percentBasis, out float pixels)
+    private static bool TryParseLength(string token, float percentBasis, double fontSize, out float pixels)
     {
-        pixels = 0;
-        var v = token.Trim();
-        if (v.Length == 0)
-            return false;
+        if (TryLength(token, percentBasis, fontSize) is { } length)
+        {
+            pixels = (float)length;
+            return true;
+        }
 
-        if (v.Equals("auto", StringComparison.OrdinalIgnoreCase))
-            return false;
+        pixels = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// A CSS length in pixels: absolute units, a percentage of <paramref name="percentBasis"/>, or
+    /// a font-relative one against <paramref name="fontSize"/>. <c>null</c> for <c>auto</c>, for a
+    /// missing value, and for anything that is not a length.
+    /// </summary>
+    internal static double? TryLength(string? token, double percentBasis, double fontSize)
+    {
+        var v = token?.Trim();
+        if (string.IsNullOrEmpty(v) || v.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            return null;
 
         foreach (var (suffix, perUnit) in LengthUnits)
         {
@@ -260,28 +301,65 @@ internal readonly record struct WptPageBox(
                 continue;
 
             var number = v[..^suffix.Length];
-            if (!float.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out var scalar))
-                return false;
+            if (!double.TryParse(number, NumberStyles.Float, CultureInfo.InvariantCulture, out var scalar))
+                return null;
 
-            pixels = suffix == "%" ? scalar / 100f * percentBasis : scalar * perUnit;
-            return true;
+            return suffix switch
+            {
+                "%" => scalar / 100d * percentBasis,
+                "em" or "rem" => scalar * fontSize,
+                _ => scalar * perUnit,
+            };
         }
 
         // A bare number is only a length when it is zero.
-        if (float.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var bare) && bare == 0)
-        {
-            pixels = 0;
-            return true;
-        }
+        if (double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out var bare) && bare == 0)
+            return 0;
 
-        return false;
+        return null;
     }
 
-    /// <summary>CSS absolute units, in pixels per unit, longest suffix first so <c>mm</c> is not read as <c>m</c>.</summary>
-    private static readonly (string Suffix, float PerUnit)[] LengthUnits =
+    /// <summary>The CSS initial font size, which a font-relative length falls back to.</summary>
+    internal const double DefaultFontSize = 16;
+
+    /// <summary>
+    /// The font size <paramref name="declarations"/> establish, for the font-relative lengths on
+    /// the boxes that inherit from them. Read from <c>font-size</c>, or from the <c>font</c>
+    /// shorthand's size component, which is the token before the <c>/</c> line height.
+    /// </summary>
+    internal static double FontSizeOf(IReadOnlyList<CssDeclaration> declarations)
+    {
+        double size = DefaultFontSize;
+        foreach (var declaration in declarations)
+        {
+            if (declaration.Name.Equals("font-size", StringComparison.OrdinalIgnoreCase))
+            {
+                size = TryLength(declaration.Value.Text, size, size) ?? size;
+            }
+            else if (declaration.Name.Equals("font", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var token in declaration.Value.Text
+                    .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var head = token.Split('/')[0];
+                    if (TryLength(head, size, size) is { } parsed and > 0)
+                    {
+                        size = parsed;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return size;
+    }
+
+    /// <summary>CSS length units, in pixels per unit, longest suffix first so <c>mm</c> is not read as <c>m</c>.</summary>
+    private static readonly (string Suffix, double PerUnit)[] LengthUnits =
     [
-        ("px", 1f), ("in", 96f), ("cm", 96f / 2.54f), ("mm", 96f / 25.4f),
-        ("q", 96f / 101.6f), ("pt", 96f / 72f), ("pc", 16f), ("%", 0f),
+        ("rem", 0d), ("em", 0d),
+        ("px", 1d), ("in", 96d), ("cm", 96d / 2.54d), ("mm", 96d / 25.4d),
+        ("q", 96d / 101.6d), ("pt", 96d / 72d), ("pc", 16d), ("%", 0d),
     ];
 
     /// <summary>The named page sizes of CSS Paged Media 3 §3.1, in portrait orientation at 96dpi.</summary>

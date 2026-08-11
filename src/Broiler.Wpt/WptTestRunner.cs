@@ -2543,11 +2543,11 @@ internal sealed partial class WptTestRunner
     /// <remarks>
     /// <para>
     /// Off by default because paged rendering is not yet a better answer than not paginating at
-    /// all. Measured over the 409 print reftests: 252 passing unpaginated, 213 paged. That is not
+    /// all. Measured over the 409 print reftests: 252 passing unpaginated, 212 paged. That is not
     /// the paging being wrong so much as it being partial — where the flow is unpaginated a test
     /// and its reference are wrong in the same way and agree, and each unimplemented piece of
-    /// paged media (<c>@page</c> margin boxes, fragmentation of flex and table content, per-name
-    /// page sizes) breaks that agreement for the pairs that rest on it.
+    /// paged media (fragmentation of flex and table content, per-name page sizes) breaks that
+    /// agreement for the pairs that rest on it.
     /// </para>
     /// <para>
     /// It is worth having behind a lever rather than not at all because it is the only way to

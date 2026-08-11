@@ -123,6 +123,139 @@ public sealed class PagedPrintRenderTests : IDisposable
         Assert.Equal(300, rendered.Height);
     }
 
+    // ---- CSS Paged Media 3 §5: margin boxes ----
+
+    // A 300x200 sheet with 50px margins: a 200x100 page area, and a 200x50 top edge strip.
+    private const string MarginBoxPage =
+        "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+        + "@page { size: 300px 200px; margin: 50px; @SLOTS }"
+        + "html,body { margin: 0; padding: 0; }"
+        + "</style><div style=\"height:10px\"></div>";
+
+    private static BBitmap RenderMarginBoxes(string slots) =>
+        RenderPrint(MarginBoxPage.Replace("@SLOTS", slots));
+
+    [Fact]
+    public void A_Margin_Box_Paints_In_Its_Own_Slot()
+    {
+        using var rendered = RenderMarginBoxes("@top-left { content: \"\"; background: #000; }");
+
+        Assert.True(IsInk(rendered, 60, 25), "the top-left box should cover the start of the top strip");
+        Assert.False(IsInk(rendered, 150, 120), "the page area should be untouched");
+    }
+
+    [Theory]
+    [InlineData("@top-left-corner { content: \"\"; background:#000; }", 25, 25)]
+    [InlineData("@top-right-corner { content: \"\"; background:#000; }", 275, 25)]
+    [InlineData("@bottom-left-corner { content: \"\"; background:#000; }", 25, 175)]
+    [InlineData("@bottom-right-corner { content: \"\"; background:#000; }", 275, 175)]
+    [InlineData("@left-middle { content: \"\"; background:#000; }", 25, 100)]
+    [InlineData("@right-middle { content: \"\"; background:#000; }", 275, 100)]
+    [InlineData("@bottom-center { content: \"\"; background:#000; }", 150, 175)]
+    public void Each_Slot_Is_Where_The_Page_Margin_Puts_It(string slot, int x, int y)
+    {
+        using var rendered = RenderMarginBoxes(slot);
+
+        Assert.True(IsInk(rendered, x, y), $"expected the box at ({x},{y})");
+    }
+
+    // A box on its own fills its edge; two of them share it. Both are the same rule — CSS Paged
+    // Media 3 §5.3.2 gives the unused length to the boxes that state none.
+    [Fact]
+    public void Two_Auto_Boxes_Share_Their_Edge()
+    {
+        using var rendered = RenderMarginBoxes(
+            "@top-left { content: \"\"; background:#000; } @top-right { content: \"\"; background:#00f; }");
+
+        Assert.True(IsInk(rendered, 60, 25), "the left box should hold the start of the strip");
+        Assert.Equal(255, rendered.GetPixel(240, 25).B);
+    }
+
+    [Fact]
+    public void A_Stated_Width_Is_Kept_And_The_Rest_Goes_To_The_Auto_Box()
+    {
+        using var rendered = RenderMarginBoxes(
+            "@top-left { content: \"\"; background:#000; width: 40px; }"
+            + "@top-right { content: \"\"; background:#00f; }");
+
+        Assert.True(IsInk(rendered, 60, 25), "the stated 40px should start the strip");
+        Assert.False(IsInk(rendered, 130, 25), "and end at 40px");
+        Assert.Equal(255, rendered.GetPixel(130, 25).B);
+    }
+
+    // `content: none`, `content: normal` and no content at all generate no box; an empty string
+    // generates one. margin-boxes/content-001 is built on the difference.
+    [Theory]
+    [InlineData("content: none;", false)]
+    [InlineData("content: normal;", false)]
+    [InlineData("background: #000;", false)]
+    [InlineData("content: \"\";", true)]
+    public void A_Box_Exists_Only_When_Its_Content_Does(string declarations, bool painted)
+    {
+        using var rendered = RenderMarginBoxes($"@top-left {{ background:#000; {declarations} }}");
+
+        Assert.Equal(painted, IsInk(rendered, 60, 25));
+    }
+
+    // A running header: the same margin box drawn on every page, which is what page margin boxes
+    // are for. The overlay is built per page rather than once, and this is what says so.
+    [Fact]
+    public void A_Margin_Box_Is_Drawn_On_Every_Page()
+    {
+        const string html =
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "@page { size: 300px 200px; margin: 50px;"
+            + "  @top-center { content: \"header\"; font: 20px monospace; } }"
+            + "html,body { margin: 0; padding: 0; }"
+            + "div { height: 60px; }"
+            + "</style><div></div><div style=\"break-before:page\"></div>";
+
+        using var rendered = RenderPrint(html);
+
+        Assert.Equal(400, rendered.Height);
+        Assert.True(TopStripInk(rendered, page: 0) > 0, "page 1 should carry the header");
+        Assert.True(TopStripInk(rendered, page: 1) > 0, "page 2 should carry the header");
+    }
+
+    // The page counters are reset per page on the overlay's root, so `counter(page)` has the right
+    // value to read — but nothing reads it yet: the engine's `content` support takes a single
+    // quoted string and renders anything else as the text it is written as, `counter(page)` and
+    // `"a" "b"` alike.
+    //
+    // Which is why this is *not* worked around here. WPT's own references state the same content
+    // through a `::before` rule, so both sides of every comparison render the same literal text and
+    // agree; evaluating the counters on the test side alone would separate them and lose the eight
+    // margin-box tests that use one. The fix is generated content in the engine, and it fixes both
+    // sides at once.
+    [Fact]
+    public void A_Page_Counter_Renders_As_Written_Until_The_Engine_Evaluates_Content()
+    {
+        const string html =
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "@page { size: 300px 200px; margin: 50px;"
+            + "  @top-center { content: counter(page); font: 20px monospace; } }"
+            + "html,body { margin: 0; padding: 0; }"
+            + "div { height: 60px; }"
+            + "</style><div></div><div style=\"break-before:page\"></div>";
+
+        using var rendered = RenderPrint(html);
+
+        Assert.Equal(TopStripInk(rendered, page: 0), TopStripInk(rendered, page: 1));
+        Assert.True(TopStripInk(rendered, page: 0) > 0);
+    }
+
+    /// <summary>Ink in one page's top margin strip, which is where a running header goes.</summary>
+    private static int TopStripInk(BBitmap bitmap, int page)
+    {
+        int ink = 0;
+        for (int y = page * 200; y < page * 200 + 50; y++)
+            for (int x = 0; x < bitmap.Width; x++)
+                if (IsInk(bitmap, x, y))
+                    ink++;
+
+        return ink;
+    }
+
     [Theory]
     [InlineData("block-page-break-1-print.html", true)]
     [InlineData("multicol-height-002-print.xht", true)]

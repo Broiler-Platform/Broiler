@@ -163,6 +163,41 @@ public sealed class WptPageBoxTests
         Assert.True(box.AreaSize.Height >= 1);
     }
 
+    // Font-relative lengths, against the page's own font size. margin-boxes/dimensions-011 states
+    // its page entirely in em, and its reference states the same page a different way — they only
+    // agree if both are resolved.
+    [Theory]
+    [InlineData("size: 32em 28em", 512, 448)]
+    [InlineData("size: 20rem", 320, 320)]
+    public void Size_Accepts_Font_Relative_Lengths(string declaration, float width, float height)
+    {
+        var box = WptPageBox.Resolve(Page(declaration), DefaultBox);
+
+        Assert.Equal(width, box.BoxSize.Width, 1);
+        Assert.Equal(height, box.BoxSize.Height, 1);
+    }
+
+    [Fact]
+    public void A_Font_Size_On_The_Page_Is_What_Em_Resolves_Against()
+    {
+        var box = WptPageBox.Resolve(Page("font-size: 10px; size: 32em 28em;"), DefaultBox);
+
+        Assert.Equal(320, box.BoxSize.Width, 1);
+        Assert.Equal(280, box.BoxSize.Height, 1);
+    }
+
+    // `width` and `height` size the page *area* the way they size any other box's content, so the
+    // sheet is that plus its margins. margin-boxes/dimensions-011 writes the same page both ways:
+    // `width: 20em; height: 16em; margin: 6em` against `size: 32em 28em; margin: 0`.
+    [Fact]
+    public void Width_And_Height_Size_The_Page_Area_And_The_Margins_Are_Added()
+    {
+        var box = WptPageBox.Resolve(Page("margin: 6em; width: 20em; height: 16em;"), DefaultBox);
+
+        Assert.Equal(new SizeF(512, 448), box.BoxSize);
+        Assert.Equal(new SizeF(320, 256), box.AreaSize);
+    }
+
     [Theory]
     [InlineData("size: nonsense")]
     [InlineData("margin: nonsense")]
