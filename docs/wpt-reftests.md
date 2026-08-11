@@ -116,3 +116,70 @@ Two things the reftest shard deliberately does *not* inherit: the Playwright and
 reference caches (there is nothing to cache), and `BROILER_WPT_DEFER_PROMISE_TESTS`
 — that override exists to freeze the DOM at the point Chromium's reference
 generator screenshots, and a reftest has no Chromium capture to line up with.
+
+## Triaging a failure: the suite cannot tell you whether the test is winnable
+
+The trade this suite makes has a second edge that only shows up in triage. A
+golden-image failure is measured against an engine that *does* implement the
+feature, so the reference tells you what the answer looks like. Here both sides
+are Broiler, so a 0.0% match says the two renders disagree and nothing else —
+not whether the disagreement is a bug, an unimplemented feature, a test that
+needs a driver the runner does not have, or a test no engine passes.
+
+**Use a browser as an oracle for the question the suite cannot answer**, and
+only for that question: render the test *and its declared reference* in
+Chromium and compare those two. That says whether the reftest is winnable at
+all, without any Chromium pixel entering a Broiler verdict.
+
+```sh
+CHROME=/opt/pw-browsers/chromium-*/chrome-linux/chrome
+WPT=tests/wpt/checkout
+for side in css/CSS2/box-display/root-box-003.xht \
+            css/CSS2/box-display/root-box-003-ref.xht; do
+  "$CHROME" --headless --disable-gpu --no-sandbox --hide-scrollbars \
+    --force-device-scale-factor=1 --window-size=1024,768 \
+    --screenshot="/tmp/$(basename "$side").png" "file://$PWD/$WPT/$side"
+done
+```
+
+Three things this reliably separates, from the triage of
+[issue #1601](https://github.com/Broiler-Platform/Broiler/issues/1601) (top 30
+problems, all at 0.0–1.4% match):
+
+- **A real Broiler bug** — Chromium reproduces its own reference, Broiler does
+  not. Four of the thirty were this, and each turned out to be something other
+  than what its directory suggested:
+  `css/css-page/monolithic-overflow-014-print` was not a paged-media gap at all
+  but `display: flow-root` painting nothing (fixed — see the commit; it fixed 32
+  reftests across `css-break`, `css-box/margin-trim`, `CSS2/floats` and
+  `css-rhythm`, all of them tests whose *reference* used a `flow-root` wrapper),
+  and `quirks/tables-inherit-color-from-body-quirk-007` was `document.append`
+  missing from the bridge, not a colour bug (fixed; the quirk itself is still
+  open).
+- **A test that is stale upstream.** `css/CSS2/box-display/root-box-003.xht`
+  asserts that `html { display: none; background: green }` still paints the
+  canvas green. Chromium renders it white, and so does Broiler — because
+  `css/css-backgrounds/background-color-root-propagation-001` asserts the
+  opposite and is the modern rule. Making it pass means regressing that one.
+  **A reftest failing is not by itself evidence of a defect**, and this suite
+  will never tell you which of a contradictory pair to believe.
+- **A feature nothing here implements**, where the render is honest and the
+  match is 0% anyway: the three `jpegxl/` tests need a JPEG XL decoder (Chromium
+  has none either), the `fullscreen/` and customizable-`select` ones need
+  `testdriver.js` to drive them, `forced-colors-mode-49` needs the run to be in
+  forced-colors mode, and the two `*.sub.html` colour-scheme tests need the WPT
+  server for their cross-origin substitution.
+
+The largest single group in that issue — 13 of the 30 — are `*-print.html`
+tests, which state their expected rendering in terms of page boxes, named pages,
+margin boxes and fragmentation. The runner renders them in screen mode on both
+sides, so they are not measuring what they were written to measure; they need
+paged media, not thirteen separate fixes.
+
+**Do not "fix" a reftest by making both sides equally wrong.** The suite's own
+blind spot makes that easy to do by accident and impossible to see afterwards —
+the two `css/css-page/page-size-00{7,8}-print` tests passed for exactly that
+reason until `flow-root` started rendering, and nine more across the corpus with
+them. When a change flips a test from pass to fail, check the oracle before
+treating it as a regression: a false pass ending is progress that the scoreboard
+reports as a loss.
