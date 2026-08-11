@@ -1,4 +1,5 @@
 using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 
@@ -36,6 +37,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     protected virtual void PerformLayoutImp(ILayoutEnvironment g)
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.BoxesLaidOut);
+
         ResetCollapsedMarginState();
 
         if (Display != CssConstants.None)

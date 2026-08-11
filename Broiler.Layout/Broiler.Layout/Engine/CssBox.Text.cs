@@ -1,4 +1,5 @@
 using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Globalization;
@@ -418,6 +419,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         if (_wordsSizeMeasured)
             return;
+
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.TextMeasure);
 
         LoadBackgroundImageIfNeeded();
         MeasureWordSpacing(g);

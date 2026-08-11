@@ -1,5 +1,6 @@
 using Broiler.CSS;
 using Broiler.Graphics;
+using Broiler.Layout.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 
@@ -428,6 +429,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // centring; inert unless such a box exists.
                 CenterOutOfFlowBlockAxis(this);
             }
+
+            // Multithreading item #13: count how much of the finished tree sits under a subtree
+            // the item proposes to claim. One walk at the root, only while the layout-composition
+            // profiler is running; LayoutWorkTrace.Enabled is false everywhere else.
+            if (ParentBox == null && LayoutWorkTrace.Enabled)
+                LayoutTreeCensus.Record(this);
         }
         catch (Exception ex)
         {

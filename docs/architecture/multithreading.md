@@ -6,8 +6,16 @@ the tooling.
 
 ## Status
 
-**Phase 4 is open, and it opened by re-measuring the rationale for deprioritising
-it.** That rationale had gone stale: this document deprioritised parallel layout on
+**Phase 4 is complete, and with it every phase in this document.** It ends the way it
+began — by measuring rather than building: its two items are **#18, built**, and **#13,
+retired against a measurement of both of the shapes its row proposed**. Along the way it
+spent most of its sections somewhere else entirely, because asking whether Phases 2 and 3
+had shown up on a WPT run led to finding out what a WPT run actually costs, and the answer
+was four things, none of them a threading problem and none of them in this document
+([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)–[§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading)).
+
+**It opened by re-measuring the rationale for deprioritising itself.** That rationale had
+gone stale: this document deprioritised parallel layout on
 the grounds that layout is 0.6–6.5% of a render, and on today's code it is
 **3.3–20.1%** — not because layout got slower (it costs the same 28–51 ms it always
 did) but because Phases 2 and 3 removed cost from everything around it
@@ -16,7 +24,7 @@ did) but because Phases 2 and 3 removed cost from everything around it
 on one has to re-read it rather than cite it. It does not change the ranking — 1.5–2.5×
 of a 20% stage is ~10% end to end for 20–30 days at High risk, against a
 `parse+cascade` still at 23–81% — but the phase is now last for a reason that is
-currently true. The phase's other result is a retirement: the `Broiler.Layout`
+currently true. The phase's first retirement followed: the `Broiler.Layout`
 roadmap's **step 1**, "stop laying out the whole tree twice", ranked above both
 parallel steps, is **unreachable from every path this repository measures**, and where
 it does fire two passes cost 0.80–1.35× one, because the unrestricted first pass barely
@@ -26,9 +34,30 @@ That makes **six items running whose row named the wrong thing** — five blocke
 one beneficiary. `patches/0133`. Published:
 [`tests/render-stages/results/layout-passes.md`](../../tests/render-stages/results/layout-passes.md)
 
+**Item #13 is now retired too, and the phase is closed with it.** Both of its shapes were
+measured rather than argued. Intrinsic sizing is **1.3–17.8% of the layout stage** — so
+0.04–2.5% of a render — and the counters say it is *repetition*, not computation waiting for
+threads: **4.0–39.3 subtree visits per box laid out**, because `PerformLayoutImp` ends every
+box by calling `GetMinimumWidth()`, which re-walks that box's whole subtree
+([§13](#13-a-layout-pass-is-4785-block-flow-and-item-13s-first-shape-is-2-of-a-render)).
+Independent subtrees — the second shape's ceiling — hold **0.0% of the median real
+document**: over 188 WPT documents the median tree is **17 boxes**, 59.6% of documents contain
+no independent subtree at all, and the pooled share is 18.6%. The corpus reads 94.6–99.6% and
+means nothing by it, because `paint` *is* 1 400 `position:absolute` divs and `mixed` *is* a
+70×10 table — **the corpus was built to load render stages, not to have a representative tree
+shape**, and a ceiling read off it is a ceiling for documents written to exercise the thing
+being measured ([§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)).
+What remains of a pass after both shapes is the block-flow walk at **47–85%**, which this
+document's own [what not to parallelize](#what-not-to-parallelize) list already refuses. That
+makes **seven items whose row named the wrong thing** — five blockers and two beneficiaries —
+and it retires the phase's last open item against *this* repository's workload, with the
+condition that would reopen it stated rather than left implicit. Published:
+[`layout-composition.md`](../../tests/render-stages/results/layout-composition.md),
+[`layout-independence.md`](../../tests/render-stages/results/layout-independence.md)
+
 | Item | State | Evidence |
 |---|---|---|
-| #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
+| #13 — parallel intrinsic sizing and independent subtrees | **Retired as written** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)). Then both of its shapes were measured. **Intrinsic sizing is 1.3–17.8% of the stage** — 0.04–2.5% of a render — and its counters say repetition rather than parallelism: **4.0–39.3 subtree visits per box laid out**, because every box ends its layout by re-walking its own subtree ([§13](#13-a-layout-pass-is-4785-block-flow-and-item-13s-first-shape-is-2-of-a-render)). **Independent subtrees hold 0.0% of the median real document** (188 WPT documents, 59.6% with none at all, 18.6% pooled), and the 94.6–99.6% the corpus reports is its own generator — `paint` *is* 1 400 abspos divs ([§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)). What is left of a pass is **47–85% block flow**, already refused |
 | Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
 | #18 — Web Workers | **Built (first slice); gate passed** | Contexts isolated and genuinely parallel — **2.66×/3.22× at 4 threads** ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). `MessageChannel` and structured clone were **already built**, with cross-realm cloning verified ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). **`Worker` now exists**: own thread, own `JSContext`, messages cloned twice — sender-side into an unreachable graph, receiver-side into its realm — and replies queued onto the page's loop, so item #15 holds. Plus worker timers on **real** deadlines (the page's loop is a virtual clock and would spin a worker hot), `importScripts` resolved against the worker's own directory, and transferables — with "transfer" qualified: the engine's `structuredClone` does copy-then-detach, spec-observable but not zero-copy. 23 tests; WPT classification identical name for name at every step ([§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens)). module/shared/nested workers, worker `requestAnimationFrame` and `MessagePort` transfer remain |
 | Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
@@ -146,6 +175,34 @@ Two residuals are named rather than hidden, and both are one patch each: the
 `Viewport` ambient slot has no read-side assertion (it lives in `Broiler.CSS`),
 and `DocumentModeContext` is never published on the HTML-string render path.
 Both are in the P0-c document.
+
+## What is left
+
+Every phase in this document is now closed, which is a claim that invites being read as
+"nothing remains". These are the open ends, each named where it was found rather than
+discovered by re-reading. None is a phase; several are one patch or one afternoon.
+
+| Open end | Where it was named | What it is |
+|---|---|---|
+| **#2's other two call-site families** | [Phase 2 §10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) | Iframes and `fetch()`/XHR still fetch serially. #17 supplies their URL set; what is missing is a consume site — the sub-document one yields `(content, contentType)` through a policy chain the text prefetcher cannot serve |
+| **#10's shaped-run cache** | [Phase 2 §5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names) | Deliberately unbuilt: `RequiresShaping` is false for the whole Latin corpus, so it would measure nothing. It needs a corpus with complex script in it before it can be judged, not more engineering |
+| **#14's scoped rebuild** | [Phase 3 §12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could) | Narrowing a rebuild rather than skipping one, for connected mutations that genuinely do reach the tree. The two elision halves took the cases that can be answered "no" |
+| **#3's sibling partitioner** | [Phase 2 §13](#13-item-3s-sequential-win-was-not-the-clip-narrowing-this-document-told-it-to-port) | A two-band split measures *slower* than sequential, reproducibly. The ported `Broiler.Graphics` copy refuses one; the `Broiler.HTML.Image` copy has the same inversion and does not |
+| **#18's refused surface** | [§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens) | Module workers, `SharedWorker`, nested workers, worker `requestAnimationFrame`, `MessagePort` transfer, network-fetched worker scripts. Also: the engine's `structuredClone` implements transfer as copy-then-detach, which is spec-observable but is not the performance reason transferables exist |
+| **P0-b's second half** | [P0-b](#p0-b--single-threaded-determinism-first-item-15--done) | Whether `CssStyleEngine` still needs `_sync` at all. Not re-measured — and [Phase 3 §3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is) has since shown the lock was never the bottleneck, so this is tidying rather than a win |
+| **P0-c's two residuals** | [P0-c](#p0-c--shared-cache-thread-safety-audit--done) | The `Viewport` ambient slot has no read-side assertion (it lives in `Broiler.CSS`), and `DocumentModeContext` is never published on the HTML-string render path. One patch each |
+| **Page-script compile on a WPT run** | [§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading) | The largest remaining term in a WPT run at 43.60 ms/call, and **deliberately** left: sharing page-derived compiled code across documents is the one thing a conformance runner must not do. Anything here has to make a per-document compile cheaper without crossing that boundary |
+| **Three submodule patches** | [`patches/README.md`](../../patches/README.md) | `0132`, `0133`, `0134` are written, measured and pending a maintainer, because their remotes are outside this session's GitHub scope. Their fixes are not in CI's pointer |
+
+**And one that is not a task but a hazard.** [§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)
+found this document deprioritising a phase on a share that two later phases had made
+false, and nothing in the process caught it, because a superseded measurement here is
+kept deliberately and nothing distinguishes "kept for the record" from "still true".
+[§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)
+is the same hazard with a different mechanism — a number that was never false and never
+meant what it looked like. **Every share and every ceiling in this document decays**, and
+the two commands that re-read the most load-bearing ones are `--profile` and
+`--layout-independence`.
 
 ## Method and honesty caveat
 
@@ -1694,10 +1751,17 @@ either half of this one.
 
 ## What building Phase 4 changed
 
-Nothing parallel yet, deliberately. The phase's own row said to start it only once the
-measurements say layout is still worth aiming at, so the first thing built was the
-measurement — and it changed the phase twice before a line of parallel layout was
-written.
+The phase's own row said to start it only once the measurements say layout is still worth
+aiming at, so the first thing built was the measurement — and it changed the phase twice
+before a line of parallel layout was written. It never got one: **the phase ends with item
+#13 retired rather than built**, on a measurement of both of its shapes
+([§13](#13-a-layout-pass-is-4785-block-flow-and-item-13s-first-shape-is-2-of-a-render),
+[§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)),
+and item #18 built as a capability rather than a speedup. The sections in between are
+mostly not about layout or workers at all: measuring the phase's own rationale led to
+measuring a WPT run, and what a WPT run costs turned out to be four things, none of them a
+threading problem and none of them in this document
+([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)–[§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading)).
 
 ### 1. Layout's share tripled without layout changing, and the number this row quoted was measured before two phases of work
 
@@ -2231,6 +2295,138 @@ workers, `requestAnimationFrame` in a worker, `MessagePort` transfer, and networ
 scripts. Published:
 [`worker-object.md`](../../tests/render-stages/results/worker-object.md).
 
+### 13. A layout pass is 47–85% block flow, and item #13's first shape is 2% of a render
+
+Item #13 is the phase's remaining item and the only one in this document still marked *not
+started*. Its row proposes two shapes — "parallel intrinsic sizing" and "parallel independent
+subtrees" — and neither has ever been measured. [§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)
+established the stage's *size* and [§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)
+retired the sequential step ranked above both, but what a single pass is *made of* was still a
+source reading. `--layout-composition` splits it into disjoint self times:
+
+| page | intrinsic sizing | text measure | line breaking | table | flex | residual (block flow) |
+|---|---:|---:|---:|---:|---:|---:|
+| text | 2.1% | 4.3% | 31.3% | — | — | **62.3%** |
+| rules | 3.2% | 4.5% | 22.7% | — | — | **69.7%** |
+| boxes | **15.0%** | 10.6% | 10.3% | — | 9.2% | **54.9%** |
+| paint | 1.3% | 8.7% | 5.9% | — | — | **84.0%** |
+| mixed | 9.0% | 11.0% | 9.6% | 16.9% | — | **53.5%** |
+
+Those are one run's medians; over four runs the per-page shares hold to **2.1–2.7%** (`text`),
+2.9–3.3% (`rules`), 14.1–17.8% (`boxes`), 1.3–1.6% (`paint`) and 6.8–10.9% (`mixed`), with the
+residual spanning 47–85%. The spread is this host, and the conclusion does not turn on which end of
+it a page sits at.
+
+**Intrinsic sizing is 1.3–17.8% of a layout stage that [§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)
+measured at 3.3–20.1% of a render.** Multiplied out that is **0.04–2.5% of a render**, and at the
+roadmap's own 1.5–2.5× estimate the first shape is worth **~1% end to end on the page where it is
+largest** — for a 20–30 day item this document rates High risk. The residual — the ordinary
+block-flow walk — is **47–85%**, and normal block flow is on this document's own
+[what not to parallelize](#what-not-to-parallelize) list, because a block's position depends on the
+accumulated height of its predecessors.
+
+**The counters say the operation is repetition, not computation.** Every intrinsic call runs a
+recursive walk (`GetMinimumWidth_LongestWord`, `GetMinMaxSumWords`), and the walks are counted
+exactly:
+
+| page | boxes laid out | intrinsic calls | intrinsic visits | visits/box |
+|---|---:|---:|---:|---:|
+| text | 264 | 264 | 4 969 | **18.8** |
+| rules | 704 | 704 | 11 209 | **15.9** |
+| boxes | 724 | 2 434 | 28 449 | **39.3** |
+| paint | 1 404 | 1 404 | 5 609 | **4.0** |
+| mixed | 716 | 2 136 | 10 249 | **14.3** |
+
+A pass that measured each box's content once would read 1. It reads 4.0–39.3, because
+`PerformLayoutImp` finishes every box by calling `GetMinimumWidth()`, which re-walks that box's
+whole subtree. **That is a memoisation shape, not a threading shape** — and the honest complement
+is that memoising all of it is bounded by the same 0.04–2.5%, so it is recorded here as what the
+site is rather than proposed as work.
+
+**Two controls, because the shares are otherwise unreadable.** Measured without that control on a first
+attempt, `text` read **171 ms** against the ~51 ms the stage profile measures for the same
+configuration, and the obvious reading — "the tracer costs 3×" — was wrong. Every page is now
+rendered *twice per iteration*, traced and untraced, interleaved: the trace cost comes out at
+**0.56–1.21×** over four runs, and a ratio below 1.00 is a tracer that made the pass faster, which is impossible.
+The spread is the host, not the trace. That is the third time in this phase the same hazard has
+been caught ([§3](#3-the-harness-nearly-published-a-false-positive-the-same-way-phase-2-7s-did),
+[§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)),
+and the second time it was caught by a control rather than by suspicion.
+
+**What the instrumentation costs when off was bounded rather than timed**, and the reason is the
+same drift. One call site sits inside `GetMinimumWidth_LongestWord`, which the `boxes` page enters
+28 449 times per pass, so "it is only a bool read" is a claim that needs a number — but the layout
+stage moves 1.6–1.9× between consecutive runs of an identical configuration, so a whole-render A/B
+would have had its sign decided by drift. The two factors were measured where each is measurable
+instead: a disabled `Count` over 20 M calls is **0.61 ns**, and the call count per page is exact
+because it is structural. Worst page: **0.02 ms, 0.1% of the pass.** Eliminating a candidate is not
+the same as measuring it — [§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)
+is in this phase because of that distinction.
+
+Published: [`layout-composition.md`](../../tests/render-stages/results/layout-composition.md).
+
+### 14. The corpus cannot answer item #13's second shape, and on real documents the median tree is 17 boxes with nothing independent in it
+
+The second shape's ceiling is the share of a tree that sits under an independent subtree — threads
+cannot help with a box that is not in one. Counted on the corpus:
+
+| page | tree boxes | abspos roots | table cells | flex/grid items | independent share |
+|---|---:|---:|---:|---:|---:|
+| text | 1 246 | 0 | 0 | 0 | **0.0%** |
+| rules | 2 806 | 0 | 0 | 0 | **0.0%** |
+| boxes | 2 166 | 0 | 0 | 810 | **95.6%** |
+| paint | 1 406 | 1 400 | 0 | 0 | **99.6%** |
+| mixed | 1 501 | 0 | 710 | 0 | **94.6%** |
+
+**Both halves of that are tautologies, and publishing it without saying so would have been the
+phase's worst number.** `paint` *is* 1 400 `position:absolute` divs, `mixed` *is* a 70×10 table and
+`boxes` *is* nested flex and grid; `text` and `rules` contain none of those constructs by
+construction. The corpus was built under P0-a to load one render stage each, not to be
+representative of tree shape, so a ceiling read off it is a ceiling for documents written to
+exercise the thing being measured. This is the same hazard as
+[§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)'s
+stale share arriving from the other direction: there a true number went out of date, here a true
+number never meant what it appears to mean.
+
+**So the census was run over documents nobody chose with it in mind** — 188 real WPT documents,
+counts only, no clock:
+
+| quantity | min | median | p90 | max |
+|---|---:|---:|---:|---:|
+| document bytes | 45 | 1 116 | 3 581 | 11 428 |
+| **boxes in the tree** | 5 | **17** | 68 | 328 |
+| tree depth | 4 | 5 | 7 | 10 |
+| **independent share** | 0.0% | **0.0%** | 41.2% | 93.4% |
+
+**112 of 188 documents (59.6%) contain no independent subtree at all**, and pooled over every box
+in every document the share is **18.6%** (1 240 of 6 669). The median document this repository
+renders at scale has **17 boxes**, none of them independent. There is nothing to divide — and even
+where there is, [§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)
+already measured the whole render at 1.6–2.0% of a WPT test and layout at 0.09 ms of an empty one.
+
+The per-directory table is published next to the pooled figure for the reason the corpus needed
+saying out loud: `css/css-align/self-alignment` reads 91.0% independent across two documents, and a
+suite of flexbox tests would report a flex share that says more about the directory than about
+documents.
+
+**Item #13 is therefore retired as written**, the same way this phase retired the `Broiler.Layout`
+roadmap's step 1. Its first shape aims at 0.04–2.5% of a render and is a repetition problem rather
+than a parallelism one; its second has a ceiling of 0.0% at the median on the documents that
+dominate this repository's wall clock, and reads 94.6–99.6% only on corpus pages built out of the
+constructs being counted; and what is left after both is the block-flow walk, which this document
+already refuses. **That makes seven items whose row named the wrong thing — five blockers, and now
+two beneficiaries.**
+
+**What would change the answer, stated so it is not re-derived.** A document population with large,
+deeply independent trees — real web application pages, where a viewport of flex and grid items over
+thousands of boxes is ordinary — would move the census, and nothing here measures one. Item #13 is
+retired against *this* repository's workload, not against the shape of the web; if Broiler acquires
+a benchmark of real pages, the census is one command and the ceiling is the first thing to re-read.
+That is [§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)'s
+lesson applied prospectively: this number will decay too.
+
+Published: [`layout-independence.md`](../../tests/render-stages/results/layout-independence.md).
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -2251,7 +2447,7 @@ non-deterministic correctness defect.
 | 10 | Graphics | [`TrueTypeFont.GetGlyphContours`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) — **DONE**; [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) — not built | Outlines were re-extracted per glyph *occurrence*; shaping is called per run during layout | Concurrent cache by glyph index, published through `GetOrAdd` | Nothing | **The item was right that the cache is the whole win, and wrong about which cache.** Glyph outlines: raster stage **1.34×** (`text`), **1.54×** (`boxes`), 1.00× on the text-free `paint` control. The shaped-run cache is deliberately unbuilt — `RequiresShaping` is false for the whole Latin corpus, so it would measure nothing ([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)) | Low | Done (outlines) | 2 |
 | 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
 | 12 | CSS | [`CssStyleEngine.GetCascadedStyle`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) resolved ahead of the box walk by [`CssStyleRecalc`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/CssStyleRecalc.cs) — **DONE** | Was sequential per element, with the three memo caches under one global `_sync` | Warm pass over every element on `BROILER_STYLE_THREADS`, then the unchanged ordered box walk reads the memo; caches sharded to `ConcurrentDictionary`, generation guard kept | Nothing now. **Neither blocker this cell named was the operative one.** The lock was not the bottleneck — the per-element cascade was 210 µs on a five-rule page ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)) | **Measured: 1.16–2.01× on the cascade stage at 4 threads, 1.08–1.96× end to end**, pixel-identical at 1/2/4. The serial residue is now measured per page (16–55%), so what is left is stated rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)) | Medium | Done | 3 |
-| 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 3.3–20.1% of a render** — re-measured on today's code, where the share is up from the 0.6–6.5% this cell used to quote **not because layout got slower but because Phases 2–3 made everything else faster** ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)). ~8–12% end to end on the one page where the stage is largest, against `parse+cascade` still at 23–81% of the same renders | **High** | 20–30 d | 4 |
+| 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) — **retired as written** | Full-tree, in-place mutation, from the root every pass — **once**, on every path this repository measures ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) | Was: parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Nothing blocks it. **Neither shape is worth building, and the measurement is why.** Intrinsic sizing is 1.3–17.8% of the stage and is dominated by *repetition* — 4.0–39.3 subtree visits per box laid out, because every box ends its layout by re-walking its own subtree ([§13](#13-a-layout-pass-is-4785-block-flow-and-item-13s-first-shape-is-2-of-a-render)). Independent subtrees hold **0.0% of the median real document** and 18.6% pooled over 188 of them; the 94.6–99.6% the corpus reports is its generator restating itself ([§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)) | **Measured, and it is 0.04–2.5% of a render for the first shape and 0% at the median for the second.** What is left of a pass after both is the block-flow walk at **47–85%**, which is on the do-not-parallelize list. Re-read the census if a real-page benchmark ever exists | **High** | Retired | 4 |
 | 14 | DOM / Layout | [`RenderTreeInvalidation`](../../Broiler.Layout/Broiler.Layout/Engine/RenderTreeInvalidation.cs) and [`CascadeInvalidationSet`](../../Broiler.Layout/Broiler.Layout/Engine/CascadeInvalidationSet.cs) consulted by `HtmlContainerInt.EnsureBoundDocumentCurrent` — **done**; a *scoped* rebuild is the remainder | Was: **any** DOM version bump disposes the render tree and re-cascades the whole document, then lays out the whole tree | **Not multithreading.** A consumer for `DomDocument.Mutated`, then invalidation sets over the rule index | **Neither blocker this cell named was the operative one, and that is now five items running.** The DOM's signal was never a bare counter — `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written; what was missing was a consumer, and it is in the main repo, not `Broiler.DOM` ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). What blocks the **remainder** is real and different: eliding a *connected* mutation needs the cascade to answer whether any rule's subject could match differently | **Measured, both halves: the offscreen-build case goes from a full rebuild to none — `rules` 1 032.7 → 11.5 ms (89.8×)**, `boxes` 25.8×, `paint` 22.6×, `mixed` 16.3×, `text` 10.0×; and the connected `data-*` write the first half could not touch goes **1 476.7 → 43.0 ms (34.4×)** on `rules`, 14.2× `paint`, 13.8× `mixed`, 9.5× `boxes`, 2.1× `text`, with a class toggle 36.0× on `rules`. Rows that still rebuild span 0.79–1.21, i.e. run-to-run spread. A perfect layout dirty bit alone remains worth 1.03× | Medium–High | Done; `patches/0132` | 3 |
 | 15 | JS | [`JSPromise.Post:376`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs), [`JSAsyncFunction.cs:152`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSAsyncFunction.cs), [`JSGenerator.cs:435`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs) — `ThreadPool.QueueUserWorkItem` when `sc == null` | JS continuations run on pool threads, racing main-thread layout | **Remove the parallelism.** Always pump a single-threaded event loop | This is the root cause behind WPT #1445 / #1143; the CSS `_sync` lock and the concurrent bridge memo maps are mitigations for it | Negative CPU gain, **large correctness gain**; removes lock overhead on hot cascade paths | Low | 5–8 d | 0 |
 | 16 | JS | [`ScriptCompileAhead`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptCompileAhead.cs), consumed by the eval loop in [`CaptureService`](../../src/Broiler.Cli/CaptureService.cs) — **DONE** | Was compiled on demand, serially, by the ordered eval loop | Every classic script source compiled on `BROILER_SCRIPT_COMPILE_THREADS` into the context's own cache; the loop is unchanged and reads hits | Nothing, and **the blocker this cell used to name did not exist**: `JSContext.CodeCache` is public, so the store is the context's own and no engine change is needed. The context is not late either — a document's sources are not all known until its fetches return ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)) | **Measured: compile stage 1.41×/1.62×/1.52× at 2/4/8 threads; whole capture 1.44× on a compile-heavy document, 1.22× on a modestly scripted one.** The estimate's 1.5–3× lands only on the stage, and only where a page's scripts are large. The sub-linear ceiling is **not** the compile-thread handoff — tested, not assumed ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)) | Low | Done | 3 |
@@ -2599,22 +2795,41 @@ first.
    ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)).
    What is left of the item is the *scoped* rebuild — narrowing a rebuild rather
    than skipping one, for the connected mutations that do reach the tree.
-3. **Parallel intrinsic sizing.** Min/max-content measurement of independent
-   subtrees is a pure function of the subtree given resolved style, so it
-   parallelizes before the mutating flow pass does.
-4. **Parallel independent subtrees** (item #13), in ascending order of risk:
-   subdocuments/iframes → `position:absolute/fixed` subtrees (they do not
-   contribute to their parent's flow) → table cells → flex/grid items. Each
-   worker must establish the thread-static ambient state from P0-c.
-   *Exit gate per class:* fragment trees identical to the sequential run across
-   the WPT corpus, verified with `FragmentJsonDumper`, at 1 and 8 threads.
+3. **Parallel intrinsic sizing** — **measured, and retired as written.** The claim
+   that min/max-content measurement "parallelizes before the mutating flow pass
+   does" is true and is not the question. `--layout-composition` puts the
+   operation at **1.3–17.8% of a layout pass**, so 0.04–2.5% of a render, and its
+   counters describe a different problem from the one this step names: the pass
+   makes **4.0–39.3 subtree visits per box laid out**, because `PerformLayoutImp`
+   ends every box with a `GetMinimumWidth()` that re-walks that box's whole
+   subtree. **That is a memoisation shape, not a threading shape** — and memoising
+   it is bounded by the same 0.04–2.5%, which is why it is recorded rather than
+   scheduled ([§13](#13-a-layout-pass-is-4785-block-flow-and-item-13s-first-shape-is-2-of-a-render)).
+4. **Parallel independent subtrees** (item #13) — **measured, and retired as
+   written.** The ceiling is the share of a tree that *is* in an independent
+   subtree, and over 188 real WPT documents that share is **0.0% at the median**:
+   the median tree is 17 boxes, 59.6% of documents have no independent subtree at
+   all, and the pooled share is 18.6%. The corpus reports 94.6–99.6% and cannot be
+   used for this — `paint` *is* 1 400 abspos divs, `mixed` *is* a 70×10 table, and
+   `text`/`rules` contain none of these constructs by construction
+   ([§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)).
+   The ordering by risk (subdocuments → abspos → table cells → flex/grid items)
+   and the exit gate (fragment trees identical at 1 and 8 threads, via
+   `FragmentJsonDumper`) are kept here because they are what a future attempt
+   would need — **and what would justify one is a document population this
+   repository does not have**: real application pages, where a viewport of flex
+   and grid items over thousands of boxes is ordinary. `--layout-independence` is
+   one command, and its answer is the first thing to re-read if such a benchmark
+   appears.
 
-**Constraint to keep in view:** normal block flow is sequential in the block
-direction — a block's position depends on the height of its predecessors — so
-the ceiling here is low regardless of core count. Steps 1 and 2 were said to be
-worth more than steps 3 and 4 combined; **step 2 was, and step 1 is worth nothing
-on any path measured here**, so what remains of that claim rests entirely on the
-item that has already landed.
+**Constraint that turned out to be the whole answer:** normal block flow is
+sequential in the block direction — a block's position depends on the height of
+its predecessors — so the ceiling here is low regardless of core count. Measured,
+that walk is **47–85% of a layout pass** on every corpus page, which is what is
+left once steps 3 and 4 are subtracted. Steps 1 and 2 were said to be worth more
+than steps 3 and 4 combined; **step 2 was, step 1 is worth nothing on any path
+measured here, and steps 3 and 4 are worth 0.04–2.5% and ~0%** — so the claim is
+true, and true because three of its four terms are approximately zero.
 
 ### Broiler.JS
 
@@ -2790,7 +3005,7 @@ Recording these so they are not revisited each time the topic comes up:
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
 | **2 — Raster, decode, text** — **DONE** | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **#8 landed, and it needed neither of the two things §6 predicted** — not #17's URL set (the box tree names what layout will actually ask for, where a source scan names a superset) and not a cache (layout's existing loader seam is the split) — but it did need one thing nothing predicted: **only the decode was safe to move off the layout thread, not the completion callback**, which changed the rendered page on the failure path and nowhere else (§12). It also discharges P0-c's last debt, being the first worker to establish the ambient state and arm its assertion. **#3's port closed the phase, and it corrected this document rather than confirming it** — §8 said to port the clip narrowing first, and the sequential win turned out to be a per-pixel target lookup that banding forced out of the loop; the narrowing itself pays only on content inside the surface and outside the clip, which the corpus scene written for it did not contain (§13). Its threading is 1.00–1.39x at four threads with 85–100% of area split, so **both copies now say band parallelism is the wrong unit, for opposite reasons.** It leaves one named follow-up: a two-band split measured slower than none, and only the ported copy refuses one. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12 — and §9 makes it the largest unattributed question in the document, now that nothing in Phase 2 is open. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** — **DONE** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. **What it changed, in the order it matters:** the phase opened by answering the question Phase 2 §9 said it owed, and the answer reframes the item it gates — **`parse+cascade` is 81.3–98.2% cascade on every page**, so item #12 aims at the whole stage rather than a fraction of it, and the stage's name is a legacy of nobody having measured it ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)); getting that number needed the profile's first instrumentation *inside* the engine, because none of the four sub-stages is a pure function of the source and P0-a's out-of-band trick therefore does not reach them ([§2](#2-measuring-it-needed-instrumentation-and-p0-as-method-note-is-why-that-is-worth-saying)). **#12 landed and both of the blockers its row named were the wrong ones.** The `_sync` lock was not the bottleneck — the per-element cascade was 210 µs on a *five-rule* page, which no number of lock acquires explains ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all: it rewrites `display` before children read it, hides a closed `<details>`'s subtree after cascading it, and inserts generated boxes on the way back up. So #12 is a **prefetch/consume split**, the fourth in this document to arrive at that shape after the item named a different one ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)). **1.16–2.01× on the cascade stage at four threads, 1.08–1.96× end to end, pixel-identical at 1/2/4** — and the harness now publishes the serial residue per page (16–55%), so what is left is measured rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)). **#21 landed** and cost nothing but the reading that says why it is safe — 2 118 tests, 0 failures, **57–59 s → 31–37 s (~1.75×)** on four cores. **#16 landed, and it needed none of what this document said it needed.** The store §6 said had to be built was already there — `JSContext.CodeCache` is public — so the item is one main-repo type and a two-line call site, with no engine change, no submodule patch and none of the cross-document isolation §6 worried about ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)). That makes **four items running whose stated blocker was not the operative one** (#8, #12 twice, #16), and the lesson is now explicit: the "What blocks it today" column is a hypothesis, and checking it belongs in an item's first hour rather than its last. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one** — and its measurement tested the obvious explanation for the ceiling instead of publishing it, which is how the explanation turned out to be wrong and a 15–17% *sequential* tax turned up instead ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)). **#14 is the phase's remainder, and its precondition is now built.** The relayout harness §7 asked for exists (`--relayout-profile`), and its first result re-aims the item: a relayout is **60–97% box-tree rebuild and re-cascade**, because any DOM version bump disposes the render tree and re-cascades the whole document before the layout pass runs — so dirty bits on `CssBox.PerformLayout` bound 3–39% of the cost, and 2.9% on the rule-heavy page. The available ceiling is real (34× on that page if the rebuild goes, against 1.03× for a perfect layout dirty bit alone) but it sits in the box tree and the cascade, and the work starts a layer down in `Broiler.DOM`, where every script-shaped mutation is today indistinguishable from every other ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). **#14's first slice then landed, and its blocker did not exist either — the fifth in a row.** The DOM was never limited to a version counter: `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written, so the item does not start in `Broiler.DOM` at all; what was missing was a consumer, and `RenderTreeInvalidation` is it. Mutations that cannot reach the render tree no longer rebuild it — **`rules` 1 032.7 → 11.5 ms (89.8×)** on the offscreen-build case, 10.0–25.8× on the other four pages, with the remaining thirty rows inside the run-to-run spread. The measurement also refuted one of §10's own two predictions (the burst does not amortise — a rebuild is whole-document for a single attribute write) and reinterpreted the other ("changes nothing observable" is already free at the value level). **The remainder was larger than the slice** — an unstyled `data-*` write still cost 997.8 ms on `rules` — and **#14's second half then took it**: `CascadeInvalidationSet` asks the sheets the tree was cascaded from whether any rule could match differently, and asks box construction separately whether it reads the attribute for reasons of its own, because a set built from stylesheets would happily elide a `<td colspan>` write on a page whose sheet never mentions `colspan`. **`rules` 1 476.7 → 43.0 ms (34.4×)** on that row, 9.5–14.2× on three other pages, 36.0× on `rules`' class toggle, with two control rows (`styled attribute`, `styled class`) that still rebuild on exactly the pages whose sheets name what they write. **The phase's last finding is not a speedup but a defect, and the gate is what makes that worth stating**: `--relayout-parity` renders every page with the elision on and off and compares images, it failed on first run, and the cause was that laying the same box tree out twice was never idempotent — a two-pixel margin drift that had been live in the *first* slice since it shipped, because nothing in this repository had ever taken that path twice ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)). An optimisation that skips work is a new execution path, and its gate has to run that path end to end. What is left of #14 is a *scoped* rebuild rather than a skipped one. See [What building Phase 3 changed](#what-building-phase-3-changed). |
-| **4 — Parallel layout and workers** — **open** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. **The phase opened by re-measuring its own rationale, and the rationale had gone stale in the direction that matters.** This row used to justify deprioritising the phase with "layout is 0.6–6.5% of a first render (Phase 1 §2)". Re-run on today's code, layout is **3.3–20.1%** ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) — its absolute cost is unchanged at 28–51 ms, and every phase that removed cost from raster and the cascade raised its share by Amdahl. That does *not* make #13 worth 20–30 days at High risk: 1.5–2.5× of a 20% stage is ~10% end to end on one page. It does mean the phase has to be argued from a current number. The relayout side still says what it said — the layout pass is **3–39% of a relayout** ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)), the rest being box-tree rebuild and cascade — so the interactive case does not rescue the phase either. **What the phase has built is the measurement its sequential step asked for, and it retired that step**: the `Broiler.Layout` roadmap's step 1 ("stop laying out the whole tree twice", stated as worth more than the two parallel steps combined) is **unreachable from every path this repository measures**, and where it does fire it is not a doubling ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)). Phase 3 §4, §8 and §11 remain a warning about #13's wording, and this phase adds a sixth: **six** items running have found that the structure an item names is not the structure that can be split, or that the blocker — or, here, the *beneficiary* — it names is not the operative one. See [What building Phase 4 changed](#what-building-phase-4-changed). |
+| **4 — Parallel layout and workers** — **DONE** | Parallel intrinsic sizing and independent subtrees (#13) — **retired as written**; Web Workers (#18) — **built** | Highest cost, highest risk, lowest ceiling. **The phase opened by re-measuring its own rationale, and the rationale had gone stale in the direction that matters.** This row used to justify deprioritising the phase with "layout is 0.6–6.5% of a first render (Phase 1 §2)". Re-run on today's code, layout is **3.3–20.1%** ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) — its absolute cost is unchanged at 28–51 ms, and every phase that removed cost from raster and the cascade raised its share by Amdahl. That does *not* make #13 worth 20–30 days at High risk: 1.5–2.5× of a 20% stage is ~10% end to end on one page. It does mean the phase has to be argued from a current number. The relayout side still says what it said — the layout pass is **3–39% of a relayout** ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)), the rest being box-tree rebuild and cascade — so the interactive case does not rescue the phase either. **What the phase has built is the measurement its sequential step asked for, and it retired that step**: the `Broiler.Layout` roadmap's step 1 ("stop laying out the whole tree twice", stated as worth more than the two parallel steps combined) is **unreachable from every path this repository measures**, and where it does fire it is not a doubling ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)). Phase 3 §4, §8 and §11 remain a warning about #13's wording, and this phase adds a sixth: **six** items running have found that the structure an item names is not the structure that can be split, or that the blocker — or, here, the *beneficiary* — it names is not the operative one. **The phase then closed by measuring #13's own two shapes and retiring both, which makes seven.** A layout pass is **47–85% block-flow walk** — the thing this document already refuses — with intrinsic sizing at **1.3–17.8%** of the stage (0.04–2.5% of a render) and dominated by *repetition* rather than by work needing threads: **4.0–39.3 subtree visits per box laid out**, because every box ends its layout by re-walking its own subtree ([§13](#13-a-layout-pass-is-4785-block-flow-and-item-13s-first-shape-is-2-of-a-render)). And the second shape's ceiling — the share of a tree inside an independent subtree — is **0.0% at the median over 188 real WPT documents**, whose median tree is 17 boxes, with 59.6% containing none at all. **The corpus says 94.6–99.6% and means nothing by it**: it was built under P0-a to load one render stage each, so `paint` *is* 1 400 abspos divs and `mixed` *is* a 70×10 table, and a ceiling read off it is a ceiling for documents written to exercise the thing being measured ([§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)). What would reopen the item is named rather than left implicit — a benchmark of real application pages, which this repository does not have. **#18 is built**: `Worker` on its own thread and realm, structured clone in both directions, timers on real deadlines, `importScripts`, transferables, and a passing isolation-and-throughput gate (2.66×/3.22× at 4 threads). See [What building Phase 4 changed](#what-building-phase-4-changed). |
 
 **Global exit gate:** every parallel path has a `--threads 1` equivalent that
 reproduces the sequential output exactly, and the WPT corpus produces identical

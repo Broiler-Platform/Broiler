@@ -1,4 +1,5 @@
 using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Globalization;
 
 
@@ -85,6 +86,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     internal double GetMinimumWidth()
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Intrinsic);
+
         double maxWidth = 0;
         CssRect maxWidthWord = null;
         CssBoxHelper.GetMinimumWidth_LongestWord(this, ref maxWidth, ref maxWidthWord);
@@ -111,6 +115,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     internal void GetContentMinMaxWidth(out double minWidth, out double maxWidth)
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Intrinsic);
+
         double min = 0f;
         double maxSum = 0f;
         double paddingSum = 0f;
@@ -127,6 +134,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     internal void GetMinMaxWidth(out double minWidth, out double maxWidth)
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Intrinsic);
+
         // A grid with a fixed track template contributes its physical-width track
         // sum (+ gaps + own border/padding) as both min- and max-content, rather
         // than the intrinsic width of its inline content — so a shrink-to-fit grid
@@ -182,6 +192,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     private double ComputeShrinkToFitWidth()
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Intrinsic);
+
         // A grid with a fixed track template shrink-to-fits to its physical-width
         // track sum (+ gaps), not the max-content of its inline content — an empty
         // or small-item grid would otherwise collapse (fit-content / float /
