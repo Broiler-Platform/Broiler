@@ -202,6 +202,32 @@ that compared no elisions is how this would quietly stop being a gate.
 The same switch is available as `BROILER_RENDER_TREE_ELISION=0`, which is what to reach for
 first when a rendering bug is suspected to be a stale relayout.
 
+## Layout composition and independence — item #13
+
+Two modes about what a *single* layout pass contains, built before any of item #13 so the
+item's two proposed shapes could be checked against a measurement rather than a reading.
+
+```sh
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --layout-composition
+dotnet run -c Release --project tests/render-stages/Broiler.Render.Stage.Benchmarks -- --layout-independence --wpt-dir tests/wpt
+```
+
+`--layout-composition` splits a pass into disjoint self times — intrinsic sizing, text
+measurement, line breaking, table and flex — and reports the remainder as a residual rather
+than absorbing it. Two controls sit in the output because the shares are otherwise
+unreadable: every page is *also* rendered with the trace off, interleaved iteration by
+iteration, so a reader can see how much of the traced pass is the trace; and the disabled
+cost is bounded by measuring one `Count` over 20 M calls and multiplying by each page's
+exact call count, because this host's layout stage drifts by more than the quantity a
+whole-render A/B would be trying to resolve. Published run:
+[`../results/layout-composition.md`](../results/layout-composition.md).
+
+`--layout-independence` runs the same census over real WPT documents instead of the corpus.
+It exists because the corpus's own answer is a property of its generator — `paint` *is* 1 400
+`position:absolute` divs — so the corpus can report an independence ceiling of 99.6% and mean
+nothing by it. Counts only, no clock. Published run:
+[`../results/layout-independence.md`](../results/layout-independence.md).
+
 ## GC configuration — item #19
 
 The mode is fixed when the runtime starts, so one process cannot compare the two. Run it

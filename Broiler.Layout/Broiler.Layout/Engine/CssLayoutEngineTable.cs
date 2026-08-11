@@ -1,4 +1,5 @@
 using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Drawing;
 
 
@@ -69,6 +70,8 @@ internal sealed class CssLayoutEngineTable
     {
         ArgumentNullException.ThrowIfNull(g);
         ArgumentNullException.ThrowIfNull(tableBox);
+
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Table);
 
         try
         {

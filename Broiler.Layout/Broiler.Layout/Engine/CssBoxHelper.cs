@@ -1,4 +1,5 @@
 ﻿using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Diagnostics;
 
 
@@ -130,6 +131,8 @@ internal static class CssBoxHelper
 
     public static void GetMinimumWidth_LongestWord(CssBox box, ref double maxWidth, ref CssRect maxWidthWord)
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicVisits);
+
         // A display:none box generates no boxes at all (CSS 2.1 §9.2.4), so it contributes nothing
         // to an intrinsic size. Without this the UA-hidden elements that carry *text* — <style>,
         // <script>, <title> — were measured, and their source text set the min/max-content width of
@@ -194,6 +197,8 @@ internal static class CssBoxHelper
 
     public static void GetMinMaxSumWords(CssBox box, ref double min, ref double maxSum, ref double paddingSum, ref double marginSum, CssBox suppressExplicitWidthFor = null)
     {
+        LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicVisits);
+
         // See GetMinimumWidth_LongestWord: a display:none box generates no boxes, so it adds
         // nothing to the running max-content line. This is the max-content half of the same fix.
         if (box.Display == CssConstants.None)

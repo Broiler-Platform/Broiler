@@ -94,6 +94,18 @@ public static class Program
             return LayoutPassProfile.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
         }
 
+        if (args.Length >= 1 && args[0] == "--layout-composition")
+        {
+            return LayoutComposition.Run(ArgValue(args, "--iterations", 9), ArgValue(args, "--warmup", 2));
+        }
+
+        if (args.Length >= 1 && args[0] == "--layout-independence")
+        {
+            return LayoutIndependenceCensus.Run(
+                ArgString(args, "--wpt-dir") ?? "tests/wpt",
+                ArgValue(args, "--limit", 0));
+        }
+
         if (args.Length >= 1 && args[0] == "--relayout-parity")
         {
             return RelayoutParity.Run();
@@ -162,6 +174,14 @@ public static class Program
         Console.WriteLine("        How many full-tree layout passes one PerformLayout performs, per corpus");
         Console.WriteLine("        page and per caller shape (fixed viewport / auto-size / measure) — the");
         Console.WriteLine("        precondition for the Broiler.Layout roadmap's step 1.");
+        Console.WriteLine();
+        Console.WriteLine("  --layout-composition [--iterations N] [--warmup N]");
+        Console.WriteLine("        What one layout pass spends its time on, and how much of the box tree sits");
+        Console.WriteLine("        under an independent subtree — the premise check for item #13's two shapes.");
+        Console.WriteLine();
+        Console.WriteLine("  --layout-independence [--wpt-dir <dir>] [--limit N]");
+        Console.WriteLine("        The same census over real WPT documents rather than the corpus, whose own");
+        Console.WriteLine("        answer is a property of its generator. Counts only — no clock.");
         Console.WriteLine();
         Console.WriteLine("  --relayout-parity");
         Console.WriteLine("        Renders every corpus page after every mutation with the render-tree");

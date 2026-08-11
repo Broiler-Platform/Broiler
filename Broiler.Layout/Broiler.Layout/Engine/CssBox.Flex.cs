@@ -1,4 +1,5 @@
 using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Drawing;
 using System.Globalization;
 
@@ -110,6 +111,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     internal void PerformFlexRowLayout(ILayoutEnvironment g)
     {
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Flex);
+
         EnsureDescendantWordsMeasured(g);
 
         double contentLeft = ClientLeft;

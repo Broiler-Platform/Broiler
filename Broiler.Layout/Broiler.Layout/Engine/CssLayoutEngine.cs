@@ -1,4 +1,5 @@
 using Broiler.CSS;
+using Broiler.Layout.Diagnostics;
 using System.Drawing;
 
 
@@ -274,6 +275,8 @@ internal static class CssLayoutEngine
     {
         ArgumentNullException.ThrowIfNull(g);
         ArgumentNullException.ThrowIfNull(blockBox);
+
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.LineBreak);
 
         blockBox.LineBoxes.Clear();
 
