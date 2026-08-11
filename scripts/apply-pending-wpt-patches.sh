@@ -84,8 +84,6 @@ set -euo pipefail
 # page. Its unit tests pin the grammar; only the pixel suite can say the rules
 # reached the render.
 PENDING_PATCHES=(
-  "Broiler.CSS|patches/0135-css-media-queries-range-and-custom-media.patch"
-  "Broiler.CSS|patches/0136-css-accept-legacy-webkit-box-display.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
