@@ -475,6 +475,40 @@ non-empty cases; it is the empty ones that wait on it.
 Every `clip-*` test in the directory passes then; the one failure left in it is
 `visibility-005`, which is about `visibility` and not about clipping at all.
 
+## A percentage width made a replaced element ignore its height
+
+`css/CSS2/backgrounds` had 135 failures at a median 97.7 % match — the signature
+of something small and systematic rather than a missing feature. It was in the
+**references**, and in one line of the layout engine.
+
+CSS2's background references draw their coloured band the same way:
+
+```html
+<div><img src="support/1x1-green.png" width="100%" height="50" alt="…" /></div>
+```
+
+CSS 2.1 §10.4 uses a replaced element's intrinsic ratio to fill in a dimension
+left `auto`; it never overrules one the author stated. `MeasureImageSize` agreed
+for a length width — `width="200" height="20"` came out 200×20 — but its
+percentage-width branch set the "now derive the height from the ratio" flag
+unconditionally. So a 1×1 green pixel at `width="100%" height="50"` came out as
+tall as it was wide: a full-page green block where the reference wanted a 50px
+band. The max-width clamp a few lines below had it right (`!hasImageTagHeight`);
+this one said `true`.
+
+The same flag also stood in for "the width is stated" in the aspect-ratio pass,
+where a percentage width had to stop counting as `auto` — otherwise fixing the
+height merely moved the bug to the width, deriving 50px back out of it.
+
+**`css/CSS2/backgrounds` goes 204 → 247 of 339.** The tests were rendering
+correctly the whole time.
+
+**This is the reference-side failure mode the section above warns about, at
+scale.** The diff was in the part of the picture the tests were not about — 43
+`background-N` and 42 `background-position-N` tests, none of which have anything
+to do with replaced-element sizing, all failing because the document they were
+being compared against was drawn with an `<img>`.
+
 ## Flex items are stretched now, and what that says about the scoreboard
 
 `align-items: stretch` is the initial value, so it is what happens to most flex

@@ -63,6 +63,14 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — a replaced element whose width is a percentage no longer
+  ignores its stated height. CSS 2.1 §10.4 uses the intrinsic ratio to fill in a
+  dimension left `auto`, not to overrule one the author stated, but the
+  percentage-width branch of `MeasureImageSize` set the derive-the-height flag
+  unconditionally — so `<img width="100%" height="50">` came out as tall as it was
+  wide. `css/CSS2/backgrounds` goes 204 → 247 of 339 reftests: the tests were
+  right all along, and the bug was in the reference documents they are compared
+  against, which draw their coloured band exactly that way.
 - `Broiler.Documents` — the DOCX reader walked only the direct `w:p` children of
   `w:body`, so a document whose content lived inside a layout table (the shape CV
   and letterhead templates use) opened completely empty in Broiler.Writer. Block
