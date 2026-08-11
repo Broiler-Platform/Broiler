@@ -43,7 +43,47 @@ internal static class WptDocumentRenderer
         BColor backgroundColor,
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad,
         EventHandler<HtmlImageLoadEventArgs>? imageLoad,
-        string? baseUrl)
+        string? baseUrl,
+        BBitmap? baseLayer = null) =>
+        RenderToImage(document, html: null, width, height, backgroundColor,
+            stylesheetLoad, imageLoad, baseUrl, baseLayer);
+
+    /// <summary>
+    /// Renders <paramref name="document"/> — or <paramref name="html"/>, when no document was
+    /// projected — onto a surface that starts as <paramref name="baseLayer"/>.
+    /// </summary>
+    /// <remarks>
+    /// The base layer is what the render composites onto, exactly as the flat
+    /// <paramref name="backgroundColor"/> is when there is none: the engine paints over whatever the
+    /// surface already holds, so a canvas background the root propagates blends with the page
+    /// background beneath it rather than replacing it. That is the whole of
+    /// <c>page-box-002-print</c>, whose half-transparent red body over a blue <c>@page</c> has to
+    /// come out violet.
+    /// </remarks>
+    internal static BBitmap RenderToImage(
+        DomDocument? document,
+        string? html,
+        int width,
+        int height,
+        BColor backgroundColor,
+        EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad,
+        EventHandler<HtmlImageLoadEventArgs>? imageLoad,
+        string? baseUrl,
+        BBitmap? baseLayer = null) =>
+        RenderToImage(document, html, width, height, backgroundColor,
+            stylesheetLoad, imageLoad, baseUrl, baseLayer, out _);
+
+    private static BBitmap RenderToImage(
+        DomDocument? document,
+        string? html,
+        int width,
+        int height,
+        BColor backgroundColor,
+        EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad,
+        EventHandler<HtmlImageLoadEventArgs>? imageLoad,
+        string? baseUrl,
+        BBitmap? baseLayer,
+        out Fragment? tree)
     {
         var bitmap = new BBitmap(width, height);
 
@@ -60,25 +100,207 @@ internal static class WptDocumentRenderer
         if (imageLoad != null)
             container.ImageLoad += imageLoad;
 
-        // The string path publishes this from the markup it is handed
-        // (HtmlContainerInt.SetHtmlWithStyleSet); binding a document does not, so the document's
-        // own doctype has to say it here. Without this the render inherits whatever this thread
-        // last rendered — which happens to be right, since the bridge parsed this very test, but
-        // only by accident and only for as long as one thread renders one document.
-        Broiler.Layout.DocumentModeContext.CurrentQuirksMode = SelectsQuirksMode(document);
-
-        container.SetDocumentWithStyleSet(document, baseStyleSet: null, baseUrl: baseUrl);
+        if (document is not null)
+        {
+            // The string path publishes this from the markup it is handed
+            // (HtmlContainerInt.SetHtmlWithStyleSet); binding a document does not, so the document's
+            // own doctype has to say it here. Without this the render inherits whatever this thread
+            // last rendered — which happens to be right, since the bridge parsed this very test, but
+            // only by accident and only for as long as one thread renders one document.
+            Broiler.Layout.DocumentModeContext.CurrentQuirksMode = SelectsQuirksMode(document);
+            container.SetDocumentWithStyleSet(document, baseStyleSet: null, baseUrl: baseUrl);
+        }
+        else
+        {
+            container.SetHtmlWithStyleSet(html ?? string.Empty, baseStyleSet: null, baseUrl: baseUrl);
+        }
 
         bitmap.Clear(backgroundColor);
+        if (baseLayer is not null)
+            BlitOnto(bitmap, baseLayer, 0, 0);
 
         var clip = new RectangleF(0, 0, width, height);
         container.PerformLayout(bitmap, clip);
         container.PerformPaint(bitmap, clip);
 
-        if (container.LatestFragmentTree is { } tree)
+        tree = container.LatestFragmentTree;
+        if (tree is not null)
             CompositeEmbeddedDocuments(tree, bitmap, stylesheetLoad, imageLoad);
 
         return bitmap;
+    }
+
+    /// <summary>
+    /// Renders a document over the paint its own <c>@page</c> puts on the sheet: the page
+    /// background, and the border and padding between the page's margin and its page area.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// One page, not a paginated flow — this is the unpaginated render every <c>-print</c> reftest
+    /// gets by default (<see cref="WptTestRunner.PagedPrint"/>), with the sheet's own paint put back
+    /// under it. Without this a page background is simply not drawn, and a test whose reference
+    /// states the same colour as a <c>body</c> background matches it by 0.0 %:
+    /// <c>page-box-001-print</c>, <c>-002</c>, <c>-003</c> and <c>page-background-image-print</c> are
+    /// each that failure.
+    /// </para>
+    /// <para>
+    /// The flow is rendered into the page area — the border box less the page's border and padding —
+    /// so a page that states them moves the content in by them, the way
+    /// <c>page-box-011-print</c>'s reference moves it in with a <c>body</c> border and padding of
+    /// its own.
+    /// </para>
+    /// </remarks>
+    internal static BBitmap RenderDecorated(
+        DomDocument? document,
+        string html,
+        WptPageBox page,
+        WptPageDecoration decoration,
+        BColor backgroundColor,
+        EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad,
+        EventHandler<HtmlImageLoadEventArgs>? imageLoad,
+        string? baseUrl)
+    {
+        int sheetWidth = Math.Max(1, (int)Math.Round(page.BoxSize.Width));
+        int sheetHeight = Math.Max(1, (int)Math.Round(page.BoxSize.Height));
+
+        using var backdrop = decoration.Render(page, stylesheetLoad, imageLoad, baseUrl);
+        var insets = decoration.MeasureInsets(page, stylesheetLoad, imageLoad, baseUrl);
+        var borderBox = WptPageDecoration.BorderBox(page);
+
+        int areaX = (int)Math.Round(borderBox.X + insets.Left);
+        int areaY = (int)Math.Round(borderBox.Y + insets.Top);
+        int areaWidth = Math.Max(1, (int)Math.Round(borderBox.Width - insets.Left - insets.Right));
+        int areaHeight = Math.Max(1, (int)Math.Round(borderBox.Height - insets.Top - insets.Bottom));
+
+        using var underneath = Crop(backdrop, areaX, areaY, areaWidth, areaHeight, backgroundColor);
+
+        BBitmap flow;
+        Fragment? tree;
+        var previousBackdrop = Broiler.Layout.Engine.CanvasBackdrop.Current;
+        Broiler.Layout.Engine.CanvasBackdrop.Current = UniformColor(underneath);
+        try
+        {
+            flow = RenderToImage(
+                document, html, areaWidth, areaHeight, backgroundColor,
+                stylesheetLoad, imageLoad, baseUrl, baseLayer: underneath, tree: out tree);
+        }
+        finally
+        {
+            Broiler.Layout.Engine.CanvasBackdrop.Current = previousBackdrop;
+        }
+
+        using var _ = flow;
+
+        var output = new BBitmap(sheetWidth, sheetHeight);
+        output.Clear(backgroundColor);
+
+        // A root element that generates no box generates no page either, so nothing of the sheet is
+        // painted — not the flow, and not the `@page`'s own background and border.
+        // `root-element-display-none-print` states exactly that, and its reference is an empty
+        // document.
+        if (!GeneratesPageContent(tree))
+            return output;
+
+        BlitOnto(output, backdrop, 0, 0);
+        BlitOnto(output, flow, areaX, areaY);
+
+        return output;
+    }
+
+    /// <summary>
+    /// Whether a laid-out document puts anything on a page: some box below the fragment tree's root
+    /// that is neither <c>display: none</c> nor collapsed to nothing.
+    /// </summary>
+    /// <remarks>
+    /// The tree's root is the canvas rather than the root element, so a document whose root element
+    /// is <c>display: none</c> still produces one — with every fragment under it <c>none</c> and
+    /// zero-sized, which is what this looks for. An empty <c>&lt;body&gt;</c> is not that case: its
+    /// box is the width of the page even when it is no lines tall, so a page whose only content is
+    /// its own background still counts as generated.
+    /// </remarks>
+    private static bool GeneratesPageContent(Fragment? tree)
+    {
+        if (tree is null)
+            return false;
+
+        foreach (var child in tree.Children)
+        {
+            if (GeneratesBox(child))
+                return true;
+        }
+
+        return false;
+
+        static bool GeneratesBox(Fragment fragment)
+        {
+            if (!string.Equals(fragment.Style.Display, "none", StringComparison.OrdinalIgnoreCase)
+                && (fragment.Size.Width > 0 || fragment.Size.Height > 0))
+            {
+                return true;
+            }
+
+            foreach (var child in fragment.Children)
+            {
+                if (GeneratesBox(child))
+                    return true;
+            }
+
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The single colour <paramref name="bitmap"/> is painted in, or <c>null</c> when it is not all
+    /// one colour.
+    /// </summary>
+    /// <remarks>
+    /// What the canvas can be told it is compositing against
+    /// (<c>Broiler.Layout.Engine.CanvasBackdrop</c>): the paint walker flattens a translucent
+    /// propagated background into one opaque colour, so a backdrop it can use has to <em>be</em> one
+    /// colour. A page whose background is an image or a gradient answers null and keeps the white
+    /// assumption, which is what every render did before this existed.
+    /// </remarks>
+    private static BColor? UniformColor(BBitmap bitmap)
+    {
+        if (bitmap.Width == 0 || bitmap.Height == 0)
+            return null;
+
+        var first = bitmap.GetPixel(0, 0);
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y) != first)
+                    return null;
+            }
+        }
+
+        return first;
+    }
+
+    /// <summary>A rectangle of <paramref name="source"/>, padded with <paramref name="fill"/>.</summary>
+    private static BBitmap Crop(BBitmap source, int x, int y, int width, int height, BColor fill)
+    {
+        var crop = new BBitmap(width, height);
+        crop.Clear(fill);
+
+        for (int row = 0; row < height; row++)
+        {
+            int sy = y + row;
+            if (sy < 0 || sy >= source.Height)
+                continue;
+
+            for (int column = 0; column < width; column++)
+            {
+                int sx = x + column;
+                if (sx < 0 || sx >= source.Width)
+                    continue;
+
+                crop.SetPixel(column, row, source.GetPixel(sx, sy));
+            }
+        }
+
+        return crop;
     }
 
     /// <summary>The most pages a paged render lays out and composes.</summary>
@@ -115,11 +337,19 @@ internal static class WptDocumentRenderer
         BColor backgroundColor,
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad,
         EventHandler<HtmlImageLoadEventArgs>? imageLoad,
-        string? baseUrl)
+        string? baseUrl,
+        WptPageDecoration? decoration = null)
     {
+        // The page's own paint, and the border and padding it insets the page area by. Every page
+        // of the flow gets the same sheet, so this is resolved once and stamped per page below.
+        using var backdrop = decoration?.Render(page, stylesheetLoad, imageLoad, baseUrl);
+        var insets = decoration?.MeasureInsets(page, stylesheetLoad, imageLoad, baseUrl) ?? (0, 0, 0, 0);
+
         var area = page.AreaSize;
-        int areaWidth = Math.Max(1, (int)Math.Round(area.Width));
-        int areaHeight = Math.Max(1, (int)Math.Round(area.Height));
+        int areaWidth = Math.Max(1, (int)Math.Round(area.Width - insets.Item1 - insets.Item3));
+        int areaHeight = Math.Max(1, (int)Math.Round(area.Height - insets.Item2 - insets.Item4));
+        int areaX = (int)Math.Round(page.MarginLeft + insets.Item1);
+        int areaY = (int)Math.Round(page.MarginTop + insets.Item2);
 
         using var surface = new BBitmap(areaWidth, areaHeight * MaxRenderedPages);
 
@@ -148,6 +378,15 @@ internal static class WptDocumentRenderer
 
         surface.Clear(backgroundColor);
 
+        // Every page band starts as the sheet's page area, so a canvas background the root
+        // propagates composites onto the page background instead of hiding it.
+        if (backdrop is not null)
+        {
+            using var underneath = Crop(backdrop, areaX, areaY, areaWidth, areaHeight, backgroundColor);
+            for (int p = 0; p < MaxRenderedPages; p++)
+                BlitOnto(surface, underneath, 0, p * areaHeight);
+        }
+
         var clip = new RectangleF(0, 0, surface.Width, surface.Height);
 
         SetPageSize(container, new SizeF(areaWidth, areaHeight));
@@ -164,20 +403,24 @@ internal static class WptDocumentRenderer
 
         int boxWidth = Math.Max(1, (int)Math.Round(page.BoxSize.Width));
         int boxHeight = Math.Max(1, (int)Math.Round(page.BoxSize.Height));
-        int marginLeft = (int)Math.Round(page.MarginLeft);
-        int marginTop = (int)Math.Round(page.MarginTop);
 
         var output = new BBitmap(boxWidth, boxHeight * pages);
         output.Clear(backgroundColor);
 
-        // The margin ring first, then the flow's band over the page area it leaves blank. The two
-        // never overlap — a margin box lives in the margin by construction — so the order only
-        // decides which one pays for the rounding at the page area's edge, and the flow is the one
-        // whose position the rest of the render is measured against.
+        // The sheet's own paint under everything, then the margin ring, then the flow's band over
+        // the page area both leave blank. The last two never overlap — a margin box lives in the
+        // margin by construction — so their order only decides which one pays for the rounding at
+        // the page area's edge, and the flow is the one the rest of the render is measured against.
+        if (backdrop is not null)
+        {
+            for (int p = 0; p < pages; p++)
+                BlitOnto(output, backdrop, 0, p * boxHeight);
+        }
+
         PaintMarginBoxes(output, html, page, pages, boxWidth, boxHeight, stylesheetLoad, imageLoad, baseUrl);
 
         for (int p = 0; p < pages; p++)
-            BlitBand(output, surface, p * areaHeight, marginLeft, p * boxHeight + marginTop, areaWidth, areaHeight);
+            BlitBand(output, surface, p * areaHeight, areaX, p * boxHeight + areaY, areaWidth, areaHeight);
 
         return output;
     }

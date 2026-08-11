@@ -341,6 +341,72 @@ with paged media:
   on the test side: doing so alone would separate the eight margin-box tests that
   use one from references that still render the literal text.
 
+### `@page` paint is not behind the lever, because it is not about pagination
+
+CSS Paged Media 3 §7 lets the sheet itself carry paint — a background, a border
+and a padding on the `@page` rule — and that is a different question from whether
+the flow is cut into pages. So it is **not** behind `BROILER_WPT_PAGED_PRINT`: a
+`-print` reftest gets its page's paint whether or not it is paginated, decided by
+the same `-print` stem and carried into the reference render the same way (see
+`WptTestRunner.PrintMedia`, which the paged lever now sits on top of rather than
+beside).
+
+It has to be on for the unpaginated run, because the pairs that state it are
+written to be read on screen. `css-page/page-background-image-print` says so
+outright — *"Should print on a green background but not display it on screen"* —
+and its reference states the same colour on `html`, so the two agree only when
+the page paints. Before this, `page-box-001-print`, `-002`, `-003` and `-011` each
+matched their reference by **0.0 %**: the reference paints the colour through a
+`body` background and the test through its `@page`, and only one of the two was
+drawn. `css/css-page` goes **133 → 136** (`page-box-000`, `-001`, `-003` and
+`-011` gained, one lost — see named pages below), and **137** once the
+`Broiler.HTML` patch below is applied.
+
+Three details are the whole of it, and each is a WPT pair stating it:
+
+- **The background covers the whole page box, margins included; the border and
+  padding sit on the box the margins leave.** `page-background-004-print` states
+  a 500×300 page with a 50px margin and matches a reference that is solid yellow
+  corner to corner, while `page-box-008-print` paints its margin ring in the page
+  background and its padding ring in the propagated `body` one. So the backdrop
+  is two boxes — a full-sheet one carrying the background declarations, an inset
+  one carrying the border and padding — and both are ordinary divs handed to the
+  same renderer that will draw the page, which is what makes a page background
+  that is a gradient or an image work without the runner knowing they exist. The
+  distance from that box to the page area is measured off a render of it for the
+  same reason (`WptPageDecoration.MeasureInsets`), rather than by parsing
+  `border-width` shorthands, logical spellings and percentages a second time.
+- **A page that generates no content paints nothing at all.**
+  `root-element-display-none-print` states a hotpink page with a red border and
+  matches an *empty document*: a root element with no box generates no page, so
+  the sheet's own paint goes with it.
+- **`visibility` applies in the page context** (§5.1) and to the background and
+  the border alike, keeping the space they take.
+  `page-visibility-hidden-001-print` hides a red page border and matches a
+  reference whose border is `solid transparent`.
+
+**One pair needs a `Broiler.HTML` change and carries a patch**:
+`page-box-002-print` puts a half-transparent `body` background over a blue page
+and must come out violet. CSS 2.1 §14.2 propagates the `body` background to the
+canvas, and the paint walker flattens a translucent one into a single opaque fill
+against a backdrop it assumes is white — right for a render onto a blank surface,
+wrong for one onto a page background. The colour to composite against now comes
+from `Broiler.Layout.Engine.CanvasBackdrop` (main repo, thread-static, null by
+default so every other render is byte-identical), which the runner sets when the
+page background under the whole page area is one flat colour and leaves alone
+when it is an image or a gradient. The one-line call site is
+`patches/0001-html-canvas-backdrop-lever.patch`; until it is applied
+`page-box-002-print` stays at 0.0 % and everything else here works without it.
+
+**What is still missing is named pages, and it costs one test.**
+`WptPageDecoration` reads the unconditional `@page` only, as `WptPageBox` does —
+so `page-name-table-001-print`, whose content selects a `@page square` that
+overrides the unconditional rule's red with `#eee`, now paints red where it used
+to paint nothing. It was passing because *neither* side drew a page background;
+that was a false pass, and it is an honest failure now. Fixing it properly needs
+the `page` property in the fragment tree's computed style, which is also what the
+paged run needs for per-name page sizes.
+
 ## Flex items are stretched now, and what that says about the scoreboard
 
 `align-items: stretch` is the initial value, so it is what happens to most flex

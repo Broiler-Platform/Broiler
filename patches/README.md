@@ -1,0 +1,48 @@
+# Submodule patches waiting to be applied
+
+`Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
+are git submodules with their own remotes. A session whose GitHub scope is this
+repository alone cannot push to them — the git proxy answers **403** — so a fix
+that belongs in a submodule is committed there, exported with
+`git format-patch`, and left here for a maintainer to apply. The submodule
+working tree is then reverted to its pinned commit and **the gitlink is not
+bumped**: CI clones a submodule by pointer, and a pointer to a commit that was
+never pushed would break the build.
+
+Applying one:
+
+```sh
+cd <Submodule>
+git checkout -b <branch> && git am ../patches/NNNN-<slug>.patch
+git push origin HEAD
+cd .. && git add <Submodule>      # bump the pointer only once the push succeeds
+```
+
+## Index
+
+### `0001-html-canvas-backdrop-lever.patch` — `Broiler.HTML`
+
+One line in `Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs`:
+the colour a translucent propagated canvas background (CSS 2.1 §14.2) is
+flattened against becomes `Broiler.Layout.Engine.CanvasBackdrop.Current ??
+BColor.White` instead of `BColor.White`.
+
+`CanvasBackdrop` itself is **already in this repository**
+(`Broiler.Layout/Broiler.Layout/Engine/CanvasBackdrop.cs`), thread-static and
+null by default, so the main repo builds and every render that does not set it is
+byte-identical to today. The patch is only the call.
+
+Wanted by the WPT reftest runner's `@page` paint (CSS Paged Media 3 §7 — see
+[docs/wpt-reftests.md](../docs/wpt-reftests.md#page-paint-is-not-behind-the-lever-because-it-is-not-about-pagination)):
+a page background is painted under the flow, and a `body` background propagated
+over it has to composite with it rather than against an assumed white.
+`css/css-page/page-box-002-print` is the pair that states it — `body {
+background: #f008 }` over `@page { background: #00f }` must come out violet, not
+pink — and it stays at 0.0 % until this is applied. Nothing else in the `@page`
+paint work depends on it.
+
+**No main-repo fallback, deliberately.** The flatten happens while the display
+list is built, so the composited-away colour is not recoverable from the rendered
+pixels afterwards; a runner-side workaround would have to re-implement canvas
+background propagation to guess what was flattened. One reftest is not worth
+that, and the patch is one line.

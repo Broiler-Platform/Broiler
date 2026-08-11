@@ -7,6 +7,25 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Added
+
+- `Broiler.Wpt` — a WPT `-print` reftest now renders the paint its own `@page`
+  rule puts on the sheet (CSS Paged Media 3 §7): the page background over the
+  whole page box, margins included, and the page's border and padding on the box
+  the margins leave, with the flow inset by them. Independent of the
+  `BROILER_WPT_PAGED_PRINT` lever, because a page paints whether or not the flow
+  is paginated — `css-page/page-background-image-print` states outright that its
+  background should print and not show on screen. A page whose root element
+  generates no box paints nothing at all, and `visibility` applies in the page
+  context. `css/css-page` goes 133 → 136 of 224 reftests (137 once
+  `patches/0001-html-canvas-backdrop-lever.patch` is applied); documents that
+  declare no page paint render byte-identically to before.
+- `Broiler.Layout` — `Engine.CanvasBackdrop`, the colour a translucent canvas
+  background (CSS 2.1 §14.2) is composited against when the surface underneath it
+  already carries paint. Thread-static and null by default, so a render that does
+  not set it is unchanged. Read by a one-line `Broiler.HTML` change carried as
+  `patches/0001-html-canvas-backdrop-lever.patch`.
+
 ### Changed
 
 - `Broiler.Layout` / `Broiler.HTML.Image` — a page's display list is now replayed

@@ -1,0 +1,40 @@
+From e9ef268ab2c551c3e4fa78e930b2550d77e4de88 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 11 Aug 2026 19:29:16 +0000
+Subject: [PATCH] Let a caller say what the canvas composites its background
+ against
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CSS 2.1 §14.2 propagates the root element's background to the canvas, and
+EmitCanvasBackground flattens a translucent one against an assumed white
+backdrop before emitting it as a single opaque fill. That is right for a
+render onto a blank surface and wrong for one onto a surface that already
+carries paint — CSS Paged Media 3 §7.2's page background is that case, and
+the css-page/page-box-002-print reftest states it: a #f008 body over a #00f
+@page must come out violet, not pink.
+
+Read the backdrop from Broiler.Layout.Engine.CanvasBackdrop, falling back
+to white when nothing set it, so every render that does not set it is
+byte-identical to before.
+---
+ .../IR/PaintWalker.CanvasBackground.cs                          | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
+index bae2bd1..4bae763 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs
+@@ -56,7 +56,7 @@ internal static partial class PaintWalker
+         // body leave the dark backdrop showing. It is also the backdrop a
+         // *translucent* propagated background composites against, so carry it
+         // down to EmitCanvasBackgroundLayers rather than assuming white there.
+-        BColor canvasBackdrop = BColor.White;
++        BColor canvasBackdrop = Broiler.Layout.Engine.CanvasBackdrop.Current ?? BColor.White;
+         if (RootUsesDarkColorScheme(root))
+         {
+             canvasBackdrop = DarkCanvasColor;
+-- 
+2.43.0
+
