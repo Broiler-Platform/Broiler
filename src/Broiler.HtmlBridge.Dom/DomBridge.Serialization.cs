@@ -36,11 +36,36 @@ public sealed partial class DomBridge
             root,
             CreateSerializationAdapter(projection.SourceFor),
             new HtmlSerializationOptions(
-                IncludeHtmlDoctype: true,
+                IncludeHtmlDoctype: SelectsStandardsMode(),
                 MaximumDepth: MaxSerializationDepth,
                 EncodeTextNodes: false,
                 NewLineAfterDoctype: true));
     }
+
+    /// <summary>
+    /// Whether the document's doctype selects standards mode, which is what the emitted
+    /// <c>&lt;!DOCTYPE html&gt;</c> above carries to whoever re-parses this string.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This used to be an unconditional <c>true</c>, and that silently destroyed quirks mode for
+    /// every consumer of the serialised page. The renderer re-derives the mode from the string it
+    /// is handed (<c>DocumentModeContext.IsQuirksHtml</c>, via
+    /// <c>HtmlContainerInt.SetHtmlWithStyleSet</c>), so a doctype-less document came back out with
+    /// a doctype and rendered as standards — no quirk could ever fire on the WPT path, whose whole
+    /// `quirks/` directory is doctype-less by construction.
+    /// </para>
+    /// <para>
+    /// The mode is what round-trips, not the doctype's text: <c>IsQuirksHtml</c> keys off the
+    /// doctype's *name* alone, so a public/system identifier (the XHTML doctypes the CSS2.1
+    /// <c>.xht</c> tests carry) selects standards through the bare form just as it did through the
+    /// original — those identifiers were already dropped here and still are. A doctype whose name
+    /// is not <c>html</c> selects quirks, so it is correctly serialised as no doctype at all.
+    /// </para>
+    /// </remarks>
+    private bool SelectsStandardsMode() =>
+        _document.DocumentType is { } doctype
+        && doctype.Name.Equals("html", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The document's current element child — what the canvas actually renders — or
