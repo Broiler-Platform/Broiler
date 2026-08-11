@@ -328,13 +328,12 @@ were never real — `dimensions-003` and `-005` were passing at 99.5% and 99.2%
 rest is in the **references**, and it is two engine gaps that have nothing to do
 with paged media:
 
-- **Flex items were never stretched on the cross axis** — fixed, and it moved
-  `css/css-flexbox` 470 → 568 of 994 on its own. It does *not* unblock these
-  references, because their edge strips are flex containers nested in a grid cell:
-  the strip's height comes from the grid track, and the track is sized in
-  `ApplyGridLayoutAfterInline` — after the strip has already laid its own line
-  out. So the strip is still auto-height when it decides what its items stretch
-  into. The grid half of the same gap is a separate change.
+- **Flex items were never stretched on the cross axis** — fixed, in both halves:
+  the stretch itself (`css/css-flexbox` 470 → 568 of 994), and the re-layout a
+  flex container needs once the grid track it sits in has sized it. These
+  references render now, where 26 of the 36 were blank or nearly so. It is still
+  not enough to *pass* them — see below — but it is what makes the difference
+  readable at all.
 - **Generated `content` takes a single quoted string and nothing else.**
   `content: "a" "b"` renders as `a" "b` and `content: counter(page)` renders as
   the text `counter(page)`. Both sides of a comparison share the gap, so it costs
@@ -358,6 +357,26 @@ them as a regression: they are tests whose *reference* states the expected layou
 with absolutely positioned boxes that Broiler still sizes to their text.
 `flexbox_align-items-stretch` is exactly that — the render is now right to the
 pixel and the reference is not, where before the two were wrong together.
+
+**A flex container that is a grid item needs a second layout, and it scores
+nothing.** A grid item is measured before its track is sized and resized
+afterwards — fine for a block, whose content sits at the block-start either way,
+and wrong for a flex container, whose line's cross size is read from its height.
+Resizing the box alone left a strip that was the right size holding items sized
+for the wrong one. Measured over 10 000+ reftests (`css/CSS2`, `css-align`,
+`css-sizing`, `css-position`, `html/rendering`, `css-grid`, `css-flexbox`):
+**not one test changes**. It moves the print set −2, both of them references that
+used to render blank and now render, ending false passes. What it buys is that
+the references built this way — most of `margin-boxes` — draw their content at
+all, which is the difference between a diff you can read and a blank page.
+
+The second layout has one trap worth recording, because it looks like a
+pagination bug rather than a layout one: the pass re-places the item before the
+grid puts it back, and everything it touches goes into the document's running
+extent — which is what a paged render counts pages with. Leaking that
+intermediate position doubled the page count of every reference built this way,
+and turned eleven pixel mismatches into eleven 0.0% dimension mismatches.
+`GridItemFlexRelayoutTests` pins it.
 
 ## Quirks mode reaches the render, as of the doctype round-trip fix
 
