@@ -1200,14 +1200,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 }
 
                 CssBox? previousInFlow = null;
-                foreach (var childBox in Boxes)
+                for (int childIndex = 0; childIndex < Boxes.Count; childIndex++)
                 {
+                    var childBox = Boxes[childIndex];
                     childBox.PerformLayout(g);
 
                     // CSS Fragmentation 3 §3: a forced page break before this child (or after the
                     // one before it) moves it to the top of the next page. Applied here, between
                     // siblings, so the child that follows lays out from the moved bottom edge.
-                    ApplyForcedPageBreakBefore(childBox, previousInFlow);
+                    // CSS Paged Media 3 §3.4's page-name change is the same break, which is why it
+                    // is decided here too — from the index, since the sibling it is measured
+                    // against is not the same one a break-after is read from.
+                    ApplyForcedPageBreakBefore(childBox, childIndex, previousInFlow);
 
                     // CSS Fragmentation 3 §4.1: and a page boundary falling inside an unbreakable
                     // child moves the whole child past it. Breakable content needs nothing — the

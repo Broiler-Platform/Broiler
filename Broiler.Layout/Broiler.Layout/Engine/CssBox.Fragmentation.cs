@@ -29,13 +29,20 @@ namespace Broiler.Layout.Engine;
 /// a monolithic test and a nudge rather than a box-splitting engine.
 /// </para>
 /// <para>
-/// <b>What is still missing before a paged render can use any of this.</b> The boundaries have to be
-/// in the right place, and they are defined by <c>@page</c>: its <c>size</c> and its <c>margin</c>
-/// give the page area, and nothing else does. Paginating at the viewport instead is not an
-/// approximation of that — it is a different set of boundaries. Measured over the 409 print
-/// reftests with the runner wired to the viewport: 252 → 228 passing, the losses concentrated in
+/// <b>Where the boundaries come from.</b> They are defined by <c>@page</c> — its <c>size</c> and its
+/// <c>margin</c> give the page area, and nothing else does. Paginating at the viewport instead is
+/// not an approximation of that but a different set of boundaries: measured over the 409 print
+/// reftests with the runner wired to the viewport, 252 → 228 passing, the losses concentrated in
 /// <c>css/CSS2/pagination</c>, whose tests declare <c>@page { size: 5in 3in; margin: 0.5in }</c> —
-/// a two-inch page area — and were being cut at 768px.
+/// a two-inch page area — and were being cut at 768px. The runner resolves the real box
+/// (<c>WptPageBox</c>) and renders pages from it behind <c>WptTestRunner.PagedPrint</c>.
+/// </para>
+/// <para>
+/// <b>What is still missing.</b> Named pages with per-name <c>@page</c> sizes, <c>@page</c> margin
+/// boxes, and fragmentation of flex, grid and table content — each of which one part of the corpus
+/// rests on. That is why the paged run is behind a lever and off by default: at 213 of 400 it is
+/// still below the 252 the same tests score unpaginated, where a test and its reference are
+/// unpaginated together and agree.
 /// </para>
 /// </remarks>
 internal partial class CssBox
@@ -62,6 +69,130 @@ internal partial class CssBox
                 || v.Equals(CssConstants.Right, System.StringComparison.OrdinalIgnoreCase)
                 || v.Equals("recto", System.StringComparison.OrdinalIgnoreCase)
                 || v.Equals("verso", System.StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// CSS Paged Media 3 §3.4: the used value of <c>page</c> — this box's own name when it declares
+    /// one, otherwise the nearest ancestor's, and the empty name when none does.
+    /// </summary>
+    /// <remarks>
+    /// The property is not inherited, but <c>auto</c> resolves up the box tree, which is not the
+    /// same thing: an ancestor's name reaches a descendant that declares nothing, while a
+    /// descendant that declares <c>auto</c> explicitly resolves the same way rather than to the
+    /// initial value. Walking the chain is therefore the resolution, not a cache of it.
+    /// </remarks>
+    private string UsedPageName()
+    {
+        for (var box = this; box is not null; box = box.ParentBox)
+        {
+            if (!box.TakesAPageName())
+                continue;
+
+            var name = box.Page?.Trim();
+            if (!string.IsNullOrEmpty(name)
+                && !name.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase))
+            {
+                return name;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Whether a page name declared on this box applies to it. <c>page</c> names the page a
+    /// block-level box is laid out on, so an inline-level one — which shares its parent's line, and
+    /// so its parent's page — declares a name that has nothing to name.
+    /// </summary>
+    /// <remarks>
+    /// <c>css-page/page-name-img-001</c> is the case: <c>&lt;body page:a&gt;</c> with an
+    /// <c>&lt;img page:b&gt;</c> followed by a <c>&lt;div page:b&gt;</c>. Its reference breaks
+    /// between the image and the div, which only happens if the image's own <c>page:b</c> is
+    /// ignored and it stays on the body's page <c>a</c>.
+    /// </remarks>
+    private bool TakesAPageName() =>
+        Display is not (CssConstants.Inline or CssConstants.InlineBlock or CssConstants.InlineTable
+            or "inline-flex" or "inline-grid" or CssConstants.None);
+
+    /// <summary>
+    /// The page name the <em>first</em> page this box occupies carries, and the one the
+    /// <em>last</em> one does — its own used name when it has no in-flow content of its own, and
+    /// otherwise the name propagated up from the descendant that starts (or ends) it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A page name names the page a box is laid out on, so a box wrapping content that names a
+    /// different page does not itself claim a page — the innermost name is the one the page has.
+    /// <c>&lt;div page:b&gt;&lt;div page:c&gt;&lt;div page:a&gt;…</c> begins a page named <c>a</c>,
+    /// not <c>b</c>, and WPT's <c>css-page/page-name-propagated-*</c> are written to pin exactly
+    /// that: their references state the same layout with no page names at all, so an engine that
+    /// read the outermost name would break where the reference does not.
+    /// </para>
+    /// <para>
+    /// Both ends are needed because the two are different names on a box whose first and last
+    /// descendants disagree, and the break rule compares the end of one sibling against the start
+    /// of the next.
+    /// </para>
+    /// </remarks>
+    private string StartPageName()
+    {
+        if (!PropagatesPageNamesFromChildren())
+            return UsedPageName();
+
+        foreach (var child in Boxes)
+        {
+            if (child.ParticipatesInPageNamePropagation())
+                return child.StartPageName();
+        }
+
+        return UsedPageName();
+    }
+
+    /// <inheritdoc cref="StartPageName"/>
+    private string EndPageName()
+    {
+        if (!PropagatesPageNamesFromChildren())
+            return UsedPageName();
+
+        for (int i = Boxes.Count - 1; i >= 0; i--)
+        {
+            if (Boxes[i].ParticipatesInPageNamePropagation())
+                return Boxes[i].EndPageName();
+        }
+
+        return UsedPageName();
+    }
+
+    /// <summary>
+    /// Whether this box carries a page name up to its ancestors — it is in the flow and generates
+    /// something on a page.
+    /// </summary>
+    /// <remarks>
+    /// Out-of-flow boxes are excluded because they are laid out against a containing block rather
+    /// than the flow, and <c>page-name-propagated-003</c> and <c>-005</c> are built on that: each
+    /// puts an absolutely positioned box where the first (or last) in-flow child would be, and its
+    /// reference shows the name propagating past it. Collapsed whitespace is excluded for the more
+    /// mundane reason that these tests are written with their markup indented, so the newline
+    /// between two named <c>&lt;div&gt;</c>s must not be read as content of the box around them.
+    /// </remarks>
+    private bool ParticipatesInPageNamePropagation()
+    {
+        if (Display == CssConstants.None
+            || Position is CssConstants.Absolute or CssConstants.Fixed)
+        {
+            return false;
+        }
+
+        if (Boxes.Count > 0)
+            return true;
+
+        foreach (var word in Words)
+        {
+            if (!word.IsSpaces || word.IsImage)
+                return true;
+        }
+
+        return Size.Height > 0.01;
     }
 
     /// <summary>
@@ -156,6 +287,7 @@ internal partial class CssBox
         }
 
         double origin = environment.MarginTop;
+
         double top = child.Location.Y - origin;
         double height = child.ActualBottom - child.Location.Y;
 
@@ -174,6 +306,99 @@ internal partial class CssBox
     }
 
     /// <summary>
+    /// CSS Paged Media 3 §3.4: whether <paramref name="child"/> begins a different page type than
+    /// the box before it, which forces a break between them.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole of what named pages mean for the flow. A page name selects which
+    /// <c>@page</c> rule applies to the pages a box lands on, so two boxes with different used names
+    /// cannot share one — the break is a consequence of the naming, not a separate declaration.
+    /// WPT's <c>css-page/page-name-*</c> are built on exactly that: the test names a page and the
+    /// reference states the same layout with <c>break-before: page</c>.
+    /// </remarks>
+    private bool StartsANewPageType(CssBox child, CssBox? previous) =>
+        previous is not null
+        && CarriesThePageFlow()
+        && child.ParticipatesInPageNamePropagation()
+        && !string.Equals(child.StartPageName(), previous.EndPageName(), StringComparison.Ordinal);
+
+    /// <summary>
+    /// The sibling a page-name change is measured against: the last one before <paramref name="child"/>
+    /// that puts something on a page.
+    /// </summary>
+    /// <remarks>
+    /// Not the same as the previous in-flow sibling, which is what a <c>break-after</c> is read from.
+    /// A box that generates nothing — the collapsed whitespace between two elements, most of all —
+    /// still carries a used page name, its ancestor's, and reading that name would insert a break
+    /// wherever the markup happens to be indented. <c>page-name-img-003</c> is the case: the
+    /// newline between <c>&lt;body page:a&gt;</c> and an <c>&lt;img page:b&gt;</c> would break
+    /// before the image, where its reference has no break at all. A zero-height box that <em>is</em>
+    /// written in the document still carries its own <c>break-after</c>, which is why this is a
+    /// second lookup rather than a narrowing of the first.
+    /// </remarks>
+    private static CssBox? PreviousOnAPage(IReadOnlyList<CssBox> siblings, int index)
+    {
+        for (int i = index - 1; i >= 0; i--)
+        {
+            var sibling = siblings[i];
+            if (sibling.Float == CssConstants.None && sibling.ParticipatesInPageNamePropagation())
+                return sibling;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Whether the children of this box are laid out in the page's own block flow, so a page-name
+    /// change between two of them is a page break.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Three things take a box's children out of that flow, and WPT has a <c>page-name</c> test for
+    /// each. A flex or grid container places items rather than stacking them, so an item's page
+    /// name names nothing to break at (<c>page-name-flex-001</c>, <c>-002</c>) — while a name on the
+    /// container itself still breaks, because the container <em>is</em> in its parent's flow
+    /// (<c>page-name-flex-003</c>). An out-of-flow subtree is positioned against its containing
+    /// block rather than following the flow (<c>page-name-abspos-002</c>). And a box whose block
+    /// axis is not the page's stacks its children sideways, where a page boundary does not fall
+    /// (<c>page-name-orthogonal-writing-003</c>) — though a box inside it that turns back upright
+    /// is in the page's axis again, which is what <c>-004</c> pins.
+    /// </para>
+    /// <para>
+    /// Only the page-<em>name</em> rule is gated here. An explicit <c>break-before: page</c> means
+    /// what it says wherever it is written, and the references of these very tests are built from
+    /// it.
+    /// </para>
+    /// </remarks>
+    private bool CarriesThePageFlow()
+    {
+        if (Display is "flex" or "inline-flex" or "grid" or "inline-grid")
+            return false;
+
+        if (!string.IsNullOrEmpty(WritingMode)
+            && !WritingMode.Equals("horizontal-tb", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        for (var box = this; box is not null; box = box.ParentBox)
+        {
+            if (box.Position is CssConstants.Absolute or CssConstants.Fixed)
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Whether a page name propagates up out of this box's children. The same three exclusions as
+    /// <see cref="CarriesThePageFlow"/>: a name that cannot break where it is written must not be
+    /// carried out to a place where it would.
+    /// </summary>
+    private bool PropagatesPageNamesFromChildren() =>
+        Display is not ("flex" or "inline-flex" or "grid" or "inline-grid");
+
+    /// <summary>
     /// Moves <paramref name="child"/> to the top of the next page when a break is forced before it,
     /// or after the box that precedes it. Returns the distance moved, so the caller can carry it
     /// into the sibling that follows.
@@ -189,7 +414,7 @@ internal partial class CssBox
     /// every pushed box grew by the distance it was pushed and everything after it drifted. That is
     /// what made a two-page document paginate as five.
     /// </remarks>
-    internal double ApplyForcedPageBreakBefore(CssBox child, CssBox? previous)
+    internal double ApplyForcedPageBreakBefore(CssBox child, int childIndex, CssBox? previous)
     {
         if (LayoutEnvironment is not { } environment)
             return 0;
@@ -206,7 +431,8 @@ internal partial class CssBox
         }
 
         if (!ForcesPageBreak(child.BreakBefore)
-            && !(previous is not null && ForcesPageBreak(previous.BreakAfter)))
+            && !(previous is not null && ForcesPageBreak(previous.BreakAfter))
+            && !StartsANewPageType(child, PreviousOnAPage(Boxes, childIndex)))
         {
             return 0;
         }

@@ -116,6 +116,7 @@ internal static partial class CssUtils
             "page-break-before" => cssBox.BreakBefore,
             "break-after" => cssBox.BreakAfter,
             "page-break-after" => cssBox.BreakAfter,
+            "page" => cssBox.Page,
             "line-clamp" => cssBox.LineClamp,
             "-webkit-line-clamp" => cssBox.WebkitLineClamp,
             "max-lines" => cssBox.MaxLines,
@@ -689,6 +690,9 @@ internal static partial class CssUtils
             case "break-after":
             case "page-break-after":
                 cssBox.BreakAfter = value;
+                break;
+            case "page":
+                cssBox.Page = value;
                 break;
             case "line-clamp":
                 cssBox.LineClamp = value;

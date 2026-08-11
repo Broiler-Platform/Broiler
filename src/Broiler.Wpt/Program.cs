@@ -3040,6 +3040,11 @@ public class Program
         Console.WriteLine("  --defer-promise-tests      Do not run stub promise_test bodies before the snapshot, matching");
         Console.WriteLine("                             Chromium's reference generator (captures at load). Fixes the");
         Console.WriteLine("                             css-anchor-position scroll cluster. Env: BROILER_WPT_DEFER_PROMISE_TESTS=1");
+        Console.WriteLine("  (env only)                 BROILER_WPT_PAGED_PRINT=1 renders a -print reftest as CSS Paged");
+        Console.WriteLine("                             Media says — pages of the document's own @page box, cut from the");
+        Console.WriteLine("                             flow and stacked — on both sides of the comparison. Default off:");
+        Console.WriteLine("                             the 409 print reftests score 252 unpaginated and 213 paged, since");
+        Console.WriteLine("                             paged media is still partial. See docs/wpt-reftests.md.");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
         Console.WriteLine("  --memory-limit-mb <MB>     Per-test RAM cap in MiB, measured as growth of the rendering");

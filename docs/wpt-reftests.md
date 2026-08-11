@@ -203,7 +203,9 @@ The largest single group in that issue — 13 of the 30 — are `*-print.html`
 tests, which state their expected rendering in terms of page boxes, named pages,
 margin boxes and fragmentation. The runner renders them in screen mode on both
 sides, so they are not measuring what they were written to measure; they need
-paged media, not thirteen separate fixes.
+paged media, not thirteen separate fixes. There is now a paged render behind a
+lever — see [paged print rendering](#paged-print-rendering-and-why-it-is-off)
+for what it does and what it costs.
 
 ## The bug is as likely to be in the reference, and that inverts the scoreboard
 
@@ -264,13 +266,48 @@ Two of those deserve a note because they look actionable and are not:
   what it is; see `CssUtils.NormalizeDisplayValue`.
 - **The `*-print` group needs paged media, not thirteen fixes** — the runner
   renders both sides in screen mode, so those tests are not measuring what they
-  were written to measure. This is the same finding as issue #1601's triage, and
-  it has not moved.
+  were written to measure. This is the same finding as issue #1601's triage.
+  A paged render now exists behind `BROILER_WPT_PAGED_PRINT=1`; the section
+  below has the numbers and the reason it is not the default yet.
 
 The list to work from is therefore not this one. The directory totals are:
 `css/css-grid/grid-lanes` 478 (above), `css/css-writing-modes` ~724 at 55–95%
 match (partial vertical layout — deep, and the largest winnable group),
 `css/css-flexbox` ~206, `css/css-overflow/line-clamp` (was 156, now 82).
+
+## Paged print rendering, and why it is off
+
+`BROILER_WPT_PAGED_PRINT=1`, default **off**. With it on, a reftest whose file
+stem ends in `-print` is rendered as CSS Paged Media says: the document's own
+`@page` `size` and `margin` give the page box, the flow is laid out once on a
+surface several page areas tall, and each page is the band of that surface from
+`k·H` to `(k+1)·H`, blitted into the output at its page's margin origin. Both
+sides of the comparison switch together — WPT's print references are *not*
+themselves named `-print` (`block-page-break-inside-avoid-1-print.html` matches
+`block-page-break-inside-avoid-print-ref.html`), so the mode is decided from the
+test and carried into the reference render.
+
+**It is off because it is not yet a better answer than not paginating at all.**
+Over the 409 print reftests: **252 pass unpaginated, 213 paged.** That is not the
+paging being wrong so much as it being partial. Where the flow is not paginated,
+a test and its reference are wrong in the *same* way and agree — this is the
+suite's blind spot working in the corpus's favour — and each unimplemented piece
+of paged media separates the pairs that rest on it. What is missing, in order of
+size in the current failures: `@page` margin boxes (29), fragmentation of flex
+and table content (34), per-name `@page` sizes, and monolithic content in grid.
+
+**The lever is still worth having, because without it every paged-media fix
+scores exactly zero.** It is what turned "the print tests need paged media" into
+a number that moves: implementing named pages (CSS Paged Media 3 §3.4 — the
+`page` property, its start/end propagation, and the break a name change forces)
+took the paged run **173 → 213**. Of the 118 print tests whose paged render came
+out with the wrong *page count*, 31 were `page-name` tests.
+
+**Page count is the failure mode to look at first.** A paged render that gets the
+count wrong reports 0.0% — the images are different sizes — so the ranked failure
+list fills with 0.0% entries that are all the same defect. Read the dimensions out
+of the message (`actual 480×576 vs baseline 480×864` is two pages against three)
+before reading anything into the percentage.
 
 ## Quirks mode reaches the render, as of the doctype round-trip fix
 

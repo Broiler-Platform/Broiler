@@ -509,6 +509,14 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     public string BreakAfter { get; set; } = CssConstants.Auto;
 
+    /// <summary>
+    /// CSS Paged Media 3 §3.4 <c>page</c>: the name of the page type this box is laid out on.
+    /// <c>auto</c> (the initial value) is not inherited but resolves to the nearest ancestor's
+    /// non-<c>auto</c> value — see <c>CssBox.UsedPageName</c>, which is what the fragmentation
+    /// rule reads.
+    /// </summary>
+    public string Page { get; set; } = CssConstants.Auto;
+
     public string Left
     {
         get { return _left; }

@@ -17,11 +17,9 @@ namespace Broiler.Wpt.Tests;
 /// reftests 252 → 228 when tried.
 /// </para>
 /// <para>
-/// Not yet consumed by the runner. Wiring it up needs the paged render path beside it, and that in
-/// turn needs the pagination this exposes to be right first — with the page box in place the print
-/// reftests still fall to 178, because Broiler's own pagination produces the wrong page count (a
-/// two-page reference renders as five). The parser is landed on its own because it is
-/// self-contained and verifiable on its own, and it is the input every later attempt needs.
+/// Consumed by <c>WptDocumentRenderer.RenderPaged</c> behind <see cref="WptTestRunner.PagedPrint"/>
+/// — see <see cref="PagedPrintRenderTests"/> for the render it defines and for what the paged run
+/// currently scores.
 /// </para>
 /// </remarks>
 public sealed class WptPageBoxTests

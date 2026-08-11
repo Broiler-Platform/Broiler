@@ -23,7 +23,8 @@ namespace Broiler.Wpt;
 /// the viewport instead is not an approximation of the page area but a different set of
 /// boundaries, which is why enabling fragmentation before this existed moved the print reftests
 /// 252 → 228 (the losses concentrated in <c>css/CSS2/pagination</c>, whose page area is two
-/// inches and was being cut at 768px).
+/// inches and was being cut at 768px). <c>WptDocumentRenderer.RenderPaged</c> lays a print test out
+/// against the box resolved here, behind <see cref="WptTestRunner.PagedPrint"/>.
 /// </para>
 /// <para>
 /// Only the unconditional <c>@page</c> is read. A page selector — <c>:first</c>, <c>:left</c>,
