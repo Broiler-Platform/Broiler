@@ -217,6 +217,10 @@ internal sealed class JSWorker
     /// </summary>
     private void InstallWorkerGlobals(JSContext context)
     {
+        // A real DOMException, so a worker catching a NetworkError or DataCloneError finds a .name
+        // and .code to branch on rather than the bare string ThrowDOMException falls back to.
+        DomBridge.RegisterDOMException(context);
+
         context["self"] = context.Eval("this");
         context["onmessage"] = JSNull.Value;
         context["__broilerWorkerListeners"] = new JSArray();
@@ -226,11 +230,15 @@ internal sealed class JSWorker
             var payload = a.Length > 0 ? a[0] : JSUndefined.Value;
 
             // Cloned here, on the worker thread in the worker's realm, into a graph no script holds.
-            // The page clones it again on its own thread; see WorkerBinding's remarks.
+            // The page clones it again on its own thread; see WorkerBinding's remarks. A transfer
+            // list detaches the worker's own buffers, which is why it is applied on this side.
             JSValue detached;
             try
             {
-                detached = JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, payload));
+                var transfer = WorkerTransfer.BuildCloneOptions(context, a.Length > 1 ? a[1] : null);
+                detached = transfer.IsNullOrUndefined
+                    ? JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, payload))
+                    : JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, payload, transfer));
             }
             catch (JSException ex)
             {

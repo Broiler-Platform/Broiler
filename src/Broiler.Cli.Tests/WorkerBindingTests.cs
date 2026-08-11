@@ -531,7 +531,7 @@ public sealed class WorkerBindingTests : IDisposable
             "got !== null");
 
         Assert.True(ok, "the worker never replied");
-        Assert.Contains("NetworkError", context.Eval("got.threw").ToString(), StringComparison.Ordinal);
+        Assert.Equal("NetworkError", context.Eval("got.threw").ToString());
         Assert.False(context.Eval("got.loadedAfter").BooleanValue,
             "a specifier after the failing one still ran — the call did not abort");
     }
@@ -584,6 +584,154 @@ public sealed class WorkerBindingTests : IDisposable
 
         Assert.True(ok, "the worker never replied");
         Assert.Equal("leaf<middle", context.Eval("got.depth").ToString());
+    }
+
+    // --------------------------------------------------------- transferables
+
+    /// <summary>
+    /// A transferred <c>ArrayBuffer</c> arrives with its contents and leaves the sender detached.
+    /// Both halves matter: the contents prove it was not lost, the detachment proves it was
+    /// transferred rather than copied.
+    /// </summary>
+    [Fact]
+    public void Transferred_buffer_arrives_and_detaches_the_sender()
+    {
+        var script = WriteWorker("xfer.js", @"
+            onmessage = function (e) {
+                var view = new Uint8Array(e.data.buf);
+                postMessage({ first: view[0], last: view[view.length - 1], size: e.data.buf.byteLength });
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var buf = new ArrayBuffer(4);
+            var fill = new Uint8Array(buf); fill[0] = 7; fill[3] = 9;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage({{ buf: buf }}, [buf]);
+            var lengthAfterSend = buf.byteLength;",
+            "got !== null");
+
+        Assert.True(ok, "the worker never replied");
+        Assert.Equal(7, context.Eval("got.first").DoubleValue);
+        Assert.Equal(9, context.Eval("got.last").DoubleValue);
+        Assert.Equal(4, context.Eval("got.size").DoubleValue);
+
+        // Detached on the sender: a transferred buffer is 0 bytes afterwards.
+        Assert.Equal(0, context.Eval("lengthAfterSend").DoubleValue);
+        Assert.Equal(0, context.Eval("buf.byteLength").DoubleValue);
+    }
+
+    /// <summary>
+    /// The control for the case above: <b>without</b> a transfer list the same send copies, and the
+    /// sender's buffer stays usable. Without this, "detached" could just be what postMessage always
+    /// does to a buffer.
+    /// </summary>
+    [Fact]
+    public void Without_a_transfer_list_the_buffer_is_copied_and_stays_usable()
+    {
+        var script = WriteWorker("copy.js", @"
+            onmessage = function (e) {
+                var view = new Uint8Array(e.data.buf);
+                postMessage({ first: view[0], size: e.data.buf.byteLength });
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var got = null;
+            var buf = new ArrayBuffer(4);
+            new Uint8Array(buf)[0] = 5;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{ got = e.data; }};
+            w.postMessage({{ buf: buf }});",
+            "got !== null");
+
+        Assert.True(ok, "the worker never replied");
+        Assert.Equal(5, context.Eval("got.first").DoubleValue);
+        Assert.Equal(4, context.Eval("got.size").DoubleValue);
+        Assert.Equal(4, context.Eval("buf.byteLength").DoubleValue);
+    }
+
+    /// <summary>Transfer works from the worker back to the page too, detaching the worker's buffer.</summary>
+    [Fact]
+    public void Worker_can_transfer_a_buffer_back_to_the_page()
+    {
+        var script = WriteWorker("xfer-back.js", @"
+            onmessage = function () {
+                var buf = new ArrayBuffer(3);
+                var v = new Uint8Array(buf); v[0] = 1; v[2] = 3;
+                postMessage({ buf: buf }, [buf]);
+                // Detached on this side immediately after the send.
+                postMessage({ detachedHere: buf.byteLength === 0 });
+            };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        var ok = RunAndDrain(bridge, context, $@"
+            var payload = null, note = null;
+            var w = new Worker({Quote(script)});
+            w.onmessage = function (e) {{
+                if (e.data.buf) {{ payload = e.data.buf; }} else {{ note = e.data; }}
+            }};
+            w.postMessage(null);",
+            "payload !== null && note !== null");
+
+        Assert.True(ok, "the worker never sent both messages");
+        Assert.Equal(3, context.Eval("payload.byteLength").DoubleValue);
+        Assert.Equal(3, context.Eval("new Uint8Array(payload)[2]").DoubleValue);
+        Assert.True(context.Eval("note.detachedHere").BooleanValue,
+            "the worker's own buffer was not detached by the transfer");
+    }
+
+    /// <summary>An invalid transfer list is a <c>DataCloneError</c>, per the messaging model.</summary>
+    [Theory]
+    [InlineData("w.postMessage({}, [{ notATransferable: true }]);", "non-transferable")]
+    [InlineData("var b = new ArrayBuffer(1); w.postMessage({}, [b, b]);", "duplicate")]
+    public void An_invalid_transfer_list_is_a_DataCloneError(string send, string _)
+    {
+        var script = WriteWorker("idle.js", "onmessage = function () { };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        context.Eval($"var w = new Worker({Quote(script)}); var name = '';");
+        context.Eval($"try {{ {send} }} catch (e) {{ name = e.name || String(e); }}");
+
+        Assert.Equal("DataCloneError", context.Eval("name").ToString());
+    }
+
+    /// <summary>
+    /// Re-transferring an already-detached buffer is a <c>DataCloneError</c> rather than a silent
+    /// send of nothing.
+    /// </summary>
+    [Fact]
+    public void Transferring_an_already_detached_buffer_is_a_DataCloneError()
+    {
+        var script = WriteWorker("idle2.js", "onmessage = function () { };");
+
+        using var context = new JSContext();
+        using var bridge = new DomBridge();
+        bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
+
+        context.Eval($@"
+            var w = new Worker({Quote(script)});
+            var buf = new ArrayBuffer(2);
+            w.postMessage({{ buf: buf }}, [buf]);   // detaches it
+            var name = '';
+            try {{ w.postMessage({{ buf: buf }}, [buf]); }} catch (e) {{ name = e.name || String(e); }}");
+
+        Assert.Equal(0, context.Eval("buf.byteLength").DoubleValue);
+        Assert.Equal("DataCloneError", context.Eval("name").ToString());
     }
 
     private static string Quote(string path) => "'" + path.Replace("\\", "\\\\").Replace("'", "\\'") + "'";

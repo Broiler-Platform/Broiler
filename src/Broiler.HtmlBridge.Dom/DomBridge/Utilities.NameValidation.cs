@@ -76,9 +76,15 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// Registers the <c>DOMException</c> constructor on the JS context.
+    /// Registers the <c>DOMException</c> constructor on <paramref name="context"/>.
     /// </summary>
-    private static void RegisterDOMException(JSContext context)
+    /// <remarks>
+    /// Internal rather than private because a worker's context needs it too: without it
+    /// <see cref="ThrowDOMException"/> falls back to throwing a bare string, so worker code catching
+    /// a <c>NetworkError</c> or <c>DataCloneError</c> would find no <c>.name</c> or <c>.code</c> to
+    /// branch on. See <c>JSWorker.InstallWorkerGlobals</c>.
+    /// </remarks>
+    internal static void RegisterDOMException(JSContext context)
     {
         context.Eval(@"
             function DOMException(message, name) {

@@ -150,10 +150,14 @@ internal sealed class WorkerBinding : IDisposable
                     return JSUndefined.Value;
 
                 var payload = a.Length > 0 ? a[0] : JSUndefined.Value;
+
                 // Cloned here, on the page's thread with the page's context current: the sending
-                // side is where DataCloneError belongs, and where post-send mutation stops being
-                // visible to the receiver.
-                var detached = CloneDetached(payload);
+                // side is where DataCloneError belongs, where post-send mutation stops being visible
+                // to the receiver, and — for a transfer list — where the source buffers are detached.
+                var transfer = _host.JsContext is { } pageContext
+                    ? WorkerTransfer.BuildCloneOptions(pageContext, a.Length > 1 ? a[1] : null)
+                    : JSUndefined.Value;
+                var detached = CloneDetached(payload, transfer);
                 if (detached is null)
                     return Reject("The object could not be cloned.", "DataCloneError");
 
@@ -192,11 +196,13 @@ internal sealed class WorkerBinding : IDisposable
     /// Clones <paramref name="value"/> in the current realm into a graph no script holds a reference
     /// to. Returns <see langword="null"/> when the value is not cloneable.
     /// </summary>
-    private JSValue? CloneDetached(JSValue value)
+    private JSValue? CloneDetached(JSValue value, JSValue transferOptions)
     {
         try
         {
-            return JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value));
+            return transferOptions.IsNullOrUndefined
+                ? JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value))
+                : JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, value, transferOptions));
         }
         catch (JSException ex)
         {

@@ -13,8 +13,8 @@ then pumps messages until closed or terminated.
 
 | side | surface |
 |---|---|
-| page | `worker.postMessage(v)`, `worker.onmessage`, `worker.onerror`, `worker.addEventListener('message'\|'error')`, `worker.terminate()` |
-| worker | `self`, `postMessage(v)`, `onmessage`, `addEventListener('message')`, `close()`, `console` |
+| page | `worker.postMessage(v[, transfer])`, `worker.onmessage`, `worker.onerror`, `worker.addEventListener('message'\|'error')`, `worker.terminate()` |
+| worker | `self`, `postMessage(v[, transfer])`, `onmessage`, `addEventListener('message')`, `close()`, `console`, `setTimeout`/`setInterval`/`clearTimeout`/`clearInterval`, `importScripts` |
 
 ## The design decision that matters: messages are cloned **twice**
 
@@ -45,8 +45,9 @@ reply in flight keeps the host's drain alive instead of racing the end of the do
 
 ## Verified
 
-`WorkerBindingTests`, seventeen cases, all driving the real bridge rather than the binding in isolation —
-the seam most likely to be wrong is where the worker thread meets the page's loop:
+`WorkerBindingTests`, **twenty-three cases**, all driving the real bridge rather than the binding in
+isolation — the seam most likely to be wrong is where the worker thread meets the page's loop. The
+six for the core object:
 
 | case | asserts |
 |---|---|
@@ -63,6 +64,9 @@ so a newly-defined global can silently change which path a test takes. It did no
 - `css/css-backgrounds` reftests: **failing set identical name for name** (266), 444/266/1 unchanged.
 - `css/css-fonts` + `css/css-writing-modes`: unchanged at 685/815.
 - `Broiler.Wpt.Tests`: 750 passed / 55 failed, unchanged.
+
+Each later slice below was re-checked the same way, against the immediately preceding commit rather
+than against a remembered number.
 
 ## Timers, and why they are not the page's loop
 
@@ -111,13 +115,66 @@ Failure behaviour follows the spec: a specifier that cannot be loaded raises **`
 assumed. A script that *throws* propagates to the importer rather than being swallowed; catching it
 would leave the worker running with a half-initialised global and no way to find out.
 
+## Transferables
+
+`postMessage(value, [buffer])` — and the modern `postMessage(value, { transfer: [buffer] })` spelling
+that `structuredClone` itself takes — now detach the listed `ArrayBuffer`s on the sending side. Both
+directions: page→worker and worker→page.
+
+**What "transfer" means here is worth stating plainly, because the word promises more than the
+engine delivers.** The engine's `structuredClone` implements transfer as **copy the bytes, then
+detach the source** — not as a zero-copy handover. The *observable* semantics are the spec's: after
+the send the sender's buffer is detached and `byteLength === 0`, and the receiver has the contents.
+What is not delivered is the performance reason transferables exist. That is a property of the
+engine's `structuredClone` rather than of this binding, and it is recorded because "transferred"
+reads like a promise of zero copies. Nothing here would have to change if the engine later made it
+one.
+
+**A `MessagePort` in the list is refused, not silently copied.** Porting a port into a worker needs
+the port's peer to live on the other thread, which is a different piece of work; a copy would look
+like it worked and then deliver messages to nobody.
+
+Validation order matches `MessagingBinding.ExtractTransferList`, the same job for same-document
+messaging — a non-array list, a non-transferable entry, an already-detached buffer and a duplicate
+entry are each a `DataCloneError`, raised on the sender.
+
+Six cases, of which two exist only to keep the others from being vacuous:
+
+| case | asserts |
+|---|---|
+| page → worker transfer | contents arrive **and** the sender's buffer is detached (`byteLength === 0`) |
+| **control: no transfer list** | the same send copies and the sender's buffer stays at 4 bytes — without this, "detached" could just be what `postMessage` always does |
+| worker → page transfer | works the other way, detaching the **worker's** buffer, checked from inside the worker |
+| non-transferable entry | `DataCloneError` |
+| duplicate entry | `DataCloneError` |
+| already-detached buffer | `DataCloneError` rather than a silent send of nothing |
+
+Getting the error *name* right needed one small change outside the binding: `DomBridge`'s
+`RegisterDOMException` was private, so a worker context had no `DOMException` and `ThrowDOMException`
+fell back to throwing a bare string — worker code catching a `DataCloneError` would have found no
+`.name` to branch on. It is now `internal` and installed into every worker global, which also let the
+`importScripts` failure test tighten from "the message contains `NetworkError`" to `e.name ===
+'NetworkError'`.
+
+**Regression check, and a note on how it was taken.** The container was re-provisioned partway
+through this slice and the WPT checkout had to be re-cloned, which is a newer checkout than the runs
+above used — 713 reftests rather than 711, so the pass count is 446 rather than 444 and is *not*
+comparable to the earlier rows. What is comparable is the A/B taken on that one checkout: the
+working tree and the immediately preceding commit were each run against it, and the failing sets are
+**identical name for name over 266 tests**. `Broiler.Wpt.Tests` is unchanged at 750 passed / 55
+failed, which *is* directly comparable since it does not read the checkout.
+
+The comparison script asserts the fail set is non-empty before reporting identity — the first attempt
+at this check printed "IDENTICAL" while both sets were empty, because the runner had exited on the
+missing checkout. A comparison that cannot fail is not a check.
+
 ## Deliberately out of this slice
 
 Refused or absent rather than half-built: module workers, `SharedWorker`, nested workers,
-`requestAnimationFrame` in a worker, and transferables (an `ArrayBuffer` in a transfer list is
-cloned, not transferred). Worker scripts — including imports — resolve from the filesystem only; one
-that would have to be fetched over the network fires `error` (or `NetworkError` for an import)
-rather than blocking a render on a request this host has no policy for.
+`requestAnimationFrame` in a worker, and `MessagePort` transfer. Worker scripts — including imports —
+resolve from the filesystem only; one that would have to be fetched over the network fires `error`
+(or `NetworkError` for an import) rather than blocking a render on a request this host has no policy
+for.
 
 Those are the honest boundary of a first slice. Each is additive to what is here, and none of them
 changes the two-clone contract above, which is the part that would have been expensive to get wrong.
