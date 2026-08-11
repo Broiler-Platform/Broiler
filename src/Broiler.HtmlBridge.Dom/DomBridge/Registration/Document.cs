@@ -98,6 +98,13 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"appendChild", new JSFunction((in a) => Dom.Features.NodeMutationBinding.AppendChild(this, in a), "appendChild", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"insertBefore", new JSFunction((in a) => Dom.Features.NodeMutationBinding.InsertBefore(this, in a), "insertBefore", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // Document includes the ParentNode mixin (DOM §4.2.6), so append/prepend/replaceChildren
+        // exist on the document node just as they do on an element. Only the Node-level methods
+        // above were bound, which made `document.append(x)` a TypeError mid-script.
+        document.FastAddValue((KeyString)"append", new JSFunction((in a) => Dom.Features.NodeMutationBinding.Append(this, in a), "append", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"prepend", new JSFunction((in a) => Dom.Features.NodeMutationBinding.Prepend(this, in a), "prepend", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"replaceChildren", new JSFunction((in a) => Dom.Features.NodeMutationBinding.ReplaceChildren(this, in a), "replaceChildren", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
         // document.forms — collection of all <form> elements with named access
         document.FastAddProperty((KeyString)"forms", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetForms(this, in a), "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
