@@ -382,6 +382,29 @@ internal sealed partial class WptTestRunner
     internal static bool NativeZoom { get; set; }
 
     /// <summary>
+    /// Render the script-mutated document directly instead of serialising it to HTML and
+    /// re-parsing that. Force on with <c>BROILER_WPT_DOM_RENDER=1</c>; force the round trip back
+    /// with <c>BROILER_WPT_DOM_RENDER=0</c>, the same shape as the other render levers here.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The round trip loses whatever markup cannot express, and HTML tree construction is not a
+    /// faithful inverse of a DOM: it unconditionally creates a <c>&lt;body&gt;</c>, so a document a
+    /// script deliberately left without one comes back with one. WPT's
+    /// <c>quirks/tables-inherit-color-from-body-quirk-004…-007</c> exist to check exactly that case
+    /// and cannot be decided through the string path at all — the render is not wrong, it is of a
+    /// different document.
+    /// </para>
+    /// <para>
+    /// Both paths take the same projected document (<c>DomBridge.GetRenderDocument</c>) as their
+    /// input; the lever only decides whether it is serialised first. That is what makes the A/B
+    /// comparison meaningful rather than a comparison of two pipelines.
+    /// </para>
+    /// </remarks>
+    internal static bool DomRender { get; set; } =
+        Environment.GetEnvironmentVariable("BROILER_WPT_DOM_RENDER") is ("1" or "true" or "TRUE" or "on");
+
+    /// <summary>
     /// File extensions treated as test files.
     /// </summary>
     private static readonly HashSet<string> TestExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -1705,6 +1728,7 @@ internal sealed partial class WptTestRunner
 
         // Execute inline scripts via DomBridge.
         IReadOnlyList<LayoutAssertionFailure>? layoutAssertionFailures = null;
+        Broiler.Dom.DomDocument? renderDocument = null;
         try
         {
             var executed = ExecuteScriptsWithDom(
@@ -1712,7 +1736,8 @@ internal sealed partial class WptTestRunner
                 new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
                 wptRoot,
                 batchStyleInvalidations: IsCrashTest(testPath));
-            html = executed.Html;
+            html = executed.Html ?? html;
+            renderDocument = executed.Document;
             layoutAssertionFailures = ComputeLayoutAssertionFailures(executed.LayoutAssertions);
         }
         catch (Exception ex)
@@ -1729,8 +1754,12 @@ internal sealed partial class WptTestRunner
             };
         }
 
-        // Post-process HTML (strip scripts, clean up for rendering).
-        html = HtmlPostProcessor.Process(html);
+        // Post-process (strip scripts, clean up for rendering) — on whichever form the render
+        // path is going to consume.
+        if (renderDocument is not null)
+            WptDocumentPostProcessor.Process(renderDocument);
+        else
+            html = HtmlPostProcessor.Process(html);
 
         // Derive the base URL from the test file so that relative sub-resource
         // paths (background images, stylesheets, etc.) resolve correctly.
@@ -1763,9 +1792,13 @@ internal sealed partial class WptTestRunner
         try
         {
             using var presentation = ImageAnimationClock.Pin(presentationTime);
-            rendered = RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
-                backgroundColor: BColor.White,
-                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+            rendered = RenderWithNativeAnchor(html, () => renderDocument is not null
+                ? WptDocumentRenderer.RenderToImage(renderDocument, _width, _height,
+                    backgroundColor: BColor.White,
+                    stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl)
+                : HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+                    backgroundColor: BColor.White,
+                    stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
         }
         catch (Exception ex)
         {
@@ -2413,10 +2446,21 @@ internal sealed partial class WptTestRunner
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
+        Broiler.Dom.DomDocument? renderDocument;
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Scripts))
-            html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot).Html;
+        {
+            var executed = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
+            html = executed.Html ?? html;
+            renderDocument = executed.Document;
+        }
+
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.PostProcess))
-            html = HtmlPostProcessor.Process(html);
+        {
+            if (renderDocument is not null)
+                WptDocumentPostProcessor.Process(renderDocument);
+            else
+                html = HtmlPostProcessor.Process(html);
+        }
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
         EventHandler<HtmlImageLoadEventArgs>? imageHandler = null;
@@ -2440,9 +2484,13 @@ internal sealed partial class WptTestRunner
         using var presentation = ImageAnimationClock.Pin(presentationTime);
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
         {
-            return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
-                backgroundColor: BColor.White,
-                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+            return RenderWithNativeAnchor(html, () => renderDocument is not null
+                ? WptDocumentRenderer.RenderToImage(renderDocument, _width, _height,
+                    backgroundColor: BColor.White,
+                    stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl)
+                : HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+                    backgroundColor: BColor.White,
+                    stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
         }
     }
 
@@ -2679,7 +2727,18 @@ internal sealed partial class WptTestRunner
         return failures.Count > 0 ? failures : null;
     }
 
-    private static (string Html, IReadOnlyList<DomBridge.CheckLayoutAssertion> LayoutAssertions) ExecuteScriptsWithDom(
+    /// <summary>
+    /// The document a test's scripts left behind, in whichever form the render path wants it:
+    /// <see cref="Html"/> for the serialise-and-reparse path, <see cref="Document"/> for the
+    /// direct one (<see cref="DomRender"/>). Exactly one is populated — producing both would
+    /// build the render projection twice, which is the expensive half of either.
+    /// </summary>
+    private readonly record struct ExecutedDocument(
+        string? Html,
+        Broiler.Dom.DomDocument? Document,
+        IReadOnlyList<DomBridge.CheckLayoutAssertion> LayoutAssertions);
+
+    private static ExecutedDocument ExecuteScriptsWithDom(
         string html,
         string url,
         string? wptRoot = null,
@@ -2803,7 +2862,9 @@ internal sealed partial class WptTestRunner
             bridge2.ResolveAnimationSnapshots();
             bridge2.ResolveAnchorPositions();
             var assertions2 = bridge2.EvaluateCheckLayoutAssertions();
-            return (bridge2.SerializeToHtml(), assertions2);
+            return DomRender
+                ? new ExecutedDocument(null, bridge2.GetRenderDocument(), assertions2)
+                : new ExecutedDocument(bridge2.SerializeToHtml(), null, assertions2);
         }
 
         // Current on this thread for the whole of script execution: a promise captures its
@@ -2961,7 +3022,14 @@ internal sealed partial class WptTestRunner
         postScope.Dispose();
 
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Serialize))
-            return (bridge.SerializeToHtml(), layoutAssertions);
+        {
+            // The render projection is what both paths render; only one of them turns it into
+            // text first. Building it twice would double the most expensive step here, so the
+            // lever picks one.
+            return DomRender
+                ? new ExecutedDocument(null, bridge.GetRenderDocument(), layoutAssertions)
+                : new ExecutedDocument(bridge.SerializeToHtml(), null, layoutAssertions);
+        }
     }
 
     /// <summary>
