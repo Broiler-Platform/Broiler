@@ -1209,6 +1209,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     // siblings, so the child that follows lays out from the moved bottom edge.
                     ApplyForcedPageBreakBefore(childBox, previousInFlow);
 
+                    // CSS Fragmentation 3 §4.1: and a page boundary falling inside an unbreakable
+                    // child moves the whole child past it. Breakable content needs nothing — the
+                    // surface is continuous, so it already resumes at the top of the next page.
+                    ApplyMonolithicPageFit(childBox);
+
                     if (childBox.Display != CssConstants.None
                         && childBox.Position is not (CssConstants.Absolute or CssConstants.Fixed)
                         && childBox.Float == CssConstants.None)

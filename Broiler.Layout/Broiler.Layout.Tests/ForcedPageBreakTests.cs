@@ -135,9 +135,83 @@ public sealed class ForcedPageBreakTests
         Assert.Equal(second.Location.Y, grandchild.Location.Y, 3);
     }
 
+    // -------- monolithic content (CSS Fragmentation 3 §4.1) --------
+
+    // A page boundary falling inside a box that cannot be split moves the whole box past it. This
+    // is the only thing automatic fragmentation has to *decide* in this model: breakable content
+    // needs no work, because the surface is continuous and already resumes at the top of the next
+    // page.
+    //
+    // Block-level boxes only. An atomic inline is monolithic too, but it is placed by the inline
+    // formatting context rather than by the block child loop this hook sits in, and so are grid and
+    // flex items — those paths are not covered yet.
+    [Theory]
+    [InlineData("break-inside", "avoid")]
+    [InlineData("break-inside", "avoid-page")]
+    [InlineData("page-break-inside", "avoid")]
+    [InlineData("overflow", "hidden")]
+    [InlineData("overflow", "scroll")]
+    [InlineData("contain", "size")]
+    [InlineData("contain", "strict")]
+    [InlineData("contain", "content")]
+    public void An_Unbreakable_Box_Straddling_A_Boundary_Moves_To_The_Next_Page(string property, string value)
+    {
+        // First child 150 tall, so the second (50 tall) would span 150..200 — across the boundary
+        // at 200 only if it is taller than the 50 remaining. Make it 100 so it straddles.
+        var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: 100);
+        CssUtils.SetPropertyValue(second, property, value);
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(PageHeight, second.Location.Y, 3);
+    }
+
+    // The control: breakable content is left exactly where the flow put it, straddling the
+    // boundary, because the next band renders its remainder.
+    [Fact]
+    public void A_Breakable_Box_Is_Left_Straddling_The_Boundary()
+    {
+        var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: 100);
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(150, second.Location.Y, 3);
+    }
+
+    // A box that fits in what is left of the page is not moved — moving it would waste the page.
+    [Fact]
+    public void An_Unbreakable_Box_That_Still_Fits_Does_Not_Move()
+    {
+        var (root, second) = TreeWithTwoChildren(firstHeight: 100, secondHeight: 50);
+        second.BreakInside = "avoid";
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(100, second.Location.Y, 3);
+    }
+
+    // A box taller than the page has to be cut wherever it starts, so it stays put: pushing it
+    // would leave a blank page and then overflow the next one anyway.
+    [Fact]
+    public void An_Unbreakable_Box_Taller_Than_A_Page_Stays_Put()
+    {
+        var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: PageHeight + 50);
+        second.BreakInside = "avoid";
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(150, second.Location.Y, 3);
+    }
+
+    [Fact]
+    public void Without_A_Page_Size_An_Unbreakable_Box_Is_Not_Moved()
+    {
+        var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: 100, pageHeight: 99999);
+        second.BreakInside = "avoid";
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(150, second.Location.Y, 3);
+    }
+
     /// <summary>A root of two stacked block children; the second is the one under test.</summary>
     private static (CssBox Root, CssBox Second) TreeWithTwoChildren(
-        double firstHeight = ChildHeight, double pageHeight = PageHeight)
+        double firstHeight = ChildHeight, double secondHeight = ChildHeight, double pageHeight = PageHeight)
     {
         var root = new CssBox(null, null, BaseUrl)
         {
@@ -162,7 +236,7 @@ public sealed class ForcedPageBreakTests
         }
 
         Child(firstHeight);
-        return (root, Child(ChildHeight));
+        return (root, Child(secondHeight));
     }
 
     private sealed class StubLayoutEnvironment(double pageHeight) : ILayoutEnvironment
