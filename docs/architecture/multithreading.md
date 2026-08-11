@@ -6,8 +6,16 @@ the tooling.
 
 ## Status
 
-**Phase 4 is open, and it opened by re-measuring the rationale for deprioritising
-it.** That rationale had gone stale: this document deprioritised parallel layout on
+**Phase 4 is complete, and with it every phase in this document.** It ends the way it
+began — by measuring rather than building: its two items are **#18, built**, and **#13,
+retired against a measurement of both of the shapes its row proposed**. Along the way it
+spent most of its sections somewhere else entirely, because asking whether Phases 2 and 3
+had shown up on a WPT run led to finding out what a WPT run actually costs, and the answer
+was four things, none of them a threading problem and none of them in this document
+([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)–[§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading)).
+
+**It opened by re-measuring the rationale for deprioritising itself.** That rationale had
+gone stale: this document deprioritised parallel layout on
 the grounds that layout is 0.6–6.5% of a render, and on today's code it is
 **3.3–20.1%** — not because layout got slower (it costs the same 28–51 ms it always
 did) but because Phases 2 and 3 removed cost from everything around it
@@ -16,7 +24,7 @@ did) but because Phases 2 and 3 removed cost from everything around it
 on one has to re-read it rather than cite it. It does not change the ranking — 1.5–2.5×
 of a 20% stage is ~10% end to end for 20–30 days at High risk, against a
 `parse+cascade` still at 23–81% — but the phase is now last for a reason that is
-currently true. The phase's other result is a retirement: the `Broiler.Layout`
+currently true. The phase's first retirement followed: the `Broiler.Layout`
 roadmap's **step 1**, "stop laying out the whole tree twice", ranked above both
 parallel steps, is **unreachable from every path this repository measures**, and where
 it does fire two passes cost 0.80–1.35× one, because the unrestricted first pass barely
@@ -167,6 +175,34 @@ Two residuals are named rather than hidden, and both are one patch each: the
 `Viewport` ambient slot has no read-side assertion (it lives in `Broiler.CSS`),
 and `DocumentModeContext` is never published on the HTML-string render path.
 Both are in the P0-c document.
+
+## What is left
+
+Every phase in this document is now closed, which is a claim that invites being read as
+"nothing remains". These are the open ends, each named where it was found rather than
+discovered by re-reading. None is a phase; several are one patch or one afternoon.
+
+| Open end | Where it was named | What it is |
+|---|---|---|
+| **#2's other two call-site families** | [Phase 2 §10](#10-item-17s-win-was-not-the-scan-it-was-a-host-that-never-reached-item-2s-split) | Iframes and `fetch()`/XHR still fetch serially. #17 supplies their URL set; what is missing is a consume site — the sub-document one yields `(content, contentType)` through a policy chain the text prefetcher cannot serve |
+| **#10's shaped-run cache** | [Phase 2 §5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names) | Deliberately unbuilt: `RequiresShaping` is false for the whole Latin corpus, so it would measure nothing. It needs a corpus with complex script in it before it can be judged, not more engineering |
+| **#14's scoped rebuild** | [Phase 3 §12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could) | Narrowing a rebuild rather than skipping one, for connected mutations that genuinely do reach the tree. The two elision halves took the cases that can be answered "no" |
+| **#3's sibling partitioner** | [Phase 2 §13](#13-item-3s-sequential-win-was-not-the-clip-narrowing-this-document-told-it-to-port) | A two-band split measures *slower* than sequential, reproducibly. The ported `Broiler.Graphics` copy refuses one; the `Broiler.HTML.Image` copy has the same inversion and does not |
+| **#18's refused surface** | [§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens) | Module workers, `SharedWorker`, nested workers, worker `requestAnimationFrame`, `MessagePort` transfer, network-fetched worker scripts. Also: the engine's `structuredClone` implements transfer as copy-then-detach, which is spec-observable but is not the performance reason transferables exist |
+| **P0-b's second half** | [P0-b](#p0-b--single-threaded-determinism-first-item-15--done) | Whether `CssStyleEngine` still needs `_sync` at all. Not re-measured — and [Phase 3 §3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is) has since shown the lock was never the bottleneck, so this is tidying rather than a win |
+| **P0-c's two residuals** | [P0-c](#p0-c--shared-cache-thread-safety-audit--done) | The `Viewport` ambient slot has no read-side assertion (it lives in `Broiler.CSS`), and `DocumentModeContext` is never published on the HTML-string render path. One patch each |
+| **Page-script compile on a WPT run** | [§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading) | The largest remaining term in a WPT run at 43.60 ms/call, and **deliberately** left: sharing page-derived compiled code across documents is the one thing a conformance runner must not do. Anything here has to make a per-document compile cheaper without crossing that boundary |
+| **Three submodule patches** | [`patches/README.md`](../../patches/README.md) | `0132`, `0133`, `0134` are written, measured and pending a maintainer, because their remotes are outside this session's GitHub scope. Their fixes are not in CI's pointer |
+
+**And one that is not a task but a hazard.** [§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)
+found this document deprioritising a phase on a share that two later phases had made
+false, and nothing in the process caught it, because a superseded measurement here is
+kept deliberately and nothing distinguishes "kept for the record" from "still true".
+[§14](#14-the-corpus-cannot-answer-item-13s-second-shape-and-on-real-documents-the-median-tree-is-17-boxes-with-nothing-independent-in-it)
+is the same hazard with a different mechanism — a number that was never false and never
+meant what it looked like. **Every share and every ceiling in this document decays**, and
+the two commands that re-read the most load-bearing ones are `--profile` and
+`--layout-independence`.
 
 ## Method and honesty caveat
 
