@@ -96,6 +96,59 @@ public class ViewTransitionRenderTests
         Assert.True(backdrop is { R: 255, G: 182, B: 193 }, $"backdrop was {backdrop.R},{backdrop.G},{backdrop.B}");
     }
 
+    // WPT css/css-view-transitions/active-view-transition-on-non-root: both view-transition
+    // pseudo-classes match the *root element only*, so a rule that hangs one off any other compound
+    // can never match. The implementation used to strip the pseudo out and re-match what was left,
+    // which turned `main:active-view-transition #target` — a selector written precisely to assert
+    // that it never matches — into `main #target`, and styled the target red.
+    [Fact]
+    public void ActiveViewTransition_PseudoClass_Does_Not_Match_A_Non_Root_Element()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  #target { background: green; width: 100px; height: 100px; view-transition-name: target; }
+  main:active-view-transition #target { background: red; }
+  html::view-transition-new(target) { animation: unset; opacity: 0; }
+  html::view-transition-old(target) { animation: unset; opacity: 1; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition { background: lightpink; }
+</style>
+<main><div id="target"></div></main>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        var square = bitmap.GetPixel(40, 40);
+        Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
+    }
+
+    // The control for the case above: the same rule on the root element *does* match, so a change
+    // that simply stopped applying either pseudo-class would not pass both.
+    [Fact]
+    public void ActiveViewTransition_PseudoClass_Still_Matches_The_Root()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  #target { background: red; width: 100px; height: 100px; view-transition-name: target; }
+  html:active-view-transition #target { background: green; }
+  html::view-transition-new(target) { animation: unset; opacity: 0; }
+  html::view-transition-old(target) { animation: unset; opacity: 1; }
+  html::view-transition-group(root) { display: none; }
+  html::view-transition { background: lightpink; }
+</style>
+<main><div id="target"></div></main>
+</html>
+""";
+        using var bitmap = Render(html, "document.startViewTransition();");
+
+        var square = bitmap.GetPixel(40, 40);
+        Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
+    }
+
     [Fact]
     public void Ready_Promise_Resolves_So_The_Screenshot_Fires()
     {
