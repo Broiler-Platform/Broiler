@@ -163,6 +163,8 @@ self-contained debug APKs and Release AABs, and ship `android-arm64` plus
 
 Each submodule README contains its standalone build and test commands. Broiler.HTML also
 has repository-specific WPT tooling, while Broiler.JS documents its test262 workflow.
+The [real-world website render suite](docs/real-world-render-tests.md) complements those
+standards tests with visual comparisons against a small allowlist of public websites.
 
 ## Repository layout
 

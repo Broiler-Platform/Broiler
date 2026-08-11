@@ -1,0 +1,125 @@
+{
+  "$schema": "./sites.schema.json",
+  "schemaVersion": 1,
+  "defaults": {
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "navigationTimeoutSeconds": 45,
+    "settleMilliseconds": 2500,
+    "locale": "en-US",
+    "timezoneId": "UTC",
+    "pixelTolerance": 5,
+    "thresholds": {
+      "pixelMatchPercent": 90,
+      "contentMatchPercent": 60,
+      "structureMatchPercent": 60
+    }
+  },
+  "sites": [
+    {
+      "id": "google-search",
+      "name": "Google Search",
+      "url": "https://www.google.com/search?q=browser+rendering&hl=en&pws=0&gl=us",
+      "category": "dynamic",
+      "description": "Dense search-results stress case. Consent, anti-bot, geolocation, and result changes are expected to be visible in the report.",
+      "tags": [
+        "search",
+        "forms",
+        "javascript",
+        "dynamic-content"
+      ]
+    },
+    {
+      "id": "seven-zip",
+      "name": "7-Zip",
+      "url": "https://www.7-zip.org/",
+      "category": "stable",
+      "description": "Mostly static legacy HTML with tables, lists, links, and small images.",
+      "tags": [
+        "static",
+        "tables",
+        "legacy-html"
+      ]
+    },
+    {
+      "id": "heise",
+      "name": "heise online",
+      "url": "https://www.heise.de/",
+      "category": "dynamic",
+      "description": "Large German news homepage with responsive layout, web fonts, images, consent handling, and substantial scripting.",
+      "locale": "de-DE",
+      "timezoneId": "Europe/Berlin",
+      "settleMilliseconds": 4000,
+      "tags": [
+        "news",
+        "responsive",
+        "javascript",
+        "dynamic-content"
+      ]
+    },
+    {
+      "id": "wikipedia-browser",
+      "name": "Wikipedia: Web browser",
+      "url": "https://en.wikipedia.org/wiki/Web_browser",
+      "category": "stable",
+      "description": "Content-heavy article with navigation, multi-column layout, tables, images, and typography.",
+      "tags": [
+        "article",
+        "typography",
+        "responsive"
+      ]
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "url": "https://github.com/",
+      "category": "dynamic",
+      "description": "Modern component-heavy landing page with responsive CSS, SVG, gradients, and scripting.",
+      "tags": [
+        "application",
+        "responsive",
+        "svg",
+        "javascript"
+      ]
+    },
+    {
+      "id": "mdn-html",
+      "name": "MDN: HTML",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTML",
+      "category": "stable",
+      "description": "Documentation layout with navigation, code-oriented typography, sidebars, and responsive components.",
+      "tags": [
+        "documentation",
+        "typography",
+        "responsive"
+      ]
+    },
+    {
+      "id": "hacker-news",
+      "name": "Hacker News",
+      "url": "https://news.ycombinator.com/",
+      "category": "dynamic",
+      "description": "Frequently changing but structurally simple table-based page; useful as a dense text/layout canary.",
+      "tags": [
+        "news",
+        "tables",
+        "legacy-html",
+        "dynamic-content"
+      ]
+    },
+    {
+      "id": "w3c",
+      "name": "W3C",
+      "url": "https://www.w3.org/",
+      "category": "stable",
+      "description": "Standards organization homepage with semantic HTML, responsive cards, images, and modern CSS.",
+      "tags": [
+        "standards",
+        "semantic-html",
+        "responsive"
+      ]
+    }
+  ]
+}

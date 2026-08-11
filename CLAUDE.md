@@ -157,6 +157,13 @@ something to attempt from inside the container.
   Broiler — no Chromium, no reference-image directory. CI: the `WPT Reftests`
   workflow. Its pass rate is not comparable to the golden-image suite's; see
   `docs/wpt-reftests.md`.
+- Real-world website render runner: install the pinned Playwright dependencies
+  under `tests/wpt`, install `tests/real-world-sites/requirements.txt`, set
+  `NODE_PATH=tests/wpt/node_modules`, then run
+  `python scripts/run-real-world-render-tests.py [--sites <id,...>]`. This is an
+  observational weekly/manual suite, not a standards-conformance rate; it
+  writes JSON, Markdown, HTML, screenshots, and diffs under
+  `artifacts/real-world-render-tests`. See `docs/real-world-render-tests.md`.
 - WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
   and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
   0 disables). The cap is on the *growth* of the rendering process's resident

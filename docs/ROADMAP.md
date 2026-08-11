@@ -95,7 +95,9 @@ repairing their documentation links is tracked in
 - Capture fresh Acid1/Acid2/Acid3 viewport references and report script score,
   geometry, content, and pixel metrics separately.
 - Add a local HTTP fixture for the remaining Acid3 status/content-type cases.
-- Re-run the Google comparison against a recorded input and Chromium revision;
+- Use the [real-world website render suite](real-world-render-tests.md) to rerun
+  Google and the broader public-site corpus. It records Chromium's final DOM,
+  browser revision, live end-to-end output, and a layout-only replay separately;
   record actual milestone measurements rather than inferring compliance from API
   presence.
 - Cross-check the golden-image suite against the engine-independent one. The

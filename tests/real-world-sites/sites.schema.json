@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://broiler.dev/schemas/real-world-sites.schema.json",
+  "title": "Broiler real-world render-test corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "defaults",
+    "sites"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "defaults": {
+      "$ref": "#/$defs/defaults"
+    },
+    "sites": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/site"
+      }
+    }
+  },
+  "$defs": {
+    "percentage": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pixelMatchPercent",
+        "contentMatchPercent",
+        "structureMatchPercent"
+      ],
+      "properties": {
+        "pixelMatchPercent": {
+          "$ref": "#/$defs/percentage"
+        },
+        "contentMatchPercent": {
+          "$ref": "#/$defs/percentage"
+        },
+        "structureMatchPercent": {
+          "$ref": "#/$defs/percentage"
+        }
+      }
+    },
+    "thresholdOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "pixelMatchPercent": {
+          "$ref": "#/$defs/percentage"
+        },
+        "contentMatchPercent": {
+          "$ref": "#/$defs/percentage"
+        },
+        "structureMatchPercent": {
+          "$ref": "#/$defs/percentage"
+        }
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "width",
+        "height"
+      ],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 320,
+          "maximum": 4096
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 240,
+          "maximum": 4096
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "viewport",
+        "navigationTimeoutSeconds",
+        "settleMilliseconds",
+        "locale",
+        "timezoneId",
+        "pixelTolerance",
+        "thresholds"
+      ],
+      "properties": {
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "navigationTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "settleMilliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2
+        },
+        "timezoneId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pixelTolerance": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "thresholds": {
+          "$ref": "#/$defs/thresholds"
+        }
+      }
+    },
+    "site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "url",
+        "category"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "category": {
+          "enum": [
+            "stable",
+            "dynamic"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2
+        },
+        "timezoneId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "pixelTolerance": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "navigationTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300
+        },
+        "settleMilliseconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        },
+        "thresholds": {
+          "$ref": "#/$defs/thresholdOverrides"
+        },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        }
+      }
+    }
+  }
+}
