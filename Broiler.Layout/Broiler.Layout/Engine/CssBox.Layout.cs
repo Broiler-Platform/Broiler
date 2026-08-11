@@ -1199,9 +1199,22 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         Size = new SizeF((float)colWidth, Size.Height);
                 }
 
+                CssBox? previousInFlow = null;
                 foreach (var childBox in Boxes)
                 {
                     childBox.PerformLayout(g);
+
+                    // CSS Fragmentation 3 §3: a forced page break before this child (or after the
+                    // one before it) moves it to the top of the next page. Applied here, between
+                    // siblings, so the child that follows lays out from the moved bottom edge.
+                    ApplyForcedPageBreakBefore(childBox, previousInFlow);
+
+                    if (childBox.Display != CssConstants.None
+                        && childBox.Position is not (CssConstants.Absolute or CssConstants.Fixed)
+                        && childBox.Float == CssConstants.None)
+                    {
+                        previousInFlow = childBox;
+                    }
 
                     // CSS2.1 §13.3.1: When page-break-inside:avoid is
                     // set, move floated children to the next page if they

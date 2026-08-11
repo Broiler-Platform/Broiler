@@ -495,6 +495,20 @@ internal abstract partial class CssBoxProperties
 
     public string PageBreakInside { get; set; } = CssConstants.Auto;
 
+    /// <summary>
+    /// CSS Fragmentation 3 §3 <c>break-before</c>: whether a fragmentation break is forced
+    /// immediately before this box. <c>auto</c> (the initial value) forces nothing; <c>page</c>,
+    /// <c>always</c>, <c>left</c>, <c>right</c>, <c>recto</c> and <c>verso</c> force a page break.
+    /// The legacy <c>page-break-before</c> is an alias and lands here too.
+    /// </summary>
+    public string BreakBefore { get; set; } = CssConstants.Auto;
+
+    /// <summary>
+    /// CSS Fragmentation 3 §3 <c>break-after</c> — the same, immediately after this box. Aliased by
+    /// the legacy <c>page-break-after</c>.
+    /// </summary>
+    public string BreakAfter { get; set; } = CssConstants.Auto;
+
     public string Left
     {
         get { return _left; }

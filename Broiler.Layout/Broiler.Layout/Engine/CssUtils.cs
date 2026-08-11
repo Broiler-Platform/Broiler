@@ -112,6 +112,10 @@ internal static partial class CssUtils
             "text-decoration-style" => cssBox.TextDecorationStyle,
             "text-decoration-color" => cssBox.TextDecorationColor,
             "white-space" => cssBox.WhiteSpace,
+            "break-before" => cssBox.BreakBefore,
+            "page-break-before" => cssBox.BreakBefore,
+            "break-after" => cssBox.BreakAfter,
+            "page-break-after" => cssBox.BreakAfter,
             "line-clamp" => cssBox.LineClamp,
             "-webkit-line-clamp" => cssBox.WebkitLineClamp,
             "max-lines" => cssBox.MaxLines,
@@ -677,6 +681,14 @@ internal static partial class CssUtils
                 break;
             case "white-space":
                 cssBox.WhiteSpace = NormalizeWhiteSpaceValue(value);
+                break;
+            case "break-before":
+            case "page-break-before":
+                cssBox.BreakBefore = value;
+                break;
+            case "break-after":
+            case "page-break-after":
+                cssBox.BreakAfter = value;
                 break;
             case "line-clamp":
                 cssBox.LineClamp = value;
