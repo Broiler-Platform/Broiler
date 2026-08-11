@@ -147,15 +147,18 @@ Three things this reliably separates, from the triage of
 problems, all at 0.0–1.4% match):
 
 - **A real Broiler bug** — Chromium reproduces its own reference, Broiler does
-  not. Four of the thirty were this, and each turned out to be something other
-  than what its directory suggested:
+  not. Four of the thirty were this, and three of them turned out to be
+  something other than what the directory suggested:
   `css/css-page/monolithic-overflow-014-print` was not a paged-media gap at all
-  but `display: flow-root` painting nothing (fixed — see the commit; it fixed 32
-  reftests across `css-break`, `css-box/margin-trim`, `CSS2/floats` and
-  `css-rhythm`, all of them tests whose *reference* used a `flow-root` wrapper),
-  and `quirks/tables-inherit-color-from-body-quirk-007` was `document.append`
-  missing from the bridge, not a colour bug (fixed; the quirk itself is still
-  open).
+  but `display: flow-root` painting nothing (fixed; it fixed 32 reftests across
+  `css-break`, `css-box/margin-trim`, `CSS2/floats` and `css-rhythm`, all of
+  them tests whose *reference* used a `flow-root` wrapper);
+  `quirks/tables-inherit-color-from-body-quirk-007` was `document.append`
+  missing from the bridge, not a colour bug (fixed — 0.0% → 94.9%; the quirk
+  itself is still open); and the two `css/css-image-animation/…-paused` tests
+  were the one case that *was* what it looked like, an unimplemented
+  `image-animation` (fixed, 0.0% → 100% each, and 15/22 → 20/22 for the
+  directory).
 - **A test that is stale upstream.** `css/CSS2/box-display/root-box-003.xht`
   asserts that `html { display: none; background: green }` still paints the
   canvas green. Chromium renders it white, and so does Broiler — because
