@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 20270,
+    "failed": 20276,
     "skipped": 0,
-    "total": 20270
+    "total": 20276
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 14494,
+      "count": 14502,
       "examples": [
         "accname/name/comp_tooltip.html",
         "appmanifest/icons-member/icons-member-cors-fail-manual.sub.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 2742,
+      "count": 2744,
       "examples": [
         "css/compositing/Blending_in_a_group_with_filter.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-blended-element-with-transparent-pixels.html",
@@ -39,7 +39,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 1561,
+      "count": 1562,
       "examples": [
         "conformance-checkers/html-aria/accessible-name-updates/706.html",
         "content-security-policy/blob/self-doesnt-match-blob.sub.html",
@@ -51,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 1001,
+      "count": 999,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/compositing/mix-blend-mode/mix-blend-mode-parent-with-text.html",
@@ -63,11 +63,11 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 67,
+      "count": 65,
       "examples": [
-        "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
         "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
-        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html"
+        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
+        "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html"
       ]
     },
     {
@@ -86,7 +86,7 @@
   "topFailingDirectories": [
     [
       "css/CSS2",
-      3084
+      3085
     ],
     [
       "html/canvas",
@@ -117,22 +117,22 @@
       553
     ],
     [
-      "conformance-checkers/html-svg",
-      515
+      "html/semantics",
+      517
     ],
     [
-      "html/semantics",
+      "conformance-checkers/html-svg",
       515
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      19853
+      19862
     ],
     [
       "Timeout",
-      67
+      65
     ]
   ],
   "droppedDeclarations": [],
@@ -1605,6 +1605,13 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html-its/translate/html/translate6html.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0038-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -6140,13 +6147,15 @@
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Feodor_I_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Naser_al-Din_Shah_Qajar-novalid.html",
@@ -11939,13 +11948,13 @@
       "category": "Timeout"
     },
     {
-      "relativeTestPath": "css/CSS2/cascade-import/cascade-import-009.xht",
+      "relativeTestPath": "css/CSS2/cascade-import/cascade-import-006.xht",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
     },
     {
-      "relativeTestPath": "css/CSS2/cascade-import/cascade-import-010.xht",
+      "relativeTestPath": "css/CSS2/cascade-import/cascade-import-009.xht",
       "passed": false,
       "skipped": false,
       "category": "Timeout"
@@ -14934,6 +14943,13 @@
     },
     {
       "relativeTestPath": "css/CSS2/fonts/font-family-rule-017.xht",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/CSS2/fonts/font-family-valid-characters-001.xht",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -98073,6 +98089,13 @@
       "subCategory": "LayoutShift"
     },
     {
+      "relativeTestPath": "css/css-values/vh-update-and-transition-in-subframe-iframe.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "css/css-values/vh-update-and-transition-in-subframe.html",
       "passed": false,
       "skipped": false,
@@ -98265,14 +98288,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/auto-name-from-id.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/auto-name.html",
@@ -106783,7 +106806,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/filter-effects/feComposite-intersection-feTile-input.html",
@@ -131478,6 +131501,13 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "html/semantics/embedded-content/the-img-element/image-loading-lazy-empty-src.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "html/semantics/embedded-content/the-img-element/image-loading-lazy-multicol.html",
       "passed": false,
       "skipped": false,
@@ -139487,7 +139517,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/animateMotion-keyPoints-002.html",
@@ -140230,6 +140260,20 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "svg/painting/reftests/non-scaling-stroke-001.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
+    },
+    {
+      "relativeTestPath": "svg/painting/reftests/non-scaling-stroke-003.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/painting/reftests/non-scaling-stroke-004.html",
