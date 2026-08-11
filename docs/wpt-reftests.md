@@ -192,7 +192,8 @@ problems, all at 0.0–1.4% match):
     **during** parsing sees a tree the runner cannot reproduce.
     `…-quirk-006` and `-007` say so in a comment — "at this point, the `<body>`
     has not been created yet" — and they still fail, because by the time this
-    runner executes anything, it has.
+    runner executes anything, it has. **Open, and deliberately**: see
+    [what parse-time script execution would cost](#what-parser-blocking-scripts-would-cost).
 
   Suspect both when a test's script removes or replaces `<html>`/`<body>`, and
   pin the behaviour in a unit test over the box tree rather than waiting for the
@@ -258,3 +259,47 @@ a silent per-test rendering difference rather than a build error.
 The switch was made on a paired A/B over ~3 400 reftests in which 3 tests
 changed, all fixed, none regressed. That is not the whole corpus, which is why
 the round trip is still one environment variable away.
+
+## What parser-blocking scripts would cost
+
+A browser runs a `<script>` the moment the parser reaches it, against the tree
+built so far. This runner parses the whole document and then evaluates the
+scripts it extracted. The difference is invisible to almost every test and
+decisive for a couple, so it is worth writing down what closing it involves
+rather than rediscovering the question.
+
+**What it would buy: two reftests.** Of the eleven reftests whose scripts could
+observe a mid-parse DOM (`document.write`, `readyState`, `currentScript`, or a
+comment saying as much), **seven already pass** — post-parse `document.write`
+reproduces their result — and two of the four failures need unrelated features
+(`popover-hidden-display`, `video_initially_paused`). Only
+`quirks/tables-inherit-color-from-body-quirk-006` and `-007` actually require
+it: their script runs before any body-level markup, so `document.body` is null
+when it replaces the document element, and the document legitimately ends up
+with no body.
+
+**What it would cost.** Three things at once:
+
+- **A parser callback.** `HtmlDocumentParser` would have to invoke the host when
+  it inserts a `<script>` and resume afterwards. That change is small, but the
+  parser is in the `Broiler.DOM` submodule — so it ships as a patch, and the
+  first call to the new overload stops the main repository compiling against the
+  pinned pointer. Every other fix on this path was kept main-repo-only precisely
+  to avoid that coupling.
+- **The runner's script sequencing, re-derived.** Stub injection, external
+  `src=` resolution, deferred and module scripts, microtask draining, the
+  `window`→global promotion and the load event are all ordered around "parse
+  first, then evaluate". Interleaving moves all of it.
+- **A corpus-wide behaviour change.** Every script would see only the markup
+  above it. That is *more* correct — WPT scripts are written for real browsers —
+  but "more correct" over ~9 000 tests is a claim only a paired A/B settles, and
+  this is the runner's core rather than a leaf.
+
+**The shortcut is a trap, and worth naming.** The tempting version is to stop
+attaching `<body>` until markup opens it, which makes both tests pass. It is
+wrong: HTML tree construction *does* insert `<body>` at EOF, so every head-only
+document would become body-less and non-conformant. In these tests the body is
+absent because the script replaced the document element *before* EOF — not
+because head-only documents lack one. Passing them that way would be the same
+"both sides equally wrong" failure this document warns about elsewhere, bought
+at the price of a real regression.
