@@ -170,7 +170,6 @@ internal partial class CssBox
             return 0;
 
         child.OffsetTop(remaining);
-        child.ActualBottom += remaining;
         return remaining;
     }
 
@@ -182,9 +181,13 @@ internal partial class CssBox
     /// <remarks>
     /// Applied after the child is laid out rather than before, because its position is only known
     /// then — and the whole laid-out subtree moves with it, which is what
-    /// <see cref="OffsetTop"/> is for. <c>ActualBottom</c> is advanced by hand: <c>OffsetTop</c>
-    /// moves the box's origin and its descendants but not its recorded bottom edge, and that edge
-    /// is precisely what the next sibling positions itself from.
+    /// <see cref="OffsetTop"/> is for. Nothing else needs adjusting:
+    /// <see cref="CssBoxProperties.ActualBottom"/> is derived from the box's origin
+    /// (<c>Location.Y + Size.Height</c>), so moving the origin carries the bottom edge — the edge
+    /// the next sibling positions itself from — with it. Advancing it as well, which this used to
+    /// do, does not translate the box but *stretches* it: the setter resizes rather than moves, so
+    /// every pushed box grew by the distance it was pushed and everything after it drifted. That is
+    /// what made a two-page document paginate as five.
     /// </remarks>
     internal double ApplyForcedPageBreakBefore(CssBox child, CssBox? previous)
     {
@@ -220,7 +223,6 @@ internal partial class CssBox
 
         double delta = pageHeight - intoPage;
         child.OffsetTop(delta);
-        child.ActualBottom += delta;
         return delta;
     }
 }

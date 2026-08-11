@@ -209,6 +209,54 @@ public sealed class ForcedPageBreakTests
         Assert.Equal(150, second.Location.Y, 3);
     }
 
+    // The page-count regression test, from css/CSS2/pagination/block-page-break-inside-avoid-print-ref:
+    // a page area 192 tall, a 96-tall block with `page-break-after: always`, then two more 96-tall
+    // blocks. The forced break puts the second at the top of page 2 and the third directly below
+    // it, so the content ends at exactly two pages.
+    //
+    // The third block is what this is really for. ActualBottom is derived from the box's origin
+    // (Location.Y + Size.Height) and its setter *resizes* rather than moves, so advancing it after
+    // OffsetTop -- which the break already did -- stretched every pushed box by the distance it was
+    // pushed. Each following sibling then started lower than it should, and the document reported
+    // more content than it had: this two-page reference paginated as five.
+    [Fact]
+    public void A_Forced_Break_Moves_The_Box_Without_Stretching_It()
+    {
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Location = new PointF(0, 0),
+            Size = new SizeF(384, 1536),
+            Display = CssConstants.Block,
+            FontSize = "16px",
+            LayoutEnvironment = new StubLayoutEnvironment(192),
+        };
+
+        CssBox Block(double h)
+        {
+            var b = new CssBox(root, null, BaseUrl)
+            {
+                Location = new PointF(0, 0),
+                Size = new SizeF(384, (float)h),
+                Display = CssConstants.Block,
+                FontSize = "16px",
+            };
+            b.Height = h.ToString(System.Globalization.CultureInfo.InvariantCulture) + "px";
+            return b;
+        }
+
+        var first = Block(96);
+        first.BreakAfter = "always";
+        var second = Block(96);
+        var third = Block(96);
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(0, first.Location.Y, 1);
+        Assert.Equal(192, second.Location.Y, 1);
+        Assert.Equal(288, third.Location.Y, 1);
+        Assert.Equal(384, third.ActualBottom, 1);
+    }
+
     /// <summary>A root of two stacked block children; the second is the one under test.</summary>
     private static (CssBox Root, CssBox Second) TreeWithTwoChildren(
         double firstHeight = ChildHeight, double secondHeight = ChildHeight, double pageHeight = PageHeight)
