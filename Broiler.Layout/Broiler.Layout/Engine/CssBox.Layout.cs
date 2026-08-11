@@ -821,11 +821,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // clear below them.
             if (Float == CssConstants.None && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
             {
-                bool isBfcRoot = Display == CssConstants.InlineBlock
-                    || Display == CssConstants.TableCell
-                    || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
-                    || (Overflow != null && Overflow != CssConstants.Visible)
-                    || (AlignContent != null && AlignContent != "normal");
+                bool isBfcRoot = CssBoxHelper.EstablishesBfc(this);
 
                 if (isBfcRoot)
                 {
@@ -1137,16 +1133,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // does not call MarginBottomCollapse(), so BFC elements
                 // with only floated children would otherwise have zero
                 // content height.
-                bool isBfc = Float != CssConstants.None
-                    || Display == CssConstants.InlineBlock
-                    || Display == CssConstants.TableCell
-                    || Display is "flex" or "inline-flex" or "grid" or "inline-grid"
-                    || (Overflow != null && Overflow != CssConstants.Visible)
-                    || Position == CssConstants.Absolute
-                    || Position == CssConstants.Fixed
-                    || (AlignContent != null && AlignContent != "normal");
-
-                if (isBfc)
+                if (CssBoxHelper.EstablishesBfc(this))
                 {
                     ActualBottom = MarginBottomCollapse();
                 }

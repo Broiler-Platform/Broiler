@@ -268,8 +268,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     public bool IsInline => (Display == CssConstants.Inline || Display == CssConstants.InlineBlock
         || Display == "inline-flex" || Display == "inline-grid") && !IsBrElement;
     
+    // CSS Display 3 §2.5: `flow-root` is block-level (its <display-outside> is
+    // `block`); the keyword only changes the <display-inside> to "block container
+    // that establishes a new BFC". Everything block layout does applies to it
+    // unchanged, so it belongs in this predicate — omitting it left such a box
+    // neither block nor inline, and it laid out and painted nothing at all.
     public bool IsBlock => Display == CssConstants.Block || Display == "flex"
-        || Display == "grid";
+        || Display == "grid" || Display == "flow-root";
     
     public virtual bool IsClickable
     {

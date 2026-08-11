@@ -262,13 +262,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // block formatting context (BFC).  Non-BFC blocks (e.g. a plain
         // <ul> inside a floated <dd>) must not include descendant floats
         // in their height calculation.
-        bool isBfc = Float != CssConstants.None
-            || Display == CssConstants.InlineBlock
-            || Display == CssConstants.TableCell
-            || (Overflow != null && Overflow != CssConstants.Visible)
-            || Position == CssConstants.Absolute
-            || Position == CssConstants.Fixed
-            || (AlignContent != null && AlignContent != "normal");
+        bool isBfc = CssBoxHelper.EstablishesBfc(this);
 
         // Use the maximum ActualBottom across all children to handle
         // floated children that may not be the last in source order.
