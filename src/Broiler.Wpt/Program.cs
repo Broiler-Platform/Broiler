@@ -111,6 +111,7 @@ public class Program
         bool verifyReference = false;
         bool workerMode = false;
         bool noWorkerIsolation = false;
+        bool phaseTrace = false;
         int? requestedWorkerCount = null;
 
         for (int i = 0; i < args.Length; i++)
@@ -122,6 +123,9 @@ public class Program
                     break;
                 case "--no-worker-isolation":
                     noWorkerIsolation = true;
+                    break;
+                case "--phase-trace":
+                    phaseTrace = true;
                     break;
                 case "--workers" when i + 1 < args.Length:
                     if (!TryParseWorkerCount(args[++i], out requestedWorkerCount))
@@ -349,6 +353,28 @@ public class Program
             Console.WriteLine($"Rerun mode    : {rerunSelectionKind.ToString().ToLowerInvariant()}");
         }
         Console.WriteLine();
+
+        // The phases are timed inside whichever process renders, so under worker isolation the
+        // totals accumulate in the workers and the parent has nothing to report. Say so rather than
+        // printing a breakdown of whatever little the parent process happened to do itself.
+        if (phaseTrace)
+        {
+            if (useWorkerIsolation)
+            {
+                Console.Error.WriteLine(
+                    "Error: --phase-trace requires --no-worker-isolation — the phases run inside the " +
+                    "worker processes, whose counters die with them and are never sent back over the " +
+                    "protocol.");
+                return 1;
+            }
+
+            WptPhaseTrace.Enabled = true;
+            WptPhaseTrace.Reset();
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Enabled = true;
+            Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Reset();
+        }
+
+        var phaseTraceWatch = Stopwatch.StartNew();
 
         var runner = new WptTestRunner(
             failureImageDir: failureImagesDir,
@@ -596,6 +622,7 @@ public class Program
         PrintDroppedDeclarations(topDropped, droppedDeclarations.TotalDropped);
         PrintExceptionSignatures(topExceptionSignatures);
         PrintTestKinds(allResults);
+        PrintPhaseTrace(phaseTraceWatch.Elapsed.TotalMilliseconds, allResults.Count);
 
         if (jsonOutputPath is not null)
         {
@@ -2432,6 +2459,14 @@ public class Program
         return buckets;
     }
 
+    private static void PrintPhaseTrace(double wallMs, int testCount)
+    {
+        if (!WptPhaseTrace.Enabled)
+            return;
+
+        WptPhaseTrace.Report(Console.Out, wallMs, testCount);
+    }
+
     private static void PrintTestKinds(IReadOnlyList<WptTestResult> allResults)
     {
         var buckets = ComputeTestKindBuckets(allResults);
@@ -3017,6 +3052,7 @@ public class Program
         Console.WriteLine("                             identical to the Chromium reference");
         Console.WriteLine($"                             (default: {FormatPassThreshold(DefaultPassThresholdPercent)}, env: {PassThresholdEnvironmentVariable})");
         Console.WriteLine("  --no-worker-isolation      Run tests in-process instead of the default worker process");
+        Console.WriteLine("  --phase-trace              Break a run's wall time down by phase (needs --no-worker-isolation)");
         Console.WriteLine("                             isolation. Useful for debugger sessions only. Implies");
         Console.WriteLine("                             --workers 1.");
         Console.WriteLine("  --workers <N>|auto         Number of worker processes draining the test queue");

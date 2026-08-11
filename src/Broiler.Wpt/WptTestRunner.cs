@@ -2048,7 +2048,8 @@ internal sealed partial class WptTestRunner
         // Fonts before the first render, for the same reason the golden path loads them
         // there: the first text measurement caches the typeface it resolves per family.
         if (wptRoot != null)
-            EnsureWptFontsLoaded(wptRoot);
+            using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Fonts))
+                EnsureWptFontsLoaded(wptRoot);
 
         HTML.Image.BBitmap rendered;
         try
@@ -2078,6 +2079,18 @@ internal sealed partial class WptTestRunner
         }
     }
 
+
+    /// <summary>
+    /// <see cref="PixelDiffRunner.Compare"/> under a phase scope. A local helper rather than a
+    /// <c>using</c> at each call site because the result is itself disposable and the two scopes
+    /// would nest confusingly.
+    /// </summary>
+    private PixelDiffResult MeasuredCompare(HTML.Image.BBitmap rendered, HTML.Image.BBitmap reference)
+    {
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Compare))
+            return PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
+    }
+
     /// <summary>
     /// The <c>rel="match"</c> half of <see cref="RunReferenceTest"/>: pass on the first
     /// reference the render reproduces, otherwise report the closest candidate.
@@ -2102,7 +2115,7 @@ internal sealed partial class WptTestRunner
 
             using (reference)
             {
-                using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
+                using var diff = MeasuredCompare(rendered, reference);
                 double matchPct = (1.0 - diff.DiffRatio) * 100;
 
                 if (diff.IsMatch)
@@ -2118,6 +2131,7 @@ internal sealed partial class WptTestRunner
 
                 if (closestFailure is null || matchPct > (closestFailure.MatchPercent ?? -1))
                 {
+                    using var diagnoseScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.Diagnose);
                     var diagnostics = MismatchClassifier.Classify(
                         diff, rendered.Width, rendered.Height, reference.Width, reference.Height);
                     var bands = DisplacementBandAnalyzer.Analyze(diff.Mismatches);
@@ -2386,7 +2400,9 @@ internal sealed partial class WptTestRunner
 
     private HTML.Image.BBitmap RenderHtmlFileBitmapCore(string htmlPath, string? wptRoot)
     {
-        var html = File.ReadAllText(htmlPath);
+        string html;
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.FileRead))
+            html = File.ReadAllText(htmlPath);
 
         if (IsMediaPlaybackTest(html))
             throw new InvalidOperationException("Test requires media playback.");
@@ -2397,8 +2413,10 @@ internal sealed partial class WptTestRunner
         var testBaseUrl = new Uri(Path.GetFullPath(htmlPath)).AbsoluteUri;
 
         // Set local base path for sub-resource resolution.
-        html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot).Html;
-        html = HtmlPostProcessor.Process(html);
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Scripts))
+            html = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot).Html;
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.PostProcess))
+            html = HtmlPostProcessor.Process(html);
 
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetHandler = null;
         EventHandler<HtmlImageLoadEventArgs>? imageHandler = null;
@@ -2420,9 +2438,12 @@ internal sealed partial class WptTestRunner
         }
 
         using var presentation = ImageAnimationClock.Pin(presentationTime);
-        return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
-            backgroundColor: BColor.White,
-            stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
+        {
+            return RenderWithNativeAnchor(html, () => HtmlRender.RenderToImageWithStyleSet(html, _width, _height,
+                backgroundColor: BColor.White,
+                stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
+        }
     }
 
     /// <summary>
@@ -2678,6 +2699,8 @@ internal sealed partial class WptTestRunner
 
         // Inline linked stylesheets so the DomBridge passes that re-parse <style> source (view
         // transitions, animations) see them, not just the render-time cascade. Cascade-neutral.
+        var scanScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.ScriptScan);
+
         html = InlineLinkedStylesheets(html, testDir, wptRoot);
 
         bool needsStubs = false;
@@ -2757,6 +2780,14 @@ internal sealed partial class WptTestRunner
         scripts.Insert(0, FormattableString.Invariant(
             $"window.__broilerDeferPromiseTests = {(DeferPromiseTests ? "true" : "false")};"));
 
+        // The leading entries of `scripts` are this runner's own constant sources, not the
+        // document's — the promise-test flag, BrowserApiStubs, and TestharnessStubs when the test
+        // pulls in testharness.js. Counted here so the phase trace can separate what the runner
+        // injects from what the page brought.
+        var injectedScriptCount = 2 + (needsStubs ? 1 : 0);
+
+        scanScope.Dispose();
+
         if (scripts.Count == 0 && deferredScripts.Count == 0)
         {
             // Even with no inline scripts, we still need to process anchor
@@ -2779,7 +2810,9 @@ internal sealed partial class WptTestRunner
         // synchronization context when it is created, so without this the engine resumes await
         // continuations on the thread pool, racing this thread's serialize/render.
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
+        var contextScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.JsContext);
         using var context = new JSContext();
+        contextScope.Dispose();
         // Disposed with this call: the bridge owns a per-document session — the headless layout
         // view and its HtmlContainer (hence the whole box tree and every sub-resource its image
         // load handlers hold), timer/animation queues, listener stores and observers. Leaving it
@@ -2803,6 +2836,7 @@ internal sealed partial class WptTestRunner
 
             return JSUndefined.Value;
         }, "queueMicrotask", 1);
+        var attachScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.BridgeAttach);
         bridge.Attach(context, html, url);
 
         // Enforce the CSP style-src family (style-src / -elem / -attr) on the
@@ -2816,6 +2850,7 @@ internal sealed partial class WptTestRunner
 
         // Register DOM elements with IDs as globals (HTML5 named access).
         bridge.RegisterNamedElementGlobals(context);
+        attachScope.Dispose();
 
         void DrainAsyncWork()
         {
@@ -2852,15 +2887,27 @@ internal sealed partial class WptTestRunner
         if (batchStyleInvalidations)
             bridge.BeginStyleInvalidationBatch();
 
+        var evalScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.ScriptEval);
         try
         {
-            foreach (var script in scripts)
+            for (var si = 0; si < scripts.Count; si++)
             {
                 try
                 {
-                    context.Eval(script);
-                    PromoteWindowGlobalsToContext(bridge);
-                    DrainAsyncWork();
+                    if (si < injectedScriptCount)
+                    {
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalStubs))
+                            EvalInjectedStub(context, scripts[si]);
+                    }
+                    else
+                    {
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
+                            context.Eval(scripts[si]);
+                    }
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
+                        PromoteWindowGlobalsToContext(bridge);
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                        DrainAsyncWork();
                 }
                 catch (Exception ex)
                 {
@@ -2873,9 +2920,12 @@ internal sealed partial class WptTestRunner
             {
                 try
                 {
-                    context.Eval(script);
-                    PromoteWindowGlobalsToContext(bridge);
-                    DrainAsyncWork();
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
+                        context.Eval(script);
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
+                        PromoteWindowGlobalsToContext(bridge);
+                    using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                        DrainAsyncWork();
                 }
                 catch (Exception ex)
                 {
@@ -2885,17 +2935,20 @@ internal sealed partial class WptTestRunner
             }
 
             bridge.FireWindowLoadEvent();
-            DrainAsyncWork();
+            using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                DrainAsyncWork();
         }
         finally
         {
             if (batchStyleInvalidations)
                 bridge.EndStyleInvalidationBatch();
+            evalScope.Dispose();
         }
 
         // Resolve CSS animation snapshots: for elements with animation + negative
         // delay, compute the animated property values at t=0 and write them as
         // inline styles so the static renderer can produce the correct output.
+        var postScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.PostScript);
         bridge.ResolveAnimationSnapshots();
 
         // Resolve CSS anchor positioning: for elements that use anchor()
@@ -2905,7 +2958,10 @@ internal sealed partial class WptTestRunner
         bridge.ResolveAnchorPositions();
 
         var layoutAssertions = bridge.EvaluateCheckLayoutAssertions();
-        return (bridge.SerializeToHtml(), layoutAssertions);
+        postScope.Dispose();
+
+        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Serialize))
+            return (bridge.SerializeToHtml(), layoutAssertions);
     }
 
     /// <summary>
@@ -2925,6 +2981,40 @@ internal sealed partial class WptTestRunner
     /// listing names keeps this correct as libraries come and go.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Evaluates one of this runner's own injected stub sources with the process-shared code cache
+    /// installed, so it is compiled once per process rather than once per document.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The injected sources are <c>BrowserApiStubs</c> (~10 KB), <c>TestharnessStubs</c> (~4.8 KB)
+    /// and a one-line flag — <c>private const string</c> fields of this class, so a fixed and
+    /// bounded set that cannot carry page content. Every document got a fresh <see cref="JSContext"/>
+    /// with its own code cache, so all of it was recompiled per document: <b>64.49 ms per eval and
+    /// 28.5% of a WPT run</b>, second only to <c>RegisterDocument</c> before that was fixed the same
+    /// way.
+    /// </para>
+    /// <para>
+    /// <b>Deliberately not applied to the document's own scripts</b>, which are evaluated through
+    /// the plain <c>context.Eval</c> a few lines up. Those are page content: sharing their compiled
+    /// form across documents is exactly the cross-document path a conformance runner must not
+    /// create, and it would buy little anyway since WPT documents rarely repeat a script verbatim.
+    /// </para>
+    /// </remarks>
+    private static void EvalInjectedStub(JSContext context, string source)
+    {
+        var previousCache = context.CodeCache;
+        context.CodeCache = Broiler.JavaScript.Runtime.DictionaryCodeCache.Current;
+        try
+        {
+            context.Eval(source);
+        }
+        finally
+        {
+            context.CodeCache = previousCache;
+        }
+    }
+
     private static void PromoteWindowGlobalsToContext(DomBridge bridge)
     {
         try

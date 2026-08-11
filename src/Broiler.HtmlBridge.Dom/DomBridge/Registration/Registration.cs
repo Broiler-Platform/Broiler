@@ -23,7 +23,74 @@ public sealed partial class DomBridge
     /// </summary>
     public Broiler.Dom.DomElement DocumentElement { get; }
 
+    /// <summary>
+    /// Publishes the document, window and DOM API surface onto <paramref name="context"/>, with the
+    /// bridge's own JavaScript compiled once per process instead of once per document.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>What this wrapper is for.</b> A profile of a WPT run put <c>RegisterDocument</c> at
+    /// <b>50.6–53.6% of the whole run</b> — 436–446 ms per document, twice per reftest, and the
+    /// single largest item measured anywhere in that investigation. It is also <em>fixed</em> cost:
+    /// 2% apart across two unrelated subsets, while the DOM parse next to it, which does scale with
+    /// the document, stays under a millisecond.
+    /// </para>
+    /// <para>
+    /// <b>The cost was compiling, not executing.</b> Registration evaluates a fixed set of
+    /// bridge-owned JavaScript sources — the content-rendering polyfill asset, the DOMException /
+    /// Node / SVGLength constructors, XMLHttpRequest, the mutation-observer and event shims, and the
+    /// window→global mirror. Every document got a fresh <see cref="JSContext"/>, and a fresh context
+    /// builds its own <c>DictionaryCodeCache</c>, so all of that was parsed and compiled again from
+    /// nothing every time. Installing the process-shared cache for the duration takes
+    /// <c>RegisterDocument</c> from <b>422.10 ms to 13.74 ms per call (30.7×)</b> and a 41-test
+    /// reftest run from 69.5 s to 39.3 s, with execution untouched — which is what identifies the
+    /// cost as compilation rather than the work the sources do.
+    /// </para>
+    /// <para>
+    /// <b>Why the swap is scoped to this call rather than set on the context.</b> The engine already
+    /// offers <c>JSContextOptions.UseProcessSharedCodeCache</c>, which would apply the shared cache
+    /// to <em>everything</em> the context evaluates, including page script. That is a different and
+    /// much larger claim: it would put one document's compiled code where the next document's
+    /// evaluation can find it. Nothing here needs that. Within this method the only sources
+    /// evaluated are compile-time constants owned by this assembly — verified rather than assumed:
+    /// no <c>Eval</c> reachable from here takes an interpolated or page-derived string, and page
+    /// script does not run until the host's own loop, after <c>Attach</c> has returned. Inline event
+    /// handlers, which <em>are</em> page-controlled, are compiled at dispatch time and so still go
+    /// through the context's own cache.
+    /// </para>
+    /// <para>
+    /// <b>What the shared cache can therefore hold</b> is a fixed, bounded set of strings that ship
+    /// in this assembly — it does not grow with the number of documents rendered, and no
+    /// page-controlled source can enter it through this path.
+    /// </para>
+    /// <para>
+    /// <b>Correctness rests on the cache key, which the engine already defines.</b>
+    /// <c>DictionaryCodeCache</c> keys on source, location, argument list and
+    /// <c>JSCompilationOptions</c>, so an entry is only ever served to a context that would have
+    /// compiled exactly the same thing; the compiled code binds to whichever context executes it.
+    /// The same property is what lets item #16's compile-ahead hand a worker's output to the eval
+    /// loop.
+    /// </para>
+    /// <para>
+    /// A context is single-threaded by construction (item #15), so saving and restoring the cache
+    /// around the call cannot race a second user of the same context.
+    /// </para>
+    /// </remarks>
     private void RegisterDocument(JSContext context)
+    {
+        var previousCache = context.CodeCache;
+        context.CodeCache = DictionaryCodeCache.Current;
+        try
+        {
+            RegisterDocumentCore(context);
+        }
+        finally
+        {
+            context.CodeCache = previousCache;
+        }
+    }
+
+    private void RegisterDocumentCore(JSContext context)
     {
         _jsContext = context;
         var document = new JSObject();
@@ -33,12 +100,15 @@ public sealed partial class DomBridge
         // strict equality checks like 'range.commonAncestorContainer === document' work.
         _jsObjects.Set(_document, document);
 
-        RegisterDocumentBasics(context, document);
-        RegisterDocumentEventsAndMutationObservers(context);
-        RegisterDocumentWriting(document);
-        RegisterDocumentTraversalApis(context, document);
-        RegisterDocumentNodeAndCollectionApis(context, document);
-        RegisterDocumentEventTargetAndMetadata(document);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegDocumentObject))
+        {
+            RegisterDocumentBasics(context, document);
+            RegisterDocumentEventsAndMutationObservers(context);
+            RegisterDocumentWriting(document);
+            RegisterDocumentTraversalApis(context, document);
+            RegisterDocumentNodeAndCollectionApis(context, document);
+            RegisterDocumentEventTargetAndMetadata(document);
+        }
 
         _documentJSObject = document;
         context["document"] = document;
@@ -46,6 +116,7 @@ public sealed partial class DomBridge
         var window = new JSObject();
         _windowJSObject = window;
 
+        var windowBasicsScope = Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowBasics);
         var console = RegisterWindowBasics(document, window);
         var fetchFn = _fetch.Install(context, window);
         // MessageChannel (messaging) and getComputedStyle (CSSOM) historically lived inside the fetch
@@ -63,13 +134,26 @@ public sealed partial class DomBridge
             (KeyString)"getComputedStyle",
             new JSFunction((in a) => Dom.Features.ComputedStyleBinding.GetComputedStyle(this, in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        RegisterWindowGlobals(context, document, window, console, fetchFn);
-        RegisterPerformanceObject(context, window);
-        RegisterNavigatorObject(context, window);
-        RegisterViewportObjects(context, window);
-        RegisterContentRenderingPolyfills(context, document);
-        RegisterSecurityAndConstructorPolyfills(context, window);
-        MirrorWindowMembersOntoGlobal(context, window);
+        windowBasicsScope.Dispose();
+
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowGlobals))
+            RegisterWindowGlobals(context, document, window, console, fetchFn);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowObjects))
+        {
+            RegisterPerformanceObject(context, window);
+            RegisterNavigatorObject(context, window);
+            RegisterViewportObjects(context, window);
+        }
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegContentPolyfills))
+            RegisterContentRenderingPolyfills(context, document);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegSecurityPolyfills))
+            RegisterSecurityAndConstructorPolyfills(context, window);
+        // Worker (multithreading item #18). Registered after the window globals so the constructor
+        // lands on a fully-built window, and before the global mirror below so it is reachable
+        // unqualified the way page scripts spell it.
+        _workers?.Register(context, window);
+        using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowMirror))
+            MirrorWindowMembersOntoGlobal(context, window);
     }
 
     /// <summary>
@@ -164,7 +248,24 @@ public sealed partial class DomBridge
     /// </summary>
     public void SyncWindowMembersOntoGlobal()
     {
-        if (_jsContext is { } context && _windowJSObject is { } window)
+        if (_jsContext is not { } context || _windowJSObject is not { } window)
+            return;
+
+        // Same reasoning as RegisterDocument's swap, and the same bounded set: the source
+        // MirrorWindowMembersOntoGlobal evaluates is a compile-time constant in this assembly. This
+        // path matters more than it looks — a host calls it after *every* script, so the mirror was
+        // being recompiled once per script per document (253 calls across 41 reftests, 12 ms each,
+        // 8.2% of a WPT run). Restores the context's own cache, under which the host's page scripts
+        // continue to compile.
+        var previousCache = context.CodeCache;
+        context.CodeCache = DictionaryCodeCache.Current;
+        try
+        {
             MirrorWindowMembersOntoGlobal(context, window);
+        }
+        finally
+        {
+            context.CodeCache = previousCache;
+        }
     }
 }

@@ -6,6 +6,38 @@ the tooling.
 
 ## Status
 
+**Phase 4 is open, and it opened by re-measuring the rationale for deprioritising
+it.** That rationale had gone stale: this document deprioritised parallel layout on
+the grounds that layout is 0.6–6.5% of a render, and on today's code it is
+**3.3–20.1%** — not because layout got slower (it costs the same 28–51 ms it always
+did) but because Phases 2 and 3 removed cost from everything around it
+([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)).
+**Every share in this document decays as the items above it land**, and a phase gated
+on one has to re-read it rather than cite it. It does not change the ranking — 1.5–2.5×
+of a 20% stage is ~10% end to end for 20–30 days at High risk, against a
+`parse+cascade` still at 23–81% — but the phase is now last for a reason that is
+currently true. The phase's other result is a retirement: the `Broiler.Layout`
+roadmap's **step 1**, "stop laying out the whole tree twice", ranked above both
+parallel steps, is **unreachable from every path this repository measures**, and where
+it does fire two passes cost 0.80–1.35× one, because the unrestricted first pass barely
+runs the line breaker — the traversal it proposed to remove is the cheaper of the two
+([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)).
+That makes **six items running whose row named the wrong thing** — five blockers, now
+one beneficiary. `patches/0133`. Published:
+[`tests/render-stages/results/layout-passes.md`](../../tests/render-stages/results/layout-passes.md)
+
+| Item | State | Evidence |
+|---|---|---|
+| #13 — parallel intrinsic sizing and independent subtrees | **Not started; re-argued** | Its stage is 3.3–20.1% of a render, up from the 0.6–6.5% the phase row quoted, entirely by Amdahl ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) |
+| Layout roadmap step 1 — stop laying out the tree twice | **Retired as written** | `--layout-passes` (`patches/0133`): every fixed-viewport row is 1 call / 1 pass; auto-size is 2 passes at **0.80–1.35×** one pass, not 2× ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)) |
+| #18 — Web Workers | **Built (first slice); gate passed** | Contexts isolated and genuinely parallel — **2.66×/3.22× at 4 threads** ([§10](#10-item-18s-gate-passes-on-both-halves--and-one-of-them-is-the-half-nobody-was-asking-about)). `MessageChannel` and structured clone were **already built**, with cross-realm cloning verified ([§11](#11-messagechannel-was-already-built-the-unverified-word-was-cross-context)). **`Worker` now exists**: own thread, own `JSContext`, messages cloned twice — sender-side into an unreachable graph, receiver-side into its realm — and replies queued onto the page's loop, so item #15 holds. Plus worker timers on **real** deadlines (the page's loop is a virtual clock and would spin a worker hot), `importScripts` resolved against the worker's own directory, and transferables — with "transfer" qualified: the engine's `structuredClone` does copy-then-detach, spec-observable but not zero-copy. 23 tests; WPT classification identical name for name at every step ([§12](#12-worker-is-built-and-the-design-content-was-where-the-clone-happens)). module/shared/nested workers, worker `requestAnimationFrame` and `MessagePort` transfer remain |
+| Phases 2–3 measured on WPT | **Null result** | `ca53d44` vs HEAD, both sequential per render, 2 213 reftests over two suites: **1.017× and 1.013×**, inside the host's 5–7% drift, classification identical. WPT pages are 1 018 bytes at the median against a 20–212 KB corpus, so the surviving sequential wins have nothing to act on ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)) |
+| Per-render fixed cost | **Measured; §4's conclusion refuted** | Engine: **3.48 ms** empty, 15–19 ms at WPT median, 77% of the empty render being bitmap alloc + erase. Runner: the render is **1.6–2.0%** of a test — **76–79% is `ExecuteScriptsWithDom`** and **16–21% `PixelDiffRunner.Compare`**. Neither is a rendering problem, and neither is in this document ([§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)) |
+| Pixel comparison | **Fixed** | **284.61 → 4.50 ms (62×)** on the match path; the suite 368.5 → 297.3 s (1.24×). 92% of it was a PNG round trip measured to be an identity — not the per-pixel loop §5 pointed at, which was ~22 ms of 284. Classification identical name for name. `patches/0134` ([§6](#6-the-pixel-comparison-is-fixed-and-the-part-that-read-worst-was-not-the-part-that-cost)) |
+| `ExecuteScriptsWithDom` | **Profiled** | **`DomBridge.RegisterDocument` was 50.6–53.6% of a whole WPT run** at ~440 ms per document, twice per reftest — and *fixed* cost (436 vs 446 ms/call across two subsets). The DOM build next to it is **0.61 ms**. Script eval is 20–25%; the render 1.1–1.7% ([§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms)) |
+| `RegisterDocument` | **Fixed** | **422.10 → 13.74 ms/call (30.7×)**; the suite 368.5 → 195.7 s (**1.88×**). The bridge was recompiling its own constant JavaScript for every document; the process-shared code cache is installed for that call only, so no page-controlled source can enter it. Failing set identical to pristine name for name ([§8](#8-registerdocument-was-recompiling-the-bridges-own-javascript-per-document--422-ms--137-ms)) |
+| Script eval | **Fixed, in part** | Injected stubs **64.49 → 1.24 ms (52×)** and the window→global sync **11.98 → 0.12 ms (100×)** — the same constant-recompiled-per-document fault in two more places. **Page scripts deliberately untouched** (41.99 → 43.60): sharing page-derived compiled code across documents is the one thing a conformance runner must not do. Suite **368.5 → 108.6 s cumulative, 3.39×** ([§9](#9-the-same-fault-in-two-more-places-and-the-boundary-that-stopped-it-spreading)) |
+
 **Phase 3 is complete: #12, #21, #16 and #14.** The relayout harness
 [§7](#7-item-14-has-no-measurement-it-can-be-started-against-and-building-it-first-would-be-building-it-blind)
 said had to exist before any dirty bit was built first, and it changed the item:
@@ -391,6 +423,16 @@ this section predicted would wash out at scale does wash out, and the remaining
 gap to 4× is the per-test GiB budget capping the pool at four workers, not the
 runner's serial remainder. That is the first measurement of item #1 at corpus
 scale; every earlier figure here is the 61-test subset.
+
+> **Which tree that was measured on matters, and it is not the one a reader would
+> assume.** `ca53d44` was written while Phase 2 was one commit old: it contains item
+> #9 — a thread-safety prerequisite the master table records as "not a speedup
+> itself" — and **none** of #4, #5, #6, #7, #8, #10, #17, #3, or any of Phase 3. So
+> both endpoints of the 2.0× are an essentially **end-of-Phase-1** engine, and the
+> figure is a pool ratio measured on a tree that predates every sequential win since.
+> Phase 4 §4 re-measured the endpoints against today's engine and found them
+> **unmoved**, which is a finding about WPT rather than about the wins
+> ([§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why)).
 
 Where the memory figure cannot be read at all, the pool stays at **one** worker.
 Guessing high on an unreadable budget is how a runner OOM-kills a CI box, and the
@@ -1650,6 +1692,545 @@ change. Narrowing that needs the rebuild to have a unit smaller than the documen
 which neither the ledger nor the set provides, and it is a different kind of work from
 either half of this one.
 
+## What building Phase 4 changed
+
+Nothing parallel yet, deliberately. The phase's own row said to start it only once the
+measurements say layout is still worth aiming at, so the first thing built was the
+measurement — and it changed the phase twice before a line of parallel layout was
+written.
+
+### 1. Layout's share tripled without layout changing, and the number this row quoted was measured before two phases of work
+
+The sequencing table justified deprioritising this phase with "layout is 0.6–6.5% of a
+first render", citing Phase 1 §2. That figure was taken before Phase 2 and Phase 3
+landed. Re-running the stage profile on today's code:
+
+| page | render ms | layout ms | share | share as published (pre-#12) |
+|---|---:|---:|---:|---:|
+| text | 252.07 | 50.59 | **20.1%** | 19.3% |
+| boxes | 325.32 | 45.16 | **13.9%** | 11.9% |
+| mixed | 224.51 | 28.64 | **12.8%** | 14.2% |
+| paint | 822.82 | 33.00 | **4.0%** | 3.7% |
+| rules | 1 368.87 | 44.58 | **3.3%** | 1.5% |
+
+**Layout is 3.3–20.1%, not 0.6–6.5%.** The important half is *why*, and it is visible in
+the absolute column rather than the share: layout costs 28–51 ms, which is what it cost
+before — 51.56, 43.42, 50.60, 31.40, 31.83 in the published profile against 50.59, 44.58,
+45.16, 33.00, 28.64 now. **Layout did not get slower; everything else got faster.** The
+`rules` page is the clearest case: item #12 took it from 2 898.69 ms to 1 368.87, and
+layout's share of it went 1.5% → 3.3% without the layout pass moving at all.
+
+This is Amdahl arriving on schedule, and it is a standing hazard for a document
+organised as a ranked backlog: **every share in this document decays as the items above
+it land, and a phase gated on a share has to re-read it rather than cite it.** Phase 1 §2
+was right when it was written and is wrong now, and nothing in the process would have
+caught that, because a superseded measurement here is kept deliberately (it is what a
+decision was made on) and nothing distinguishes "kept for the record" from "still true".
+
+What it does **not** do is rescue item #13. A 20% stage at the roadmap's own estimate of
+1.5–2.5× is ~8–12% end to end on the one page where the stage is largest, for 20–30 days
+at High risk — against a `parse+cascade` that is still 23–81% of every render on the same
+five pages. The finding changes the *argument*, not the ranking: the phase is still last,
+but it is last for a reason that is currently true.
+
+### 2. The double layout is unreachable from every path this repository measures, and where it fires it is not a doubling
+
+The `Broiler.Layout` roadmap orders its own steps "do the sequential work first" and
+states that **steps 1 and 2 are worth more than steps 3 and 4 combined**. Step 2 is
+item #14 and is done. Step 1 — "stop laying out the whole tree twice" — was never
+measured, only read out of the source, and the source reading is correct:
+`HtmlContainerInt.PerformLayout` runs `Root.PerformLayout` a second time whenever
+`MaxSize.Width <= 0.1`, so the first pass can find the shrink-to-fit width the second
+lays out against.
+
+The question that decides the step's size is not in the source: `MaxSize` is set by the
+**caller**, so which hosts reach the branch is a property of the hosts. `--layout-passes`
+counts the passes at the site (`patches/0133`, four lines) across the three caller shapes
+that exist here. Published:
+[`layout-passes.md`](../../tests/render-stages/results/layout-passes.md).
+
+**Every fixed-viewport row is one call and one pass.** The WPT runner, the CLI capture,
+`Broiler.Browser.Core` and every benchmark in `tests/render-stages` set a viewport width,
+so none of them has ever executed the branch. The step the roadmap ranks above both
+parallel steps is worth **exactly nothing** on every path this document has ever
+measured. It fires on the auto-size embedding path — `HtmlRendererUtils.Layout(autoSize:
+true)` — which is a real case that no number in this document covers.
+
+**And where it fires it is not the doubling the step assumes.** Two passes cost
+**0.80–1.35×** one pass, not 2× (`text` 42.41 → 53.36 ms, `boxes` 41.13 → 52.81,
+`paint` 38.09 → 51.51, `rules` 49.47 → 60.44, `mixed` 41.23 → 33.06 — the last below 1.0,
+inside the spread). The reason is structural: the first of the two passes runs at width
+99999, where almost nothing wraps and the line breaker — the dominant cost of a layout
+pass on a text-heavy page — barely runs. **The pass step 1 proposes to cache away is the
+cheaper of the two.** The shape that actually multiplies is
+`MeasureHtmlByRestrictions`, at three passes across two calls on the two pages whose
+unrestricted width exceeds the viewport (`text` 139.84 ms against 42.41 — 3.3×); if step 1
+is ever built, that is the shape to aim it at, and not the one the step names.
+
+So step 1 is retired as written rather than built. That makes **six** items in this
+document whose row named the wrong thing — five blockers, and now one beneficiary.
+
+### 3. The harness nearly published a false positive, the same way Phase 2 §7's did
+
+Measured shape by shape — all of `viewport`'s iterations, then all of `autosize`'s —
+`text | viewport` read **136.80 ms** in one run and **83.83 ms** in the next with no code
+change between them, and the `viewport → autosize` ratio inverted between the two. Both
+also disagreed with the stage profile, which measures that configuration at ~51 ms.
+
+The cause is already written down in this document. Phase 2 §7 records a null result that
+was nearly a false positive because a configuration measured *outside* an interleave was
+compared with ones measured inside it, and concludes: **a median is only comparable with
+another median taken under the same drift.** This host drifts by tens of percent over tens
+of seconds. Interleaved iteration by iteration — which is what `DecodeScaling` does, for
+this reason — two consecutive runs agree and `text | viewport` (40.21 / 50.93 / 42.41 ms
+over three runs) agrees with the stage profile.
+
+Worth stating because the failure recurred in a harness written by someone who had read
+the section warning about it. The tell was cheap and general: **a number moved when
+nothing did.** The counts, being structural rather than timed, were correct in every run —
+which is the argument for measuring a structural question with a counter rather than
+inferring it from a time.
+
+### 4. Phases 2 and 3 are worth nothing on a WPT run, and the pages are why
+
+Phase 1 §4's "90 minutes → 45" is a `--workers 1` vs `--workers 4` ratio, and its note
+above now records the thing that makes the ratio's *endpoints* interesting: `ca53d44`
+contains Phase 2 item #9 and nothing else, so both endpoints are an end-of-Phase-1
+engine. Every sequential win since — #5's off-screen elision, #10's glyph cache, #3's
+per-pixel target lookup, #12's fourth memo, #14's invalidation — postdates the number,
+and none of them was ever measured on WPT. The expectation was that they had moved the
+absolute endpoints down and the ratio had simply divided them out of both sides.
+
+**They have not moved them.** Baseline `ca53d44` against today's HEAD, both at
+`--workers 4` on 4 cores — where HEAD's own header reports `Render threads: 1 per
+worker`, so both trees are sequential per render — run A,B,B,A so drift cancels:
+
+| suite | reftests | baseline (s) | head (s) | head/baseline |
+|---|---:|---|---|---:|
+| `css/css-backgrounds` | 713 | 368.5, 367.1 (367.8) | 377.3, 371.1 (374.2) | 1.017 |
+| `css/css-fonts` + `css/css-writing-modes` | 1 500 | 781.3, 788.0 (784.7) | 792.1, 797.3 (794.7) | 1.013 |
+
+Classification is identical on every run of both suites (443/267/1 and 685/815/0).
+**The 1.3–1.7% is not a regression**: the same HEAD, same command, ninety minutes later
+read 393.7 / 399.4 s on the first suite — 5–7% off itself, so the deltas are inside the
+host's drift. What is *outside* the drift is the size of the thing being looked for.
+The two suites were picked to disagree if page character mattered —
+`css-backgrounds` is the best case for the raster items, `css-fonts`/`css-writing-modes`
+for the glyph cache — and they agree.
+
+**The mechanism is the pages, and it is not overhead.** The run is CPU-bound at 359% of
+4 cores (90% utilization), and per-process fixed cost is 1.69 CPU-s — 1.8% of the run it
+was subtracted from. What is left is ≈2.2–2.5 CPU-s per reftest, ≈1.1 CPU-s per render,
+roughly flat across two unrelated test sets. And the documents are **1 018 bytes at the
+median** (p90 1 895, max 8 518, n = 1 168) against a corpus of 20 102–211 592 — *every*
+corpus page is larger than *every* WPT page in that directory, and a 77 KB corpus page
+renders in ~250 ms where a 1 KB WPT page costs ~1.1 CPU-s.
+
+So the per-render cost here is dominated by something that does not scale with the
+document, and every surviving sequential win does: #5 needs a page taller than the
+viewport (a reftest is written to fit one), #10 needs repeated glyphs, #12 needs many
+elements, #14 needs a *second* layout, and #3's win is in `Broiler.Graphics`' rasterizer,
+which [§2](#2-the-rasterizer-the-profile-measures-is-item-4s-copy-not-item-3s) already
+records is not the copy this path uses. The wins are real on the corpus, which was built
+to load each stage, and have nothing to act on here.
+
+**One hypothesis was tested rather than published.** The obvious candidate for the small
+negative sign was item #14 charging bookkeeping a suite that never relayouts can only
+pay for. With its own switch: `BROILER_RENDER_TREE_ELISION=0` **399.4 s**, `=1` **393.7 s**
+— turning it off is not faster, so that is not the cause.
+
+**Scope, stated rather than implied:** this is the reftest suite, not the golden-image
+suite 90/45 comes from, and 2 213 of the corpus's 19 398 reftests were measured, not all
+of them — a full A/B is ~6 h on this host and two independent suites already agree
+inside the drift. The negative conclusion is what transfers, because its mechanism is
+page size, a property of WPT documents generally rather than of the directories sampled.
+
+**What it makes actionable is not in this document.** The run is CPU-bound at ~1.1 CPU-s
+per render of a 1 KB page, flat in document size — per-render *fixed* cost inside the
+engine, which no item here has measured or aimed at. That is the target for WPT wall
+clock, and it is a different investigation from anything Phases 0–4 contain. Published:
+[`wpt-sequential-wins.md`](../../tests/render-stages/results/wpt-sequential-wins.md).
+
+### 5. The engine's per-render fixed cost is 3.5 ms, and §4's closing sentence was wrong
+
+[§4](#4-phases-2-and-3-are-worth-nothing-on-a-wpt-run-and-the-pages-are-why) ended by naming
+per-render fixed cost "inside the engine" as the target for WPT wall clock. That was an
+inference from a null result, and measuring it took one harness and refuted it.
+
+**The engine side.** `--render-fixed-cost` sweeps document size through
+`HtmlRender.RenderToImageWithStyleSet` at 1024x768 — the call `WptTestRunner` makes — and fits
+`ms = 6.06 + 0.19 * boxes`. An **empty** document renders in **3.48 ms**, a WPT-median one
+(~1 KB) in **15–19 ms**. Three quarters of the empty render is allocating and clearing the
+3 MB bitmap (2.32 of 3.02 ms); `SetHtmlWithStyleSet` is 0.58, layout 0.09, paint 0.02, the
+container constructor and disposal both 0.00. Nothing there is within two orders of magnitude
+of the ~1.1 CPU-s per render §4 inferred.
+
+**The runner side.** `--phase-trace` (in `Broiler.Wpt`, single-process so wall ≈ CPU) says where
+a test's time really goes, on two subsets picked to differ:
+
+| phase | `css-backgrounds/animations` (41) | `css-fonts` (373) | ms/call |
+|---|---:|---:|---|
+| **scripts + DOM bridge** | **76.0%** | **79.3%** | 928 / 704 |
+| **pixel compare** | **20.5%** | **15.9%** | 501 / 327 |
+| **render** | **1.6%** | **2.0%** | 19.5 / 17.7 |
+| file read, fonts, post-process, diagnostics | <0.2% each | <0.1% each | |
+| attributed | 98.3% | 97.3% | |
+
+**The render is 1.6–2.0% of a WPT test**, and its 19.5 / 17.7 ms per call independently
+reproduces the first harness's 15–19 ms by a completely different method — which is the reason
+to believe either. What costs the run is `ExecuteScriptsWithDom` (build a DOM, run the classic
+scripts, re-serialize — twice per reftest) and `PixelDiffRunner.Compare`, which walks 786 432
+pixels through a per-pixel `GetPixel` on both bitmaps and a `SetPixel` on a diff bitmap for
+*every* pixel, and allocates that diff bitmap unconditionally before discarding it on the ~62%
+of tests that pass. That accessor pattern is the same shape item #3 already found and fixed in
+the rasterizer, where hoisting the per-pixel lookup was worth 1.58–2.96× by itself.
+
+**So §4's mechanism was right and its conclusion was not.** Phases 2 and 3 measured zero on WPT
+because they were aimed at 2% of the run — and only at the page-proportional part of that 2%.
+No engine work, parallel or sequential, could have shown up.
+
+**The reasoning error is the part worth keeping.** §4 ruled out I/O and process startup, found
+the remaining cost was CPU and flat in document size, and concluded it was fixed cost *in the
+engine*. "Flat in document size" was equally consistent with fixed cost in the **harness**,
+which is where it was. Eliminating two candidates does not confirm a third — and this document
+has now made the same class of mistake twice in one phase, after
+[§3](#3-the-harness-nearly-published-a-false-positive-the-same-way-phase-2-7s-did) caught the
+first. Published:
+[`render-fixed-cost.md`](../../tests/render-stages/results/render-fixed-cost.md).
+
+### 6. The pixel comparison is fixed, and the part that read worst was not the part that cost
+
+[§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong) named two
+targets outside this document. The smaller one is done: **`PixelDiffRunner.Compare` goes
+284.61 → 4.50 ms on the match path (62×)** and 285.23 → 7.92 on the mismatch path (36×).
+
+**The fix was not where the code looked worst.** The per-pixel `GetPixel`/`SetPixel` loop over
+786 432 pixels — the thing §5 singled out, and the same shape item #3 had already fixed in the
+rasterizer — is real, and it was **~22 ms of 284**. The other **92% was `NormalizeForComparison`**:
+`BBitmap.Decode(source.Encode(Png, 100))` on *both* inputs before a pixel was read, a full PNG
+compress and decompress of 3 MB each, per comparison. So §5's own diagnosis was half right in
+the same way §4's was — the mechanism it named existed, and was not the cost.
+
+**The round trip was an identity, and this time it was measured before anything was deleted.**
+A synthetic opaque image, one with graded alpha, one fully transparent with non-zero RGB — the
+two cases where a PNG codec may premultiply or collapse the colour type — and 25 real WPT
+reference PNGs off disk all round-tripped byte-identical. It could not have been otherwise:
+`Encode` serialises the same `_pixels` array `GetPixel` reads, so a lossless round trip has
+nothing to normalise between two `BBitmap`s.
+
+Three changes, in descending order of what they were worth: the inputs are compared directly;
+the loop reads backing spans instead of a call and a `BColor` 1.57 M times; and the diff bitmap
+is built **only when the comparison failed**, instead of being allocated and written for every
+pixel and discarded on the match path — 3 MB and 786 432 `SetPixel` calls nothing looked at, on
+the ~62% of tests that pass.
+
+On the suite: `css/css-backgrounds` reftests at four workers, **368.5 → 297.3 s (1.24×)** — less
+than the 186 CPU-s removed, because four workers divide it. Classification identical (444/266/1,
+failing sets identical name for name) and `Broiler.Wpt.Tests` 748/57 both ways.
+
+**The verification produced one false alarm worth keeping.** The first post-fix run differed by
+three `background-size` tests. Restoring normalization while keeping the loop rewrite reproduced
+*the same three*, which cleared both changes; running the **pristine** tree under the same
+invocation then produced exactly the fix's 266-failure set. They are a pre-existing
+nondeterministic fringe in the suite, and the runs they had been compared against were taken
+back-to-back inside one script invocation. **A before/after taken under different invocation
+conditions is not a before/after** — the same lesson as
+[§3](#3-the-harness-nearly-published-a-false-positive-the-same-way-phase-2-7s-did), arriving
+through a different door.
+
+`patches/0134`. Published:
+[`pixel-compare.md`](../../tests/render-stages/results/pixel-compare.md). **What is left of §5's
+two targets is the larger one**: `ExecuteScriptsWithDom` at 76–79% of a WPT run.
+
+### 7. Half a WPT run is publishing the DOM API, and the DOM build is 0.6 ms
+
+[§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)'s larger
+remaining target was `ExecuteScriptsWithDom` at 76–79% of a WPT run. Profiled sub-phase by
+sub-phase, on two unrelated subsets:
+
+| phase | `css-backgrounds/animations` (41) | `css-fonts` (373) | ms/call |
+|---|---:|---:|---|
+| **scripts + DOM bridge** | **79.3%** | **78.2%** | 683 / 651 |
+| ├ script scan + sheet inlining | 0.0% | 0.0% | 0.30 / 0.12 |
+| ├ JSContext construction | 0.8% | 0.6% | 7.14 / 4.95 |
+| ├ **DomBridge.Attach** | **52.0%** | **54.9%** | 448 / 457 |
+| · ParseHtml (DOM build) | **0.1%** | **0.0%** | **0.61 / 0.40** |
+| · **RegisterDocument (DOM API surface)** | **50.6%** | **53.6%** | **436 / 446** |
+| ├ script eval + drains | 25.0% | 20.5% | 216 / 171 |
+| ├ load event + snapshots + anchors | 1.1% | 1.9% | 9.9 / 16.1 |
+| └ SerializeToHtml | 0.1% | 0.2% | 0.57 / 1.81 |
+| render | 1.1% | 1.7% | 9.5 / 14.4 |
+| attributed | 98.8% | 97.2% | |
+
+**`DomBridge.RegisterDocument` is 50.6–53.6% of a whole WPT run** — publishing the document, the
+window and the DOM API surface onto a fresh `JSContext`, ~440 ms per document and twice per
+reftest. It is the largest single item measured anywhere in this investigation, larger than the
+render, the pixel comparison and script execution combined.
+
+**The phase above it is misnamed for what it does, which is why this needed measuring rather than
+reading.** "`DomBridge.Attach`" sounds like a DOM build, and [§5](#5-the-engines-per-render-fixed-cost-is-35-ms-and-4s-closing-sentence-was-wrong)
+described it as one. The DOM build is **0.61 / 0.40 ms — 0.1% and 0.0%**. Attach is 99.9% API
+registration. That is the fourth time in this phase that the operation an item is named after was
+not the operation that costs.
+
+**And it is fixed cost, measured rather than inferred**: 435.86 ms/call on one subset against
+445.80 on the other — 2% apart across unrelated directories and 9× the test count — while the
+parse that *does* scale with the document stays under a millisecond. A WPT reftest document is
+1 018 bytes at the median, so nearly all of what a test costs is the engine rebuilding the same
+API surface from nothing, twice, for a page with almost nothing in it.
+
+Two incidental findings from reading the path: the
+`scripts.Count == 0 && deferredScripts.Count == 0` early-out in
+`WptTestRunner.ExecuteScriptsWithDom` is **unreachable** (two `scripts.Insert(0, …)` calls run
+before it, so the list is never empty), and `SerializeToHtml` — the DOM-back-to-markup step this
+architecture is built on — is **0.57 ms**, so the round trip through markup is not what costs.
+
+**Not attempted, deliberately.** Making `RegisterDocument` cheaper is a design change to the
+bridge — lazy or cached host-object registration, or reusing a context across documents where
+isolation permits — not a profiling result, and per-document isolation is exactly the property a
+WPT runner must not lose. Published:
+[`script-dom-phase.md`](../../tests/render-stages/results/script-dom-phase.md).
+
+### 8. `RegisterDocument` was recompiling the bridge's own JavaScript per document — 422 ms → 13.7 ms
+
+[§7](#7-half-a-wpt-run-is-publishing-the-dom-api-and-the-dom-build-is-06-ms) named
+`DomBridge.RegisterDocument` as half a WPT run and stopped at profiling. Profiled one level
+further, the phase splits into seven steps and **all seven fall by the same factor**, which is the
+shape of one shared cause rather than a hot spot:
+
+| step | before (ms/call) | after (ms/call) |
+|---|---:|---:|
+| document object | 106.66 | 6.67 |
+| window basics + fetch | 61.25 | 1.66 |
+| content-rendering polyfills | 61.73 | 1.65 |
+| security/constructor polyfills | 148.49 | 2.12 |
+| window→global mirror | 40.54 | 1.36 |
+| window globals, performance/navigator/viewport | 3.41 | 0.09 |
+| **RegisterDocument** | **422.10** | **13.74** |
+
+**The cause is compilation, not execution.** Registration evaluates a fixed set of *bridge-owned*
+JavaScript sources — the content-rendering polyfill asset, the `DOMException`/`Node`/`SVGLength`
+constructors, `XMLHttpRequest`, the mutation-observer and event shims, the window→global mirror.
+Every document gets a fresh `JSContext`, a fresh context builds its own `DictionaryCodeCache`, and
+so every one of those sources was parsed and compiled again from nothing, per document, twice per
+reftest. Installing the process-shared cache for the duration of the call — and restoring the
+context's own afterwards — removes 97% of the phase while changing nothing about what the sources
+do when they run. **That the swap alone accounts for it is the evidence that the cost was
+compiling.**
+
+**The scope is the call, deliberately, and this is the interesting design point.** The engine
+already offers `JSContextOptions.UseProcessSharedCodeCache`, which applies the shared cache to
+*everything* a context evaluates including page script — a far larger claim, and one that would
+put one document's compiled code where the next document's evaluation can find it. A WPT runner is
+exactly where that must not happen. Nothing here needs it: inside `RegisterDocument` every
+evaluated source is a compile-time constant owned by the bridge assembly — **verified rather than
+assumed**, no reachable `Eval` takes an interpolated or page-derived string — and page script does
+not run until the host's loop, after `Attach` returns. Inline event handlers, which *are*
+page-controlled, compile at dispatch time and still use the context's own cache. So the shared
+cache holds a bounded set of strings that ship in the assembly and cannot grow with documents
+rendered.
+
+**On the suite: `css/css-backgrounds` reftests 368.5 → 195.7 s, 1.88×** — 173 s off a six-minute
+subset, with `patches/0134` unapplied, so the two fixes are independent and compose.
+
+**Correctness:** failing-test set **identical to the pristine tree, name for name** (266) and
+stable across two runs, classification 444/266/1 unchanged, and `css-fonts` + `css-writing-modes`
+unchanged at 685/815. `Broiler.Wpt.Tests` goes 748/57 → **750/55 with nothing newly failing**; the
+two that flip are both `RunTestWithTimeout_*_Completes_Without_Timing_Out`, which is the fix doing
+its job rather than noise.
+
+Published: [`register-document.md`](../../tests/render-stages/results/register-document.md).
+**Where that leaves a WPT run:** the render was 1.1–1.7% before any of this and the two largest
+terms have now been cut; what remains largest is script eval.
+
+### 9. The same fault in two more places, and the boundary that stopped it spreading
+
+[§8](#8-registerdocument-was-recompiling-the-bridges-own-javascript-per-document--422-ms--137-ms)
+left script eval as the largest remaining phase. Split into its parts, most of it was not the
+document's scripts:
+
+| step | calls | before (ms/call) | after (ms/call) |
+|---|---:|---:|---:|
+| **injected stubs** | 164 | **64.49** | **1.24** |
+| page scripts | 92 | 41.99 | 43.60 |
+| **window→global sync** | 253 | **11.98** | **0.12** |
+| drains | 335 | 1.30 | 1.81 |
+| **script eval** | 82 | **240.15** | **82.48** |
+
+**The stubs are the runner's own constants** — `BrowserApiStubs` (~10 KB), `TestharnessStubs`
+(~4.8 KB) and a one-line flag, all `private const string` — recompiled for every document: **28.5%
+of a whole WPT run, 52×**. **The window→global sync is a constant mirror source the host
+re-evaluates after every script** — 253 calls across 41 reftests, recompiled each time, **100×**.
+Same fault as §8 in two more places, fixed the same way.
+
+**The interesting part is where the fix stops.** Page scripts are 43.60 ms/call and are now the
+largest item in the phase, and they are deliberately left alone: they are page content, and
+sharing their compiled form across documents is precisely the cross-document path a conformance
+runner must not create. The measurement confirms the boundary held — 41.99 before, 43.60 after.
+Every swap in §8 and here wraps a single evaluation of a *named constant*, so what the shared
+cache can hold is a fixed, bounded set of strings shipped in the assemblies, and no page-derived
+source can reach it.
+
+**Cumulative on `css/css-backgrounds` reftests: 368.5 → 195.7 → 108.6 s, 3.39×**, with
+`patches/0134` still unapplied. Failing set identical to pristine name for name (266) and stable,
+`css-fonts`/`css-writing-modes` unchanged at 685/815, `Broiler.Wpt.Tests` 748/57 → 750/55 with
+nothing newly failing (the two that flip are the timeout tests, and the suite runs 10 m → 3.5 m).
+
+**Where a WPT run now stands, against the item this document is about**: the render — everything
+Phases 0–3 optimised — was 1.1–1.7% of a run before any of this began, and the four things that
+actually cost were a PNG round trip, and three copies of "recompile a constant for every
+document". None of them is a threading problem, and none was in this document. Published:
+[`script-eval.md`](../../tests/render-stages/results/script-eval.md).
+
+### 10. Item #18's gate passes, on both halves — and one of them is the half nobody was asking about
+
+The roadmap does not schedule Web Workers until the P0-c static-state audit clears them, and #18's
+row asserts the other side ("per-context state exists … so isolation is feasible"). Both are claims
+about code, so the gate is built here as something that runs.
+
+**Correctness.** `JSContextIsolationTests` — five cases, four real threads each owning a
+`JSContext` for its lifetime (item #18's proposed shape), released together on a barrier, each case
+aimed at a named piece of process-wide state: globals not leaking, interned key strings and shape
+transitions under identical property names, identical sources compiled at maximum contention, the
+process-shared code cache, and the built-in registry's static initialization. **All five pass**, and
+each run asserts the threads *actually overlapped*, because a concurrency test whose threads run one
+after another passes for the wrong reason.
+
+**Throughput, which is the half a correctness test cannot reach.** An engine holding one global lock
+would pass every assertion above and still make a worker useless — the point of a worker is to run
+*while* the main context runs, so **correct-but-serialized is the outcome that would sink the item**.
+`--js-context-scaling`, one context per thread, same CPU-bound workload each, compiled before the
+clock:
+
+| code cache | 1 thread | 2 threads | 4 threads |
+|---|---:|---:|---:|
+| per-context | 1.00× | 1.82× | **2.66×** |
+| process-shared | 1.00× | 1.88× | **3.22×** |
+
+**The premise holds.** Contexts are isolated under real concurrency and run genuinely in parallel.
+Item #18 is not gated on an engine that would serialize it.
+
+**The second finding is about this phase's own work.** §8/§9 routed the bridge's and the runner's
+constant sources through the process-shared `DictionaryCodeCache.Current`, which is safe today only
+because those hosts render on one thread per process — under #18, several threads reach it at once.
+It is not just safe under contention, it **scales better** than the per-context cache (3.22× against
+2.66×), which is what work that stops being repeated per context should do. A blocker introduced by
+this phase's own optimisation would have been an unpleasant thing to find after building the
+feature on top of it.
+
+**What this is not**: the feature. `Worker`, `MessageChannel` and structured-clone message passing
+are unwritten and the 30–40 day, High-risk estimate stands; the workload exercises the shared state
+the roadmap names, not the bridge, timers, promises or modules. Published:
+[`js-context-concurrency.md`](../../tests/render-stages/results/js-context-concurrency.md).
+
+### 11. `MessageChannel` was already built; the unverified word was "cross-context"
+
+Item #18's row scopes the work as "New: `Worker` / `MessageChannel`", state "Not implemented", with
+structured-clone message passing as the shape to build. Checking before building: `MessageChannel`,
+`MessagePort`, entanglement, transfer lists, the pending queue, `MessageEvent` and
+`window.postMessage` are all in `MessagingBinding` with three test files over them — and **both**
+`window.postMessage` and `MessagePort.postMessage` already run their payload through
+`CloneForMessaging`, which calls the engine's own `structuredClone` (itself complete, down to
+Date/RegExp/Map/Set/ArrayBuffer and cycles). **Seventh row in this phase whose stated state was not
+the operative fact.**
+
+**What was genuinely unverified is whether a clone crosses a realm.** Everything above clones and
+delivers *within one context*, which is all a same-document channel needs. A worker is the other
+case, and a clone that quietly produced a sender-owned graph would pass every existing test while
+being exactly the cross-realm leak a worker must not have. That is testable without threads, so it
+was: `CrossContextStructuredCloneTests`, six cases, all passing — values copied with no identity
+shared, sender mutation not reaching the receiver (and the reverse), cloned objects answering to the
+**receiving** realm's `Array`/`Date`/`Map`/`Object.prototype`, functions refused, cycles preserved.
+
+**The sixth case is what makes the third mean anything**: it asserts the two contexts have *distinct*
+intrinsics, and that an array handed directly from A into B answers **false** to B's
+`instanceof Array`. Without it, a shared `Array` would have made every realm assertion true
+regardless of which realm built the clone. So the structured-clone half of item #18 is **done**, and
+now has a standing gate.
+
+**What is left is small and named.** The clone is made on the *sender's* side — `CloneForMessaging`
+runs before `QueueFrameAction`, with the sender's context current — which is correct only because
+both ends of a port share a realm today. A worker changes exactly that: the clone must be produced
+with the *receiving* context current, and delivery must hop to the receiving thread's event loop
+rather than the sender's frame-action queue. The rest is the `Worker` object itself — a thread
+owning its context and loop, a port pair straddling them, and termination rules. Published:
+[`message-channel-slice.md`](../../tests/render-stages/results/message-channel-slice.md).
+
+### 12. `Worker` is built, and the design content was where the clone happens
+
+Item #18's remaining piece. `new Worker(url)` starts a thread that owns a `JSContext`, runs the
+worker script in it and pumps messages; the page gets `postMessage`/`onmessage`/`onerror`/
+`addEventListener`/`terminate`, the worker gets `self`/`postMessage`/`onmessage`/
+`addEventListener`/`close`/`console`.
+
+**The design content is not the thread — it is where the clone happens.** Two obvious designs are
+both wrong. Cloning once on the sender and handing the result over puts one realm's graph in another
+thread's hands. Cloning once on the receiver from the sender's *live* value is worse: the sending
+script keeps running and can mutate that graph while the receiver walks it, which is a data race on
+engine internals. So a message is cloned on the **sending** thread into a graph no script can reach,
+and cloned again on the **receiving** thread with the receiving context current. The intermediate is
+unreachable from either side, so nothing can mutate it while it is read — and the first clone is
+also what makes post-send mutation invisible and raises `DataCloneError` on the sender, where it
+belongs. Both clones are the engine's own `structuredClone`; a second implementation of the walk
+would have been a second definition of which types survive.
+
+**Item #15 is kept rather than bent.** Each context is still driven by one thread and one loop, and
+nothing dispatches JavaScript from a foreign thread: a worker's reply is *queued* onto the page's
+`BrowserEventLoop` (a `ConcurrentDictionary`, so enqueuing across threads is safe) and the page's own
+drain runs it. Pending frame actions count as pending work, so a reply in flight keeps the host's
+drain alive instead of racing the end of the document.
+
+**Verified** by `WorkerBindingTests` — seventeen cases for the object itself, twenty-three once timers,
+`importScripts` and transferables landed, all driving the real bridge — round trip; cloning proved
+in *both* directions by mutating each side after sending; `Date`/`RegExp`/arrays/nesting/cycles
+surviving; realm separation plus asynchronous delivery; a missing script firing `error` without
+throwing; and `terminate()` plus disposal joining threads promptly.
+
+**The regression risk was feature detection, and it did not fire.** Adding `Worker` to the global can
+silently change which path a WPT test takes. `css/css-backgrounds` is **identical name for name**
+(266 failures, 444/266/1), `css-fonts`/`css-writing-modes` unchanged at 685/815, and
+`Broiler.Wpt.Tests` unchanged at 750/55.
+
+**Timers are in, and they are deliberately not the page's loop.** `setTimeout`/`setInterval` (shared
+id space, interchangeable clears, `(deadline, seq)` ordering) run on **real** deadlines, because the
+page's `BrowserEventLoop` is explicitly virtual — "not wall-clock… only the relative ordering of
+deadlines" — which suits a loop drained in bounded bursts and breaks one that is pumped continuously:
+a worker's `setInterval(fn, 1000)` under a virtual clock has its deadline reached the moment the loop
+looks at it, so it would spin hot forever. The pump therefore waits for whichever comes first, an
+inbound message or the next deadline, and an idle worker with no timers blocks. The determinism this
+costs is confined to the worker — a page's timers still fire virtually, and a page only ever observes
+a worker through messages it must wait for. Two of the six timer cases are the ones that catch a
+wrong pump: a live interval must not starve the inbox, and `terminate()` must win over a repeating
+timer rather than wait for it to go quiet.
+
+**`importScripts` is in**: synchronous, in order, in the worker's global, and re-entrant. Specifiers
+resolve against the **worker's** directory rather than the document's base path — what the spec means
+by "relative to the worker's script URL" — so the resolver seam now takes a base directory. That is
+easy to get accidentally right, so the test puts a *different file of the same name* next to the page
+with the page's base path pointing at it: resolving the wrong way finds the decoy and reports the
+wrong marker instead of failing to load. A specifier that cannot be loaded raises `NetworkError` and
+**aborts the rest of the call** (asserted); a script that throws propagates rather than being
+swallowed.
+
+**Transferables are in, with the word qualified.** `postMessage(v, [buf])` and the
+`{ transfer: [buf] }` spelling both detach the listed `ArrayBuffer`s on the sending side, in both
+directions. But the engine's `structuredClone` implements transfer as **copy then detach, not
+zero-copy** — the observable semantics are the spec's (sender detached, receiver has the contents),
+what is missing is the performance reason transferables exist. That is the engine's property, not
+this binding's, and it is written down because "transferred" reads like a promise of zero copies. A
+`MessagePort` in the list is refused rather than silently copied: a copied port would look like it
+worked and deliver messages to nobody. Six cases, two of which exist to stop the others being
+vacuous — a control send *without* a transfer list proving the buffer stays usable, and an
+already-detached buffer proving re-transfer is a `DataCloneError` rather than a silent no-op. One
+change fell out of it: `RegisterDOMException` was private, so workers had no real `DOMException` and
+`ThrowDOMException` threw a bare string; making it `internal` and installing it in every worker
+global is what lets worker code branch on `e.name`.
+
+**Out of this slice, refused rather than half-built**: module workers, `SharedWorker`, nested
+workers, `requestAnimationFrame` in a worker, `MessagePort` transfer, and network-fetched worker
+scripts. Published:
+[`worker-object.md`](../../tests/render-stages/results/worker-object.md).
+
 ## Master table
 
 Gain is per-stage unless stated. Effort is engineering days for one person
@@ -1670,7 +2251,7 @@ non-deterministic correctness defect.
 | 10 | Graphics | [`TrueTypeFont.GetGlyphContours`](../../Broiler.Graphics/Broiler.Graphics/Text/TrueTypeFont.cs) — **DONE**; [`ComplexTextShaper.Shape:72`](../../Broiler.Graphics/Broiler.Graphics/Text/ComplexTextShaper.cs) — not built | Outlines were re-extracted per glyph *occurrence*; shaping is called per run during layout | Concurrent cache by glyph index, published through `GetOrAdd` | Nothing | **The item was right that the cache is the whole win, and wrong about which cache.** Glyph outlines: raster stage **1.34×** (`text`), **1.54×** (`boxes`), 1.00× on the text-free `paint` control. The shaped-run cache is deliberately unbuilt — `RequiresShaping` is false for the whole Latin corpus, so it would measure nothing ([§5](#5-the-phases-largest-win-so-far-is-a-cache-and-not-the-one-item-10-names)) | Low | Done (outlines) | 2 |
 | 11 | CSS | [`CssStyleEngine.CollectFromRules:623`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) — linear scan of every rule of every sheet, per element | O(elements × rules) | **Not multithreading.** Rule index (bucket by id/class/tag) + ancestor bloom filter | Nothing — this is the standard engine design and it is simply absent | **DONE.** Exit gate met: with matches fixed at four, 32× the rules now costs 1.64× the time and 1.13× the bytes (was 30.8× / 32.0×) — up to **136.9× faster** and **600× less garbage** at 3 200 rules. On a whole render the corpus `rules` page is 5 218.96 ms → 1 841.71 ms (2.8×); see [What building Phase 1 changed](#what-building-phase-1-changed) §1. `patches/0123-css-cascade-rule-index.patch` | Low | Done | 1 |
 | 12 | CSS | [`CssStyleEngine.GetCascadedStyle`](../../Broiler.CSS/Broiler.CSS.Dom/CssStyleEngine.cs) resolved ahead of the box walk by [`CssStyleRecalc`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/Parse/CssStyleRecalc.cs) — **DONE** | Was sequential per element, with the three memo caches under one global `_sync` | Warm pass over every element on `BROILER_STYLE_THREADS`, then the unchanged ordered box walk reads the memo; caches sharded to `ConcurrentDictionary`, generation guard kept | Nothing now. **Neither blocker this cell named was the operative one.** The lock was not the bottleneck — the per-element cascade was 210 µs on a five-rule page ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)) | **Measured: 1.16–2.01× on the cascade stage at 4 threads, 1.08–1.96× end to end**, pixel-identical at 1/2/4. The serial residue is now measured per page (16–55%), so what is left is stated rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)) | Medium | Done | 3 |
-| 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 0.6–6.5% of a render** on every corpus page, including one built to load layout — so a few percent overall at best | **High** | 20–30 d | 4 |
+| 13 | Layout | [`CssBox.PerformLayout:347`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.cs), [`PerformLayoutImp:37`](../../Broiler.Layout/Broiler.Layout/Engine/CssBox.Layout.cs) | Full-tree, in-place mutation, from the root every pass — **twice** when width is unrestricted ([`HtmlContainerInt.cs:929,936`](../../Broiler.HTML/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs)) | Parallel intrinsic sizing; parallel independent subtrees (abspos/fixed, flex+grid items, table cells, multicol, subdocuments) | Mutable shared tree; ambient thread-static state (`CssLengthParser` viewport, [`DocumentModeContext.cs:22`](../../Broiler.Layout/Broiler.Layout/DocumentModeContext.cs)); no dirty-bit invalidation to bound the work | **1.5–2.5×** of a stage **measured at 3.3–20.1% of a render** — re-measured on today's code, where the share is up from the 0.6–6.5% this cell used to quote **not because layout got slower but because Phases 2–3 made everything else faster** ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)). ~8–12% end to end on the one page where the stage is largest, against `parse+cascade` still at 23–81% of the same renders | **High** | 20–30 d | 4 |
 | 14 | DOM / Layout | [`RenderTreeInvalidation`](../../Broiler.Layout/Broiler.Layout/Engine/RenderTreeInvalidation.cs) and [`CascadeInvalidationSet`](../../Broiler.Layout/Broiler.Layout/Engine/CascadeInvalidationSet.cs) consulted by `HtmlContainerInt.EnsureBoundDocumentCurrent` — **done**; a *scoped* rebuild is the remainder | Was: **any** DOM version bump disposes the render tree and re-cascades the whole document, then lays out the whole tree | **Not multithreading.** A consumer for `DomDocument.Mutated`, then invalidation sets over the rule index | **Neither blocker this cell named was the operative one, and that is now five items running.** The DOM's signal was never a bare counter — `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written; what was missing was a consumer, and it is in the main repo, not `Broiler.DOM` ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). What blocks the **remainder** is real and different: eliding a *connected* mutation needs the cascade to answer whether any rule's subject could match differently | **Measured, both halves: the offscreen-build case goes from a full rebuild to none — `rules` 1 032.7 → 11.5 ms (89.8×)**, `boxes` 25.8×, `paint` 22.6×, `mixed` 16.3×, `text` 10.0×; and the connected `data-*` write the first half could not touch goes **1 476.7 → 43.0 ms (34.4×)** on `rules`, 14.2× `paint`, 13.8× `mixed`, 9.5× `boxes`, 2.1× `text`, with a class toggle 36.0× on `rules`. Rows that still rebuild span 0.79–1.21, i.e. run-to-run spread. A perfect layout dirty bit alone remains worth 1.03× | Medium–High | Done; `patches/0132` | 3 |
 | 15 | JS | [`JSPromise.Post:376`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs), [`JSAsyncFunction.cs:152`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSAsyncFunction.cs), [`JSGenerator.cs:435`](../../Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Generator/JSGenerator.cs) — `ThreadPool.QueueUserWorkItem` when `sc == null` | JS continuations run on pool threads, racing main-thread layout | **Remove the parallelism.** Always pump a single-threaded event loop | This is the root cause behind WPT #1445 / #1143; the CSS `_sync` lock and the concurrent bridge memo maps are mitigations for it | Negative CPU gain, **large correctness gain**; removes lock overhead on hot cascade paths | Low | 5–8 d | 0 |
 | 16 | JS | [`ScriptCompileAhead`](../../src/Broiler.HtmlBridge.Core/Scripting/ScriptCompileAhead.cs), consumed by the eval loop in [`CaptureService`](../../src/Broiler.Cli/CaptureService.cs) — **DONE** | Was compiled on demand, serially, by the ordered eval loop | Every classic script source compiled on `BROILER_SCRIPT_COMPILE_THREADS` into the context's own cache; the loop is unchanged and reads hits | Nothing, and **the blocker this cell used to name did not exist**: `JSContext.CodeCache` is public, so the store is the context's own and no engine change is needed. The context is not late either — a document's sources are not all known until its fetches return ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)) | **Measured: compile stage 1.41×/1.62×/1.52× at 2/4/8 threads; whole capture 1.44× on a compile-heavy document, 1.22× on a modestly scripted one.** The estimate's 1.5–3× lands only on the stage, and only where a page's scripts are large. The sub-linear ceiling is **not** the compile-thread handoff — tested, not assumed ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)) | Low | Done | 3 |
@@ -1980,10 +2561,22 @@ no gain.
 The most expensive and the least certain. Do it last, and do the sequential work
 first.
 
-1. **Stop laying out the whole tree twice.** `HtmlContainerInt.PerformLayout`
-   runs `Root.PerformLayout` a second time whenever `MaxSize.Width <= 0.1`
-   (shrink-to-fit). Caching intrinsic widths from the first pass removes a
-   whole tree traversal before any threading is considered.
+1. **Stop laying out the whole tree twice** — **measured, and retired as written.**
+   `HtmlContainerInt.PerformLayout` does run `Root.PerformLayout` a second time
+   whenever `MaxSize.Width <= 0.1` (shrink-to-fit), and this step claimed that
+   caching intrinsic widths from the first pass "removes a whole tree traversal".
+   Both halves of that are wrong in practice
+   ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)).
+   **Nothing this repository measures reaches the branch** — the WPT runner, the CLI
+   capture, the browser and every benchmark set a viewport width, so all of them lay
+   the tree out exactly once, which `--layout-passes` counts at the site rather than
+   inferring. It fires on the auto-size embedding path, and there the two passes cost
+   **0.80–1.35× one pass, not 2×**: the first runs at width 99999, where the line
+   breaker barely runs, so the traversal being removed is the cheaper of the two.
+   The shape worth aiming at, if this is ever built, is
+   `HtmlRendererUtils.MeasureHtmlByRestrictions` — three passes across two calls,
+   3.3× a single pass on the text-heavy page — and not the single-call shrink-to-fit
+   one this step names.
 2. **Dirty-bit invalidation** (item #14). Today every relayout starts at the
    root. Relayout roots bound the work *and* give parallel layout its unit of
    independence — without them, "parallel subtree layout" has no subtrees to
@@ -2018,8 +2611,10 @@ first.
 
 **Constraint to keep in view:** normal block flow is sequential in the block
 direction — a block's position depends on the height of its predecessors — so
-the ceiling here is low regardless of core count. Steps 1 and 2 are worth more
-than steps 3 and 4 combined.
+the ceiling here is low regardless of core count. Steps 1 and 2 were said to be
+worth more than steps 3 and 4 combined; **step 2 was, and step 1 is worth nothing
+on any path measured here**, so what remains of that claim rests entirely on the
+item that has already landed.
 
 ### Broiler.JS
 
@@ -2195,7 +2790,7 @@ Recording these so they are not revisited each time the topic comes up:
 | **1 — Free wins and the sequential fixes** — **DONE** | WPT worker pool (#1), CLI batch (#20), concurrent sub-resource fetch (#2), CSS rule indexing (#11) | Cheap, low-risk, and #1 shortens the feedback loop for everything else. #11 is single-threaded but must precede #12. **What it changed:** #11 met its exit gate (cascade cost is now flat in total rules) but is 2.8× on a whole render, and `parse+cascade` still dominates the rule-heavy page — so #12 needs that stage split before it is started; #20 had to use processes, which makes item #9 a gate on every render-path item, not three. |
 | **2 — Raster, decode, text** — **DONE** | Rasterizer unification + band/tile parallelism (#3, #4, #5), font-cache safety (#9), text caches (#10), image decode (#6, #7, #8), preload scan (#17) | Largest CPU wins, disjoint memory, verifiable by exact pixel comparison. **#9 first, and it is done** — Phase 1 §2 made it the gate on every other item here, not just on #10/#12/#13. **What it changed, in the order it matters:** band parallelism inside a primitive turned out to be the wrong unit for a page — three of five corpus pages split zero fills, because their raster is glyphs — which promotes **#5 from "supersedes #3" to the only raster parallelism the corpus can use (§4)**; the phase's largest single win was a *cache*, and not the one #10 names (§5); the pool and the in-process threads multiply, so the runner now divides them (§7); the item-#9 findings (§1–§3) stand. **#5 landed and about half of its win was single-threaded** — the rasterizer was walking pixels its clip could never admit (§8) — and between them #4, #10 and #5 have taken raster from the largest stage on three pages to the largest on one (§9). **#17 landed and its number came from somewhere the item did not name:** the capture host does its own script extraction and so never reached the split item #2 built, leaving that family serial in the path this repository measures (§10). **#8 landed, and it needed neither of the two things §6 predicted** — not #17's URL set (the box tree names what layout will actually ask for, where a source scan names a superset) and not a cache (layout's existing loader seam is the split) — but it did need one thing nothing predicted: **only the decode was safe to move off the layout thread, not the completion callback**, which changed the rendered page on the failure path and nowhere else (§12). It also discharges P0-c's last debt, being the first worker to establish the ambient state and arm its assertion. **#3's port closed the phase, and it corrected this document rather than confirming it** — §8 said to port the clip narrowing first, and the sequential win turned out to be a per-pixel target lookup that banding forced out of the loop; the narrowing itself pays only on content inside the surface and outside the clip, which the corpus scene written for it did not contain (§13). Its threading is 1.00–1.39x at four threads with 85–100% of area split, so **both copies now say band parallelism is the wrong unit, for opposite reasons.** It leaves one named follow-up: a two-band split measured slower than none, and only the ported copy refuses one. The largest open question is still the parse/cascade split Phase 1 §1 named, which gates #12 — and §9 makes it the largest unattributed question in the document, now that nothing in Phase 2 is open. See [What building Phase 2 changed](#what-building-phase-2-changed). |
 | **3 — Style and incremental layout** — **DONE** | Cache sharding + parallel style recalc (#12), layout dirty bits (#14), parallel script compile (#16), re-enable test parallelization (#21) | Depends on Phase 1's algorithmic fixes and Phase 0's determinism. **What it changed, in the order it matters:** the phase opened by answering the question Phase 2 §9 said it owed, and the answer reframes the item it gates — **`parse+cascade` is 81.3–98.2% cascade on every page**, so item #12 aims at the whole stage rather than a fraction of it, and the stage's name is a legacy of nobody having measured it ([§1](#1-parsecascade-is-a-cascade-stage-the-name-overstates-the-parse)); getting that number needed the profile's first instrumentation *inside* the engine, because none of the four sub-stages is a pure function of the source and P0-a's out-of-band trick therefore does not reach them ([§2](#2-measuring-it-needed-instrumentation-and-p0-as-method-note-is-why-that-is-worth-saying)). **#12 landed and both of the blockers its row named were the wrong ones.** The `_sync` lock was not the bottleneck — the per-element cascade was 210 µs on a *five-rule* page, which no number of lock acquires explains ([§3](#3-the-_sync-lock-was-not-the-bottleneck-the-item-names-and-the-cascades-own-cost-is)) — and the parallel unit is not the box walk, which cannot be split at all: it rewrites `display` before children read it, hides a closed `<details>`'s subtree after cascading it, and inserts generated boxes on the way back up. So #12 is a **prefetch/consume split**, the fourth in this document to arrive at that shape after the item named a different one ([§4](#4-the-parallel-unit-is-not-the-box-walk--this-is-a-prefetchconsume-split-the-fourth-in-this-document)). **1.16–2.01× on the cascade stage at four threads, 1.08–1.96× end to end, pixel-identical at 1/2/4** — and the harness now publishes the serial residue per page (16–55%), so what is left is measured rather than guessed ([§5](#5-the-serial-residue-is-measured-now-and-it-differs-three-fold-across-pages)). **#21 landed** and cost nothing but the reading that says why it is safe — 2 118 tests, 0 failures, **57–59 s → 31–37 s (~1.75×)** on four cores. **#16 landed, and it needed none of what this document said it needed.** The store §6 said had to be built was already there — `JSContext.CodeCache` is public — so the item is one main-repo type and a two-line call site, with no engine change, no submodule patch and none of the cross-document isolation §6 worried about ([§8](#8-item-16s-blocker-did-not-exist-the-store-is-the-contexts-own-cache)). That makes **four items running whose stated blocker was not the operative one** (#8, #12 twice, #16), and the lesson is now explicit: the "What blocks it today" column is a hypothesis, and checking it belongs in an item's first hour rather than its last. **Compile stage 1.41×/1.62×/1.52× at 2/4/8 threads, whole capture 1.44× on a compile-heavy document and 1.22× on a modestly scripted one** — and its measurement tested the obvious explanation for the ceiling instead of publishing it, which is how the explanation turned out to be wrong and a 15–17% *sequential* tax turned up instead ([§9](#9-the-compile-stages-ceiling-is-not-the-thing-that-looks-like-it)). **#14 is the phase's remainder, and its precondition is now built.** The relayout harness §7 asked for exists (`--relayout-profile`), and its first result re-aims the item: a relayout is **60–97% box-tree rebuild and re-cascade**, because any DOM version bump disposes the render tree and re-cascades the whole document before the layout pass runs — so dirty bits on `CssBox.PerformLayout` bound 3–39% of the cost, and 2.9% on the rule-heavy page. The available ceiling is real (34× on that page if the rebuild goes, against 1.03× for a perfect layout dirty bit alone) but it sits in the box tree and the cascade, and the work starts a layer down in `Broiler.DOM`, where every script-shaped mutation is today indistinguishable from every other ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). **#14's first slice then landed, and its blocker did not exist either — the fifth in a row.** The DOM was never limited to a version counter: `DomDocument.Mutated` has published a typed `DomMutationRecord` since before the item was written, so the item does not start in `Broiler.DOM` at all; what was missing was a consumer, and `RenderTreeInvalidation` is it. Mutations that cannot reach the render tree no longer rebuild it — **`rules` 1 032.7 → 11.5 ms (89.8×)** on the offscreen-build case, 10.0–25.8× on the other four pages, with the remaining thirty rows inside the run-to-run spread. The measurement also refuted one of §10's own two predictions (the burst does not amortise — a rebuild is whole-document for a single attribute write) and reinterpreted the other ("changes nothing observable" is already free at the value level). **The remainder was larger than the slice** — an unstyled `data-*` write still cost 997.8 ms on `rules` — and **#14's second half then took it**: `CascadeInvalidationSet` asks the sheets the tree was cascaded from whether any rule could match differently, and asks box construction separately whether it reads the attribute for reasons of its own, because a set built from stylesheets would happily elide a `<td colspan>` write on a page whose sheet never mentions `colspan`. **`rules` 1 476.7 → 43.0 ms (34.4×)** on that row, 9.5–14.2× on three other pages, 36.0× on `rules`' class toggle, with two control rows (`styled attribute`, `styled class`) that still rebuild on exactly the pages whose sheets name what they write. **The phase's last finding is not a speedup but a defect, and the gate is what makes that worth stating**: `--relayout-parity` renders every page with the elision on and off and compares images, it failed on first run, and the cause was that laying the same box tree out twice was never idempotent — a two-pixel margin drift that had been live in the *first* slice since it shipped, because nothing in this repository had ever taken that path twice ([§12](#12-item-14s-second-half-the-sheets-already-knew-and-the-gate-caught-a-bug-nothing-else-could)). An optimisation that skips work is a new execution path, and its gate has to run that path end to end. What is left of #14 is a *scoped* rebuild rather than a skipped one. See [What building Phase 3 changed](#what-building-phase-3-changed). |
-| **4 — Parallel layout and workers** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. Only worth starting once Phase 3's measurements say layout is still the bottleneck — and they now say the opposite three times over: layout is 0.6–6.5% of a first render (Phase 1 §2), and the relayout harness Phase 3 §7 asked for has since been built and says the layout pass is **3–39% of a relayout** too, the rest being the box-tree rebuild and the cascade ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)). So the interactive case does not rescue this phase either: it is a cascade problem, like the first render — and item #14's first slice has since confirmed that from the other direction, by taking a relayout to 11.5 ms on the page that hurts most simply by not re-cascading it ([§11](#11-item-14s-blocker-did-not-exist-either-and-the-burst-does-not-amortise)). Phase 3 §4, §8 and §11 are also a warning about #13's wording: **five** items in a row have found that the structure an item names is not the structure that can be split, or that the blocker it names is not the one holding it. |
+| **4 — Parallel layout and workers** — **open** | Parallel intrinsic sizing and independent subtrees (#13), Web Workers (#18) | Highest cost, highest risk, lowest ceiling. **The phase opened by re-measuring its own rationale, and the rationale had gone stale in the direction that matters.** This row used to justify deprioritising the phase with "layout is 0.6–6.5% of a first render (Phase 1 §2)". Re-run on today's code, layout is **3.3–20.1%** ([§1](#1-layouts-share-tripled-without-layout-changing-and-the-number-this-row-quoted-was-measured-before-two-phases-of-work)) — its absolute cost is unchanged at 28–51 ms, and every phase that removed cost from raster and the cascade raised its share by Amdahl. That does *not* make #13 worth 20–30 days at High risk: 1.5–2.5× of a 20% stage is ~10% end to end on one page. It does mean the phase has to be argued from a current number. The relayout side still says what it said — the layout pass is **3–39% of a relayout** ([§10](#10-item-14s-harness-exists-now-and-it-says-the-item-is-aimed-at-the-smaller-half)), the rest being box-tree rebuild and cascade — so the interactive case does not rescue the phase either. **What the phase has built is the measurement its sequential step asked for, and it retired that step**: the `Broiler.Layout` roadmap's step 1 ("stop laying out the whole tree twice", stated as worth more than the two parallel steps combined) is **unreachable from every path this repository measures**, and where it does fire it is not a doubling ([§2](#2-the-double-layout-is-unreachable-from-every-path-this-repository-measures-and-where-it-fires-it-is-not-a-doubling)). Phase 3 §4, §8 and §11 remain a warning about #13's wording, and this phase adds a sixth: **six** items running have found that the structure an item names is not the structure that can be split, or that the blocker — or, here, the *beneficiary* — it names is not the operative one. See [What building Phase 4 changed](#what-building-phase-4-changed). |
 
 **Global exit gate:** every parallel path has a `--threads 1` equivalent that
 reproduces the sequential output exactly, and the WPT corpus produces identical
