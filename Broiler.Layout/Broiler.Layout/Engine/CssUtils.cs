@@ -47,6 +47,8 @@ internal static partial class CssUtils
             "flex-shrink" => cssBox.FlexShrink,
             "flex-basis" => cssBox.FlexBasis,
             "flex-wrap" => cssBox.FlexWrap,
+            "flex-flow" => (cssBox.FlexDirection + " " + cssBox.FlexWrap).Trim(),
+            "flex" => string.Join(' ', cssBox.FlexGrow, cssBox.FlexShrink, cssBox.FlexBasis),
             "order" => cssBox.Order,
             "justify-content" => cssBox.JustifyContent,
             "justify-items" => cssBox.JustifyItems,
@@ -168,6 +170,71 @@ internal static partial class CssUtils
             "color-scheme" => cssBox.ColorScheme,
             _ => null,
         };
+    }
+
+    /// <summary>
+    /// CSS Flexbox §5.1 <c>flex-flow</c>: a direction, a wrap, or both, in either order. Expanded
+    /// here because nothing upstream expands it, and a container whose direction never arrives is
+    /// laid out as a row — the wrong axis for everything in it.
+    /// </summary>
+    private static void SetFlexFlowShorthand(CssBox cssBox, string value)
+    {
+        foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (token is "row" or "row-reverse" or "column" or "column-reverse")
+                cssBox.FlexDirection = token;
+            else if (token is "nowrap" or "wrap" or "wrap-reverse")
+                cssBox.FlexWrap = token;
+        }
+    }
+
+    /// <summary>
+    /// CSS Flexbox §7.1 <c>flex</c>: up to a grow factor, a shrink factor and a basis, in that
+    /// order, with the unstated ones taking the shorthand's own defaults rather than the
+    /// longhands' — <c>flex: 1</c> is <c>1 1 0%</c>, not <c>1 0 auto</c>.
+    /// </summary>
+    private static void SetFlexShorthand(CssBox cssBox, string value)
+    {
+        var v = value.Trim();
+
+        if (v.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            cssBox.FlexGrow = "0";
+            cssBox.FlexShrink = "0";
+            cssBox.FlexBasis = CssConstants.Auto;
+            return;
+        }
+
+        if (v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
+            || v.Equals("initial", StringComparison.OrdinalIgnoreCase))
+        {
+            cssBox.FlexGrow = v.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase) ? "1" : "0";
+            cssBox.FlexShrink = "1";
+            cssBox.FlexBasis = CssConstants.Auto;
+            return;
+        }
+
+        string? grow = null, shrink = null, basis = null;
+        foreach (var token in v.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            bool isNumber = double.TryParse(
+                token, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out _);
+
+            if (isNumber && grow is null)
+                grow = token;
+            else if (isNumber && shrink is null)
+                shrink = token;
+            else
+                basis ??= token;
+        }
+
+        if (grow is null)
+            return;
+
+        cssBox.FlexGrow = grow;
+        cssBox.FlexShrink = shrink ?? "1";
+        cssBox.FlexBasis = basis ?? "0%";
     }
 
     public static void SetPropertyValue(CssBox cssBox, string propName, string value)
@@ -296,6 +363,12 @@ internal static partial class CssUtils
                 break;
             case "flex-wrap":
                 cssBox.FlexWrap = value;
+                break;
+            case "flex-flow":
+                SetFlexFlowShorthand(cssBox, value);
+                break;
+            case "flex":
+                SetFlexShorthand(cssBox, value);
                 break;
             case "order":
                 cssBox.Order = value;

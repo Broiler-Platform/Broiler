@@ -1156,7 +1156,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // CSS Box Alignment §6.2: distribute flex/grid items along
                 // the block (cross) axis per align-items / align-self.
                 ApplyFlexGridCrossAxisAlignment();
-                ApplyFlexColumnInlineAxisAlignment();
+                ApplyFlexColumnInlineAxisAlignment(g);
             }
             else if (Boxes.Count > 0)
             {

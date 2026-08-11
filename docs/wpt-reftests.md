@@ -328,13 +328,13 @@ were never real — `dimensions-003` and `-005` were passing at 99.5% and 99.2%
 rest is in the **references**, and it is two engine gaps that have nothing to do
 with paged media:
 
-- **Flex items are never stretched on the cross axis.** 26 of the 36 references
-  state the margin ring as a grid whose edge strips are flex containers, and every
-  box in them is sized by the default `align-items: stretch`. Broiler leaves flex
-  items at their content size — a row item with a width and no height comes out
-  zero-tall and paints nothing — so those references render blank or nearly so.
-  `CssBox.Flex.cs` only *shifts* items for `center`/`end`; there is no stretch
-  step at all.
+- **Flex items were never stretched on the cross axis** — fixed, and it moved
+  `css/css-flexbox` 470 → 568 of 994 on its own. It does *not* unblock these
+  references, because their edge strips are flex containers nested in a grid cell:
+  the strip's height comes from the grid track, and the track is sized in
+  `ApplyGridLayoutAfterInline` — after the strip has already laid its own line
+  out. So the strip is still auto-height when it decides what its items stretch
+  into. The grid half of the same gap is a separate change.
 - **Generated `content` takes a single quoted string and nothing else.**
   `content: "a" "b"` renders as `a" "b` and `content: counter(page)` renders as
   the text `counter(page)`. Both sides of a comparison share the gap, so it costs
@@ -342,9 +342,22 @@ with paged media:
   on the test side: doing so alone would separate the eight margin-box tests that
   use one from references that still render the literal text.
 
-Fixing the first would unblock most of this cluster and is a `Broiler.Layout`
-change with a suite-wide blast radius (`css/css-flexbox` is ~206 failures of its
-own), so it wants its own measured pass rather than being folded into paged media.
+## Flex items are stretched now, and what that says about the scoreboard
+
+`align-items: stretch` is the initial value, so it is what happens to most flex
+items on most pages — and the engine did none of it. `CssBox.Flex.cs` only
+*shifted* items for `center`/`end`; nothing ever sized one. An item with a width
+and no height came out zero-tall and painted nothing, which is why any flex
+container used as a strip rendered blank. Two shorthands went unexpanded with it:
+`flex-flow: column` was silently laid out as a row (the wrong axis for everything
+in it), and `flex: 1` never delivered a grow factor.
+
+**`css/css-flexbox`: 470 → 568 of 994**, 123 won against 25 lost. The 25 are the
+pattern this document keeps coming back to, and worth checking before reading
+them as a regression: they are tests whose *reference* states the expected layout
+with absolutely positioned boxes that Broiler still sizes to their text.
+`flexbox_align-items-stretch` is exactly that — the render is now right to the
+pixel and the reference is not, where before the two were wrong together.
 
 ## Quirks mode reaches the render, as of the doctype round-trip fix
 
