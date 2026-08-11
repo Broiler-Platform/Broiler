@@ -160,7 +160,9 @@ internal static class ComputedStyleBuilder
             Filter = box.Filter,
             Isolation = box.Isolation,
             BackgroundClip = box.BackgroundClip,
-            ClipPath = box.ClipPath,
+            // CSS 2.1 §11.1.2's `clip` is the same rectangular clip `clip-path: inset()` names, so
+            // it is resolved into one here rather than applied a second time in paint.
+            ClipPath = ClipRect.EffectiveClipPath(box),
             Contain = box.Contain,
             OverflowClipMargin = box.ActualOverflowClipMargin,
             ContentVisibility = box.ContentVisibility,

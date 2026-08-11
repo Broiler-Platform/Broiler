@@ -2885,6 +2885,44 @@ internal sealed partial class WptTestRunner
         Broiler.Dom.DomDocument? Document,
         IReadOnlyList<DomBridge.CheckLayoutAssertion> LayoutAssertions);
 
+    /// <summary>
+    /// The script inside an XML CDATA section, or <paramref name="content"/> unchanged when it is
+    /// not wrapped in one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An XHTML test writes its inline scripts as <c>&lt;![CDATA[ … ]]&gt;</c> — an XML parser
+    /// consumes the wrapper and hands the engine what is between the markers, but this scan reads
+    /// the file as text and would hand the engine the markers too. <c>&lt;![CDATA[</c> is a syntax
+    /// error, so the whole script threw and every one of the document's scripts was lost with it:
+    /// not just the statements, but the functions an <c>onload</c> attribute goes on to call. That
+    /// is why <c>css/CSS2/visufx/clip-001.xht</c> never ran the <c>clip = "auto"</c> its result
+    /// depends on, and it is the same for every scripted test in the <c>.xht</c> half of the corpus.
+    /// </para>
+    /// <para>
+    /// The commented spellings (<c>//&lt;![CDATA[</c>, <c>&lt;!-- … --&gt;</c>) are handled too:
+    /// they are the same wrapper written to survive an HTML parser, and both halves are only ever
+    /// noise to the engine.
+    /// </para>
+    /// </remarks>
+    internal static string StripCdataSection(string content)
+    {
+        var trimmed = content.Trim();
+
+        // `//<![CDATA[` and `// ]]>` — the JS-comment spelling, which the engine would tolerate but
+        // which the plain form below is the general case of.
+        trimmed = CdataOpenPattern().Replace(trimmed, string.Empty, 1);
+        trimmed = CdataClosePattern().Replace(trimmed, string.Empty, 1);
+
+        return trimmed;
+    }
+
+    [GeneratedRegex(@"\A\s*(?://\s*|<!--\s*)?<!\[CDATA\[")]
+    private static partial Regex CdataOpenPattern();
+
+    [GeneratedRegex(@"(?://\s*)?\]\]>(?:\s*-->)?\s*\z")]
+    private static partial Regex CdataClosePattern();
+
     private static ExecutedDocument ExecuteScriptsWithDom(
         string html,
         string url,
@@ -2962,7 +3000,7 @@ internal sealed partial class WptTestRunner
             }
 
             // Inline script
-            var content = match.Groups["content"].Value.Trim();
+            var content = StripCdataSection(match.Groups["content"].Value).Trim();
             if (string.IsNullOrEmpty(content)) continue;
 
             if (isDefer)

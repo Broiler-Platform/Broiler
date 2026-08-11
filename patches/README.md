@@ -46,3 +46,23 @@ list is built, so the composited-away colour is not recoverable from the rendere
 pixels afterwards; a runner-side workaround would have to re-implement canvas
 background propagation to guess what was flattened. One reftest is not worth
 that, and the patch is one line.
+
+### `0002-html-empty-inset-clip.patch` — `Broiler.HTML`
+
+Four lines in `Source/Broiler.HTML.Orchestration/IR/PaintWalker.Geometry.cs`: a
+`clip-path: inset()` whose rectangle comes out empty is emitted as a clip instead
+of being dropped. An empty rectangle is a clip that admits nothing —
+`inset(100% 0 0 0)` says the element is not to be seen — and the raster backend
+clips to it correctly once it arrives; dropping it painted the element in full.
+
+Wanted by CSS 2.1 §11.1.2 `clip`, which is implemented **in this repository**
+(`Broiler.Layout/Broiler.Layout/IR/ClipRect.cs`, projecting onto the `clip-path`
+the paint walker already applies — see
+[docs/wpt-reftests.md](../docs/wpt-reftests.md)). Most of what `clip` states *is*
+an empty rectangle: `rect(96px, 96px, 96px, 96px)` on a 96×96 box runs from the
+96px mark to the 96px mark on both axes. So the main-repo half lands the
+non-empty cases and this unlocks the rest — measured together, **+46 reftests,
+none lost**: `css/CSS2/visufx` 6 → 50 of 51, and two in `css-masking/clip` that
+were the same bug reached through `clip-path` directly.
+
+Applying it does not need `0001`; the two touch different files.

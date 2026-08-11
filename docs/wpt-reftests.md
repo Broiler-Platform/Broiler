@@ -358,9 +358,16 @@ and its reference states the same colour on `html`, so the two agree only when
 the page paints. Before this, `page-box-001-print`, `-002`, `-003` and `-011` each
 matched their reference by **0.0 %**: the reference paints the colour through a
 `body` background and the test through its `@page`, and only one of the two was
-drawn. `css/css-page` goes **133 → 136** (`page-box-000`, `-001`, `-003` and
-`-011` gained, one lost — see named pages below), and **137** once the
+drawn. `css/css-page` goes **133 → 137** — `page-background-image-print`,
+`page-box-000`, `-001`, `-003` and `-011`, nothing lost — and **138** once the
 `Broiler.HTML` patch below is applied.
+
+> Measure with an **absolute** `--wpt-dir`, the way `scripts/run-wpt-reftests.sh`
+> and CI do (`WPT_DIR="$REPO_ROOT/tests/wpt/checkout"`). A relative one does not
+> resolve a test's root-relative resources — `url(/images/green.png)` and
+> `<img src="/images/…">` silently render nothing — so a run started by hand with
+> `--wpt-dir tests/wpt/checkout` reports failures CI does not have, and a
+> before/after comparison across the two spellings is not a comparison at all.
 
 Three details are the whole of it, and each is a WPT pair stating it:
 
@@ -398,14 +405,75 @@ when it is an image or a gradient. The one-line call site is
 `patches/0001-html-canvas-backdrop-lever.patch`; until it is applied
 `page-box-002-print` stays at 0.0 % and everything else here works without it.
 
-**What is still missing is named pages, and it costs one test.**
-`WptPageDecoration` reads the unconditional `@page` only, as `WptPageBox` does —
-so `page-name-table-001-print`, whose content selects a `@page square` that
-overrides the unconditional rule's red with `#eee`, now paints red where it used
-to paint nothing. It was passing because *neither* side drew a page background;
-that was a false pass, and it is an honest failure now. Fixing it properly needs
-the `page` property in the fragment tree's computed style, which is also what the
-paged run needs for per-name page sizes.
+**What is still missing is named pages.** `WptPageDecoration` reads the
+unconditional `@page` only, as `WptPageBox` does, so a page a name selects paints
+the wrong rule's background — `page-name-table-001-print` puts its table on a
+`@page square` whose `#eee` overrides the unconditional red, and fails either way.
+Fixing it needs the `page` property in the fragment tree's computed style, which
+is what the paged run needs for per-name page sizes too.
+
+## Scripts in an XHTML test never ran, and it cost 45 reftests
+
+Half of `css/CSS2` is `.xht`, and an XHTML test writes its inline scripts inside
+an XML CDATA section:
+
+```xml
+<script type="text/javascript"><![CDATA[
+  function startTest() { … }
+]]></script>
+```
+
+An XML parser consumes the wrapper and hands the engine what is between the
+markers. This runner does not parse the document to find its scripts — it scans
+the source — so it handed the engine the markers too, `<![CDATA[` is a syntax
+error, and **the whole script was lost with it**. Not just the statements: the
+functions an `onload` attribute goes on to call went with them, so a test whose
+result depends on `body onload="startTest()"` rendered its unscripted state and
+was compared as if that were the answer.
+
+Stripping the wrapper (`WptTestRunner.StripCdataSection`, with the commented
+`//<![CDATA[` and `<!-- … -->` spellings) took **`css/CSS2` from 4863 to 4908 of
+6216**, nothing lost. The gains are where scripted CSS2 tests live:
+`box-display` +30 (its `insert-block-in-*` / `delete-inline-in-*` DOM-mutation
+family), `tables` +14, `positioning` +1. 395 documents in the checkout carry a
+CDATA-wrapped script, so the reach is wider than the tests it happens to move
+today.
+
+**The tell for this class of bug is a test that renders its "before" state.**
+Nothing errors, nothing is skipped, and the rendered image is a plausible render
+— of the document as it stood before a script it never ran.
+
+## `clip` is implemented, and most of what it clips is nothing
+
+CSS 2.1 §11.1.2's `clip` had no implementation at all: `ComputedStyle` had no such
+property and the paint walker never looked for one, so `css/CSS2/visufx/clip-*`
+rendered 44 unclipped elements over references that show none of them.
+
+It is implemented as a projection rather than a second clip.
+`clip: rect(<top>, <right>, <bottom>, <left>)` and `clip-path: inset()` name the
+same operation — a rectangle the element and everything inside it is clipped to,
+measured on the border box — so `Broiler.Layout/…/IR/ClipRect.cs` resolves the one
+into the other in `ComputedStyleBuilder`, where the used border box is already
+known. Everything downstream sees an ordinary `clip-path`. CSS Masking 1 §7 makes
+that ordering right as well as convenient: a real `clip-path` supersedes `clip`,
+so `clip` is only consulted when `clip-path` is `none`.
+
+**The geometry is stated from two edges, not four**, and that is the whole reason
+this family looked unwinnable. `top` and `bottom` are offsets down from the border
+box's top edge, `right` and `left` offsets right from its left edge — so
+`rect(96px, 96px, 96px, 96px)` on a 96×96 box is an *empty* clip, and about forty
+of the tests state exactly that, one per unit spelling (`1in`, `72pt`, `6pc`,
+`2.54cm`, `-0px`, `+0px`, …). Each means "nothing should be visible".
+
+The paint walker dropped an empty `inset()` as if it were no clip, which painted
+the element in full — `patches/0002-html-empty-inset-clip.patch` is the four lines
+that emit it instead. With both halves: **`css/CSS2/visufx` 6 → 50 of 51**, plus
+two in `css-masking/clip` that were the same bug reached through `clip-path`
+directly, and nothing lost. Without the patch the main-repo half still lands the
+non-empty cases; it is the empty ones that wait on it.
+
+Every `clip-*` test in the directory passes then; the one failure left in it is
+`visibility-005`, which is about `visibility` and not about clipping at all.
 
 ## Flex items are stretched now, and what that says about the scoreboard
 
