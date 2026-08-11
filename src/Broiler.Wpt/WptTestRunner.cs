@@ -400,9 +400,19 @@ internal sealed partial class WptTestRunner
     /// input; the lever only decides whether it is serialised first. That is what makes the A/B
     /// comparison meaningful rather than a comparison of two pipelines.
     /// </para>
+    /// <para>
+    /// <b>Default ON</b>, on a paired A/B over <b>~3 400 reftests</b> in which <b>3 tests changed,
+    /// all of them fixed, and none regressed</b>: a 2 206-test set spanning <c>css-break</c>,
+    /// <c>css-overflow/line-clamp</c>, <c>css-box/margin-trim</c>, <c>CSS2/floats</c>,
+    /// <c>css-align</c>, <c>css-sizing</c>, <c>css-display</c>, <c>css-lists</c>,
+    /// <c>css-inline</c>, <c>css-rhythm</c>, <c>css-pseudo</c> and <c>quirks</c> (1 133 → 1 135),
+    /// and a 1 173-test <c>css-backgrounds</c> + <c>css-images</c> set (690 → 691). That is not
+    /// the whole corpus — the directories nothing has swept are why the round trip stays one
+    /// environment variable away.
+    /// </para>
     /// </remarks>
     internal static bool DomRender { get; set; } =
-        Environment.GetEnvironmentVariable("BROILER_WPT_DOM_RENDER") is ("1" or "true" or "TRUE" or "on");
+        Environment.GetEnvironmentVariable("BROILER_WPT_DOM_RENDER") is not ("0" or "false" or "FALSE" or "off");
 
     /// <summary>
     /// File extensions treated as test files.

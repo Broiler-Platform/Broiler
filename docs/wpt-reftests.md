@@ -178,16 +178,25 @@ problems, all at 0.0–1.4% match):
 
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
-  a *different document*. The runner executes a test's scripts, serialises the
-  mutated DOM back to HTML, and renders that string; anything the script built
-  that markup cannot express is lost in the round trip. HTML tree construction
-  unconditionally creates a `<body>`, so
-  `quirks/tables-inherit-color-from-body-quirk-004`…`-007` — which exist to
-  check what a table does when the document has *no* body element — come back
-  with one, and the `body { color: red }` they declare then matches it. Nothing
-  in the failure points at the round trip. Suspect it when a test's script
-  removes or replaces `<html>`/`<body>`, and pin the behaviour in a unit test
-  over the box tree instead of waiting for the reftest.
+  a *different document*. Two distinct versions of this, and the fix for the
+  first does not touch the second:
+  - *The document was rebuilt on the way to the renderer.* The runner used to
+    serialise the script-mutated DOM back to HTML and render a re-parse of that
+    string, and HTML tree construction is not the inverse of a DOM — it
+    unconditionally creates a `<body>`. **Fixed:** the runner renders the
+    document itself (`BROILER_WPT_DOM_RENDER`, default on; set it to `0` for the
+    round trip). That is what decided
+    `quirks/tables-inherit-color-from-body-quirk-004` and `-005`.
+  - *The document was built at a moment the runner does not have.* Scripts here
+    run after the whole document is parsed, so a test whose script runs
+    **during** parsing sees a tree the runner cannot reproduce.
+    `…-quirk-006` and `-007` say so in a comment — "at this point, the `<body>`
+    has not been created yet" — and they still fail, because by the time this
+    runner executes anything, it has.
+
+  Suspect both when a test's script removes or replaces `<html>`/`<body>`, and
+  pin the behaviour in a unit test over the box tree rather than waiting for the
+  reftest to be able to express it.
 
 The largest single group in that issue — 13 of the 30 — are `*-print.html`
 tests, which state their expected rendering in terms of page boxes, named pages,
@@ -217,3 +226,35 @@ reason until `flow-root` started rendering, and nine more across the corpus with
 them. When a change flips a test from pass to fail, check the oracle before
 treating it as a regression: a false pass ending is progress that the scoreboard
 reports as a loss.
+
+## The runner renders the document, not a re-parse of its markup
+
+`BROILER_WPT_DOM_RENDER`, default on. The script pass hands the renderer the
+bridge's render projection (`DomBridge.GetRenderDocument`) and
+`WptDocumentRenderer` binds it with `SetDocumentWithStyleSet` — the same
+container, layout pass, paint pass and embedded-document compositing the string
+entry point uses. Set the variable to `0` to go back to serialising and
+re-parsing.
+
+Two things the string path gets for free and this one does explicitly, both
+worth knowing if you touch either:
+
+- **The document mode.** `SetHtmlWithStyleSet` publishes
+  `DocumentModeContext.CurrentQuirksMode` from the markup it is handed;
+  `SetDocumentWithStyleSet` publishes nothing, so the renderer would inherit
+  whatever that thread last rendered. Right by accident, and only while one
+  thread renders one document.
+- **Post-processing.** `HtmlPostProcessor` is regex-over-markup, so it cannot
+  run. `WptDocumentPostProcessor` reproduces the three passes that can reach a
+  WPT document — already-executed `<script>`s, `<iframe>` fallback, and `<map>`
+  (32 files in the corpus have one) — plus the `:root` rewrite, through the
+  string helper both paths share. The rest of that method is Acid-shaped and
+  matches nothing here; that was checked against the checkout, not assumed.
+
+**Adding a pass to one path means adding it to the other.** They are not
+generated from a common description, and a pass that exists on only one side is
+a silent per-test rendering difference rather than a build error.
+
+The switch was made on a paired A/B over ~3 400 reftests in which 3 tests
+changed, all fixed, none regressed. That is not the whole corpus, which is why
+the round trip is still one environment variable away.
