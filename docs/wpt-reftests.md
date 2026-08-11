@@ -205,6 +205,73 @@ margin boxes and fragmentation. The runner renders them in screen mode on both
 sides, so they are not measuring what they were written to measure; they need
 paged media, not thirteen separate fixes.
 
+## The bug is as likely to be in the reference, and that inverts the scoreboard
+
+The suite renders both sides, so a defect in the *reference* file is worth
+exactly as much as one in the test — and it is much harder to see, because the
+reference is the thing you are reading to decide what the test should look like.
+It also does something the test-side kind never does: **fixing the test can make
+the pass rate go down**, because a test whose two sides were wrong in the same
+direction was passing, and correcting one side alone separates them.
+
+That is not hypothetical. Implementing `line-clamp` (CSS Overflow 4 §5 —
+`max-lines`, `block-ellipsis` and the legacy `-webkit-line-clamp`, none of which
+had any implementation behind them) took `css/css-overflow/line-clamp` from
+**107/263 to 174/263**, and nine tests moved the other way. Four of the nine were
+`line-clamp-with-abspos-0{10,14}` and `line-clamp-with-fixed-pos-0{10,14}`, and
+none of them had anything to do with abspos, or with the clamp. Their
+*references* state the clamped result as `white-space: pre` text ending in a
+newline, and Broiler laid out a trailing preserved newline as an extra empty line
+box — so each reference rendered a line too tall, and the tests could only pass
+while the clamp was equally wrong. Fixing that (CSS Text 3 §4.1: a forced break
+at the end of a block generates no line box; the engine already applied it to a
+trailing `<br>` and not to the `pre` spelling of the same rule) fixed all four,
+took the directory to **181/263**, and moved another 14 tests elsewhere in the
+corpus that had nothing to do with clamping.
+
+**The tell is that the diff is in a part of the picture the test is not about.**
+When the rendered and reference images differ somewhere the test's own feature
+cannot reach — a margin, a trailing line, the height of a wrapper — read the
+reference as a document in its own right and reduce *it* to a minimal case
+against Chromium. The four above all showed the clamp working perfectly and the
+whole box a line too tall.
+
+## Issue #1604's top thirty: what a "biggest problem" list is made of
+
+Re-run after the work above, all thirty still fail, and the shape is worth
+recording because it is the shape these lists keep having — the ranking is by
+*blast radius*, and a 0.0% match is the signature of a missing feature rather
+than of a bug close to being fixed. In order of size: **13** `*-print` tests
+needing paged media; **5** `css-view-transitions`; **4** `jpegxl/` needing a
+JPEG XL decoder (Chromium has none either); **3** `fullscreen/` and **1**
+customizable-`select` needing `testdriver.js`; **3** `*.sub.html` colour-scheme
+tests needing the WPT server for their cross-origin substitution; **1**
+`forced-colors-mode-49` needing the run to be in forced-colors mode; **1**
+`root-box-003` that is stale upstream (see above); **1** `grid-lanes` test; and
+**1** whose `rel=match` is a bare 60×60 PNG compared against a full-page render
+that also carries a `<p>` of instructions, which cannot match at any threshold.
+
+Two of those deserve a note because they look actionable and are not:
+
+- **`css/css-grid/grid-lanes` is the corpus's single largest failure group —
+  478 reftests, 12.8% of every failure — and it is deliberate.** The engine drops
+  `display: grid-lanes` as an invalid value to match reference browsers, and
+  Chromium fails `column-align-items-001` against its own reference by 83% of
+  pixels, so the tests are unwinnable without shipping the experimental feature.
+  Doing so would trade **+478 reftests against the golden-image suite**, where
+  the drop is currently what makes ~1 400 of those tests pass (191 fail there
+  today). The trade is a large net loss and the reason the current behaviour is
+  what it is; see `CssUtils.NormalizeDisplayValue`.
+- **The `*-print` group needs paged media, not thirteen fixes** — the runner
+  renders both sides in screen mode, so those tests are not measuring what they
+  were written to measure. This is the same finding as issue #1601's triage, and
+  it has not moved.
+
+The list to work from is therefore not this one. The directory totals are:
+`css/css-grid/grid-lanes` 478 (above), `css/css-writing-modes` ~724 at 55–95%
+match (partial vertical layout — deep, and the largest winnable group),
+`css/css-flexbox` ~206, `css/css-overflow/line-clamp` (was 156, now 82).
+
 ## Quirks mode reaches the render, as of the doctype round-trip fix
 
 Worth knowing because it silently invalidated a whole directory. `SerializeToHtml`
