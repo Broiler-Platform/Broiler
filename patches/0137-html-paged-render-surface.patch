@@ -1,0 +1,76 @@
+From 4699c19168a42b707de5836af269570336c1f53b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 11 Aug 2026 14:42:01 +0000
+Subject: [PATCH] html: a paged render paints its whole surface, and exposes
+ the page box
+
+Two changes only a host rendering paged media can observe.
+
+GetPaintViewport bounded painting to min(MaxSize, PageSize). For every
+existing caller PageSize is the very large "not paginated" extent, so that
+minimum was already MaxSize and nothing changes. For a host that paginates it
+was the difference between a document and its first page: a paged render lays
+the continuous flow out on a surface several pages tall and cuts pages from
+it, so bounding the paint to one page painted page one and silently dropped
+the rest -- while the viewport, and with it vh and the fragmentation
+boundaries, has to stay the page. The two sizes are now used for the two
+different things.
+
+HtmlContainer gains a PageSize passthrough so a host outside the assembly can
+set that page. HtmlContainerInt has held the two apart all along; only the
+accessor was missing.
+---
+ Source/Broiler.HTML.Image/HtmlContainer.cs          | 13 +++++++++++++
+ .../Broiler.HTML.Orchestration/HtmlContainerInt.cs  |  9 ++++++++-
+ 2 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Image/HtmlContainer.cs b/Source/Broiler.HTML.Image/HtmlContainer.cs
+index a373de8..7f0b8ba 100644
+--- a/Source/Broiler.HTML.Image/HtmlContainer.cs
++++ b/Source/Broiler.HTML.Image/HtmlContainer.cs
+@@ -104,6 +104,19 @@ public sealed class HtmlContainer : IDisposable
+         set => HtmlContainerInt.MaxSize = value;
+     }
+ 
++    /// <summary>
++    /// The page box size for a paged render; the default is the very large extent that means "not
++    /// paginated". Separate from <see cref="MaxSize"/>, which is the surface being rasterised: a
++    /// paged render lays its flow out on a surface several pages tall and cuts pages from it, so
++    /// the page is what <c>vw</c>/<c>vh</c> and the fragmentation boundaries resolve against while
++    /// the surface is what gets painted.
++    /// </summary>
++    public SizeF PageSize
++    {
++        get => HtmlContainerInt.PageSize;
++        set => HtmlContainerInt.PageSize = value;
++    }
++
+     public SizeF ActualSize
+     {
+         get => HtmlContainerInt.ActualSize;
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index 5c592ef..4b1c99d 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -1138,10 +1138,17 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+         return displayList;
+     }
+ 
++    // The surface being painted, which is MaxSize when there is one -- not min(MaxSize, PageSize).
++    // The two differ only for a host that is paginating, and only in the direction that matters:
++    // a paged render lays the continuous flow out on a surface several pages tall and cuts pages
++    // from it, so bounding the paint to one page paints page one and silently drops the rest --
++    // while the *viewport*, and with it vh and the fragmentation boundaries, has to stay the page.
++    // For every other caller PageSize is the very large "not paginated" extent, so the minimum was
++    // already MaxSize and this changes nothing.
+     private RectangleF GetPaintViewport()
+     {
+         if (MaxSize.Height > 0)
+-            return new RectangleF(Location.X, Location.Y, Math.Min(MaxSize.Width, PageSize.Width), Math.Min(MaxSize.Height, PageSize.Height));
++            return new RectangleF(Location.X, Location.Y, MaxSize.Width, MaxSize.Height);
+ 
+         return new RectangleF(MarginLeft, MarginTop, PageSize.Width, PageSize.Height);
+     }
+-- 
+2.43.0
+
