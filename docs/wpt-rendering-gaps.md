@@ -1628,12 +1628,25 @@ section that already owns it rather than being re-measured.
   the child still paints *inside* the clip (a fix that simply suppressed the
   visible descendant would pass the clip assertion and be wrong).
 
-### Replacing the document element renders nothing — problem 17, diagnosed, not fixed
+### ~~Replacing the document element renders nothing~~ — problem 17, **the diagnosis below is superseded**
+
+> **Superseded (2026-08-12 audit).** Re-measured: the page is **not** blank, and
+> appending an element to `document` after `documentElement.remove()` **does**
+> install it as the document element. Broiler now renders the dark canvas, the
+> paragraph and the 200×200 square — 94.6 % `rgb(18,18,18)` plus 5.1 % of square,
+> against a reference that is 94.6 % `rgb(18,18,18)` plus the same 5.1 %. The whole
+> difference is the square's **colour**: ours is `rgb(255,0,0)`, the reference's is
+> `rgb(0,0,0)`. So this is the quirk the test is named for after all — the table
+> inherits `color: red` from the `<div>` instead of falling back to the initial
+> colour, and the test says outright "Test passes if there is a square filled with
+> initial color and **no red**". Everything below is kept as the record of the
+> earlier reading; the exit gate it proposes has already been met.
 
 - **Test:** `quirks/tables-inherit-color-from-body-quirk-007`, 5.1% on CI. The
   reference is the UA dark canvas (`html { color-scheme: dark }`) with light text
-  and a white 200px Ahem square. **Ours is a blank white page** — not a colour
-  mistake, nothing rendered at all.
+  and a white 200px Ahem square. ~~**Ours is a blank white page** — not a colour
+  mistake, nothing rendered at all.~~ **Ours is now the right page in the wrong
+  colour** (see the note above).
 - **The quirk the test is named for never gets a chance to matter.** The test
   builds its content in a `<div>`, appends it to the document element, then does
   `document.documentElement.remove()` and `document.append(root.cloneNode(true))`
@@ -1649,11 +1662,14 @@ section that already owns it rather than being re-measured.
   - `remove()` then appending a **hand-built** `<html><body>` with a lime block →
     still white;
   - `remove()` then appending a clone carrying a lime block → still white.
-- **So the finding is not about `cloneNode`, and not about quirks.** After
+- ~~**So the finding is not about `cloneNode`, and not about quirks.** After
   `documentElement.remove()`, appending *any* element to `document` does not
   install it as the new document element: the render stays empty. That is the
   whole 5.1%, and it is a DOM/bridge-level gap (the render tree is built from a
-  document root that was never re-established), not a paint or cascade one.
+  document root that was never re-established), not a paint or cascade one.~~
+  **No longer true — and it was the load-bearing claim.** The append does install
+  a document element, so the 5.1% is the colour of the square, and the test *is*
+  about the quirk it is named for.
 - **Exit gate for whoever takes it:** the fifth probe above — remove the document
   element, append a fresh `<html>` containing a 200×200 lime block, and get lime
   pixels. Everything the test actually asserts is downstream of that.
@@ -1696,10 +1712,10 @@ measurement.
 | 6 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1538 problem 10: Chromium fails this reftest against its own reference |
 | 7, 8 | `css-grid/…/grid-subgridded-to-grid-lanes/…` (2) | 0.8%, 0.9% | — | open — same `display: inline grid-lanes` family as #1538 problems 12/13, which Broiler drops as invalid because no stable browser ships it unflagged |
 | 9, 10 | `css-view-transitions/auto-name{-from-id-shadow,}` (2) | 1.3% | — | **won't fix** — the `auto-name` family, #1538 problem 18: the reference is Chromium's unfeatured render |
-| 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | — | does not reproduce offline (98.46% at #1538 problem 19) — judge from CI |
+| 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | **1.3%** | ~~does not reproduce offline~~ — **it does**, at CI's own number, against the test's own `-ref.html`: the transition content is absent from our render |
 | 12 | `css-view-transitions/root-to-shared-animation-start` | 1.5% | — | new to this list — needs the rasterised root snapshot, #1491 problems 19/21/23 |
 | 13–16 | `css-view-transitions/massive-element-{left,right}-of-viewport-partially-onscreen-{new,old}` (4) | 2.0%, 2.6% | — | open — **half fixed** at #1538 problems 22/23/25/26; these still fail on the snapshot clone's box sizing |
-| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | — | open — **diagnosed**: after `documentElement.remove()`, appending *any* element to `document` does not install a new document element, so the page renders empty. Not a quirks bug. See above |
+| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | 94.9% | open — **re-diagnosed**: the page renders (the appended element *does* become the document element); the whole gap is the square painted red where the reference has the initial colour, i.e. the quirk the test is named for. See above |
 | 18 | `css-grid/subgrid/orthogonal-writing-mode-006` | 5.6% | — | open — **diagnosed, and mis-named**: Broiler renders the test and its own `-ref.html` to a byte-identical PNG, so subgrid is a no-op both ways. The gap is the grid layout they share. See above |
 | 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | **5.7%** | re-report of #1538 problem 1 — ~~needs the server's `trickle` pipe~~ **reproduces offline exactly**; a script-injected `data:text/css` sheet never applies, see [the audit](#one-test-reclassified-css-backgroundsbackground-image-shared-stylesheet) |
 | 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | **5.9% → 100%** | **fixed** — a `visibility: hidden` box still clips its visible descendants ([`patches/0121`](../patches/README.md)) |
@@ -2028,14 +2044,15 @@ bug.)
   a top-level render is byte-identical. That, the inheritance fix, and the WPT
   runner's own frame compositor (`WptDocumentRenderer`, which pins the lever and
   composites source-over) are **main repo**. The renderer's side is
-  [`patches/0004`](../patches/README.md) — the `Broiler.HTML` remote 403s from
-  here — and until it is applied the two tests keep their current scores.
+  a `Broiler.HTML` change that shipped as a patch because that remote 403s from
+  here. **It has since been applied and the pointer bumped** (`d1cdad4`), so both
+  tests carry their improved scores on CI.
 - **Verified:** the dark-color-scheme directory goes **22 → 24 of 29** with
   nothing lost, and `html/semantics/embedded-content/the-iframe-element` is
   **unchanged across all 161 tests** — the change is inert for a frame that fills
   its own canvas, which is nearly all of them. 22 focused cases cover the rule,
-  the cascade and the render, four of them probing for the patch so they become
-  real guards when the pointer is bumped.
+  the cascade and the render, four of them probing for the submodule half — and
+  **real guards now**, since the pointer carries it.
 - **A separate gap the fix uncovered — since fixed.** `color-scheme-iframe-background`
   stopped at 98.9 % rather than passing, on a residual that was not colour-scheme
   related at all: the default `<iframe>` border. See
@@ -2052,7 +2069,8 @@ bug.)
 - **The gap.** CSS 2.1 §8.5.3 paints `inset`, `outset`, `groove` and `ridge` as a
   bevel — two sides in a darkened shade of the border colour, two in the colour
   itself. The IR paint path used the colour flat on all four sides, so the border
-  the HTML Standard puts on every `<iframe>` and `<hr>` (`border: 2px inset`) came
+  the HTML Standard puts on every `<iframe>` and `<hr>` (`2px inset` on the frame,
+  `1px inset` on the rule) came
   out **solid black** where every browser paints `#9A9A9A` over `#EEEEEE`, and the
   `border: 2px groove` it puts on every `<fieldset>` came out flat too. On a
   600×400 frame that ring is 4 012 px — half of the test's residual, and exactly
@@ -2072,8 +2090,8 @@ bug.)
   `border-color: #EEEEEE` now the engine derives the pair, and `iframe` gets the
   same base. **The two halves must land together:** shading while `hr` still
   carried the pre-bevelled colours would darken `#9A9A9A` a second time and
-  regress every `<hr>`, which is why the call sits in
-  [`patches/0005`](../patches/README.md) rather than in `ComputedStyleBuilder`.
+  regress every `<hr>`, which is why the call shipped as a submodule patch
+  (`f8db3c6`, since applied) rather than going into `ComputedStyleBuilder`.
 - **Verified:** across 665 tests of `html/rendering` and the iframe element,
   **89 changed and every one of them improved** — none worse — with one more
   passing; many went 99.7–99.8 % to 100.0 %. `hr` renders identically to before.
@@ -2137,8 +2155,8 @@ bug.)
   1 949 tests of `css/css-backgrounds`, `html/rendering`, `css/css-gaps` and this
   directory, **no test changes state in either direction** and the net is
   **+1.578 points** (+1.707 across 55 tests against −0.129 across 103, one of
-  which loses more than a hundredth of a point). Ships as
-  [`patches/0006`](../patches/README.md).
+  which loses more than a hundredth of a point). Shipped as a submodule patch and
+  **since applied** — `Broiler.HTML` `f86b655`, which is the pinned pointer.
 
 ### #1615 problems, at a glance
 
@@ -2210,7 +2228,7 @@ only the first block paints — the cyan and pink blocks are lost. Two distinct
 defects sit behind that: viewport units do not resolve against the page area
 (`100vh` stays the full page box, so each block overflows its page), and
 `break-before: page` over-fragments. Paged media is known-partial and off by
-default (`docs/wpt-reftests.md`: 252 unpaginated versus 213 paged), so this joins
+default (`docs/wpt-reftests.md`: 252 unpaginated versus 212 paged), so this joins
 [screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests)
 rather than becoming this run's work. **It cannot change what CI reports for this
 test in any case** — CI scores it unpaginated against Chromium's blank
@@ -2407,32 +2425,57 @@ missing server feature. The earlier note that "the pair matched at 99.8 % locall
 while CI reports 0.0 %" was the resolver bug: neither side loaded the image, so
 the two agreed on nothing.
 
-### What this audit did not settle
+### The last 26, checked by hand
 
-26 of the 87 raised findings lost their adversarial verifier to a session limit
-and are **unverified** — they cluster in the [#1562](#the-next-run-issue-1562-2026-08-07)
-and [#1615](#the-next-run-issue-1615-2026-08-12) sections and the final table. They
-are not recorded as fact here. The two systemic corrections above (patch numbering,
-the relative-root bug) apply to those sections as much as to the rest, since they
-were established independently of the audit agents.
+26 of the 87 raised findings lost their adversarial verifier to a session limit.
+They have since been verified individually, by measurement rather than by a second
+opinion, and **all 26 held**. Most were the two systemic patterns already covered
+above — dangling patch numbers, "pending patch" prose, the dead anchor — and are
+now corrected in place. Four were substantive, and three of those had been giving
+a wrong impression of the engine:
+
+- **`quirks/tables-inherit-color-from-body-quirk-007` does not render a blank
+  page.** The [problem 17 section](#replacing-the-document-element-renders-nothing--problem-17-the-diagnosis-below-is-superseded)
+  concluded that appending an element to `document` after
+  `documentElement.remove()` never installs a new document element, "the render
+  stays empty", and called it a DOM/bridge gap rather than a quirks one. Measured
+  now: ours is 94.6 % `rgb(18,18,18)` + 5.1 % square against a reference that is
+  94.6 % `rgb(18,18,18)` + the same 5.1 % square. The page renders; the document
+  element *is* installed. The entire difference is that our square is
+  `rgb(255,0,0)` where the reference's is `rgb(0,0,0)` — so it is the quirk the
+  test is named for, and the test says so outright ("a square filled with initial
+  color and **no red**"). The section's own exit gate had already been met.
+- **`view-transition-waituntil-animation-manipulation` does reproduce offline**,
+  at CI's own 1.3 %, against the test's own reference. It was filed as "judge from
+  CI".
+- **`<hr>` does not carry a 2px border.** The 3D-border section said the HTML
+  Standard puts `border: 2px inset` on "every `<iframe>` and `<hr>`". The UA sheet
+  it cites says `hr { border: 1px inset }` and `iframe { border: 2px inset }` —
+  and the distinction matters to that very section, since a bevel only splits at
+  `width >= 2`.
+- **The paged-reftest figure was one release out of date** — 212, not 213
+  (`docs/wpt-reftests.md` was updated and the citation here, plus the runner's
+  `--help`, were not).
 
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
 references; CI's are authoritative where they disagree. **Status** records work
-landed since the run — a fix marked *pending patch* is not yet on CI, because it
-lives in a submodule whose remote this session cannot push to (see
-`patches/README.md`). Patches 0035–0039 have since been applied and their
-pointers bumped, so everything they carried is now on CI. **won't fix** and
+landed since the run — a fix marked *pending patch* was not on CI **when this
+table was written**, because it lived in a submodule whose remote this session
+cannot push to. **Nothing in this table is pending any more:** every submodule fix
+it names has been applied upstream and its pointer bumped, so all of them are on
+CI (see `patches/README.md`, and the patch-number caveat at the top of this
+document — the numbers below no longer name files). **won't fix** and
 **untrustworthy** mark tests whose Chromium reference was produced without the
 feature they test — closing those means rendering less, not more.
 
 | # | Test | CI | Local observation | Status |
 | --- | --- | --- | --- | --- |
 | 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | ~~99.8% — needs the server's `trickle` pipe~~ **5.7%, matching CI** | open — **re-diagnosed**: no server needed; the parent's script-injected `data:text/css` stylesheet never applies |
-| 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
+| 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ~~ours `#121212`, Chromium white — needs `.sub`~~ **passes (100%)** | **fixed** — the runner performs `.sub` substitution; main repo, on CI |
 | 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** — patch 0039 applied |
-| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0041** |
+| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; the submodule half has since been applied. All four now pass their own `rel=match` reference at 100% |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
 | 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | **won't fix** — the reference is a `vertical-rl` viewport-screenshot artifact ([screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests)) |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |

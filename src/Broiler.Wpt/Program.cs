@@ -3068,7 +3068,7 @@ public class Program
         Console.WriteLine("  (env only)                 BROILER_WPT_PAGED_PRINT=1 renders a -print reftest as CSS Paged");
         Console.WriteLine("                             Media says — pages of the document's own @page box, cut from the");
         Console.WriteLine("                             flow and stacked — on both sides of the comparison. Default off:");
-        Console.WriteLine("                             the 409 print reftests score 252 unpaginated and 213 paged, since");
+        Console.WriteLine("                             the 409 print reftests score 252 unpaginated and 212 paged, since");
         Console.WriteLine("                             paged media is still partial. See docs/wpt-reftests.md.");
         Console.WriteLine("  --timeout <SECS>           Per-test timeout in seconds (default: 30, env:");
         Console.WriteLine($"                             {RunTestTimeoutEnvironmentVariable})");
