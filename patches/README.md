@@ -66,3 +66,28 @@ none lost**: `css/CSS2/visufx` 6 → 50 of 51, and two in `css-masking/clip` tha
 were the same bug reached through `clip-path` directly.
 
 Applying it does not need `0001`; the two touch different files.
+
+### `0003-dom-frame-void-element.patch` — `Broiler.DOM`
+
+Two lines across `Broiler.Dom.Html/HtmlDocumentParser.cs` and
+`Broiler.Dom.Html/HtmlSerializer.cs`: `frame` joins the void-element set each
+keeps. HTML §"the in frameset insertion mode" inserts a `frame` element and
+*immediately pops it* off the stack of open elements, so a frame never takes
+children; the fragment-serialisation algorithm names it alongside the void
+elements as taking no end tag. The tree builder did not know either, so
+`<frame src=a><frame src=b>` nested the second frame inside the first,
+`DomParser.LayoutFramesetChildren` was handed one cell instead of two, and
+**every frame after the first painted nothing** — a two-frame `cols="50%,50%"`
+frameset rendered its left half and left the right half blank.
+
+Verified before the tree was reverted: a two-frame frameset (`cols` and `rows`
+alike) goes from 50 % painted to both cells painting their own document, and a
+single-frame frameset and a two-iframe page are unchanged.
+
+**Not needed by the WPT test that motivated the frameset work.**
+`resource-timing/initiator-type/frameset` has exactly one frame, and it passes
+on CI today (99.7 %) from the main-repo half of that work —
+`Broiler.Layout.Engine.DocumentRoot` plus the root-relative branch in
+`FragmentTreeBuilder.TryLoadEmbeddedDocument`. This patch is the multi-frame
+case, which no test in the current subset covers; nothing regresses while it
+waits.

@@ -579,6 +579,15 @@ internal static class FragmentTreeBuilder
             return (null, null);
         }
 
+        // HTML §"resolve a URL": a leading `/` is resolved against the document's origin, not
+        // against the directory the containing page sits in. A file:// render has no origin to
+        // ask, so the root comes from the host (DocumentRoot) — and joining such a URL onto the
+        // containing directory is worse than not resolving it at all, because Path.Combine
+        // discards its left operand when the right one is rooted and yields a path at the
+        // filesystem root.
+        if (IsRootRelative(url))
+            return LoadEmbeddedDocumentFromRoot(url);
+
         if (box.BaseUrl == null)
             return (null, null);
 
@@ -603,6 +612,64 @@ internal static class FragmentTreeBuilder
         {
             return (null, null);
         }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="url"/> is root-relative — one leading slash, resolved against the
+    /// document root. Two slashes is a scheme-relative URL (<c>//host/path</c>), which names another
+    /// origin and is not ours to read off the local disk.
+    /// </summary>
+    private static bool IsRootRelative(string url) =>
+        url.Length > 1 && url[0] == '/' && url[1] != '/';
+
+    /// <summary>
+    /// Loads a root-relative sub-document from the host's document root
+    /// (<see cref="Engine.DocumentRoot.Current"/>), or <c>(null, null)</c> when no root is set or
+    /// the path names nothing under it — the empty frame this case has always painted.
+    /// </summary>
+    private static (string Html, string BaseUrl) LoadEmbeddedDocumentFromRoot(string url)
+    {
+        if (Engine.DocumentRoot.Current is not { Length: > 0 } root)
+            return (null, null);
+
+        try
+        {
+            // The query and fragment address a server that is not there; the path alone names the
+            // file. WPT leans on this — `?pipe=` decorates the URL of a resource that is still just
+            // a file on disk — and the runner's other root-relative loaders already strip it the
+            // same way (WptTestRunner.TryResolveWptRootRelativePath).
+            string path = url.Split('?', '#')[0];
+            if (path.Length <= 1)
+                return (null, null);
+
+            path = Uri.UnescapeDataString(path);
+
+            string docPath = Path.GetFullPath(
+                Path.Combine(root, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)));
+
+            // A `..` segment must not walk out of the root: served over HTTP it could not, and the
+            // frame would 404 rather than reach an unrelated file.
+            if (!IsUnderRoot(docPath, root) || !File.Exists(docPath))
+                return (null, null);
+
+            string docUrl = new Uri(docPath).AbsoluteUri;
+            string markup = BuildEmbeddedDocumentMarkup(docPath, docUrl);
+            return markup == null ? (null, null) : (markup, docUrl);
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    /// <summary>Whether <paramref name="path"/> sits inside <paramref name="root"/>.</summary>
+    private static bool IsUnderRoot(string path, string root)
+    {
+        string full = Path.GetFullPath(root);
+        if (!full.EndsWith(Path.DirectorySeparatorChar))
+            full += Path.DirectorySeparatorChar;
+
+        return path.StartsWith(full, StringComparison.Ordinal);
     }
 
     /// <summary>
