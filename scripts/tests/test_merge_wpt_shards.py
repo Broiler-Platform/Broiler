@@ -785,6 +785,158 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertEqual(1, len(merged["biggestProblems"]))
             self.assertEqual("LowMatch", merged["biggestProblems"][0]["kind"])
 
+    SUSPECT = (
+        "⚠ suspect reference: Broiler matches its rel=match reference HTML (100.0%) "
+        "but not the committed reference PNG — the committed reference is likely "
+        "stale/incorrect, not a Broiler bug"
+    )
+
+    def _mixed_match_report(
+        self, root: Path, name: str, shard_index: int, entries: list[tuple[str, float, bool]]
+    ) -> None:
+        """Write a shard report whose lowestMatchTests mix ordinary mismatches with
+        reference disagreements (``suspect`` = the runner cleared it)."""
+        (root / name).write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "passed": 0,
+                        "failed": len(entries),
+                        "skipped": 0,
+                        "total": len(entries),
+                    },
+                    "shard": {"index": shard_index, "count": 8},
+                    "triage": {
+                        "lowestMatchTests": [
+                            {
+                                "testPath": path,
+                                "matchPercent": match,
+                                "category": "PixelMismatch",
+                                "subCategory": "MissingContent",
+                                **({"suspectReference": self.SUSPECT} if suspect else {}),
+                            }
+                            for path, match, suspect in entries
+                        ]
+                    },
+                    "results": [
+                        self._failure(path, "PixelMismatch", "MissingContent")
+                        for path, _, _ in entries
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_reference_disagreements_are_not_ranked_as_biggest_problems(self) -> None:
+        # The shape this run actually reports: several 0.0% matches that Broiler
+        # renders exactly as the test's own rel=match reference asks, plus one real
+        # mismatch. Only the real one is a "biggest problem" — the cleared ones are
+        # reported separately rather than occupying the severity list.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._mixed_match_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [
+                    ("css/css-image-animation/paused.html", 0.0, True),
+                    ("css/mediaqueries/at-custom-media-basic.html", 0.0, True),
+                    ("fullscreen/rendering/backdrop-object.html", 1.1, False),
+                ],
+            )
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=3, low_match_threshold=50.0
+            )
+
+            biggest = merged["biggestProblems"]
+            self.assertEqual(
+                ["fullscreen/rendering/backdrop-object.html"],
+                [p["relativeTestPath"] for p in biggest],
+            )
+
+            disagreements = merged["referenceDisagreements"]
+            self.assertEqual(
+                [
+                    "css/css-image-animation/paused.html",
+                    "css/mediaqueries/at-custom-media-basic.html",
+                ],
+                [entry["relativeTestPath"] for entry in disagreements],
+            )
+            self.assertEqual([0.0, 0.0], [entry["matchPercent"] for entry in disagreements])
+
+            markdown = MODULE.render_biggest_problems_markdown(merged, None)
+            self.assertIn("Not ranked — reference disagreements", markdown)
+            self.assertIn("css/mediaqueries/at-custom-media-basic.html", markdown)
+            # The reproduce hint points at a real problem, not a cleared one.
+            self.assertIn(
+                "--render tests/wpt/checkout/fullscreen/rendering/backdrop-object.html",
+                markdown,
+            )
+
+    def test_reference_disagreements_do_not_drive_threshold_escalation(self) -> None:
+        # A cleared 0.0% is not a ranking candidate, so it must not count towards
+        # filling the issue — the threshold widens past the real 96% near-miss and
+        # surfaces it, exactly as it would if the cleared test were absent.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._mixed_match_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [("css/a/cleared.html", 0.0, True), ("css/a/real.html", 96.0, False)],
+            )
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=3, low_match_threshold=50.0
+            )
+
+            self.assertEqual(100.0, merged["lowMatchThreshold"])
+            self.assertEqual(
+                ["css/a/real.html"],
+                [p["relativeTestPath"] for p in merged["biggestProblems"]],
+            )
+
+    def test_all_disagreements_yields_no_biggest_problems(self) -> None:
+        # When every mismatch is cleared there is nothing to rank. The severity
+        # issue must not fall back to ranking them anyway, and escalation must
+        # terminate rather than spin to the ceiling looking for candidates.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._mixed_match_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [("css/a/one.html", 0.0, True), ("css/a/two.html", 2.5, True)],
+            )
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=3, low_match_threshold=50.0
+            )
+
+            self.assertEqual([], merged["biggestProblems"])
+            self.assertEqual(2, len(merged["referenceDisagreements"]))
+
+    def test_low_match_tests_without_verification_are_ranked_as_before(self) -> None:
+        # Reports from a run without --verify-reference carry no suspectReference
+        # key at all; ranking must be unchanged for them.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._low_match_report(shard_dir, "shard-0.json", 0, [3.2, 40.0])
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=3, low_match_threshold=50.0
+            )
+
+            self.assertEqual([], merged["referenceDisagreements"])
+            self.assertEqual(
+                [3.2, 40.0], sorted(p["matchPercent"] for p in merged["biggestProblems"])
+            )
+            self.assertNotIn(
+                "reference disagreements",
+                MODULE.render_biggest_problems_markdown(merged, None),
+            )
+
     def test_cli_emits_biggest_issue_outputs(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             shard_dir = Path(temp)

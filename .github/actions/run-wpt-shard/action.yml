@@ -159,6 +159,14 @@ runs:
         # past the reference point. Affects only the C# runner, not the (Chromium)
         # reference generation. Revert by removing this line if it regresses tests.
         BROILER_WPT_DEFER_PROMISE_TESTS: '1'
+        # On a pixel mismatch, also render the reference the test declares via
+        # rel=match. When Broiler reproduces that but not the committed Chromium
+        # golden, the golden is the outlier — the render matches the only authority
+        # the test itself names. Recording that is what keeps such tests out of the
+        # biggest-problems issue (scripts/merge-wpt-shards.py), which they otherwise
+        # occupy run after run. Costs one extra render per failing test; it does not
+        # change any test's pass/fail, only how a failure is reported.
+        BROILER_WPT_VERIFY_REFERENCE: '1'
       run: |
         # The regular WPT suite executes JavaScript in both Chromium and
         # Broiler. --non-js remains available only for explicit local runs.

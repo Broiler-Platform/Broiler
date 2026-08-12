@@ -345,11 +345,23 @@ MARKDOWN_REPORT="$OUTPUT_DIR/wpt-triage-summary.md"
 REF_ARGS+=(--json-output "$JSON_REPORT")
 REF_ARGS+=(--markdown-output "$MARKDOWN_REPORT")
 
+# On each pixel mismatch, also render the reference the test itself declares via
+# rel=match. Where Broiler reproduces that, the committed golden — not the render
+# — is the outlier, and the result is recorded as such so triage does not chase a
+# non-bug (scripts/merge-wpt-shards.py keeps those out of the biggest-problems
+# ranking). Costs one extra render per *failing* test only, so it is off by
+# default for local runs and switched on by CI.
+VERIFY_ARGS=()
+if [[ "${BROILER_WPT_VERIFY_REFERENCE:-}" == "1" || "${BROILER_WPT_VERIFY_REFERENCE:-}" == "true" ]]; then
+    VERIFY_ARGS+=(--verify-reference)
+fi
+
 set +e
 dotnet run --project "$REPO_ROOT/src/Broiler.Wpt" \
     --configuration Release --no-build -- \
     --wpt-dir "$TEST_DIR" "${REF_ARGS[@]}" "${SUBSET_ARGS[@]}" \
-    "${SHARD_ARGS[@]}" "${RERUN_ARGS[@]}" "${NON_JS_ARGS[@]}" 2>&1 | tee "$LOGFILE"
+    "${SHARD_ARGS[@]}" "${RERUN_ARGS[@]}" "${NON_JS_ARGS[@]}" \
+    "${VERIFY_ARGS[@]}" 2>&1 | tee "$LOGFILE"
 WPT_EXIT=$?
 set -e
 

@@ -10,13 +10,17 @@
   [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30),
   [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05),
   [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07),
-  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12) and
-  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12). Where a re-run
+  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12),
+  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12) and
+  [#1618 (2026-08-12)](#the-next-run-issue-1618-2026-08-12). Where a re-run
   contradicts something below, the section says so and the row here is struck
   through — read the newest section first. #1612 contradicts two of them: the
   frameset test was not a frameset bug, and `image-animation: paused` is no
   longer unimplemented. #1615 contradicts a third: `.sub` tests are no longer
   unjudgeable offline, because the runner now performs the substitution itself.
+  #1618 stops the pattern repeating: the run reports these verdicts itself now,
+  so a test that is right by its own reference is no longer ranked as the run's
+  worst render.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
   carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
@@ -2105,6 +2109,144 @@ Local numbers are this container's, against Chromium references generated here.
 | 6 | `fullscreen/rendering/backdrop-iframe` | 0.0% | 99.1% `#008000` | **won't fix** — re-verified; the reference never entered fullscreen (no WebDriver) |
 | 7 | `fullscreen/rendering/backdrop-inherit` | 0.0% | 100% `#008000` | **won't fix** — same |
 | 8 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | 99.8% white | **won't fix** — re-verified; ours matches the test's `rel=match`, Chromium fails it |
+
+## The next run (issue #1618, 2026-08-12)
+
+7 579 failures, no incomplete shards. **This run's 0.0% list is the previous
+run's, minus the one that was fixed** — the seven tests reported here are #1615's
+problems 2–8, and the `.sub` cross-origin test has dropped off because it now
+passes. That is the third consecutive run whose severity issue is almost entirely
+tests that were triaged, judged correct, and closed in an earlier run.
+
+So this run was not spent re-arguing them. It was spent answering the question
+the repetition asks: **why does a test Broiler renders correctly keep being
+reported as the run's worst render?** — and making the run answer it itself.
+
+### Every one of the seven, re-measured against the only authority the test names
+
+The previous sections judged these by comparing colour histograms against a
+locally generated Chromium reference. There is a stronger check available, and it
+needs no other engine at all: the **reftest suite** renders both the test *and the
+`rel=match` reference the test itself declares* with Broiler, and compares them.
+That is WPT's own statement of what the test should look like.
+
+Run over all seven (`--reftests-only`), **six pass**:
+
+| Test | Against its own `rel=match` reference |
+| --- | --- |
+| `css-image-animation/image-animation-body-background-root-propagation-paused` | **passes** (100.0%) |
+| `css-image-animation/image-animation-root-background-paused` | **passes** (100.0%) |
+| `mediaqueries/at-custom-media-basic` | **passes** (100.0%) |
+| `fullscreen/rendering/backdrop-iframe` | **passes** (99.1%) |
+| `fullscreen/rendering/backdrop-inherit` | **passes** (100.0%) |
+| `css-color-adjust/…/mismatch-dynamic` | **passes** (100.0%) |
+| `css-page/page-margin-002-print` | **fails** (89.2%) — see below |
+
+Six of seven reproduce their own reference exactly. Each remains 0.0% against the
+committed Chromium golden for the reason its earlier section gives, and every one
+of those verdicts stands — but they now rest on the test's own reference rather
+than on an argument about what Chromium implements.
+
+### `page-margin-002-print` is not the exception it looks like
+
+It is the one test that disagrees with its own reference, and the disagreement is
+**not** an engine bug either — it is a `-print` test being scored on screen.
+`@page { margin: 10px 20px 30px 40px }` has no effect outside paged media, so the
+test paints `100vw × 100vh` of yellow across the whole canvas while its reference
+subtracts the margins explicitly (`calc(100vw - 60px)`, `margin-right: 20px`). The
+two are *designed* to agree only once the page box exists. 89.2% is the size of
+those margins, nothing more.
+
+Rendering both sides as paged media (`BROILER_WPT_PAGED_PRINT=1`) does surface a
+real gap, and it is worth recording even though nothing here can move the CI
+number: the test paginates to **4 pages** and the reference to **7**, where both
+should be **3** (each `.fullpager` is exactly one page area), and on both sides
+only the first block paints — the cyan and pink blocks are lost. Two distinct
+defects sit behind that: viewport units do not resolve against the page area
+(`100vh` stays the full page box, so each block overflows its page), and
+`break-before: page` over-fragments. Paged media is known-partial and off by
+default (`docs/wpt-reftests.md`: 252 unpaginated versus 213 paged), so this joins
+[screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests)
+rather than becoming this run's work. **It cannot change what CI reports for this
+test in any case** — CI scores it unpaginated against Chromium's blank
+`vertical-rl` viewport capture, so the 0.0% is the screenshot artifact the
+previous runs identified, whatever the paged path does.
+
+### The actual defect this run fixes is in the report, not the renderer — **fixed**
+
+- **Owner:** the WPT runner (`src/Broiler.Wpt`), the shard merger
+  (`scripts/merge-wpt-shards.py`) and the workflow's shard action.
+- **The bug.** The golden-image suite scores Broiler against *Chromium's* pixels.
+  When Broiler implements something Chromium does not, the test drops to 0.0% and
+  stays there — permanently, by construction. The severity issue ranks strictly by
+  `100 − matchPercent`, so those tests take the top of the list every single run
+  and push real bugs off it. This run's list is the proof: seven entries at 0.0%,
+  six of which are correct renders, while genuine mismatches
+  (`fullscreen/rendering/backdrop-object`, the subgrid track-sizing pair) sat
+  below them.
+- **The evidence was already available and never gathered.** The runner has had a
+  `--verify-reference` switch for some time (`WptTestRunner.VerifyAgainstReferenceHtml`):
+  on a pixel-mismatch failure it re-renders the test's own `rel=match` reference
+  and records `suspectReference` when Broiler reproduces *it* but not the committed
+  PNG. The flag was serialised into the per-test results — and **nothing ever ran
+  it.** CI never passed the switch, and the ranking never read the field.
+- **What landed, all main repo — on CI immediately, no patch.**
+  1. **The switch is on in CI.** `scripts/run-wpt-tests.sh` forwards
+     `--verify-reference` when `BROILER_WPT_VERIFY_REFERENCE=1`, and
+     `.github/actions/run-wpt-shard` sets it. It costs one extra render per
+     *failing* test and **changes no test's pass/fail** — only how a failure is
+     described. Measured on `css/css-page` (280 tests, 37 failures): 43 s without,
+     36 s with, i.e. inside the run-to-run noise.
+  2. **The flag reaches the ranker.** `suspectReference` is now carried on each
+     `lowestMatchTests` triage entry, not just on the full result.
+  3. **The ranking excludes them.** A mismatch carrying the flag is never a
+     "biggest problem". It is listed under its own heading — *Not ranked —
+     reference disagreements* — so the information is still in the issue, but it
+     no longer occupies the severity list. Dropping it silently would be
+     indistinguishable from losing a 0.0%.
+  4. **A shard offers candidates of both kinds.** `lowestMatchTests` was the five
+     lowest matches overall; five reference disagreements would therefore have
+     starved the ranking of every real mismatch in that shard — exactly the tests
+     that would do it are the ones stuck at 0.0%. It is now the five lowest
+     *rankable* mismatches plus the five lowest cleared ones, so the payload stays
+     bounded and the ranking always has candidates.
+- **Verified end to end on this run's own tests.** With locally generated Chromium
+  references, `--verify-reference` flags exactly the six and leaves
+  `page-margin-002-print` alone — the discrimination is precise, not a blanket
+  amnesty for 0.0%. Feeding that report through the merger produces a severity
+  issue whose *Biggest problems* are `css-page/page-margin-002-print` and
+  `fullscreen/rendering/backdrop-object` — two tests worth a maintainer's time —
+  with the six listed below as reference disagreements. Four focused cases pin the
+  behaviour, including the negative halves: a report from a run *without*
+  `--verify-reference` ranks exactly as before; a cleared test does not drive
+  threshold escalation; and an all-cleared run yields no biggest problems rather
+  than falling back to ranking them.
+- **What this does not do.** It does not change the pass rate, hide a failure, or
+  mark any test as passing: all seven still fail the golden-image comparison and
+  are still counted in the run's 7 579. It changes only which failures are called
+  the run's *worst*, and only on evidence the runner produced itself.
+- **The reftest suite is unaffected.** It renders both sides with Broiler, so it
+  never sets `suspectReference`; its severity issue is byte-identical to before.
+
+### #1618 problems, at a glance
+
+`rel=match` is this container's reftest-suite result — Broiler against the
+reference the test itself declares, no other engine involved.
+
+| # | Test | CI | `rel=match` | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-image-animation/image-animation-body-background-root-propagation-paused` | 0.0% | **passes** | **won't fix** — reference disagreement; now reported as one |
+| 2 | `css-image-animation/image-animation-root-background-paused` | 0.0% | **passes** | **won't fix** — same |
+| 3 | `css-page/page-margin-002-print` | 0.0% | 89.2% | **won't fix** — a `-print` test scored on screen; the paged gap behind it cannot move this number |
+| 4 | `mediaqueries/at-custom-media-basic` | 0.0% | **passes** | **won't fix** — reference disagreement; now reported as one |
+| 5 | `fullscreen/rendering/backdrop-iframe` | 0.0% | **passes** | **won't fix** — same |
+| 6 | `fullscreen/rendering/backdrop-inherit` | 0.0% | **passes** | **won't fix** — same |
+| 7 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | **passes** | **won't fix** — same |
+
+The honest count for this run's 0.0% tail is **zero engine gaps** — and that is
+the finding, not an evasion. Six tests are correct by their own reference and one
+is a print test measured on screen. The work that was available was to stop the
+suite from reporting them as the worst thing that happened, which is what landed.
 
 ## Reported problems, at a glance
 

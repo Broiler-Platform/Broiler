@@ -2057,6 +2057,28 @@ public class Program
         var comparedPassRate = compared > 0 ? 100.0 * passed / compared : 0;
         var averageMatch = GetAverageMatchPercent(allResults);
 
+        // The TopBucketLimit worst pixel comparisons among the failures `include`
+        // selects, lowest match first. See the ["lowestMatchTests"] entry below for
+        // why the selection is run twice rather than once over every failure.
+        List<Dictionary<string, object?>> LowestMatchEntries(Func<WptTestResult, bool> include) =>
+            failures
+                .Where(r => r.MatchPercent.HasValue && include(r))
+                .OrderBy(r => r.MatchPercent)
+                .ThenBy(r => r.TestPath, StringComparer.Ordinal)
+                .Take(TopBucketLimit)
+                .Select(r => new Dictionary<string, object?>
+                {
+                    ["testPath"] = Path.GetRelativePath(wptPath, r.TestPath).Replace('\\', '/'),
+                    ["matchPercent"] = r.MatchPercent,
+                    ["category"] = r.Category.ToString(),
+                    ["subCategory"] = r.MismatchDiagnostics?.Category.ToString(),
+                    // Set (under --verify-reference) when Broiler reproduces the test's
+                    // own rel=match reference but not the committed golden: the
+                    // reference is the outlier, not the render.
+                    ["suspectReference"] = r.SuspectReference,
+                })
+                .ToList();
+
         var report = new Dictionary<string, object?>
         {
             ["timestamp"] = DateTime.UtcNow.ToString("o"),
@@ -2098,18 +2120,21 @@ public class Program
                         ["count"] = g.Count(),
                     })
                     .ToList(),
-                ["lowestMatchTests"] = failures
-                    .Where(r => r.MatchPercent.HasValue)
-                    .OrderBy(r => r.MatchPercent)
-                    .ThenBy(r => r.TestPath, StringComparer.Ordinal)
-                    .Take(TopBucketLimit)
-                    .Select(r => new Dictionary<string, object?>
-                    {
-                        ["testPath"] = Path.GetRelativePath(wptPath, r.TestPath).Replace('\\', '/'),
-                        ["matchPercent"] = r.MatchPercent,
-                        ["category"] = r.Category.ToString(),
-                        ["subCategory"] = r.MismatchDiagnostics?.Category.ToString(),
-                    })
+                // The shard's worst pixel comparisons, feeding the biggest-problems
+                // ranking in scripts/merge-wpt-shards.py.
+                //
+                // Two lists of TopBucketLimit rather than one, because a test whose
+                // SuspectReference is set is *not* a ranking candidate: under
+                // --verify-reference that flag means Broiler reproduced the reference
+                // the test itself declares, so the committed golden is the outlier and
+                // the render is not a problem to rank. Taking the N lowest overall
+                // would let a handful of those crowd out every rankable mismatch in the
+                // shard — precisely the tests that do so are the ones that sit at 0.0%
+                // run after run. Ranking candidates and cleared tests are therefore
+                // selected separately, so a shard always offers up to TopBucketLimit of
+                // each and the payload stays bounded.
+                ["lowestMatchTests"] = LowestMatchEntries(r => r.SuspectReference is null)
+                    .Concat(LowestMatchEntries(r => r.SuspectReference is not null))
                     .ToList(),
                 // CSS declarations the engine dropped as invalid/unsupported.
                 // A high-count entry usually points at a missing feature gating
