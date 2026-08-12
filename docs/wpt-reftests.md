@@ -512,6 +512,41 @@ scale.** The diff was in the part of the picture the tests were not about — 43
 to do with replaced-element sizing, all failing because the document they were
 being compared against was drawn with an `<img>`.
 
+## Next lead: an out-of-flow replaced element with an auto size renders nothing
+
+Diagnosed, not fixed. `css/CSS2/positioning/absolute-replaced-width-*` is 40
+failures at 96.5–98.8 % match, and what the diff is missing is the whole image:
+
+```html
+<div style="position:relative; width:200px; height:60px">
+  <img src="blue15x15.png" style="position:absolute">      <!-- nothing paints -->
+  <img src="blue15x15.png" style="float:left">             <!-- nothing paints -->
+  <img src="blue15x15.png" style="position:absolute; width:40px; height:40px">
+</div>                                                      <!-- this one paints -->
+```
+
+An `<img>` paints in flow, and paints out of flow **only when both dimensions are
+stated**. Dumping the fragment tree separates three distinct defects, and each
+wants its own before/after sweep:
+
+1. **Absolutely positioned, auto size.** The box is laid out (it has a line box)
+   but its fragment comes out `0×0`, so nothing of it is painted — not the image,
+   not even a background set on it.
+2. **Floated.** `CreateLineBoxes` skips floats as out-of-flow and the loop that
+   lays them out afterwards iterates the container's own `Boxes` — so a float
+   inside an *anonymous* block (which is where an `<img>` between text nodes ends
+   up) is never reached at all. Its anonymous parent is left `lines=1`, height 0.
+3. **`display: block` and absolutely positioned.** No fragment is produced for the
+   image at all.
+
+The engine is right at the point where the fix belongs: `CssBox.PerformLayout`
+routes `IsBlock || isOutOfFlow` down the block path, and `isOutOfFlow` covers
+`absolute`/`fixed` but not `float`; neither path sizes a *replaced* box from its
+image the way the inline path does. Keep any fix narrow to boxes that carry an
+image word — those render nothing today, so the blast radius of getting them
+wrong is small, while the same change on non-replaced boxes would touch every
+float in the corpus.
+
 ## Flex items are stretched now, and what that says about the scoreboard
 
 `align-items: stretch` is the initial value, so it is what happens to most flex
