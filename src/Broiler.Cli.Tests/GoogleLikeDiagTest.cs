@@ -193,7 +193,7 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
     /// screenshot where buttons rendered as full-width gray bars.
     /// </summary>
     [Fact]
-    public void FlexChild_DisplayBlock_NotFullWidth()
+    public void SubmitButtons_InFlexRow_DoNotStretchToContainerWidth()
     {
         var html = @"<html><body style='margin:0'>
 <style>
@@ -228,7 +228,7 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
     /// display:grid container children should also use shrink-to-fit sizing.
     /// </summary>
     [Fact]
-    public void GridChild_UsesContentSizing()
+    public void GridChild_SubmitButton_UsesContentSizing()
     {
         var html = @"<html><body style='margin:0'>
 <div style='display:grid; width:800px'>
