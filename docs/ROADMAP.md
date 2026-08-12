@@ -247,7 +247,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    fails if its retained coverage regresses.
 
 2. **Remove tests with no effective coverage (root and Broiler.JS).**
-   *2a landed; 2b pending as a Broiler.JS patch.*
+   *2a landed; 2b shipped as [`patches/0007`](../patches/README.md).*
 
    *2a — this repository.*
    - Delete `HttpClientMigrationTests`, `Acid3DebugTest`, `Acid3CascadeDebugTests`,
@@ -294,8 +294,8 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj -c Release --filter "FullyQualifiedName~Acid3|FullyQualifiedName~Flex|FullyQualifiedName~GoogleLike"`.
 
 3. **Finish the Skia-era test transition (Broiler.HTML and root tests).**
-   *3a landed except the `GraphicsAbstractionTests` facts; 3b pending as a
-   Broiler.HTML patch.*
+   *3a landed except the `GraphicsAbstractionTests` facts; 3b shipped as
+   [`patches/0008`](../patches/README.md).*
    Coordinate this batch with
    [Broiler.HTML's compatibility-seam retirement](../Broiler.HTML/docs/roadmap.md#4-retire-the-skia-era-compatibility-seam).
 

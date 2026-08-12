@@ -1,0 +1,883 @@
+From a143cadab2afd82eb17c8b4aecf565f9ae792247 Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Wed, 12 Aug 2026 17:15:13 +0000
+Subject: [PATCH] test: retire the Repro scratch tests and the legacy solution
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Batch 2b of the root repository's test-suite retirement item.
+
+ReproTests and ReproT were debugging leftovers. Neither contained a single
+assertion: ReproT printed six regex probes to the console, and ReproTests
+appended its results to a hard-coded D:\Broiler.JS\repro-out.txt, which on Linux
+is treated as a relative filename, so it silently created a file with a colon
+and backslashes in its name and passed.
+
+ReproT's probes are already covered — Issue725Tests and Issue723Tests both
+assert that an unmatched optional group comes back undefined from exec — so it
+is deleted outright.
+
+ReproTests was probing something real that nothing else covers: super property
+lookup inside a class *field initializer*, directly under eval, through an arrow
+inside eval, and through an arrow declared in one eval statement and invoked in
+the next. Issue814DerivedConstructorEvalSuperTests covers the neighbouring
+derived-constructor case, which is a different binding — there is no super
+constructor call here, only lookup through the field initializer's home object.
+Those probes are now ClassFieldInitializerEvalSuperTests, six asserting tests,
+all passing. The engine already behaves correctly on every one; until now a
+regression in any of them would have been invisible.
+
+BroilerJS.sln is deleted. It could not restore — it referenced Broiler.Regex
+paths that moved to Broiler.Regex/ — and Broiler.JS.slnx supersedes it.
+
+The standalone JIntPerfTests executable goes with it. Its eleven scenarios are
+exactly the [Params] list of JIntSmokeBenchmarks, which globs the same
+OtherTests/JIntPerfTests/Scripts directory from the benchmark project. The
+corpus itself is kept and untouched; only Program.cs and the csproj are removed.
+
+Deleting the solution left Broiler.JavaScript.Network and
+Broiler.JavaScript.NodePollyfill in no solution. They are deliberately not added
+to Broiler.JS.slnx, because neither compiles: both still open
+Broiler.JavaScript.Core, a namespace the engine refactor removed, so every file
+in them fails CS0234. They were only reachable through a solution that could not
+restore, so nothing regressed. Reviving them means repairing the namespace
+first; deleting the sources is a separate decision and is not made here. This is
+recorded in the status document along with the corrected test counts.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VSxmiiY5E7ppTLgqaJJQUR
+---
+ .../ClassFieldInitializerEvalSuperTests.cs    |  71 +++
+ .../ReproT.cs                                 |  18 -
+ .../ReproTests.cs                             |  36 --
+ Broiler.JS/BroilerJS.sln                      | 527 ------------------
+ .../JIntPerfTests/JIntPerfTests.csproj        |  19 -
+ .../OtherTests/JIntPerfTests/Program.cs       |  57 --
+ docs/compliance/process.md                    |   2 +-
+ docs/roadmap/Roadmap.status.md                |  25 +-
+ 8 files changed, 92 insertions(+), 663 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/ClassFieldInitializerEvalSuperTests.cs
+ delete mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproT.cs
+ delete mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproTests.cs
+ delete mode 100644 Broiler.JS/BroilerJS.sln
+ delete mode 100644 Broiler.JS/OtherTests/JIntPerfTests/JIntPerfTests.csproj
+ delete mode 100644 Broiler.JS/OtherTests/JIntPerfTests/Program.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ClassFieldInitializerEvalSuperTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ClassFieldInitializerEvalSuperTests.cs
+new file mode 100644
+index 00000000..97154e4a
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ClassFieldInitializerEvalSuperTests.cs
+@@ -0,0 +1,71 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Integration.Tests;
++
++// A class field initializer is a method-like function with its own [[HomeObject]], so
++// `super.x` resolves inside it, and a direct eval within it inherits that home object —
++// as does an arrow function closed over it, at any nesting depth.
++//
++// Issue814DerivedConstructorEvalSuperTests covers the neighbouring case, `super(...)` and
++// `super.m()` inside a *derived constructor*. The field-initializer case is not the same
++// binding: there is no super *constructor* call involved, only super property lookup
++// through the field initializer's home object. These probes previously lived in a
++// ReproTests scratch file that wrote its results to a hard-coded D:\ path and asserted
++// nothing, so a regression in any of them was invisible.
++public class ClassFieldInitializerEvalSuperTests
++{
++    private static string Eval(string code)
++    {
++        using var ctx = new JSContext();
++        return ctx.Eval(code).ToString();
++    }
++
++    [Fact]
++    public void DirectEvalInFieldInitializerCallsSuperMethod()
++        => Assert.Equal("1", Eval(
++            "class B { foo() { return 1; } }" +
++            "class C extends B { x = eval('super.foo()'); }" +
++            "'' + new C().x"));
++
++    [Fact]
++    public void ArrowInsideEvalInFieldInitializerCallsSuperMethod()
++        => Assert.Equal("2", Eval(
++            "class B { foo() { return 2; } }" +
++            "class C extends B { x = eval('(() => super.foo())()'); }" +
++            "'' + new C().x"));
++
++    [Fact]
++    public void ArrowInsideEvalInFieldInitializerReadsSuperMethodAsValue()
++        // Reading `super.foo` without calling it yields the method itself, so the field
++        // holds a function rather than its result.
++        => Assert.Equal("function", Eval(
++            "class B { foo() { return 3; } }" +
++            "class C extends B { x = eval('(() => super.foo)()'); }" +
++            "typeof new C().x"));
++
++    [Fact]
++    public void ArrowInFieldInitializerCallsSuperMethodWithoutEval()
++        // The no-eval baseline: whatever the eval cases do, this must keep working, or
++        // the home object is being lost before eval is even involved.
++        => Assert.Equal("6", Eval(
++            "class B { foo() { return 6; } }" +
++            "class C extends B { x = (() => super.foo())(); }" +
++            "'' + new C().x"));
++
++    [Fact]
++    public void FunctionDeclaredInsideEvalInFieldInitializerCallsSuperMethod()
++        // The arrow is declared in one eval statement and invoked in the next, so the
++        // home object has to survive on the closure rather than on the call site.
++        => Assert.Equal("7", Eval(
++            "class B { foo() { return 7; } }" +
++            "class C extends B { x = eval('var f = () => super.foo(); f();'); }" +
++            "'' + new C().x"));
++
++    [Fact]
++    public void ArrowInsideEvalInMethodCallsSuperMethod()
++        // The same shape in an ordinary method rather than a field initializer.
++        => Assert.Equal("5", Eval(
++            "class B { foo() { return 5; } }" +
++            "class C extends B { m() { return eval('(() => super.foo())()'); } }" +
++            "'' + new C().m()"));
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproT.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproT.cs
+deleted file mode 100644
+index 868c1f99..00000000
+--- a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproT.cs
++++ /dev/null
+@@ -1,18 +0,0 @@
+-using Broiler.JavaScript.Engine;
+-namespace Broiler.JavaScript.Integration.Tests;
+-public class ReproT
+-{
+-    private static string Eval(string code){ using var ctx = new JSContext(); return ctx.Eval(code).ToString(); }
+-    [Xunit.Fact]
+-    public void Probe()
+-    {
+-        foreach (var (l,c) in new[]{
+-          ("abc-empty-opt","JSON.stringify(/abc()?/.exec('abc-------abc'))"),
+-          ("a-opt-no-match","JSON.stringify(/(a)?/.exec('b'))"),
+-          ("a-opt-match","JSON.stringify(/(a)?/.exec('a'))"),
+-          ("nonempty-opt","JSON.stringify(/a(b)?c/.exec('ac'))"),
+-          ("nonempty-opt2","JSON.stringify(/a(b)?c/.exec('abc'))"),
+-          ("alt","JSON.stringify(/(x)|(y)/.exec('y'))"),
+-        }) System.Console.WriteLine($"R {l} :: {Eval(c)}");
+-    }
+-}
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproTests.cs
+deleted file mode 100644
+index 91366672..00000000
+--- a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ReproTests.cs
++++ /dev/null
+@@ -1,36 +0,0 @@
+-using Broiler.JavaScript.Engine;
+-using Broiler.JavaScript.Runtime;
+-
+-namespace Broiler.JavaScript.Integration.Tests;
+-
+-public class ReproTests
+-{
+-    private static void Log(string s) => System.IO.File.AppendAllText(@"D:\Broiler.JS\repro-out.txt", s + "\n");
+-
+-    private void Run(string name, string code)
+-    {
+-        try
+-        {
+-            using var ctx = new JSContext();
+-            var result = ctx.Eval(code);
+-            Log($"[{name}] OK => {result}");
+-        }
+-        catch (Exception ex)
+-        {
+-            Log($"[{name}] FAIL => {ex.GetType().Name}: {ex.Message?.Split('\n')[0]}");
+-        }
+-    }
+-
+-    [Fact]
+-    public void Repro()
+-    {
+-        Run("field-eval-direct", "class B{foo(){return 1;}} class C extends B{x=eval('super.foo()');} new C().x;");
+-        Run("field-eval-arrow-call", "class B{foo(){return 2;}} class C extends B{x=eval('(()=>super.foo())()');} new C().x;");
+-        Run("field-eval-arrow-prop", "class B{foo(){return 3;}} class C extends B{x=eval('(()=>super.foo)()');} new C().x;");
+-        Run("field-explicit-eval-arrow", "class B{foo(){return 4;}} class C extends B{constructor(){super();} x=eval('(()=>super.foo())()');} new C().x;");
+-        Run("method-eval-arrow", "class B{foo(){return 5;}} class C extends B{m(){return eval('(()=>super.foo())()');}} new C().m();");
+-        Run("field-arrow-direct-noeval", "class B{foo(){return 6;}} class C extends B{x=(()=>super.foo())();} new C().x;");
+-        // nested arrow without eval, in field
+-        Run("field-eval-nested-fn", "class B{foo(){return 7;}} class C extends B{x=eval('var f=()=>super.foo(); f();');} new C().x;");
+-    }
+-}
+diff --git a/Broiler.JS/BroilerJS.sln b/Broiler.JS/BroilerJS.sln
+deleted file mode 100644
+index 3a5956ce..00000000
+--- a/Broiler.JS/BroilerJS.sln
++++ /dev/null
+@@ -1,527 +0,0 @@
+-﻿
+-Microsoft Visual Studio Solution File, Format Version 12.00
+-# Visual Studio Version 18
+-VisualStudioVersion = 18.4.11605.240
+-MinimumVisualStudioVersion = 10.0.40219.1
+-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{8D5F60A8-566A-4068-8B83-1BA48F66E60B}"
+-	ProjectSection(SolutionItems) = preProject
+-		.gitignore = .gitignore
+-		Improvements.md = Improvements.md
+-		README.md = README.md
+-		UNSUPPORTED.md = UNSUPPORTED.md
+-		version.json = version.json
+-	EndProjectSection
+-EndProject
+-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JIntPerfTests", "OtherTests\JIntPerfTests\JIntPerfTests.csproj", "{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.ExpressionCompiler", "Broiler.JavaScript.ExpressionCompiler\Broiler.JavaScript.ExpressionCompiler.csproj", "{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Ast", "Broiler.JavaScript.Ast\Broiler.JavaScript.Ast.csproj", "{C755D2E2-E26D-45A6-B6F6-8837873102A1}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Parser", "Broiler.JavaScript.Parser\Broiler.JavaScript.Parser.csproj", "{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Storage", "Broiler.JavaScript.Storage\Broiler.JavaScript.Storage.csproj", "{7674B1F8-9387-407B-AE4F-44D3386B5311}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.JSClassGenerator", "Broiler.JavaScript.JSClassGenerator\Broiler.JavaScript.JSClassGenerator.csproj", "{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Debugger", "Broiler.JavaScript.Debugger\Broiler.JavaScript.Debugger.csproj", "{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript", "Broiler.JavaScript\Broiler.JavaScript.csproj", "{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Network", "Broiler.JavaScript.Network\Broiler.JavaScript.Network.csproj", "{47967323-8D30-4FB3-BD20-5D4167420217}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.NodePollyfill", "Broiler.JavaScript.NodePollyfill\Broiler.JavaScript.NodePollyfill.csproj", "{89D86863-B8AD-4B71-AEE0-1457355CDAA1}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.ModuleExtensions", "Broiler.JavaScript.ModuleExtensions\Broiler.JavaScript.ModuleExtensions.csproj", "{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}"
+-EndProject
+-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "OtherTests", "OtherTests", "{8CA59A59-8C38-3FBC-71BB-91FE4C8522D6}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Runtime", "Broiler.JavaScript.Runtime\Broiler.JavaScript.Runtime.csproj", "{3DD24E82-8A26-4148-9C4F-345813159065}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Clr", "Broiler.JavaScript.Clr\Broiler.JavaScript.Clr.csproj", "{88716440-6150-45D6-9DBE-248A6B54297A}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Compiler", "Broiler.JavaScript.Compiler\Broiler.JavaScript.Compiler.csproj", "{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Modules", "Broiler.JavaScript.Modules\Broiler.JavaScript.Modules.csproj", "{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.BuiltIns", "Broiler.JavaScript.BuiltIns\Broiler.JavaScript.BuiltIns.csproj", "{4C9CDD4E-D055-48BB-AA5C-4C7703844446}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.All", "Broiler.JavaScript.All\Broiler.JavaScript.All.csproj", "{376C40FF-CA8F-4C8E-9926-76128ABC10DB}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Storage.Tests", "Broiler.JavaScript.Storage.Tests\Broiler.JavaScript.Storage.Tests.csproj", "{CB9CED38-0C49-4553-BB9C-AA890C43036E}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Ast.Tests", "Broiler.JavaScript.Ast.Tests\Broiler.JavaScript.Ast.Tests.csproj", "{C3DB2A41-91E8-434B-B958-67A30F34786E}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Parser.Tests", "Broiler.JavaScript.Parser.Tests\Broiler.JavaScript.Parser.Tests.csproj", "{8D04825E-2DDE-453D-9CB9-FD1380A779FA}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Runtime.Tests", "Broiler.JavaScript.Runtime.Tests\Broiler.JavaScript.Runtime.Tests.csproj", "{6226B913-7134-42D9-AD59-F15A4718922F}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Core.Tests", "Broiler.JavaScript.Core.Tests\Broiler.JavaScript.Core.Tests.csproj", "{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Compiler.Tests", "Broiler.JavaScript.Compiler.Tests\Broiler.JavaScript.Compiler.Tests.csproj", "{2CCEC8C1-154D-4460-9296-33ECE11F09C8}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.BuiltIns.Tests", "Broiler.JavaScript.BuiltIns.Tests\Broiler.JavaScript.BuiltIns.Tests.csproj", "{6C51BFD2-4F0E-418F-A119-89AB977D0F54}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Clr.Tests", "Broiler.JavaScript.Clr.Tests\Broiler.JavaScript.Clr.Tests.csproj", "{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Debugger.Tests", "Broiler.JavaScript.Debugger.Tests\Broiler.JavaScript.Debugger.Tests.csproj", "{3752E53C-F67C-45A7-9235-B836A4B7E8E8}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Modules.Tests", "Broiler.JavaScript.Modules.Tests\Broiler.JavaScript.Modules.Tests.csproj", "{18474635-489C-450F-B6F3-350A5E098AFE}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.ModuleExtensions.Tests", "Broiler.JavaScript.ModuleExtensions.Tests\Broiler.JavaScript.ModuleExtensions.Tests.csproj", "{086AECD6-105F-4E5C-99D3-7197F4F07D40}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Integration.Tests", "Broiler.JavaScript.Integration.Tests\Broiler.JavaScript.Integration.Tests.csproj", "{F218DDD5-CEC0-4350-973F-B291C0A9CC96}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Extensions", "Broiler.JavaScript.Extensions\Broiler.JavaScript.Extensions.csproj", "{8AAAF6DB-ACD0-4394-B351-A6628815131E}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Globals", "Broiler.JavaScript.Globals\Broiler.JavaScript.Globals.csproj", "{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.Engine", "Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj", "{A0118A73-9363-42C4-B727-D3E0457BB262}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.JavaScript.LinqExpressions", "Broiler.JavaScript.LinqExpressions\Broiler.JavaScript.LinqExpressions.csproj", "{521B750D-7463-4104-9B2A-80B404E5D4C9}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.Regex", "Broiler.Regex\Broiler.Regex.csproj", "{E4F3CD60-BE57-42BF-B775-DF4818AD7574}"
+-EndProject
+-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Broiler.Regex.Tests", "Broiler.Regex.Tests\Broiler.Regex.Tests.csproj", "{85881C98-796B-44B0-918D-D3B4A509B7AF}"
+-EndProject
+-Global
+-	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+-		Debug|Any CPU = Debug|Any CPU
+-		Debug|x64 = Debug|x64
+-		Debug|x86 = Debug|x86
+-		Release|Any CPU = Release|Any CPU
+-		Release|x64 = Release|x64
+-		Release|x86 = Release|x86
+-	EndGlobalSection
+-	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Debug|x64.Build.0 = Debug|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Debug|x86.Build.0 = Debug|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Release|x64.ActiveCfg = Release|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Release|x64.Build.0 = Release|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Release|x86.ActiveCfg = Release|Any CPU
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6}.Release|x86.Build.0 = Release|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Debug|x64.Build.0 = Debug|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Debug|x86.Build.0 = Debug|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Release|x64.ActiveCfg = Release|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Release|x64.Build.0 = Release|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Release|x86.ActiveCfg = Release|Any CPU
+-		{0B8C110A-8B1B-41CD-88C9-D3317BD53F2B}.Release|x86.Build.0 = Release|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Debug|x64.Build.0 = Debug|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Debug|x86.Build.0 = Debug|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Release|x64.ActiveCfg = Release|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Release|x64.Build.0 = Release|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Release|x86.ActiveCfg = Release|Any CPU
+-		{C755D2E2-E26D-45A6-B6F6-8837873102A1}.Release|x86.Build.0 = Release|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Debug|x64.Build.0 = Debug|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Debug|x86.Build.0 = Debug|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Release|x64.ActiveCfg = Release|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Release|x64.Build.0 = Release|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Release|x86.ActiveCfg = Release|Any CPU
+-		{CF12EB27-8A66-44C9-A4B0-12F7D2C64352}.Release|x86.Build.0 = Release|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Debug|x64.Build.0 = Debug|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Debug|x86.Build.0 = Debug|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Release|x64.ActiveCfg = Release|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Release|x64.Build.0 = Release|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Release|x86.ActiveCfg = Release|Any CPU
+-		{7674B1F8-9387-407B-AE4F-44D3386B5311}.Release|x86.Build.0 = Release|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Debug|x64.Build.0 = Debug|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Debug|x86.Build.0 = Debug|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x64.ActiveCfg = Release|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x64.Build.0 = Release|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x86.ActiveCfg = Release|Any CPU
+-		{52F4B516-F2F4-41D7-9D2A-C78F05946C2E}.Release|x86.Build.0 = Release|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|x64.Build.0 = Debug|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Debug|x86.Build.0 = Debug|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Release|x64.ActiveCfg = Release|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Release|x64.Build.0 = Release|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Release|x86.ActiveCfg = Release|Any CPU
+-		{CBA1A13E-C57D-442D-A8E1-CD40BCA7C9EC}.Release|x86.Build.0 = Release|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Debug|x64.Build.0 = Debug|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Debug|x86.Build.0 = Debug|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Release|x64.ActiveCfg = Release|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Release|x64.Build.0 = Release|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Release|x86.ActiveCfg = Release|Any CPU
+-		{61CFDF7E-6924-452A-8D8E-0C1D397AA43A}.Release|x86.Build.0 = Release|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Debug|x64.Build.0 = Debug|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Debug|x86.Build.0 = Debug|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Release|x64.ActiveCfg = Release|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Release|x64.Build.0 = Release|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Release|x86.ActiveCfg = Release|Any CPU
+-		{47967323-8D30-4FB3-BD20-5D4167420217}.Release|x86.Build.0 = Release|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Debug|x64.Build.0 = Debug|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Debug|x86.Build.0 = Debug|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Release|x64.ActiveCfg = Release|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Release|x64.Build.0 = Release|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Release|x86.ActiveCfg = Release|Any CPU
+-		{89D86863-B8AD-4B71-AEE0-1457355CDAA1}.Release|x86.Build.0 = Release|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Debug|x64.Build.0 = Debug|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Debug|x86.Build.0 = Debug|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Release|x64.ActiveCfg = Release|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Release|x64.Build.0 = Release|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Release|x86.ActiveCfg = Release|Any CPU
+-		{E0510F5A-FB66-4922-9FDC-58A3A6613EBB}.Release|x86.Build.0 = Release|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Debug|x64.Build.0 = Debug|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Debug|x86.Build.0 = Debug|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Release|x64.ActiveCfg = Release|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Release|x64.Build.0 = Release|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Release|x86.ActiveCfg = Release|Any CPU
+-		{3DD24E82-8A26-4148-9C4F-345813159065}.Release|x86.Build.0 = Release|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Debug|x64.Build.0 = Debug|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Debug|x86.Build.0 = Debug|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Release|x64.ActiveCfg = Release|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Release|x64.Build.0 = Release|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Release|x86.ActiveCfg = Release|Any CPU
+-		{88716440-6150-45D6-9DBE-248A6B54297A}.Release|x86.Build.0 = Release|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Debug|x64.Build.0 = Debug|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Debug|x86.Build.0 = Debug|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Release|x64.ActiveCfg = Release|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Release|x64.Build.0 = Release|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Release|x86.ActiveCfg = Release|Any CPU
+-		{FA5C9862-07EA-46A4-96F0-FC8BB873DD27}.Release|x86.Build.0 = Release|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Debug|x64.Build.0 = Debug|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Debug|x86.Build.0 = Debug|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Release|x64.ActiveCfg = Release|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Release|x64.Build.0 = Release|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Release|x86.ActiveCfg = Release|Any CPU
+-		{DF05F181-1F65-415A-A1E0-FD06C7D61B9D}.Release|x86.Build.0 = Release|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Debug|x64.Build.0 = Debug|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Debug|x86.Build.0 = Debug|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Release|x64.ActiveCfg = Release|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Release|x64.Build.0 = Release|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Release|x86.ActiveCfg = Release|Any CPU
+-		{4C9CDD4E-D055-48BB-AA5C-4C7703844446}.Release|x86.Build.0 = Release|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Debug|x64.Build.0 = Debug|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Debug|x86.Build.0 = Debug|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Release|x64.ActiveCfg = Release|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Release|x64.Build.0 = Release|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Release|x86.ActiveCfg = Release|Any CPU
+-		{376C40FF-CA8F-4C8E-9926-76128ABC10DB}.Release|x86.Build.0 = Release|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Debug|x64.Build.0 = Debug|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Debug|x86.Build.0 = Debug|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Release|x64.ActiveCfg = Release|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Release|x64.Build.0 = Release|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Release|x86.ActiveCfg = Release|Any CPU
+-		{CB9CED38-0C49-4553-BB9C-AA890C43036E}.Release|x86.Build.0 = Release|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Debug|x64.Build.0 = Debug|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Debug|x86.Build.0 = Debug|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Release|x64.ActiveCfg = Release|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Release|x64.Build.0 = Release|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Release|x86.ActiveCfg = Release|Any CPU
+-		{C3DB2A41-91E8-434B-B958-67A30F34786E}.Release|x86.Build.0 = Release|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Debug|x64.Build.0 = Debug|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Debug|x86.Build.0 = Debug|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Release|x64.ActiveCfg = Release|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Release|x64.Build.0 = Release|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Release|x86.ActiveCfg = Release|Any CPU
+-		{8D04825E-2DDE-453D-9CB9-FD1380A779FA}.Release|x86.Build.0 = Release|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Debug|x64.Build.0 = Debug|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Debug|x86.Build.0 = Debug|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Release|x64.ActiveCfg = Release|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Release|x64.Build.0 = Release|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Release|x86.ActiveCfg = Release|Any CPU
+-		{6226B913-7134-42D9-AD59-F15A4718922F}.Release|x86.Build.0 = Release|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Debug|x64.Build.0 = Debug|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Debug|x86.Build.0 = Debug|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Release|x64.ActiveCfg = Release|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Release|x64.Build.0 = Release|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Release|x86.ActiveCfg = Release|Any CPU
+-		{D07CD0D5-2FFE-49FF-B773-3E61522C38D8}.Release|x86.Build.0 = Release|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Debug|x64.Build.0 = Debug|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Debug|x86.Build.0 = Debug|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Release|x64.ActiveCfg = Release|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Release|x64.Build.0 = Release|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Release|x86.ActiveCfg = Release|Any CPU
+-		{2CCEC8C1-154D-4460-9296-33ECE11F09C8}.Release|x86.Build.0 = Release|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Debug|x64.Build.0 = Debug|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Debug|x86.Build.0 = Debug|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Release|x64.ActiveCfg = Release|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Release|x64.Build.0 = Release|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Release|x86.ActiveCfg = Release|Any CPU
+-		{6C51BFD2-4F0E-418F-A119-89AB977D0F54}.Release|x86.Build.0 = Release|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Debug|x64.Build.0 = Debug|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Debug|x86.Build.0 = Debug|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Release|x64.ActiveCfg = Release|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Release|x64.Build.0 = Release|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Release|x86.ActiveCfg = Release|Any CPU
+-		{EDD21376-B17D-45D1-9D59-B38F2B61A8C5}.Release|x86.Build.0 = Release|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Debug|x64.Build.0 = Debug|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Debug|x86.Build.0 = Debug|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Release|x64.ActiveCfg = Release|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Release|x64.Build.0 = Release|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Release|x86.ActiveCfg = Release|Any CPU
+-		{3752E53C-F67C-45A7-9235-B836A4B7E8E8}.Release|x86.Build.0 = Release|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Debug|x64.Build.0 = Debug|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Debug|x86.Build.0 = Debug|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Release|x64.ActiveCfg = Release|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Release|x64.Build.0 = Release|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Release|x86.ActiveCfg = Release|Any CPU
+-		{18474635-489C-450F-B6F3-350A5E098AFE}.Release|x86.Build.0 = Release|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Debug|x64.Build.0 = Debug|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Debug|x86.Build.0 = Debug|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Release|x64.ActiveCfg = Release|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Release|x64.Build.0 = Release|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Release|x86.ActiveCfg = Release|Any CPU
+-		{086AECD6-105F-4E5C-99D3-7197F4F07D40}.Release|x86.Build.0 = Release|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Debug|x64.Build.0 = Debug|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Debug|x86.Build.0 = Debug|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Release|x64.ActiveCfg = Release|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Release|x64.Build.0 = Release|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Release|x86.ActiveCfg = Release|Any CPU
+-		{F218DDD5-CEC0-4350-973F-B291C0A9CC96}.Release|x86.Build.0 = Release|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Debug|x64.Build.0 = Debug|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Debug|x86.Build.0 = Debug|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Release|x64.ActiveCfg = Release|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Release|x64.Build.0 = Release|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Release|x86.ActiveCfg = Release|Any CPU
+-		{8AAAF6DB-ACD0-4394-B351-A6628815131E}.Release|x86.Build.0 = Release|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Debug|x64.Build.0 = Debug|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Debug|x86.Build.0 = Debug|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Release|x64.ActiveCfg = Release|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Release|x64.Build.0 = Release|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Release|x86.ActiveCfg = Release|Any CPU
+-		{48BC7D2B-DE11-49ED-AF28-DD9B9C19709F}.Release|x86.Build.0 = Release|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Debug|x64.Build.0 = Debug|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Debug|x86.Build.0 = Debug|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Release|x64.ActiveCfg = Release|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Release|x64.Build.0 = Release|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Release|x86.ActiveCfg = Release|Any CPU
+-		{A0118A73-9363-42C4-B727-D3E0457BB262}.Release|x86.Build.0 = Release|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Debug|x64.Build.0 = Debug|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Debug|x86.Build.0 = Debug|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Release|x64.ActiveCfg = Release|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Release|x64.Build.0 = Release|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Release|x86.ActiveCfg = Release|Any CPU
+-		{521B750D-7463-4104-9B2A-80B404E5D4C9}.Release|x86.Build.0 = Release|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Debug|x64.Build.0 = Debug|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Debug|x86.Build.0 = Debug|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Release|x64.ActiveCfg = Release|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Release|x64.Build.0 = Release|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Release|x86.ActiveCfg = Release|Any CPU
+-		{E4F3CD60-BE57-42BF-B775-DF4818AD7574}.Release|x86.Build.0 = Release|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Debug|x64.ActiveCfg = Debug|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Debug|x64.Build.0 = Debug|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Debug|x86.ActiveCfg = Debug|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Debug|x86.Build.0 = Debug|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Release|Any CPU.Build.0 = Release|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Release|x64.ActiveCfg = Release|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Release|x64.Build.0 = Release|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Release|x86.ActiveCfg = Release|Any CPU
+-		{85881C98-796B-44B0-918D-D3B4A509B7AF}.Release|x86.Build.0 = Release|Any CPU
+-	EndGlobalSection
+-	GlobalSection(SolutionProperties) = preSolution
+-		HideSolutionNode = FALSE
+-	EndGlobalSection
+-	GlobalSection(NestedProjects) = preSolution
+-		{75C8A8AC-7A81-46AE-AF4C-706BDC7AB6D6} = {8D5F60A8-566A-4068-8B83-1BA48F66E60B}
+-	EndGlobalSection
+-	GlobalSection(ExtensibilityGlobals) = postSolution
+-		SolutionGuid = {51CB0E2B-8005-4839-8808-C1CA8C9C2BA7}
+-	EndGlobalSection
+-EndGlobal
+diff --git a/Broiler.JS/OtherTests/JIntPerfTests/JIntPerfTests.csproj b/Broiler.JS/OtherTests/JIntPerfTests/JIntPerfTests.csproj
+deleted file mode 100644
+index affccced..00000000
+--- a/Broiler.JS/OtherTests/JIntPerfTests/JIntPerfTests.csproj
++++ /dev/null
+@@ -1,19 +0,0 @@
+-﻿<Project Sdk="Microsoft.NET.Sdk">
+-
+-  <PropertyGroup>
+-    <OutputType>Exe</OutputType>
+-    <TargetFramework>net10.0</TargetFramework>
+-	  <IsPackable>false</IsPackable>
+-  </PropertyGroup>
+-	<ItemGroup>
+-		<None Include=".\Scripts\*.*" CopyToOutputDirectory="PreserveNewest" />
+-		<None Include="..\Jint.Tests.CommonScripts\Scripts\**" CopyToOutputDirectory="PreserveNewest" LinkBase="Scripts" />
+-	</ItemGroup>
+-	<ItemGroup>
+-		<ProjectReference Include="..\..\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
+-		<ProjectReference Include="..\..\Broiler.JavaScript.Compiler\Broiler.JavaScript.Compiler.csproj" />
+-	  <ProjectReference Include="..\..\Broiler.JavaScript.Engine\Broiler.JavaScript.Engine.csproj" />
+-	</ItemGroup>
+-
+-
+-</Project>
+diff --git a/Broiler.JS/OtherTests/JIntPerfTests/Program.cs b/Broiler.JS/OtherTests/JIntPerfTests/Program.cs
+deleted file mode 100644
+index 0c3424e5..00000000
+--- a/Broiler.JS/OtherTests/JIntPerfTests/Program.cs
++++ /dev/null
+@@ -1,57 +0,0 @@
+-﻿using System;
+-using System.Collections.Generic;
+-using System.IO;
+-using System.Linq;
+-using Broiler.JavaScript.Ast;
+-using Broiler.JavaScript.Engine;
+-
+-public class Program
+-{
+-
+-    private static readonly Dictionary<string, string> _files = new()
+-    {
+-        { "array-stress", null },
+-        { "evaluation", null },
+-        { "linq-js", null },
+-        { "minimal", null },
+-        { "stopwatch", null },
+-        { "dromaeo-3d-cube", null },
+-        { "dromaeo-core-eval", null },
+-        { "dromaeo-object-array", null },
+-        { "dromaeo-object-regexp", null },
+-        { "dromaeo-object-string", null },
+-        { "dromaeo-string-base64", null },
+-    };
+-
+-    private static readonly string _dromaeoHelpers = @"
+-        var startTest = function () { };
+-        var test = function (name, fn) { fn(); };
+-        var endTest = function () { };
+-        var prep = function (fn) { fn(); };";
+-
+-
+-    public static void Main()
+-    {
+-
+-        var files = _files.Keys.ToList();
+-
+-        foreach(var fileName in files)
+-        {
+-            var script = File.ReadAllText($"Scripts/{fileName}.js");
+-            if (fileName.Contains("dromaeo"))
+-            {
+-                script = _dromaeoHelpers + Environment.NewLine + Environment.NewLine + script;
+-            }
+-            _files[fileName] = script;
+-        }
+-
+-        foreach (var item in files)
+-        {
+-            var content = _files[item];
+-            var engine = new JSContext();
+-            // By default BroilerJSJS is strict mode only, in strict mode
+-            // unless you pass `this`, `this` in a global context is undefined.
+-            engine.Eval(content, item + ".js", engine);
+-        }
+-    }
+-}
+diff --git a/docs/compliance/process.md b/docs/compliance/process.md
+index cd6528d4..7071acff 100644
+--- a/docs/compliance/process.md
++++ b/docs/compliance/process.md
+@@ -11,7 +11,7 @@ selection, command, environment, totals, and raw artifact.
+ | `dotnet test Broiler.JS.slnx` | Repository unit, architecture, integration, and regression tests |
+ | test262 at a commit SHA | ECMAScript and ECMA-402 conformance |
+ | `scripts/compliance/engine-scenarios.json` | Small Broiler/Node/engine262 semantic cross-check |
+-| `OtherTests/JIntPerfTests` | Repository compatibility and legacy performance scenarios |
++| `benchmarks/Broiler.JavaScript.Engine.Benchmarks` | Repository compatibility and legacy performance scenarios, over the `OtherTests/JIntPerfTests/Scripts` corpus |
+ 
+ test262 is the release conformance source. The other suites are useful cross-checks and
+ must not be added together into a synthetic “percent compliant” figure.
+diff --git a/docs/roadmap/Roadmap.status.md b/docs/roadmap/Roadmap.status.md
+index b706289b..4cc1cd73 100644
+--- a/docs/roadmap/Roadmap.status.md
++++ b/docs/roadmap/Roadmap.status.md
+@@ -220,12 +220,27 @@ Headline before/after on the probes:
+ | `script:stopwatch` (real script) | 976 ms | 669 ms | **1.5×** | 736 MB | **264 MB** |
+ 
+ Repository suite at `cdb2fd41`: **7 284 tests across 13 projects, 7 281 passing.** The
+-three failures are host-environment, not engine — `ReproTests.Repro` (a debugging
++three failures were host-environment, not engine — `ReproTests.Repro` (a debugging
+ leftover writing to a hardcoded `D:\Broiler.JS\` path, asserting nothing) and two
+-`Issue838Tests` date cases that assume a UTC host. Baseline before attributing either
+-to a change. Note also that `Broiler.JS/BroilerJS.sln` **cannot restore** — it
+-references `Broiler.Regex` paths that do not exist — so `Broiler.JS.slnx` at the
+-repository root is the solution to run.
++`Issue838Tests` date cases that assume a UTC host. `ReproTests` and its `ReproT`
++sibling have since been retired: neither asserted anything, and on Linux the `D:\`
++string was treated as a relative filename, so `Repro` passed there and the count read
++7 282 of 7 280 depending on the host. Its `super`-in-class-field-initializer probes now
++assert, as `ClassFieldInitializerEvalSuperTests`. Expect two failures on a non-UTC host
++and none of them from `Repro`. Baseline before attributing either to a change.
++`Broiler.JS/BroilerJS.sln` has been deleted — it could not restore, referencing
++`Broiler.Regex` paths that moved — so `Broiler.JS.slnx` at the repository root is the
++solution to run.
++
++Deleting that solution left `Broiler.JavaScript.Network` and
++`Broiler.JavaScript.NodePollyfill` in no solution at all. They were deliberately not
++added to `Broiler.JS.slnx`: neither compiles. Both still open `Broiler.JavaScript.Core`,
++a namespace removed by the engine refactor, so every source file in them fails with
++CS0234 — 23 errors and 3 errors respectively. They were only ever reachable through a
++solution that itself could not restore, so nothing regressed when it went. Whoever
++intends to revive the `fetch`/`Blob`/`AbortController` and Node polyfill surfaces should
++repair the namespace first and register them then; deleting the sources is a separate
++decision and is not made here.
+ 
+ ### 4.2 The current Octane profile
+ 
+-- 
+2.43.0
+

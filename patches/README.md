@@ -276,3 +276,71 @@ one-in-three and the coverages come out 1/6, 1/2, 5/6 against Chromium's measure
 changes state in either direction**, and the net is **+1.578 points** — +1.707
 across 55 tests against −0.129 across 103, only one of which loses more than a
 hundredth of a point.
+
+### `0007-js-retire-repro-and-legacy-sln.patch` — `Broiler.JS`
+
+Retires two debugging leftovers and the legacy solution, as batch 2b of
+[the root test-suite retirement item](../docs/ROADMAP.md#retire-obsolete-test-suites-and-historical-test-artifacts).
+
+`ReproTests` and `ReproT` contained no assertion between them. `ReproT` printed
+six regex probes to the console; `ReproTests` appended to a hard-coded
+`D:\Broiler.JS\repro-out.txt`, which on Linux is a relative filename, so it
+created a file with a colon in its name and passed. That is why the submodule's
+status document recorded `ReproTests.Repro` as a host-environment *failure* — on
+Windows it wrote to a path that may not exist.
+
+`ReproT` goes outright: `Issue725Tests` and `Issue723Tests` already assert that
+an unmatched optional group comes back `undefined` from `exec`. `ReproTests` was
+probing something real that nothing else covers — `super` property lookup inside
+a class **field initializer** under direct eval, through an arrow inside eval,
+and through an arrow declared in one eval statement and called in the next. That
+is a different binding from the derived-constructor `super()` case that
+`Issue814DerivedConstructorEvalSuperTests` covers. The patch turns those probes
+into `ClassFieldInitializerEvalSuperTests`, six asserting tests, all passing
+against the pinned engine.
+
+`BroilerJS.sln` is deleted: it cannot restore, referencing `Broiler.Regex` paths
+that moved. The standalone `JIntPerfTests` executable goes with it — its eleven
+scenarios are exactly the `[Params]` list of `JIntSmokeBenchmarks`, which globs
+the same `Scripts` directory. **The script corpus itself is kept**; only
+`Program.cs` and the `.csproj` are removed.
+
+Deleting the solution leaves `Broiler.JavaScript.Network` and
+`Broiler.JavaScript.NodePollyfill` in no solution. The patch deliberately does
+**not** register them, because neither compiles — both still open
+`Broiler.JavaScript.Core`, a namespace the engine refactor removed, so every file
+fails `CS0234`. They were only reachable through a solution that could not
+restore. Reviving them means repairing the namespace first; deleting the sources
+is a separate decision the patch does not make.
+
+No main-repo fallback is needed: nothing outside the submodule referenced any of
+these files.
+
+### `0008-html-drop-wpf-adapter-references.patch` — `Broiler.HTML`
+
+Removes the last references to the deleted `Broiler.HTML.WPF` adapter, as batch
+3b of the same roadmap item.
+
+Three assemblies still granted it internals access —
+`InternalsVisibleTo("Broiler.HTML.WPF")` in `Broiler.HTML.Core`,
+`Broiler.HTML.Dom`, and `Broiler.HTML.Orchestration`. The assembly is never
+built, so the grants widened nothing, but a friend grant to a non-existent
+assembly is an invitation to recreate it.
+
+The documentation was further out of date than the code: the README still
+described the renderer as ending in "WPF hosting", listed the assembly among the
+shipped set, and documented four public types on it; `docs/architecture.md` named
+it as one of the two concrete backends and gave it its own hosting section; and
+two gate lists in `docs/graphics-backend.md` and `docs/roadmap.md` still required
+WPF checks to pass.
+
+The main-repo half of this batch has already landed: `SkiaDecouplingGuardTests`
+asserted that the deleted `Source/Broiler.HTML.WPF` directory still existed, and
+that assertion — its only failure — is gone. Until this patch is applied, the
+submodule half of batch 3's exit gate ("repository searches find no obsolete
+Skia package, adapter, directory, or fallback references") cannot go green,
+because six of the eight references live behind the submodule pointer.
+
+All seven touched files are LF; `git show --stat` on the patch commit reports 6
+insertions and 24 deletions, so a larger stat after applying means a line-ending
+rewrite, not a diff.

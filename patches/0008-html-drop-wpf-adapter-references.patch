@@ -1,0 +1,184 @@
+From 98008053f6d3b913176b6cb099458611f15e00a6 Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Wed, 12 Aug 2026 17:16:49 +0000
+Subject: [PATCH] docs: drop the deleted WPF adapter from the public surface
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Batch 3b of the root repository's test-suite retirement item.
+
+Broiler.HTML.WPF was removed, but the repository still advertised it. The
+README described the renderer as ending in "WPF hosting", listed the assembly
+among the shipped set, and documented four public types on it; the architecture
+notes named it as one of the two concrete backends hosting pipeline output and
+gave it its own hosting section; and two gate lists still required WPF checks to
+pass. None of it exists.
+
+Three assemblies also still granted it internals access. Those
+InternalsVisibleTo("Broiler.HTML.WPF") entries in Broiler.HTML.Core,
+Broiler.HTML.Dom, and Broiler.HTML.Orchestration named an assembly that is never
+built, so they widened nothing — but a friend grant to a non-existent assembly
+is an invitation to recreate it, and the root repository's Skia decoupling guard
+asserted on the deleted directory's continued existence until this cleanup.
+
+Two "without WPF" qualifiers on Broiler.HTML.Graphics are also dropped: with no
+WPF frontend left, rendering without it is not a distinguishing property.
+
+The Win32 demo and the Direct2D surface are untouched; only the WPF half of
+those sentences goes.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VSxmiiY5E7ppTLgqaJJQUR
+---
+ README.md                                           | 10 +++-------
+ Source/Broiler.HTML.Core/Properties/AssemblyInfo.cs |  1 -
+ Source/Broiler.HTML.Dom/Properties/AssemblyInfo.cs  |  1 -
+ .../Properties/AssemblyInfo.cs                      |  1 -
+ docs/architecture.md                                | 13 +------------
+ docs/graphics-backend.md                            |  2 +-
+ docs/roadmap.md                                     |  2 +-
+ 7 files changed, 6 insertions(+), 24 deletions(-)
+
+diff --git a/README.md b/README.md
+index 2cab31a..d7b215c 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # Broiler.HTML
+ 
+-Broiler.HTML is a modular .NET HTML renderer split into focused assemblies for parsing, CSS processing, layout, painting, image generation, and WPF hosting.
++Broiler.HTML is a modular .NET HTML renderer split into focused assemblies for parsing, CSS processing, layout, painting, and image generation.
+ 
+ > **Preview status:** APIs, rendering behavior, and platform support are unstable.
+ > Substantial implementation work was AI-assisted. Human-review approval is
+@@ -47,18 +47,15 @@ The solution file is `Source/Broiler.HTML.slnx` and the codebase is organized in
+ - `Broiler.HTML.Graphics.Win32.Demo` - simple Win32 URL rendering demo using `Broiler.Graphics.Direct2D`
+ - `Broiler.HTML.Image` / `Broiler.HTML.Image.Compat` - image rendering,
+   deterministic comparison, and the remaining backend-neutral compatibility seam
+-- `Broiler.HTML.WPF` - WPF rendering surface and controls
+ - `Broiler.HTML` - shared public surface used by platform adapters
+ 
+ ## Public API highlights
+ 
+ - `Broiler.HTML.Image.HtmlRender` renders HTML to in-memory bitmaps, PNG bytes, and files.
+-- `Broiler.HTML.Graphics.HtmlRender` renders HTML to `Broiler.Graphics.BBitmap` instances, encoded bytes, files, and renderer command lists without WPF.
++- `Broiler.HTML.Graphics.HtmlRender` renders HTML to `Broiler.Graphics.BBitmap` instances, encoded bytes, files, and renderer command lists.
+ - `Broiler.HTML.Tool` exposes a cross-platform command-line renderer plus image-diff reporting for HTML compliance workflows.
+ - `Broiler.HTML.Image.PixelDiffRunner` compares rendered output to a baseline image.
+ - `Broiler.HTML.Image.MismatchClassifier` classifies visual mismatches for compliance triage.
+-- `Broiler.HTML.WPF.HtmlRender` renders HTML into WPF drawing contexts and images.
+-- `Broiler.HTML.WPF.HtmlPanel` and `Broiler.HTML.WPF.HtmlLabel` expose WPF controls.
+ - `Broiler.HTML.Adapters.RAdapter` is the backend extension point for graphics, fonts, images, clipboard, and context-menu services.
+ 
+ ## Build and validation
+@@ -71,7 +68,6 @@ dotnet build Broiler.HTML.slnx
+ dotnet test Broiler.HTML.slnx
+ ```
+ 
+-`Broiler.HTML.WPF` now enables Windows targeting so solution-wide restore/build validation also works on non-Windows CI hosts.
+ The current solution does not contain checked-in .NET test projects yet, so `dotnet test` currently acts as a repository validation command rather than a substantive automated renderer test suite. The checked-in automated tests currently live under `scripts/wpt/*.test.mjs`.
+ 
+ Run those script tests from the repository root:
+@@ -202,7 +198,7 @@ Use repeated `--include` filters with `--limit-per-include` when you want a boun
+ 
+ ## Win32 graphics demo
+ 
+-The repository includes a no-WPF/no-WinForms demo that renders a URL with `Broiler.HTML.Graphics` directly into a `Broiler.Graphics.Direct2D` HWND surface:
++The repository includes a demo that renders a URL with `Broiler.HTML.Graphics` directly into a `Broiler.Graphics.Direct2D` HWND surface:
+ 
+ ```bash
+ dotnet run --project Source/Broiler.HTML.Graphics.Win32.Demo -- https://example.com/
+diff --git a/Source/Broiler.HTML.Core/Properties/AssemblyInfo.cs b/Source/Broiler.HTML.Core/Properties/AssemblyInfo.cs
+index 46cb9a4..91b0b74 100644
+--- a/Source/Broiler.HTML.Core/Properties/AssemblyInfo.cs
++++ b/Source/Broiler.HTML.Core/Properties/AssemblyInfo.cs
+@@ -6,6 +6,5 @@ using System.Runtime.CompilerServices;
+ [assembly: InternalsVisibleTo("Broiler.HTML.Orchestration")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+-[assembly: InternalsVisibleTo("Broiler.HTML.WPF")]
+ [assembly: InternalsVisibleTo("Broiler.DevConsole")]
+ [assembly: InternalsVisibleTo("Broiler.DevConsole.Tests")]
+diff --git a/Source/Broiler.HTML.Dom/Properties/AssemblyInfo.cs b/Source/Broiler.HTML.Dom/Properties/AssemblyInfo.cs
+index 0b890cb..d55937d 100644
+--- a/Source/Broiler.HTML.Dom/Properties/AssemblyInfo.cs
++++ b/Source/Broiler.HTML.Dom/Properties/AssemblyInfo.cs
+@@ -4,7 +4,6 @@ using System.Runtime.CompilerServices;
+ [assembly: InternalsVisibleTo("Broiler.HTML.Orchestration")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+-[assembly: InternalsVisibleTo("Broiler.HTML.WPF")]
+ [assembly: InternalsVisibleTo("Broiler")]
+ [assembly: InternalsVisibleTo("Broiler.HtmlBridge")]
+ [assembly: InternalsVisibleTo("Broiler.HtmlBridge.Dom")]
+diff --git a/Source/Broiler.HTML.Orchestration/Properties/AssemblyInfo.cs b/Source/Broiler.HTML.Orchestration/Properties/AssemblyInfo.cs
+index c0b0c3f..d41edfc 100644
+--- a/Source/Broiler.HTML.Orchestration/Properties/AssemblyInfo.cs
++++ b/Source/Broiler.HTML.Orchestration/Properties/AssemblyInfo.cs
+@@ -5,5 +5,4 @@ using System.Runtime.CompilerServices;
+ [assembly: InternalsVisibleTo("Broiler.HTML.Rendering")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image")]
+ [assembly: InternalsVisibleTo("Broiler.HTML.Image.Tests")]
+-[assembly: InternalsVisibleTo("Broiler.HTML.WPF")]
+ [assembly: InternalsVisibleTo("Broiler.Cli.Tests")]
+diff --git a/docs/architecture.md b/docs/architecture.md
+index c477200..5a6cb6b 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -8,7 +8,7 @@ Broiler.HTML is structured as a pipeline of small assemblies instead of a single
+ 2. `Broiler.HTML.CSS` parses stylesheets and computes CSS data.
+ 3. `Broiler.HTML.Dom` performs DOM-driven layout work.
+ 4. `Broiler.HTML.Rendering` converts laid-out content into painting operations.
+-5. `Broiler.HTML.Image` and `Broiler.HTML.WPF` host the output in concrete backends.
++5. `Broiler.HTML.Image` hosts the output in a concrete backend.
+ 
+ Supporting assemblies keep the pipeline reusable:
+ 
+@@ -58,17 +58,6 @@ Use this assembly when you need deterministic image output, fixture generation,
+ - `MissingContent`
+ - `MinorDiff`
+ 
+-### WPF hosting
+-
+-`Broiler.HTML.WPF` exposes the WPF-facing surface:
+-
+-- `HtmlRender`
+-- `HtmlContainer`
+-- `HtmlPanel`
+-- `HtmlLabel`
+-
+-Use `HtmlRender` for direct drawing/image generation and `HtmlPanel` / `HtmlLabel` for control-based hosting.
+-
+ ### Backend extension point
+ 
+ `Broiler.HTML.Adapters.RAdapter` is the central abstraction for backend-specific functionality such as brushes, pens, fonts, images, clipboard integration, and context menus.
+diff --git a/docs/graphics-backend.md b/docs/graphics-backend.md
+index 7bc6d11..ad6d9b9 100644
+--- a/docs/graphics-backend.md
++++ b/docs/graphics-backend.md
+@@ -38,7 +38,7 @@ Changes to backend or compatibility behavior must run:
+ - deterministic pixel-diff and repeated-render checks;
+ - SVG, text shaping, font registration/fallback, clipping, gradient, transform, and
+   compositing tests;
+-- WPF and Win32 host smoke tests where applicable; and
++- Win32 host smoke tests where applicable; and
+ - the owned HTML/CSS suite plus the pinned non-JS WPT selection.
+ 
+ The current removal work and its exit gate are tracked in
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 34b8ee7..1518f29 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -110,7 +110,7 @@ Exit gate:
+ 
+ - normal rendering and all supported host packages have no Skia dependency;
+ - fallback behavior is explicit and tested rather than discovered by reflection;
+-- raster, text, SVG, image, WPF, pixel-diff, Acid, and WPT gates pass; and
++- raster, text, SVG, image, pixel-diff, Acid, and WPT gates pass; and
+ - `docs/graphics-backend.md` and package metadata describe the final topology.
+ 
+ ## 5. Release and review gates
+-- 
+2.43.0
+
