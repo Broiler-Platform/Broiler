@@ -25,14 +25,6 @@ public sealed class LegacyEventBindingModuleTests
     }
 
     [Fact]
-    public void CreateEvent_Callback_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        Assert.Null(bridge.GetMethod("JsRegistrationCreateEvent033Core",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static));
-    }
-
-    [Fact]
     public void CreateEvent_Builds_An_Initializable_Event_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

@@ -31,24 +31,6 @@ public sealed class SvgElementBindingModuleTests
     }
 
     [Fact]
-    public void Svg_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsElementInterfacesCallback086Core", "JsElementInterfacesGetViewBox087Core",
-                     "JsElementInterfacesGetNumberOfChars088Core", "JsElementInterfacesGetComputedTextLength089Core",
-                     "JsElementInterfacesGetSubStringLength090Core", "JsElementInterfacesGetStartPositionOfChar091Core",
-                     "JsElementInterfacesGetEndPositionOfChar092Core", "JsElementInterfacesGetRotationOfChar093Core",
-                     "JsElementInterfacesSetCurrentTime095Core", "CreateSvgLengthValue",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Svg_AnimatedLength_Reflects_Dimensional_Attribute()
     {
         var html = @"<!DOCTYPE html>

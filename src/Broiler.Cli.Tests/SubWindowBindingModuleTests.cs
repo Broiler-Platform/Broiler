@@ -44,27 +44,6 @@ public sealed class SubWindowBindingModuleTests
     }
 
     [Fact]
-    public void SubWindow_Builder_Moved_Off_The_Bridge()
-    {
-        // The sub-window object builder + its scroll/getComputedStyle callbacks now live on the module;
-        // the bridge no longer declares them.
-        var bridgeMethods = typeof(DomBridge)
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Select(m => m.Name)
-            .ToHashSet();
-        foreach (var gone in new[]
-                 {
-                     "GetOrCreateSubWindow", "GetSubWindowScrollOffset", "SetSubWindowScrollOffsets",
-                     "GetParentWindowForSubDocument", "GetSubDocumentScrollingElement",
-                     "JsSubDocumentsScroll006Core", "JsSubDocumentsGetComputedStyle009Core",
-                 })
-            Assert.DoesNotContain(gone, bridgeMethods);
-
-        Assert.NotNull(typeof(SubWindowBinding).GetMethod("GetOrCreate",
-            BindingFlags.Public | BindingFlags.Instance));
-    }
-
-    [Fact]
     public void ContentWindow_Exposes_SubWindow_Surface_Through_The_Module()
     {
         const string html =

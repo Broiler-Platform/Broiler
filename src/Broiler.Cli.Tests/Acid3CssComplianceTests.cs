@@ -750,6 +750,45 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("top=0", result);
     }
 
+    /// <summary>
+    /// The rendered consequence of the same cascade. The computed-style assertion above
+    /// cannot see it: without :root support the html element keeps its 2cm (~76px) top
+    /// border and pushes the Acid3 title roughly 76px down the page. Asserts on pixels,
+    /// so it fails if the cascade resolves correctly but layout ignores the result.
+    /// </summary>
+    [Fact]
+    public void Root_Selector_Overrides_Html_Border_Top_In_Rendered_Output()
+    {
+        var html = @"<!DOCTYPE html><html>
+<style>
+* { margin: 0; border: 1px blue; padding: 0; font: inherit; line-height: 1.2; color: inherit; background: transparent; }
+html { font: 20px Arial, sans-serif; border: 2cm solid gray; width: 32em; margin: 1em; }
+:root { background: silver; color: black; border-width: 0 0.2em 0.2em 0; }
+body { padding: 2em 2em 0; border: solid 1px black; margin: -0.2em 0 0 -0.2em; }
+h1:first-child { font-size: 5em; font-weight: bolder; margin-bottom: -0.4em; }
+</style>
+<body><h1>X</h1></body></html>";
+
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 800, 300);
+
+        int topDark = -1;
+        for (int y = 0; y < 250 && topDark < 0; y++)
+        for (int x = 50; x < 400; x++)
+        {
+            var pixel = bitmap.GetPixel(x, y);
+            if (pixel.R < 80 && pixel.G < 80 && pixel.B < 80)
+            {
+                topDark = y;
+                break;
+            }
+        }
+
+        // Without :root support the title landed at y~91; with it, at y~16.
+        Assert.True(topDark > 0, "Should find dark title text");
+        Assert.True(topDark < 30, $"Title should start before y=30 (found y={topDark}). " +
+            "The :root selector must override html border-top-width to 0.");
+    }
+
     // ────────────── D7: font-weight bolder resolution ──────────────
 
     /// <summary>

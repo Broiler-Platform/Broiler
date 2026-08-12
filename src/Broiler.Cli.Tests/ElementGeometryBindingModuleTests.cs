@@ -43,25 +43,6 @@ public sealed class ElementGeometryBindingModuleTests
     }
 
     [Fact]
-    public void Geometry_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsElementInterfacesGetScrollTop072Core", "JsElementInterfacesSetScrollTop073Core",
-                     "JsElementInterfacesGetScrollLeft074Core", "JsElementInterfacesSetScrollLeft075Core",
-                     "JsElementInterfacesGetOffsetParent078Core", "JsElementInterfacesGetBoundingClientRect079Core",
-                     "JsElementInterfacesGetClientRects080Core", "JsElementInterfacesScrollIntoView081Core",
-                     "JsElementInterfacesScroll082Core", "JsElementInterfacesScrollTo083Core",
-                     "JsElementInterfacesScrollBy084Core", "JsElementInterfacesScrollParent085Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Box_Model_Metrics_Report_Own_Css_Pixels()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";
@@ -97,5 +78,29 @@ public sealed class ElementGeometryBindingModuleTests
         Assert.Equal("true,1", Eval(body,
             "(function(){var rects=document.getElementById('a').getClientRects();" +
             "return Array.isArray(rects)+','+rects.length;})()"));
+    }
+
+    [Fact]
+    public void Boxed_Element_Reads_Real_Shared_Geometry()
+    {
+        // A box-generating element answers all four metrics from the shared layout
+        // snapshot, not from a declared-size guess. scrollWidth equals the content
+        // width because the box is empty.
+        var body = "<div id='b' style='width:120px;height:40px'></div>";
+        Assert.Equal("120,40,120,120", Eval(body,
+            "(function(){var e=document.getElementById('b');" +
+            "return [e.offsetWidth,e.offsetHeight,e.clientWidth,e.scrollWidth].join(',');})()"));
+    }
+
+    [Fact]
+    public void DisplayNone_Element_Reads_Zero_Geometry()
+    {
+        // display:none produces no box, so every metric reads zero. The declared
+        // width/height must not leak through: an element absent from the shared
+        // snapshot reports zero rather than its specified size.
+        var body = "<div id='n' style='display:none;width:100px;height:50px'></div>";
+        Assert.Equal("0,0,0,0", Eval(body,
+            "(function(){var e=document.getElementById('n');" +
+            "return [e.offsetWidth,e.offsetHeight,e.clientWidth,e.scrollWidth].join(',');})()"));
     }
 }

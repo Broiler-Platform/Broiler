@@ -30,28 +30,6 @@ public sealed class NodeAccessorsBindingModuleTests
     }
 
     [Fact]
-    public void NodeAccessors_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsGetIsConnected032Core", "JsJsObjectsGetChildNodes033Core",
-                     "JsJsObjectsGetFirstChild034Core", "JsJsObjectsGetLastChild035Core",
-                     "JsJsObjectsGetNextSibling036Core", "JsJsObjectsGetPreviousSibling037Core",
-                     "JsJsObjectsGetNodeType038Core", "JsJsObjectsGetNodeName039Core",
-                     "JsJsObjectsGetLocalName040Core", "JsJsObjectsGetPrefix041Core",
-                     "JsJsObjectsGetNamespaceURI042Core", "JsJsObjectsGetNodeValue043Core",
-                     "JsJsObjectsSetNodeValue044Core", "JsJsObjectsGetPublicId055Core",
-                     "JsJsObjectsGetSystemId056Core", "JsJsObjectsGetOwnerDocument057Core",
-                     "JsJsObjectsGetParentElement058Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void NodeAccessors_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

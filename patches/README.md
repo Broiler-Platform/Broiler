@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**The backlog is empty. Nothing here is waiting on a maintainer.**
+**Three patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -25,8 +25,10 @@ cd .. && git add <Submodule>      # bump the pointer only once the push succeeds
 A patch is deleted from here the moment its fix is upstream and the submodule
 pointer is bumped, because from then on it reaches CI through the pointer and a
 file that can only ever be skipped is noise. `scripts/apply-pending-wpt-patches.sh`
-holds the matching list — also empty — and is idempotent, so a patch already
-contained in the pinned pointer is skipped rather than re-applied.
+holds the matching list — the subset whose fix can move rendered pixels, so a
+WPT run exercises it rather than testing against the un-fixed pointer — and is
+idempotent, so a patch already contained in the pinned pointer is skipped rather
+than re-applied.
 
 **Check the pointer, not this file, before concluding a fix is pending.** The
 numbering is *recycled*: numbers are assigned from `0001` against whatever the
@@ -65,3 +67,105 @@ applied cleanly in either direction any more** — the surrounding code had move
 on, so `git am` would have failed and a reverse-apply check would have said "not
 applied". A drifted patch file for an applied fix is worse than no file: it reads
 as outstanding work and cannot be applied to find out otherwise.
+
+## Index
+
+All three come from
+[the test-suite retirement roadmap item](../docs/ROADMAP.md#retire-obsolete-test-suites-and-historical-test-artifacts),
+and all three apply cleanly to the pointers pinned as of this writing. Identify
+them by commit subject rather than by number — the numbering restarts against
+whatever this directory holds.
+
+| # | submodule | subject |
+| --- | --- | --- |
+| `0001` | `Broiler.JS` | Retire the Repro scratch tests and the legacy solution |
+| `0002` | `Broiler.HTML` | Drop the deleted WPF adapter from the public surface |
+| `0003` | `Broiler.HTML` | Keep dashed and dotted strokes on the raster path |
+
+### Retire the Repro scratch tests and the legacy solution — `Broiler.JS`
+
+`ReproTests` and `ReproT` contained no assertion between them. `ReproT` printed
+six regex probes to the console; `ReproTests` appended to a hard-coded
+`D:\Broiler.JS\repro-out.txt`, which on Linux is a relative filename, so it
+created a file with a colon in its name and passed. That is why the submodule's
+status document recorded `ReproTests.Repro` as a host-environment *failure*.
+
+`ReproT` goes outright — `Issue725Tests` and `Issue723Tests` already assert that
+an unmatched optional group comes back `undefined` from `exec`. `ReproTests` was
+probing something nothing else covers: `super` property lookup inside a class
+**field initializer** under direct eval, through an arrow inside eval, and
+through an arrow declared in one eval statement and called in the next. That is a
+different binding from the derived-constructor `super()` case
+`Issue814DerivedConstructorEvalSuperTests` covers. The patch turns those probes
+into `ClassFieldInitializerEvalSuperTests`, six asserting tests, all passing
+against the pinned engine.
+
+`BroilerJS.sln` is deleted: it cannot restore, referencing `Broiler.Regex` paths
+that moved. The standalone `JIntPerfTests` executable goes with it — its eleven
+scenarios are exactly the `[Params]` list of `JIntSmokeBenchmarks`, which globs
+the same `Scripts` directory. **The script corpus itself is kept.**
+
+Deleting the solution leaves `Broiler.JavaScript.Network` and
+`Broiler.JavaScript.NodePollyfill` in no solution. The patch deliberately does
+**not** register them, because neither compiles — both still open
+`Broiler.JavaScript.Core`, a namespace the engine refactor removed. Reviving them
+means repairing the namespace first.
+
+Not listed for the WPT run: it touches no rendering code.
+
+### Drop the deleted WPF adapter from the public surface — `Broiler.HTML`
+
+Three assemblies still granted internals access to the removed
+`Broiler.HTML.WPF` — `InternalsVisibleTo("Broiler.HTML.WPF")` in
+`Broiler.HTML.Core`, `Broiler.HTML.Dom`, and `Broiler.HTML.Orchestration`. The
+assembly is never built, so the grants widened nothing, but a friend grant to a
+non-existent assembly is an invitation to recreate it.
+
+The documentation was further out of date than the code: the README described the
+renderer as ending in "WPF hosting", listed the assembly among the shipped set,
+and documented four public types on it; `docs/architecture.md` named it as one of
+two concrete backends and gave it its own hosting section; and two gate lists
+still required WPF checks to pass.
+
+The main-repo half has already landed: `SkiaDecouplingGuardTests` asserted that
+the deleted `Source/Broiler.HTML.WPF` directory still existed, and that
+assertion — its only failure — is gone.
+
+Not listed for the WPT run: documentation and friend grants only, no rendering
+change.
+
+### Keep dashed and dotted strokes on the raster path — `Broiler.HTML`
+
+**Fixes a live rendering defect.** A `border-style: dashed` or `dotted` edge
+painted **nothing at all**, while `solid`, `double`, and `groove` painted
+normally, so a box simply lost its outline.
+
+`GraphicsAdapter.DrawLine`/`DrawRectangle` hand a stroke to the raster canvas
+only when the pen `HasSimpleStroke` — a solid colour *and* `DashStyle.Solid`.
+Everything else fell through to the graphics compatibility seam, which on a host
+with no OS backend resolves to `StubCompatBackend`: `CreatePenPaint` returns an
+inert `StubPaint` and `DrawLine` is an empty method body. The stroke was
+discarded silently.
+
+The reduction itself —
+[`Broiler.Layout.IR.DashedStrokeGeometry`](../Broiler.Layout/Broiler.Layout/IR/DashedStrokeGeometry.cs)
+— **is already in this repository**, so the patch is only the two call sites plus
+an internal `CurrentDashStyle` accessor on `PenAdapter` (`RPen.DashStyle` is
+set-only and the raster path has to read the style back). The geometry is covered
+by `DashedStrokeGeometryTests`, 17 cases, which pass without the patch.
+
+The new branch only catches pens with a solid colour and a non-solid dash style —
+precisely the case that previously reached the inert stub and painted nothing.
+Pens with no solid colour still take the compat path, so **nothing that renders
+today changes**; the patch can only add paint where there was none.
+
+Measured on a 3px border around a 60x20 box: dashed 0 -> 388 painted pixels,
+dotted 0 -> 484, while solid stays 516, double 344, groove 516.
+
+**Listed in `scripts/apply-pending-wpt-patches.sh`.** It is the one of the three
+that moves pixels, and it moves them in the direction the pixel suite measures:
+every `css/css-backgrounds` dashed- and dotted-border case currently renders a
+blank edge. Without the entry the WPT run would keep scoring the un-fixed
+pointer. Until it is applied, dashed and dotted borders remain invisible in this
+repository, and no test here detects it — the call site is a submodule file with
+no equivalent main-repo layer.

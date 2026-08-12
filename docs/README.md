@@ -67,10 +67,12 @@ copying their implementation checklists.
 
 ## Test evidence
 
-Machine-consumed baselines belong beside their harnesses. The browser WebAssembly
-closure fixture is under
-[`tests/browser-wasm-phase0/baselines`](../tests/browser-wasm-phase0/baselines/).
-Chromium reference locks and focused conformance summaries are under
-[`tests/m2-conformance`](../tests/m2-conformance/). Generated WPT and visual
-comparison output should remain reproducible from scripts and workflows rather
-than being maintained as prose delivery journals.
+Machine-consumed baselines belong beside their harnesses. Chromium reference
+locks and focused conformance summaries are under
+[`tests/m2-conformance`](../tests/m2-conformance/); durable WPT expected
+failures are under [`tests/wpt-baseline`](../tests/wpt-baseline/). Generated WPT
+and visual comparison output should remain reproducible from scripts and
+workflows rather than being maintained as prose delivery journals — and should
+not be committed at all, which is why the April 2026 WPT result snapshots and
+the browser WebAssembly phase-0 baselines were retired. A committed baseline
+that no harness compares against is a prose journal in a binary format.

@@ -30,15 +30,6 @@ public sealed class DocumentWriteBindingModuleTests
     }
 
     [Fact]
-    public void Write_And_Writeln_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(bridge.GetMethod("JsRegistrationWrite036Core", all));
-        Assert.Null(bridge.GetMethod("JsRegistrationWriteln037Core", all));
-    }
-
-    [Fact]
     public void Write_And_Writeln_Insert_Queryable_Nodes_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

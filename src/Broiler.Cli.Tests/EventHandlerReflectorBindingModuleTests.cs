@@ -28,17 +28,6 @@ public sealed class EventHandlerReflectorBindingModuleTests
     }
 
     [Fact]
-    public void EventHandlerReflector_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[] { "JsJsObjectsCallback104Core", "JsJsObjectsCallback105Core" })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void On_Handler_Assigns_Reads_Fires_And_Clears()
     {
         var html = @"<!DOCTYPE html>

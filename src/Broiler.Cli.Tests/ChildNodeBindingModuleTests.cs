@@ -28,21 +28,6 @@ public sealed class ChildNodeBindingModuleTests
     }
 
     [Fact]
-    public void ChildNode_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsRemove093Core", "JsJsObjectsBefore094Core",
-                     "JsJsObjectsAfter095Core", "JsJsObjectsReplaceWith096Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void ChildNode_Mixin_Flows_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

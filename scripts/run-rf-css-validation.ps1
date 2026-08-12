@@ -91,9 +91,8 @@ if ($IncludeVisual) {
     $groups += [pscustomobject]@{
         Name = 'acid3-css-layout'
         Project = 'src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj'
-        Filter = 'FullyQualifiedName~Acid3CssComplianceTests|FullyQualifiedName~Acid3CascadeDebugTests|FullyQualifiedName~Acid3BorderLayoutTests|FullyQualifiedName~Acid3BarPositionTest'
+        Filter = 'FullyQualifiedName~Acid3CssComplianceTests|FullyQualifiedName~Acid3BorderLayoutTests|FullyQualifiedName~Acid3BarPositionTest'
         AllowedFailures = @(
-            'Without_Important_Higher_Specificity_Red_Wins',
             'Border_Shorthand_Expands_Color_To_Individual_Sides'
         )
     }

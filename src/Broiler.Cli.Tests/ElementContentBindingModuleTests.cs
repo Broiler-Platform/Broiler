@@ -28,20 +28,6 @@ public sealed class ElementContentBindingModuleTests
     }
 
     [Fact]
-    public void ElementContent_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsSetInnerHTML016Core", "JsJsObjectsSetOuterHTML018Core", "JsJsObjectsSetTextContent021Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void InnerHtml_Reads_And_Writes_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

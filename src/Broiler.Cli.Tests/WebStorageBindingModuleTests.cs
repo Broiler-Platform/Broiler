@@ -30,21 +30,6 @@ public sealed class WebStorageBindingModuleTests
     }
 
     [Fact]
-    public void WebStorage_Callbacks_And_Builder_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "BuildLocalStorageObject", "JsUtilitiesGetItem029Core", "JsUtilitiesSetItem030Core",
-                     "JsUtilitiesRemoveItem031Core", "JsUtilitiesClear032Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void LocalStorage_Object_Round_Trips_Through_Its_Callbacks()
     {
         var storage = WebStorageBinding.BuildLocalStorage();

@@ -136,14 +136,6 @@ public sealed class StyleDeclarationBindingModuleTests
     //    (JsJsObjectsSetStyle025Core) into StyleDeclarationBinding.SetInlineStyleCssText. --
 
     [Fact]
-    public void ElementStyle_Assignment_Setter_Moved_Off_The_Bridge()
-    {
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(typeof(DomBridge).GetMethod("JsJsObjectsSetStyle025Core", all));
-        Assert.NotNull(typeof(StyleDeclarationBinding).GetMethod("SetInlineStyleCssText", all));
-    }
-
-    [Fact]
     public void Assigning_ElementStyle_A_String_Parses_CssText_And_Writes_Through()
     {
         using var bridge = Attach(out var context,

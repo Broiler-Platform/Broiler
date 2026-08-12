@@ -30,22 +30,6 @@ public sealed class ObjectElementBindingModuleTests
     }
 
     [Fact]
-    public void ObjectElement_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsElementInterfacesSetData051Core",
-                     "JsElementInterfacesGetContentDocument054Core",
-                     "JsElementInterfacesGetSVGDocument055Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Object_ContentDocument_And_GetSVGDocument_Resolve_Same_Origin()
     {
         var html = @"<!DOCTYPE html>

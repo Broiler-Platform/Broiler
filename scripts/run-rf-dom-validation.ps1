@@ -64,8 +64,8 @@ $groups = @(
     [pscustomobject]@{
         Name = 'dom-boundary'
         Project = 'src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj'
-        Filter = 'FullyQualifiedName~HtmlBridgeBoundaryGuardTests|FullyQualifiedName~DomExtractionPhaseZeroTests'
-        MinimumTests = 20
+        Filter = 'FullyQualifiedName~HtmlBridgeBoundaryGuardTests|FullyQualifiedName~HtmlBridgeOwnershipGuardTests|FullyQualifiedName~CanonicalDomTreeTests'
+        MinimumTests = 23
         AllowedFailures = @()
     },
     [pscustomobject]@{

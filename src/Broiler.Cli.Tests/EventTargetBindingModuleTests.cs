@@ -31,22 +31,6 @@ public sealed class EventTargetBindingModuleTests
     }
 
     [Fact]
-    public void EventTarget_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsAddEventListener097Core", "JsJsObjectsRemoveEventListener098Core",
-                     "JsJsObjectsDispatchEvent099Core", "JsJsObjectsClick101Core",
-                     "JsJsObjectsFocus102Core", "JsJsObjectsBlur103Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Add_Remove_And_Dispatch_Flow_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";

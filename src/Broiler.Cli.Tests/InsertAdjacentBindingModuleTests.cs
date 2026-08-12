@@ -29,23 +29,6 @@ public sealed class InsertAdjacentBindingModuleTests
     }
 
     [Fact]
-    public void InsertAdjacent_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsInsertAdjacentElement130Core", "JsJsObjectsInsertAdjacentText131Core",
-                     "JsJsObjectsInsertAdjacentHTML132Core",
-                     // helpers moved with them
-                     "NormalizeInsertAdjacentPosition", "GetInsertAdjacentTarget",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void InsertAdjacentElement_Places_Node_At_Each_Position()
     {
         var html = @"<!DOCTYPE html>

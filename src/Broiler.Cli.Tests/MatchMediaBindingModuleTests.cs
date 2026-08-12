@@ -28,15 +28,6 @@ public sealed class MatchMediaBindingModuleTests
     }
 
     [Fact]
-    public void MatchMedia_Callback_And_Evaluator_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(bridge.GetMethod("JsRegistrationMatchMedia069Core", all));
-        Assert.Null(bridge.GetMethod("EvaluateMediaQuery", all));
-    }
-
-    [Fact]
     public void MatchMedia_Evaluates_Against_The_Viewport_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

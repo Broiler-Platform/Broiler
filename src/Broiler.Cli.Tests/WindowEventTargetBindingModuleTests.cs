@@ -29,21 +29,6 @@ public sealed class WindowEventTargetBindingModuleTests
     }
 
     [Fact]
-    public void Window_EventTarget_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationAddEventListener136Core", "JsRegistrationRemoveEventListener137Core",
-                     "JsRegistrationDispatchEvent138Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Window_Add_Dispatch_Remove_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

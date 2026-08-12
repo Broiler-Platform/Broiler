@@ -14,18 +14,15 @@ public sealed partial class DomBridge
     // geometry fix is live on CI) and the increment-4 parity gate confirmed the shared
     // path matches or improves on the estimators — see
     // SharedLayoutGeometryParityTests.Shared_Geometry_Matches_Or_Beats_Estimator_On_CheckLayout_Corpus.
-    // Mirrors the LayoutGeometryCacheEnabled test seam.
     internal static bool UseSharedLayoutGeometry = true;
 
-    // RF-BRIDGE-1b increment 6 cutover — the geometry entry points now answer *exclusively*
-    // from the shared snapshot: an element with a shared box reads its real geometry and any
+    // RF-BRIDGE-1b increment 6 cutover — the geometry entry points answer *exclusively* from
+    // the shared snapshot: an element with a shared box reads its real geometry and any
     // snapshot-missing element (detached, display:none/contents, text/comment, or an
     // unmaterialised/cross-origin frame the provider cannot lay out) reports zero. The coarse
-    // LayoutMetrics estimators that this flag used to gate a fallback to are deleted, so the
-    // flag is now vestigial (retained only because the cutover tests still reference it) and
-    // toggling it no longer changes behaviour.
+    // LayoutMetrics estimators are deleted, so there is no second source to select between and
+    // no flag gating the choice. ElementGeometryBindingModuleTests covers both halves.
     // See docs/architecture/htmlbridge.md#layout-and-geometry.
-    internal static bool UseSharedGeometryExclusively = true;
 
     // The preferred binding is the per-session factory supplied through DomBridgeSessionOptions,
     // which keeps simultaneous documents independent. This process-static factory remains only
@@ -60,7 +57,8 @@ public sealed partial class DomBridge
     /// Looks up real-layout box geometry for <paramref name="element"/> via the injected
     /// <see cref="ILayoutView"/> (RF-BRIDGE-1b), from the current pass's snapshot (built once
     /// per pass). Returns <c>false</c> when the element produced no box (detached /
-    /// <c>display:none</c>), so the caller falls back to the estimator. Active only when
+    /// <c>display:none</c>); the geometry entry points then report zero, since the coarse
+    /// estimators they used to fall back to are gone. Active only when
     /// <see cref="UseSharedLayoutGeometry"/> is set; the live entry points gate on that.
     /// </summary>
     private bool TryGetSharedLayoutGeometry(DomElement element, out BoxGeometry geometry)

@@ -30,21 +30,6 @@ public sealed class NodeMutationBindingModuleTests
     }
 
     [Fact]
-    public void Mutation_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationGetChildNodes046Core", "JsRegistrationRemoveChild047Core",
-                     "JsRegistrationAppendChild048Core", "JsRegistrationInsertBefore049Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Document_Node_Mutation_Flows_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

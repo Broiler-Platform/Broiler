@@ -31,22 +31,6 @@ public sealed class ElementTraversalBindingModuleTests
     }
 
     [Fact]
-    public void ElementTraversal_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsGetChildren081Core", "JsJsObjectsGetFirstElementChild083Core",
-                     "JsJsObjectsGetLastElementChild084Core", "JsJsObjectsGetNextElementSibling085Core",
-                     "JsJsObjectsGetPreviousElementSibling086Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Element_Traversal_Flows_Through_The_Bridge()
     {
         // Interleave text and comment nodes so the element-only traversal must skip them.

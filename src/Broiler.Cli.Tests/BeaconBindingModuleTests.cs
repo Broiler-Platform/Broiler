@@ -24,14 +24,6 @@ public sealed class BeaconBindingModuleTests
     }
 
     [Fact]
-    public void SendBeacon_Callback_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        Assert.Null(bridge.GetMethod("JsRegistrationSendBeacon124Core",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static));
-    }
-
-    [Fact]
     public void SendBeacon_Delegates_To_Fetch_As_KeepAlive_Post_And_Honours_The_No_Data_Contract()
     {
         var html = @"<!DOCTYPE html>

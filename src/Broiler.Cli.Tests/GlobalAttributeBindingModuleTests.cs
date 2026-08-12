@@ -28,22 +28,6 @@ public sealed class GlobalAttributeBindingModuleTests
     }
 
     [Fact]
-    public void GlobalAttribute_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsSetId002Core", "JsJsObjectsGetClassName003Core", "JsJsObjectsSetClassName004Core",
-                     "JsJsObjectsSetTitle006Core", "JsJsObjectsSetLang008Core", "JsJsObjectsSetAccessKey010Core",
-                     "JsJsObjectsSetDir012Core", "JsJsObjectsGetDraggable013Core", "JsJsObjectsSetDraggable014Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Reflected_Global_Attributes_Round_Trip_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

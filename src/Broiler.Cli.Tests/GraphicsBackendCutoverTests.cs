@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Broiler.HTML.Image;
-using BColor = Broiler.Graphics.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -50,47 +49,20 @@ public class GraphicsBackendCutoverTests
         Assert.Equal(expectedRasterPipeline, BGraphicsBackend.UseBroilerRasterPipeline);
     }
 
+    // Two pixel-parity facts used to sit here, rendering each fixture twice — once through
+    // the Broiler raster pipeline and once through what was then a real second backend — and
+    // asserting the results were identical. The stub is no longer a second implementation, so
+    // the comparison measured the raster pipeline against a placeholder and had stopped
+    // meaning anything. Pixel fidelity is the WPT suites' job; what is left here is the
+    // backend selection surface itself.
+
+    /// <summary>
+    /// The capture sidecar records which backend produced the image. This is the only
+    /// coverage of the <c>renderBackend</c> metadata anywhere, and it runs the real
+    /// <c>--capture-image</c> path end to end.
+    /// </summary>
     [Fact]
-    public void HtmlRender_Curated_NonText_Fixture_Matches_Explicit_Skia_Fallback()
-    {
-        const string html = """
-            <html><body style='margin:0;background:#ffffff'>
-            <div style='margin:8px;width:120px;height:90px;background:linear-gradient(90deg,#0044ff,#55ccff);border:4px solid #112244;border-radius:16px'></div>
-            <div style='margin:8px;width:140px;height:16px;background:#ff8844'></div>
-            </body></html>
-            """;
-
-        using var broiler = RenderWithBackend(BGraphicsBackend.BroilerRasterId, html, 180, 140);
-        using var skia = RenderWithBackend(BGraphicsBackend.StubFallbackId, html, 180, 140);
-        using var diff = PixelDiffRunner.Compare(broiler, skia);
-
-        Assert.True(diff.IsMatch);
-        Assert.Equal(0, diff.DiffPixelCount);
-        Assert.Equal(0d, diff.DiffRatio);
-    }
-
-    [Fact]
-    public void HtmlRender_Curated_Ahem_Text_Fixture_Matches_Explicit_Skia_Fallback()
-    {
-        EnsureAhemLoaded();
-
-        const string html = """
-            <html><body style='margin:0;background:#ffffff'>
-            <div style='margin-left:10px;margin-top:12px;font:20px/1 Ahem;color:#000000'>XXXX</div>
-            </body></html>
-            """;
-
-        using var broiler = RenderWithBackend(BGraphicsBackend.BroilerRasterId, html, 120, 60);
-        using var skia = RenderWithBackend(BGraphicsBackend.StubFallbackId, html, 120, 60);
-        using var diff = PixelDiffRunner.Compare(broiler, skia);
-
-        Assert.True(diff.IsMatch);
-        Assert.Equal(0, diff.DiffPixelCount);
-        Assert.Equal(0d, diff.DiffRatio);
-    }
-
-    [Fact]
-    public async Task CaptureArtifactMetadata_Uses_Explicit_Skia_Fallback_Label()
+    public async Task CaptureArtifactMetadata_Records_The_Active_Backend()
     {
         var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
         var outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
@@ -125,29 +97,5 @@ public class GraphicsBackendCutoverTests
             if (File.Exists(metadataPath))
                 File.Delete(metadataPath);
         }
-    }
-
-    private static BBitmap RenderWithBackend(string backendId, string html, int width, int height)
-    {
-        using var _ = BGraphicsBackend.OverrideForCurrentThread(backendId);
-        return HtmlRender.RenderToImageWithStyleSet(html, width, height, backgroundColor: BColor.White);
-    }
-
-    private static void EnsureAhemLoaded()
-    {
-        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.BroilerRasterId);
-        HtmlRender.LoadFontFromFile(Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf"), "Ahem");
-    }
-
-    private static string GetRepoRoot()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null &&
-               !(File.Exists(Path.Combine(current.FullName, ".gitmodules")) &&
-                 File.Exists(Path.Combine(current.FullName, "Directory.Build.props"))))
-            current = current.Parent;
-
-        return current?.FullName
-            ?? throw new DirectoryNotFoundException("Could not locate the repository root from the test output directory.");
     }
 }

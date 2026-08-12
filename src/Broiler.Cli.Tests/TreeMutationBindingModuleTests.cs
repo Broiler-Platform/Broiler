@@ -31,22 +31,6 @@ public sealed class TreeMutationBindingModuleTests
     }
 
     [Fact]
-    public void TreeMutation_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsInsertBefore080Core", "JsJsObjectsAppendChild088Core",
-                     "JsJsObjectsAppend089Core", "JsJsObjectsPrepend090Core",
-                     "JsJsObjectsRemoveChild091Core", "JsJsObjectsReplaceChild092Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void AppendChild_Append_Prepend_And_InsertBefore_Position_Children()
     {
         var html = @"<!DOCTYPE html>
