@@ -7,6 +7,38 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Added
+
+- `Broiler.Wpt` — a WPT `-print` reftest now renders the paint its own `@page`
+  rule puts on the sheet (CSS Paged Media 3 §7): the page background over the
+  whole page box, margins included, and the page's border and padding on the box
+  the margins leave, with the flow inset by them. Independent of the
+  `BROILER_WPT_PAGED_PRINT` lever, because a page paints whether or not the flow
+  is paginated — `css-page/page-background-image-print` states outright that its
+  background should print and not show on screen. A page whose root element
+  generates no box paints nothing at all, and `visibility` applies in the page
+  context. `css/css-page` goes 133 → 137 of 224 reftests (138 once
+  `patches/0001-html-canvas-backdrop-lever.patch` is applied), nothing lost;
+  documents that declare no page paint render byte-identically to before.
+- `Broiler.Layout` — CSS 2.1 §11.1.2 `clip`, the legacy rectangular clip on an
+  absolutely positioned element. Resolved into the `clip-path: inset()` that names
+  the same operation (`IR.ClipRect`, in `ComputedStyleBuilder`, where the used
+  border box is known), so nothing downstream needs a second clip; a real
+  `clip-path` supersedes it, per CSS Masking 1 §7. With
+  `patches/0002-html-empty-inset-clip.patch`, which stops an empty `inset()` being
+  dropped as if it were no clip, `css/CSS2/visufx` goes 6 → 50 of 51 reftests and
+  `css-masking/clip` gains two, none lost.
+- `Broiler.Wpt` — inline scripts in an XHTML test are unwrapped from their XML
+  CDATA section before execution. `<![CDATA[` is a syntax error, so every script
+  in such a document was lost — including the functions an `onload` attribute goes
+  on to call, which left the test rendering its pre-script state.
+  `css/CSS2` goes 4863 → 4908 of 6216 reftests, nothing lost.
+- `Broiler.Layout` — `Engine.CanvasBackdrop`, the colour a translucent canvas
+  background (CSS 2.1 §14.2) is composited against when the surface underneath it
+  already carries paint. Thread-static and null by default, so a render that does
+  not set it is unchanged. Read by a one-line `Broiler.HTML` change carried as
+  `patches/0001-html-canvas-backdrop-lever.patch`.
+
 ### Changed
 
 - `Broiler.Layout` / `Broiler.HTML.Image` — a page's display list is now replayed
@@ -31,6 +63,28 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — `position: relative` now offsets an inline-level box. CSS 2.1
+  §9.4.3's offset is visual, so it has to reach the box's words; `PerformLayout`
+  applied it for every box it lays out, but an inline-level box is laid out by
+  `CreateLineBoxes` and never goes through `PerformLayout` — so neither an inline
+  `<span>` nor an inline `<img>` moved at all. **+73 reftests, none lost**, over a
+  16 059-test sweep: `css/css-writing-modes` +68 (419 → 487 of 1139),
+  `CSS2/box-display` +3, `CSS2/positioning` +1, `CSS2/visuren` +1. The family that
+  gains is
+  `abs-pos-non-replaced-v{lr,rl}-*`, whose *references* place their swatch with
+  `position: relative`. Vertical containers are excluded — their words sit in the
+  engine's rotated space, so a physical `left`/`top` arrives turned a quarter turn
+  and needs a per-writing-mode mapping first.
+- `Broiler.Layout` — a replaced element whose width is a percentage no longer
+  ignores its stated height. CSS 2.1 §10.4 uses the intrinsic ratio to fill in a
+  dimension left `auto`, not to overrule one the author stated, but the
+  percentage-width branch of `MeasureImageSize` set the derive-the-height flag
+  unconditionally — so `<img width="100%" height="50">` came out as tall as it was
+  wide. **+89 reftests, none lost**, over a 16 059-test sweep of every directory
+  that sizes a replaced element: `css/CSS2/backgrounds` +43 (204 → 247 of 339),
+  `normal-flow` +22, `borders` +13, `positioning` +10. The tests were right all
+  along — the bug was in the reference documents they are compared against, which
+  draw their coloured band exactly that way.
 - `Broiler.Documents` — the DOCX reader walked only the direct `w:p` children of
   `w:body`, so a document whose content lived inside a layout table (the shape CV
   and letterhead templates use) opened completely empty in Broiler.Writer. Block

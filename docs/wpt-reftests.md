@@ -341,6 +341,260 @@ with paged media:
   on the test side: doing so alone would separate the eight margin-box tests that
   use one from references that still render the literal text.
 
+### `@page` paint is not behind the lever, because it is not about pagination
+
+CSS Paged Media 3 §7 lets the sheet itself carry paint — a background, a border
+and a padding on the `@page` rule — and that is a different question from whether
+the flow is cut into pages. So it is **not** behind `BROILER_WPT_PAGED_PRINT`: a
+`-print` reftest gets its page's paint whether or not it is paginated, decided by
+the same `-print` stem and carried into the reference render the same way (see
+`WptTestRunner.PrintMedia`, which the paged lever now sits on top of rather than
+beside).
+
+It has to be on for the unpaginated run, because the pairs that state it are
+written to be read on screen. `css-page/page-background-image-print` says so
+outright — *"Should print on a green background but not display it on screen"* —
+and its reference states the same colour on `html`, so the two agree only when
+the page paints. Before this, `page-box-001-print`, `-002`, `-003` and `-011` each
+matched their reference by **0.0 %**: the reference paints the colour through a
+`body` background and the test through its `@page`, and only one of the two was
+drawn. `css/css-page` goes **133 → 137** — `page-background-image-print`,
+`page-box-000`, `-001`, `-003` and `-011`, nothing lost — and **138** once the
+`Broiler.HTML` patch below is applied.
+
+> Measure with an **absolute** `--wpt-dir`, the way `scripts/run-wpt-reftests.sh`
+> and CI do (`WPT_DIR="$REPO_ROOT/tests/wpt/checkout"`). A relative one does not
+> resolve a test's root-relative resources — `url(/images/green.png)` and
+> `<img src="/images/…">` silently render nothing — so a run started by hand with
+> `--wpt-dir tests/wpt/checkout` reports failures CI does not have, and a
+> before/after comparison across the two spellings is not a comparison at all.
+
+Three details are the whole of it, and each is a WPT pair stating it:
+
+- **The background covers the whole page box, margins included; the border and
+  padding sit on the box the margins leave.** `page-background-004-print` states
+  a 500×300 page with a 50px margin and matches a reference that is solid yellow
+  corner to corner, while `page-box-008-print` paints its margin ring in the page
+  background and its padding ring in the propagated `body` one. So the backdrop
+  is two boxes — a full-sheet one carrying the background declarations, an inset
+  one carrying the border and padding — and both are ordinary divs handed to the
+  same renderer that will draw the page, which is what makes a page background
+  that is a gradient or an image work without the runner knowing they exist. The
+  distance from that box to the page area is measured off a render of it for the
+  same reason (`WptPageDecoration.MeasureInsets`), rather than by parsing
+  `border-width` shorthands, logical spellings and percentages a second time.
+- **A page that generates no content paints nothing at all.**
+  `root-element-display-none-print` states a hotpink page with a red border and
+  matches an *empty document*: a root element with no box generates no page, so
+  the sheet's own paint goes with it.
+- **`visibility` applies in the page context** (§5.1) and to the background and
+  the border alike, keeping the space they take.
+  `page-visibility-hidden-001-print` hides a red page border and matches a
+  reference whose border is `solid transparent`.
+
+**One pair needs a `Broiler.HTML` change and carries a patch**:
+`page-box-002-print` puts a half-transparent `body` background over a blue page
+and must come out violet. CSS 2.1 §14.2 propagates the `body` background to the
+canvas, and the paint walker flattens a translucent one into a single opaque fill
+against a backdrop it assumes is white — right for a render onto a blank surface,
+wrong for one onto a page background. The colour to composite against now comes
+from `Broiler.Layout.Engine.CanvasBackdrop` (main repo, thread-static, null by
+default so every other render is byte-identical), which the runner sets when the
+page background under the whole page area is one flat colour and leaves alone
+when it is an image or a gradient. The one-line call site is
+`patches/0001-html-canvas-backdrop-lever.patch`; until it is applied
+`page-box-002-print` stays at 0.0 % and everything else here works without it.
+
+**What is still missing is named pages.** `WptPageDecoration` reads the
+unconditional `@page` only, as `WptPageBox` does, so a page a name selects paints
+the wrong rule's background — `page-name-table-001-print` puts its table on a
+`@page square` whose `#eee` overrides the unconditional red, and fails either way.
+Fixing it needs the `page` property in the fragment tree's computed style, which
+is what the paged run needs for per-name page sizes too.
+
+## Scripts in an XHTML test never ran, and it cost 45 reftests
+
+Half of `css/CSS2` is `.xht`, and an XHTML test writes its inline scripts inside
+an XML CDATA section:
+
+```xml
+<script type="text/javascript"><![CDATA[
+  function startTest() { … }
+]]></script>
+```
+
+An XML parser consumes the wrapper and hands the engine what is between the
+markers. This runner does not parse the document to find its scripts — it scans
+the source — so it handed the engine the markers too, `<![CDATA[` is a syntax
+error, and **the whole script was lost with it**. Not just the statements: the
+functions an `onload` attribute goes on to call went with them, so a test whose
+result depends on `body onload="startTest()"` rendered its unscripted state and
+was compared as if that were the answer.
+
+Stripping the wrapper (`WptTestRunner.StripCdataSection`, with the commented
+`//<![CDATA[` and `<!-- … -->` spellings) took **`css/CSS2` from 4863 to 4908 of
+6216**, nothing lost. The gains are where scripted CSS2 tests live:
+`box-display` +30 (its `insert-block-in-*` / `delete-inline-in-*` DOM-mutation
+family), `tables` +14, `positioning` +1. 395 documents in the checkout carry a
+CDATA-wrapped script, so the reach is wider than the tests it happens to move
+today.
+
+**The tell for this class of bug is a test that renders its "before" state.**
+Nothing errors, nothing is skipped, and the rendered image is a plausible render
+— of the document as it stood before a script it never ran.
+
+## `clip` is implemented, and most of what it clips is nothing
+
+CSS 2.1 §11.1.2's `clip` had no implementation at all: `ComputedStyle` had no such
+property and the paint walker never looked for one, so `css/CSS2/visufx/clip-*`
+rendered 44 unclipped elements over references that show none of them.
+
+It is implemented as a projection rather than a second clip.
+`clip: rect(<top>, <right>, <bottom>, <left>)` and `clip-path: inset()` name the
+same operation — a rectangle the element and everything inside it is clipped to,
+measured on the border box — so `Broiler.Layout/…/IR/ClipRect.cs` resolves the one
+into the other in `ComputedStyleBuilder`, where the used border box is already
+known. Everything downstream sees an ordinary `clip-path`. CSS Masking 1 §7 makes
+that ordering right as well as convenient: a real `clip-path` supersedes `clip`,
+so `clip` is only consulted when `clip-path` is `none`.
+
+**The geometry is stated from two edges, not four**, and that is the whole reason
+this family looked unwinnable. `top` and `bottom` are offsets down from the border
+box's top edge, `right` and `left` offsets right from its left edge — so
+`rect(96px, 96px, 96px, 96px)` on a 96×96 box is an *empty* clip, and about forty
+of the tests state exactly that, one per unit spelling (`1in`, `72pt`, `6pc`,
+`2.54cm`, `-0px`, `+0px`, …). Each means "nothing should be visible".
+
+The paint walker dropped an empty `inset()` as if it were no clip, which painted
+the element in full — `patches/0002-html-empty-inset-clip.patch` is the four lines
+that emit it instead. With both halves: **`css/CSS2/visufx` 6 → 50 of 51**, plus
+two in `css-masking/clip` that were the same bug reached through `clip-path`
+directly, and nothing lost. Without the patch the main-repo half still lands the
+non-empty cases; it is the empty ones that wait on it.
+
+Every `clip-*` test in the directory passes then; the one failure left in it is
+`visibility-005`, which is about `visibility` and not about clipping at all.
+
+## A percentage width made a replaced element ignore its height
+
+`css/CSS2/backgrounds` had 135 failures at a median 97.7 % match — the signature
+of something small and systematic rather than a missing feature. It was in the
+**references**, and in one line of the layout engine.
+
+CSS2's background references draw their coloured band the same way:
+
+```html
+<div><img src="support/1x1-green.png" width="100%" height="50" alt="…" /></div>
+```
+
+CSS 2.1 §10.4 uses a replaced element's intrinsic ratio to fill in a dimension
+left `auto`; it never overrules one the author stated. `MeasureImageSize` agreed
+for a length width — `width="200" height="20"` came out 200×20 — but its
+percentage-width branch set the "now derive the height from the ratio" flag
+unconditionally. So a 1×1 green pixel at `width="100%" height="50"` came out as
+tall as it was wide: a full-page green block where the reference wanted a 50px
+band. The max-width clamp a few lines below had it right (`!hasImageTagHeight`);
+this one said `true`.
+
+The same flag also stood in for "the width is stated" in the aspect-ratio pass,
+where a percentage width had to stop counting as `auto` — otherwise fixing the
+height merely moved the bug to the width, deriving 50px back out of it.
+
+**`css/CSS2/backgrounds` goes 204 → 247 of 339**, and the fix reaches further than
+the directory that surfaced it: over a 16 059-test sweep of every directory that
+sizes a replaced element, **+89 reftests and none lost** — `backgrounds` +43,
+`CSS2/normal-flow` +22, `CSS2/borders` +13, `CSS2/positioning` +10. The tests were
+rendering correctly the whole time.
+
+**This is the reference-side failure mode the section above warns about, at
+scale.** The diff was in the part of the picture the tests were not about — 43
+`background-N` and 42 `background-position-N` tests, none of which have anything
+to do with replaced-element sizing, all failing because the document they were
+being compared against was drawn with an `<img>`.
+
+## `position: relative` did nothing to an inline box, and it cost 68 writing-mode reftests
+
+`css/css-writing-modes` is the corpus's largest winnable group, and its largest
+family — `abs-pos-non-replaced-v{lr,rl}-*`, 224 tests at a median 97.4 % — turned
+out not to be about vertical layout at all. Their **references** are ordinary
+horizontal documents that place a swatch like this:
+
+```html
+<style>img#green-square { position: relative; left: 160px; top: 80px; }</style>
+<div><img id="green-square" src="swatch-green.png" width="80" height="80"></div>
+```
+
+The swatch rendered at its static position, so the reference showed the green
+square in the wrong place while the *test* had it right.
+
+CSS 2.1 §9.4.3's offset is visual — the box keeps its place in the flow and its
+content is painted somewhere else — so it has to reach the words, which is what
+`OffsetLeft`/`OffsetTop` already do. `PerformLayout` applies it for every box it
+lays out; an **inline-level** box is laid out by `CreateLineBoxes` and never goes
+through `PerformLayout`, so nothing applied it at all. Neither an inline `<img>`
+nor an inline `<span>` moved. The fix walks the inline descendants once the line
+boxes exist (`CssBox.OffsetRelativeInlineDescendants`).
+
+**The walk is `display: inline` only, and that distinction is the whole of it.**
+An `inline-block` is inline-*level* but is laid out as a block and already applies
+its own offset in `PerformLayout`, so including it moved such a box by double —
+`CSS2/margin-padding-clear/margin-collapse-001`'s reference stacks two relatively
+positioned inline-blocks and was the pair that caught it. Such a box still moves
+with a relative *ancestor*, because `OffsetLeft` carries the ancestor's shift into
+every descendant whatever its display.
+
+**`css/css-writing-modes` goes 419 → 487 of 1139**, and over a 16 059-test sweep
+the change is **+73 with none lost** — `CSS2/box-display` +3, `CSS2/positioning`
++1 and `CSS2/visuren` +1 besides, all of them references that place something with
+`position: relative` on an inline box.
+
+**Vertical containers are deliberately left out.** `left`/`top` are physical, but
+a vertical container's words sit in the engine's rotated space, so the offset
+arrives turned a quarter turn: measured on `vertical-rl`, `left: 60px; top: 30px`
+came out as a visual `(-30, +60)`, and on `vertical-lr` as `(+30, +60)`. Applying
+it there needs a per-writing-mode mapping — the two `sideways-*` modes included,
+which has not been measured — and doing it wrongly is worse than not doing it:
+`vrl-inline-paint-invalidation` was the single regression when the offset went in
+unmapped, and it is the pair to fix against when someone works out the mapping.
+
+That is also the reason the family only moved 60 of its 224 tests: the rest fail
+on their *test* side, which is what these were written to exercise.
+
+## Next lead: an out-of-flow replaced element with an auto size renders nothing
+
+Diagnosed, not fixed. `css/CSS2/positioning/absolute-replaced-width-*` is 40
+failures at 96.5–98.8 % match, and what the diff is missing is the whole image:
+
+```html
+<div style="position:relative; width:200px; height:60px">
+  <img src="blue15x15.png" style="position:absolute">      <!-- nothing paints -->
+  <img src="blue15x15.png" style="float:left">             <!-- nothing paints -->
+  <img src="blue15x15.png" style="position:absolute; width:40px; height:40px">
+</div>                                                      <!-- this one paints -->
+```
+
+An `<img>` paints in flow, and paints out of flow **only when both dimensions are
+stated**. Dumping the fragment tree separates three distinct defects, and each
+wants its own before/after sweep:
+
+1. **Absolutely positioned, auto size.** The box is laid out (it has a line box)
+   but its fragment comes out `0×0`, so nothing of it is painted — not the image,
+   not even a background set on it.
+2. **Floated.** `CreateLineBoxes` skips floats as out-of-flow and the loop that
+   lays them out afterwards iterates the container's own `Boxes` — so a float
+   inside an *anonymous* block (which is where an `<img>` between text nodes ends
+   up) is never reached at all. Its anonymous parent is left `lines=1`, height 0.
+3. **`display: block` and absolutely positioned.** No fragment is produced for the
+   image at all.
+
+The engine is right at the point where the fix belongs: `CssBox.PerformLayout`
+routes `IsBlock || isOutOfFlow` down the block path, and `isOutOfFlow` covers
+`absolute`/`fixed` but not `float`; neither path sizes a *replaced* box from its
+image the way the inline path does. Keep any fix narrow to boxes that carry an
+image word — those render nothing today, so the blast radius of getting them
+wrong is small, while the same change on non-replaced boxes would touch every
+float in the corpus.
+
 ## Flex items are stretched now, and what that says about the scoreboard
 
 `align-items: stretch` is the initial value, so it is what happens to most flex

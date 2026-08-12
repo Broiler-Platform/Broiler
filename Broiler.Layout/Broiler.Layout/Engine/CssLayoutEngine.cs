@@ -101,6 +101,12 @@ internal static class CssLayoutEngine
         bool hasImageTagHeight = TryResolveDefiniteImageLength(imageWord.OwnerBox.Height, em, out double tagHeightPx);
         bool scaleImageHeight = false;
 
+        // A percentage width is a stated width too — resolved against the containing block rather
+        // than read off the declaration, which is the only reason it is not a "tag" width here.
+        // The aspect-ratio pass below must not treat it as `auto` and derive it back from the
+        // height, or `<img width="100%" height="50">` comes out 50px wide.
+        bool hasStatedWidth = hasImageTagWidth;
+
         if (hasImageTagWidth)
         {
             imageWord.Width = tagWidthPx;
@@ -115,7 +121,16 @@ internal static class CssLayoutEngine
             if (width.Number > 0 && width.IsPercentage)
             {
                 imageWord.Width = width.Number * imageWord.OwnerBox.ContainingBlock.Size.Width;
-                scaleImageHeight = true;
+
+                // Only when the height is left to the image. CSS 2.1 §10.4 uses the intrinsic
+                // ratio to fill in a dimension that is `auto`, not to overrule one the author
+                // stated — and a percentage width is no different from a length one in that. The
+                // max-width clamp below already says `!hasImageTagHeight`; this said `true`, so
+                // `<img width="100%" height="50">` came out as tall as it was wide. That is the
+                // shape CSS2's own reference files use, so the cost landed on the reference side
+                // of 85 reftests in css/CSS2/backgrounds alone.
+                scaleImageHeight = !hasImageTagHeight;
+                hasStatedWidth = true;
             }
             else if (image != null)
             {
@@ -177,16 +192,16 @@ internal static class CssLayoutEngine
 
         if (hasCssAspectRatio)
         {
-            bool widthDriven = (hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight;
+            bool widthDriven = (hasStatedWidth && !hasImageTagHeight) || scaleImageHeight;
 
             if (widthDriven)
                 imageWord.Height = imageWord.Width / cssAspectRatio;
-            else if (hasImageTagHeight && !hasImageTagWidth)
+            else if (hasImageTagHeight && !hasStatedWidth)
                 imageWord.Width = imageWord.Height * cssAspectRatio;
         }
         else if (image != null && image.Value.HasIntrinsicRatio)
         {
-            bool widthDriven = (hasImageTagWidth && !hasImageTagHeight) || scaleImageHeight;
+            bool widthDriven = (hasStatedWidth && !hasImageTagHeight) || scaleImageHeight;
             // If only the width was set in the html tag, ratio the height.
             if (widthDriven)
             {
@@ -195,7 +210,7 @@ internal static class CssLayoutEngine
                 imageWord.Height = image.Value.Height * ratio;
             }
             // If only the height was set in the html tag, ratio the width.
-            else if (hasImageTagHeight && !hasImageTagWidth)
+            else if (hasImageTagHeight && !hasStatedWidth)
             {
                 // Divide the given tag height with the actual image height, to get the ratio.
                 double ratio = imageWord.Height / image.Value.Height;

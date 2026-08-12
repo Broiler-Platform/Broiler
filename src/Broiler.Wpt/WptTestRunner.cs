@@ -2515,11 +2515,31 @@ internal sealed partial class WptTestRunner
         using var presentation = ImageAnimationClock.Pin(presentationTime);
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
         {
+            // `@page` paint applies to paged media only, so it is read for a print test and for
+            // nothing else — and for both sides of one, since PrintMedia is set from the test path
+            // for the whole reftest. A document with no page background, border or padding resolves
+            // to null here and renders exactly as it always has.
+            var decoration = PrintMedia ? WptPageDecoration.Resolve(html) : null;
+
             if (PagedRender)
             {
                 var page = WptPageBox.Resolve(html, new System.Drawing.SizeF(_width, _height));
                 return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderPaged(
                     renderDocument, html, page,
+                    backgroundColor: BColor.White,
+                    stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl,
+                    decoration: decoration));
+            }
+
+            if (decoration is not null)
+            {
+                // Unpaginated, so the surface stays the runner's viewport and only the `@page`'s
+                // margins are taken from the rule: taking its `size` too would resize one side of a
+                // comparison whose reference states no size of its own.
+                var sheet = WptPageBox.Resolve(html, new System.Drawing.SizeF(_width, _height))
+                    with { BoxSize = new System.Drawing.SizeF(_width, _height) };
+                return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderDecorated(
+                    renderDocument, html, sheet, decoration,
                     backgroundColor: BColor.White,
                     stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl));
             }
@@ -2574,22 +2594,43 @@ internal sealed partial class WptTestRunner
     private static bool PagedRender;
 
     /// <summary>
-    /// Runs <paramref name="body"/> with paged rendering on iff the lever is on and
-    /// <paramref name="testPath"/> names a WPT print test — the <c>-print</c> suffix on the file's
-    /// stem, which is the convention the suite uses to mark one and the trigger every other runner
-    /// reads.
+    /// Whether the render in progress stands in for a printed page — set for the whole of one
+    /// <c>-print</c> reftest, its references included, by the same rule and for the same reason as
+    /// <see cref="PagedRender"/>.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="PagedRender"/> because it answers a different question: that one
+    /// asks whether to cut the flow into pages, which is still behind the
+    /// <see cref="PagedPrint"/> lever, while this asks whether the document is being rendered for
+    /// paged media at all — which decides whether its <c>@page</c> paints, and is true whether or
+    /// not the flow is paginated. <c>page-background-image-print</c> is the pair that needs the
+    /// distinction: it says outright that its background should print and not show on screen, and
+    /// its reference states the same colour on <c>html</c>, so the two agree only when the page
+    /// paints.
+    /// </remarks>
+    [ThreadStatic]
+    private static bool PrintMedia;
+
+    /// <summary>
+    /// Runs <paramref name="body"/> in print media iff <paramref name="testPath"/> names a WPT
+    /// print test — the <c>-print</c> suffix on the file's stem, which is the convention the suite
+    /// uses to mark one and the trigger every other runner reads — and with paged rendering on iff
+    /// the lever is on besides.
     /// </summary>
     private static T InPageModeFor<T>(string testPath, Func<T> body)
     {
-        bool previous = PagedRender;
-        PagedRender = PagedPrint && IsPrintTestPath(testPath);
+        bool previousPaged = PagedRender;
+        bool previousPrint = PrintMedia;
+        PrintMedia = IsPrintTestPath(testPath);
+        PagedRender = PagedPrint && PrintMedia;
         try
         {
             return body();
         }
         finally
         {
-            PagedRender = previous;
+            PagedRender = previousPaged;
+            PrintMedia = previousPrint;
         }
     }
 
@@ -2844,6 +2885,44 @@ internal sealed partial class WptTestRunner
         Broiler.Dom.DomDocument? Document,
         IReadOnlyList<DomBridge.CheckLayoutAssertion> LayoutAssertions);
 
+    /// <summary>
+    /// The script inside an XML CDATA section, or <paramref name="content"/> unchanged when it is
+    /// not wrapped in one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An XHTML test writes its inline scripts as <c>&lt;![CDATA[ … ]]&gt;</c> — an XML parser
+    /// consumes the wrapper and hands the engine what is between the markers, but this scan reads
+    /// the file as text and would hand the engine the markers too. <c>&lt;![CDATA[</c> is a syntax
+    /// error, so the whole script threw and every one of the document's scripts was lost with it:
+    /// not just the statements, but the functions an <c>onload</c> attribute goes on to call. That
+    /// is why <c>css/CSS2/visufx/clip-001.xht</c> never ran the <c>clip = "auto"</c> its result
+    /// depends on, and it is the same for every scripted test in the <c>.xht</c> half of the corpus.
+    /// </para>
+    /// <para>
+    /// The commented spellings (<c>//&lt;![CDATA[</c>, <c>&lt;!-- … --&gt;</c>) are handled too:
+    /// they are the same wrapper written to survive an HTML parser, and both halves are only ever
+    /// noise to the engine.
+    /// </para>
+    /// </remarks>
+    internal static string StripCdataSection(string content)
+    {
+        var trimmed = content.Trim();
+
+        // `//<![CDATA[` and `// ]]>` — the JS-comment spelling, which the engine would tolerate but
+        // which the plain form below is the general case of.
+        trimmed = CdataOpenPattern().Replace(trimmed, string.Empty, 1);
+        trimmed = CdataClosePattern().Replace(trimmed, string.Empty, 1);
+
+        return trimmed;
+    }
+
+    [GeneratedRegex(@"\A\s*(?://\s*|<!--\s*)?<!\[CDATA\[")]
+    private static partial Regex CdataOpenPattern();
+
+    [GeneratedRegex(@"(?://\s*)?\]\]>(?:\s*-->)?\s*\z")]
+    private static partial Regex CdataClosePattern();
+
     private static ExecutedDocument ExecuteScriptsWithDom(
         string html,
         string url,
@@ -2921,7 +3000,7 @@ internal sealed partial class WptTestRunner
             }
 
             // Inline script
-            var content = match.Groups["content"].Value.Trim();
+            var content = StripCdataSection(match.Groups["content"].Value).Trim();
             if (string.IsNullOrEmpty(content)) continue;
 
             if (isDefer)

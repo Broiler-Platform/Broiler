@@ -48,6 +48,7 @@ internal abstract partial class CssBoxProperties
     private string _backgroundImage = "none";
     private string _backgroundClip = "border-box";
     private string _clipPath = "none";
+    private string _clip = "auto";
     private string _textIndent = "0";
     private string _textDecorationColor = "currentcolor";
     private string _top = "auto";
@@ -1101,6 +1102,18 @@ internal abstract partial class CssBoxProperties
     {
         get => _clipPath;
         set => _clipPath = value ?? "none";
+    }
+
+    /// <summary>
+    /// CSS 2.1 §11.1.2 <c>clip</c>, as written: <c>auto</c>, or
+    /// <c>rect(&lt;top&gt;, &lt;right&gt;, &lt;bottom&gt;, &lt;left&gt;)</c> — the legacy spelling
+    /// of a rectangular clip on an absolutely positioned element's border box.
+    /// <see cref="Broiler.Layout.IR.ClipRect"/> resolves it against that box.
+    /// </summary>
+    public string Clip
+    {
+        get => _clip;
+        set => _clip = value ?? "auto";
     }
 
     /// <summary>
@@ -2720,6 +2733,7 @@ internal abstract partial class CssBoxProperties
         BoxSizing = p.BoxSizing;
         BackgroundClip = p.BackgroundClip;
         ClipPath = p.ClipPath;
+        Clip = p.Clip;
         FlexDirection = p.FlexDirection;
         FlexGrow = p.FlexGrow;
         FlexShrink = p.FlexShrink;

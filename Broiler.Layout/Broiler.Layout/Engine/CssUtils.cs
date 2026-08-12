@@ -143,6 +143,7 @@ internal static partial class CssUtils
             "overflow" => cssBox.Overflow,
             "box-sizing" => cssBox.BoxSizing,
             "clip-path" => cssBox.ClipPath,
+            "clip" => cssBox.Clip,
             "transform" => cssBox.Transform,
             "will-change" => cssBox.WillChange,
             "align-content" => cssBox.AlignContent,
@@ -332,6 +333,9 @@ internal static partial class CssUtils
                 break;
             case "clip-path":
                 cssBox.ClipPath = value;
+                break;
+            case "clip":
+                cssBox.Clip = value;
                 break;
             case "transform":
                 cssBox.Transform = value;
