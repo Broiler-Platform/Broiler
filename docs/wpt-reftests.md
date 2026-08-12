@@ -401,9 +401,9 @@ wrong for one onto a page background. The colour to composite against now comes
 from `Broiler.Layout.Engine.CanvasBackdrop` (main repo, thread-static, null by
 default so every other render is byte-identical), which the runner sets when the
 page background under the whole page area is one flat colour and leaves alone
-when it is an image or a gradient. The one-line call site is
-`patches/0001-html-canvas-backdrop-lever.patch`; until it is applied
-`page-box-002-print` stays at 0.0 % and everything else here works without it.
+when it is an image or a gradient. The one-line call site is upstream and pinned
+(`Broiler.HTML` `1bf117a`), so `page-box-002-print` **passes at 100 %**; before it
+landed that test stayed at 0.0 % and everything else here worked without it.
 
 **What is still missing is named pages.** `WptPageDecoration` reads the
 unconditional `@page` only, as `WptPageBox` does, so a page a name selects paints
@@ -466,11 +466,11 @@ of the tests state exactly that, one per unit spelling (`1in`, `72pt`, `6pc`,
 `2.54cm`, `-0px`, `+0px`, …). Each means "nothing should be visible".
 
 The paint walker dropped an empty `inset()` as if it were no clip, which painted
-the element in full — `patches/0002-html-empty-inset-clip.patch` is the four lines
-that emit it instead. With both halves: **`css/CSS2/visufx` 6 → 50 of 51**, plus
-two in `css-masking/clip` that were the same bug reached through `clip-path`
-directly, and nothing lost. Without the patch the main-repo half still lands the
-non-empty cases; it is the empty ones that wait on it.
+the element in full — four lines in `Broiler.HTML` emit it instead (upstream and
+pinned, `be76c7f`). With both halves: **`css/CSS2/visufx` 6 → 50 of 51**, plus two
+in `css-masking/clip` that were the same bug reached through `clip-path` directly,
+and nothing lost. Before the submodule half landed, the main-repo half still
+handled the non-empty cases; it was the empty ones that waited on it.
 
 Every `clip-*` test in the directory passes then; the one failure left in it is
 `visibility-005`, which is about `visibility` and not about clipping at all.

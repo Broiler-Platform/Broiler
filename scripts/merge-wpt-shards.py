@@ -18,7 +18,12 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
   a "low percent match" problem only when it renders below the low-match
   threshold (50% by default); when too few mismatches clear that bar to fill the
   issue, the threshold is widened in 10-point steps until it does (or nothing
-  more can be found). Each crash names an example gated test and the issue spells
+  more can be found). A mismatch the runner flagged with ``suspectReference``
+  (``--verify-reference``: Broiler reproduces the reference the test itself
+  declares, so the committed golden is the outlier) is never ranked — it is
+  listed under its own heading instead, so a test that is correct by its own
+  reference stops being reported as the run's worst render. Each crash names an
+  example gated test and the issue spells
   out the ``--render`` command to reproduce a listed test, so every entry points
   at its cause. This is the "what hurt most this run" companion to the
   frequency-ranked ``--issue-md`` view.
@@ -329,6 +334,14 @@ def _rank_biggest_problems(
       the reference by less than ``low_match_threshold`` percent, worst match
       first.
 
+    A mismatch carrying ``suspectReference`` is excluded from tier 2 altogether.
+    That flag means the runner re-rendered the test's own ``rel=match`` reference
+    and Broiler *did* reproduce it — so the committed golden is the outlier and
+    the render is not the run's worst problem, however low the percentage looks.
+    Ranking these would (and repeatedly did) fill the severity issue with tests
+    that are correct by the only authority the test itself names; they are
+    reported separately by ``_reference_disagreements``.
+
     Selection is diversity-first: the single worst entry of each distinct kind is
     taken before any slot is spent on a second entry of a kind already shown, then
     remaining slots (if ``limit`` exceeds the number of kinds present) are filled
@@ -385,6 +398,8 @@ def _rank_biggest_problems(
     for test in low_match_tests:
         if test["matchPercent"] >= low_match_threshold:
             continue
+        if test.get("suspectReference"):
+            continue
         existing = lowest_by_path.get(test["relativeTestPath"])
         if existing is None or test["matchPercent"] < existing["matchPercent"]:
             lowest_by_path[test["relativeTestPath"]] = test
@@ -435,6 +450,38 @@ def _rank_biggest_problems(
     return [ordered[index] for index in sorted(selected_indices)]
 
 
+def _reference_disagreements(low_match_tests: list[dict]) -> list[dict]:
+    """The mismatches the runner cleared as reference problems, worst match first.
+
+    These carry ``suspectReference``: with ``--verify-reference`` the runner also
+    rendered the test's own ``rel=match`` reference and found that Broiler
+    reproduces it. The committed golden disagrees with the test's own statement of
+    what it should look like, so the render is not a Broiler bug.
+
+    They are excluded from the biggest-problems ranking but reported alongside it,
+    because "these six are not bugs" is itself worth telling a maintainer — and
+    silently dropping a 0.0% match would be indistinguishable from losing it.
+    """
+    lowest_by_path: dict[str, dict] = {}
+    for test in low_match_tests:
+        if not test.get("suspectReference"):
+            continue
+        existing = lowest_by_path.get(test["relativeTestPath"])
+        if existing is None or test["matchPercent"] < existing["matchPercent"]:
+            lowest_by_path[test["relativeTestPath"]] = test
+    return sorted(
+        (
+            {
+                "relativeTestPath": test["relativeTestPath"],
+                "matchPercent": test["matchPercent"],
+                "detail": test["suspectReference"],
+            }
+            for test in lowest_by_path.values()
+        ),
+        key=lambda entry: (entry["matchPercent"], entry["relativeTestPath"]),
+    )
+
+
 def _rank_biggest_problems_escalating(
     incomplete_shards: list[dict],
     exception_signatures: Counter[str],
@@ -461,8 +508,15 @@ def _rank_biggest_problems_escalating(
     threshold = float(low_match_threshold)
     # The closest-matching candidate mismatch. Once the threshold clears it, a
     # wider band would capture nothing new, so escalating past it is pointless.
+    # Reference disagreements are never ranked, so they are not candidates and must
+    # not keep the escalation going after every real mismatch is already admitted.
     highest_match = max(
-        (test["matchPercent"] for test in low_match_tests), default=None
+        (
+            test["matchPercent"]
+            for test in low_match_tests
+            if not test.get("suspectReference")
+        ),
+        default=None,
     )
     while True:
         problems = _rank_biggest_problems(
@@ -563,12 +617,20 @@ def merge(
                 if relative_path is None or not isinstance(match_percent, (int, float)):
                     continue
                 sub_category = entry.get("subCategory")
+                suspect_reference = entry.get("suspectReference")
                 low_match_tests.append(
                     {
                         "relativeTestPath": str(relative_path),
                         "matchPercent": float(match_percent),
                         "category": str(entry.get("category") or "Unknown"),
                         "subCategory": str(sub_category) if sub_category else None,
+                        # Present only when the runner ran with --verify-reference and
+                        # found that Broiler reproduces the test's own rel=match
+                        # reference. Such a test is a reference disagreement, not a bad
+                        # render, so it is ranked separately (see _rank_biggest_problems).
+                        "suspectReference": (
+                            str(suspect_reference) if suspect_reference else None
+                        ),
                     }
                 )
 
@@ -772,6 +834,7 @@ def merge(
         "biggestProblemLimit": biggest_problem_limit,
         "lowMatchThreshold": effective_low_match_threshold,
         "biggestProblems": biggest_problems,
+        "referenceDisagreements": _reference_disagreements(low_match_tests),
         "results": failures,
     }
 
@@ -975,6 +1038,28 @@ def render_biggest_problems_markdown(merged: dict, run_url: str | None) -> str:
         lines.append(
             "- None — no incomplete shards, crashes, or sub-threshold pixel matches."
         )
+
+    # Mismatches the runner cleared as reference problems. Listed, but deliberately
+    # outside the ranking above: Broiler reproduces the reference each of these
+    # tests itself declares, so a near-0% score against the committed golden says
+    # the golden is wrong, not the render.
+    disagreements = merged.get("referenceDisagreements") or []
+    if disagreements:
+        lines += [
+            "",
+            "### Not ranked — reference disagreements",
+            "",
+            f"_{len(disagreements)} mismatch(es) are excluded from the ranking above."
+            " For each, the runner re-rendered the reference the test itself declares"
+            " via `rel=match` and Broiler reproduced it, so the committed golden is the"
+            " outlier rather than the render. Fixing these would mean rendering *less*"
+            " than the test asks for._",
+            "",
+        ]
+        for entry in disagreements:
+            lines.append(
+                f"- **{entry['matchPercent']:.1f}% match** — `{entry['relativeTestPath']}`"
+            )
 
     # Point at the fix: spell out the exact command to render a listed test against
     # the live engine. Only when a listed problem has a concrete test path — an

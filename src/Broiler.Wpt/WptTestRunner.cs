@@ -2449,7 +2449,17 @@ internal sealed partial class WptTestRunner
 
         var rel = path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
         var local = Path.Combine(wptRoot, rel);
-        return File.Exists(local) ? local : null;
+        if (!File.Exists(local))
+            return null;
+
+        // Absolute, always. The resolved path is handed straight to the engine, which
+        // resolves what it is given against the *document's* base URL — so a relative
+        // one (which is what this returns whenever --wpt-dir is itself relative, e.g.
+        // the `--wpt-dir tests/wpt/checkout` every doc and script spells out) is looked
+        // for next to the test file and silently not found. File.Exists above succeeds
+        // regardless, because it resolves against the process's working directory, so
+        // the failure is invisible: the render simply comes out with no image.
+        return Path.GetFullPath(local);
     }
 
     /// <summary>

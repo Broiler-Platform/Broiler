@@ -1,5 +1,34 @@
 # WPT rendering gaps — the worst pixel mismatches
 
+> ## Read this first — three things that are true of the whole document
+>
+> Established by an audit of every checkable claim below (2026-08-12); see
+> [the audit](#the-audit-2026-08-12--what-was-stale-across-the-whole-document)
+> for how each was measured.
+>
+> 1. **No fix in this document is waiting on a patch. The `patches/` backlog is
+>    empty.** Every submodule fix named below is upstream and an ancestor of the
+>    pinned pointer, so it is live on CI. Wording like *"pending patch"*, *"until a
+>    maintainer applies it"* or *"the push is 403, so it ships as a patch"* is
+>    **historical**: it records the state when the section was written.
+> 2. **A patch number identifies nothing.** `patches/` is a backlog, not an
+>    archive — a patch file is deleted once it lands, and numbering restarts from
+>    `0001` against whatever is left. So `patches/0041` in one section and the
+>    `0001`–`0006` that existed until this audit are unrelated series, and **every
+>    `patches/NNNN` reference below names a file that no longer exists**. To decide
+>    whether a submodule fix is live, look for its commit, not its patch number:
+>    `git -C <Submodule> log --oneline --grep '<commit subject>'` then
+>    `git merge-base --is-ancestor <sha> HEAD`.
+> 3. **Local numbers taken before this audit under-report any test that loads a
+>    root-relative resource.** The runner resolved `/images/green.png` to a path
+>    relative to the *process working directory*, and the engine then resolved that
+>    against the *document's* base URL, so the resource silently did not load —
+>    whenever `--wpt-dir` was itself relative, which is what every command in this
+>    document and in `CLAUDE.md` spells out (`--wpt-dir tests/wpt/checkout`). CI
+>    passes an absolute path and was never affected, so this shows up as *"our local
+>    score is better than CI's"* or *"not reproducible offline"*. Fixed; a local run
+>    now agrees with CI. Re-measure before trusting any such note below.
+
 - **Scope:** the `< 50% match` tail of the WPT run reported in
   [issue #1491](https://github.com/Broiler-Platform/Broiler/issues/1491),
   problems 4–30. Each of those 27 tests renders at **0.0–2.5%** of its Chromium
@@ -10,13 +39,17 @@
   [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30),
   [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05),
   [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07),
-  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12) and
-  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12). Where a re-run
+  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12),
+  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12) and
+  [#1618 (2026-08-12)](#the-next-run-issue-1618-2026-08-12). Where a re-run
   contradicts something below, the section says so and the row here is struck
   through — read the newest section first. #1612 contradicts two of them: the
   frameset test was not a frameset bug, and `image-animation: paused` is no
   longer unimplemented. #1615 contradicts a third: `.sub` tests are no longer
   unjudgeable offline, because the runner now performs the substitution itself.
+  #1618 stops the pattern repeating: the run reports these verdicts itself now,
+  so a test that is right by its own reference is no longer ranked as the run's
+  worst render.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
   carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
@@ -96,11 +129,17 @@ Four caveats, all learned the hard way:
   "Executable doesn't exist". Point the generator at the installed one with
   `BROILER_CHROMIUM_PATH=/opt/pw-browsers/chromium` rather than downloading
   another.
-- **A test that needs the WPT server cannot be reproduced from a bare checkout.**
+- ~~**A test that needs the WPT server cannot be reproduced from a bare checkout.**
   `.sub.html` files need substitution, `?pipe=trickle(…)` needs the server's pipe
-  handlers, and cross-origin tests need a second host. Offline, both engines fail
-  the same way and the match score is meaningless — a *higher* local score than
-  CI is the signature of this.
+  handlers, and cross-origin tests need a second host.~~ **All three turned out to
+  be reproducible offline**, and each was a bug on our side rather than a missing
+  server: `.sub` substitution is now done by the runner, "a second host" was a red
+  herring (WPT serves every host from one checkout), and a `?pipe=…` query is just
+  stripped — `background-image-shared-stylesheet` now reproduces its CI score to
+  the tenth of a percent. What *is* still true is the signature: **a higher local
+  score than CI usually means both engines rendered nothing.** Treat that as the
+  warning, not "the server is missing" as the explanation, and check whether the
+  resource actually loaded before concluding a test cannot be judged here.
 - **Reference generation must honour `reftest-wait`.** A flat screenshot delay
   reads a view-transition or `takeScreenshotDelayed` test at the wrong moment, so
   the local reference disagrees with CI's.
@@ -117,7 +156,7 @@ Four caveats, all learned the hard way:
   looks like "the test never ran"; register a `file://` route that serves them
   from the checkout, the way `generate-wpt-references.js` does.
 
-## Animated images always painted their first frame — **fixed, pending patch**
+## Animated images always painted their first frame — **fixed**
 
 - **Tests:** problems 7–10, all four
   `css/css-image-animation/image-animation-*-paused.html`.
@@ -512,9 +551,9 @@ Four caveats, all learned the hard way:
   with a root-relative `src` failed identically. Written up in full under
   [#1612 problem 8](#a-root-relative-frame-src-resolved-against-the-wrong-directory--problem-8-fixed).
 - **Left over, and separate:** a frameset with *more than one* frame paints only
-  its first cell. That is a parser bug, not a grid bug —
-  [`patches/0003`](../patches/README.md) — and no test in the current subset
-  covers it.
+  its first cell. That is a parser bug, not a grid bug, and it is **fixed and live
+  on CI** (`Broiler.DOM` `55057b8`, the pinned pointer). No test in the current
+  subset covers it either way.
 
 ## `Node.moveBefore` was missing — **fixed**
 
@@ -556,7 +595,7 @@ Four caveats, all learned the hard way:
   tests were re-run against it unchanged, which is the evidence that the
   delegation preserved the binding's observable behaviour.
 
-## A `<template>`'s styles leaked into the page — **fixed, pending patch**
+## A `<template>`'s styles leaked into the page — **fixed**
 
 - **Test:** problem 29, `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling.html`.
 - **Owner:** Broiler.HTML (the stylesheet walk), then HtmlBridge for what is left.
@@ -725,11 +764,17 @@ Four caveats, all learned the hard way:
   problem 4 (`css/css-backgrounds/background-image-shared-stylesheet.html`),
   problem 13 (`css/css-transforms/animation/transform-interpolation-002.html`).
 - **Owner:** the WPT runner, then the component the confirmed failure names.
-- **Current evidence:** both remaining tests are reported at 0.0% by CI but are
-  not reproducible offline, and their local scores are misleading:
-  - problem 4 needs `?pipe=trickle(d2)` for its image and a script-injected
+- **Current evidence:** ~~both remaining tests are reported at 0.0% by CI but are
+  not reproducible offline~~ — **problem 4 is now reproducible; problem 13 is
+  not:**
+  - ~~problem 4 needs `?pipe=trickle(d2)` for its image and a script-injected
     `data:text/css` stylesheet; offline neither engine loads the image, so the
-    pair matched at 99.8% locally while CI reports 0.0%.
+    pair matched at 99.8% locally while CI reports 0.0%.~~ **It needs no server.**
+    The 99.8% was the runner resolving the root-relative image to a
+    working-directory-relative path, so neither side loaded it; with that fixed the
+    test reproduces at **5.7%, matching CI exactly**, and the gap is a real one in
+    script-injected `data:text/css` stylesheets. See
+    [the audit](#one-test-reclassified-css-backgroundsbackground-image-shared-stylesheet).
   - problem 13 builds its whole DOM from `interpolation-testcommon.js`; offline
     both renders are empty (100% local match, 0.0% on CI), so the CI artifact's
     `rendered.png` is the only evidence that says what Broiler actually drew.
@@ -1318,14 +1363,14 @@ owned by a section above). Re-reported problems point at that section.
 
 | # | Test | CI | Local | Status |
 | --- | --- | --- | --- | --- |
-| 1 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | — | re-report of #1491 problem 4 — needs the server's `trickle` pipe |
+| 1 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | — | re-report of #1491 problem 4 — ~~needs the server's `trickle` pipe~~ **needs no server**; reproduces at 5.7%, see [the audit](#one-test-reclassified-css-backgroundsbackground-image-shared-stylesheet) |
 | 2 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | — | re-report of #1491 problem 5 — needs `.sub` substitution and a second host |
-| 3 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1491 problem 12 — [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests) |
+| 3 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1491 problem 12 — [screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests) |
 | 4 | `css-transforms/animation/transform-interpolation-002` | 0.0% | — | re-report of #1491 problem 13 — both engines empty offline |
 | 5, 6 | `css-view-transitions/iframe-and-main-frame-transition-old-main-*` (2) | 0.0% | 0.00% | re-report of #1491 problems 16/17 — needs a transition in a nested browsing context |
 | 7 | `css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative` | 0.0% | **0.00% → 100%** | **fixed** — an explicit `view-transition-group` name now only matches an ancestor, main repo. (Also a corrected verdict: it was not the blank-reference pass the #1491 table records) |
 | 8 | `css-view-transitions/nothing-captured` | 0.0% | **99.54% (passes)** | does not reproduce — judge from CI |
-| 9 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1491 problem 26 — [frameset frames render nothing](#frameset-frames-render-nothing) |
+| 9 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1491 problem 26 — [frameset frames render nothing](#frameset-frames-render-nothing--fixed-see-1612-problem-8) |
 | 10 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1497 problem 25: Chromium fails this reftest against its own reference |
 | 11 | `css-pseudo/backdrop-animate-002` | 0.8% | **0.77% → 99.74%** | **fixed** — property-indexed keyframes + `animate({pseudoElement})`, main repo |
 | 12, 13 | `css-grid/…/subgrid/…` (2) | 0.8%, 0.9% | 0.80%, 0.89% | open — built on `display: inline grid-lanes`, which Broiler deliberately drops as invalid because no stable browser ships it unflagged. See above. The 241-test `grid-subgridded-to-grid-lanes` subset is 122 passing |
@@ -1583,12 +1628,25 @@ section that already owns it rather than being re-measured.
   the child still paints *inside* the clip (a fix that simply suppressed the
   visible descendant would pass the clip assertion and be wrong).
 
-### Replacing the document element renders nothing — problem 17, diagnosed, not fixed
+### ~~Replacing the document element renders nothing~~ — problem 17, **the diagnosis below is superseded**
+
+> **Superseded (2026-08-12 audit).** Re-measured: the page is **not** blank, and
+> appending an element to `document` after `documentElement.remove()` **does**
+> install it as the document element. Broiler now renders the dark canvas, the
+> paragraph and the 200×200 square — 94.6 % `rgb(18,18,18)` plus 5.1 % of square,
+> against a reference that is 94.6 % `rgb(18,18,18)` plus the same 5.1 %. The whole
+> difference is the square's **colour**: ours is `rgb(255,0,0)`, the reference's is
+> `rgb(0,0,0)`. So this is the quirk the test is named for after all — the table
+> inherits `color: red` from the `<div>` instead of falling back to the initial
+> colour, and the test says outright "Test passes if there is a square filled with
+> initial color and **no red**". Everything below is kept as the record of the
+> earlier reading; the exit gate it proposes has already been met.
 
 - **Test:** `quirks/tables-inherit-color-from-body-quirk-007`, 5.1% on CI. The
   reference is the UA dark canvas (`html { color-scheme: dark }`) with light text
-  and a white 200px Ahem square. **Ours is a blank white page** — not a colour
-  mistake, nothing rendered at all.
+  and a white 200px Ahem square. ~~**Ours is a blank white page** — not a colour
+  mistake, nothing rendered at all.~~ **Ours is now the right page in the wrong
+  colour** (see the note above).
 - **The quirk the test is named for never gets a chance to matter.** The test
   builds its content in a `<div>`, appends it to the document element, then does
   `document.documentElement.remove()` and `document.append(root.cloneNode(true))`
@@ -1604,11 +1662,14 @@ section that already owns it rather than being re-measured.
   - `remove()` then appending a **hand-built** `<html><body>` with a lime block →
     still white;
   - `remove()` then appending a clone carrying a lime block → still white.
-- **So the finding is not about `cloneNode`, and not about quirks.** After
+- ~~**So the finding is not about `cloneNode`, and not about quirks.** After
   `documentElement.remove()`, appending *any* element to `document` does not
   install it as the new document element: the render stays empty. That is the
   whole 5.1%, and it is a DOM/bridge-level gap (the render tree is built from a
-  document root that was never re-established), not a paint or cascade one.
+  document root that was never re-established), not a paint or cascade one.~~
+  **No longer true — and it was the load-bearing claim.** The append does install
+  a document element, so the 5.1% is the colour of the square, and the test *is*
+  about the quirk it is named for.
 - **Exit gate for whoever takes it:** the fifth probe above — remove the document
   element, append a fresh `<html>` containing a 200×200 lime block, and get lime
   pixels. Everything the test actually asserts is downstream of that.
@@ -1645,18 +1706,18 @@ measurement.
 | # | Test | CI | Local | Status |
 | --- | --- | --- | --- | --- |
 | 1 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | — | re-report of #1538 problem 2 — needs `.sub` substitution and a second host |
-| 2 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1538 problem 3 — [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests) |
+| 2 | `css-page/page-margin-002-print` | 0.0% | — | re-report of #1538 problem 3 — [screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests) |
 | 3, 4 | `css-view-transitions/nested/nested-{position-with-border,root-capture-with-clip}` (2) | 0.0% | — | new to this list — the nested-transition family of [view transitions do not capture the document](#view-transitions-do-not-capture-the-document--still-open-2-will-not-be-won-here) |
-| 5 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1538 problem 9 — [frameset frames render nothing](#frameset-frames-render-nothing) |
+| 5 | `resource-timing/initiator-type/frameset` | 0.0% | — | re-report of #1538 problem 9 — [frameset frames render nothing](#frameset-frames-render-nothing--fixed-see-1612-problem-8) |
 | 6 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | — | **won't fix** — #1538 problem 10: Chromium fails this reftest against its own reference |
 | 7, 8 | `css-grid/…/grid-subgridded-to-grid-lanes/…` (2) | 0.8%, 0.9% | — | open — same `display: inline grid-lanes` family as #1538 problems 12/13, which Broiler drops as invalid because no stable browser ships it unflagged |
 | 9, 10 | `css-view-transitions/auto-name{-from-id-shadow,}` (2) | 1.3% | — | **won't fix** — the `auto-name` family, #1538 problem 18: the reference is Chromium's unfeatured render |
-| 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | — | does not reproduce offline (98.46% at #1538 problem 19) — judge from CI |
+| 11 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | **1.3%** | ~~does not reproduce offline~~ — **it does**, at CI's own number, against the test's own `-ref.html`: the transition content is absent from our render |
 | 12 | `css-view-transitions/root-to-shared-animation-start` | 1.5% | — | new to this list — needs the rasterised root snapshot, #1491 problems 19/21/23 |
 | 13–16 | `css-view-transitions/massive-element-{left,right}-of-viewport-partially-onscreen-{new,old}` (4) | 2.0%, 2.6% | — | open — **half fixed** at #1538 problems 22/23/25/26; these still fail on the snapshot clone's box sizing |
-| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | — | open — **diagnosed**: after `documentElement.remove()`, appending *any* element to `document` does not install a new document element, so the page renders empty. Not a quirks bug. See above |
+| 17 | `quirks/tables-inherit-color-from-body-quirk-007` | 5.1% | 94.9% | open — **re-diagnosed**: the page renders (the appended element *does* become the document element); the whole gap is the square painted red where the reference has the initial colour, i.e. the quirk the test is named for. See above |
 | 18 | `css-grid/subgrid/orthogonal-writing-mode-006` | 5.6% | — | open — **diagnosed, and mis-named**: Broiler renders the test and its own `-ref.html` to a byte-identical PNG, so subgrid is a no-op both ways. The gap is the grid layout they share. See above |
-| 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | — | re-report of #1538 problem 1 — needs the server's `trickle` pipe |
+| 19 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | **5.7%** | re-report of #1538 problem 1 — ~~needs the server's `trickle` pipe~~ **reproduces offline exactly**; a script-injected `data:text/css` sheet never applies, see [the audit](#one-test-reclassified-css-backgroundsbackground-image-shared-stylesheet) |
 | 20 | `css-overflow/overflow-scroll-resize-visibility-hidden` | 5.9% | **5.9% → 100%** | **fixed** — a `visibility: hidden` box still clips its visible descendants ([`patches/0121`](../patches/README.md)) |
 | 21–26 | `css-contain/contain-{body,html}-bg-00{1,3,4}` (6) | 7.5% | **7.5% → 99.8%** | **fixed** — any containment on html or body disables propagation from body ([`patches/0120`](../patches/README.md)) |
 | 27 | `css/filter-effects/fecolormatrix-negative` | 7.7% | **7.7% → 99.6%** | **fixed** — a colour-only filter chain over a solid fill recolours the shape; main repo, on CI immediately |
@@ -1740,12 +1801,16 @@ at 0.0% *because* `image-animation` was implemented in the meantime.
   `<frame src=a><frame src=b>` parses the second frame as a *child* of the first
   and `DomParser.LayoutFramesetChildren` is handed one cell instead of two.
   Confirmed by writing the same markup with explicit `</frame>` tags, which
-  renders both cells. Fixed in [`patches/0003`](../patches/README.md) — the
-  submodule remote 403s from here — and verified before the tree was reverted:
+  renders both cells. **Fixed and live on CI** — the fix is `Broiler.DOM`
+  `55057b8`, "Treat `<frame>` as a void element in the parser and serializer",
+  which is the pinned pointer itself. (It shipped as a patch because the submodule
+  remote 403s from here; a maintainer has since applied it.) Verified when it was
+  written:
   both `cols` and `rows` framesets go from half-painted to both cells painting
   their own document, with a single-frame frameset and a two-iframe page
   unchanged. **No test in the current subset covers it**, and the test that
-  motivated this work has exactly one frame, so nothing regresses while it waits.
+  motivated this work has exactly one frame — so nothing was riding on it either
+  before or after it landed.
 
 ### Six tests where Broiler is right and the reference is not — problems 2, 3, 5, 6, 7 and 9
 
@@ -1767,7 +1832,7 @@ Why each reference is what it is:
 
 - **Problems 2 and 3 — `image-animation: paused`, and a worked example of the
   trap.** These two were reported *fixed at 100%* in the [#1491
-  write-up](#animated-images-always-painted-their-first-frame--fixed-pending-patch):
+  write-up](#animated-images-always-painted-their-first-frame--fixed):
   frame selection put the 300 ms screenshot on the red frame, which is what
   Chromium shows. `image-animation` has since been implemented
   (`CssBox.ImageAnimation.cs`), so Broiler now honours `paused` and holds the
@@ -1815,7 +1880,7 @@ theoretical: the engine got better and the score got worse.
 - **Problem 4** (`css-page/page-margin-002-print`) is a screenshot artifact, not
   a rendering gap: Chromium's own *viewport* capture of a `vertical-rl` root is
   blank while its full-page capture paints all three blocks. Established under
-  [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests);
+  [screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests);
   matching it would mean drawing nothing.
 
 ### #1612 problems, at a glance
@@ -1938,13 +2003,13 @@ bug.)
   rendered an empty frame. Same **won't fix** class as problem 9.
 - **Lost, and it is a real bug (1).** `…-opaque-cross-origin-003.sub` painted a
   200×200 white box that should not be there. **Since fixed** — see
-  [the frame-canvas section below](#a-frames-canvas-was-never-transparent--003sub-and-iframe-background-fixed-pending-patch).
+  [the frame-canvas section below](#a-frames-canvas-was-never-transparent--003sub-and-iframe-background-fixed).
   Worth keeping the shape of it on record: the test's former pass is exactly what
   this document calls **untrustworthy** — passing by rendering nothing — and a
   truthful failure that named a real gap was worth more than a green tick that
   depended on a frame never loading.
 
-### A frame's canvas was never transparent — 003.sub and `iframe-background`, **fixed, pending patch**
+### A frame's canvas was never transparent — 003.sub and `iframe-background`, **fixed**
 
 - **Tests:** `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-opaque-cross-origin-003.sub`
   (94.7 % → **99.8 %, passing**) and `…/color-scheme-iframe-background`
@@ -1979,20 +2044,21 @@ bug.)
   a top-level render is byte-identical. That, the inheritance fix, and the WPT
   runner's own frame compositor (`WptDocumentRenderer`, which pins the lever and
   composites source-over) are **main repo**. The renderer's side is
-  [`patches/0004`](../patches/README.md) — the `Broiler.HTML` remote 403s from
-  here — and until it is applied the two tests keep their current scores.
+  a `Broiler.HTML` change that shipped as a patch because that remote 403s from
+  here. **It has since been applied and the pointer bumped** (`d1cdad4`), so both
+  tests carry their improved scores on CI.
 - **Verified:** the dark-color-scheme directory goes **22 → 24 of 29** with
   nothing lost, and `html/semantics/embedded-content/the-iframe-element` is
   **unchanged across all 161 tests** — the change is inert for a frame that fills
   its own canvas, which is nearly all of them. 22 focused cases cover the rule,
-  the cascade and the render, four of them probing for the patch so they become
-  real guards when the pointer is bumped.
+  the cascade and the render, four of them probing for the submodule half — and
+  **real guards now**, since the pointer carries it.
 - **A separate gap the fix uncovered — since fixed.** `color-scheme-iframe-background`
   stopped at 98.9 % rather than passing, on a residual that was not colour-scheme
   related at all: the default `<iframe>` border. See
-  [the bevel section below](#a-3d-border-was-painted-flat--fixed-pending-patch).
+  [the bevel section below](#a-3d-border-was-painted-flat--fixed).
 
-### A 3D border was painted flat — **fixed, pending patch**
+### A 3D border was painted flat — **fixed**
 
 - **Tests:** `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background`
   (98.9 % → **99.4 %, passing**, on top of the frame-canvas fix), and 89 tests
@@ -2003,7 +2069,8 @@ bug.)
 - **The gap.** CSS 2.1 §8.5.3 paints `inset`, `outset`, `groove` and `ridge` as a
   bevel — two sides in a darkened shade of the border colour, two in the colour
   itself. The IR paint path used the colour flat on all four sides, so the border
-  the HTML Standard puts on every `<iframe>` and `<hr>` (`border: 2px inset`) came
+  the HTML Standard puts on every `<iframe>` and `<hr>` (`2px inset` on the frame,
+  `1px inset` on the rule) came
   out **solid black** where every browser paints `#9A9A9A` over `#EEEEEE`, and the
   `border: 2px groove` it puts on every `<fieldset>` came out flat too. On a
   600×400 frame that ring is 4 012 px — half of the test's residual, and exactly
@@ -2023,8 +2090,8 @@ bug.)
   `border-color: #EEEEEE` now the engine derives the pair, and `iframe` gets the
   same base. **The two halves must land together:** shading while `hr` still
   carried the pre-bevelled colours would darken `#9A9A9A` a second time and
-  regress every `<hr>`, which is why the call sits in
-  [`patches/0005`](../patches/README.md) rather than in `ComputedStyleBuilder`.
+  regress every `<hr>`, which is why the call shipped as a submodule patch
+  (`f8db3c6`, since applied) rather than going into `ComputedStyleBuilder`.
 - **Verified:** across 665 tests of `html/rendering` and the iframe element,
   **89 changed and every one of them improved** — none worse — with one more
   passing; many went 99.7–99.8 % to 100.0 %. `hr` renders identically to before.
@@ -2044,12 +2111,12 @@ bug.)
     directly, a page of groove and ridge boxes matches to **99.95 %**.
 - **The corner miters — since fixed.** The 0.05 % residual above was the 45°
   diagonal between two differently-coloured sides: Broiler stepped it, Chromium
-  feathers it. See [the miter section below](#a-border-corner-had-no-mitre-and-no-anti-aliasing--fixed-pending-patch).
+  feathers it. See [the miter section below](#a-border-corner-had-no-mitre-and-no-anti-aliasing--fixed).
 - **Also remaining:** the other half of `color-scheme-iframe-background`'s original
   residual (≈ 4 356 px) is text antialiasing inside the frame, unrelated to
   borders and below the threshold now that the bevel is right.
 
-### A border corner had no mitre, and no anti-aliasing — **fixed, pending patch**
+### A border corner had no mitre, and no anti-aliasing — **fixed**
 
 - **Owner:** `Broiler.HTML` (`RGraphicsRasterBackend`, `BCanvas`) for the paint;
   `Broiler.Layout` for the coverage rule.
@@ -2088,8 +2155,8 @@ bug.)
   1 949 tests of `css/css-backgrounds`, `html/rendering`, `css/css-gaps` and this
   directory, **no test changes state in either direction** and the net is
   **+1.578 points** (+1.707 across 55 tests against −0.129 across 103, one of
-  which loses more than a hundredth of a point). Ships as
-  [`patches/0006`](../patches/README.md).
+  which loses more than a hundredth of a point). Shipped as a submodule patch and
+  **since applied** — `Broiler.HTML` `f86b655`, which is the pinned pointer.
 
 ### #1615 problems, at a glance
 
@@ -2106,25 +2173,311 @@ Local numbers are this container's, against Chromium references generated here.
 | 7 | `fullscreen/rendering/backdrop-inherit` | 0.0% | 100% `#008000` | **won't fix** — same |
 | 8 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | 99.8% white | **won't fix** — re-verified; ours matches the test's `rel=match`, Chromium fails it |
 
+## The next run (issue #1618, 2026-08-12)
+
+7 579 failures, no incomplete shards. **This run's 0.0% list is the previous
+run's, minus the one that was fixed** — the seven tests reported here are #1615's
+problems 2–8, and the `.sub` cross-origin test has dropped off because it now
+passes. That is the third consecutive run whose severity issue is almost entirely
+tests that were triaged, judged correct, and closed in an earlier run.
+
+So this run was not spent re-arguing them. It was spent answering the question
+the repetition asks: **why does a test Broiler renders correctly keep being
+reported as the run's worst render?** — and making the run answer it itself.
+
+### Every one of the seven, re-measured against the only authority the test names
+
+The previous sections judged these by comparing colour histograms against a
+locally generated Chromium reference. There is a stronger check available, and it
+needs no other engine at all: the **reftest suite** renders both the test *and the
+`rel=match` reference the test itself declares* with Broiler, and compares them.
+That is WPT's own statement of what the test should look like.
+
+Run over all seven (`--reftests-only`), **six pass**:
+
+| Test | Against its own `rel=match` reference |
+| --- | --- |
+| `css-image-animation/image-animation-body-background-root-propagation-paused` | **passes** (100.0%) |
+| `css-image-animation/image-animation-root-background-paused` | **passes** (100.0%) |
+| `mediaqueries/at-custom-media-basic` | **passes** (100.0%) |
+| `fullscreen/rendering/backdrop-iframe` | **passes** (99.1%) |
+| `fullscreen/rendering/backdrop-inherit` | **passes** (100.0%) |
+| `css-color-adjust/…/mismatch-dynamic` | **passes** (100.0%) |
+| `css-page/page-margin-002-print` | **fails** (89.2%) — see below |
+
+Six of seven reproduce their own reference exactly. Each remains 0.0% against the
+committed Chromium golden for the reason its earlier section gives, and every one
+of those verdicts stands — but they now rest on the test's own reference rather
+than on an argument about what Chromium implements.
+
+### `page-margin-002-print` is not the exception it looks like
+
+It is the one test that disagrees with its own reference, and the disagreement is
+**not** an engine bug either — it is a `-print` test being scored on screen.
+`@page { margin: 10px 20px 30px 40px }` has no effect outside paged media, so the
+test paints `100vw × 100vh` of yellow across the whole canvas while its reference
+subtracts the margins explicitly (`calc(100vw - 60px)`, `margin-right: 20px`). The
+two are *designed* to agree only once the page box exists. 89.2% is the size of
+those margins, nothing more.
+
+Rendering both sides as paged media (`BROILER_WPT_PAGED_PRINT=1`) does surface a
+real gap, and it is worth recording even though nothing here can move the CI
+number: the test paginates to **4 pages** and the reference to **7**, where both
+should be **3** (each `.fullpager` is exactly one page area), and on both sides
+only the first block paints — the cyan and pink blocks are lost. Two distinct
+defects sit behind that: viewport units do not resolve against the page area
+(`100vh` stays the full page box, so each block overflows its page), and
+`break-before: page` over-fragments. Paged media is known-partial and off by
+default (`docs/wpt-reftests.md`: 252 unpaginated versus 212 paged), so this joins
+[screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests)
+rather than becoming this run's work. **It cannot change what CI reports for this
+test in any case** — CI scores it unpaginated against Chromium's blank
+`vertical-rl` viewport capture, so the 0.0% is the screenshot artifact the
+previous runs identified, whatever the paged path does.
+
+### The actual defect this run fixes is in the report, not the renderer — **fixed**
+
+- **Owner:** the WPT runner (`src/Broiler.Wpt`), the shard merger
+  (`scripts/merge-wpt-shards.py`) and the workflow's shard action.
+- **The bug.** The golden-image suite scores Broiler against *Chromium's* pixels.
+  When Broiler implements something Chromium does not, the test drops to 0.0% and
+  stays there — permanently, by construction. The severity issue ranks strictly by
+  `100 − matchPercent`, so those tests take the top of the list every single run
+  and push real bugs off it. This run's list is the proof: seven entries at 0.0%,
+  six of which are correct renders, while genuine mismatches
+  (`fullscreen/rendering/backdrop-object`, the subgrid track-sizing pair) sat
+  below them.
+- **The evidence was already available and never gathered.** The runner has had a
+  `--verify-reference` switch for some time (`WptTestRunner.VerifyAgainstReferenceHtml`):
+  on a pixel-mismatch failure it re-renders the test's own `rel=match` reference
+  and records `suspectReference` when Broiler reproduces *it* but not the committed
+  PNG. The flag was serialised into the per-test results — and **nothing ever ran
+  it.** CI never passed the switch, and the ranking never read the field.
+- **What landed, all main repo — on CI immediately, no patch.**
+  1. **The switch is on in CI.** `scripts/run-wpt-tests.sh` forwards
+     `--verify-reference` when `BROILER_WPT_VERIFY_REFERENCE=1`, and
+     `.github/actions/run-wpt-shard` sets it. It costs one extra render per
+     *failing* test and **changes no test's pass/fail** — only how a failure is
+     described. Measured on `css/css-page` (280 tests, 37 failures): 43 s without,
+     36 s with, i.e. inside the run-to-run noise.
+  2. **The flag reaches the ranker.** `suspectReference` is now carried on each
+     `lowestMatchTests` triage entry, not just on the full result.
+  3. **The ranking excludes them.** A mismatch carrying the flag is never a
+     "biggest problem". It is listed under its own heading — *Not ranked —
+     reference disagreements* — so the information is still in the issue, but it
+     no longer occupies the severity list. Dropping it silently would be
+     indistinguishable from losing a 0.0%.
+  4. **A shard offers candidates of both kinds.** `lowestMatchTests` was the five
+     lowest matches overall; five reference disagreements would therefore have
+     starved the ranking of every real mismatch in that shard — exactly the tests
+     that would do it are the ones stuck at 0.0%. It is now the five lowest
+     *rankable* mismatches plus the five lowest cleared ones, so the payload stays
+     bounded and the ranking always has candidates.
+- **Verified end to end on this run's own tests.** With locally generated Chromium
+  references, `--verify-reference` flags exactly the six and leaves
+  `page-margin-002-print` alone — the discrimination is precise, not a blanket
+  amnesty for 0.0%. Feeding that report through the merger produces a severity
+  issue whose *Biggest problems* are `css-page/page-margin-002-print` and
+  `fullscreen/rendering/backdrop-object` — two tests worth a maintainer's time —
+  with the six listed below as reference disagreements. Four focused cases pin the
+  behaviour, including the negative halves: a report from a run *without*
+  `--verify-reference` ranks exactly as before; a cleared test does not drive
+  threshold escalation; and an all-cleared run yields no biggest problems rather
+  than falling back to ranking them.
+- **What this does not do.** It does not change the pass rate, hide a failure, or
+  mark any test as passing: all seven still fail the golden-image comparison and
+  are still counted in the run's 7 579. It changes only which failures are called
+  the run's *worst*, and only on evidence the runner produced itself.
+- **The reftest suite is unaffected.** It renders both sides with Broiler, so it
+  never sets `suspectReference`; its severity issue is byte-identical to before.
+
+### #1618 problems, at a glance
+
+`rel=match` is this container's reftest-suite result — Broiler against the
+reference the test itself declares, no other engine involved.
+
+| # | Test | CI | `rel=match` | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-image-animation/image-animation-body-background-root-propagation-paused` | 0.0% | **passes** | **won't fix** — reference disagreement; now reported as one |
+| 2 | `css-image-animation/image-animation-root-background-paused` | 0.0% | **passes** | **won't fix** — same |
+| 3 | `css-page/page-margin-002-print` | 0.0% | 89.2% | **won't fix** — a `-print` test scored on screen; the paged gap behind it cannot move this number |
+| 4 | `mediaqueries/at-custom-media-basic` | 0.0% | **passes** | **won't fix** — reference disagreement; now reported as one |
+| 5 | `fullscreen/rendering/backdrop-iframe` | 0.0% | **passes** | **won't fix** — same |
+| 6 | `fullscreen/rendering/backdrop-inherit` | 0.0% | **passes** | **won't fix** — same |
+| 7 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | **passes** | **won't fix** — same |
+
+The honest count for this run's 0.0% tail is **zero engine gaps** — and that is
+the finding, not an evasion. Six tests are correct by their own reference and one
+is a print test measured on screen. The work that was available was to stop the
+suite from reporting them as the worst thing that happened, which is what landed.
+
+## The audit (2026-08-12) — what was stale across the whole document
+
+This document had grown to ~2 280 lines across six runs, each appending a section
+rather than rewriting. That keeps history, but it also means a verdict written
+five runs ago sits in the same prose register as one written today. This audit
+checked **every claim in the document that can be checked**, and the summary is at
+the top under *Read this first*.
+
+### How it was measured
+
+Three sources of ground truth, none of them the document itself:
+
+1. **Every test the document names, re-run against its own reference.** 140 test
+   references were extracted from the prose and resolved against the checkout;
+   66 are reftests, and all 66 were run with `--reftests-only`, which renders both
+   the test *and the `rel=match` reference the test itself declares* with Broiler.
+   No Chromium, no committed golden. **43 passed, 22 failed, 1 skipped.**
+   Note the metric: a test can pass here and still be 0.0 % on CI (that is the
+   reference-disagreement case the [#1618 section](#the-next-run-issue-1618-2026-08-12)
+   is about), so a reftest pass is evidence that Broiler renders what the test
+   asks for — not that CI agrees.
+2. **Patch state, from submodule history rather than from `patches/`.** For each
+   patch file: does its commit exist in the submodule, and is it an ancestor of the
+   pinned pointer (`git merge-base --is-ancestor`)?
+3. **Code claims, by reading the pinned submodule source in place.**
+
+### What was found
+
+- **The `patches/` backlog was entirely stale.** All six files it held
+  (`0001`–`0006`) were already upstream *and* pinned — `Broiler.HTML` was pinned at
+  `f86b655`, which **is** `0006`, and `Broiler.DOM` at `55057b8`, which **is**
+  `0003`. They have been deleted, and `patches/README.md` now records where each
+  landed. Worth knowing for next time: by then **none of the six applied in either
+  direction any more**, so both `git am` and a reverse-apply check would have said
+  "not applied". A drifted file for an applied fix is worse than no file.
+- **Five section headings said "fixed, pending patch".** All five are simply
+  **fixed**; the headings now say so. Two of their predictions were confirmed
+  rather than assumed: `css-page/page-box-002-print`, which
+  [wpt-reftests.md](wpt-reftests.md) said "stays at 0.0 % until the patch is
+  applied", now **passes at 100 %**, and `css/CSS2/visufx` is **51 of 52**, the one
+  failure being the `visibility-005` that document names.
+- **25 dangling `patches/NNNN` references**, across the numbers `0035`–`0045`,
+  `0102`, `0120` and `0121`. None of those files exist; the numbering has since
+  restarted from `0001` twice over. The claims *around* them are generally right —
+  it is the identifiers that rotted. Rather than delete them (they are the only
+  provenance those sections carry), *Read this first* now states what a patch
+  number is worth.
+- **One broken anchor used five times.**
+  `#screen-layout-gaps-behind-the-three-print-html-tests` never resolved: GitHub
+  strips the backticks, `*` and `.` from `` `*-print.html` ``, so the heading's real
+  slug is `…three--printhtml-tests`. Fixed in all five places.
+- **55 further prose claims were confirmed stale or wrong** by the audit and
+  survived an adversarial check; 6 more were raised and refuted. They are not
+  rewritten here one by one — most are individually small, and *Read this first*
+  covers the two patterns that produce the majority of them. The rest stand as
+  dated observations.
+
+### The methodology bug behind "not reproducible offline" — **fixed**
+
+- **Owner:** the WPT runner (`WptTestRunner.TryResolveWptRootRelativePath`).
+- **The bug.** The resolver mapped a root-relative URL onto the checkout with
+  `Path.Combine(wptRoot, rel)` and returned it as-is. With a **relative**
+  `--wpt-dir` that result is relative to the *process working directory* — and the
+  engine resolves what it is handed against the **document's** base URL, so it went
+  looking for `…/css/css-backgrounds/tests/wpt/checkout/images/green.png` and found
+  nothing. The `File.Exists` guard inside the resolver still passed, because *it*
+  resolves against the working directory, so nothing anywhere reported a failure:
+  the render simply came out with no image.
+- **Why it mattered more than it looks.** CI passes an absolute path
+  (`run-wpt-tests.sh` defaults `WPT_DIR` to `$REPO_ROOT/tests/wpt/checkout`), so CI
+  was never affected. Every *local* command in this document and in `CLAUDE.md`
+  passes a relative one. So the bug was invisible in the one place that gates
+  merges and active in the one place this document draws its evidence from — which
+  is the signature the [reproduction notes](#reproducing-one-of-these-locally)
+  already recorded as "a *higher* local score than CI means both engines rendered
+  nothing", without knowing the cause was ours.
+- **The fix** is to return `Path.GetFullPath(local)`. Absolute always, because the
+  path is consumed by something that resolves relative paths against a different
+  base.
+- **Verified, including the negative half.** Across 1 553 reftests
+  (`css-backgrounds`, `css-images`, `fullscreen`, `css-masking`): a relative
+  `--wpt-dir` and an absolute one now produce **identical** results, where before
+  they differed on 22 tests. CI's own configuration is unmoved — a pre-fix and a
+  post-fix run with an absolute root differ on **one** already-failing test by
+  0.05 pp, with **no pass/fail change**. The runner is deterministic run to run
+  (two identical 1 553-test runs differ on nothing), so that residue is real but
+  far below any decision threshold. `Broiler.Wpt.Tests`: 927 passing against the
+  documented 55 pre-existing failures, and two new cases pin both halves — a
+  relative root must yield an absolute path, and an absolute root must be unchanged.
+- **Net on pass counts: zero, and that is the honest number.** Three tests went
+  from failing to passing (`fullscreen/rendering/backdrop-object` reaches
+  **100 %**), and three went from passing to failing — those three had been
+  *passing by rendering nothing*, the trap this document warns about, and now that
+  the image loads on both sides a real difference is exposed.
+
+### One test reclassified: `css-backgrounds/background-image-shared-stylesheet`
+
+Filed since #1491 (problem 4) as needing the WPT server's `trickle` pipe, and
+re-reported unchanged at [#1538 problem 1](#the-next-run-issue-1538-2026-08-05) and
+[#1562 problem 19](#the-next-run-issue-1562-2026-08-07). **It does not need a
+server.** With the resolver fixed it reproduces offline exactly, scoring **5.7 %
+against its own reference — the same 5.7 % CI reports.** The `?pipe=trickle(d2)`
+query is stripped and `/images/green.png` is served from the checkout like any
+other root-relative resource.
+
+What the 5.7 % is, precisely: the reference is 100 % lime, and Broiler paints 94 %
+white with a green block of exactly 300×150 — **the default `<iframe>` size**. So
+the iframe is never removed and the parent's script-injected `data:text/css`
+stylesheet never applies, while the *iframe's own* copy of that stylesheet does.
+That is a real, offline-reproducible gap in dynamic stylesheet injection, not a
+missing server feature. The earlier note that "the pair matched at 99.8 % locally
+while CI reports 0.0 %" was the resolver bug: neither side loaded the image, so
+the two agreed on nothing.
+
+### The last 26, checked by hand
+
+26 of the 87 raised findings lost their adversarial verifier to a session limit.
+They have since been verified individually, by measurement rather than by a second
+opinion, and **all 26 held**. Most were the two systemic patterns already covered
+above — dangling patch numbers, "pending patch" prose, the dead anchor — and are
+now corrected in place. Four were substantive, and three of those had been giving
+a wrong impression of the engine:
+
+- **`quirks/tables-inherit-color-from-body-quirk-007` does not render a blank
+  page.** The [problem 17 section](#replacing-the-document-element-renders-nothing--problem-17-the-diagnosis-below-is-superseded)
+  concluded that appending an element to `document` after
+  `documentElement.remove()` never installs a new document element, "the render
+  stays empty", and called it a DOM/bridge gap rather than a quirks one. Measured
+  now: ours is 94.6 % `rgb(18,18,18)` + 5.1 % square against a reference that is
+  94.6 % `rgb(18,18,18)` + the same 5.1 % square. The page renders; the document
+  element *is* installed. The entire difference is that our square is
+  `rgb(255,0,0)` where the reference's is `rgb(0,0,0)` — so it is the quirk the
+  test is named for, and the test says so outright ("a square filled with initial
+  color and **no red**"). The section's own exit gate had already been met.
+- **`view-transition-waituntil-animation-manipulation` does reproduce offline**,
+  at CI's own 1.3 %, against the test's own reference. It was filed as "judge from
+  CI".
+- **`<hr>` does not carry a 2px border.** The 3D-border section said the HTML
+  Standard puts `border: 2px inset` on "every `<iframe>` and `<hr>`". The UA sheet
+  it cites says `hr { border: 1px inset }` and `iframe { border: 2px inset }` —
+  and the distinction matters to that very section, since a bevel only splits at
+  `width >= 2`.
+- **The paged-reftest figure was one release out of date** — 212, not 213
+  (`docs/wpt-reftests.md` was updated and the citation here, plus the runner's
+  `--help`, were not).
+
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
 references; CI's are authoritative where they disagree. **Status** records work
-landed since the run — a fix marked *pending patch* is not yet on CI, because it
-lives in a submodule whose remote this session cannot push to (see
-`patches/README.md`). Patches 0035–0039 have since been applied and their
-pointers bumped, so everything they carried is now on CI. **won't fix** and
+landed since the run — a fix marked *pending patch* was not on CI **when this
+table was written**, because it lived in a submodule whose remote this session
+cannot push to. **Nothing in this table is pending any more:** every submodule fix
+it names has been applied upstream and its pointer bumped, so all of them are on
+CI (see `patches/README.md`, and the patch-number caveat at the top of this
+document — the numbers below no longer name files). **won't fix** and
 **untrustworthy** mark tests whose Chromium reference was produced without the
 feature they test — closing those means rendering less, not more.
 
 | # | Test | CI | Local observation | Status |
 | --- | --- | --- | --- | --- |
-| 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | 99.8% — needs the server's `trickle` pipe | open |
-| 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ours `#121212`, Chromium white — needs `.sub` | open |
+| 4 | `css-backgrounds/background-image-shared-stylesheet` | 0.0% | ~~99.8% — needs the server's `trickle` pipe~~ **5.7%, matching CI** | open — **re-diagnosed**: no server needed; the parent's script-injected `data:text/css` stylesheet never applies |
+| 5 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | ~~ours `#121212`, Chromium white — needs `.sub`~~ **passes (100%)** | **fixed** — the runner performs `.sub` substitution; main repo, on CI |
 | 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** — patch 0039 applied |
-| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0041** |
+| 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; the submodule half has since been applied. All four now pass their own `rel=match` reference at 100% |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
-| 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | **won't fix** — the reference is a `vertical-rl` viewport-screenshot artifact ([screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests)) |
+| 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | **won't fix** — the reference is a `vertical-rl` viewport-screenshot artifact ([screen-layout gaps](#screen-layout-gaps-behind-the-three--printhtml-tests)) |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
 | 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
 | 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |

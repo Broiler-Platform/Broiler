@@ -79,8 +79,18 @@ commit you could not push — CI clones the submodule by pointer and would break
 If the same bug also needs to work on CI *now* (before a patch is applied), add
 an equivalent fallback fix at a main-repo layer and say so in the patch index —
 e.g. issue #1119's `Broiler.HTML` `HtmlParser.AppendCanonicalNode` text-node
-coalescing is shipped as `patches/0001-…`, with the active fallback
-`DomBridge.RemoveRenderCommentNodes` in the main repo until the patch lands.
+coalescing shipped as a patch with the active fallback
+`DomBridge.RemoveRenderCommentNodes` in the main repo until it landed.
+
+**Never identify a patch by number in prose that outlives it.** `patches/` is a
+backlog, not an archive: a file is deleted once its fix is upstream, and numbering
+restarts from `0001` against whatever is left. So the same number names different
+changes at different times, and a `patches/NNNN` reference in an older commit
+message, comment or document is almost always dangling — `docs/wpt-rendering-gaps.md`
+accumulated 25 such references before they were called out. Name the **commit
+subject** instead, and check whether a submodule fix is live with
+`git -C <Submodule> log --oneline --grep '<subject>'` followed by
+`git merge-base --is-ancestor <sha> HEAD`.
 
 ### Keep the patch small: put the *type* in the main repo, the *call* in the submodule
 
