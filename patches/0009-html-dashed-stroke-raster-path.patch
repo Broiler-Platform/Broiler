@@ -1,0 +1,124 @@
+From 1fae175460e40ce3158aa30da25a2bc6dbe2bc1b Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Wed, 12 Aug 2026 20:10:58 +0000
+Subject: [PATCH] image: keep dashed and dotted strokes on the raster path
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A `border-style: dashed` or `dotted` edge painted nothing at all. `solid`,
+`double` and `groove` painted normally, so the box simply lost its outline.
+
+GraphicsAdapter.DrawLine and DrawRectangle send a stroke to the raster canvas
+only when the pen HasSimpleStroke — a solid colour *and* DashStyle.Solid.
+Everything else fell through to the graphics compatibility seam, and on a host
+with no OS backend that seam resolves to StubCompatBackend, whose CreatePenPaint
+returns an inert StubPaint and whose DrawLine is an empty method body. The stroke
+was discarded silently.
+
+A dashed straight stroke is just a list of solid straight strokes, so it does not
+need the compat seam at all. Broiler.Layout.IR.DashedStrokeGeometry — which lives
+in the main repository, so this patch stays small and the geometry is unit-tested
+outside the submodule — reduces the stroke to its painted runs, and the adapter
+draws each one on the raster canvas. The dash pattern scales with the stroke
+width, the way CSS border dashes do: 3:3 on/off for dashed, 1:1 for dotted,
+following the GDI+ enum the DashStyle names come from.
+
+The new branch only catches pens that have a solid colour but a non-solid dash
+style — exactly the case that previously reached the inert stub and painted
+nothing. Pens with no solid colour still take the compat path, so nothing that
+renders today changes.
+
+PenAdapter gains an internal CurrentDashStyle accessor because RPen.DashStyle is
+set-only and the raster path has to read the style back. The public pen contract
+is unchanged.
+
+Measured on a 3px border around a 60x20 box: dashed goes from 0 painted pixels
+to 388 and dotted from 0 to 484, while solid stays at 516, double at 344, and
+groove at 516.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VSxmiiY5E7ppTLgqaJJQUR
+---
+ .../Adapters/GraphicsAdapter.cs               | 42 +++++++++++++++++++
+ .../Broiler.HTML.Image/Adapters/PenAdapter.cs |  4 ++
+ 2 files changed, 46 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+index 0182053..d77434a 100644
+--- a/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
++++ b/Source/Broiler.HTML.Image/Adapters/GraphicsAdapter.cs
+@@ -232,6 +232,26 @@ internal sealed class GraphicsAdapter : RGraphics, ITileParallelSurface, IBounds
+             return;
+         }
+ 
++        // A solid-coloured dashed or dotted stroke reduces to a list of solid runs, which the
++        // raster canvas can draw. Without this it fell through to the compat seam below, and on
++        // a host with no OS backend that seam is an inert stub — so `border-style: dashed` and
++        // `dotted` painted nothing at all while `solid` painted normally.
++        if (CanUseRaster && penAdapter.SolidColor is { } dashColor)
++        {
++            var width = (float)pen.Width;
++            var runs = DashedStrokeGeometry.Segments(
++                (float)x1,
++                (float)y1,
++                (float)x2,
++                (float)y2,
++                DashedStrokeGeometry.PatternFor(penAdapter.CurrentDashStyle, width));
++
++            foreach (var run in runs)
++                _rasterCanvas!.DrawLine(new PointF(run.X1, run.Y1), new PointF(run.X2, run.Y2), dashColor, width);
++
++            return;
++        }
++
+         _canvasCompat.DrawLine(EnsureCanvas(), (float)x1, (float)y1, (float)x2, (float)y2, penAdapter.Paint);
+     }
+ 
+@@ -244,6 +264,28 @@ internal sealed class GraphicsAdapter : RGraphics, ITileParallelSurface, IBounds
+             return;
+         }
+ 
++        // Same reduction for a stroked rectangle: dash each edge rather than lose the outline.
++        if (CanUseRaster && penAdapter.SolidColor is { } dashColor)
++        {
++            float x0 = (float)x, y0 = (float)y, x1 = (float)(x + width), y1 = (float)(y + height);
++            var strokeWidth = (float)pen.Width;
++            var pattern = DashedStrokeGeometry.PatternFor(penAdapter.CurrentDashStyle, strokeWidth);
++
++            foreach (var (ax, ay, bx, by) in new[]
++                     {
++                         (x0, y0, x1, y0),
++                         (x1, y0, x1, y1),
++                         (x1, y1, x0, y1),
++                         (x0, y1, x0, y0),
++                     })
++            {
++                foreach (var run in DashedStrokeGeometry.Segments(ax, ay, bx, by, pattern))
++                    _rasterCanvas!.DrawLine(new PointF(run.X1, run.Y1), new PointF(run.X2, run.Y2), dashColor, strokeWidth);
++            }
++
++            return;
++        }
++
+         _canvasCompat.DrawRectangle(EnsureCanvas(), new RectangleF((float)x, (float)y, (float)width, (float)height), penAdapter.Paint);
+     }
+ 
+diff --git a/Source/Broiler.HTML.Image/Adapters/PenAdapter.cs b/Source/Broiler.HTML.Image/Adapters/PenAdapter.cs
+index 8c4e249..afc32aa 100644
+--- a/Source/Broiler.HTML.Image/Adapters/PenAdapter.cs
++++ b/Source/Broiler.HTML.Image/Adapters/PenAdapter.cs
+@@ -20,6 +20,10 @@ internal sealed class PenAdapter(Func<float, Graphics.DashStyle, object> paintFa
+ 
+     public bool HasSimpleStroke => SolidColor.HasValue && _dashStyle == DashStyle.Solid;
+ 
++    // RPen.DashStyle is set-only, but the raster path has to read the style back to reduce a
++    // dashed stroke to solid runs. Internal so the public pen contract is unchanged.
++    internal Graphics.DashStyle CurrentDashStyle => _dashStyle;
++
+     public override double Width
+     {
+         get => _width;
+-- 
+2.43.0
+

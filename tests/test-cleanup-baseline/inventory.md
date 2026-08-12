@@ -54,7 +54,7 @@ deliberately **not** registered in `Broiler.JS.slnx`: neither compiles. Both sti
 open `Broiler.JavaScript.Core`, a namespace the engine refactor removed. They were
 only reachable through a solution that could not restore.
 
-## Batch 3a — Skia-era transition, main repo · done (except `GraphicsAbstractionTests`)
+## Batch 3a — Skia-era transition, main repo · done
 
 | Item | Outcome |
 | --- | --- |
@@ -62,18 +62,45 @@ only reachable through a solution that could not restore.
 | `SkiaDecouplingGuardTests` | **Repaired, not deleted.** Its only defect was the deleted `Broiler.HTML.WPF` directory in `ProductionDirectories`; removing that entry takes it from 6/7 to 7/7. Deleting the file would have removed the only automated enforcement of this batch's own gate — no Skia package in the restore graph, no SkiaSharp token in production source — leaving it to a one-time manual grep, which batch 1 forbids |
 | `GraphicsBackendCutoverTests` two pixel-parity facts | Deleted. Now 5/5, was 5/7 |
 | `GraphicsBackendCutoverTests.CaptureArtifactMetadata_Uses_Explicit_Skia_Fallback_Label` | **Renamed** to `CaptureArtifactMetadata_Records_The_Active_Backend` and kept — the only `renderBackend` sidecar coverage in the repository, and it passes |
-| `GraphicsAbstractionTests` 11 Skia fake/materialization facts | **Pending.** Left failing rather than deleted, deliberately — see below |
-| `Directory.Build.props`, `FormControlClickTests`, `CssExtractionPhaseZeroTests` WPF references | **Pending** |
+| `GraphicsAbstractionTests` 11 Skia fake/materialization facts | **Removed**, after diagnosis — 78 backend-neutral cases remain, all green |
 
-Measured: the Skia cluster went from 109 cases with 19 failures to 101 cases with
-11 failures. The 8 that went away are exactly the ones retired or repaired.
+Measured: the Skia cluster went from 109 cases with 19 failures to 90 cases with
+**none**. Adding the 17-case `DashedStrokeGeometryTests` makes it 107 green.
 
-The 11 `GraphicsAbstractionTests` facts are held back on purpose. They exercise a
-compat seam that is still supported — the roadmap forbids removing the boundary
-until Broiler.HTML's own exit gate is met — so "why do they fail" has to be
-answered before deciding between replacing and removing them. Deleting eleven
-failing tests without that diagnosis risks deleting evidence of a real defect,
-which is the one thing this whole item is written to avoid.
+### Why the 11 were held back, and what the diagnosis found
+
+They were not deleted on sight, because the roadmap forbids removing the compat
+boundary until Broiler.HTML's own exit gate is met, and deleting eleven failing
+tests without knowing why they fail risks deleting evidence of a real defect.
+
+They fail because they assert that non-raster operations fall back to the compat
+seam and materialize compat objects on demand. That seam resolves to
+`StubCompatBackend` on a host with no OS backend: `CreatePenPaint` returns an
+inert `StubPaint` and `DrawLine` has an empty body. Drawing a dashed line, a
+gradient, or text through the adapter painted **zero pixels**.
+
+Following that into the real render path found a live defect: a
+`border-style: dashed` or `dotted` edge painted nothing at all, while `solid`
+(516 px), `double` (344 px), and `groove` (516 px) painted normally. Gradients and
+text were unaffected — they reach the raster path by other routes — so borders
+were the whole user-visible consequence.
+
+The fix keeps such strokes on the raster path by reducing a dash to solid runs.
+The geometry is `Broiler.Layout.IR.DashedStrokeGeometry` in this repository,
+covered by 17 unit tests; the two call sites are `patches/0009`. Dashed goes
+0 → 388 painted pixels and dotted 0 → 484, with solid, double, and groove
+unchanged.
+
+With that understood, the 11 go: they assert the materialization plumbing of an
+inert stub rather than any rendered result. Two of them were nearly repairable —
+they fail only because the test's fake `SKCanvas` lacks the `Save`/`Restore`/
+`Translate` that `CompatCanvasOperations` reflects for — but completing the fake
+just moves the failure to a paint-factory mismatch deeper in the same harness,
+which is archaeology on a seam that is being retired.
+
+**Until `patches/0009` is applied, dashed and dotted borders remain invisible in
+this repository**, and no test here detects that any more. There is no main-repo
+fallback: the call site is a submodule file with no equivalent layer on this side.
 
 ## Batch 3b — Broiler.HTML · done (patch `0008`)
 

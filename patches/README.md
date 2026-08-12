@@ -344,3 +344,43 @@ because six of the eight references live behind the submodule pointer.
 All seven touched files are LF; `git show --stat` on the patch commit reports 6
 insertions and 24 deletions, so a larger stat after applying means a line-ending
 rewrite, not a diff.
+
+### `0009-html-dashed-stroke-raster-path.patch` — `Broiler.HTML`
+
+**Fixes a live rendering defect**, found while resolving the last of
+[the test-suite retirement item](../docs/ROADMAP.md#retire-obsolete-test-suites-and-historical-test-artifacts):
+a `border-style: dashed` or `dotted` edge painted **nothing at all**. `solid`,
+`double`, and `groove` painted normally, so a box simply lost its outline.
+
+`GraphicsAdapter.DrawLine`/`DrawRectangle` hand a stroke to the raster canvas only
+when the pen `HasSimpleStroke` — a solid colour *and* `DashStyle.Solid`.
+Everything else fell through to the graphics compatibility seam, which on a host
+with no OS backend resolves to `StubCompatBackend`: `CreatePenPaint` returns an
+inert `StubPaint` and `DrawLine` is an empty method body. The stroke was
+discarded silently.
+
+The reduction itself —
+[`Broiler.Layout.IR.DashedStrokeGeometry`](../Broiler.Layout/Broiler.Layout/IR/DashedStrokeGeometry.cs)
+— **is already in this repository**, so this patch is only the two call sites plus
+an internal `CurrentDashStyle` accessor on `PenAdapter` (`RPen.DashStyle` is
+set-only and the raster path has to read the style back). The geometry is covered
+by `DashedStrokeGeometryTests` in `Broiler.Cli.Tests`, 17 cases, which pass
+without the patch.
+
+The new branch only catches pens with a solid colour and a non-solid dash style —
+precisely the case that previously reached the inert stub and painted nothing.
+Pens with no solid colour still take the compat path, so **nothing that renders
+today changes**; the patch can only add paint where there was none.
+
+Measured on a 3px border around a 60×20 box: dashed 0 → 388 painted pixels,
+dotted 0 → 484, while solid stays 516, double 344, groove 516.
+
+**Until this is applied, dashed and dotted borders remain invisible.** There is no
+main-repo fallback, because the call site is a submodule file with no equivalent
+layer on this side; `DashedStrokeGeometry` is inert until something calls it. The
+11 `GraphicsAbstractionTests` facts that were the only in-repo evidence of the
+seam being inert have been retired, since they asserted the *materialization
+plumbing* of the stub rather than any rendered result — see the roadmap item.
+
+`Source/Broiler.HTML.Image` is LF; `git show --stat` on the patch commit reports
+46 insertions across 2 files.

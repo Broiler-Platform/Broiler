@@ -212,8 +212,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
 **Next actions:**
 
 1. **Freeze the inventory and baseline (root test infrastructure).**
-   *Landed, except the RTF registration — see
-   [`tests/test-cleanup-baseline`](../tests/test-cleanup-baseline/).*
+   *Landed — see [`tests/test-cleanup-baseline`](../tests/test-cleanup-baseline/).*
    - Record the exact files, methods, production flags, solution roots,
      documentation links, and CI references proposed in each cleanup batch, under
      `tests/test-cleanup-baseline/` (an `inventory.md` plus one result file per
@@ -294,8 +293,8 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj -c Release --filter "FullyQualifiedName~Acid3|FullyQualifiedName~Flex|FullyQualifiedName~GoogleLike"`.
 
 3. **Finish the Skia-era test transition (Broiler.HTML and root tests).**
-   *3a landed except the `GraphicsAbstractionTests` facts; 3b shipped as
-   [`patches/0008`](../patches/README.md).*
+   *3a landed; 3b shipped as [`patches/0008`](../patches/README.md), and the
+   rendering defect it uncovered as [`patches/0009`](../patches/README.md).*
    Coordinate this batch with
    [Broiler.HTML's compatibility-seam retirement](../Broiler.HTML/docs/roadmap.md#4-retire-the-skia-era-compatibility-seam).
 
@@ -316,11 +315,20 @@ names a `dotnet`/`git`/`grep` command that does run locally.
      live stub-fallback metadata. That leaves 5 of 7 cases — backend identity,
      legacy-environment-variable inertness, the two-row override theory, and
      capture metadata.
-   - Replace or remove the eleven Skia-specific fake/materialization facts in
-     `GraphicsAbstractionTests` — the eleven that fail today, of 86 methods and
-     89 cases; retain the backend-neutral render, canvas, raster, text, SVG, and
-     image behavior, including the facts whose names mention Skia only to say the
-     path does not use it.
+   - The eleven Skia-specific fake/materialization facts in
+     `GraphicsAbstractionTests` are **removed**, leaving 78 backend-neutral cases,
+     all green. Diagnosing them first was worth it: they assert that non-raster
+     operations fall back to the compat seam and materialize compat objects on
+     demand, and that seam resolves to an inert stub on a host with no OS backend.
+     Chasing that through the real render path found a live defect — a
+     `border-style: dashed` or `dotted` edge painted **nothing at all**, while
+     `solid`, `double`, and `groove` painted normally. The fix keeps such strokes
+     on the raster path by reducing them to solid runs
+     ([`DashedStrokeGeometry`](../Broiler.Layout/Broiler.Layout/IR/DashedStrokeGeometry.cs),
+     with the call site in [`patches/0009`](../patches/README.md)). The eleven were
+     asserting the plumbing of a stub rather than any rendered result, so they go;
+     what replaces them as coverage is the 17-case `DashedStrokeGeometryTests` plus
+     the fix itself.
    - Replace stale Skia adapter/fallback terminology in comments with the
      current stub/compat terminology. Do not remove the compat boundary itself
      until the component roadmap's separate exit gate is met.

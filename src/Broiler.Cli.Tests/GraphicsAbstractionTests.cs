@@ -410,21 +410,6 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void BBitmap_OpenGraphics_Syncs_SkiaOverride_Drawing_Back_Into_Primary_Pixel_Buffer()
-    {
-        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.StubFallbackId);
-        using var bitmap = new BBitmap(4, 4);
-        using (var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 4, 4)))
-        {
-            using var brush = graphics.GetSolidBrush(BColor.FromArgb(255, 255, 0, 0));
-            graphics.DrawRectangle(brush, 0, 0, 4, 4);
-        }
-
-        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(1, 1));
-        Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(3, 3));
-    }
-
-    [Fact]
     public void RasterCapable_Solid_Brush_And_Pen_Drawing_Do_Not_Materialize_Skia_Paint()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -478,29 +463,6 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void NonRaster_Fallback_Drawing_Materializes_Skia_Paint_On_Demand()
-    {
-        using var bitmap = new BBitmap(6, 6);
-        var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.FromArgb(255, 211, 19, 173)));
-        pen.DashStyle = DashStyle.Dash;
-
-        Assert.False(bitmap.HasMaterializedCompatBitmap);
-        Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(pen.HasMaterializedPaint);
-
-        graphics.DrawLine(pen, 0, 3, 5, 3);
-
-        Assert.True(bitmap.HasMaterializedCompatBitmap);
-        Assert.True(graphics.HasMaterializedCanvas);
-        Assert.True(pen.HasMaterializedPaint);
-
-        graphics.Dispose();
-
-        Assert.Equal(1, bitmap.CompatSyncInvocationCount);
-    }
-
-    [Fact]
     public void Linear_Gradient_Brush_Creation_Defers_Skia_Paint_Until_Draw()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -514,49 +476,6 @@ public class GraphicsAbstractionTests
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
         Assert.False(brush.HasMaterializedPaint);
-    }
-
-    [Fact]
-    public void Linear_Gradient_Brush_Fallback_Drawing_Materializes_Skia_Paint_On_Demand()
-    {
-        using var bitmap = new BBitmap(6, 6);
-        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 6, 6)));
-        using var brush = Assert.IsType<BrushAdapter>(graphics.GetLinearGradientBrush(
-            new RectangleF(0, 0, 6, 6),
-            BColor.Red,
-            BColor.Blue,
-            90));
-
-        Assert.False(bitmap.HasMaterializedCompatBitmap);
-        Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(brush.HasMaterializedPaint);
-
-        graphics.DrawRectangle(brush, 0, 0, 6, 6);
-
-        Assert.True(bitmap.HasMaterializedCompatBitmap);
-        Assert.True(graphics.HasMaterializedCanvas);
-        Assert.True(brush.HasMaterializedPaint);
-    }
-
-    [Fact]
-    public void FontAdapter_Defers_Skia_Font_Creation_Until_Text_Uses_It()
-    {
-        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
-        using var bitmap = new BBitmap(32, 32);
-        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
-
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        var size = graphics.MeasureString("abc", font);
-
-        Assert.True(size.Width > 0);
-        Assert.True(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        graphics.DrawString("abc", font, BColor.Black, new PointF(0, 0), size, rtl: false);
-
-        Assert.True(font.HasMaterializedRenderFont);
     }
 
     [Fact]
@@ -586,77 +505,6 @@ public class GraphicsAbstractionTests
 
         Assert.True(font.HasMaterializedRenderFont);
         Assert.Equal(["CreateFont:12", "GetMetrics", $"CreateFont:{12 * (96f / 72f):0.####}"], compatFactory.Calls);
-    }
-
-    [Fact]
-    public void Broiler_Text_Draw_And_Measurement_Do_Not_Materialize_Skia_For_Loaded_Fonts()
-    {
-        var alias = $"RasterText_{Guid.NewGuid():N}";
-        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
-        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
-        Assert.Equal(alias, family);
-
-        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
-        using var bitmap = new BBitmap(48, 24);
-        bitmap.Clear(BColor.White);
-        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
-
-        var size = graphics.MeasureString("XX", font);
-
-        Assert.False(bitmap.HasMaterializedCompatBitmap);
-        Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
-
-        graphics.DrawString("XX", font, BColor.Black, new PointF(4, 4), size, rtl: false);
-
-        Assert.False(bitmap.HasMaterializedCompatBitmap);
-        Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
-        Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 4));
-    }
-
-    [Fact]
-    public void Broiler_Ahem_CharFit_Measurement_Does_Not_Materialize_Skia_For_Loaded_Fonts()
-    {
-        var alias = $"RasterCharFit_{Guid.NewGuid():N}";
-        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
-        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
-        Assert.Equal(alias, family);
-
-        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
-        using var bitmap = new BBitmap(48, 24);
-        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 48, 24)));
-
-        var singleWidth = graphics.MeasureString("X", font).Width;
-        graphics.MeasureString("XX", font, singleWidth + 0.1f, out var charFit, out var charFitWidth);
-
-        Assert.Equal(1, charFit);
-        Assert.InRange(Math.Abs(charFitWidth - singleWidth), 0, 0.01d);
-        Assert.False(bitmap.HasMaterializedCompatBitmap);
-        Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
-    }
-
-    [Fact]
-    public void Broiler_Render_Font_Reuses_The_Registered_Font_Size_For_Loaded_Fonts()
-    {
-        var alias = $"RasterRenderSize_{Guid.NewGuid():N}";
-        var fontPath = Path.Combine(GetRepoRoot(), "tests", "wpt", "fonts", "Ahem.ttf");
-        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
-        Assert.Equal(alias, family);
-
-        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
-
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        Assert.NotNull(font.Font);
-        Assert.True(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        Assert.NotNull(font.RenderFont);
-        Assert.True(font.HasMaterializedRenderFont);
-        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
     }
 
     [Fact]
@@ -692,51 +540,6 @@ public class GraphicsAbstractionTests
             textShaper.Calls);
         Assert.False(font.HasMaterializedLayoutFont);
         Assert.False(font.HasMaterializedRenderFont);
-    }
-
-    [Fact]
-    public void GraphicsAdapter_NonText_Fallback_Operations_Delegate_Through_Canvas_Compat_Seam()
-    {
-        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
-        var canvasCompat = new RecordingCanvasCompat();
-        using var graphics = new GraphicsAdapter(
-            () => surface.Canvas,
-            new RectangleF(0, 0, 32, 32),
-            canvasCompat: canvasCompat);
-        using var textureBitmap = new BBitmap(2, 1);
-        using var image = new ImageAdapter(textureBitmap.Copy());
-        using var textureBrush = Assert.IsType<BrushAdapter>(graphics.GetTextureBrush(
-            image,
-            new RectangleF(0, 0, 2, 1),
-            new PointF(3, 4)));
-        using var solidBrush = graphics.GetSolidBrush(BColor.Red);
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.Blue));
-        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
-
-        Assert.False(textureBrush.HasMaterializedPaint);
-
-        _ = textureBrush.Paint;
-        graphics.PushClip(new RectangleF(2, 3, 4, 5));
-        graphics.PushClipExclude(new RectangleF(3, 4, 5, 6));
-        graphics.DrawLine(pen, 1, 2, 3, 4);
-        graphics.DrawRectangle(pen, 1, 2, 3, 4);
-        graphics.DrawRectangle(solidBrush, 5, 6, 7, 8);
-        graphics.DrawImage(image, new RectangleF(6, 7, 8, 9), new RectangleF(0, 0, 1, 1));
-        graphics.DrawImage(image, new RectangleF(7, 8, 9, 10));
-        path.Start(1, 1);
-        path.LineTo(4, 1);
-        path.LineTo(4, 4);
-        graphics.DrawPath(pen, path);
-        graphics.DrawPath(solidBrush, path);
-        graphics.PushClipRounded(new RectangleF(1, 2, 10, 11), 1, 2, 3, 4, 5, 6, 7, 8);
-        graphics.DrawPolygon(solidBrush, [new PointF(1, 1), new PointF(5, 1), new PointF(3, 4)]);
-        graphics.SaveOpacityLayer(0.5f);
-        graphics.SaveBlendLayer("screen");
-
-        Assert.True(textureBrush.HasMaterializedPaint);
-        Assert.Equal(
-            ["CreateTexturePaint", "PushClip", "PushClipExclude", "DrawLine", "DrawRectangle", "DrawRectangle", "DrawImageWithSource", "DrawImage", "DrawPath", "DrawPath", "ClipRounded", "DrawPolygon", "SaveOpacityLayer", "SaveBlendLayer"],
-            canvasCompat.Calls);
     }
 
     [Fact]
@@ -799,37 +602,6 @@ public class GraphicsAbstractionTests
     }
 
     [Fact]
-    public void Graphics_Default_Compat_Dependencies_Come_From_Skia_Compat_Provider()
-    {
-        var provider = new RecordingCompatProvider();
-        using var overrideScope = CompatProvider.OverrideForCurrentThread(provider);
-        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
-        using var graphics = new GraphicsAdapter(
-            () => surface.Canvas,
-            new RectangleF(0, 0, 32, 32));
-        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
-        using var imageBitmap = new BBitmap(2, 2);
-        using var image = new ImageAdapter(imageBitmap);
-        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
-
-        _ = graphics.MeasureString("measure", font);
-        _ = font.Height;
-        _ = font.Font;
-        _ = font.RenderFont;
-        graphics.DrawString("draw", font, BColor.Black, new PointF(1, 2), new SizeF(3, 4), rtl: false);
-        graphics.PushClip(new RectangleF(2, 3, 4, 5));
-        graphics.DrawImage(image, new RectangleF(4, 5, 6, 7));
-        path.Start(1, 1);
-        path.LineTo(3, 4);
-        _ = path.Path;
-
-        Assert.Equal(["MeasureString", "DrawString"], provider.TextShaper.Calls);
-        Assert.Equal(["PushClip", "DrawImage"], provider.CanvasCompat.Calls);
-        Assert.Equal(["CreateFont:12", "CreateFont:16"], provider.FontCompatFactory.Calls);
-        Assert.Equal(["CreatePath", "MoveTo", "LineTo"], provider.PathCompat.Calls);
-    }
-
-    [Fact]
     public void StubImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
     {
         var provider = new RecordingCompatProvider();
@@ -851,33 +623,6 @@ public class GraphicsAbstractionTests
         Assert.Equal(1, provider.FontTypefaceResolverFactoryCallCount);
         Assert.Equal(["RegisterFontFile", "ResolveTypeface"], provider.FontTypefaceResolver.Calls);
         Assert.Equal(["CreatePenPaint", "CreateSolidBrushPaint", "CreateLinearGradientBrushPaint"], provider.PaintCompatFactory.Calls);
-    }
-
-    [Fact]
-    public void Aliased_Font_File_Load_Defers_Skia_Typeface_Creation_Until_Font_Request()
-    {
-        var alias = $"LazyProbeSans_{Guid.NewGuid():N}";
-        var fontPath = Path.Combine(GetRepoRoot(), "acid", "fonts", "DejaVuSans.ttf");
-
-        var family = StubImageAdapter.Instance.LoadFontFromFile(fontPath, alias);
-
-        Assert.Equal(alias, family);
-        Assert.True(StubImageAdapter.Instance.HasDeferredLoadedTypefacePath(alias));
-        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
-
-        var font = Assert.IsType<FontAdapter>(StubImageAdapter.Instance.GetFont(alias, 12, FontStyle.Regular));
-
-        Assert.False(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        using var bitmap = new BBitmap(32, 32);
-        using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
-        var size = graphics.MeasureString("abc", font);
-
-        Assert.True(size.Width > 0);
-        Assert.True(StubImageAdapter.Instance.HasMaterializedLoadedTypeface(alias));
-        Assert.True(font.HasMaterializedLayoutFont);
     }
 
     [Fact]
@@ -1056,28 +801,6 @@ public class GraphicsAbstractionTests
         Assert.False(path.HasMaterializedPath);
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-    }
-
-    [Fact]
-    public void NonRaster_Fallback_Path_Drawing_Materializes_Skia_Path_On_Demand()
-    {
-        using var bitmap = new BBitmap(7, 7);
-        using var graphics = Assert.IsType<GraphicsAdapter>(bitmap.OpenGraphics(new RectangleF(0, 0, 7, 7)));
-        var pen = Assert.IsType<PenAdapter>(graphics.GetPen(BColor.Black));
-        using var path = Assert.IsType<GraphicsPathAdapter>(graphics.GetGraphicsPath());
-        pen.DashStyle = DashStyle.Dash;
-        path.Start(1, 1);
-        path.LineTo(5, 5);
-
-        Assert.False(path.HasMaterializedPath);
-        Assert.False(bitmap.HasMaterializedCompatBitmap);
-        Assert.False(graphics.HasMaterializedCanvas);
-
-        graphics.DrawPath(pen, path);
-
-        Assert.True(path.HasMaterializedPath);
-        Assert.True(bitmap.HasMaterializedCompatBitmap);
-        Assert.True(graphics.HasMaterializedCanvas);
     }
 
     [Fact]
