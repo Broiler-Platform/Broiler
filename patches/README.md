@@ -223,3 +223,56 @@ the residual being corner-miter antialiasing that a plain four-colour `solid`
 border shows too. Applied together with `0004`,
 `css/css-color-adjust/rendering/dark-color-scheme` reaches 25 of 29 and
 `color-scheme-iframe-background` reaches 99.4 % from 69.0 %.
+
+### `0006-html-border-miter.patch` — `Broiler.HTML`
+
+Two changes, in `Source/Broiler.HTML.Orchestration/IR/RGraphicsRasterBackend.cs`
+and `Source/Broiler.HTML.Image/BCanvas.cs`:
+
+- `inset`, `outset`, `groove` and `ridge` take the **mitred trapezoid** path that
+  only `solid` took, instead of being stroked along their centre lines;
+- the border path pins `Broiler.Layout.Engine.BorderAntialiasing` around its four
+  sides, and `BCanvas.FillPolygon` blends by coverage while it is pinned.
+
+`BorderAntialiasing` — the lever and the coverage rule — is **already in this
+repository** (`Broiler.Layout/Broiler.Layout/Engine/BorderAntialiasing.cs`),
+thread-static and unpinned by default, with 14 tests. Nothing calls it until this
+patch lands, so the main repo renders byte-identically to today.
+
+CSS 2.1 §8.5.4 divides a border at its corners by a straight line. **A stroke has
+no mitre**: it butts square into the neighbouring side, so whichever side is drawn
+last owns the whole corner. That is invisible while two sides share a colour and
+glaring when they do not — which is exactly what the 3D styles do, a `groove`
+putting a darkened top against a lit right. They stroke *solid*
+(`CreateBorderPen` gives them `DashStyle.Solid`), so the trapezoid draws the same
+band and simply mitres it. `dashed`, `dotted` and `double` keep their own paths,
+which are about the pattern along a side rather than its ends.
+
+**The mitre is blended; the border's own edges are not.** Filling by pixel centre
+steps the diagonal into a staircase where a browser lays one blended pixel along
+it. The first attempt anti-aliased every edge of the trapezoid and regressed 210
+tests, five of them out of passing: a border's own edges are straight lines the
+layout puts where it puts them, and feathering those turns a 1px form-control
+border sitting on a half-pixel into two grey rows instead of one solid one. Only
+the diagonals carry coverage now.
+
+**Why the corner fill runs for every corner.** Two trapezoids meeting along a
+mitre each cover about half of the pixels on it, so blended independently onto the
+page they leave the background showing through the seam. The corner rectangle that
+was already filled for same-coloured sides is now filled for every corner, with
+the colour of whichever side is drawn **first** (the order is top, left, bottom,
+right), so the second blends over an opaque corner. Where the two colours agree it
+is the same rectangle it always was, and a translucent side disables the whole
+thing — the fill cannot run for one without compositing its alpha twice.
+
+Verified against Chromium directly: a 12px four-colour border's corners go from
+**48 differing pixels to 12** (the rest differing by 1/255), with the corner pixel
+now exact — `rgb(255,83,0)` where red meets orange. A page of groove and ridge
+boxes goes from **425 differing pixels to 21**. Unequal corners fall out of the
+same rule rather than a special case for 45°: a 12px top against a 4px left slopes
+one-in-three and the coverages come out 1/6, 1/2, 5/6 against Chromium's measured
+0.158, 0.503, 0.842. Across 1 949 tests of `css/css-backgrounds`,
+`html/rendering`, `css/css-gaps` and the dark-color-scheme directory **no test
+changes state in either direction**, and the net is **+1.578 points** — +1.707
+across 55 tests against −0.129 across 103, only one of which loses more than a
+hundredth of a point.

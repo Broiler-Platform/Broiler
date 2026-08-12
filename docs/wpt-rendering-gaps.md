@@ -2042,13 +2042,54 @@ bug.)
     `fieldset-vertical` at +0.67 points — `<fieldset>` is rendered
     `border: 2px groove`, so it is the element this reaches most. Against Chromium
     directly, a page of groove and ridge boxes matches to **99.95 %**.
-- **Remaining:** the corner miters. The 0.05 % residual above is antialiasing on
-  the 45° diagonal between two differently-coloured sides — Broiler steps it,
-  Chromium feathers it — and a plain four-colour `solid` border shows the same
-  thing, so it is not a bevel gap. Owner: the raster backend's border geometry.
+- **The corner miters — since fixed.** The 0.05 % residual above was the 45°
+  diagonal between two differently-coloured sides: Broiler stepped it, Chromium
+  feathers it. See [the miter section below](#a-border-corner-had-no-mitre-and-no-anti-aliasing--fixed-pending-patch).
 - **Also remaining:** the other half of `color-scheme-iframe-background`'s original
   residual (≈ 4 356 px) is text antialiasing inside the frame, unrelated to
   borders and below the threshold now that the bevel is right.
+
+### A border corner had no mitre, and no anti-aliasing — **fixed, pending patch**
+
+- **Owner:** `Broiler.HTML` (`RGraphicsRasterBackend`, `BCanvas`) for the paint;
+  `Broiler.Layout` for the coverage rule.
+- **Two gaps, found one behind the other.** CSS 2.1 §8.5.4 divides a border at its
+  corners by a straight line.
+  1. **A stroke has no mitre.** Only `solid` was painted as a trapezoid; `inset`,
+     `outset`, `groove` and `ridge` were stroked along their centre lines, and a
+     stroke butts square into its neighbour — so whichever side was drawn last
+     owned the whole corner. Invisible while two sides share a colour, glaring
+     when they do not, which is exactly what a `groove` does.
+  2. **The mitre was a staircase.** Filled by testing each pixel's centre, the
+     diagonal steps one pixel per row where a browser lays one blended pixel
+     along it.
+- **Coverage, not a 45° special case.** The miter is only diagonal when the two
+  sides are equally wide. A 12px top against a 4px left slopes one-in-three, and
+  the pixel coverages come out 1/6, 1/2, 5/6 — against Chromium's measured 0.158,
+  0.503, 0.842. The rule is the area of the pixel the trapezoid covers, and it
+  reproduces both.
+- **Only the mitres blend.** The first attempt anti-aliased *every* edge of the
+  trapezoid and regressed 210 tests, five of them out of passing. A border's own
+  edges are straight lines the layout puts where it puts them, and feathering them
+  turns a 1px form-control border sitting on a half-pixel into two grey rows
+  instead of one solid one. Axis-aligned edges keep the pixel-centre test; only
+  the diagonals carry coverage. **That failure is the useful part of this entry** —
+  the obvious version of the fix is the wrong one, and only a broad measurement
+  said so.
+- **Why it is opt-in.** Two trapezoids meeting along a mitre each cover about half
+  of the pixels on it, so blended independently onto the page they leave the
+  background showing through the seam. The corner rectangle already filled for
+  same-coloured sides is now filled for every corner, with the colour of whichever
+  side is drawn first, so the second blends over an opaque corner. A translucent
+  side disables the whole thing, since that fill would composite its alpha twice.
+- **Verified:** against Chromium directly, a 12px four-colour border's corners go
+  from **48 differing pixels to 12** (the rest off by 1/255) with the corner pixel
+  now exact, and a page of groove and ridge boxes from **425 to 21**. Across
+  1 949 tests of `css/css-backgrounds`, `html/rendering`, `css/css-gaps` and this
+  directory, **no test changes state in either direction** and the net is
+  **+1.578 points** (+1.707 across 55 tests against −0.129 across 103, one of
+  which loses more than a hundredth of a point). Ships as
+  [`patches/0006`](../patches/README.md).
 
 ### #1615 problems, at a glance
 
