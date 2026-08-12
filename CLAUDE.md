@@ -171,8 +171,11 @@ something to attempt from inside the container.
   `MemoryLimitExceeded`, and a worker whose own resident set reaches the cap is
   recycled between tests. See `src/Broiler.Wpt/WptMemoryGuard.cs`.
 - Current cross-component WPT work:
-  `docs/ROADMAP.md#standards-and-test-infrastructure`. Generated results live
-  under `tests/html/wpt-results` and `tests/css/wpt-results`.
+  `docs/ROADMAP.md#standards-and-test-infrastructure`. Generated results are
+  written to the ignored `tests/wpt-results`; durable expected failures live in
+  the tracked `tests/wpt-baseline`. Nothing generated belongs in the index — the
+  old `tests/html/wpt-results` and `tests/css/wpt-results` snapshots were
+  retired for that reason.
 - Some `Broiler.Cli.Tests` (PDF conversion) and some `Wpt_*_MatchesReference`
   tests can fail in a bare container for environmental reasons (missing
   `Broiler.Pdf` app, font differences) — baseline before attributing a failure

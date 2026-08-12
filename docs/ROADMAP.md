@@ -83,11 +83,12 @@ results from immutable revisions, and an upstream refresh is a reviewable diff.
 **Current evidence:** focused regression tests exist and historical campaigns
 landed many fixes, but checked implementation tasks and a 100/100 Acid script
 score do not establish current pixel fidelity or broad standards conformance.
-The checked-in HTML and CSS WPT result directories are April 2026 snapshots,
-not reproducible current evidence. Current workflows generate ignored output in
-`tests/wpt-results`, while durable expected failures live in
-[`tests/wpt-baseline`](../tests/wpt-baseline/). Retiring the old snapshots and
-repairing their documentation links is tracked in
+The April 2026 HTML and CSS WPT result snapshots have been retired — they were
+a point-in-time report, not reproducible current evidence — so there is now no
+checked-in substitute for a fresh run. Current workflows generate ignored output
+in `tests/wpt-results`, while durable expected failures live in
+[`tests/wpt-baseline`](../tests/wpt-baseline/). The remaining cleanup of
+historical test artifacts is tracked in
 [the test-suite cleanup item](#retire-obsolete-test-suites-and-historical-test-artifacts).
 
 **Next actions:**
@@ -410,10 +411,11 @@ names a `dotnet`/`git`/`grep` command that does run locally.
      `tests/wpt-results` and leave `tests/wpt-baseline` unchanged, understanding
      that "unchanged" means "unchanged by this batch" — CI rewrites its
      failed-test manifest on its own schedule.
-   - Register `tests/octane/jint-host/Broiler.Octane.JintHost.csproj`, or record
-     why it stays unregistered: it is in no `.slnx`, no `.sln`, and not in
-     `eng/solutions.json`, yet the Octane script and workflow build it. The exit
-     gate's "no orphan project" clause is not met while it is missing.
+   - `tests/octane/jint-host/Broiler.Octane.JintHost.csproj` belongs to no
+     solution and is built directly by `scripts/run-octane-benchmarks.sh`. That
+     is deliberate and the reason is recorded in the project file itself — it
+     references no repository project, only the Jint package. It satisfies the
+     exit gate's "no orphan project" clause as recorded; leave it alone.
    - Regenerate and verify focused solutions after every manifest or project
      reference change with `scripts/update-solutions.ps1` and
      `scripts/verify-solution-projects.ps1`. Both are PowerShell and neither is
