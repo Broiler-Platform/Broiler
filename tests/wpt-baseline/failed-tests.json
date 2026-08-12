@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7951,
+    "failed": 7941,
     "skipped": 0,
-    "total": 7951
+    "total": 7941
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5787,
+      "count": 5779,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 684,
+      "count": 683,
       "examples": [
         "css/css-align/blocks/align-content-block-007.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -51,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 477,
+      "count": 476,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-backgrounds/background-size-029.html",
@@ -114,11 +114,11 @@
     ],
     [
       "conformance-checkers/html",
-      247
+      246
     ],
     [
       "html/semantics",
-      243
+      242
     ],
     [
       "css/css-transforms",
@@ -128,7 +128,7 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      7536
+      7526
     ],
     [
       "Timeout",
@@ -4650,13 +4650,6 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/iframe/src/path-bare-percent-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/iframe/src/path-leading-backslash-at-sign-novalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -32461,7 +32454,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -40309,13 +40302,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-view-transitions/auto-name-from-id.html",
       "passed": false,
       "skipped": false,
@@ -40716,13 +40702,6 @@
     },
     {
       "relativeTestPath": "css/css-view-transitions/scoped/display-change.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/scoped/ink-overflow-on-target.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -50749,13 +50728,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-source-media-env-change.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/media_fragment_seek.html",
       "passed": false,
       "skipped": false,
@@ -53245,13 +53217,6 @@
       "category": "ScriptError"
     },
     {
-      "relativeTestPath": "navigation-timing/dom-interactive-media-document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
       "relativeTestPath": "navigation-timing/nav2-test-document-open.html",
       "passed": false,
       "skipped": false,
@@ -53302,13 +53267,6 @@
     },
     {
       "relativeTestPath": "navigation-timing/test-performance-attributes-exist-in-object.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "navigation-timing/test-timing-attributes-dependent-on-document-load.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -53624,13 +53582,6 @@
     },
     {
       "relativeTestPath": "payment-request/user-accepts-payment-request-algo-manual.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "permissions-policy/experimental-features/vertical-scroll-disabled-scrollbar-tentative.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -54232,20 +54183,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "resource-timing/initiator-type/frameset.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "resource-timing/initiator-type/iframe.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "resource-timing/initiator-type/style.html",
       "passed": false,
       "skipped": false,
@@ -54687,13 +54624,6 @@
     },
     {
       "relativeTestPath": "svg/animations/non-additive-type-from-by-animation.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "svg/animations/smil-values-trailing-semicolon.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
