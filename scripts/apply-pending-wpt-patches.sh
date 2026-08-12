@@ -104,7 +104,6 @@ set -euo pipefail
 #     documentation and three InternalsVisibleTo grants to an assembly that is
 #     never built. Nothing it removes can move a pixel.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0003-html-dashed-stroke-raster-path.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
