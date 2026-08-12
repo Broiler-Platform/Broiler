@@ -188,12 +188,13 @@ count below is reproducible with the command in its batch.
   suites do assert — the reason to retire them is that stable Acid regression
   coverage supersedes them, not an absence of assertions.
 - The tracked `tests/html/wpt-results` and `tests/css/wpt-results` directories
-  contain 38,597,035 bytes of generated output dated 2026-04-24 across 10 files.
-  Two of them — the `wpt-results.log` pair, 18.9 MB, 49% of the total — are
+  held 38,597,035 bytes of generated output dated 2026-04-24 across 10 files.
+  Two of them — the `wpt-results.log` pair, 18.9 MB, 49% of the total — were
   tracked in violation of `.gitignore:70` (`*.log`) and must have been
-  force-added. The legacy `Broiler.JS/Broiler.JS/BroilerJS.sln` also references
-  projects that have moved, while the supported `Broiler.JS/Broiler.JS.slnx`
-  (the submodule root, not this repository's root) replaces it.
+  force-added. Both directories are now deleted (batch 6). The legacy
+  `Broiler.JS/Broiler.JS/BroilerJS.sln` still references projects that have
+  moved, while the supported `Broiler.JS/Broiler.JS.slnx` (the submodule root,
+  not this repository's root) replaces it.
 
 The cleanup is intentionally evidence-driven. A filename containing `phase`,
 `migration`, `obsolete`, or `cutover` is not sufficient reason to delete a test;
@@ -211,6 +212,8 @@ names a `dotnet`/`git`/`grep` command that does run locally.
 **Next actions:**
 
 1. **Freeze the inventory and baseline (root test infrastructure).**
+   *Landed, except the RTF registration — see
+   [`tests/test-cleanup-baseline`](../tests/test-cleanup-baseline/).*
    - Record the exact files, methods, production flags, solution roots,
      documentation links, and CI references proposed in each cleanup batch, under
      `tests/test-cleanup-baseline/` (an `inventory.md` plus one result file per
@@ -244,6 +247,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    fails if its retained coverage regresses.
 
 2. **Remove tests with no effective coverage (root and Broiler.JS).**
+   *2a landed; 2b pending as a Broiler.JS patch.*
 
    *2a — this repository.*
    - Delete `HttpClientMigrationTests`, `Acid3DebugTest`, `Acid3CascadeDebugTests`,
@@ -290,6 +294,8 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj -c Release --filter "FullyQualifiedName~Acid3|FullyQualifiedName~Flex|FullyQualifiedName~GoogleLike"`.
 
 3. **Finish the Skia-era test transition (Broiler.HTML and root tests).**
+   *3a landed except the `GraphicsAbstractionTests` facts; 3b pending as a
+   Broiler.HTML patch.*
    Coordinate this batch with
    [Broiler.HTML's compatibility-seam retirement](../Broiler.HTML/docs/roadmap.md#4-retire-the-skia-era-compatibility-seam).
 
@@ -340,6 +346,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    patch is applied.
 
 4. **Remove completed geometry cutover seams (HtmlBridge).** Entirely main-repo.
+   *Landed.*
    - Relocate the two durable assertions in `SharedGeometryExclusiveCutoverTests`
      first — `Exclusive_Boxed_Element_Reads_Real_Shared_Geometry` and
      `Exclusive_DisplayNone_Element_Reads_Zero_Not_Estimator`, the latter being
@@ -402,7 +409,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    search term — 8766/8767 also appear in kept sample READMEs.
 
 6. **Remove historical output and repair test discovery (root test
-   infrastructure).**
+   infrastructure).** *Landed.*
    - Delete `tests/html/wpt-results` and `tests/css/wpt-results`. This removes
      `tests/html/` entirely — it holds no other tracked file — while `tests/css/`
      survives via the differential corpus. Fix the one stale pointer outside this
