@@ -543,7 +543,10 @@ positioned inline-blocks and was the pair that caught it. Such a box still moves
 with a relative *ancestor*, because `OffsetLeft` carries the ancestor's shift into
 every descendant whatever its display.
 
-**`css/css-writing-modes` goes 419 → 487 of 1139, nothing lost.**
+**`css/css-writing-modes` goes 419 → 487 of 1139**, and over a 16 059-test sweep
+the change is **+73 with none lost** — `CSS2/box-display` +3, `CSS2/positioning`
++1 and `CSS2/visuren` +1 besides, all of them references that place something with
+`position: relative` on an inline box.
 
 **Vertical containers are deliberately left out.** `left`/`top` are physical, but
 a vertical container's words sit in the engine's rotated space, so the offset

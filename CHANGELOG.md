@@ -67,8 +67,10 @@ are versioned in lockstep during the preview.
   §9.4.3's offset is visual, so it has to reach the box's words; `PerformLayout`
   applied it for every box it lays out, but an inline-level box is laid out by
   `CreateLineBoxes` and never goes through `PerformLayout` — so neither an inline
-  `<span>` nor an inline `<img>` moved at all. `css/css-writing-modes` goes
-  419 → 487 of 1139 reftests, nothing lost: the family that gains is
+  `<span>` nor an inline `<img>` moved at all. **+73 reftests, none lost**, over a
+  16 059-test sweep: `css/css-writing-modes` +68 (419 → 487 of 1139),
+  `CSS2/box-display` +3, `CSS2/positioning` +1, `CSS2/visuren` +1. The family that
+  gains is
   `abs-pos-non-replaced-v{lr,rl}-*`, whose *references* place their swatch with
   `position: relative`. Vertical containers are excluded — their words sit in the
   engine's rotated space, so a physical `left`/`top` arrives turned a quarter turn
