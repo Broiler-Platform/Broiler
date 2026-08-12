@@ -1817,6 +1817,9 @@ internal sealed partial class WptTestRunner
         try
         {
             using var presentation = ImageAnimationClock.Pin(presentationTime);
+            // The checkout is the document root a `/`-rooted <frame>/<iframe> src resolves against,
+            // matching what the stylesheet/image handlers above already do for their own URLs.
+            using var documentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot);
             rendered = RenderWithNativeAnchor(html, () => renderDocument is not null
                 ? WptDocumentRenderer.RenderToImage(renderDocument, _width, _height,
                     backgroundColor: BColor.White,
@@ -2513,6 +2516,9 @@ internal sealed partial class WptTestRunner
         }
 
         using var presentation = ImageAnimationClock.Pin(presentationTime);
+        // The checkout is the document root a `/`-rooted <frame>/<iframe> src resolves against,
+        // matching what the stylesheet/image handlers above already do for their own URLs.
+        using var documentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot);
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
         {
             // `@page` paint applies to paged media only, so it is read for a print test and for

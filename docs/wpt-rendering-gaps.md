@@ -8,10 +8,13 @@
 - **Later runs get their own section rather than a rewrite**, since most of each
   new list is the same tests under new numbers:
   [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30),
-  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05) and
-  [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07). Where a re-run
+  [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05),
+  [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07) and
+  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12). Where a re-run
   contradicts something below, the section says so and the row here is struck
-  through — read the newest section first.
+  through — read the newest section first. #1612 contradicts two of them: the
+  frameset test was not a frameset bug, and `image-animation: paused` is no
+  longer unimplemented.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
   carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
@@ -31,20 +34,24 @@
   bumped**, so all of those are now live on CI rather than pending. So has
   problem 29's `0042` (confirmed two ways: it reverse-applies to the pinned
   `Broiler.HTML`, and `TemplateContentInertnessTests`' probe now sees template
-  styles staying inert). The one still waiting on a maintainer is problems 7–10's
-  [`patches/0041`](../patches/README.md), whose remote this session cannot push to
-  (403, as documented in `CLAUDE.md`) — and which **no longer applies to the
-  pinned pointer**, so it needs regenerating before it can be applied at all.
-  Until then those four tests stay at their old numbers on CI.
-- **Four of these tests should not be "fixed".** Problems 14, 15 and 24 pass only
-  by rendering *less* than Broiler already does — their Chromium reference was
-  produced by an engine that does not implement the feature under test, so the
-  reference is the unfeatured render. Problem 18's reference is a blank white
+  styles staying inert). ~~The one still waiting on a maintainer is problems
+  7–10's `patches/0041`.~~ **That one has been applied too** — the pinned
+  `Broiler.HTML` calls `BBitmap.DecodeFrameAt` — so nothing on this list is
+  waiting on a patch any more. What problems 7–10 score is now decided by the
+  `image-animation` implementation that landed after it; see
+  [#1612 problems 2 and 3](#the-next-run-issue-1612-2026-08-12).
+- **Several of these tests should not be "fixed".** Problems 14, 15 and 24 pass
+  only by rendering *less* than Broiler already does — their Chromium reference
+  was produced by an engine that does not implement the feature under test, so
+  the reference is the unfeatured render. Problem 18's reference is a blank white
   canvas for the same reason. Chasing them would mean deleting working support.
-  The same trap governs problems 7–10, where the reference is the *unpaused*
-  animation: the fix there is frame selection, deliberately not
-  `image-animation: paused`. Check what the reference actually contains before
-  treating a 0.0% as a gap.
+  Check what the reference actually contains before treating a 0.0% as a gap —
+  **the newest run makes this the majority case**: six of the nine tests reported
+  at 0.0% in [#1612](#the-next-run-issue-1612-2026-08-12) render exactly what
+  their own `rel=match` reference asks for, and only one was a real bug. Problems
+  7–10 are the worked example of the cost: they were fixed to 100% by frame
+  selection, then went back to 0.0% when `image-animation: paused` was
+  implemented for real, because Chromium still does not implement it.
 
 Every item names an owner, the evidence behind it, its next action, and an
 objective exit gate. Where the evidence is a local measurement rather than the CI
@@ -141,10 +148,18 @@ Four caveats, all learned the hard way:
   that short as "unspecified" and substitutes 100 ms (Blink's threshold is 11 ms,
   and the references are Chromium's). So green occupies 0–100 ms and red
   everything after — 300 ms is red, which is exactly what the reference shows.
-- **`image-animation: paused` is still deliberately unimplemented.** Chromium
-  does not implement it either, so each reference *is* the unpaused render;
-  honouring the property would make these four tests diverge again. The property
-  is what the tests are named for, not what they currently measure.
+- **~~`image-animation: paused` is still deliberately unimplemented.~~ No longer
+  true — and the consequence this bullet predicted is exactly what happened.**
+  The property *has* since been implemented in the main repo
+  (`Broiler.Layout/Engine/CssBox.ImageAnimation.cs`: a `paused`/`stopped` box
+  pins its own image loads to time zero, and a `<body>` background that
+  propagates to the canvas takes the *root's* value). Chromium still does not
+  implement it, so each Chromium reference is still the unpaused render — and
+  the two canvas-propagation tests of the four duly went back to 0.0% as
+  [#1612 problems 2 and 3](#the-next-run-issue-1612-2026-08-12). Broiler now
+  renders both the way their own `rel=match` references say, and matching CI
+  again would mean deleting the property. Read the two bullets together before
+  touching either: this is the trap, not a regression.
 - **Verified:** the four tests, run against locally generated Chromium
   references, go from **0.0% to 100%** — the same 0.0% CI reports, reproduced
   before the change and gone after. Four focused tests cover the timeline
@@ -152,12 +167,10 @@ Four caveats, all learned the hard way:
   hold, and the clock's nested pin/restore), and 14 cases cover the runner's
   delay extraction — including the negative half, that a test with no literal
   delay resolves to zero rather than guessing.
-- **Remaining:** the patch. There is no main-repo fallback — the decode is
-  entirely the submodule's — so CI paints frame 0 until it is applied and the
-  pointer bumped. A frame-selection test at the `BBitmap` level has to wait for
-  the same thing: `Broiler.HTML` has no test project of its own, and a main-repo
-  test calling the new `DecodeFrameAt` would not compile against the pinned
-  submodule.
+- **~~Remaining: the patch.~~ Applied.** The pinned `Broiler.HTML` calls
+  `BBitmap.DecodeFrameAt(data, ImageAnimationClock.PresentationTime)` from
+  `StubImageAdapter`, so frame selection is live on CI. What the four tests score
+  is now decided by the `image-animation` implementation above, not by this.
 - **A cost worth naming:** the clock is process-wide, not thread-local, because
   image loading is dispatched to the thread pool — a `[ThreadStatic]` value would
   be invisible to the code that reads it. Concurrent renders at *different*
@@ -480,20 +493,26 @@ Four caveats, all learned the hard way:
   `"100s"` and silently resolved to 0. `GetUnit` now also reports the written
   length; any new site that splits a length must use it.
 
-## Frameset frames render nothing
+## Frameset frames render nothing — **fixed** (see [#1612 problem 8](#a-root-relative-frame-src-resolved-against-the-wrong-directory--problem-8-fixed))
 
 - **Test:** problem 26, `resource-timing/initiator-type/frameset.html`.
 - **Owner:** HtmlBridge (nested browsing contexts) with Broiler.HTML.
-- **Current evidence:** Broiler's canvas is 100% white; Chromium's is 100%
+- **Original evidence:** Broiler's canvas is 100% white; Chromium's is 100%
   `#dddddd` with frame borders. `0b3c596` and `a06b53c` moved `<frame>`
-  sub-documents and the iframe default object size forward, so this is the
-  remaining `<frameset>` case: the frameset grid paints neither its own canvas
-  nor its frames' documents.
-- **Next action:** render a `<frameset>`'s frames as nested browsing contexts
-  positioned on the frameset grid, and paint the frameset's own canvas behind
-  them.
-- **Exit gate:** the test matches, and a focused test asserts a two-frame
-  frameset paints both documents at their grid rects.
+  sub-documents and the iframe default object size forward, so this looked like
+  the remaining `<frameset>` case: the frameset grid paints neither its own
+  canvas nor its frames' documents.
+- **That diagnosis was wrong, and the test is now passing** (0.0% → **99.7%**).
+  The frameset grid was never the problem — the *URL* was. This test's frame is
+  `src="/resource-timing/resources/green.html"`, and a root-relative URL did not
+  resolve; the same page with a directory-relative `src` already rendered its
+  frame correctly. Nothing about `<frameset>` was involved, and an `<iframe>`
+  with a root-relative `src` failed identically. Written up in full under
+  [#1612 problem 8](#a-root-relative-frame-src-resolved-against-the-wrong-directory--problem-8-fixed).
+- **Left over, and separate:** a frameset with *more than one* frame paints only
+  its first cell. That is a parser bug, not a grid bug —
+  [`patches/0003`](../patches/README.md) — and no test in the current subset
+  covers it.
 
 ## `Node.moveBefore` was missing — **fixed**
 
@@ -1634,6 +1653,177 @@ measurement.
 | 28, 29 | `css/filter-effects/svg-filter-{filter,primitive}-units-user-space` (2) | 8.0% | 8.0% | **won't fix** — the reference is an all-green canvas: Chromium fails both against their own `-ref.html`. Ours is already the closer render |
 | 30 | `css-sizing/replaced-max-size-saturation` | 8.3% | — | open — **diagnosed**: `<canvas>` is not modelled as a replaced element, so it lays out as a non-atomic inline and `max-width`/`max-height` never apply. Three parts, see above |
 
+## The next run (issue #1612, 2026-08-12)
+
+7 603 failures, no incomplete shards. **This session worked the nine tests
+reported at 0.0%** — problems 1 through 9 — and the result is lopsided enough to
+be the headline:
+
+- **One is a real engine bug.** Problem 8, `resource-timing/initiator-type/frameset`,
+  is **fixed** — 0.0% → **99.7%, passing** — and it was not the bug its own
+  section here had predicted.
+- **Six render *correctly* and fail anyway**, because the Chromium golden image
+  they are scored against was produced without the feature under test. Problems
+  2, 3, 5, 6 and 7 are new to this list and all five are this shape; problem 9 is
+  the already-settled member of it. In every one of the six, Broiler's render
+  matches the test's **own `rel=match` reference** and Chromium's does not.
+- **Two are re-reports that were already settled.** Problem 1 cannot be judged
+  offline at all — it needs the WPT server. Problem 4 is judged and closed:
+  its reference is a screenshot artifact, not a rendering gap.
+
+So the honest count for this run's 0.0% tail is **one gap, fixed**, and eight
+tests that say more about the reference-generation strategy than about the
+engine. That ratio is itself the finding: the golden-image suite scores Broiler
+against Chromium's pixels, and Broiler now implements several things Chromium
+does not, so *shipping a feature moves these tests to 0.0%*. Problems 2 and 3
+demonstrate it end to end — they were at 100% in the #1491 write-up and are back
+at 0.0% *because* `image-animation` was implemented in the meantime.
+
+### A root-relative frame `src` resolved against the wrong directory — problem 8, **fixed**
+
+- **Test:** problem 8, `resource-timing/initiator-type/frameset.html`. CI 0.0%,
+  local **0.0% → 99.7% (passing)**.
+- **Owner:** Broiler.Layout (`FragmentTreeBuilder`), with the WPT runner.
+- **The previous diagnosis was wrong.** [Frameset frames render
+  nothing](#frameset-frames-render-nothing--fixed-see-1612-problem-8) had this as
+  the frameset grid painting neither its canvas nor its frames' documents, and
+  the next action was to render frames as nested browsing contexts on that grid.
+  None of that was needed: the grid, the sub-viewport projection and the frame
+  document load all already worked. Bisecting the test down found the whole
+  difference in the URL — the same page with `src="../resources/green.html"`
+  rendered its frame correctly, and only `src="/resource-timing/resources/green.html"`
+  came out blank. `<frameset>` was a red herring, and so was `<frame>`: an
+  `<iframe>` with a root-relative `src` failed identically.
+- **The bug.** HTML §"resolve a URL" resolves a leading `/` against the
+  document's origin. A `file://` render has no origin, and
+  `FragmentTreeBuilder.TryLoadEmbeddedDocument` joined the URL onto the
+  containing directory like any other relative reference —
+  `Path.Combine(dir, "/resource-timing/…")`. `Path.Combine` **discards its left
+  operand when the right one is rooted**, so the result was an absolute path at
+  the filesystem root, `File.Exists` failed, and the frame painted empty. Silent,
+  and it had nothing to do with framesets.
+- **What landed, all main repo — on CI immediately, no patch.**
+  `Broiler.Layout.Engine.DocumentRoot` is a thread-static, scope-restoring render
+  lever (the shape of `CanvasBackdrop.Current` and `NativeZoom.Enabled`) carrying
+  the directory a root-relative sub-document URL resolves against;
+  `TryLoadEmbeddedDocument` takes a root-relative branch that reads from it,
+  stripping the query and fragment and refusing to leave the root. The WPT runner
+  pins it to the checkout around both render paths — the same root its
+  stylesheet, image and script loaders already resolve `/`-paths against
+  (`TryResolveWptRootRelativePath`). **This was the one sub-resource kind with no
+  such hook.**
+- **Null by default is the point.** A host that sets nothing renders exactly as
+  before: an unresolvable root-relative frame stays the empty box it has always
+  been. Nothing outside the runner changes behaviour.
+- **Verified:** the test goes 0.0% → 99.7% and passes, against a locally
+  generated Chromium reference — and the render is the *right* pixels, 99.8%
+  `#00FF00` plus the reference's own `<h1>Placeholder</h1>` text, matching
+  Chromium's 99.8%/0.1% split. The `resource-timing/initiator-type` subset goes
+  8 → 9 passing with nothing lost. 13 focused cases pin the behaviour, including
+  the negative halves that keep it honest: no root set → still empty; the root is
+  *not* the page's own directory; `//host/path` is scheme-relative and must not
+  be read off the local disk; `..` cannot escape the root; a bare `/` is not a
+  document; and a directory-relative `src` is unaffected either way.
+- **Left over, and genuinely a frameset bug this time:** a frameset with more
+  than one frame paints only its first cell. `<frame>` is missing from
+  `Broiler.DOM`'s void-element set, though `Broiler.HTML` has it, so
+  `<frame src=a><frame src=b>` parses the second frame as a *child* of the first
+  and `DomParser.LayoutFramesetChildren` is handed one cell instead of two.
+  Confirmed by writing the same markup with explicit `</frame>` tags, which
+  renders both cells. Fixed in [`patches/0003`](../patches/README.md) — the
+  submodule remote 403s from here — and verified before the tree was reverted:
+  both `cols` and `rows` framesets go from half-painted to both cells painting
+  their own document, with a single-frame frameset and a two-iframe page
+  unchanged. **No test in the current subset covers it**, and the test that
+  motivated this work has exactly one frame, so nothing regresses while it waits.
+
+### Six tests where Broiler is right and the reference is not — problems 2, 3, 5, 6, 7 and 9
+
+All six were rendered here and compared against a Chromium reference generated in
+this container, alongside the reference the test itself declares. The pattern is
+identical in each: **Broiler matches the test's `rel=match` target; Chromium does
+not.** Percentages are dominant-colour shares of the 1024×768 canvas.
+
+| Problem | Test | Broiler renders | Chromium reference | The test's own `rel=match` |
+| --- | --- | --- | --- | --- |
+| 2 | `image-animation-body-background-root-propagation-paused` | 100% `#00FF00` | 100% `#FF0000` | `…-ref.html` → `green.png` |
+| 3 | `image-animation-root-background-paused` | 100% `#00FF00` | 100% `#FF0000` | `…-ref.html` → `green.png` |
+| 5 | `mediaqueries/at-custom-media-basic` | 100% `#008000` | 100% white | `/css/reference/green.html` → `background: green` |
+| 6 | `fullscreen/rendering/backdrop-iframe` | 99.1% `#008000` | 98.7% white | `backdrop-green-ref.html` → `background: green` |
+| 7 | `fullscreen/rendering/backdrop-inherit` | 100% `#008000` | 98.9% white | `backdrop-green-ref.html` → `background: green` |
+| 9 | `color-scheme-iframe-background-mismatch-dynamic` | 99.8% white | 99.7% `#121212` | `support/light-frame-scrolling.html` → white |
+
+Why each reference is what it is:
+
+- **Problems 2 and 3 — `image-animation: paused`, and a worked example of the
+  trap.** These two were reported *fixed at 100%* in the [#1491
+  write-up](#animated-images-always-painted-their-first-frame--fixed-pending-patch):
+  frame selection put the 300 ms screenshot on the red frame, which is what
+  Chromium shows. `image-animation` has since been implemented
+  (`CssBox.ImageAnimation.cs`), so Broiler now honours `paused` and holds the
+  green first frame — which is precisely what `…-ref.html` asks for, and precisely
+  what Chromium, which does not implement the property, does not do. **The two
+  that flipped are exactly the two canvas-propagation cases**, and the other two
+  of the family did not, for reasons worth knowing:
+  `image-animation-background-paused` paints its two 20×10 boxes green against
+  Chromium's red and still scores **99.9%**, because the disagreement is 0.1% of
+  the canvas — it passes the 99% threshold by being small, not by being right;
+  and `image-animation-body-background-no-propagation-paused` asks for the
+  *unpaused* render (`red.png`) and gets it, because propagation hands the
+  canvas the **root's** `image-animation`, not body's. That asymmetry is
+  modelled, and it is why only two of four are on this list.
+- **Problem 5 — `@custom-media`.** `@custom-media --foo (width > 0px);` plus
+  `@media (--foo) { :root { background: green } }`. Broiler implements Media
+  Queries 5 §3 (`CssStyleEngine.Values.cs`, with substitution and cycle detection
+  covered by `CssStyleEngineTests`) and paints the green the reference asks for.
+  Chromium does not implement it, so the `@media (--foo)` block never matches and
+  its screenshot is white.
+- **Problems 6 and 7 — fullscreen `::backdrop`.** Both call `requestFullscreen()`
+  through `test_driver.bless`, which needs WebDriver; the plain Playwright
+  reference generator provides none, so Chromium never enters fullscreen, no
+  `::backdrop` is generated, and the screenshot is the un-activated page. Broiler
+  runs the blessed callback (the runner's `test_driver` shim, covered by
+  `FullscreenRenderTests`), promotes the element into the top layer and paints its
+  `::backdrop` green. Problem 7 is the stronger evidence that this is real rather
+  than a backdrop painted indiscriminately: it sets `--bg: red` on `body` and
+  `--bg: green` on the `div`, and asserts `div::backdrop` inherits from the
+  *fullscreen element*. Broiler renders green — inheriting from the div. A
+  backdrop painted from the wrong parent would be red.
+- **Problem 9 — settled previously, unchanged.** Chromium fails this reftest
+  against its own `rel=match` reference; see [#1497 problem
+  25](#the-next-run-issue-1497-2026-07-30). Ours matches the reference.
+
+**None of the six should be "fixed".** Each would require deleting working
+support, and problems 2 and 3 are the proof that the cost is real rather than
+theoretical: the engine got better and the score got worse.
+
+### The two that cannot be judged here — problems 1 and 4
+
+- **Problem 1** (`color-scheme-…-opaque-cross-origin-002.sub`) needs `.sub`
+  substitution and a real cross-origin host; unchanged from [items that need the
+  WPT server](#items-that-need-the-wpt-server-before-they-can-be-judged).
+- **Problem 4** (`css-page/page-margin-002-print`) is a screenshot artifact, not
+  a rendering gap: Chromium's own *viewport* capture of a `vertical-rl` root is
+  blank while its full-page capture paints all three blocks. Established under
+  [screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests);
+  matching it would mean drawing nothing.
+
+### #1612 problems, at a glance
+
+Local numbers are this container's, against Chromium references generated here.
+
+| # | Test | CI | Local | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-color-adjust/…/cross-origin-002.sub` | 0.0% | — | re-report — needs `.sub` substitution and a second host |
+| 2 | `css-image-animation/image-animation-body-background-root-propagation-paused` | 0.0% | 0.0% | **won't fix** — ours matches the test's `rel=match` (green); Chromium has no `image-animation` |
+| 3 | `css-image-animation/image-animation-root-background-paused` | 0.0% | 0.0% | **won't fix** — same |
+| 4 | `css-page/page-margin-002-print` | 0.0% | — | **won't fix** — the reference is a `vertical-rl` viewport-screenshot artifact |
+| 5 | `mediaqueries/at-custom-media-basic` | 0.0% | 0.0% | **won't fix** — ours matches `/css/reference/green.html`; Chromium has no `@custom-media` |
+| 6 | `fullscreen/rendering/backdrop-iframe` | 0.0% | 0.0% | **won't fix** — ours matches `backdrop-green-ref.html`; the reference never entered fullscreen (no WebDriver) |
+| 7 | `fullscreen/rendering/backdrop-inherit` | 0.0% | 0.0% | **won't fix** — same, and ours inherits `--bg` from the fullscreen element as the test asserts |
+| 8 | `resource-timing/initiator-type/frameset` | 0.0% | **0.0% → 99.7%** | **fixed** — a root-relative `<frame src>` resolved against the page's directory; main repo, on CI immediately |
+| 9 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | 0.0% | **won't fix** — Chromium fails this reftest against its own reference |
+
 ## Reported problems, at a glance
 
 Local numbers come from this container against locally generated Chromium
@@ -1652,7 +1842,7 @@ feature they test — closing those means rendering less, not more.
 | 6 | `css-color/contrast-color-style-query` | 0.0% | ours white, Chromium green | **fixed** — patch 0039 applied |
 | 7–10 | `css-image-animation/*-paused` (4) | 0.0% | ours green frame 0, Chromium red | **fixed** — 0.0% → 100% locally; **pending patch 0041** |
 | 11 | `css-page/monolithic-overflow-011-print` | 0.0% | ours blank, Chromium yellow + hotpink | open |
-| 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | open |
+| 12 | `css-page/page-margin-002-print` | 0.0% | ours yellow, Chromium white | **won't fix** — the reference is a `vertical-rl` viewport-screenshot artifact ([screen-layout gaps](#screen-layout-gaps-behind-the-three-print-html-tests)) |
 | 13 | `css-transforms/animation/transform-interpolation-002` | 0.0% | 100% — both empty offline | open |
 | 14, 15 | `css-view-transitions/auto-name*` (2) | 0.0% | ours captures both items + backdrop; Chromium drops `view-transition-name: auto` | **won't fix** — reference is the unfeatured render |
 | 16, 17 | `css-view-transitions/iframe-and-main-frame-*` (2) | 0.0% | ours 99.5% white, Chromium 74.5% green + 25% blue | open — needs a transition in a nested browsing context |
@@ -1662,7 +1852,7 @@ feature they test — closing those means rendering less, not more.
 | 23 | `css-view-transitions/root-captured-as-different-tag` | 0.0% | ours 100% red (the `(root)` trap rule) | part-fixed — the `(root)` rules no longer match; still needs the root snapshot |
 | 24 | `canvas/…/manual/dialog-paints-in-top-layer.tentative` | 0.0% | ours dialog, Chromium blank (unsupported) | **fixed** — reclassified Manual |
 | 25 | `the-link-element/stylesheet-with-base` | 0.0% | ours red (trap file), Chromium white | **fixed** — renders green locally |
-| 26 | `resource-timing/initiator-type/frameset` | 0.0% | ours white, Chromium `#dddddd` | open |
+| 26 | `resource-timing/initiator-type/frameset` | 0.0% | **0.0% → 99.7%** | **fixed** at [#1612 problem 8](#a-root-relative-frame-src-resolved-against-the-wrong-directory--problem-8-fixed) — a root-relative `<frame src>`, not the frameset grid; main repo |
 | 27 | `dom/nodes/moveBefore/preserve-render-blocking-style` | 0.0% | ours white, Chromium green | **fixed** — but only at the *second* attempt; `moveBefore` (patch 0038) was half of it, and the test stayed at 0.0% until `<link>` got its IDL reflectors. See [the #1497 section](#the-next-run-issue-1497-2026-07-30) |
 | 28 | `forced-colors-mode/forced-colors-mode-20` | 0.0% | ours black, Chromium white | **fixed** — patch 0036 applied |
 | 29 | `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling` | 0.0% | ours flat `#cccccc` — a template's styles leaking into the page | **0.0% → 97.8%** with patch 0042; residual is inline-block line height |
