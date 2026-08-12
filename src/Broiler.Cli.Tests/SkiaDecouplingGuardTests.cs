@@ -17,12 +17,17 @@ public class SkiaDecouplingGuardTests
     private static readonly string RepoRoot = Path.GetFullPath(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
 
+    // Broiler.HTML.WPF used to be listed here. The adapter was deleted, and asserting on a
+    // directory that no longer exists tests the deletion rather than the decoupling — the
+    // one thing this guard is not for. What it does guard is still live and is the only
+    // automated enforcement of the Skia exit gate: no Skia package anywhere in the restore
+    // graph, and no SkiaSharp token in production source or in any Cli test outside the two
+    // files that deliberately exercise the compat seam.
     private static readonly string[] ProductionDirectories =
     [
         Path.Combine(RepoRoot, "src", "Broiler.Cli"),
         Path.Combine(RepoRoot, "src", "Broiler.DevSite"),
         Path.Combine(RepoRoot, "src", "Broiler.Wpt"),
-        Path.Combine(RepoRoot, "Broiler.HTML", "Source", "Broiler.HTML.WPF"),
     ];
 
     private static readonly string CliTestsDirectory = Path.Combine(RepoRoot, "src", "Broiler.Cli.Tests");
