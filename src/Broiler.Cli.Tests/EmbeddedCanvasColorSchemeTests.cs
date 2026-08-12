@@ -73,11 +73,11 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
 
     /// <summary>
     /// Whether the pinned <c>Broiler.HTML</c> can leave a frame's canvas transparent. The renderer
-    /// half of this ships as <c>patches/0004-html-embedded-canvas-color-scheme.patch</c> and the
-    /// submodule remote is outside this session's GitHub scope, so until a maintainer applies it
-    /// and bumps the pointer every frame is still composited opaque and the render assertions
-    /// cannot hold. Probed rather than assumed, so they become real guards the moment the patch
-    /// lands — the same shape as <c>TemplateContentInertnessTests</c>.
+    /// half of this is upstream and pinned (<c>Broiler.HTML</c> <c>d1cdad4</c>), so the probe now
+    /// succeeds and the render assertions below are live guards. It stays a probe rather than an
+    /// assumption because that is what makes the suite honest against a *future* pointer that
+    /// predates the fix — the same shape as <c>TemplateContentInertnessTests</c>. Before it landed,
+    /// every frame was composited opaque and those assertions could not hold.
     /// </summary>
     private bool FrameCanvasCanBeTransparent()
     {
