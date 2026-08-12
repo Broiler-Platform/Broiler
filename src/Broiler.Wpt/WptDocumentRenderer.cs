@@ -651,6 +651,12 @@ internal static class WptDocumentRenderer
 
             if (dw > 0 && dh > 0 && fitsAllocation)
             {
+                // CSS Color Adjust §2.4: this frame's canvas is transparent unless its used colour
+                // scheme differs from *this element's* — the embedding element's, which may carry
+                // its own `color-scheme` independent of the containing document's. Pinned around
+                // the render so the frame's own canvas paint sees its embedder, exactly as
+                // HtmlRender.CompositeEmbeddedDocuments does it on the string-render path.
+                using var embedded = Broiler.Layout.Engine.EmbeddedCanvas.Pin(fragment.Style.ColorScheme);
                 using var sub = HtmlRender.RenderToImageWithStyleSet(
                     fragment.EmbeddedDocumentHtml!,
                     dw,
@@ -659,7 +665,7 @@ internal static class WptDocumentRenderer
                     stylesheetLoad: stylesheetLoad,
                     imageLoad: imageLoad,
                     baseUrl: fragment.EmbeddedDocumentBaseUrl);
-                BlitOnto(target, sub, dx, dy);
+                BlitFrameOnto(target, sub, dx, dy);
             }
         }
 
@@ -684,5 +690,62 @@ internal static class WptDocumentRenderer
                 target.SetPixel(tx, ty, source.GetPixel(x, y));
             }
         }
+    }
+
+    /// <summary>
+    /// Composites a rendered frame over <paramref name="target"/>, source-over rather than a copy:
+    /// a frame whose canvas is transparent (CSS Color Adjust §2.4) has to let the embedder show
+    /// through instead of punching it out. An opaque source takes the copy path, so a frame that
+    /// fills its own canvas — every frame, before that rule was modelled — is unchanged.
+    /// <para>
+    /// Separate from <see cref="BlitOnto"/> deliberately: that one also stacks the <c>@page</c>
+    /// backdrop, flow and margin-box layers of a print render, which are composed by replacement
+    /// and are no part of this rule.
+    /// </para>
+    /// </summary>
+    private static void BlitFrameOnto(BBitmap target, BBitmap source, int destX, int destY)
+    {
+        for (int y = 0; y < source.Height; y++)
+        {
+            int ty = destY + y;
+            if (ty < 0 || ty >= target.Height)
+                continue;
+
+            for (int x = 0; x < source.Width; x++)
+            {
+                int tx = destX + x;
+                if (tx < 0 || tx >= target.Width)
+                    continue;
+
+                target.SetPixel(tx, ty, BlendOver(source.GetPixel(x, y), target.GetPixel(tx, ty)));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Porter-Duff source-over on straight (non-premultiplied) alpha. Mirrors
+    /// <c>HtmlRender.BlendOver</c>, which the string-render path composites frames with.
+    /// </summary>
+    private static BColor BlendOver(BColor source, BColor destination)
+    {
+        if (source.A == 255 || destination.A == 0)
+            return source;
+        if (source.A == 0)
+            return destination;
+
+        float sa = source.A / 255f;
+        float da = destination.A / 255f;
+        float outA = sa + da * (1f - sa);
+        if (outA <= 0f)
+            return BColor.Transparent;
+
+        byte Channel(byte s, byte d) =>
+            (byte)Math.Clamp((int)Math.Round((s * sa + d * da * (1f - sa)) / outA), 0, 255);
+
+        return BColor.FromArgb(
+            (byte)Math.Clamp((int)Math.Round(outA * 255f), 0, 255),
+            Channel(source.R, destination.R),
+            Channel(source.G, destination.G),
+            Channel(source.B, destination.B));
     }
 }

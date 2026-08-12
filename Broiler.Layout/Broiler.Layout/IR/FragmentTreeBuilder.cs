@@ -579,6 +579,15 @@ internal static class FragmentTreeBuilder
             return (null, null);
         }
 
+        // An absolute URL naming a host the caller serves from the document root is that root's
+        // file under a different name: dropping the origin leaves the root-relative URL for the
+        // same resource. Without this a frame pointed at such a host is a network fetch a local
+        // render cannot make, so it paints empty — which is what WPT's cross-origin reftests
+        // (`http://not-web-platform.test:8000/…`, every host of theirs served from one checkout)
+        // showed. No list set, no absolute URL resolves, and nothing changes.
+        if (Engine.DocumentRoot.TryStripLocalOrigin(url) is { Length: > 0 } servedLocally)
+            url = servedLocally;
+
         // HTML §"resolve a URL": a leading `/` is resolved against the document's origin, not
         // against the directory the containing page sits in. A file:// render has no origin to
         // ask, so the root comes from the host (DocumentRoot) — and joining such a URL onto the

@@ -9,12 +9,14 @@
   new list is the same tests under new numbers:
   [#1497 (2026-07-30)](#the-next-run-issue-1497-2026-07-30),
   [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05),
-  [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07) and
-  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12). Where a re-run
+  [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07),
+  [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12) and
+  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12). Where a re-run
   contradicts something below, the section says so and the row here is struck
   through — read the newest section first. #1612 contradicts two of them: the
   frameset test was not a frameset bug, and `image-animation: paused` is no
-  longer unimplemented.
+  longer unimplemented. #1615 contradicts a third: `.sub` tests are no longer
+  unjudgeable offline, because the runner now performs the substitution itself.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
   carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
@@ -711,31 +713,39 @@ Four caveats, all learned the hard way:
 
 ## Items that need the WPT server before they can be judged
 
-- **Tests:** problem 5
-  (`css/css-color-adjust/…/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub.html`),
+> **Partly resolved.** The `.sub` half of this needed no server at all — see
+> [#1615](#the-runner-never-performed-wpts-sub-substitution--problem-1-fixed).
+> The runner now expands `.sub` templates itself and serves WPT's own hosts from
+> the checkout, so problem 5 is reproducible, **fixed and passing**, and so is
+> every other `.sub` test's cross-origin frame. What remains below is the `?pipe=`
+> half and the script-built-DOM case.
+
+- **Tests:** ~~problem 5
+  (`css/css-color-adjust/…/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub.html`)~~ **fixed**,
   problem 4 (`css/css-backgrounds/background-image-shared-stylesheet.html`),
   problem 13 (`css/css-transforms/animation/transform-interpolation-002.html`).
 - **Owner:** the WPT runner, then the component the confirmed failure names.
-- **Current evidence:** all three are reported at 0.0% by CI but are not
-  reproducible offline, and their local scores are misleading:
-  - problem 5 needs `.sub` substitution and a cross-origin host. Offline Broiler
-    paints the `#121212` dark canvas backdrop and Chromium paints white, which
-    hints at a `color-scheme` propagation difference but proves nothing without
-    the real cross-origin frame.
+- **Current evidence:** both remaining tests are reported at 0.0% by CI but are
+  not reproducible offline, and their local scores are misleading:
   - problem 4 needs `?pipe=trickle(d2)` for its image and a script-injected
     `data:text/css` stylesheet; offline neither engine loads the image, so the
     pair matched at 99.8% locally while CI reports 0.0%.
   - problem 13 builds its whole DOM from `interpolation-testcommon.js`; offline
     both renders are empty (100% local match, 0.0% on CI), so the CI artifact's
     `rendered.png` is the only evidence that says what Broiler actually drew.
+  - ~~problem 5 needs `.sub` substitution and a cross-origin host.~~ It needed
+    substitution, which is now done on both sides of the comparison; the
+    "cross-origin host" was a red herring, because WPT serves all of its hosts
+    from one checkout.
 - **Next actions:**
-  1. Pull the `wpt-merged` artifact's failure images for these three before
+  1. Pull the `wpt-merged` artifact's failure images for these two before
      opening any component work — the local pipeline cannot see their real
      failure.
-  2. Decide whether the runner should serve tests over a local HTTP origin with
-     substitution and pipe support, which is what would make this whole class
-     reproducible.
-- **Exit gate:** each of the three is either reproducible locally or reassigned to
+  2. `?pipe=` is the remaining server behaviour worth emulating; the `sub` pipe is
+     done, and the handlers are per-pipe and independent
+     (`tools/wptserve/wptserve/pipes.py`), so `trickle`, `status` and `header` can
+     follow the same shape — a runner-side transform, not a server.
+- **Exit gate:** each of the two is either reproducible locally or reassigned to
   an owning component with a CI-artifact failure image as its evidence.
 
 ## Runner: a `manual/` test was being scored — **fixed**
@@ -1823,6 +1833,278 @@ Local numbers are this container's, against Chromium references generated here.
 | 7 | `fullscreen/rendering/backdrop-inherit` | 0.0% | 0.0% | **won't fix** — same, and ours inherits `--bg` from the fullscreen element as the test asserts |
 | 8 | `resource-timing/initiator-type/frameset` | 0.0% | **0.0% → 99.7%** | **fixed** — a root-relative `<frame src>` resolved against the page's directory; main repo, on CI immediately |
 | 9 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | 0.0% | **won't fix** — Chromium fails this reftest against its own reference |
+
+## The next run (issue #1615, 2026-08-12)
+
+7 593 failures, no incomplete shards. **This run's 0.0% list is the previous
+run's, minus the one that was fixed** — the eight tests reported here are #1612's
+problems 1–7 and 9, and `resource-timing/initiator-type/frameset` has dropped off
+because it now passes. So the six *won't fix* verdicts and the one
+screenshot-artifact verdict all stood; every one was re-rendered here and
+reproduced its documented colours to the tenth of a percent (100 % `#00FF00` for
+both `image-animation` tests, 100 % `#008000` for `at-custom-media-basic` and
+`backdrop-inherit`, 99.1 % for `backdrop-iframe`, 99.8 % white for
+`mismatch-dynamic`, 99.95 % yellow for `page-margin-002-print`).
+
+That left exactly one test with any headroom: **problem 1, the one that could not
+be judged offline at all.** It can now, and it passes.
+
+### The runner never performed WPT's `.sub` substitution — problem 1, **fixed**
+
+- **Test:** problem 1,
+  `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub.html`.
+  CI 0.0%, local **0.0% → passing**, and 100.00 % pixel-identical to the test's
+  own `rel=match` reference.
+- **Owner:** the WPT runner (`src/Broiler.Wpt`) and its reference generator, with
+  a two-line hook in `Broiler.Layout`.
+- **The diagnosis this replaces.** [Items that need the WPT
+  server](#items-that-need-the-wpt-server-before-they-can-be-judged) had this
+  test as unreproducible without a real server and a second host, and the next
+  action was to decide whether to serve the suite over a local HTTP origin. No
+  server is needed. A `.sub` file is a **template**: WPT's server expands
+  `{{host}}`, `{{ports[http][0]}}` and friends before sending it
+  (`tools/wptserve/wptserve/handlers.py` — the rule is a literal `".sub." in
+  path`). Read straight off disk the placeholders survive into the markup, so
+  this test's frame pointed at the uninterpretable URL
+  `http://{{hosts[alt][]}}:{{ports[http][0]}}/css/…/support/light-frame.html`,
+  loaded nothing, and the page rendered 100 % `#121212` — the parent's dark
+  canvas showing through an empty frame. **Neither side of the comparison
+  substituted**, so Chromium's golden was blank for the same reason and the score
+  was meaningless in both directions. There are **1 419 `.sub.html` files** in
+  the tree; 51 of them are reftests.
+- **The second half: WPT's hosts are all one checkout.** Substituting alone only
+  moves the problem — the URL becomes `http://not-web-platform.test:8000/css/…`,
+  which a local render still cannot fetch. But WPT serves *every* one of its
+  hosts from the same document root, so that URL and `/css/…` name one file.
+  Recognising that is what makes a cross-origin frame reachable offline.
+- **What landed, all main repo — on CI immediately, no patch.**
+  `WptSubstitution` performs the substitution with WPT's own defaults
+  (`tools/serve/serve.py`): primary host `web-platform.test`, alternate
+  `not-web-platform.test`, the subdomain set closed under the two-deep products
+  `_make_subdomains_product` builds, IDNA-encoded, and ports pinned to the
+  documented numbers so a render is reproducible. `Broiler.Layout.Engine.DocumentRoot`
+  — the lever [#1612 problem 8](#a-root-relative-frame-src-resolved-against-the-wrong-directory--problem-8-fixed)
+  added — gains a list of hosts served from that root, and `FragmentTreeBuilder`
+  strips such an origin before its existing root-relative branch. The runner's
+  stylesheet and image loaders take the same view through
+  `TryResolveWptRootRelativePath`. `scripts/generate-wpt-references.js` mirrors
+  both halves, because the two sides must render the same bytes.
+- **Only what a file on disk can answer is substituted.** `{{uuid()}}`,
+  `{{headers[…]}}`, `{{GET[…]}}`, `{{file_hash(…)}}` and `{{$var}}` describe a
+  live request and are left **verbatim**, so a test using them renders exactly as
+  it did before. `{{not_domains[nonexistent]}}` is left alone for a stronger
+  reason — it names a host that is *meant* not to resolve — and the served-host
+  match is exact rather than by suffix for the same reason, so
+  `nonexistent.web-platform.test` is never served content.
+- **Empty by default.** A host that declares no served hosts renders byte-for-byte
+  as before: an absolute URL stays the unfetchable empty box it has always been.
+- **CACHE_EPOCH is bumped to 7.** Every `.sub` test's golden changes, so the
+  cached reference slice must be regenerated or the two sides disagree by
+  construction.
+- **Verified:** 0.0% → passing, and the render is the *right* pixels —
+  **100.00 % identical** to `support/light-frame.html`, the reference the test
+  itself declares. 47 focused substitution cases and 16 frame-loading cases pin
+  it, including the negative halves: an unknown or request-scoped placeholder
+  left verbatim, `not_domains` left verbatim, an unlisted host and a subdomain of
+  a listed one both refused, a non-http scheme left alone, `..` unable to escape
+  the root, and a served URL naming nothing still painting empty. The reference
+  generator's own 28 node tests assert the JS mirror agrees case for case.
+
+### What else moved, and the one it exposed
+
+Measured before/after across three directories, each with locally generated
+Chromium references on **both** sides so the comparison is like for like:
+
+| Subset | Tests | Before | After |
+| --- | --- | --- | --- |
+| `css/css-color-adjust/rendering/dark-color-scheme` | 29 | 22 passing | 22 passing |
+| `css/css-values/urls` + `html/syntax/speculative-parsing/…/document-write` | 121 | 121 passing | 121 passing |
+
+Outside the cross-origin-iframe family the change is inert — 121 tests,
+identical both ways. Inside it, four tests moved, and the net is zero because two
+of them were **passing for the wrong reason**. (The frame-canvas fix below then
+took that directory to **24 passing**; the four moves are recorded as the
+substitution change left them, because the second of them is what pointed at the
+bug.)
+
+- **Gained (2).** `…-opaque-cross-origin-002.sub` (the problem above) and
+  `color-scheme-iframe-preferred-page-dark-cross-origin.sub` both load their
+  frame now and match.
+- **Lost, and correctly (1).** `…-mismatch-dynamic-cross-origin.sub` is the
+  cross-origin twin of problem 9, and it fails for exactly the same reason its
+  same-origin twin does: Broiler renders **100.00 % identical to the test's own
+  `rel=match`** (`support/light-frame-scrolling.html`, white), while Chromium's
+  reference is 99.8 % `#121212`. It used to pass only because *both* engines
+  rendered an empty frame. Same **won't fix** class as problem 9.
+- **Lost, and it is a real bug (1).** `…-opaque-cross-origin-003.sub` painted a
+  200×200 white box that should not be there. **Since fixed** — see
+  [the frame-canvas section below](#a-frames-canvas-was-never-transparent--003sub-and-iframe-background-fixed-pending-patch).
+  Worth keeping the shape of it on record: the test's former pass is exactly what
+  this document calls **untrustworthy** — passing by rendering nothing — and a
+  truthful failure that named a real gap was worth more than a green tick that
+  depended on a frame never loading.
+
+### A frame's canvas was never transparent — 003.sub and `iframe-background`, **fixed, pending patch**
+
+- **Tests:** `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-opaque-cross-origin-003.sub`
+  (94.7 % → **99.8 %, passing**) and `…/color-scheme-iframe-background`
+  (69.0 % → **98.9 %**), plus `…/color-scheme-iframe-background-mismatch-used-preferred`
+  (94.6 % → **99.5 %, passing**) which fell out with them.
+- **Owner:** `Broiler.HTML` (`HtmlRender`, `PaintWalker.CanvasBackground`) for the
+  renderer half; `Broiler.Layout` for the rule and the cascade fix.
+- **The rule.** CSS Color Adjust 1 §2.4: a nested browsing context's canvas is
+  **transparent** — the embedder shows through it — *unless* the used colour
+  scheme of the **embedding element** differs from the embedded root's, in which
+  case the UA paints an opaque backdrop of the embedded root's scheme. The
+  comparison is element-to-root, not document-to-document, and these two tests are
+  built on precisely that: one puts a dark frame in a dark-scheme `<iframe>` on a
+  light page, the other a light frame in a light-scheme `<iframe>` on a dark page,
+  and both ask for the page to show through.
+- **Two bugs, not one.**
+  1. **The canvas was always opaque.** `RenderToImageCore` erased every embedded
+     document to its resolved canvas colour, `PaintWalker.EmitCanvasBackground`
+     painted the UA dark fill unconditionally, and `BlitOnto` copied the result
+     pixel-for-pixel with no alpha. A frame could not be transparent at all, so
+     the embedding element's `color-scheme` was never consulted.
+  2. **`color-scheme` did not inherit.** §2.1 makes it an inherited property, but
+     it was missing from `CssBoxProperties.InheritStyle` — unnoticed because it was
+     only ever read off the root element, which inherits nothing. An `<iframe>`
+     under `html { color-scheme: dark }` therefore reported `normal`. Fixing only
+     the first bug regressed `…-002.sub` (the frame went transparent when the
+     schemes genuinely *did* differ); the two have to land together.
+- **What landed where.** `Broiler.Layout.Engine.EmbeddedCanvas` is the rule — a
+  thread-static, scope-restoring lever like `CanvasBackdrop` and `DocumentRoot`,
+  carrying the embedding element's computed `color-scheme` and answering
+  `PaintsOpaqueBackdrop`. Unpinned means "not embedded", so it answers `true` and
+  a top-level render is byte-identical. That, the inheritance fix, and the WPT
+  runner's own frame compositor (`WptDocumentRenderer`, which pins the lever and
+  composites source-over) are **main repo**. The renderer's side is
+  [`patches/0004`](../patches/README.md) — the `Broiler.HTML` remote 403s from
+  here — and until it is applied the two tests keep their current scores.
+- **Verified:** the dark-color-scheme directory goes **22 → 24 of 29** with
+  nothing lost, and `html/semantics/embedded-content/the-iframe-element` is
+  **unchanged across all 161 tests** — the change is inert for a frame that fills
+  its own canvas, which is nearly all of them. 22 focused cases cover the rule,
+  the cascade and the render, four of them probing for the patch so they become
+  real guards when the pointer is bumped.
+- **A separate gap the fix uncovered — since fixed.** `color-scheme-iframe-background`
+  stopped at 98.9 % rather than passing, on a residual that was not colour-scheme
+  related at all: the default `<iframe>` border. See
+  [the bevel section below](#a-3d-border-was-painted-flat--fixed-pending-patch).
+
+### A 3D border was painted flat — **fixed, pending patch**
+
+- **Tests:** `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background`
+  (98.9 % → **99.4 %, passing**, on top of the frame-canvas fix), and 89 tests
+  across `html/rendering` and `html/semantics/embedded-content/the-iframe-element`
+  that carry an `<iframe>` or an `<hr>`.
+- **Owner:** `Broiler.HTML` (`PaintWalker.Decorations`, `CssDefaults`) for the call
+  and the UA base; `Broiler.Layout` for the rule.
+- **The gap.** CSS 2.1 §8.5.3 paints `inset`, `outset`, `groove` and `ridge` as a
+  bevel — two sides in a darkened shade of the border colour, two in the colour
+  itself. The IR paint path used the colour flat on all four sides, so the border
+  the HTML Standard puts on every `<iframe>` and `<hr>` (`border: 2px inset`) came
+  out **solid black** where every browser paints `#9A9A9A` over `#EEEEEE`, and the
+  `border: 2px groove` it puts on every `<fieldset>` came out flat too. On a
+  600×400 frame that ring is 4 012 px — half of the test's residual, and exactly
+  the half that kept it under the threshold.
+- **Measured, not guessed.** The spec leaves the shades to the UA, so the rule
+  came from screenshotting Chromium and sampling each side. The darkened side
+  scales all three channels by the factor that takes the *largest* one down by
+  0.33 of full intensity — which is what keeps the hue: `rgb(200,100,50)` darkens
+  to `rgb(116,58,29)`, all ×0.58, where the per-channel subtraction the greys
+  alone suggested would have given `rgb(116,16,0)` and turned brown into red. The
+  lit side is the colour itself, except black, whose lit side is `#545454`.
+- **The second half is the UA stylesheet.** CSS makes the initial `border-color`
+  `currentColor`, which bevels black-on-black; browsers substitute a light grey at
+  paint time. Broiler states that grey in the UA stylesheet instead — which is
+  what `hr` already did, with the *result* of the bevel hard-coded per side
+  (`#9A9A9A`/`#EEEEEE`). Those four declarations collapse to one
+  `border-color: #EEEEEE` now the engine derives the pair, and `iframe` gets the
+  same base. **The two halves must land together:** shading while `hr` still
+  carried the pre-bevelled colours would darken `#9A9A9A` a second time and
+  regress every `<hr>`, which is why the call sits in
+  [`patches/0005`](../patches/README.md) rather than in `ComputedStyleBuilder`.
+- **Verified:** across 665 tests of `html/rendering` and the iframe element,
+  **89 changed and every one of them improved** — none worse — with one more
+  passing; many went 99.7–99.8 % to 100.0 %. `hr` renders identically to before.
+  30 focused cases pin the shading numbers against the Chromium measurements.
+- **`groove` and `ridge` split each side lengthwise**, and are emitted as two
+  nested rings rather than one. A groove reads as `inset` on its outer half and
+  `outset` on its inner half; a ridge is the mirror. The split sits at
+  `ceil(width / 2)` from the outer edge — a 3px groove is two dark rows then one
+  light, a 5px one three then two — and below 2px there is no room for two halves,
+  where Chromium paints a single stroke of the *lit* shade on all four sides. That
+  1px case is the one place the two styles agree and the only one that is not a
+  split; it was found by measuring all four sides rather than just the top, which
+  is where a per-side rule would have looked right and been wrong.
+  - **Verified:** five more tests moved, all improvements, the largest
+    `fieldset-vertical` at +0.67 points — `<fieldset>` is rendered
+    `border: 2px groove`, so it is the element this reaches most. Against Chromium
+    directly, a page of groove and ridge boxes matches to **99.95 %**.
+- **The corner miters — since fixed.** The 0.05 % residual above was the 45°
+  diagonal between two differently-coloured sides: Broiler stepped it, Chromium
+  feathers it. See [the miter section below](#a-border-corner-had-no-mitre-and-no-anti-aliasing--fixed-pending-patch).
+- **Also remaining:** the other half of `color-scheme-iframe-background`'s original
+  residual (≈ 4 356 px) is text antialiasing inside the frame, unrelated to
+  borders and below the threshold now that the bevel is right.
+
+### A border corner had no mitre, and no anti-aliasing — **fixed, pending patch**
+
+- **Owner:** `Broiler.HTML` (`RGraphicsRasterBackend`, `BCanvas`) for the paint;
+  `Broiler.Layout` for the coverage rule.
+- **Two gaps, found one behind the other.** CSS 2.1 §8.5.4 divides a border at its
+  corners by a straight line.
+  1. **A stroke has no mitre.** Only `solid` was painted as a trapezoid; `inset`,
+     `outset`, `groove` and `ridge` were stroked along their centre lines, and a
+     stroke butts square into its neighbour — so whichever side was drawn last
+     owned the whole corner. Invisible while two sides share a colour, glaring
+     when they do not, which is exactly what a `groove` does.
+  2. **The mitre was a staircase.** Filled by testing each pixel's centre, the
+     diagonal steps one pixel per row where a browser lays one blended pixel
+     along it.
+- **Coverage, not a 45° special case.** The miter is only diagonal when the two
+  sides are equally wide. A 12px top against a 4px left slopes one-in-three, and
+  the pixel coverages come out 1/6, 1/2, 5/6 — against Chromium's measured 0.158,
+  0.503, 0.842. The rule is the area of the pixel the trapezoid covers, and it
+  reproduces both.
+- **Only the mitres blend.** The first attempt anti-aliased *every* edge of the
+  trapezoid and regressed 210 tests, five of them out of passing. A border's own
+  edges are straight lines the layout puts where it puts them, and feathering them
+  turns a 1px form-control border sitting on a half-pixel into two grey rows
+  instead of one solid one. Axis-aligned edges keep the pixel-centre test; only
+  the diagonals carry coverage. **That failure is the useful part of this entry** —
+  the obvious version of the fix is the wrong one, and only a broad measurement
+  said so.
+- **Why it is opt-in.** Two trapezoids meeting along a mitre each cover about half
+  of the pixels on it, so blended independently onto the page they leave the
+  background showing through the seam. The corner rectangle already filled for
+  same-coloured sides is now filled for every corner, with the colour of whichever
+  side is drawn first, so the second blends over an opaque corner. A translucent
+  side disables the whole thing, since that fill would composite its alpha twice.
+- **Verified:** against Chromium directly, a 12px four-colour border's corners go
+  from **48 differing pixels to 12** (the rest off by 1/255) with the corner pixel
+  now exact, and a page of groove and ridge boxes from **425 to 21**. Across
+  1 949 tests of `css/css-backgrounds`, `html/rendering`, `css/css-gaps` and this
+  directory, **no test changes state in either direction** and the net is
+  **+1.578 points** (+1.707 across 55 tests against −0.129 across 103, one of
+  which loses more than a hundredth of a point). Ships as
+  [`patches/0006`](../patches/README.md).
+
+### #1615 problems, at a glance
+
+Local numbers are this container's, against Chromium references generated here.
+
+| # | Test | CI | Local | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-color-adjust/…/opaque-cross-origin-002.sub` | 0.0% | **0.0% → passing** | **fixed** — the runner performs WPT's `.sub` substitution and serves WPT's hosts from the checkout; main repo, on CI immediately |
+| 2 | `css-image-animation/image-animation-body-background-root-propagation-paused` | 0.0% | 100% `#00FF00` | **won't fix** — re-verified; ours matches the test's `rel=match`, Chromium has no `image-animation` |
+| 3 | `css-image-animation/image-animation-root-background-paused` | 0.0% | 100% `#00FF00` | **won't fix** — same |
+| 4 | `css-page/page-margin-002-print` | 0.0% | 99.95% `#FFFF00` | **won't fix** — re-verified; the reference is a `vertical-rl` viewport-screenshot artifact |
+| 5 | `mediaqueries/at-custom-media-basic` | 0.0% | 100% `#008000` | **won't fix** — re-verified; ours matches `/css/reference/green.html`, Chromium has no `@custom-media` |
+| 6 | `fullscreen/rendering/backdrop-iframe` | 0.0% | 99.1% `#008000` | **won't fix** — re-verified; the reference never entered fullscreen (no WebDriver) |
+| 7 | `fullscreen/rendering/backdrop-inherit` | 0.0% | 100% `#008000` | **won't fix** — same |
+| 8 | `css-color-adjust/…/mismatch-dynamic` | 0.0% | 99.8% white | **won't fix** — re-verified; ours matches the test's `rel=match`, Chromium fails it |
 
 ## Reported problems, at a glance
 

@@ -21,6 +21,9 @@
     <InternalsVisibleTo Include="Broiler.HTML.Dom" />
     <InternalsVisibleTo Include="Broiler.HTML" />
     <InternalsVisibleTo Include="Broiler.HTML.Orchestration" />
+    <!-- Rasterises a nested browsing context, so it reads EmbeddedCanvas to decide whether that
+         frame's canvas is opaque or transparent (CSS Color Adjust §2.4). -->
+    <InternalsVisibleTo Include="Broiler.HTML.Image" />
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
     <InternalsVisibleTo Include="Broiler.DevConsole" />
     <InternalsVisibleTo Include="Broiler.DevConsole.Tests" />
