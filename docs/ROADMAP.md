@@ -2,7 +2,7 @@
 
 - **Status:** Active preview
 - **Scope:** Only unfinished work that crosses component or application boundaries
-- **Last reconciled:** 2026-08-01
+- **Last reconciled:** 2026-08-12
 
 Component-local work is tracked in the roadmaps linked from
 [the documentation index](README.md). This file does not repeat completed
@@ -127,55 +127,113 @@ one owning component.
 WebAssembly fixtures, generated-result policy, and aggregate verification;
 HtmlBridge owns the geometry cutover flags; Broiler.HTML owns graphics-backend
 coverage; Broiler.JS owns JavaScript integration repros and performance-harness
-consolidation; Broiler.UI owns registration of its active RTF tests.
+consolidation; Broiler.UI owns registration of its active RTF tests. Ownership
+names the component that decides, not the directory a file sits in: the Skia and
+geometry test files live in `src/Broiler.Cli.Tests` and `src/Broiler.HtmlBridge.Dom`
+in this repository even though Broiler.HTML and HtmlBridge own the decision.
 
-**Current evidence (2026-08-10):** the focused audit found several kinds of
-test code that no longer protect a supported behavior:
+**Where each batch can land.** `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`,
+`Broiler.JS`, and `Broiler.Graphics` are git submodules with their own remotes. A
+session scoped to this repository cannot push to them — the git proxy answers
+**403** — so submodule-resident work ships as a patch file under
+[`patches/`](../patches/README.md) with the gitlink left unbumped, and a
+maintainer applies it separately. Batches 1, 4, 5, and 6 are entirely
+main-repo. Batches 2 and 3 straddle the boundary and must be split:
+
+| Batch | Main repo (pushable) | Submodule (patch only) |
+| --- | --- | --- |
+| 2 | `src/Broiler.Cli.Tests/*`, `scripts/run-rf-*-validation.ps1` | **Broiler.JS**: `ReproTests`, `ReproT`, `BroilerJS.sln`, `JIntPerfTests`, status docs |
+| 3 | `src/Broiler.Cli.Tests/*`, `Directory.Build.props` | **Broiler.HTML**: three `InternalsVisibleTo`, README, architecture, graphics-backend, roadmap. **Broiler.JS**: `Broiler.JS/Directory.Build.props` |
+
+A consequence to state in the pull request: the batch 2 and batch 3 gates cannot
+go green in this repository's CI until the maintainer applies the patch, because
+part of what they assert lives behind the submodule pointer.
+
+**Current evidence (2026-08-12, measured on `0edd1e0`):** the focused audit found
+several kinds of test code that no longer protect a supported behavior. Every
+count below is reproducible with the command in its batch.
 
 - [`SkiaDecouplingGuardTests`](../src/Broiler.Cli.Tests/SkiaDecouplingGuardTests.cs)
-  still guards an external backend that has been removed. The historical M5
-  rollback window in
+  still guards an external backend that has been removed; its one failing case
+  asserts `Directory.Exists` on the deleted `Broiler.HTML/Source/Broiler.HTML.WPF`
+  (`:25`, `:59`). The historical M5 rollback window in
   [`GraphicsBackendStabilizationTests`](../src/Broiler.Cli.Tests/GraphicsBackendStabilizationTests.cs)
   now compares the current internal stub while naming it Skia. A focused run of
-  the Skia/cutover/stabilization cluster failed 8 of 20 cases; the stabilization
-  suite alone performs about 50 full renders per run.
+  the Skia/cutover/stabilization cluster failed 8 of 20 cases (7 + 6 + 7, failing
+  1 + 5 + 2); the stabilization suite alone performs about 50 full renders per run.
 - `tests/browser-wasm-phase0` through `tests/browser-wasm-phase5` are historical
-  feasibility fixtures rather than supported test entry points. Phase 0 contains
-  two applications, not test projects, and its optional verifier cannot reach
-  baseline comparison. Phase 1-5 are orphaned Playwright scripts with no package,
-  runner, CI job, or matching application globals and selectors.
+  feasibility fixtures rather than supported test entry points — 18 tracked files.
+  Phase 0 contains two applications, not test projects, and its baseline path
+  cannot reach comparison because its composition root registers no
+  `Broiler.Graphics` image-codec catalog. Phase 1-5 are orphaned Playwright
+  scripts (one `smoke.mjs` each) with no package, runner, CI job, or matching
+  application globals and selectors.
 - [`SharedGeometryExclusiveCutoverTests`](../src/Broiler.Cli.Tests/SharedGeometryExclusiveCutoverTests.cs)
   and
   [`LayoutGeometryCacheEquivalenceTests`](../src/Broiler.Cli.Tests/LayoutGeometryCacheEquivalenceTests.cs)
-  are the only reason their production toggles still compile. Production comments
-  state that changing either toggle no longer changes behavior.
+  are the only remaining consumers of their production toggles, and the
+  production comments state that changing either toggle no longer changes
+  behavior. `UseSharedGeometryExclusively` (`SharedLayoutGeometry.cs:28`) has
+  **zero** production readers; `LayoutGeometryCacheEnabled` (`LayoutMetrics.cs:29`)
+  gates one two-line early return at `LayoutMetrics.cs:39`. The whole production
+  footprint of that batch is four lines across two files.
 - [`HttpClientMigrationTests`](../src/Broiler.Cli.Tests/HttpClientMigrationTests.cs)
-  reflect over assemblies that no longer exist; 8 of 9 focused cases fail with
-  `FileNotFoundException`. JavaScript `ReproTests`/`ReproT` and several Acid
-  diagnostic suites either have no assertions, depend on a hard-coded local path,
-  or duplicate current regression coverage.
+  reflect over `HtmlRenderer.Rendering`, `HtmlRenderer.Orchestration`,
+  `HtmlRenderer.Utils`, and `Broiler.HtmlBridge` — none of which exist; 8 of 9
+  focused cases fail with `FileNotFoundException`, and the ninth asserts only
+  that a JavaScript string literal starts with `https://`. JavaScript `ReproTests`
+  and `ReproT` assert nothing at all, and `ReproTests` appends to a hard-coded
+  `D:\Broiler.JS\repro-out.txt` (`ReproTests.cs:8`). The three Acid diagnostic
+  suites do assert — the reason to retire them is that stable Acid regression
+  coverage supersedes them, not an absence of assertions.
 - The tracked `tests/html/wpt-results` and `tests/css/wpt-results` directories
-  contain about 39 MB of old generated output. The legacy
-  `Broiler.JS/Broiler.JS/BroilerJS.sln` also references removed projects, while
-  the supported root `Broiler.JS.slnx` replaces it.
+  contain 38,597,035 bytes of generated output dated 2026-04-24 across 10 files.
+  Two of them — the `wpt-results.log` pair, 18.9 MB, 49% of the total — are
+  tracked in violation of `.gitignore:70` (`*.log`) and must have been
+  force-added. The legacy `Broiler.JS/Broiler.JS/BroilerJS.sln` also references
+  projects that have moved, while the supported `Broiler.JS/Broiler.JS.slnx`
+  (the submodule root, not this repository's root) replaces it.
 
 The cleanup is intentionally evidence-driven. A filename containing `phase`,
 `migration`, `obsolete`, or `cutover` is not sufficient reason to delete a test;
 retained cases must be judged by the current behavior or compatibility boundary
-they protect.
+they protect. The converse also holds: `GoogleLikeDiagTest` and `Phase1FixTests`
+were suspected of holding duplicate methods and hold none — two `GoogleLikeDiagTest`
+methods merely share a *name* with `FlexLayoutTests` methods that assert
+something else.
+
+**Tooling note:** `pwsh` is not installed in the standard development container,
+so the `scripts/run-rf-*.ps1` and `scripts/*-solutions.ps1` gates below are
+maintainer-run or CI-run, not locally reproducible. Every batch therefore also
+names a `dotnet`/`git`/`grep` command that does run locally.
 
 **Next actions:**
 
 1. **Freeze the inventory and baseline (root test infrastructure).**
    - Record the exact files, methods, production flags, solution roots,
-     documentation links, and CI references proposed in each cleanup batch.
+     documentation links, and CI references proposed in each cleanup batch, under
+     `tests/test-cleanup-baseline/` (an `inventory.md` plus one result file per
+     solution), mirroring the `tests/wpt-baseline` convention. Delete that
+     directory together with this roadmap item.
    - Capture focused results for every affected suite plus the supported
      aggregate solution before removing anything. Treat existing failures as a
      baseline, not as permission to hide unrelated regressions.
+   - **Record the already-red suites explicitly**, or every later "matches the
+     recorded baseline" gate is unfalsifiable: `CssExtractionPhaseZeroTests` and
+     `CssExtractionPhaseThreeTests` fail today for reasons unrelated to this
+     cleanup, and `scripts/run-rf-css-validation.ps1`'s `css-extraction` group
+     declares no allowed failures. One of them,
+     `Phase7_CssData_Is_Only_An_Obsolete_StyleSet_Wrapper`, is the test that the
+     `CssData` keep boundary below protects — it is protected *and* failing.
    - Baseline `Broiler.UI.RichEdit.Rtf.Tests` independently, register the active
      documented suite in `Broiler.UI.slnx`, and run
-     `dotnet test Broiler.UI/Broiler.UI.slnx -c Release`. This is a discovery
-     repair, not a deletion, and must not change the cleanup baseline silently.
+     `dotnet test Broiler.UI/Broiler.UI.slnx -c Release`. Register the
+     `Broiler.UI.RichEdit.Rtf` implementation project it depends on in the same
+     edit. Note that `Broiler.UI.slnx` is **hand-maintained** — it carries no
+     generated-from header, is absent from `eng/solutions.json`, and
+     `scripts/update-solutions.ps1` globs the repository root without `-Recurse`,
+     so it will neither add nor revert this change. This is a discovery repair,
+     not a deletion, and must not change the cleanup baseline silently.
    - Land the work in independently reviewable batches: dead/no-coverage tests,
      Skia coverage, geometry flags, browser WebAssembly phases, generated
      artifacts, and mixed-suite consolidation.
@@ -185,132 +243,247 @@ they protect.
    fails if its retained coverage regresses.
 
 2. **Remove tests with no effective coverage (root and Broiler.JS).**
-   - Delete `HttpClientMigrationTests`, `ReproTests`, `ReproT`,
-     `Acid3DebugTest`, `Acid3CascadeDebugTests`, and
-     `Acid3TitlePositionDiagTest`.
-   - Remove exact duplicate methods from `GoogleLikeDiagTest` and
-     `Phase1FixTests`. Move a genuinely unique JavaScript regression to the
-     owning Broiler.JS component suite before deleting its historical wrapper.
-   - Delete the broken legacy `BroilerJS.sln`. Retain the JInt script corpus,
-     which the current benchmark project consumes; remove the standalone
-     `JIntPerfTests` executable only after confirming the benchmark runner owns
-     every scenario.
+
+   *2a — this repository.*
+   - Delete `HttpClientMigrationTests`, `Acid3DebugTest`, `Acid3CascadeDebugTests`,
+     and `Acid3TitlePositionDiagTest`. Before deleting the last one, confirm that
+     `Acid3CssComplianceTests` covers the *rendered* title position and not only
+     the computed border value; relocate the assertion if it does not.
+   - Do **not** delete methods from `GoogleLikeDiagTest` or `Phase1FixTests` as
+     duplicates — there are none. Rename the two name-colliding `GoogleLikeDiagTest`
+     methods (`FlexChild_DisplayBlock_NotFullWidth`, `GridChild_UsesContentSizing`)
+     so a `FullyQualifiedName~` filter selects one suite unambiguously. Keep
+     `Phase1FixTests`: `ToFixed_NegativeZero_Returns_PositiveString` and
+     `NullByte_In_Regex_Test` are the tree's only coverage of those behaviors, and
+     renaming the class for the behavior it protects is the correct treatment.
    - Remove `Acid3CascadeDebugTests` from the Acid filters in
-     `scripts/run-rf-layout-validation.ps1` and
-     `scripts/run-rf-css-validation.ps1`, and remove only its
+     `scripts/run-rf-layout-validation.ps1` (`:59`) and
+     `scripts/run-rf-css-validation.ps1` (`:94`), and remove only its
      `Without_Important_Higher_Specificity_Red_Wins` allowed-failure entry. Keep
-     the unrelated border-shorthand allowance; stable cascade and rendering
-     coverage already supersedes the debug suite. Reconcile Broiler.JS's current
-     status counts and leave its archive as historical evidence.
+     the unrelated `Border_Shorthand_Expands_Color_To_Individual_Sides`
+     allowance — it belongs to `Acid3CssComplianceTests`, which stays and is
+     currently red.
+
+   *2b — Broiler.JS, patch only.*
+   - Delete `ReproTests`, `ReproT`, and the broken legacy `BroilerJS.sln`. Before
+     deleting `ReproTests`, promote its `super`-in-class-field-initializer probes
+     into an asserting test in the owning Broiler.JS suite; `ReproT`'s six regex
+     probes are already covered there.
+   - Retain the JInt script corpus: `OtherTests/JIntPerfTests/Scripts/*.js` is
+     hard-referenced by
+     `benchmarks/Broiler.JavaScript.Engine.Benchmarks/Broiler.JavaScript.Engine.Benchmarks.csproj:25`.
+     Remove only the standalone `JIntPerfTests` `Program.cs` and `.csproj`, and
+     only after confirming the benchmark runner owns every scenario.
+   - Before deleting `BroilerJS.sln`, decide where `Broiler.JavaScript.Network`
+     and `Broiler.JavaScript.NodePollyfill` land: both exist on disk and are in
+     the sln but in no `.slnx`, so deleting the sln orphans them from every
+     solution.
+   - Reconcile Broiler.JS's current status counts and leave its archive as
+     historical evidence. Note that `ReproTests.Repro` is recorded there as a
+     failure but passes on Linux, where the `D:\…` string is treated as a
+     relative filename.
 
    **Gate:** focused JavaScript, CSS cascade, Acid, flex, and CLI tests match or
    improve on the recorded baseline, and no supported solution, workflow, or
-   document references a removed entry point.
+   document references a removed entry point. Locally:
+   `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj -c Release --filter "FullyQualifiedName~Acid3|FullyQualifiedName~Flex|FullyQualifiedName~GoogleLike"`.
 
 3. **Finish the Skia-era test transition (Broiler.HTML and root tests).**
    Coordinate this batch with
    [Broiler.HTML's compatibility-seam retirement](../Broiler.HTML/docs/roadmap.md#4-retire-the-skia-era-compatibility-seam).
-   - Delete `SkiaDecouplingGuardTests` and
-     `GraphicsBackendStabilizationTests`.
-   - Remove the three obsolete Skia-fallback facts from
-     `GraphicsBackendCutoverTests`, while keeping current backend identity,
-     diagnostic, override, and metadata behavior covered.
+
+   *3a — this repository.*
+   - Delete `GraphicsBackendStabilizationTests`.
+   - Retire `SkiaDecouplingGuardTests` **deliberately**. Its only real defect is
+     the deleted `Broiler.HTML.WPF` entry at `:25` — a one-line fix — and it is
+     today the sole automated enforcement of this batch's own gate, including
+     `No_Project_Carries_Skia_Package_References` and the allow-list at `:30-34`
+     that permits `SK*` tokens inside `GraphicsAbstractionTests`. Either keep it
+     with the dead directory removed, or name the check that replaces it; do not
+     delete it and leave the gate to a one-time manual grep, which batch 1
+     forbids.
+   - Remove the **two** obsolete Skia-fallback pixel-parity facts from
+     `GraphicsBackendCutoverTests` (`:54`, `:73`) and **rename**, not delete, the
+     third (`CaptureArtifactMetadata_Uses_Explicit_Skia_Fallback_Label`, `:93`):
+     it is the repository's only `renderBackend` sidecar assertion and it pins
+     live stub-fallback metadata. That leaves 5 of 7 cases — backend identity,
+     legacy-environment-variable inertness, the two-row override theory, and
+     capture metadata.
    - Replace or remove the eleven Skia-specific fake/materialization facts in
-     `GraphicsAbstractionTests`; retain its backend-neutral render, canvas,
-     raster, text, SVG, and image behavior.
+     `GraphicsAbstractionTests` — the eleven that fail today, of 86 methods and
+     89 cases; retain the backend-neutral render, canvas, raster, text, SVG, and
+     image behavior, including the facts whose names mention Skia only to say the
+     path does not use it.
    - Replace stale Skia adapter/fallback terminology in comments with the
      current stub/compat terminology. Do not remove the compat boundary itself
      until the component roadmap's separate exit gate is met.
-   - Remove stale references to the deleted `Broiler.HTML.WPF` adapter from the
-     Broiler.HTML README and architecture notes, remove the exact
-     `InternalsVisibleTo("Broiler.HTML.WPF")` entries, and prune completed
-     tombstone assertions that only check for that deleted directory. Reconcile
-     the matching adapter comments in `Directory.Build.props` and
-     `FormControlClickTests`.
+   - Reconcile the adapter comments in **both** `Directory.Build.props:92` and
+     `Broiler.JS/Directory.Build.props:95` (identical text, the second is a
+     submodule file), and in `FormControlClickTests`. Prune the completed
+     `Broiler.HTML.WPF` tombstone assertion in `CssExtractionPhaseZeroTests`.
+
+   *3b — Broiler.HTML, patch only.*
+   - Remove the three exact `InternalsVisibleTo("Broiler.HTML.WPF")` entries
+     (`Source/Broiler.HTML.{Core,Dom,Orchestration}/Properties/AssemblyInfo.cs`)
+     and the stale references to the deleted adapter in the Broiler.HTML README
+     and architecture notes. Several of those files are CRLF or mixed; check
+     `git show --stat` after committing, because a nine-line change reporting
+     thousands is a line-ending rewrite rather than a diff.
 
    **Gate:** backend-neutral graphics tests pass, the restore graph contains no
-   Skia package or native asset, and repository searches find no obsolete Skia
-   package, adapter, directory, or fallback references except intentional names
-   imported from external test corpora and current documentation of the
-   still-supported compat seam.
+   Skia package or native asset — already true; no `SkiaSharp` `PackageReference`
+   exists in any project — and repository searches find no obsolete Skia package,
+   adapter, directory, or fallback references except intentional names imported
+   from external test corpora and current documentation of the still-supported
+   compat seam. The submodule half of the search cannot go green here until the
+   patch is applied.
 
-4. **Remove completed geometry cutover seams (HtmlBridge).**
-   - Preserve or relocate the durable shared-geometry assertions, then delete
-     `SharedGeometryExclusiveCutoverTests`,
-     `LayoutGeometryCacheEquivalenceTests`, `UseSharedGeometryExclusively`,
-     `LayoutGeometryCacheEnabled`, and the branches controlled by those flags.
-   - Update the shared-static test collection comment, but keep the collection:
-     anchor-placement and zoom tests still mutate process-wide state and require
-     serialization.
-   - Assess `UseSharedLayoutGeometry` separately. Its default assertion is weak,
-     but removing a public or reflection-visible toggle has a different
-     compatibility risk from deleting the two explicitly test-only flags.
+4. **Remove completed geometry cutover seams (HtmlBridge).** Entirely main-repo.
+   - Relocate the two durable assertions in `SharedGeometryExclusiveCutoverTests`
+     first — `Exclusive_Boxed_Element_Reads_Real_Shared_Geometry` and
+     `Exclusive_DisplayNone_Element_Reads_Zero_Not_Estimator`, the latter being
+     the only coverage of the `display:none` zero-geometry read anywhere — then
+     delete the file along with its flag-default assertion, and delete
+     `LayoutGeometryCacheEquivalenceTests`, `UseSharedGeometryExclusively`
+     (`SharedLayoutGeometry.cs:28`), `LayoutGeometryCacheEnabled`
+     (`LayoutMetrics.cs:29`), and the single branch at `LayoutMetrics.cs:39`.
+     `UseSharedGeometryExclusively` gates nothing, so "the branches controlled by
+     those flags" is one two-line early return, not a code path of any size.
+   - The cached-versus-uncached equivalence assertions lose their meaning once
+     the uncached path is gone. Re-express their two fixtures as absolute
+     check-layout assertions in `SharedLayoutGeometryParityTests` rather than
+     dropping them, and note that deleting
+     `LayoutGeometryCacheEquivalenceTests` also removes a live flakiness source:
+     it mutates process-wide state without joining the `SharedGeometryStatics`
+     collection.
+   - Update the shared-static test collection comment to name the suites that
+     really need serialization, but keep the collection: anchor-placement and
+     zoom tests still mutate process-wide state.
+   - Assess `UseSharedLayoutGeometry` separately — not because it is public or
+     reflection-visible (it is `internal static`, at `SharedLayoutGeometry.cs:18`,
+     exactly like the two flags being deleted) but because it still gates five
+     live production branches in `LayoutMetrics.cs`,
+     `LayoutMetrics.ScrollGeometry.cs`, and `AnchorRegistry.cs`, and is toggled
+     from a second assembly, `src/Broiler.Wpt.Tests`. Its default assertions are
+     weak; the stale comments claiming it defaults to disabled are wrong and
+     should be fixed whether or not the flag goes.
 
    **Gate:** shared-layout geometry, anchor, zoom, and native-rendering tests pass,
-   and no source, test, or reflection inventory references either deleted flag.
+   and no source, test, or reflection inventory references either deleted flag —
+   `grep -rn "UseSharedGeometryExclusively\|LayoutGeometryCacheEnabled" --include=*.cs .`
+   returns nothing.
 
 5. **Retire browser WebAssembly phase 0-5 scaffolding (root browser/WASM).**
-   - Delete all tracked files under `tests/browser-wasm-phase0` through
+   - Delete all 18 tracked files under `tests/browser-wasm-phase0` through
      `tests/browser-wasm-phase5`.
    - Remove the phase-zero application roots from
      [`eng/solutions.json`](../eng/solutions.json), regenerate
-     `Broiler.WebAssembly.Tests.slnx`, and update architecture, roadmap, index,
-     and Broiler Code cross-links in the same change.
+     `Broiler.WebAssembly.Tests.slnx`, and update the complete inbound reference
+     set in the same change: `docs/README.md`, `docs/architecture/browser-webassembly.md`
+     (which today describes phase 0 as verifying "the exact dependency closure and
+     deterministic baseline" — the opposite of this item), and the duplicate next
+     action in this file's own Browser WebAssembly section. No CI workflow,
+     script, or Broiler Code document references these directories.
    - Keep the current WebAssembly Demo and Writer projects, Graphics WebAssembly
      tests, and Broiler Code payload probes. Move a still-required deterministic
      closure assertion into one of those supported entry points instead of
      repairing the historical verifier.
+   - **Decide where the dependency-closure check lands before deleting.**
+     `Broiler.BrowserWasm.Phase0.csproj` pins 28 explicit project references, and
+     they are the only reason `Broiler.WebAssembly.Tests.slnx` compiles the
+     Broiler.UI closure against the `browser-wasm` runtime identifier. Removing
+     the two phase-zero roots takes that solution from 58 projects to about 7 and
+     deletes that check outright. "Loads and builds" does not detect the loss.
 
    **Gate:** the regenerated WebAssembly solution loads and builds; current
    browser applications compile; and repository searches find no retired phase
-   globals, selectors, ports, directories, or verifier commands.
+   globals, selectors, directories, or verifier commands. Ports are not a usable
+   search term — 8766/8767 also appear in kept sample READMEs.
 
 6. **Remove historical output and repair test discovery (root test
    infrastructure).**
-   - Delete `tests/html/wpt-results` and `tests/css/wpt-results`; update every
-     document that calls those snapshots current evidence. Keep generated output
-     ignored under `tests/wpt-results` and leave `tests/wpt-baseline` unchanged.
+   - Delete `tests/html/wpt-results` and `tests/css/wpt-results`. This removes
+     `tests/html/` entirely — it holds no other tracked file — while `tests/css/`
+     survives via the differential corpus. Fix the one stale pointer outside this
+     file: [`CLAUDE.md`](../CLAUDE.md) still names both directories as where
+     generated results live. Keep generated output ignored under
+     `tests/wpt-results` and leave `tests/wpt-baseline` unchanged, understanding
+     that "unchanged" means "unchanged by this batch" — CI rewrites its
+     failed-test manifest on its own schedule.
+   - Register `tests/octane/jint-host/Broiler.Octane.JintHost.csproj`, or record
+     why it stays unregistered: it is in no `.slnx`, no `.sln`, and not in
+     `eng/solutions.json`, yet the Octane script and workflow build it. The exit
+     gate's "no orphan project" clause is not met while it is missing.
    - Regenerate and verify focused solutions after every manifest or project
      reference change with `scripts/update-solutions.ps1` and
-     `scripts/verify-solution-projects.ps1`.
+     `scripts/verify-solution-projects.ps1`. Both are PowerShell and neither is
+     invoked by any workflow, so this is a maintainer step; where `pwsh` is
+     unavailable, regenerate by hand and review the diff.
 
    **Gate:** no documentation links to deleted reports, generated WPT results are
    untracked, the expected-failure baseline is unchanged, and every documented
-   supported test project is reachable from its documented solution.
+   supported test project is reachable from its documented solution. Note that
+   the last clause is not checkable by `verify-solution-projects.ps1` alone —
+   `Broiler.UI.slnx` is hand-maintained and outside the manifest, and the
+   generator does not recurse below the repository root.
 
 7. **Consolidate the remaining historical wrappers (component owners).**
-   Audit `PhaseZero`, `Phase1`, cutover, removal, migration, tombstone, and
-   diagnostic suites method by method. Delete assertions that only prove an
+   Audit `PhaseZero`, `Phase1`, cutover, removal, migration, and diagnostic
+   suites method by method. Delete assertions that only prove an
    already-completed file layout or migration, move durable behavior to the
    owning component, and rename retained tests for the behavior they protect.
    Do not delete Broiler Code or formatting-code measurement harnesses without
    separate evidence that their current budget or fixture is superseded.
+   - The largest single surface is unnamed above and sizes this batch: the 58
+     `src/Broiler.Cli.Tests/*BindingModuleTests.cs` files carry 250 cases, of
+     which 47 assert only that a private member was moved off the bridge and 34
+     assert only that a type is internal or co-located. Roughly a third of the
+     batch is there. The `*RemovalTests`/`*MigrationTests` group and
+     `DomExtractionPhaseZeroTests` are the same shape.
+   - Resolve duplicated tombstones toward the guard suites the keep boundary
+     already protects rather than deleting both copies, and say explicitly where
+     `HtmlBridgePromotionPhaseZeroTests` lands — it is currently neither kept nor
+     listed for audit.
+   - `scripts/run-rf-dom-validation.ps1` asserts a minimum discovered-test count
+     and `run-rf-css-validation.ps1` filters on a phase name; both break on the
+     renames this batch performs. Update them in the same change.
 
    **Gate:** every retained test protects current behavior or an explicitly
    supported compatibility boundary, and every removed assertion has
    superseding coverage or an explicit retired-behavior rationale.
 
 **Explicit keep boundaries:** do not delete the backend-neutral majority of
-`GraphicsAbstractionTests`, the current diagnostic portion of
-`GraphicsBackendCutoverTests`, the `SharedGeometryStatics` collection,
-HtmlBridge architecture/boundary/API guards, or behavior-focused suites solely
-because their names contain a historical phase. Keep `tests/wpt`,
-`tests/wpt-baseline`, `tests/m0-baseline`, `tests/m2-conformance`,
-`tests/render-stages`, `tests/octane`, and
-`tests/css/phase0/css-engine-differential-corpus.json`. The
+`GraphicsAbstractionTests` (75 of its 86 methods), the current diagnostic portion
+of `GraphicsBackendCutoverTests` — which includes the renamed capture-metadata
+fact, the only `renderBackend` sidecar coverage in the repository — the
+`SharedGeometryStatics` collection, HtmlBridge architecture/boundary/API guards,
+or behavior-focused suites solely because their names contain a historical phase.
+Keep `UseSharedLayoutGeometry` and its five production branches; it is not part
+of batch 4. Keep `tests/wpt`, `tests/wpt-baseline`, `tests/m0-baseline`,
+`tests/m2-conformance`, `tests/render-stages`, `tests/octane`, and
+`tests/css/phase0/css-engine-differential-corpus.json` — the last of these is
+consumed from the Broiler.CSS submodule, which fails with an explicit "could not
+locate the corpus" error if it disappears. Keep
+`Broiler.JS/Broiler.JS/OtherTests/JIntPerfTests/Scripts`, which the engine
+benchmark project globs directly. The
 `Broiler.HTML/tests/html52/cases/obsolete` corpus intentionally tests obsolete
 HTML elements and is not cleanup residue. Keep the supported `CssData`
 compatibility facade and its tests until its documented compatibility window
-closes.
+closes — and note that no document currently defines that window, so either
+record the removal release in the Broiler.HTML roadmap or restate the keep as
+unconditional.
 
 **Exit gate:** supported solution generation and verification pass;
 `Broiler.Tests.slnx`, the affected component test solutions, and the current
 WebAssembly solution match or improve on their recorded baselines; no orphan
 project or smoke script, obsolete assembly reference, dead test-only flag,
 committed generated WPT output, duplicate diagnostic wrapper, or broken legacy
-solution remains. Remove this roadmap item after durable test ownership and
-result-location rules have been folded into the relevant component and
-architecture documents.
+solution remains; and every submodule-resident change is either merged upstream
+or recorded as a pending patch in [`patches/README.md`](../patches/README.md).
+Remove this roadmap item after durable test ownership and result-location rules
+have been folded into [the documentation index's test-evidence
+section](README.md#test-evidence) and the relevant component roadmaps — and fix
+the two inbound anchors in this file that point at this section when it goes.
 
 ### Bound what a large text node costs to render
 
