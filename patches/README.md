@@ -91,3 +91,66 @@ on CI today (99.7 %) from the main-repo half of that work —
 `FragmentTreeBuilder.TryLoadEmbeddedDocument`. This patch is the multi-frame
 case, which no test in the current subset covers; nothing regresses while it
 waits.
+
+### `0004-html-embedded-canvas-color-scheme.patch` — `Broiler.HTML`
+
+Three call sites plus one accessor, in
+`Source/Broiler.HTML.Image/HtmlRender.cs`,
+`Source/Broiler.HTML.Orchestration/IR/PaintWalker.CanvasBackground.cs`,
+`Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs` and
+`Source/Broiler.HTML.Image/HtmlContainer.cs`:
+
+- `CompositeEmbeddedDocuments` pins `Broiler.Layout.Engine.EmbeddedCanvas` to the
+  embedding element's computed `color-scheme` around each frame's render;
+- `RenderToImageCore` erases to transparent instead of the resolved canvas colour
+  when the lever says that frame's canvas is transparent;
+- `EmitCanvasBackground` skips its UA dark fill in the same case;
+- `BlitOnto` becomes source-over rather than a copy, since a transparent canvas
+  has to composite over the page instead of punching it out — an opaque source
+  still takes the copy path, so an opaque frame is byte-identical;
+- `GetRootColorScheme` exposes the embedded root's computed value, which the
+  rasterising caller has no other way to reach.
+
+`EmbeddedCanvas` itself is **already in this repository**
+(`Broiler.Layout/Broiler.Layout/Engine/EmbeddedCanvas.cs`), thread-static and
+unpinned by default, so the main repo builds and every render that pins nothing
+is byte-identical to today. So is the `color-scheme` inheritance half
+(`CssBoxProperties.InheritStyle`) and the runner's own frame compositor
+(`WptDocumentRenderer`), which already pins the lever and composites source-over.
+The patch is the renderer's side of the same rule.
+
+CSS Color Adjust 1 §2.4: a nested browsing context's canvas is **transparent** —
+the embedder shows through it — unless the used colour scheme of the *embedding
+element* differs from the embedded root's, in which case the UA paints an opaque
+backdrop of the embedded root's scheme. Only the second half was modelled: an
+embedded document's canvas was always resolved opaque and the blit copied it
+pixel-for-pixel, so a frame could never be transparent and the embedding
+element's `color-scheme` was never consulted at all.
+
+Wanted by two WPT tests that turn on exactly that distinction, both in
+`css/css-color-adjust/rendering/dark-color-scheme`:
+`color-scheme-iframe-background` puts a dark frame in a dark-scheme `<iframe>` on
+a light page and asks for the light page to show through (69.0 % without this),
+and `color-scheme-iframe-background-mismatch-opaque-cross-origin-003.sub` puts a
+light frame in a light-scheme `<iframe>` on a dark page and asks the same
+(94.7 % without this — a 200×200 white box that should not exist). With the patch
+applied they measure 98.9 % and 99.8 %, the directory goes 22 → 24 of 29 with
+nothing lost, and `html/semantics/embedded-content/the-iframe-element` is
+unchanged across all 161 tests. `color-scheme-iframe-background`'s residual 1.1 %
+is a *separate*, pre-existing gap — Broiler paints a black default `<iframe>`
+border where Chromium paints a grey inset one — and it is 100.00 % identical to
+its own `rel=match` reference either way.
+
+**No main-repo fallback, deliberately.** The decision has to be made while the
+frame's own canvas is erased and while its paint walker runs, both inside the
+renderer; the only main-repo lever that reaches that point is
+`RenderToImageWithStyleSet`'s `backgroundColor`, which cannot express
+"transparent" (`BColor.Transparent` and `default(BColor)` are the same value, and
+the renderer reads `default` as "resolve it yourself"). Re-routing the runner's
+frame rendering around `HtmlRender` to work about it would duplicate canvas
+resolution in the runner and still leave the UA dark fill unfixable, which is the
+kind of contortion the repository rule warns against. Until this is applied the
+two tests keep their current scores, and
+`src/Broiler.Cli.Tests/EmbeddedCanvasColorSchemeTests.cs` probes for the fix and
+disarms its four render assertions — they become real guards the moment the
+pointer is bumped.

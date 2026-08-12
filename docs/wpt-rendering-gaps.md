@@ -1922,7 +1922,10 @@ Chromium references on **both** sides so the comparison is like for like:
 
 Outside the cross-origin-iframe family the change is inert — 121 tests,
 identical both ways. Inside it, four tests moved, and the net is zero because two
-of them were **passing for the wrong reason**:
+of them were **passing for the wrong reason**. (The frame-canvas fix below then
+took that directory to **24 passing**; the four moves are recorded as the
+substitution change left them, because the second of them is what pointed at the
+bug.)
 
 - **Gained (2).** `…-opaque-cross-origin-002.sub` (the problem above) and
   `color-scheme-iframe-preferred-page-dark-cross-origin.sub` both load their
@@ -1933,34 +1936,65 @@ of them were **passing for the wrong reason**:
   `rel=match`** (`support/light-frame-scrolling.html`, white), while Chromium's
   reference is 99.8 % `#121212`. It used to pass only because *both* engines
   rendered an empty frame. Same **won't fix** class as problem 9.
-- **Lost, and it is a real bug (1).** `…-opaque-cross-origin-003.sub` now paints a
-  200×200 white box that should not be there. The test sets `color-scheme: dark`
-  on `html` but `color-scheme: light` on the `iframe` **element**, and the frame's
-  own root is light — so the embedding element and the embedded root *agree*, no
-  opaque backdrop is called for (CSS Color Adjust §2.3), and the frame should stay
-  transparent with the dark page showing through. Its own reference is 99.84 %
-  `#121212` and Chromium's is 99.80 % `#121212`; ours is 94.76 % `#121212` plus
-  exactly 40 000 white pixels. **Broiler always paints an embedded document's
-  canvas opaque** — `HtmlRender.CompositeEmbeddedDocuments` renders the frame with
-  its own canvas resolved and `BlitOnto` copies the result pixel-for-pixel, with
-  no alpha — so it never consults the embedding element's used `color-scheme` and
-  cannot leave a frame transparent at all. This was invisible while the frame
-  never loaded.
-  - **Owner:** `Broiler.HTML` (`HtmlRender.CompositeEmbeddedDocuments` /
-    `BlitOnto`), so a submodule patch, plus the used-`color-scheme` comparison the
-    decision needs.
-  - **Next action:** give the embedded render a transparent canvas when the
-    embedding element's used colour scheme matches the embedded root's, and
-    alpha-composite the blit instead of copying. Both halves are needed: a
-    transparent canvas that is copied would *erase* the parent instead of showing
-    through it.
-  - **Exit gate:** `…-opaque-cross-origin-003.sub` reaches its reference's
-    99.8 % `#121212` with `…-002.sub`, `…-001.sub`, `-mismatch-alpha` and
-    `-mismatch-opaque` unchanged.
-  - **Not a regression to hide.** The test's former pass is exactly the shape this
-    document already calls **untrustworthy** — passing by rendering nothing. A
-    truthful failure that names a real gap is worth more than a green tick that
-    depended on a frame never loading.
+- **Lost, and it is a real bug (1).** `…-opaque-cross-origin-003.sub` painted a
+  200×200 white box that should not be there. **Since fixed** — see
+  [the frame-canvas section below](#a-frames-canvas-was-never-transparent--003sub-and-iframe-background-fixed-pending-patch).
+  Worth keeping the shape of it on record: the test's former pass is exactly what
+  this document calls **untrustworthy** — passing by rendering nothing — and a
+  truthful failure that named a real gap was worth more than a green tick that
+  depended on a frame never loading.
+
+### A frame's canvas was never transparent — 003.sub and `iframe-background`, **fixed, pending patch**
+
+- **Tests:** `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background-mismatch-opaque-cross-origin-003.sub`
+  (94.7 % → **99.8 %, passing**) and `…/color-scheme-iframe-background`
+  (69.0 % → **98.9 %**), plus `…/color-scheme-iframe-background-mismatch-used-preferred`
+  (94.6 % → **99.5 %, passing**) which fell out with them.
+- **Owner:** `Broiler.HTML` (`HtmlRender`, `PaintWalker.CanvasBackground`) for the
+  renderer half; `Broiler.Layout` for the rule and the cascade fix.
+- **The rule.** CSS Color Adjust 1 §2.4: a nested browsing context's canvas is
+  **transparent** — the embedder shows through it — *unless* the used colour
+  scheme of the **embedding element** differs from the embedded root's, in which
+  case the UA paints an opaque backdrop of the embedded root's scheme. The
+  comparison is element-to-root, not document-to-document, and these two tests are
+  built on precisely that: one puts a dark frame in a dark-scheme `<iframe>` on a
+  light page, the other a light frame in a light-scheme `<iframe>` on a dark page,
+  and both ask for the page to show through.
+- **Two bugs, not one.**
+  1. **The canvas was always opaque.** `RenderToImageCore` erased every embedded
+     document to its resolved canvas colour, `PaintWalker.EmitCanvasBackground`
+     painted the UA dark fill unconditionally, and `BlitOnto` copied the result
+     pixel-for-pixel with no alpha. A frame could not be transparent at all, so
+     the embedding element's `color-scheme` was never consulted.
+  2. **`color-scheme` did not inherit.** §2.1 makes it an inherited property, but
+     it was missing from `CssBoxProperties.InheritStyle` — unnoticed because it was
+     only ever read off the root element, which inherits nothing. An `<iframe>`
+     under `html { color-scheme: dark }` therefore reported `normal`. Fixing only
+     the first bug regressed `…-002.sub` (the frame went transparent when the
+     schemes genuinely *did* differ); the two have to land together.
+- **What landed where.** `Broiler.Layout.Engine.EmbeddedCanvas` is the rule — a
+  thread-static, scope-restoring lever like `CanvasBackdrop` and `DocumentRoot`,
+  carrying the embedding element's computed `color-scheme` and answering
+  `PaintsOpaqueBackdrop`. Unpinned means "not embedded", so it answers `true` and
+  a top-level render is byte-identical. That, the inheritance fix, and the WPT
+  runner's own frame compositor (`WptDocumentRenderer`, which pins the lever and
+  composites source-over) are **main repo**. The renderer's side is
+  [`patches/0004`](../patches/README.md) — the `Broiler.HTML` remote 403s from
+  here — and until it is applied the two tests keep their current scores.
+- **Verified:** the dark-color-scheme directory goes **22 → 24 of 29** with
+  nothing lost, and `html/semantics/embedded-content/the-iframe-element` is
+  **unchanged across all 161 tests** — the change is inert for a frame that fills
+  its own canvas, which is nearly all of them. 22 focused cases cover the rule,
+  the cascade and the render, four of them probing for the patch so they become
+  real guards when the pointer is bumped.
+- **A separate gap the fix uncovered.** `color-scheme-iframe-background` stops at
+  98.9 % rather than passing, and the residual 1.1 % is not colour-scheme related:
+  Broiler paints a **black** default `<iframe>` border where Chromium paints a
+  **grey inset** one, one pixel further in. It is 100.00 % identical to its own
+  `rel=match` reference either way — both Broiler renders carry the same border,
+  so it cancels in the reftest suite and only shows against Chromium's golden.
+  Owner: the UA stylesheet's `iframe` border. Exit gate: the test reaches ≥ 99 %
+  against the Chromium reference with its interior unchanged.
 
 ### #1615 problems, at a glance
 

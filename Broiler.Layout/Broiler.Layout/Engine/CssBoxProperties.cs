@@ -2633,6 +2633,14 @@ internal abstract partial class CssBoxProperties
         TextTransform = p.TextTransform;
         Visibility = p.Visibility;
         ImageAnimation = p.ImageAnimation;
+        // CSS Color Adjust §2.1: `color-scheme` is an inherited property. It was read only off the
+        // root element (for the canvas backdrop), which never inherits anything, so its absence
+        // here went unnoticed — until an <iframe> had to be asked for its *own* used scheme to
+        // decide whether the frame's canvas is opaque (§2.4, Engine.EmbeddedCanvas). Without this
+        // an iframe under `html { color-scheme: dark }` reported `normal`, and WPT
+        // color-scheme-iframe-background-mismatch-opaque-cross-origin-002 painted the frame
+        // transparent when the schemes genuinely did differ.
+        ColorScheme = p.ColorScheme;
         _textIndent = p._textIndent;
         TextAlign = p.TextAlign;
         TextAlignLast = p.TextAlignLast;

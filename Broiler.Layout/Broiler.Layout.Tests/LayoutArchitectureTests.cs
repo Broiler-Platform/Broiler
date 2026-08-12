@@ -55,6 +55,9 @@ public sealed class LayoutArchitectureTests
                 // Headless live-geometry snapshot (Phase 5 engine-native live geometry) reads the
                 // internal box tree via HeadlessLayoutView.
                 "Broiler.HTML.Headless",
+                // Rasterises a nested browsing context, so it reads EmbeddedCanvas to decide
+                // whether that frame's canvas is opaque or transparent (CSS Color Adjust §2.4).
+                "Broiler.HTML.Image",
                 "Broiler.HTML.Orchestration",
                 // The bridge writes the Phase 5 visual-viewport channel
                 // (NativeAnchorPlacement.VisualViewportScale) around the shared geometry snapshot.
