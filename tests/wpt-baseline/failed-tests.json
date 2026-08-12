@@ -5,294 +5,71 @@
     "skipped": 0,
     "total": 7928
   },
-  "shardCount": 8,
+  "shardCount": 0,
   "problemLimit": 10,
-  "incompleteShards": [],
+  "incompleteShards": [
+    {
+      "shardIndex": 0,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 1,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 2,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 3,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 4,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 5,
+      "exitCode": 1
+    },
+    {
+      "shardIndex": 7,
+      "exitCode": 1
+    }
+  ],
   "retriedShards": [],
   "topProblems": [
     {
-      "key": "PixelMismatch:MissingContent",
-      "label": "PixelMismatch / MissingContent",
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent",
-      "count": 5764,
-      "examples": [
-        "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
-        "battery-status/battery-plugging-in-manual.https.html",
-        "conformance-checkers/html-aria/accessible-name-updates/687.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ColorShift",
-      "label": "PixelMismatch / ColorShift",
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift",
-      "count": 682,
-      "examples": [
-        "css/css-align/blocks/align-content-block-007.html",
-        "css/css-anchor-position/last-successful-change-fallbacks.html",
-        "css/css-anchor-position/last-successful-fallback-to-base-style.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:ReferenceOverlayExposed",
-      "label": "PixelMismatch / ReferenceOverlayExposed",
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed",
-      "count": 551,
-      "examples": [
-        "css/css-backgrounds/background-size/background-size-cover-svg.html",
-        "css/css-backgrounds/border-image-slice-fill-002.html",
-        "css/css-backgrounds/box-shadow-overlapping-001.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:LayoutShift",
-      "label": "PixelMismatch / LayoutShift",
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift",
-      "count": 479,
-      "examples": [
-        "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
-        "css/css-backgrounds/background-size-029.html",
-        "css/css-backgrounds/border-image-width-should-extend-to-padding.html"
-      ]
-    },
-    {
-      "key": "Timeout",
-      "label": "Timeout",
-      "category": "Timeout",
+      "key": "ShardProcessError",
+      "label": "Shard process failure",
+      "category": "ShardProcessError",
       "subCategory": null,
-      "count": 66,
+      "count": 7,
       "examples": [
-        "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
-        "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
-        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html"
-      ]
-    },
-    {
-      "key": "PixelMismatch:SubpixelAntiAliasing",
-      "label": "PixelMismatch / SubpixelAntiAliasing",
-      "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing",
-      "count": 37,
-      "examples": [
-        "css/css-anchor-position/anchor-center-safe-rtl.html",
-        "svg/coordinate-systems/out-of-flow-svg-root.html",
-        "css/css-color/animation/opacity-interpolation.html"
+        "shard 0 (exit 1)",
+        "shard 1 (exit 1)",
+        "shard 2 (exit 1)"
       ]
     }
   ],
-  "topFailingDirectories": [
-    [
-      "css/CSS2",
-      807
-    ],
-    [
-      "css/css-grid",
-      655
-    ],
-    [
-      "conformance-checkers/html-svg",
-      514
-    ],
-    [
-      "css/css-text",
-      438
-    ],
-    [
-      "css/WOFF2",
-      301
-    ],
-    [
-      "css/css-writing-modes",
-      292
-    ],
-    [
-      "css/css-flexbox",
-      270
-    ],
-    [
-      "conformance-checkers/html",
-      246
-    ],
-    [
-      "html/semantics",
-      241
-    ],
-    [
-      "css/css-transforms",
-      237
-    ]
-  ],
-  "failuresByCategory": [
-    [
-      "PixelMismatch",
-      7513
-    ],
-    [
-      "Timeout",
-      66
-    ]
-  ],
+  "topFailingDirectories": [],
+  "failuresByCategory": [],
   "droppedDeclarations": [],
   "exceptionSignatures": [],
-  "failureFamilies": [
-    {
-      "family": "css/css-text/i18n/css{N}-text-line-break-baspglwj-{N}.html",
-      "count": 113,
-      "categories": {
-        "PixelMismatch": 113
-      },
-      "examples": [
-        "css/css-text/i18n/css3-text-line-break-baspglwj-008.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-022.html",
-        "css/css-text/i18n/css3-text-line-break-baspglwj-035.html"
-      ]
-    },
-    {
-      "family": "css/CSS2/tables/table-anonymous-objects-{N}.xht",
-      "count": 103,
-      "categories": {
-        "PixelMismatch": 103
-      },
-      "examples": [
-        "css/CSS2/tables/table-anonymous-objects-034.xht",
-        "css/CSS2/tables/table-anonymous-objects-067.xht",
-        "css/CSS2/tables/table-anonymous-objects-070.xht"
-      ]
-    },
-    {
-      "family": "html-ruby-extensions/html-ruby-{N}.html",
-      "count": 80,
-      "categories": {
-        "PixelMismatch": 80
-      },
-      "examples": [
-        "html-ruby-extensions/html-ruby-001.html",
-        "html-ruby-extensions/html-ruby-009.html",
-        "html-ruby-extensions/html-ruby-016.html"
-      ]
-    },
-    {
-      "family": "conformance-checkers/html-svg/animate-elem-{N}-t-isvalid.html",
-      "count": 64,
-      "categories": {
-        "PixelMismatch": 64
-      },
-      "examples": [
-        "conformance-checkers/html-svg/animate-elem-08-t-isvalid.html",
-        "conformance-checkers/html-svg/animate-elem-17-t-isvalid.html",
-        "conformance-checkers/html-svg/animate-elem-31-t-isvalid.html"
-      ]
-    },
-    {
-      "family": "css/WOFF2/metadatadisplay-schema-extension-{N}.xht",
-      "count": 50,
-      "categories": {
-        "PixelMismatch": 50
-      },
-      "examples": [
-        "css/WOFF2/metadatadisplay-schema-extension-008.xht",
-        "css/WOFF2/metadatadisplay-schema-extension-017.xht",
-        "css/WOFF2/metadatadisplay-schema-extension-026.xht"
-      ]
-    },
-    {
-      "family": "css/css-transforms/transform-origin/svg-origin-relative-length-{N}.html",
-      "count": 46,
-      "categories": {
-        "PixelMismatch": 46
-      },
-      "examples": [
-        "css/css-transforms/transform-origin/svg-origin-relative-length-002.html",
-        "css/css-transforms/transform-origin/svg-origin-relative-length-015.html",
-        "css/css-transforms/transform-origin/svg-origin-relative-length-020.html"
-      ]
-    },
-    {
-      "family": "css/css-transforms/matrix/svg-matrix-{N}.html",
-      "count": 40,
-      "categories": {
-        "PixelMismatch": 40
-      },
-      "examples": [
-        "css/css-transforms/matrix/svg-matrix-016.html",
-        "css/css-transforms/matrix/svg-matrix-034.html",
-        "css/css-transforms/matrix/svg-matrix-045.html"
-      ]
-    },
-    {
-      "family": "html/dom/render-blocking/element-render-blocking-{N}.html",
-      "count": 40,
-      "categories": {
-        "PixelMismatch": 40
-      },
-      "examples": [
-        "html/dom/render-blocking/element-render-blocking-006.html",
-        "html/dom/render-blocking/element-render-blocking-011.html",
-        "html/dom/render-blocking/element-render-blocking-019.html"
-      ]
-    },
-    {
-      "family": "css/WOFF2/metadatadisplay-schema-license-{N}.xht",
-      "count": 33,
-      "categories": {
-        "PixelMismatch": 33
-      },
-      "examples": [
-        "css/WOFF2/metadatadisplay-schema-license-002.xht",
-        "css/WOFF2/metadatadisplay-schema-license-011.xht",
-        "css/WOFF2/metadatadisplay-schema-license-019.xht"
-      ]
-    },
-    {
-      "family": "css/WOFF2/metadatadisplay-schema-description-{N}.xht",
-      "count": 32,
-      "categories": {
-        "PixelMismatch": 32
-      },
-      "examples": [
-        "css/WOFF2/metadatadisplay-schema-description-001.xht",
-        "css/WOFF2/metadatadisplay-schema-description-009.xht",
-        "css/WOFF2/metadatadisplay-schema-description-012.xht"
-      ]
-    }
-  ],
+  "failureFamilies": [],
   "biggestProblemLimit": 3,
   "lowMatchThreshold": 50.0,
   "biggestProblems": [
     {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 100.0,
-      "impact": 1,
-      "matchPercent": 0.0,
-      "relativeTestPath": "css/css-image-animation/image-animation-body-background-root-propagation-paused.html",
-      "title": "0.0% match \u2014 css/css-image-animation/image-animation-body-background-root-propagation-paused.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / LayoutShift)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 100.0,
-      "impact": 1,
-      "matchPercent": 0.0,
-      "relativeTestPath": "css/css-image-animation/image-animation-root-background-paused.html",
-      "title": "0.0% match \u2014 css/css-image-animation/image-animation-root-background-paused.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / LayoutShift)."
-    },
-    {
-      "kind": "LowMatch",
-      "tier": 2,
-      "severity": 100.0,
-      "impact": 1,
-      "matchPercent": 0.0,
-      "relativeTestPath": "css/css-page/page-margin-002-print.html",
-      "title": "0.0% match \u2014 css/css-page/page-margin-002-print.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
+      "kind": "IncompleteShards",
+      "tier": 0,
+      "severity": 7,
+      "impact": 7,
+      "title": "7 shard(s) did not complete",
+      "detail": "A whole shard's tests are unaccounted for \u2014 the pass/fail of that slice is unknown. shard 0 (exit 1), shard 1 (exit 1), shard 2 (exit 1), shard 3 (exit 1), shard 4 (exit 1), shard 5 (exit 1), shard 7 (exit 1). A shard that recorded no reason is usually a transient CI-runner eviction (the runner received a shutdown signal before its upload step ran), which is likewise not a test regression. The slice can be remeasured without a code change: re-run the WPT Tests workflow and re-dispatch once per shard, setting shard_index to 0, 1, 2, 3, 4, 5, 7 (cached references make the rerun fast)."
     }
   ],
+  "referenceDisagreements": [],
   "results": [
     {
       "relativeTestPath": "accname/aria-owns.html",
