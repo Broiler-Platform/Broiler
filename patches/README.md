@@ -161,9 +161,10 @@ Two call-shaped changes, in
 `Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs` and
 `Source/Broiler.HTML.Core/CssDefaults.cs`:
 
-- the border display item takes each side's colour from
-  `Broiler.Layout.Engine.BorderBevel.SideColor` instead of using the border
-  colour flat on all four sides;
+- the border display item takes each side's colour and thickness from
+  `Broiler.Layout.Engine.BorderBevel` instead of using the border colour flat on
+  all four sides, and a side that splits lengthwise (`groove`/`ridge`) is emitted
+  as two nested rings rather than one;
 - the UA stylesheet states the *base* of the bevel rather than its result —
   `iframe { border: 2px inset #EEEEEE }`, and `hr`'s four hard-coded per-side
   colours collapse to one `border-color: #EEEEEE`.
@@ -201,13 +202,24 @@ repo would have shaded borders while the pinned `CssDefaults` still hard-coded
 `hr`'s bevel per side — darkening `#9A9A9A` a second time and regressing every
 `<hr>` on CI. The two halves have to arrive together, so both are in this patch.
 
-`groove` and `ridge` are untouched: they split each side lengthwise into two
-shades (a 16px grey `groove` paints its outer half `#2C2C2C` and its inner half
-`#808080`, where `inset` paints the whole width `#2C2C2C`), which needs two
-rectangles per side rather than one colour per side.
+`groove` and `ridge` carry the same two shades but split each side lengthwise, so
+those sides are emitted as **two nested rings**: a groove reads as `inset` on its
+outer half and `outset` on its inner half, and a ridge is the mirror. The split
+sits at `ceil(width / 2)` from the outer edge — a 3px groove is two dark rows then
+one light, a 5px one three then two — and below 2px there is no room for two
+halves, where Chromium paints a single stroke of the lit shade on all four sides.
+Every other style has an outer "half" that is the whole side and an empty inner
+one, so it still emits exactly the one display item it always did. This is what
+puts the bevel on every `<fieldset>`, which the HTML Standard renders with
+`border: 2px groove`.
 
-Verified across 665 tests of `html/rendering` and
-`html/semantics/embedded-content/the-iframe-element`: **89 changed, every one an
-improvement, none worse**, and one more passing. Applied together with
-`0004`, `css/css-color-adjust/rendering/dark-color-scheme` reaches 25 of 29 and
+Verified across 1 127 tests of `html/rendering`, `css/css-gaps` and
+`html/semantics/embedded-content/the-iframe-element`. The `inset`/`outset` half
+changed **89, every one an improvement**, with one more passing; the
+`groove`/`ridge` half changed **five more, again all improvements**, the largest
+being `fieldset-vertical` at +0.67 points. **Nothing regressed in either.**
+Directly against Chromium, a page of groove and ridge boxes matches to 99.95 %,
+the residual being corner-miter antialiasing that a plain four-colour `solid`
+border shows too. Applied together with `0004`,
+`css/css-color-adjust/rendering/dark-color-scheme` reaches 25 of 29 and
 `color-scheme-iframe-background` reaches 99.4 % from 69.0 %.

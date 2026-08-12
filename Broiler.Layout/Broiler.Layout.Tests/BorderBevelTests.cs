@@ -19,27 +19,119 @@ public class BorderBevelTests
     [Theory]
     [InlineData("inset", true)]
     [InlineData("outset", true)]
+    [InlineData("groove", true)]
+    [InlineData("ridge", true)]
     [InlineData("INSET", true)]
     [InlineData("solid", false)]
     [InlineData("dashed", false)]
     [InlineData("double", false)]
     [InlineData("none", false)]
     [InlineData(null, false)]
-    // groove and ridge bevel too, but by splitting each side lengthwise into two shades, which one
-    // colour per side cannot express — so they are deliberately left flat here.
-    [InlineData("groove", false)]
-    [InlineData("ridge", false)]
-    public void IsBevelled_Covers_Inset_And_Outset_Only(string? style, bool expected) =>
+    public void IsBevelled_Covers_The_Four_3D_Styles(string? style, bool expected) =>
         Assert.Equal(expected, BorderBevel.IsBevelled(style));
 
     [Fact]
     public void A_Style_That_Does_Not_Bevel_Passes_Its_Colour_Through()
     {
         var color = Rgb(200, 100, 50);
-        foreach (var style in new[] { "solid", "dashed", "groove", "ridge", "none", null })
+        foreach (var style in new[] { "solid", "dashed", "double", "none", null })
         {
             Assert.Equal(Tuple(color), Tuple(BorderBevel.SideColor(style, isTopOrLeft: true, color)));
             Assert.Equal(Tuple(color), Tuple(BorderBevel.SideColor(style, isTopOrLeft: false, color)));
+        }
+    }
+
+    // ── groove and ridge split each side lengthwise ──────────────────────────
+
+    /// <summary>Only groove and ridge split, and only when there is room for two halves.</summary>
+    [Theory]
+    [InlineData("groove", 8, true)]
+    [InlineData("ridge", 8, true)]
+    [InlineData("groove", 2, true)]
+    [InlineData("groove", 1, false)]     // no room — collapses to one stroke
+    [InlineData("ridge", 1, false)]
+    [InlineData("inset", 8, false)]      // bevelled, but one shade per side
+    [InlineData("outset", 8, false)]
+    [InlineData("solid", 8, false)]
+    public void SplitsIntoHalves_Needs_A_Split_Style_And_Two_Pixels(
+        string style, double width, bool expected) =>
+        Assert.Equal(expected, BorderBevel.SplitsIntoHalves(style, width));
+
+    /// <summary>
+    /// The split sits at <c>ceil(width / 2)</c> from the outer edge — measured on Chromium, which
+    /// paints a 3px groove as two dark rows then one light, and a 5px one as three then two.
+    /// </summary>
+    [Theory]
+    [InlineData(2, 1, 1)]
+    [InlineData(3, 2, 1)]
+    [InlineData(4, 2, 2)]
+    [InlineData(5, 3, 2)]
+    [InlineData(8, 4, 4)]
+    [InlineData(9, 5, 4)]
+    public void HalfWidth_Splits_At_The_Ceiling(double width, double outer, double inner)
+    {
+        Assert.Equal(outer, BorderBevel.HalfWidth("groove", width, outerHalf: true));
+        Assert.Equal(inner, BorderBevel.HalfWidth("groove", width, outerHalf: false));
+        Assert.Equal(outer, BorderBevel.HalfWidth("ridge", width, outerHalf: true));
+        Assert.Equal(inner, BorderBevel.HalfWidth("ridge", width, outerHalf: false));
+    }
+
+    /// <summary>
+    /// A style that does not split has an outer "half" that is the whole side and no inner one, so
+    /// it still emits exactly one ring.
+    /// </summary>
+    [Theory]
+    [InlineData("solid")]
+    [InlineData("inset")]
+    [InlineData("outset")]
+    [InlineData(null)]
+    public void An_Unsplit_Style_Puts_Its_Whole_Width_In_The_Outer_Half(string? style)
+    {
+        Assert.Equal(8, BorderBevel.HalfWidth(style, 8, outerHalf: true));
+        Assert.Equal(0, BorderBevel.HalfWidth(style, 8, outerHalf: false));
+    }
+
+    /// <summary>
+    /// A groove is carved into the canvas: its outer half reads as <c>inset</c> (top and left in
+    /// shadow) and its inner half as <c>outset</c>. Chromium paints an 8px grey groove's top as
+    /// four rows of <c>rgb(44,44,44)</c> then four of <c>rgb(128,128,128)</c>, and its right as the
+    /// reverse.
+    /// </summary>
+    [Fact]
+    public void Groove_Is_Inset_Outside_And_Outset_Inside()
+    {
+        var grey = Rgb(128, 128, 128);
+        Assert.Equal((44, 44, 44), Tuple(BorderBevel.HalfColor("groove", true, grey, 8, outerHalf: true)));
+        Assert.Equal((128, 128, 128), Tuple(BorderBevel.HalfColor("groove", true, grey, 8, outerHalf: false)));
+        Assert.Equal((128, 128, 128), Tuple(BorderBevel.HalfColor("groove", false, grey, 8, outerHalf: true)));
+        Assert.Equal((44, 44, 44), Tuple(BorderBevel.HalfColor("groove", false, grey, 8, outerHalf: false)));
+    }
+
+    /// <summary>A ridge stands proud of the canvas, so it is the groove the other way round.</summary>
+    [Fact]
+    public void Ridge_Is_Outset_Outside_And_Inset_Inside()
+    {
+        var grey = Rgb(128, 128, 128);
+        Assert.Equal((128, 128, 128), Tuple(BorderBevel.HalfColor("ridge", true, grey, 8, outerHalf: true)));
+        Assert.Equal((44, 44, 44), Tuple(BorderBevel.HalfColor("ridge", true, grey, 8, outerHalf: false)));
+        Assert.Equal((44, 44, 44), Tuple(BorderBevel.HalfColor("ridge", false, grey, 8, outerHalf: true)));
+        Assert.Equal((128, 128, 128), Tuple(BorderBevel.HalfColor("ridge", false, grey, 8, outerHalf: false)));
+    }
+
+    /// <summary>
+    /// At 1px there is no room for two halves, and Chromium paints the lit shade on <em>all four</em>
+    /// sides — not the outer half's shade, which would differ per side.
+    /// </summary>
+    [Theory]
+    [InlineData("groove")]
+    [InlineData("ridge")]
+    public void A_One_Pixel_Groove_Or_Ridge_Is_A_Single_Lit_Stroke(string style)
+    {
+        var grey = Rgb(128, 128, 128);
+        foreach (var isTopOrLeft in new[] { true, false })
+        {
+            Assert.Equal((128, 128, 128),
+                Tuple(BorderBevel.HalfColor(style, isTopOrLeft, grey, 1, outerHalf: true)));
         }
     }
 

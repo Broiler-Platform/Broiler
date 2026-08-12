@@ -24,11 +24,13 @@ namespace Broiler.Layout.Engine;
 /// <c>border: 2px inset black</c>.
 /// </para>
 /// <para>
-/// <c>groove</c> and <c>ridge</c> are <em>not</em> handled here. They split each side lengthwise
-/// into two halves carrying the two shades — measurably so: a 16px grey <c>groove</c> paints its
-/// outer half <c>#2C2C2C</c> and its inner half <c>#808080</c>, where <c>inset</c> paints the whole
-/// width <c>#2C2C2C</c>. That needs two rectangles per side rather than one colour per side, so
-/// they keep painting flat until the paint path can express it.
+/// <c>groove</c> and <c>ridge</c> carry the same two shades but split each side lengthwise between
+/// them: a groove is an <c>inset</c> bevel on its outer half and an <c>outset</c> one on its inner
+/// half — carved into the canvas — and a ridge is the mirror. The split sits at
+/// <c>ceil(width / 2)</c> from the outer edge, again measured rather than assumed (a 3px groove
+/// paints two dark rows then one light, a 5px one three then two). Below 2px there is no room for
+/// two halves and both styles collapse to a single stroke of the <em>lit</em> shade on all four
+/// sides, which is what Chromium paints for <c>border: 1px groove</c>.
 /// </para>
 /// <para>
 /// <b>An unspecified border colour is the UA stylesheet's business, not this type's.</b> CSS makes
@@ -57,25 +59,68 @@ internal static class BorderBevel
 
     /// <summary>Whether <paramref name="borderStyle"/> paints a bevel this type models.</summary>
     public static bool IsBevelled(string? borderStyle) =>
-        IsStyle(borderStyle, "inset") || IsStyle(borderStyle, "outset");
+        IsStyle(borderStyle, "inset") || IsStyle(borderStyle, "outset")
+        || IsStyle(borderStyle, "groove") || IsStyle(borderStyle, "ridge");
 
     /// <summary>
-    /// The colour one side of a bevelled border is painted, or <paramref name="color"/> unchanged
-    /// when <paramref name="borderStyle"/> is not one this type bevels.
+    /// Whether a side of this style and <paramref name="width"/> is painted as two nested rings
+    /// rather than one — <c>groove</c> and <c>ridge</c>, wide enough to show both halves.
+    /// </summary>
+    public static bool SplitsIntoHalves(string? borderStyle, double width) =>
+        width >= 2 && (IsStyle(borderStyle, "groove") || IsStyle(borderStyle, "ridge"));
+
+    /// <summary>
+    /// The thickness of one half of a side: for a split style the outer half is
+    /// <c>ceil(width / 2)</c> and the inner half is the remainder; for every other style the outer
+    /// "half" is the whole side and the inner one is nothing.
+    /// </summary>
+    public static double HalfWidth(string? borderStyle, double width, bool outerHalf)
+    {
+        if (!SplitsIntoHalves(borderStyle, width))
+            return outerHalf ? width : 0;
+
+        double outer = System.Math.Ceiling(width / 2);
+        return outerHalf ? outer : width - outer;
+    }
+
+    /// <summary>
+    /// The colour one half of a side is painted. For a style that is not split the outer half is
+    /// the whole side, and this is the flat shade it takes.
     /// </summary>
     /// <param name="borderStyle">The side's used <c>border-style</c>.</param>
     /// <param name="isTopOrLeft">Whether this is the top or left side.</param>
     /// <param name="color">The side's used <c>border-color</c>.</param>
-    public static BColor SideColor(string? borderStyle, bool isTopOrLeft, BColor color)
+    /// <param name="width">The side's used width, which decides whether it splits.</param>
+    /// <param name="outerHalf">Which half is being painted.</param>
+    public static BColor HalfColor(
+        string? borderStyle, bool isTopOrLeft, BColor color, double width, bool outerHalf)
     {
         if (!IsBevelled(borderStyle))
             return color;
 
-        // `inset` sinks the box, so the light falls on its bottom and right; `outset` raises it and
-        // lights the top and left instead.
-        bool darkened = isTopOrLeft == IsStyle(borderStyle, "inset");
-        return darkened ? Darken(color) : Lighten(color);
+        if (!SplitsIntoHalves(borderStyle, width))
+        {
+            // A groove or ridge too thin to split is a single stroke of the lit shade.
+            if (!IsStyle(borderStyle, "inset") && !IsStyle(borderStyle, "outset"))
+                return Lighten(color);
+
+            // `inset` sinks the box, so the light falls on its bottom and right; `outset` raises it
+            // and lights the top and left instead.
+            return isTopOrLeft == IsStyle(borderStyle, "inset") ? Darken(color) : Lighten(color);
+        }
+
+        // A groove is carved in: its outer half reads as `inset` and its inner half as `outset`.
+        // A ridge stands proud, so the two are swapped.
+        bool halfReadsAsInset = outerHalf == IsStyle(borderStyle, "groove");
+        return halfReadsAsInset == isTopOrLeft ? Darken(color) : Lighten(color);
     }
+
+    /// <summary>
+    /// The colour of a side that is painted as one ring. Equivalent to
+    /// <see cref="HalfColor"/> for the outer half of an unsplit side.
+    /// </summary>
+    public static BColor SideColor(string? borderStyle, bool isTopOrLeft, BColor color) =>
+        HalfColor(borderStyle, isTopOrLeft, color, width: 1, outerHalf: true);
 
     /// <summary>
     /// Chromium's <c>Color::Dark()</c>: scales every channel by <c>(v - 0.33) / v</c>, where
