@@ -20,7 +20,8 @@
 
 const path = require('path');
 const fs = require('fs');
-const { pathToFileURL } = require('url');
+const url = require('url');
+const { pathToFileURL } = url;
 
 // ---------------------------------------------------------------------------
 // Config
@@ -304,6 +305,178 @@ function decodeFileUrlPath(requestUrl) {
     const encodedPath = requestUrl.replace(/^file:\/\//i, '').split(/[?#]/)[0];
     try {
         return decodeURIComponent(encodedPath);
+    } catch {
+        return null;
+    }
+}
+
+// ── WPT `.sub` template substitution ─────────────────────────────────────────
+// The mirror of src/Broiler.Wpt/WptSubstitution.cs, and it has to stay one: the
+// two sides render the same bytes or every `.sub` test fails on a spurious
+// mismatch. Values are WPT's own defaults (tools/serve/serve.py
+// ConfigBuilder._default, tools/wptserve/wptserve/config.py _get_domains).
+const WPT_PRIMARY_HOST = 'web-platform.test';
+const WPT_ALTERNATE_HOST = 'not-web-platform.test';
+const WPT_PORTS = {
+    http: [8000, 8001],
+    https: [8443, 8444],
+    ws: [8888],
+    wss: [8889],
+    h2: [9000],
+};
+const WPT_BASE_SUBDOMAINS = ['www', 'www1', 'www2', '天気の良い日', 'élève'];
+
+/** WPT's _make_subdomains_product: every dot-joined tuple of the labels, up to `depth` long. */
+function makeSubdomainProduct(labels, depth) {
+    const result = [];
+    let level = labels;
+    for (let i = 1; i <= depth; i++) {
+        result.push(...level);
+        level = level.flatMap((prefix) => labels.map((label) => `${prefix}.${label}`));
+    }
+    return result;
+}
+
+/** all_domains: {alias: {subdomain: host}}, with non-ASCII labels IDNA-encoded. */
+const WPT_ALL_DOMAINS = (() => {
+    const subdomains = makeSubdomainProduct(WPT_BASE_SUBDOMAINS, 2);
+    const all = {};
+    for (const [alias, host] of [['', WPT_PRIMARY_HOST], ['alt', WPT_ALTERNATE_HOST]]) {
+        const domains = { '': host };
+        for (const subdomain of subdomains) {
+            domains[subdomain] = `${url.domainToASCII(subdomain)}.${host}`;
+        }
+        all[alias] = domains;
+    }
+    return all;
+})();
+
+/**
+ * Every host WPT serves from the checkout, exactly (never by suffix — WPT also
+ * mints deliberately unresolvable names such as nonexistent.web-platform.test,
+ * and serving those content would turn a load-failure test into a passing one).
+ */
+const WPT_SERVED_HOSTS = new Set(
+    Object.values(WPT_ALL_DOMAINS).flatMap((domains) => Object.values(domains)));
+
+/**
+ * Whether `p` names a template WPT serves through the `sub` pipe. WPT's rule is
+ * a literal `".sub." in path` (tools/wptserve/wptserve/handlers.py) — a
+ * case-sensitive substring test, so x.sub.html and x.tentative.sub.html both
+ * qualify. Only the basename is examined, so a checkout directory carrying
+ * `.sub.` in its own name does not make every file beneath it a template.
+ */
+function isSubstitutionFile(p) {
+    return typeof p === 'string' && path.basename(p).includes('.sub.');
+}
+
+function resolveWptTemplateField(expression, rootRelativePath) {
+    // `{{$id:uuid()}}` needs a live request; leave it, as the C# side does.
+    if (expression.startsWith('$')) {
+        return null;
+    }
+    const field = /^([A-Za-z_][A-Za-z0-9_-]*)((?:\[[^\]]*\])*)$/.exec(expression);
+    if (field === null) {
+        return null;   // a function call, or something this parser does not model
+    }
+    const name = field[1];
+    const indexes = [...field[2].matchAll(/\[([^\]]*)\]/g)].map((m) => m[1]);
+    const domain = (alias, subdomain) => {
+        const domains = WPT_ALL_DOMAINS[alias];
+        return domains !== undefined && Object.hasOwn(domains, subdomain) ? domains[subdomain] : null;
+    };
+
+    if (name === 'host' && indexes.length === 0) {
+        return WPT_PRIMARY_HOST;
+    }
+    if (name === 'hosts' && indexes.length === 2) {
+        return domain(indexes[0], indexes[1]);
+    }
+    if (name === 'domains' && indexes.length === 1) {
+        return domain('', indexes[0]);
+    }
+    if (name === 'ports' && indexes.length === 2) {
+        const ports = WPT_PORTS[indexes[0]];
+        const i = /^[0-9]+$/.test(indexes[1]) ? Number(indexes[1]) : -1;
+        return ports !== undefined && i >= 0 && i < ports.length ? String(ports[i]) : null;
+    }
+    if (name === 'location' && indexes.length === 1 && rootRelativePath !== null) {
+        const port = String(WPT_PORTS.http[0]);
+        const pathOnly = rootRelativePath.split(/[?#]/)[0];
+        const query = rootRelativePath.includes('?')
+            ? `?${rootRelativePath.split('?')[1].split('#')[0]}`
+            : '?';
+        switch (indexes[0]) {
+            case 'server': return `http://${WPT_PRIMARY_HOST}:${port}`;
+            case 'scheme': return 'http';
+            case 'host': return `${WPT_PRIMARY_HOST}:${port}`;
+            case 'hostname': return WPT_PRIMARY_HOST;
+            case 'port': return port;
+            case 'path':
+            case 'pathname': return pathOnly;
+            case 'query': return query;
+            default: return null;
+        }
+    }
+    return null;
+}
+
+/** Expand the placeholders a file on disk can answer; leave the rest verbatim. */
+function applyWptSubstitution(content, rootRelativePath = null) {
+    if (!content.includes('{{')) {
+        return content;
+    }
+    return content.replace(/\{\{([^}]*)\}\}/g, (whole, expression) => {
+        const resolved = resolveWptTemplateField(expression, rootRelativePath);
+        return resolved === null ? whole : resolved;
+    });
+}
+
+/** The root-relative URL path of `filePath` under `baseDir`, or null when outside it. */
+function rootRelativePathUnder(baseDir, filePath) {
+    const resolvedBase = path.resolve(baseDir);
+    const resolved = path.resolve(filePath);
+    if (resolved !== resolvedBase && !resolved.startsWith(resolvedBase + path.sep)) {
+        return null;
+    }
+    return '/' + path.relative(resolvedBase, resolved).split(path.sep).join('/');
+}
+
+/**
+ * The root-relative form of an absolute http(s) URL on a host WPT serves from
+ * the checkout, or `null` for any other URL. A substituted `.sub` test points
+ * its cross-origin frame at such a URL; offline there is no server to answer
+ * it, but the file it names is right here.
+ */
+function stripWptServedOrigin(requestUrl) {
+    let parsed;
+    try {
+        parsed = new URL(requestUrl);
+    } catch {
+        return null;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return null;
+    }
+    return WPT_SERVED_HOSTS.has(parsed.hostname) ? parsed.pathname + parsed.search : null;
+}
+
+/** Resolve a root-relative WPT path to a file under `baseDir`, or null. */
+function resolveUnderBaseDir(baseDir, rootRelative) {
+    const resolvedBase = path.resolve(baseDir);
+    const withoutQuery = rootRelative.split(/[?#]/)[0];
+    let decoded;
+    try {
+        decoded = decodeURIComponent(withoutQuery);
+    } catch {
+        decoded = withoutQuery;
+    }
+    const candidate = path.resolve(resolvedBase, '.' + decoded);
+    if (candidate !== resolvedBase && !candidate.startsWith(resolvedBase + path.sep)) {
+        return null;
+    }
+    try {
+        return fs.existsSync(candidate) && fs.statSync(candidate).isFile() ? candidate : null;
     } catch {
         return null;
     }
@@ -627,18 +800,56 @@ async function main(args = process.argv.slice(2)) {
     let errors = 0;
     const total = testFiles.length;
 
-    async function fileRouteHandler(route) {
-        const served = resolveRootRelativeResource(resolvedBaseDir, route.request().url());
-        if (served === null) {
-            // The test document, a resolvable relative sub-resource, or an
-            // unmappable path — let Chromium load (or 404) it directly.
-            return route.continue();
+    // Serve one on-disk file, expanding it first when it is a `.sub` template —
+    // WPT's server pipes every such file through `sub` before sending it, so a
+    // reference generated from the raw bytes renders placeholder text and URLs
+    // that address nothing.
+    async function fulfillFromDisk(route, file) {
+        let body = fs.readFileSync(file);
+        if (isSubstitutionFile(file)) {
+            body = applyWptSubstitution(
+                body.toString('utf8'), rootRelativePathUnder(resolvedBaseDir, file));
         }
         await route.fulfill({
             status: 200,
-            contentType: contentTypeForExtension(path.extname(served)),
-            body: fs.readFileSync(served),
+            contentType: contentTypeForExtension(path.extname(file)),
+            body,
         });
+    }
+
+    async function fileRouteHandler(route) {
+        const requestUrl = route.request().url();
+        const served = resolveRootRelativeResource(resolvedBaseDir, requestUrl);
+        if (served !== null) {
+            return fulfillFromDisk(route, served);
+        }
+        // The test document or a resolvable relative sub-resource: Chromium can
+        // load it itself unless it is a template, which has to be expanded here.
+        const rawPath = decodeFileUrlPath(requestUrl);
+        if (rawPath !== null && isSubstitutionFile(rawPath)) {
+            try {
+                if (fs.existsSync(rawPath) && fs.statSync(rawPath).isFile()) {
+                    return fulfillFromDisk(route, rawPath);
+                }
+            } catch { /* fall through — let Chromium 404 it */ }
+        }
+        // An unmappable path — let Chromium load (or 404) it directly.
+        return route.continue();
+    }
+
+    // A substituted test addresses WPT's own hosts (http://not-web-platform.test:8000/…).
+    // They are all served from this one checkout, so answer them from it; anything
+    // else on the network is left exactly as it was.
+    async function servedOriginRouteHandler(route) {
+        const rootRelative = stripWptServedOrigin(route.request().url());
+        if (rootRelative === null) {
+            return route.continue();
+        }
+        const file = resolveUnderBaseDir(resolvedBaseDir, rootRelative);
+        if (file === null) {
+            return route.fulfill({ status: 404, contentType: 'text/plain', body: '' });
+        }
+        return fulfillFromDisk(route, file);
     }
 
     // Create a fresh context + page, registering the resource route.  Used both
@@ -661,6 +872,7 @@ async function main(args = process.argv.slice(2)) {
         try {
             const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
             await context.route(/^file:\/\//i, fileRouteHandler);
+            await context.route(/^https?:\/\//i, servedOriginRouteHandler);
             const page = await context.newPage();
             return { context, page };
         } catch (err) {
@@ -671,6 +883,7 @@ async function main(args = process.argv.slice(2)) {
             await restartBrowser(err.message || err);
             const context = await browser.newContext(createBrowserContextOptions(nonJsOnly));
             await context.route(/^file:\/\//i, fileRouteHandler);
+            await context.route(/^https?:\/\//i, servedOriginRouteHandler);
             const page = await context.newPage();
             return { context, page };
         }
@@ -764,8 +977,13 @@ module.exports = {
     renderTestWithWatchdog,
     requiresJavaScript,
     resolveRenderTimeoutMs,
+    applyWptSubstitution,
+    isSubstitutionFile,
     resolveRootRelativeResource,
+    resolveUnderBaseDir,
+    rootRelativePathUnder,
     shardIndexForPath,
+    stripWptServedOrigin,
     waitForReftestReady,
     withTimeout,
 };

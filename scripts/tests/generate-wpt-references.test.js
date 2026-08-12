@@ -21,8 +21,13 @@ const {
     renderTestWithWatchdog,
     requiresJavaScript,
     resolveRenderTimeoutMs,
+    applyWptSubstitution,
+    isSubstitutionFile,
     resolveRootRelativeResource,
+    resolveUnderBaseDir,
+    rootRelativePathUnder,
     shardIndexForPath,
+    stripWptServedOrigin,
     waitForReftestReady,
     withTimeout,
 } = require('../generate-wpt-references.js');
@@ -365,4 +370,95 @@ test('closeQuietly survives a teardown that fails or wedges', async () => {
     const started = Date.now();
     await closeQuietly({ close: never }, 'wedged close', 20);
     assert.ok(Date.now() - started < 5_000, 'a wedged close must be bounded');
+});
+
+// ── WPT `.sub` template substitution ─────────────────────────────────────────
+// These must agree with src/Broiler.Wpt/WptSubstitution.cs case for case: the
+// runner and the reference generator render the same bytes or every `.sub` test
+// fails on a spurious pixel mismatch.
+
+test('a .sub file is recognised the way WPT recognises one', () => {
+    // WPT's rule is a literal `".sub." in path`, so it is a substring test and
+    // case-sensitive (tools/wptserve/wptserve/handlers.py).
+    for (const name of ['a.sub.html', 'a.sub.css', 'dir/a.tentative.sub.html', 'a.sub.tentative.html']) {
+        assert.equal(isSubstitutionFile(name), true, name);
+    }
+    for (const name of ['a.html', 'a.subtle.html', 'sub.html', 'a.sub', 'a.SUB.html', '', null]) {
+        assert.equal(isSubstitutionFile(name), false, String(name));
+    }
+});
+
+test('substitution expands the fields a file on disk can answer', () => {
+    assert.equal(applyWptSubstitution('{{host}}'), 'web-platform.test');
+    assert.equal(applyWptSubstitution('{{hosts[alt][]}}'), 'not-web-platform.test');
+    assert.equal(applyWptSubstitution('{{hosts[][]}}'), 'web-platform.test');
+    assert.equal(applyWptSubstitution('{{domains[www]}}'), 'www.web-platform.test');
+    assert.equal(applyWptSubstitution('{{domains[www.www1]}}'), 'www.www1.web-platform.test');
+    assert.equal(applyWptSubstitution('{{domains[élève]}}'), 'xn--lve-6lad.web-platform.test');
+    assert.equal(applyWptSubstitution('{{ports[http][0]}}'), '8000');
+    assert.equal(applyWptSubstitution('{{ports[https][0]}}'), '8443');
+    assert.equal(
+        applyWptSubstitution('<iframe src="http://{{hosts[alt][]}}:{{ports[http][0]}}/css/a.html">'),
+        '<iframe src="http://not-web-platform.test:8000/css/a.html">');
+});
+
+test('a placeholder only a live request could answer is left verbatim', () => {
+    // Rendering a fabricated value would be a worse lie than rendering the
+    // template text — and {{not_domains[…]}} names a host meant NOT to resolve.
+    for (const placeholder of [
+        '{{uuid()}}', '{{$id:uuid()}}', '{{$id}}', '{{headers[Host]}}', '{{GET[name]}}',
+        '{{file_hash(md5, dom/interfaces.html)}}', '{{not_domains[nonexistent]}}',
+        '{{ports[http][9]}}', '{{nonsense[1]}}', '{{location[host]}}',
+    ]) {
+        assert.equal(applyWptSubstitution(placeholder), placeholder);
+    }
+});
+
+test('{{location[…]}} answers once the document path is known', () => {
+    const p = '/css/x/y.sub.html';
+    assert.equal(applyWptSubstitution('{{location[server]}}', p), 'http://web-platform.test:8000');
+    assert.equal(applyWptSubstitution('{{location[host]}}', p), 'web-platform.test:8000');
+    assert.equal(applyWptSubstitution('{{location[path]}}', p), p);
+});
+
+test('a served WPT origin is stripped to its path, and nothing else is', () => {
+    assert.equal(
+        stripWptServedOrigin('http://web-platform.test:8000/css/a.html'), '/css/a.html');
+    assert.equal(
+        stripWptServedOrigin('http://not-web-platform.test:8000/css/a.html'), '/css/a.html');
+    assert.equal(
+        stripWptServedOrigin('https://www.web-platform.test:8443/css/a.html?x=1'), '/css/a.html?x=1');
+    // WPT mints nonexistent.* hosts to be unreachable; serving them would turn a
+    // load-failure test into a passing one.
+    for (const url of [
+        'http://nonexistent.web-platform.test:8000/css/a.html',
+        'http://example.com/css/a.html',
+        'http://web-platform.test.evil.example/css/a.html',
+        'ftp://web-platform.test:8000/css/a.html',
+        '/css/a.html',
+        'not a url',
+    ]) {
+        assert.equal(stripWptServedOrigin(url), null, url);
+    }
+});
+
+test('a served path resolves under the base dir and cannot escape it', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-served-'));
+    try {
+        fs.mkdirSync(path.join(dir, 'css'), { recursive: true });
+        const file = path.join(dir, 'css', 'a.html');
+        fs.writeFileSync(file, '<p>a</p>');
+
+        assert.equal(resolveUnderBaseDir(dir, '/css/a.html'), file);
+        assert.equal(resolveUnderBaseDir(dir, '/css/a.html?pipe=trickle(d1)'), file);
+        assert.equal(resolveUnderBaseDir(dir, '/css/missing.html'), null);
+        assert.equal(resolveUnderBaseDir(dir, '/../outside.html'), null);
+        // A directory is not a document.
+        assert.equal(resolveUnderBaseDir(dir, '/css'), null);
+
+        assert.equal(rootRelativePathUnder(dir, file), '/css/a.html');
+        assert.equal(rootRelativePathUnder(dir, path.join(dir + '-sibling', 'a.html')), null);
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
 });

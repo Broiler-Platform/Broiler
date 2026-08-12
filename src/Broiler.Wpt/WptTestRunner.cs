@@ -1689,7 +1689,7 @@ internal sealed partial class WptTestRunner
         string html;
         try
         {
-            html = File.ReadAllText(testPath);
+            html = WptSubstitution.ReadDocument(testPath, wptRoot);
         }
         catch (Exception ex)
         {
@@ -1818,8 +1818,10 @@ internal sealed partial class WptTestRunner
         {
             using var presentation = ImageAnimationClock.Pin(presentationTime);
             // The checkout is the document root a `/`-rooted <frame>/<iframe> src resolves against,
-            // matching what the stylesheet/image handlers above already do for their own URLs.
-            using var documentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot);
+            // matching what the stylesheet/image handlers above already do for their own URLs — and
+            // it is what WPT's own hosts serve, so a substituted `.sub` template's cross-origin
+            // frame resolves to the same checkout instead of to a network fetch that cannot happen.
+            using var documentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot, WptSubstitution.ServedHosts);
             rendered = RenderWithNativeAnchor(html, () => renderDocument is not null
                 ? WptDocumentRenderer.RenderToImage(renderDocument, _width, _height,
                     backgroundColor: BColor.White,
@@ -2046,7 +2048,7 @@ internal sealed partial class WptTestRunner
         string html;
         try
         {
-            html = File.ReadAllText(testPath);
+            html = WptSubstitution.ReadDocument(testPath, wptRoot);
         }
         catch (Exception ex)
         {
@@ -2406,9 +2408,12 @@ internal sealed partial class WptTestRunner
     }
 
     /// <summary>
-    /// Maps a root-relative WPT URL (<c>/images/blue.png</c>, <c>/fonts/Ahem.ttf</c>) onto the file
-    /// it names under <paramref name="wptRoot"/>, mirroring what a real WPT server resolves. Returns
-    /// <c>null</c> when the URL is not root-relative or names nothing on disk.
+    /// Maps a root-relative WPT URL (<c>/images/blue.png</c>, <c>/fonts/Ahem.ttf</c>) — or an
+    /// absolute one on a host WPT serves from the same checkout
+    /// (<c>http://www.web-platform.test:8000/images/blue.png</c>, which is what a substituted
+    /// <c>.sub</c> template carries) — onto the file it names under <paramref name="wptRoot"/>,
+    /// mirroring what a real WPT server resolves. Returns <c>null</c> when the URL is neither of
+    /// those or names nothing on disk.
     /// <para>
     /// The query and fragment are stripped, and percent-escapes decoded, before touching the disk —
     /// exactly what the reference generator's <c>decodeFileUrlPath</c> does on its side. WPT routinely
@@ -2421,6 +2426,11 @@ internal sealed partial class WptTestRunner
     /// </summary>
     internal static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
     {
+        // A `.sub` template's URLs are absolute and on a WPT host (`http://www.web-platform.test:8000/…`)
+        // once substituted. WPT serves every one of those hosts from this same checkout, so such a
+        // URL is the root-relative one with an origin in front of it.
+        src = WptSubstitution.TryStripServedOrigin(src) ?? src;
+
         if (src == null || !src.StartsWith("/", StringComparison.Ordinal))
             return null;
 
@@ -2469,7 +2479,7 @@ internal sealed partial class WptTestRunner
     {
         string html;
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.FileRead))
-            html = File.ReadAllText(htmlPath);
+            html = WptSubstitution.ReadDocument(htmlPath, wptRoot);
 
         if (IsMediaPlaybackTest(html))
             throw new InvalidOperationException("Test requires media playback.");
@@ -2517,8 +2527,10 @@ internal sealed partial class WptTestRunner
 
         using var presentation = ImageAnimationClock.Pin(presentationTime);
         // The checkout is the document root a `/`-rooted <frame>/<iframe> src resolves against,
-        // matching what the stylesheet/image handlers above already do for their own URLs.
-        using var documentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot);
+        // matching what the stylesheet/image handlers above already do for their own URLs — and
+        // it is what WPT's own hosts serve, so a substituted `.sub` template's cross-origin frame
+        // resolves to the same checkout instead of to a network fetch that cannot happen.
+        using var documentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot, WptSubstitution.ServedHosts);
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Render))
         {
             // `@page` paint applies to paged media only, so it is read for a print test and for
