@@ -512,6 +512,51 @@ scale.** The diff was in the part of the picture the tests were not about — 43
 to do with replaced-element sizing, all failing because the document they were
 being compared against was drawn with an `<img>`.
 
+## `position: relative` did nothing to an inline box, and it cost 68 writing-mode reftests
+
+`css/css-writing-modes` is the corpus's largest winnable group, and its largest
+family — `abs-pos-non-replaced-v{lr,rl}-*`, 224 tests at a median 97.4 % — turned
+out not to be about vertical layout at all. Their **references** are ordinary
+horizontal documents that place a swatch like this:
+
+```html
+<style>img#green-square { position: relative; left: 160px; top: 80px; }</style>
+<div><img id="green-square" src="swatch-green.png" width="80" height="80"></div>
+```
+
+The swatch rendered at its static position, so the reference showed the green
+square in the wrong place while the *test* had it right.
+
+CSS 2.1 §9.4.3's offset is visual — the box keeps its place in the flow and its
+content is painted somewhere else — so it has to reach the words, which is what
+`OffsetLeft`/`OffsetTop` already do. `PerformLayout` applies it for every box it
+lays out; an **inline-level** box is laid out by `CreateLineBoxes` and never goes
+through `PerformLayout`, so nothing applied it at all. Neither an inline `<img>`
+nor an inline `<span>` moved. The fix walks the inline descendants once the line
+boxes exist (`CssBox.OffsetRelativeInlineDescendants`).
+
+**The walk is `display: inline` only, and that distinction is the whole of it.**
+An `inline-block` is inline-*level* but is laid out as a block and already applies
+its own offset in `PerformLayout`, so including it moved such a box by double —
+`CSS2/margin-padding-clear/margin-collapse-001`'s reference stacks two relatively
+positioned inline-blocks and was the pair that caught it. Such a box still moves
+with a relative *ancestor*, because `OffsetLeft` carries the ancestor's shift into
+every descendant whatever its display.
+
+**`css/css-writing-modes` goes 419 → 487 of 1139, nothing lost.**
+
+**Vertical containers are deliberately left out.** `left`/`top` are physical, but
+a vertical container's words sit in the engine's rotated space, so the offset
+arrives turned a quarter turn: measured on `vertical-rl`, `left: 60px; top: 30px`
+came out as a visual `(-30, +60)`, and on `vertical-lr` as `(+30, +60)`. Applying
+it there needs a per-writing-mode mapping — the two `sideways-*` modes included,
+which has not been measured — and doing it wrongly is worse than not doing it:
+`vrl-inline-paint-invalidation` was the single regression when the offset went in
+unmapped, and it is the pair to fix against when someone works out the mapping.
+
+That is also the reason the family only moved 60 of its 224 tests: the rest fail
+on their *test* side, which is what these were written to exercise.
+
 ## Next lead: an out-of-flow replaced element with an auto size renders nothing
 
 Diagnosed, not fixed. `css/CSS2/positioning/absolute-replaced-width-*` is 40

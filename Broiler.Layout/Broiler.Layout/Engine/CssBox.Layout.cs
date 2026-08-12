@@ -1132,6 +1132,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     }
                 }
 
+                // CSS2.1 §9.4.3: a relatively positioned inline-level box is offset
+                // visually once its line boxes exist. PerformLayout does that for every box
+                // it lays out, but an inline-level box is laid out by CreateLineBoxes and
+                // never goes through PerformLayout — so nothing moved an inline <span> or
+                // <img> that asked to be moved, and `position: relative; left: 160px` on one
+                // rendered at its static position.
+                if (!CssWritingMode.IsVertical(WritingMode))
+                    OffsetRelativeInlineDescendants();
+
                 // CSS2.1 §10.6.7: Elements that establish a new block
                 // formatting context (BFC) must include descendant floats
                 // in their auto-height calculation.  The inline path above
@@ -2353,6 +2362,54 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// CSS2.1 §9.4.3: apply the visual position:relative offset after layout
     /// (doesnot affect flow).
     /// </summary>
+    /// <summary>
+    /// Applies <c>position: relative</c> offsets to the inline-level boxes inside this container's
+    /// line boxes — the ones <see cref="PerformLayout"/> never sees.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="OffsetLeft"/> carries a shift into the box's own words, its line-box rectangles
+    /// and its descendants, so a relative box nested inside another moves by both — which is what
+    /// compounding offsets means, and it comes out the same whichever end of the chain is offset
+    /// first, translations being additive. Each box's own offset is applied exactly once, because
+    /// only the box that declares one is ever offset.
+    /// </para>
+    /// <para>
+    /// Only <c>display: inline</c>, and the walk stops at everything else. A block-level box, a
+    /// float, and an <c>inline-block</c> (or <c>inline-flex</c>/<c>inline-grid</c>) all get their
+    /// own <see cref="PerformLayout"/> and apply their own offset there — an inline-block is
+    /// inline-<em>level</em> but is laid out as a block, so including it applied the offset twice
+    /// and moved it by double: <c>CSS2/margin-padding-clear/margin-collapse-001</c>'s reference
+    /// stacks two <c>position: relative</c> inline-blocks and is what caught it. Such a box still
+    /// moves with a relative <em>ancestor</em>, because <see cref="OffsetLeft"/> carries the
+    /// ancestor's shift into every descendant regardless of display.
+    /// </para>
+    /// <para>
+    /// <b>Horizontal containers only.</b> <c>left</c> and <c>top</c> are physical, but a vertical
+    /// container's words are positioned in the engine's rotated space, so the offset would arrive
+    /// turned a quarter turn: measured on <c>vertical-rl</c>, a <c>left: 60px; top: 30px</c> came
+    /// out as a visual <c>(-30, +60)</c>, and on <c>vertical-lr</c> as <c>(+30, +60)</c>. Applying
+    /// it there needs that mapping per writing mode — including the two <c>sideways-*</c> modes,
+    /// which this has not measured — so a vertical container is left alone rather than moved
+    /// wrongly. It is what happened before this existed, and
+    /// <c>css-writing-modes/vrl-inline-paint-invalidation</c> is the pair that says so.
+    /// </para>
+    /// </remarks>
+    private void OffsetRelativeInlineDescendants()
+    {
+        foreach (CssBox child in Boxes)
+        {
+            if (child.Display != CssConstants.Inline || child.Float != CssConstants.None
+                || child.Position is CssConstants.Absolute or CssConstants.Fixed)
+            {
+                continue;
+            }
+
+            child.OffsetRelativeInlineDescendants();
+            child.ApplyRelativePositionOffset();
+        }
+    }
+
     private void ApplyRelativePositionOffset()
     {
         // Apply position:relative offset after layout (visual only, does not affect flow)

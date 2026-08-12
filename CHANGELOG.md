@@ -63,6 +63,16 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — `position: relative` now offsets an inline-level box. CSS 2.1
+  §9.4.3's offset is visual, so it has to reach the box's words; `PerformLayout`
+  applied it for every box it lays out, but an inline-level box is laid out by
+  `CreateLineBoxes` and never goes through `PerformLayout` — so neither an inline
+  `<span>` nor an inline `<img>` moved at all. `css/css-writing-modes` goes
+  419 → 487 of 1139 reftests, nothing lost: the family that gains is
+  `abs-pos-non-replaced-v{lr,rl}-*`, whose *references* place their swatch with
+  `position: relative`. Vertical containers are excluded — their words sit in the
+  engine's rotated space, so a physical `left`/`top` arrives turned a quarter turn
+  and needs a per-writing-mode mapping first.
 - `Broiler.Layout` — a replaced element whose width is a percentage no longer
   ignores its stated height. CSS 2.1 §10.4 uses the intrinsic ratio to fill in a
   dimension left `auto`, not to overrule one the author stated, but the
