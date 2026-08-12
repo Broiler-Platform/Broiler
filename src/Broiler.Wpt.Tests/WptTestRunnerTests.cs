@@ -11680,6 +11680,41 @@ div {{ width: 256px; height: 768px; }}
     }
 
     [Fact]
+    public void TryResolveWptRootRelativePath_Is_Absolute_Even_From_A_Relative_Root()
+    {
+        // The resolved path is handed straight to the engine, which resolves what it is
+        // given against the *document's* base URL. A relative result is therefore looked
+        // for next to the test file and silently not found — and File.Exists inside the
+        // resolver still succeeds, because it resolves against the process's working
+        // directory, so nothing reports the failure: the render just comes out with no
+        // image. Every documented invocation passes a relative --wpt-dir
+        // ("--wpt-dir tests/wpt/checkout"), so this was the normal local case.
+        Directory.CreateDirectory(Path.Combine(_tempDir, "images"));
+        var onDisk = Path.Combine(_tempDir, "images", "blue.png");
+        File.WriteAllText(onDisk, "not-really-a-png");
+
+        var relativeRoot = Path.GetRelativePath(Directory.GetCurrentDirectory(), _tempDir);
+        var resolved = WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png", relativeRoot);
+
+        Assert.NotNull(resolved);
+        Assert.True(Path.IsPathRooted(resolved), $"expected an absolute path, got '{resolved}'");
+        Assert.Equal(Path.GetFullPath(onDisk), resolved);
+    }
+
+    [Fact]
+    public void TryResolveWptRootRelativePath_Absolute_Root_Is_Unchanged()
+    {
+        // The negative half: an absolute root already produced an absolute result, which is
+        // what CI passes (run-wpt-tests.sh defaults WPT_DIR to "$REPO_ROOT/tests/wpt/checkout").
+        // Normalising it must not move it, or the fix would be a CI behaviour change.
+        Directory.CreateDirectory(Path.Combine(_tempDir, "images"));
+        var onDisk = Path.Combine(_tempDir, "images", "blue.png");
+        File.WriteAllText(onDisk, "not-really-a-png");
+
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png", _tempDir));
+    }
+
+    [Fact]
     public void TryResolveWptRootRelativePath_Decodes_Percent_Escapes()
     {
         Directory.CreateDirectory(Path.Combine(_tempDir, "sup port"));

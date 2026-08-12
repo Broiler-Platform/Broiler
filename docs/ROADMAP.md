@@ -158,7 +158,7 @@ count below is reproducible with the command in its batch.
   still guards an external backend that has been removed; its one failing case
   asserts `Directory.Exists` on the deleted `Broiler.HTML/Source/Broiler.HTML.WPF`
   (`:25`, `:59`). The historical M5 rollback window in
-  [`GraphicsBackendStabilizationTests`](../src/Broiler.Cli.Tests/GraphicsBackendStabilizationTests.cs)
+  `GraphicsBackendStabilizationTests`
   now compares the current internal stub while naming it Skia. A focused run of
   the Skia/cutover/stabilization cluster failed 8 of 20 cases (7 + 6 + 7, failing
   1 + 5 + 2); the stabilization suite alone performs about 50 full renders per run.
@@ -169,16 +169,16 @@ count below is reproducible with the command in its batch.
   no `Broiler.Graphics` image-codec catalog. Phase 1-5 were orphaned Playwright
   scripts (one `smoke.mjs` each) with no package, runner, CI job, or matching
   application globals and selectors.
-- [`SharedGeometryExclusiveCutoverTests`](../src/Broiler.Cli.Tests/SharedGeometryExclusiveCutoverTests.cs)
+- `SharedGeometryExclusiveCutoverTests`
   and
-  [`LayoutGeometryCacheEquivalenceTests`](../src/Broiler.Cli.Tests/LayoutGeometryCacheEquivalenceTests.cs)
+  `LayoutGeometryCacheEquivalenceTests`
   are the only remaining consumers of their production toggles, and the
   production comments state that changing either toggle no longer changes
   behavior. `UseSharedGeometryExclusively` (`SharedLayoutGeometry.cs:28`) has
   **zero** production readers; `LayoutGeometryCacheEnabled` (`LayoutMetrics.cs:29`)
   gates one two-line early return at `LayoutMetrics.cs:39`. The whole production
   footprint of that batch is four lines across two files.
-- [`HttpClientMigrationTests`](../src/Broiler.Cli.Tests/HttpClientMigrationTests.cs)
+- `HttpClientMigrationTests`
   reflect over `HtmlRenderer.Rendering`, `HtmlRenderer.Orchestration`,
   `HtmlRenderer.Utils`, and `Broiler.HtmlBridge` — none of which exist; 8 of 9
   focused cases fail with `FileNotFoundException`, and the ninth asserts only
@@ -246,7 +246,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    fails if its retained coverage regresses.
 
 2. **Remove tests with no effective coverage (root and Broiler.JS).**
-   *2a landed; 2b shipped as [`patches/0007`](../patches/README.md).*
+   *2a landed; 2b shipped as the Broiler.JS patch "Retire the Repro scratch tests and the legacy solution" in [the patch backlog](../patches/README.md).*
 
    *2a — this repository.*
    - Delete `HttpClientMigrationTests`, `Acid3DebugTest`, `Acid3CascadeDebugTests`,
@@ -293,8 +293,9 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    `dotnet test src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj -c Release --filter "FullyQualifiedName~Acid3|FullyQualifiedName~Flex|FullyQualifiedName~GoogleLike"`.
 
 3. **Finish the Skia-era test transition (Broiler.HTML and root tests).**
-   *3a landed; 3b shipped as [`patches/0008`](../patches/README.md), and the
-   rendering defect it uncovered as [`patches/0009`](../patches/README.md).*
+   *3a landed; 3b shipped as the Broiler.HTML patch "Drop the deleted WPF adapter from the public surface",
+   and the rendering defect it uncovered as "Keep dashed and dotted strokes on the raster path" — both in
+   [the patch backlog](../patches/README.md).*
    Coordinate this batch with
    [Broiler.HTML's compatibility-seam retirement](../Broiler.HTML/docs/roadmap.md#4-retire-the-skia-era-compatibility-seam).
 
@@ -325,7 +326,8 @@ names a `dotnet`/`git`/`grep` command that does run locally.
      `solid`, `double`, and `groove` painted normally. The fix keeps such strokes
      on the raster path by reducing them to solid runs
      ([`DashedStrokeGeometry`](../Broiler.Layout/Broiler.Layout/IR/DashedStrokeGeometry.cs),
-     with the call site in [`patches/0009`](../patches/README.md)). The eleven were
+     with the call site in the Broiler.HTML patch "Keep dashed and dotted strokes on the raster path"
+     in [the patch backlog](../patches/README.md)). The eleven were
      asserting the plumbing of a stub rather than any rendered result, so they go;
      what replaces them as coverage is the 17-case `DashedStrokeGeometryTests` plus
      the fix itself.

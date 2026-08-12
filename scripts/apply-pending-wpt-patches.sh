@@ -83,7 +83,28 @@ set -euo pipefail
 # so getting it wrong is a whole stylesheet applying — or not applying — to a
 # page. Its unit tests pin the grammar; only the pixel suite can say the rules
 # reached the render.
+#
+# The dashed-stroke patch (Broiler.HTML, "Keep dashed and dotted strokes on the
+# raster path") is listed for the plainest reason of all: without it a
+# `border-style: dashed` or `dotted` edge paints *nothing*. Such a stroke has a
+# solid colour but a non-solid dash style, so it misses the raster fast path and
+# falls through to the compat seam, which on a host with no OS backend is an
+# inert stub — an empty DrawLine and a StubPaint. Every css/css-backgrounds
+# dashed- and dotted-border case therefore renders a blank edge against the
+# reference. Its geometry is unit-tested in the main repo
+# (DashedStrokeGeometryTests), but only the pixel suite can say the runs reached
+# the canvas.
+#
+# Its two companions from the same roadmap item are deliberately NOT listed:
+#   * "Retire the Repro scratch tests and the legacy solution" (Broiler.JS) —
+#     deletes assertion-free scratch tests and a solution that cannot restore.
+#     It touches no rendering code, and the WPT run never builds the assemblies
+#     it changes.
+#   * "Drop the deleted WPF adapter from the public surface" (Broiler.HTML) —
+#     documentation and three InternalsVisibleTo grants to an assembly that is
+#     never built. Nothing it removes can move a pixel.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0003-html-dashed-stroke-raster-path.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

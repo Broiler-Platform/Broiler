@@ -41,7 +41,7 @@ directly.
 | `Phase1FixTests` | **Kept.** `ToFixed_NegativeZero_Returns_PositiveString` and `NullByte_In_Regex_Test` are the only coverage of those behaviors in the tree |
 | `scripts/run-rf-layout-validation.ps1`, `scripts/run-rf-css-validation.ps1` | `Acid3CascadeDebugTests` dropped from the `acid3-layout` / `acid3-css-layout` filters, and only its `Without_Important_Higher_Specificity_Red_Wins` allowed-failure entry removed. `Border_Shorthand_Expands_Color_To_Individual_Sides` kept — it belongs to `Acid3CssComplianceTests`, which stays and is still red |
 
-## Batch 2b — Broiler.JS · done (patch `0007`)
+## Batch 2b — Broiler.JS · done (patch "Retire the Repro scratch tests and the legacy solution")
 
 `ReproTests` and `ReproT` deleted — no assertion between them. What `ReproTests`
 was probing (super property lookup in a class field initializer under eval) is
@@ -87,7 +87,8 @@ were the whole user-visible consequence.
 
 The fix keeps such strokes on the raster path by reducing a dash to solid runs.
 The geometry is `Broiler.Layout.IR.DashedStrokeGeometry` in this repository,
-covered by 17 unit tests; the two call sites are `patches/0009`. Dashed goes
+covered by 17 unit tests; the two call sites are the Broiler.HTML patch
+"Keep dashed and dotted strokes on the raster path". Dashed goes
 0 → 388 painted pixels and dotted 0 → 484, with solid, double, and groove
 unchanged.
 
@@ -98,11 +99,12 @@ they fail only because the test's fake `SKCanvas` lacks the `Save`/`Restore`/
 just moves the failure to a paint-factory mismatch deeper in the same harness,
 which is archaeology on a seam that is being retired.
 
-**Until `patches/0009` is applied, dashed and dotted borders remain invisible in
+**Until the Broiler.HTML patch "Keep dashed and dotted strokes on the raster path" is applied,
+dashed and dotted borders remain invisible in
 this repository**, and no test here detects that any more. There is no main-repo
 fallback: the call site is a submodule file with no equivalent layer on this side.
 
-## Batch 3b — Broiler.HTML · done (patch `0008`)
+## Batch 3b — Broiler.HTML · done (patch "Drop the deleted WPF adapter from the public surface")
 
 Three `InternalsVisibleTo("Broiler.HTML.WPF")` grants removed, plus the README,
 architecture, graphics-backend, and roadmap text that still advertised the
