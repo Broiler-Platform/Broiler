@@ -1,0 +1,116 @@
+From 32bf19f400b3ddbb56ebe33ce4740409e619fdd2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 12 Aug 2026 12:56:22 +0000
+Subject: [PATCH] Shade an inset/outset border into a bevel instead of four
+ flat sides
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CSS 2.1 §8.5.3: `inset` and `outset` paint two sides in a darkened shade of the
+border colour and two in the colour itself. The IR paint path used the border
+colour flat on all four sides, so every bevelled border rendered as a plain box —
+including the one the HTML Standard puts on every `<iframe>` and `<hr>`,
+`border: 2px inset`, which browsers paint #9A9A9A over #EEEEEE and Broiler
+painted solid black.
+
+The shading itself is Broiler.Layout.Engine.BorderBevel in the main repository,
+where its numbers are covered by tests; this patch is the call and the UA
+stylesheet's base colour.
+
+The spec leaves the shades to the UA, so the rule was measured off Chromium
+rather than guessed: the darkened side scales all three channels by the factor
+that takes the largest one down by 0.33 of full intensity — keeping the hue, so
+rgb(200,100,50) darkens to rgb(116,58,29) rather than the rgb(116,16,0) a
+per-channel subtraction would give — and the lit side is the colour itself,
+except black, whose lit side is #545454 so that a black bevel is still a bevel.
+
+CssDefaults carries the other half. CSS makes the initial border-color
+`currentColor`, which bevels black-on-black, and browsers substitute a light grey
+so the bevel is visible; Broiler states that grey in the UA stylesheet instead.
+`hr` already did exactly this, with the *result* of the bevel hard-coded per side
+(#9A9A9A top/left, #EEEEEE bottom/right) — that becomes a single
+`border-color: #EEEEEE` now the engine derives the pair, and `iframe` gets the
+same base. Rendering is unchanged for `hr` and matches Chromium exactly for
+`iframe`.
+
+groove and ridge are untouched. They split each side lengthwise into two shades —
+a 16px grey groove paints its outer half #2C2C2C and its inner half #808080,
+where inset paints the whole width #2C2C2C — which needs two rectangles per side
+rather than one colour per side.
+
+Verified across 665 tests of html/rendering and
+html/semantics/embedded-content/the-iframe-element: 89 changed, every one of them
+an improvement, none worse, and one more passing. With the frame-canvas patch
+alongside it, css/css-color-adjust/rendering/dark-color-scheme goes to 25 of 29
+and color-scheme-iframe-background reaches 99.4% from 69.0%.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ Source/Broiler.HTML.Core/CssDefaults.cs       |  8 +++++--
+ .../IR/PaintWalker.Decorations.cs             | 23 +++++++++++++++----
+ 2 files changed, 25 insertions(+), 6 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Core/CssDefaults.cs b/Source/Broiler.HTML.Core/CssDefaults.cs
+index f2ac049..5c782e1 100644
+--- a/Source/Broiler.HTML.Core/CssDefaults.cs
++++ b/Source/Broiler.HTML.Core/CssDefaults.cs
+@@ -117,7 +117,7 @@ internal static class CssDefaults
+            directly in DomParser (TranslateAttributes / ApplyTableBorder), not
+            here, and author CSS is left to win normally. */
+         /* Replaced inline elements — WHATWG default rendering */
+-        iframe          { border: 2px inset; display: inline-block }
++        iframe          { border: 2px inset #EEEEEE; display: inline-block }
+         object          { display: inline-block }
+ 
+         /* HTML5 semantic/sectioning elements – display:block per WHATWG */
+@@ -148,7 +148,11 @@ internal static class CssDefaults
+         script, link,
+         meta, area,
+         base, param     { display:none }
+-        hr              { border-top-color: #9A9A9A; border-left-color: #9A9A9A; border-bottom-color: #EEEEEE; border-right-color: #EEEEEE; }
++        /* The bevel base, not the bevel: Engine.BorderBevel darkens the top and left of an
++           `inset` border, turning this into the #9A9A9A/#EEEEEE pair browsers paint. CSS makes
++           the initial border-color `currentColor`, which bevels black-on-black; every engine
++           substitutes a light grey, and stating it here is how Broiler does that. */
++        hr              { border-color: #EEEEEE; }
+         pre             { font-size: 10pt; margin-top: 15px; }
+         
+         /*This is the background of the HtmlToolTip*/
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+index 71b0e17..90bd0e6 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+@@ -534,10 +534,25 @@ internal static partial class PaintWalker
+             {
+                 Bounds = rect,
+                 Widths = border,
+-                TopColor = hasTop ? style.ActualBorderTopColor : BColor.Empty,
+-                RightColor = (hasRight && isLast) ? style.ActualBorderRightColor : BColor.Empty,
+-                BottomColor = hasBottom ? style.ActualBorderBottomColor : BColor.Empty,
+-                LeftColor = (hasLeft && isFirst) ? style.ActualBorderLeftColor : BColor.Empty,
++                // CSS 2.1 §8.5.3: `inset`/`outset` paint a bevel — two sides darkened, two lit —
++                // rather than four flat sides. Any other style passes the colour through
++                // untouched (Broiler.Layout.Engine.BorderBevel).
++                TopColor = hasTop
++                    ? Broiler.Layout.Engine.BorderBevel.SideColor(
++                        style.BorderTopStyle, isTopOrLeft: true, style.ActualBorderTopColor)
++                    : BColor.Empty,
++                RightColor = (hasRight && isLast)
++                    ? Broiler.Layout.Engine.BorderBevel.SideColor(
++                        style.BorderRightStyle, isTopOrLeft: false, style.ActualBorderRightColor)
++                    : BColor.Empty,
++                BottomColor = hasBottom
++                    ? Broiler.Layout.Engine.BorderBevel.SideColor(
++                        style.BorderBottomStyle, isTopOrLeft: false, style.ActualBorderBottomColor)
++                    : BColor.Empty,
++                LeftColor = (hasLeft && isFirst)
++                    ? Broiler.Layout.Engine.BorderBevel.SideColor(
++                        style.BorderLeftStyle, isTopOrLeft: true, style.ActualBorderLeftColor)
++                    : BColor.Empty,
+                 // Style kept for Phase 1 backward compat; per-side styles are authoritative
+                 Style = style.BorderTopStyle ?? "solid",
+                 TopStyle = style.BorderTopStyle ?? "none",
+-- 
+2.43.0
+

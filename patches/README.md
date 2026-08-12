@@ -154,3 +154,60 @@ two tests keep their current scores, and
 `src/Broiler.Cli.Tests/EmbeddedCanvasColorSchemeTests.cs` probes for the fix and
 disarms its four render assertions — they become real guards the moment the
 pointer is bumped.
+
+### `0005-html-border-bevel.patch` — `Broiler.HTML`
+
+Two call-shaped changes, in
+`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs` and
+`Source/Broiler.HTML.Core/CssDefaults.cs`:
+
+- the border display item takes each side's colour from
+  `Broiler.Layout.Engine.BorderBevel.SideColor` instead of using the border
+  colour flat on all four sides;
+- the UA stylesheet states the *base* of the bevel rather than its result —
+  `iframe { border: 2px inset #EEEEEE }`, and `hr`'s four hard-coded per-side
+  colours collapse to one `border-color: #EEEEEE`.
+
+`BorderBevel` itself is **already in this repository**
+(`Broiler.Layout/Broiler.Layout/Engine/BorderBevel.cs`), a pure function with 30
+tests pinning its numbers, so the main repo builds and — because nothing calls it
+until this patch lands — renders byte-identically to today.
+
+CSS 2.1 §8.5.3 paints `inset` and `outset` as a bevel: two sides in a darkened
+shade of the border colour, two in the colour itself. The IR paint path used the
+colour flat on every side, so the border the HTML Standard puts on every
+`<iframe>` and `<hr>` — `border: 2px inset`, which browsers paint `#9A9A9A` over
+`#EEEEEE` — came out solid black.
+
+The spec leaves the shades to the UA, so the rule was **measured off Chromium**
+rather than guessed. The darkened side scales all three channels by the factor
+that takes the largest one down by 0.33 of full intensity, which is what keeps
+the hue: `rgb(200,100,50)` → `rgb(116,58,29)`, all ×0.58, where a per-channel
+subtraction would give `rgb(116,16,0)` and turn brown into red. The lit side is
+the colour itself, except black, whose lit side is `#545454` so a black bevel is
+still a bevel.
+
+**Why the UA stylesheet carries the colour.** CSS makes the initial
+`border-color` `currentColor`, which bevels black-on-black; browsers substitute a
+light grey at paint time so the bevel is visible. Broiler states that grey in the
+UA stylesheet instead — which is what `hr` already did, with the *result* of the
+bevel hard-coded per side. The rendering matches Chromium; the computed
+`border-color` differs from it (`#EEEEEE` rather than `currentColor`), and an
+author element with a bevelled border and no colour of its own still bevels from
+black rather than from the grey. Both are noted in `BorderBevel`'s remarks.
+
+**Why the call is here and not in `ComputedStyleBuilder`.** Putting it in the main
+repo would have shaded borders while the pinned `CssDefaults` still hard-coded
+`hr`'s bevel per side — darkening `#9A9A9A` a second time and regressing every
+`<hr>` on CI. The two halves have to arrive together, so both are in this patch.
+
+`groove` and `ridge` are untouched: they split each side lengthwise into two
+shades (a 16px grey `groove` paints its outer half `#2C2C2C` and its inner half
+`#808080`, where `inset` paints the whole width `#2C2C2C`), which needs two
+rectangles per side rather than one colour per side.
+
+Verified across 665 tests of `html/rendering` and
+`html/semantics/embedded-content/the-iframe-element`: **89 changed, every one an
+improvement, none worse**, and one more passing. Applied together with
+`0004`, `css/css-color-adjust/rendering/dark-color-scheme` reaches 25 of 29 and
+`color-scheme-iframe-background` reaches 99.4 % from 69.0 %.

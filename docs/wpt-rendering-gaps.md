@@ -1987,14 +1987,55 @@ bug.)
   its own canvas, which is nearly all of them. 22 focused cases cover the rule,
   the cascade and the render, four of them probing for the patch so they become
   real guards when the pointer is bumped.
-- **A separate gap the fix uncovered.** `color-scheme-iframe-background` stops at
-  98.9 % rather than passing, and the residual 1.1 % is not colour-scheme related:
-  Broiler paints a **black** default `<iframe>` border where Chromium paints a
-  **grey inset** one, one pixel further in. It is 100.00 % identical to its own
-  `rel=match` reference either way — both Broiler renders carry the same border,
-  so it cancels in the reftest suite and only shows against Chromium's golden.
-  Owner: the UA stylesheet's `iframe` border. Exit gate: the test reaches ≥ 99 %
-  against the Chromium reference with its interior unchanged.
+- **A separate gap the fix uncovered — since fixed.** `color-scheme-iframe-background`
+  stopped at 98.9 % rather than passing, on a residual that was not colour-scheme
+  related at all: the default `<iframe>` border. See
+  [the bevel section below](#an-insetoutset-border-was-painted-flat--fixed-pending-patch).
+
+### An `inset`/`outset` border was painted flat — **fixed, pending patch**
+
+- **Tests:** `css/css-color-adjust/rendering/dark-color-scheme/color-scheme-iframe-background`
+  (98.9 % → **99.4 %, passing**, on top of the frame-canvas fix), and 89 tests
+  across `html/rendering` and `html/semantics/embedded-content/the-iframe-element`
+  that carry an `<iframe>` or an `<hr>`.
+- **Owner:** `Broiler.HTML` (`PaintWalker.Decorations`, `CssDefaults`) for the call
+  and the UA base; `Broiler.Layout` for the rule.
+- **The gap.** CSS 2.1 §8.5.3 paints `inset` and `outset` as a bevel — two sides
+  in a darkened shade of the border colour, two in the colour itself. The IR paint
+  path used the colour flat on all four sides, so the border the HTML Standard
+  puts on every `<iframe>` and `<hr>` (`border: 2px inset`) came out **solid
+  black** where every browser paints `#9A9A9A` over `#EEEEEE`. On a 600×400 frame
+  that ring is 4 012 px — half of the test's residual, and exactly the half that
+  kept it under the threshold.
+- **Measured, not guessed.** The spec leaves the shades to the UA, so the rule
+  came from screenshotting Chromium and sampling each side. The darkened side
+  scales all three channels by the factor that takes the *largest* one down by
+  0.33 of full intensity — which is what keeps the hue: `rgb(200,100,50)` darkens
+  to `rgb(116,58,29)`, all ×0.58, where the per-channel subtraction the greys
+  alone suggested would have given `rgb(116,16,0)` and turned brown into red. The
+  lit side is the colour itself, except black, whose lit side is `#545454`.
+- **The second half is the UA stylesheet.** CSS makes the initial `border-color`
+  `currentColor`, which bevels black-on-black; browsers substitute a light grey at
+  paint time. Broiler states that grey in the UA stylesheet instead — which is
+  what `hr` already did, with the *result* of the bevel hard-coded per side
+  (`#9A9A9A`/`#EEEEEE`). Those four declarations collapse to one
+  `border-color: #EEEEEE` now the engine derives the pair, and `iframe` gets the
+  same base. **The two halves must land together:** shading while `hr` still
+  carried the pre-bevelled colours would darken `#9A9A9A` a second time and
+  regress every `<hr>`, which is why the call sits in
+  [`patches/0005`](../patches/README.md) rather than in `ComputedStyleBuilder`.
+- **Verified:** across 665 tests of `html/rendering` and the iframe element,
+  **89 changed and every one of them improved** — none worse — with one more
+  passing; many went 99.7–99.8 % to 100.0 %. `hr` renders identically to before.
+  30 focused cases pin the shading numbers against the Chromium measurements.
+- **Remaining, and deliberately:** `groove` and `ridge` still paint flat. They
+  split each side lengthwise into two shades — a 16px grey `groove` paints its
+  outer half `#2C2C2C` and its inner half `#808080`, where `inset` paints the
+  whole width `#2C2C2C` — which needs two rectangles per side rather than one
+  colour per side. Exit gate: a grey `groove` shows both halves.
+- **Also remaining:** the other half of `color-scheme-iframe-background`'s original
+  residual (≈ 4 356 px) is text antialiasing inside the frame, unrelated to
+  borders and below the threshold now that the bevel is right.
 
 ### #1615 problems, at a glance
 
