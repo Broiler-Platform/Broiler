@@ -672,6 +672,23 @@ internal abstract partial class CssBoxProperties
     /// (<see cref="CssBox.TryResolveAspectRatioBlockHeight"/>).</summary>
     public string AspectRatio { get; set; } = "auto";
 
+    /// <summary>
+    /// CSS Images 3 §4: the <b>natural (intrinsic) size</b> of an atomic inline-level box that is a
+    /// replaced element sized from something other than a decoded image — currently a
+    /// <c>&lt;canvas&gt;</c>, whose bitmap is its <c>width</c>/<c>height</c> content attributes
+    /// (HTML §4.12.5, defaulting to 300×150). <see langword="null"/> for every other box, which is
+    /// what keeps the replaced sizing path off for the overwhelming majority.
+    /// </summary>
+    /// <remarks>
+    /// This is what separates a replaced box from an ordinary <c>inline-block</c> that merely has a
+    /// <c>width</c> and a <c>height</c>: an axis the author left <c>auto</c> takes the natural size
+    /// rather than shrink-to-fit, and the two axes stay tied by the natural ratio when
+    /// <c>min-*</c>/<c>max-*</c> clamp one of them (CSS2.1 §10.4 — see
+    /// <see cref="ReplacedBoxSizing"/>). The renderer sets it during style resolution; layout never
+    /// derives it.
+    /// </remarks>
+    public SizeF? IntrinsicReplacedSize { get; set; }
+
     public string InlineSize
     {
         get => _inlineSize;
@@ -2731,6 +2748,7 @@ internal abstract partial class CssBoxProperties
         IsMinWidthSpecified = p.IsMinWidthSpecified;
         MinHeight = p.MinHeight;
         MaxHeight = p.MaxHeight;
+        IntrinsicReplacedSize = p.IntrinsicReplacedSize;
         _wordSpacing = p._wordSpacing;
         Opacity = p.Opacity;
         BoxShadow = p.BoxShadow;

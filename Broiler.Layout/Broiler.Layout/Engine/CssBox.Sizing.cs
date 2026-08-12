@@ -52,6 +52,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return Math.Max(0, cssHeight);
     }
 
+    /// <summary>The inverse of <see cref="ResolveSpecifiedHeightToBorderBox"/>: the content-box
+    /// height a specified <c>height</c> names. A percentage child resolves against this, not against
+    /// the border box (CSS2.1 §10.5 — percentages are relative to the containing block's
+    /// <em>content</em> height).</summary>
+    private double ResolveSpecifiedHeightToContentBox(double cssHeight)
+    {
+        if (UsesBorderBoxSizing)
+            cssHeight -= ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+
+        return Math.Max(0, cssHeight);
+    }
+
     /// <summary>
     /// CSS2.1 §10.7: clamp a specified (author-declared) height to
     /// <c>min-height</c>/<c>max-height</c> in the same box-sizing frame (both share
@@ -82,6 +94,119 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (specifiedHeight < minH) specifiedHeight = minH;
         }
         return specifiedHeight;
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.4: this box's <c>min-width</c>/<c>max-width</c> as used lengths, in the frame
+    /// <c>box-sizing</c> names (the caller converts). A percentage resolves against the containing
+    /// block's inline size, which is always definite; <c>max-width: none</c> is
+    /// <see cref="double.PositiveInfinity"/>.
+    /// </summary>
+    internal ReplacedBoxSizing.Bounds ResolveInlineSizeBounds()
+    {
+        double cbWidth = ContainingBlock?.Size.Width ?? 0;
+        double em = GetEmHeight();
+
+        double min = 0;
+        if (IsSizeConstraintLength(MinWidth))
+        {
+            double v = CssLengthParser.ParseLength(MinWidth, cbWidth, em);
+            if (v > 0 && !double.IsNaN(v))
+                min = v;
+        }
+
+        double max = double.PositiveInfinity;
+        if (IsSizeConstraintLength(MaxWidth))
+        {
+            double v = CssLengthParser.ParseLength(MaxWidth, cbWidth, em);
+            if (v >= 0 && !double.IsNaN(v))
+                max = v;
+        }
+
+        return new ReplacedBoxSizing.Bounds(min, max);
+    }
+
+    /// <summary>
+    /// Whether a <c>min-*</c>/<c>max-*</c> value is a length, percentage or math function this can
+    /// resolve — as opposed to a keyword (<c>none</c>, <c>auto</c>, <c>fit-content</c>,
+    /// <c>min-content</c>, <c>stretch</c>, <c>inherit</c>, …), which is left unconstrained.
+    /// </summary>
+    /// <remarks>
+    /// The guard is load-bearing, not defensive: <see cref="CssLengthParser.ParseLength"/> resolves
+    /// an unrecognised unit to <c>0px</c>, so handing it <c>max-width: fit-content</c> would clamp
+    /// the box to nothing rather than leave it alone.
+    /// </remarks>
+    private static bool IsSizeConstraintLength(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        string t = value.Trim();
+
+        if (t == "0" || t.Equals("none", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        char c0 = t[0];
+        if (char.IsAsciiDigit(c0) || c0 == '.')
+            return true;
+
+        if ((c0 == '+' || c0 == '-') && t.Length > 1 && (char.IsAsciiDigit(t[1]) || t[1] == '.'))
+            return true;
+
+        return t.StartsWith("calc(", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("min(", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("max(", StringComparison.OrdinalIgnoreCase)
+            || t.StartsWith("clamp(", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.7: this box's <c>min-height</c>/<c>max-height</c> as used lengths, in the frame
+    /// <c>box-sizing</c> names (the caller converts). A percentage against an <em>indefinite</em>
+    /// containing block takes the property's initial value — <c>0</c> for <c>min-height</c>,
+    /// <c>none</c> for <c>max-height</c> — so an unresolvable percentage never clamps anything.
+    /// </summary>
+    internal ReplacedBoxSizing.Bounds ResolveBlockSizeBounds()
+    {
+        double em = GetEmHeight();
+        double? percentBasis = null;
+
+        double min = 0;
+        if (IsSizeConstraintLength(MinHeight)
+            && TryResolveBlockSizeLength(MinHeight, em, ref percentBasis, out double minLength)
+            && minLength > 0)
+        {
+            min = minLength;
+        }
+
+        double max = double.PositiveInfinity;
+        if (IsSizeConstraintLength(MaxHeight)
+            && TryResolveBlockSizeLength(MaxHeight, em, ref percentBasis, out double maxLength)
+            && maxLength >= 0)
+        {
+            max = maxLength;
+        }
+
+        return new ReplacedBoxSizing.Bounds(min, max);
+    }
+
+    /// <summary>Resolves one block-axis length, looking the percentage basis up at most once (it
+    /// walks the ancestor chain) and reporting <see langword="false"/> when a percentage has no
+    /// definite basis to resolve against.</summary>
+    private bool TryResolveBlockSizeLength(string value, double em, ref double? percentBasis, out double length)
+    {
+        length = 0;
+
+        if (value.Contains('%'))
+        {
+            if (percentBasis is null)
+                percentBasis = TryGetPercentageBlockSizeBasis(out double basis) ? basis : double.NaN;
+
+            if (double.IsNaN(percentBasis.Value))
+                return false;
+        }
+
+        length = CssLengthParser.ParseLength(value, percentBasis ?? 0, em);
+        return !double.IsNaN(length) && !double.IsInfinity(length);
     }
 
     internal double GetMinimumWidth()

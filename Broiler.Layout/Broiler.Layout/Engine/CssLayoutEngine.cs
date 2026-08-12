@@ -99,7 +99,6 @@ internal static class CssLayoutEngine
         // its intrinsic size. (WPT css-grid/nested-grid-item-block-size-001.)
         bool hasImageTagWidth = TryResolveDefiniteImageLength(imageWord.OwnerBox.Width, em, out double tagWidthPx);
         bool hasImageTagHeight = TryResolveDefiniteImageLength(imageWord.OwnerBox.Height, em, out double tagHeightPx);
-        bool scaleImageHeight = false;
 
         // A percentage width is a stated width too — resolved against the containing block rather
         // than read off the declaration, which is the only reason it is not a "tag" width here.
@@ -122,14 +121,12 @@ internal static class CssLayoutEngine
             {
                 imageWord.Width = width.Number * imageWord.OwnerBox.ContainingBlock.Size.Width;
 
-                // Only when the height is left to the image. CSS 2.1 §10.4 uses the intrinsic
-                // ratio to fill in a dimension that is `auto`, not to overrule one the author
-                // stated — and a percentage width is no different from a length one in that. The
-                // max-width clamp below already says `!hasImageTagHeight`; this said `true`, so
-                // `<img width="100%" height="50">` came out as tall as it was wide. That is the
-                // shape CSS2's own reference files use, so the cost landed on the reference side
-                // of 85 reftests in css/CSS2/backgrounds alone.
-                scaleImageHeight = !hasImageTagHeight;
+                // CSS 2.1 §10.4 uses the intrinsic ratio to fill in a dimension that is `auto`, not
+                // to overrule one the author stated — and a percentage width is no different from a
+                // length one in that. Treating it as auto made `<img width="100%" height="50">`
+                // come out as tall as it was wide. That is the shape CSS2's own reference files use,
+                // so the cost landed on the reference side of 85 reftests in css/CSS2/backgrounds
+                // alone.
                 hasStatedWidth = true;
             }
             else if (image != null)
@@ -144,26 +141,6 @@ internal static class CssLayoutEngine
             else
             {
                 imageWord.Width = hasImageTagHeight ? tagHeightPx / 1.14f : 20;
-            }
-        }
-
-        var maxWidth = new CssLength(imageWord.OwnerBox.MaxWidth);
-        if (maxWidth.Number > 0)
-        {
-            double maxWidthVal = -1;
-            if (maxWidth.Unit == CssUnit.Px)
-            {
-                maxWidthVal = maxWidth.Number;
-            }
-            else if (maxWidth.IsPercentage)
-            {
-                maxWidthVal = maxWidth.Number * imageWord.OwnerBox.ContainingBlock.Size.Width;
-            }
-
-            if (maxWidthVal > -1 && imageWord.Width > maxWidthVal)
-            {
-                imageWord.Width = maxWidthVal;
-                scaleImageHeight = !hasImageTagHeight;
             }
         }
 
@@ -190,98 +167,37 @@ internal static class CssLayoutEngine
             CssBox.TryParseAspectRatio(imageWord.OwnerBox.AspectRatio, out double cssAspectRatio)
             && cssAspectRatio > 0;
 
-        if (hasCssAspectRatio)
-        {
-            bool widthDriven = (hasStatedWidth && !hasImageTagHeight) || scaleImageHeight;
+        // The ratio the box is sized by: the author's preferred one when declared, otherwise the
+        // image's natural one. Zero when the box has neither, which leaves the two axes independent.
+        double usedRatio = hasCssAspectRatio
+            ? cssAspectRatio
+            : image is { HasIntrinsicRatio: true, Height: > 0 } natural ? natural.Width / natural.Height : 0;
 
+        bool widthDriven = hasStatedWidth && !hasImageTagHeight;
+
+        if (usedRatio > 0)
+        {
+            // If only the width was stated, the ratio fills in the height, and vice versa.
             if (widthDriven)
-                imageWord.Height = imageWord.Width / cssAspectRatio;
+                imageWord.Height = imageWord.Width / usedRatio;
             else if (hasImageTagHeight && !hasStatedWidth)
-                imageWord.Width = imageWord.Height * cssAspectRatio;
-        }
-        else if (image != null && image.Value.HasIntrinsicRatio)
-        {
-            bool widthDriven = (hasStatedWidth && !hasImageTagHeight) || scaleImageHeight;
-            // If only the width was set in the html tag, ratio the height.
-            if (widthDriven)
-            {
-                // Divide the given tag width with the actual image width, to get the ratio.
-                double ratio = imageWord.Width / image.Value.Width;
-                imageWord.Height = image.Value.Height * ratio;
-            }
-            // If only the height was set in the html tag, ratio the width.
-            else if (hasImageTagHeight && !hasStatedWidth)
-            {
-                // Divide the given tag height with the actual image height, to get the ratio.
-                double ratio = imageWord.Height / image.Value.Height;
-                imageWord.Width = image.Value.Width * ratio;
-            }
+                imageWord.Width = imageWord.Height * usedRatio;
         }
 
-        // CSS2.1 §10.4/§10.7: Apply min/max width/height constraints
-        // for replaced elements (images).  These are applied after intrinsic
-        // sizing and aspect-ratio adjustments.
-        var minWidth = new CssLength(imageWord.OwnerBox.MinWidth);
-        if (minWidth.Number > 0)
-        {
-            double minWidthVal = minWidth.Unit == CssUnit.Px
-                ? minWidth.Number
-                : minWidth.IsPercentage
-                    ? minWidth.Number * imageWord.OwnerBox.ContainingBlock.Size.Width
-                    : -1;
+        // CSS2.1 §10.4/§10.7: apply the min/max constraints to the tentative size settled above.
+        // The two axes are coupled through the ratio, so this cannot be four independent clamps —
+        // see ReplacedBoxSizing for the table §10.4 resolves a double violation with.
+        double usedWidth = imageWord.Width;
+        double usedHeight = imageWord.Height;
 
-            if (minWidthVal > 0 && imageWord.Width < minWidthVal)
-            {
-                if (image != null && !hasImageTagHeight && image.Value.HasIntrinsicRatio)
-                {
-                    double ratio = minWidthVal / imageWord.Width;
-                    imageWord.Height *= ratio;
-                }
+        ReplacedBoxSizing.ApplyMinMax(
+            ref usedWidth, ref usedHeight,
+            widthIsAuto: !hasStatedWidth, heightIsAuto: !hasImageTagHeight, usedRatio,
+            imageWord.OwnerBox.ResolveInlineSizeBounds(),
+            imageWord.OwnerBox.ResolveBlockSizeBounds());
 
-                imageWord.Width = minWidthVal;
-            }
-        }
-
-        var maxHeight = new CssLength(imageWord.OwnerBox.MaxHeight);
-        if (maxHeight.Number > 0)
-        {
-            double maxHeightVal = maxHeight.Unit == CssUnit.Px
-                ? maxHeight.Number
-                : maxHeight.IsPercentage
-                    ? maxHeight.Number * imageWord.OwnerBox.ContainingBlock.Size.Height
-                    : -1;
-
-            if (maxHeightVal > 0 && imageWord.Height > maxHeightVal)
-            {
-                if (image != null && !hasImageTagWidth && image.Value.HasIntrinsicRatio)
-                {
-                    double ratio = maxHeightVal / imageWord.Height;
-                    imageWord.Width *= ratio;
-                }
-                imageWord.Height = maxHeightVal;
-            }
-        }
-
-        var minHeight = new CssLength(imageWord.OwnerBox.MinHeight);
-        if (minHeight.Number > 0)
-        {
-            double minHeightVal = minHeight.Unit == CssUnit.Px
-                ? minHeight.Number
-                : minHeight.IsPercentage
-                    ? minHeight.Number * imageWord.OwnerBox.ContainingBlock.Size.Height
-                    : -1;
-
-            if (minHeightVal > 0 && imageWord.Height < minHeightVal)
-            {
-                if (image != null && !hasImageTagWidth && image.Value.HasIntrinsicRatio)
-                {
-                    double ratio = minHeightVal / imageWord.Height;
-                    imageWord.Width *= ratio;
-                }
-
-                imageWord.Height = minHeightVal;
-            }
-        }
+        imageWord.Width = usedWidth;
+        imageWord.Height = usedHeight;
 
         imageWord.Height += imageWord.OwnerBox.ActualBorderBottomWidth + imageWord.OwnerBox.ActualBorderTopWidth + imageWord.OwnerBox.ActualPaddingTop + imageWord.OwnerBox.ActualPaddingBottom;
     }
@@ -1172,6 +1088,21 @@ internal static class CssLayoutEngine
     /// its children while participating in the parent's inline
     /// formatting context as a single opaque box.
     /// </summary>
+    /// <summary>
+    /// Moves a min/max bound from the frame <c>box-sizing</c> names into the content box, so it can
+    /// clamp a content-box size. A no-op under the default <c>content-box</c>.
+    /// </summary>
+    private static ReplacedBoxSizing.Bounds ToContentBox(
+        ReplacedBoxSizing.Bounds bounds, CssBox b, double borderAndPadding)
+    {
+        if (borderAndPadding <= 0 || !b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
+            return bounds;
+
+        return new ReplacedBoxSizing.Bounds(
+            Math.Max(0, bounds.Min - borderAndPadding),
+            double.IsPositiveInfinity(bounds.Max) ? bounds.Max : Math.Max(0, bounds.Max - borderAndPadding));
+    }
+
     private static void FlowInlineBlock(ILayoutEnvironment g, CssBox blockbox, CssBox b,
         double limitRight, double linespacing, double startx,
         double leftspacing, double rightspacing,
@@ -1184,9 +1115,23 @@ internal static class CssLayoutEngine
             - blockbox.ActualPaddingLeft - blockbox.ActualPaddingRight
             - blockbox.ActualBorderLeftWidth - blockbox.ActualBorderRightWidth;
 
+        // CSS Images 3 §4 / CSS2.1 §10.4: a replaced atomic inline — a <canvas>, whose natural size
+        // is its width/height content attributes — takes an auto axis from its natural size rather
+        // than shrinking to fit its (absent) content, and keeps the two axes tied by the natural
+        // ratio while min-*/max-* clamp them. Sized in one step below; the per-axis clamps that
+        // follow are skipped for it.
+        var intrinsic = b.IntrinsicReplacedSize;
+        bool isReplaced = intrinsic is { Width: > 0, Height: > 0 };
+        bool replacedWidthIsAuto = b.Width == CssConstants.Auto || string.IsNullOrEmpty(b.Width);
+        bool replacedHeightIsAuto = b.Height == CssConstants.Auto || string.IsNullOrEmpty(b.Height);
+
         // --- Compute inline-block content width ---
         double ibContentWidth;
-        if (b.Width != CssConstants.Auto && !string.IsNullOrEmpty(b.Width))
+        if (isReplaced && replacedWidthIsAuto)
+        {
+            ibContentWidth = intrinsic.Value.Width;
+        }
+        else if (b.Width != CssConstants.Auto && !string.IsNullOrEmpty(b.Width))
         {
             ibContentWidth = CssLengthParser.ParseLength(b.Width, containerWidth, b.GetEmHeight());
             if (b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
@@ -1219,10 +1164,44 @@ internal static class CssLayoutEngine
             ibContentWidth = Math.Min(Math.Max(prefMin, available), prefMax);
         }
 
+        // The replaced box's own natural block size, settled together with its width below.
+        double replacedContentHeight = isReplaced ? intrinsic.Value.Height : 0;
+
+        if (isReplaced)
+        {
+            if (!replacedHeightIsAuto)
+            {
+                replacedContentHeight = CssLengthParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
+                if (b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
+                {
+                    replacedContentHeight -= b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                        + b.ActualPaddingTop + b.ActualPaddingBottom;
+                }
+                if (replacedContentHeight < 0)
+                    replacedContentHeight = 0;
+            }
+
+            double naturalRatio = intrinsic.Value.Width / intrinsic.Value.Height;
+
+            // The ratio fills in whichever axis the author left auto, before the constraints run.
+            if (replacedWidthIsAuto && !replacedHeightIsAuto)
+                ibContentWidth = replacedContentHeight * naturalRatio;
+            else if (replacedHeightIsAuto && !replacedWidthIsAuto)
+                replacedContentHeight = ibContentWidth / naturalRatio;
+
+            ReplacedBoxSizing.ApplyMinMax(
+                ref ibContentWidth, ref replacedContentHeight,
+                replacedWidthIsAuto, replacedHeightIsAuto, naturalRatio,
+                ToContentBox(b.ResolveInlineSizeBounds(), b,
+                    b.ActualBorderLeftWidth + b.ActualBorderRightWidth + b.ActualPaddingLeft + b.ActualPaddingRight),
+                ToContentBox(b.ResolveBlockSizeBounds(), b,
+                    b.ActualBorderTopWidth + b.ActualBorderBottomWidth + b.ActualPaddingTop + b.ActualPaddingBottom));
+        }
+
         // CSS 2.1 §10.4: Apply min-width constraint.
         // min-width takes priority over computed width (including
         // shrink-to-fit for auto-width inline-blocks).
-        if (b.MinWidth != "0" && !string.IsNullOrEmpty(b.MinWidth))
+        if (!isReplaced && b.MinWidth != "0" && !string.IsNullOrEmpty(b.MinWidth))
         {
             double minW = CssLengthParser.ParseLength(b.MinWidth, containerWidth, b.GetEmHeight());
             double minContentW = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
@@ -1238,7 +1217,7 @@ internal static class CssLayoutEngine
         // max-width limits the computed width from above.  When both
         // min-width and max-width are specified, min-width wins if it
         // exceeds max-width (CSS2.1 §10.4).
-        if (b.MaxWidth != "none" && !string.IsNullOrEmpty(b.MaxWidth))
+        if (!isReplaced && b.MaxWidth != "none" && !string.IsNullOrEmpty(b.MaxWidth))
         {
             double maxW = CssLengthParser.ParseLength(b.MaxWidth, containerWidth, b.GetEmHeight());
             double maxContentW = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
@@ -1383,7 +1362,14 @@ internal static class CssLayoutEngine
             && b.ParentBox != null
             && b.ParentBox.Display is "grid" or "inline-grid";
 
-        if (heightIsPercent && isInFlowGridItem)
+        if (isReplaced)
+        {
+            // Already settled with the width, constraints and all.
+            ibHeight = replacedContentHeight
+                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                + b.ActualPaddingTop + b.ActualPaddingBottom;
+        }
+        else if (heightIsPercent && isInFlowGridItem)
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
         }
@@ -1414,17 +1400,24 @@ internal static class CssLayoutEngine
 
         }
 
-        // CSS 2.1 §10.7: Apply min-height constraint for inline-blocks.
-        if (b.MinHeight != "0" && !string.IsNullOrEmpty(b.MinHeight))
+        // CSS 2.1 §10.7: clamp the block axis to min-height / max-height. ibHeight is a border-box
+        // height, so a content-box bound has the box's own border and padding added to it.
+        // max-height had no arm here at all until now, which is why a `display: inline-block` box
+        // with `height: 1000px; max-height: 60px` stayed 1000px tall while the same declarations on
+        // a `display: block` box clamped correctly (WPT issue #1562 problem 30 recorded it as the
+        // second of the three gaps behind css-sizing/replaced-max-size-saturation).
+        var blockBounds = isReplaced ? ReplacedBoxSizing.Bounds.Unconstrained : b.ResolveBlockSizeBounds();
+        if (!blockBounds.IsUnconstrained)
         {
-            double minH = CssLengthParser.ParseLength(b.MinHeight, containerWidth, b.GetEmHeight());
-            double minBoxH = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
-                ? minH
-                : minH
-                    + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
-                    + b.ActualPaddingTop + b.ActualPaddingBottom;
-            if (minBoxH > ibHeight)
-                ibHeight = minBoxH;
+            double borderAndPadding = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
+                ? 0
+                : b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                  + b.ActualPaddingTop + b.ActualPaddingBottom;
+
+            ibHeight = new ReplacedBoxSizing.Bounds(
+                    blockBounds.Min > 0 ? blockBounds.Min + borderAndPadding : 0,
+                    double.IsPositiveInfinity(blockBounds.Max) ? blockBounds.Max : blockBounds.Max + borderAndPadding)
+                .Clamp(ibHeight);
         }
 
         b.ActualBottom = b.Location.Y + ibHeight;

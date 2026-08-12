@@ -569,4 +569,89 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return flowCb?.Size.Height ?? 0;
     }
 
+    /// <summary>
+    /// CSS2.1 §10.7: the block size a percentage <c>min-height</c>/<c>max-height</c> on this box
+    /// resolves against, or <see langword="false"/> when the containing block's block size is
+    /// indefinite — the percentage then takes its initial value (<c>0</c> for <c>min-height</c>,
+    /// <c>none</c> for <c>max-height</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>Unlike <see cref="PercentageHeightContainingBlockHeight"/> this walks <b>past anonymous
+    /// boxes</b>. An anonymous block is not an element: it has no author height, so its block size
+    /// is always content-derived, and stopping at one would make every percentage inside it resolve
+    /// to the initial value. Browsers skip them and resolve against the nearest real element, which
+    /// is exactly what WPT <c>css-sizing/image-percentage-max-height-in-anonymous-block</c> and
+    /// <c>css-sizing/block-image-percentage-max-height-inside-inline</c> are built to check: in both
+    /// the <c>&lt;img&gt;</c> lands in an anonymous block, and its <c>max-height: 100%</c> must still
+    /// see the <c>height: 100px</c> <c>&lt;div&gt;</c> two boxes up.</para>
+    /// <para>Read at measurement time, before block heights are resolved bottom-up, so a definite
+    /// basis is derived from the <em>specified</em> height rather than from
+    /// <see cref="CssBoxProperties.Size"/> — which is still 0 for an ancestor that has not been laid
+    /// out yet.</para>
+    /// </remarks>
+    internal bool TryGetPercentageBlockSizeBasis(out double basis)
+    {
+        basis = 0;
+
+        // An out-of-flow box's containing block is a padding box with a definite height (the
+        // viewport for the initial containing block), so a percentage never resolves to the
+        // initial value there.
+        if (Position is CssConstants.Absolute or CssConstants.Fixed)
+        {
+            basis = PercentageHeightContainingBlockHeight();
+            return basis > 0;
+        }
+
+        for (var cb = ContainingBlock; cb != null; cb = cb.ContainingBlock)
+        {
+            // The initial containing block is the viewport, which is always definite (§10.5).
+            if (cb.ParentBox == null)
+            {
+                if (LayoutEnvironment == null)
+                    return false;
+
+                basis = LayoutEnvironment.ViewportSize.Height;
+                return basis > 0;
+            }
+
+            bool heightIsAuto = cb.Height == CssConstants.Auto || string.IsNullOrEmpty(cb.Height);
+
+            if (!heightIsAuto && !cb.Height.Contains('%'))
+            {
+                double cssHeight = CssLengthParser.ParseLength(cb.Height, 0, cb.GetEmHeight());
+                if (cssHeight > 0)
+                {
+                    basis = cb.ResolveSpecifiedHeightToContentBox(cssHeight);
+                    return true;
+                }
+
+                return false;
+            }
+
+            // CSS Sizing 4 §4: an auto block axis that the box's aspect ratio makes definite is a
+            // definite basis, the same exception HeightPercentageResolvesToAuto makes.
+            if (heightIsAuto && cb.HasDefiniteAspectRatioBlockHeight())
+            {
+                cb.TryGetAspectRatioBlockHeight(out basis);
+                return basis > 0;
+            }
+
+            // A real element with an auto (or already-resolved percentage) height: its used block
+            // size, when layout has settled it, and otherwise indefinite. Size.Height is a border
+            // box, so the padding and border come off it to leave the content height percentages
+            // resolve against.
+            if (cb.HtmlTag != null)
+            {
+                basis = Math.Max(0, cb.Size.Height
+                    - cb.ActualPaddingTop - cb.ActualPaddingBottom
+                    - cb.ActualBorderTopWidth - cb.ActualBorderBottomWidth);
+                return basis > 0 && !heightIsAuto;
+            }
+
+            // Anonymous: keep climbing.
+        }
+
+        return false;
+    }
+
 }
