@@ -7,21 +7,25 @@ touches, and what happened to it. Update this as batches land.
 Legend: **done** — landed on this branch. **pending** — not started.
 **patch** — submodule-resident, shipped under [`patches/`](../../patches/README.md).
 
-## Batch 1 — baseline and discovery repair · done (partial)
+## Batch 1 — baseline and discovery repair · done
 
 | Item | Outcome |
 | --- | --- |
 | Focused pre-cleanup results | Recorded in [`focused-results.md`](focused-results.md) |
 | Already-red suites | Recorded, so later gates cannot miscount them |
-| `Broiler.UI.RichEdit.Rtf.Tests` registration | **pending** — see the note below |
+| `Broiler.UI.RichEdit.Rtf.Tests` registration | Registered in `Broiler.UI.slnx`, along with the `Broiler.UI.RichEdit.Rtf` implementation project it depends on, under a new `/src/Integrations/RichEdit/` folder |
 
-The RTF discovery repair is deliberately not bundled with the deletion batches.
 `Broiler.UI/Broiler.UI.slnx` is hand-maintained: it carries no generated-from
 header, is absent from `eng/solutions.json`, and `scripts/update-solutions.ps1`
 globs the repository root without `-Recurse`, so the generator neither adds nor
-reverts an edit to it. Registering the suite will surface its own failures,
-which is the point — but it changes a different solution's baseline and belongs
-in its own change.
+reverts an edit to it. The edit follows the file's own per-project
+`Debug-Linux`/`Release-Linux`/`Debug-Windows`/`Release-Windows` build-type shape.
+
+Registering the suite surfaced no failures: `dotnet test Broiler.UI/Broiler.UI.slnx
+-c Release` runs 10 test projects and 300 tests, all passing, with the 6 RTF
+clipboard cases among them. Before this change those 6 were invisible to the
+solution — the project built and passed only if someone named its `.csproj`
+directly.
 
 ## Batch 2a — tests with no effective coverage, main repo · done
 

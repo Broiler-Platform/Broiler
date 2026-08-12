@@ -253,6 +253,14 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
   </Folder>
+  <Folder Name="/src/Integrations/RichEdit/">
+    <Project Path="src/Integrations/RichEdit/Broiler.UI.RichEdit.Rtf/Broiler.UI.RichEdit.Rtf.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+  </Folder>
   <Folder Name="/src/Implementations/Standard/Shell/">
     <Project Path="src/Implementations/Standard/Shell/Broiler.UI.Window.Standard/Broiler.UI.Window.Standard.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
@@ -509,6 +517,12 @@
       <BuildType Project="Release" Solution="Release-Windows|*" />
     </Project>
     <Project Path="tests/Text/Broiler.UI.RichEdit.Standard.Tests/Broiler.UI.RichEdit.Standard.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
+    <Project Path="tests/Text/Broiler.UI.RichEdit.Rtf.Tests/Broiler.UI.RichEdit.Rtf.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
       <BuildType Project="Debug" Solution="Debug-Windows|*" />
