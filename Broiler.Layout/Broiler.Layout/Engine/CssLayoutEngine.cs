@@ -1088,21 +1088,6 @@ internal static class CssLayoutEngine
     /// its children while participating in the parent's inline
     /// formatting context as a single opaque box.
     /// </summary>
-    /// <summary>
-    /// Moves a min/max bound from the frame <c>box-sizing</c> names into the content box, so it can
-    /// clamp a content-box size. A no-op under the default <c>content-box</c>.
-    /// </summary>
-    private static ReplacedBoxSizing.Bounds ToContentBox(
-        ReplacedBoxSizing.Bounds bounds, CssBox b, double borderAndPadding)
-    {
-        if (borderAndPadding <= 0 || !b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
-            return bounds;
-
-        return new ReplacedBoxSizing.Bounds(
-            Math.Max(0, bounds.Min - borderAndPadding),
-            double.IsPositiveInfinity(bounds.Max) ? bounds.Max : Math.Max(0, bounds.Max - borderAndPadding));
-    }
-
     private static void FlowInlineBlock(ILayoutEnvironment g, CssBox blockbox, CssBox b,
         double limitRight, double linespacing, double startx,
         double leftspacing, double rightspacing,
@@ -1122,14 +1107,15 @@ internal static class CssLayoutEngine
         // follow are skipped for it.
         var intrinsic = b.IntrinsicReplacedSize;
         bool isReplaced = intrinsic is { Width: > 0, Height: > 0 };
-        bool replacedWidthIsAuto = b.Width == CssConstants.Auto || string.IsNullOrEmpty(b.Width);
-        bool replacedHeightIsAuto = b.Height == CssConstants.Auto || string.IsNullOrEmpty(b.Height);
 
         // --- Compute inline-block content width ---
+        // A replaced box settles both axes at once, constraints and all, so the per-axis clamps
+        // below are skipped for it and the height branch reads the result back.
+        double replacedContentHeight = 0;
         double ibContentWidth;
-        if (isReplaced && replacedWidthIsAuto)
+        if (isReplaced)
         {
-            ibContentWidth = intrinsic.Value.Width;
+            b.ResolveReplacedContentSize(intrinsic.Value, containerWidth, out ibContentWidth, out replacedContentHeight);
         }
         else if (b.Width != CssConstants.Auto && !string.IsNullOrEmpty(b.Width))
         {
@@ -1162,40 +1148,6 @@ internal static class CssLayoutEngine
                 - b.ActualBorderLeftWidth - b.ActualBorderRightWidth
                 - b.ActualPaddingLeft - b.ActualPaddingRight);
             ibContentWidth = Math.Min(Math.Max(prefMin, available), prefMax);
-        }
-
-        // The replaced box's own natural block size, settled together with its width below.
-        double replacedContentHeight = isReplaced ? intrinsic.Value.Height : 0;
-
-        if (isReplaced)
-        {
-            if (!replacedHeightIsAuto)
-            {
-                replacedContentHeight = CssLengthParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
-                if (b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase))
-                {
-                    replacedContentHeight -= b.ActualBorderTopWidth + b.ActualBorderBottomWidth
-                        + b.ActualPaddingTop + b.ActualPaddingBottom;
-                }
-                if (replacedContentHeight < 0)
-                    replacedContentHeight = 0;
-            }
-
-            double naturalRatio = intrinsic.Value.Width / intrinsic.Value.Height;
-
-            // The ratio fills in whichever axis the author left auto, before the constraints run.
-            if (replacedWidthIsAuto && !replacedHeightIsAuto)
-                ibContentWidth = replacedContentHeight * naturalRatio;
-            else if (replacedHeightIsAuto && !replacedWidthIsAuto)
-                replacedContentHeight = ibContentWidth / naturalRatio;
-
-            ReplacedBoxSizing.ApplyMinMax(
-                ref ibContentWidth, ref replacedContentHeight,
-                replacedWidthIsAuto, replacedHeightIsAuto, naturalRatio,
-                ToContentBox(b.ResolveInlineSizeBounds(), b,
-                    b.ActualBorderLeftWidth + b.ActualBorderRightWidth + b.ActualPaddingLeft + b.ActualPaddingRight),
-                ToContentBox(b.ResolveBlockSizeBounds(), b,
-                    b.ActualBorderTopWidth + b.ActualBorderBottomWidth + b.ActualPaddingTop + b.ActualPaddingBottom));
         }
 
         // CSS 2.1 §10.4: Apply min-width constraint.

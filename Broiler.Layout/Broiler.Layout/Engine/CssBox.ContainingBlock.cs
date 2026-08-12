@@ -640,7 +640,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // size, when layout has settled it, and otherwise indefinite. Size.Height is a border
             // box, so the padding and border come off it to leave the content height percentages
             // resolve against.
-            if (cb.HtmlTag != null)
+            if (cb.HtmlTag != null && !cb.IsBlockifiedInlineSplit)
             {
                 basis = Math.Max(0, cb.Size.Height
                     - cb.ActualPaddingTop - cb.ActualPaddingBottom
@@ -648,7 +648,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 return basis > 0 && !heightIsAuto;
             }
 
-            // Anonymous: keep climbing.
+            // Anonymous, or an inline blockified by a block-inside-inline split: keep climbing.
         }
 
         return false;

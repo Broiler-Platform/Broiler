@@ -160,7 +160,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
         }
 
-        if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None)
+        // CSS2.1 §10.3.4: a block-level *replaced* element resolves its width with the inline rules
+        // (§10.3.2) — an auto width is its natural width, not the containing block's. Only a box
+        // carrying a natural size reaches this (a `display: block` <canvas>); the min/max pass
+        // inside settles both axes together, and ResolveUsedBlockHeight reads the block one back.
+        if (IntrinsicReplacedSize is { Width: > 0, Height: > 0 } naturalSize)
+        {
+            ResolveReplacedContentSize(naturalSize, width, out double replacedWidth, out _);
+            width = ResolveSpecifiedWidthToBorderBox(replacedWidth);
+        }
+        else if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None)
         {
             // CSS Sizing 3 §5: width resolves to an intrinsic size
             // (min-content / max-content / fit-content). This also applies to an
@@ -234,9 +243,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         // CSS2.1 §10.4: Apply max-width constraint even when
         // Width is auto — the tentative used width must not exceed
-        // max-width.
+        // max-width. A replaced box has already had both bounds applied to both axes together
+        // above, and re-clamping here would use a different percentage basis.
+        bool replacedSizeSettled = IntrinsicReplacedSize is { Width: > 0, Height: > 0 };
 
-        if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+        if (!replacedSizeSettled && MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
         {
             double maxW = ResolveMaxWidthLength(width);
             maxW = ResolveSpecifiedWidthToBorderBox(maxW);
@@ -245,7 +256,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         // CSS2.1 §10.4: Apply min-width constraint (min wins over
         // max per §10.4) — also when Width is auto.
-        if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+        if (!replacedSizeSettled && MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
         {
             double minW = ResolveMinWidthLength(width);
 
@@ -1372,6 +1383,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             ActualBottom = Location.Y + borderBoxH;
         }
 
+        // CSS2.1 §10.6.2: a block-level replaced box's block size comes from its natural size and
+        // ratio, not from its (hidden) content — the same pass that settled its width in
+        // ResolveBlockUsedWidth, re-run now that Size.Width is final. Without it a
+        // `display: block` <canvas> measured its content height as zero and vanished.
+        if (IntrinsicReplacedSize is { Width: > 0, Height: > 0 } naturalSize)
+        {
+            double availableInlineSize = ContainingBlock.Size.Width
+                - ContainingBlock.ActualPaddingLeft - ContainingBlock.ActualPaddingRight
+                - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
+
+            ResolveReplacedContentSize(naturalSize, availableInlineSize, out _, out double replacedHeight);
+            ActualBottom = Location.Y + ResolveSpecifiedHeightToBorderBox(replacedHeight);
+        }
+
         // CSS Sizing 4 §4: a box with a preferred aspect-ratio and an auto block
         // (height) axis derives its used height from its used inline (width) size.
         // Runs after the explicit-height paths above (so an author height still
@@ -1431,68 +1456,24 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         // CSS2.1 §10.7: Apply min-height / max-height constraints.
         // When min-height > max-height, min-height wins.
-        {
-            double contentHeight = ActualBottom - Location.Y - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
-            bool constrained = false;
+        //
+        // ResolveBlockSizeBounds carries the §10.7 rules, including the one that turns a percentage
+        // into the property's initial value when the containing block's block size is indefinite —
+        // and it looks that basis up through TryGetPercentageBlockSizeBasis, which climbs past
+        // *anonymous* boxes. Reading ContainingBlock.Height directly, as this used to, stopped at
+        // the anonymous block a block-inside-inline split leaves around a `display: block` <img>
+        // and so treated its `max-height: 100%` as `none` (WPT
+        // css-sizing/block-image-percentage-max-height-inside-inline).
+        var bounds = ResolveBlockSizeBounds();
+        if (bounds.IsUnconstrained)
+            return;
 
-            // CSS2.1 §9.6.1: For fixed-position elements, percentage
-            // heights resolve against the viewport, not the parent.
-            double cbHeight = (Position == CssConstants.Fixed && LayoutEnvironment != null)
-                ? FixedPositioningViewport().Height
-                : ContainingBlock.Size.Height;
+        double contentHeight = ActualBottom - Location.Y
+            - ActualPaddingTop - ActualPaddingBottom - ActualBorderTopWidth - ActualBorderBottomWidth;
+        double clamped = bounds.Clamp(contentHeight);
 
-            if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight))
-            {
-                // CSS2.1 §10.7: If the containing block's height is not
-                // specified explicitly and this element is not absolutely
-                // positioned, a percentage max-height is treated as 'none'.
-                // Exception: the initial containing block always has a
-                // definite height (the viewport), per §10.5.
-                bool maxIsPercentageAuto = MaxHeight.Contains('%')
-                    && Position != CssConstants.Absolute && Position != CssConstants.Fixed
-                    && ContainingBlock?.ParentBox != null
-                    && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
-
-                if (!maxIsPercentageAuto)
-                {
-                    double maxH = ParseUsedLength(MaxHeight, cbHeight);
-
-                    if (contentHeight > maxH)
-                    {
-                        contentHeight = maxH;
-                        constrained = true;
-                    }
-                }
-            }
-
-            if (MinHeight != "0" && !string.IsNullOrEmpty(MinHeight))
-            {
-                // CSS2.1 §10.7: If the containing block's height is not
-                // specified explicitly and this element is not absolutely
-                // positioned, a percentage min-height is treated as '0'.
-                // Exception: the initial containing block always has a
-                // definite height (the viewport), per §10.5.
-                bool minIsPercentageAuto = MinHeight.Contains('%')
-                    && Position != CssConstants.Absolute && Position != CssConstants.Fixed
-                    && ContainingBlock?.ParentBox != null
-                    && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
-
-                if (!minIsPercentageAuto)
-                {
-                    double minH = ParseUsedLength(MinHeight, cbHeight);
-                    if (contentHeight < minH)
-                    {
-                        contentHeight = minH;
-                        constrained = true;
-                    }
-                }
-            }
-
-            if (constrained)
-            {
-                ActualBottom = Location.Y + ResolveSpecifiedHeightToBorderBox(contentHeight);
-            }
-        }
+        if (clamped != contentHeight)
+            ActualBottom = Location.Y + ResolveSpecifiedHeightToBorderBox(clamped);
     }
 
     /// <summary>

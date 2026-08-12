@@ -220,6 +220,17 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(20, word.Height, 3);
     }
 
+    // The other half of that guard: zero is min-*'s initial value but a real clamp for max-*, so it
+    // must not be filtered out with the keywords (WPT CSS2/normal-flow/max-height-101).
+    [Fact]
+    public void A_Zero_Max_Height_Clamps_To_Nothing()
+    {
+        var word = MeasureInDefiniteBlock("auto", "auto", "none", "0", throughAnonymousBlock: false,
+            imageWidth: 40, imageHeight: 20);
+
+        Assert.Equal(0, word.Height, 3);
+    }
+
     // Minimal ILayoutEnvironment: a fixed font, and the one image's intrinsics.
     private sealed class FakeLayoutEnvironment(ImageIntrinsics intrinsics) : Broiler.Layout.ILayoutEnvironment
     {

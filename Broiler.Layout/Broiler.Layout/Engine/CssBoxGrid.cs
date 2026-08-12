@@ -762,8 +762,18 @@ internal partial class CssBox
         bool widthIsPercent = !string.IsNullOrEmpty(item.Width) && item.Width.EndsWith('%');
         bool heightIsPercent = !string.IsNullOrEmpty(item.Height) && item.Height.EndsWith('%');
 
-        bool widthFills = FillsArea(item.Width) && (widthIsPercent || SelfAlignmentStretches(item.JustifySelf, JustifyItems));
-        bool heightFills = FillsArea(item.Height) && (heightIsPercent || SelfAlignmentStretches(item.AlignSelf, AlignItems));
+        // CSS Box Alignment §6.1: `normal` — the default — behaves as `start`, not `stretch`, for a
+        // *replaced* box with a natural size, so a <canvas> grid item keeps its own size instead of
+        // being pulled out to the track. Only the default is overridden; an explicit
+        // `justify-self: stretch` still stretches.
+        bool replacedKeepsSize = item.IntrinsicReplacedSize is { Width: > 0, Height: > 0 };
+
+        bool widthFills = FillsArea(item.Width)
+            && (widthIsPercent || (SelfAlignmentStretches(item.JustifySelf, JustifyItems)
+                                   && !(replacedKeepsSize && IsNormalAlignment(item.JustifySelf, JustifyItems))));
+        bool heightFills = FillsArea(item.Height)
+            && (heightIsPercent || (SelfAlignmentStretches(item.AlignSelf, AlignItems)
+                                    && !(replacedKeepsSize && IsNormalAlignment(item.AlignSelf, AlignItems))));
 
         double targetLeft = areaLeft + marginL;
         double targetTop = areaTop + marginT;
@@ -1583,6 +1593,23 @@ internal partial class CssBox
         else if (v.StartsWith("unsafe ")) v = v[7..].Trim();
 
         return string.IsNullOrEmpty(v) || v == "normal" || v == "stretch";
+    }
+
+    /// <summary>
+    /// True when a grid item's used self-alignment on an axis is the initial <c>normal</c> — the
+    /// case CSS Box Alignment §6.1 resolves differently for a replaced box (as <c>start</c>) than
+    /// for everything else (as <c>stretch</c>). An explicit <c>stretch</c> is not <c>normal</c> and
+    /// stretches whatever the box is.
+    /// </summary>
+    private static bool IsNormalAlignment(string self, string items)
+    {
+        string v = self;
+        if (string.IsNullOrEmpty(v) || v == "auto" || v == "normal")
+            v = items;
+
+        v = (v ?? "").Trim().ToLowerInvariant();
+
+        return string.IsNullOrEmpty(v) || v == "auto" || v == "normal";
     }
 
     private static double GridAxisAlignmentOffset(string self, string items, double free, bool rtl)

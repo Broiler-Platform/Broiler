@@ -1,5 +1,6 @@
 using Broiler.CSS;
 using Broiler.Layout.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 
 
@@ -72,29 +73,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// min-/max-height against an indefinite (auto-height) flow containing block is
     /// treated as its initial value (<c>0</c>/<c>none</c>), per §10.7.
     /// </summary>
-    private double ClampSpecifiedHeightToMinMax(double specifiedHeight)
-    {
-        double cbHeight = (Position == CssConstants.Fixed && LayoutEnvironment != null)
-            ? LayoutEnvironment.ViewportSize.Height
-            : ContainingBlock?.Size.Height ?? 0;
-        bool cbIndefinite = Position is not (CssConstants.Absolute or CssConstants.Fixed)
-            && ContainingBlock?.ParentBox != null
-            && (ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height));
-
-        if (MaxHeight != "none" && !string.IsNullOrEmpty(MaxHeight)
-            && !(MaxHeight.Contains('%') && cbIndefinite))
-        {
-            double maxH = CssLengthParser.ParseLength(MaxHeight, cbHeight, GetEmHeight());
-            if (specifiedHeight > maxH) specifiedHeight = maxH;
-        }
-        if (MinHeight != "0" && !string.IsNullOrEmpty(MinHeight)
-            && !(MinHeight.Contains('%') && cbIndefinite))
-        {
-            double minH = CssLengthParser.ParseLength(MinHeight, cbHeight, GetEmHeight());
-            if (specifiedHeight < minH) specifiedHeight = minH;
-        }
-        return specifiedHeight;
-    }
+    private double ClampSpecifiedHeightToMinMax(double specifiedHeight) =>
+        ResolveBlockSizeBounds().Clamp(specifiedHeight);
 
     /// <summary>
     /// CSS2.1 §10.4: this box's <c>min-width</c>/<c>max-width</c> as used lengths, in the frame
@@ -143,7 +123,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         string t = value.Trim();
 
-        if (t == "0" || t.Equals("none", StringComparison.OrdinalIgnoreCase))
+        // `none` is max-*'s initial value. Zero is *not* excluded: it is min-*'s initial value and
+        // a no-op there, but `max-height: 0` is a real clamp (WPT CSS2/normal-flow/max-height-101).
+        if (t.Equals("none", StringComparison.OrdinalIgnoreCase))
             return false;
 
         char c0 = t[0];
@@ -207,6 +189,113 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         length = CssLengthParser.ParseLength(value, percentBasis ?? 0, em);
         return !double.IsNaN(length) && !double.IsInfinity(length);
+    }
+
+    /// <summary>Moves a min/max bound out of the frame <c>box-sizing</c> names and into the content
+    /// box, so it can clamp a content-box size. A no-op under the default <c>content-box</c>.</summary>
+    private ReplacedBoxSizing.Bounds ToContentBoxBounds(ReplacedBoxSizing.Bounds bounds, double borderAndPadding)
+    {
+        if (borderAndPadding <= 0 || !UsesBorderBoxSizing)
+            return bounds;
+
+        return new ReplacedBoxSizing.Bounds(
+            Math.Max(0, bounds.Min - borderAndPadding),
+            double.IsPositiveInfinity(bounds.Max) ? bounds.Max : Math.Max(0, bounds.Max - borderAndPadding));
+    }
+
+    /// <summary>
+    /// The used content width this box's specified <c>width</c> names, or <see langword="false"/>
+    /// when there is none to use — <c>auto</c>, empty, or an intrinsic-sizing keyword. A replaced
+    /// box then takes its inline axis from its natural size, or from the block axis through its
+    /// ratio.
+    /// </summary>
+    private bool TryResolveSpecifiedReplacedContentWidth(double availableInlineSize, out double contentWidth)
+    {
+        contentWidth = 0;
+
+        if (Width == CssConstants.Auto || string.IsNullOrEmpty(Width) || IsIntrinsicSizingWidthKeyword(Width))
+            return false;
+
+        double specified = CssLengthParser.ParseLength(Width, availableInlineSize, GetEmHeight());
+        if (double.IsNaN(specified) || double.IsInfinity(specified) || specified < 0)
+            return false;
+
+        contentWidth = UsesBorderBoxSizing
+            ? Math.Max(0, specified - ActualBorderLeftWidth - ActualBorderRightWidth
+                          - ActualPaddingLeft - ActualPaddingRight)
+            : specified;
+        return true;
+    }
+
+    /// <summary>
+    /// The used content height this box's specified <c>height</c> names, or <see langword="false"/>
+    /// when there is none to use — <c>auto</c>, an intrinsic-sizing keyword, or (CSS2.1 §10.5) a
+    /// percentage with no definite basis to resolve against, which computes to <c>auto</c>. A
+    /// replaced box then takes its block axis from its natural size, or from the inline axis
+    /// through its ratio.
+    /// </summary>
+    private bool TryResolveSpecifiedReplacedContentHeight(out double contentHeight)
+    {
+        contentHeight = 0;
+
+        if (Height == CssConstants.Auto || string.IsNullOrEmpty(Height) || IsIntrinsicSizingHeightKeyword(Height))
+            return false;
+
+        double basis = 0;
+        if (Height.Contains('%') && !TryGetPercentageBlockSizeBasis(out basis))
+            return false;
+
+        double specified = CssLengthParser.ParseLength(Height, basis, GetEmHeight());
+        if (double.IsNaN(specified) || double.IsInfinity(specified) || specified < 0)
+            return false;
+
+        contentHeight = ResolveSpecifiedHeightToContentBox(specified);
+        return true;
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.3.2/§10.6.2 then §10.4: the used <em>content</em> size of a replaced box that
+    /// carries a natural size (<see cref="CssBoxProperties.IntrinsicReplacedSize"/> — a
+    /// <c>&lt;canvas&gt;</c>). An axis the author left <c>auto</c> comes from the natural size, or
+    /// from the other axis through the ratio when that one is stated; then the min/max constraints
+    /// are applied to both together.
+    /// </summary>
+    /// <remarks>
+    /// Shared by the atomic inline-level path (<see cref="CssLayoutEngine"/>'s inline flow) and the
+    /// block-level one (<see cref="ResolveBlockUsedWidth"/> / <see cref="ResolveUsedBlockHeight"/>),
+    /// so a <c>display: block</c> canvas is sized by the same rules as an inline one.
+    /// </remarks>
+    internal void ResolveReplacedContentSize(
+        SizeF natural, double availableInlineSize, out double contentWidth, out double contentHeight)
+    {
+        bool widthIsAuto = !TryResolveSpecifiedReplacedContentWidth(availableInlineSize, out contentWidth);
+        bool heightIsAuto = !TryResolveSpecifiedReplacedContentHeight(out contentHeight);
+
+        if (widthIsAuto)
+            contentWidth = natural.Width;
+        if (heightIsAuto)
+            contentHeight = natural.Height;
+
+        // CSS Sizing 4 §4: an author `aspect-ratio` is a *preferred* ratio that replaces the
+        // natural one for filling in whichever axis is auto.
+        double ratio = natural.Height > 0 ? natural.Width / natural.Height : 0;
+        if (TryParseAspectRatio(AspectRatio, out double preferred) && preferred > 0)
+            ratio = preferred;
+
+        if (ratio > 0)
+        {
+            if (widthIsAuto && !heightIsAuto)
+                contentWidth = contentHeight * ratio;
+            else if (heightIsAuto && !widthIsAuto)
+                contentHeight = contentWidth / ratio;
+        }
+
+        ReplacedBoxSizing.ApplyMinMax(
+            ref contentWidth, ref contentHeight, widthIsAuto, heightIsAuto, ratio,
+            ToContentBoxBounds(ResolveInlineSizeBounds(),
+                ActualBorderLeftWidth + ActualBorderRightWidth + ActualPaddingLeft + ActualPaddingRight),
+            ToContentBoxBounds(ResolveBlockSizeBounds(),
+                ActualBorderTopWidth + ActualBorderBottomWidth + ActualPaddingTop + ActualPaddingBottom));
     }
 
     internal double GetMinimumWidth()

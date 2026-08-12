@@ -103,7 +103,18 @@ set -euo pipefail
 #   * "Drop the deleted WPF adapter from the public surface" (Broiler.HTML) —
 #     documentation and three InternalsVisibleTo grants to an assembly that is
 #     never built. Nothing it removes can move a pixel.
+#
+# The canvas patch (Broiler.HTML, "parse: size a <canvas> as a replaced element,
+# not from presentation width/height") is listed because it is the half of a
+# two-repo fix that decides an element's *box type*. Without it every <canvas>
+# lays out as a non-replaced inline — the one box type max-width/max-height do
+# not apply to at all — and the main-repo half it feeds (CSS2.1 §10.4 in
+# ReplacedBoxSizing, reached through CssBox.IntrinsicReplacedSize) never runs, so
+# WPT css-sizing/replaced-max-size-saturation stays at its 8.3 %. The §10.4 table
+# itself is unit-tested in the main repo (ReplacedBoxSizingTests); only the pixel
+# suite can say a real <canvas> reaches it.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0004-html-canvas-replaced-element.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -689,6 +689,22 @@ internal abstract partial class CssBoxProperties
     /// </remarks>
     public SizeF? IntrinsicReplacedSize { get; set; }
 
+    /// <summary>
+    /// CSS2.1 §9.2.1.1: set on an <b>inline</b> element's box that the block-inside-inline
+    /// correction has blockified in order to break it around a block-level child. The element is
+    /// still inline as far as CSS is concerned — the block-level <c>display</c> is an artefact of
+    /// how the split is modelled — so it is not a containing block a percentage resolves against,
+    /// any more than the anonymous blocks the same split creates are.
+    /// </summary>
+    /// <remarks>
+    /// WPT <c>css-sizing/block-image-percentage-max-height-inside-inline</c> is exactly this shape:
+    /// a <c>display: block</c> <c>&lt;img&gt;</c> inside a <c>&lt;span&gt;</c> inside a
+    /// <c>height: 100px</c> <c>&lt;div&gt;</c>. Stopping at the blockified span made the image's
+    /// <c>max-height: 100%</c> resolve against an indefinite block size, so §10.7 turned it into
+    /// <c>none</c> and the image kept its 1000px height.
+    /// </remarks>
+    public bool IsBlockifiedInlineSplit { get; set; }
+
     public string InlineSize
     {
         get => _inlineSize;

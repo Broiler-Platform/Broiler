@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Three patches are waiting on a maintainer.** See the index below.
+**Four patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -70,17 +70,45 @@ as outstanding work and cannot be applied to find out otherwise.
 
 ## Index
 
-All three come from
-[the test-suite retirement roadmap item](../docs/ROADMAP.md#retire-obsolete-test-suites-and-historical-test-artifacts),
-and all three apply cleanly to the pointers pinned as of this writing. Identify
-them by commit subject rather than by number — the numbering restarts against
-whatever this directory holds.
+The first three come from
+[the test-suite retirement roadmap item](../docs/ROADMAP.md#retire-obsolete-test-suites-and-historical-test-artifacts);
+`0004` is the submodule half of a WPT fix. All four apply cleanly to the pointers
+pinned as of this writing. Identify them by commit subject rather than by number —
+the numbering restarts against whatever this directory holds.
+
+Only `0004` is registered in `scripts/apply-pending-wpt-patches.sh`: it is the
+only one of the four that can move a rendered pixel, so it is the only one a WPT
+run needs applied on top of the pinned pointer.
 
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Retire the Repro scratch tests and the legacy solution |
 | `0002` | `Broiler.HTML` | Drop the deleted WPF adapter from the public surface |
 | `0003` | `Broiler.HTML` | Keep dashed and dotted strokes on the raster path |
+| `0004` | `Broiler.HTML` | Size a `<canvas>` as a replaced element, not from presentation width/height |
+
+### Size a `<canvas>` as a replaced element, not from presentation width/height — `Broiler.HTML`
+
+HTML §4.12.5 gives a `<canvas>` its bitmap dimensions from the `width`/`height`
+content attributes, defaulting to 300×150. Those are the element's **natural**
+size, and the Rendering section maps no presentation `width`/`height` for it —
+unlike `<img>` or `<table>`. `TranslateAttributes` projected them onto CSS
+`width`/`height` anyway, which made both axes independently *stated*, so
+`max-width` and `max-height` clamped each on its own instead of keeping the
+natural ratio. Left alone entirely, a `<canvas>` laid out as a non-replaced
+inline — the one box type those two properties do not apply to at all.
+
+`CorrectCanvasBoxes` records the attributes as `CssBox.IntrinsicReplacedSize` (a
+main-repo property) and makes the box atomic inline-level, so the layout engine
+sizes it through the CSS2.1 §10.4 replaced-element rules that landed in
+`Broiler.Layout.Engine.ReplacedBoxSizing`. Only the UA default `display` is
+replaced; an author `display` is kept. Fallback content between the tags is
+hidden, as in any UA that supports canvas.
+
+Listed for the WPT run: without it WPT `css-sizing/replaced-max-size-saturation`
+(issue #1624 problem 12) stays at 8.3 %, and every `<canvas>` on every page keeps
+laying out with no size at all. See
+[WPT rendering gaps, #1624](../docs/wpt-rendering-gaps.md#the-next-run-issue-1624-2026-08-12).
 
 ### Retire the Repro scratch tests and the legacy solution — `Broiler.JS`
 
