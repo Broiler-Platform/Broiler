@@ -98,4 +98,28 @@ public sealed class ElementGeometryBindingModuleTests
             "(function(){var rects=document.getElementById('a').getClientRects();" +
             "return Array.isArray(rects)+','+rects.length;})()"));
     }
+
+    [Fact]
+    public void Boxed_Element_Reads_Real_Shared_Geometry()
+    {
+        // A box-generating element answers all four metrics from the shared layout
+        // snapshot, not from a declared-size guess. scrollWidth equals the content
+        // width because the box is empty.
+        var body = "<div id='b' style='width:120px;height:40px'></div>";
+        Assert.Equal("120,40,120,120", Eval(body,
+            "(function(){var e=document.getElementById('b');" +
+            "return [e.offsetWidth,e.offsetHeight,e.clientWidth,e.scrollWidth].join(',');})()"));
+    }
+
+    [Fact]
+    public void DisplayNone_Element_Reads_Zero_Geometry()
+    {
+        // display:none produces no box, so every metric reads zero. The declared
+        // width/height must not leak through: an element absent from the shared
+        // snapshot reports zero rather than its specified size.
+        var body = "<div id='n' style='display:none;width:100px;height:50px'></div>";
+        Assert.Equal("0,0,0,0", Eval(body,
+            "(function(){var e=document.getElementById('n');" +
+            "return [e.offsetWidth,e.offsetHeight,e.clientWidth,e.scrollWidth].join(',');})()"));
+    }
 }

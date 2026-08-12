@@ -24,10 +24,6 @@ public sealed partial class DomBridge
     // renderer layout is the sole geometry source.
     private bool _layoutGeometryPassActive;
 
-    // Test seam retained so the equivalence tests compile. The shared snapshot is the
-    // single geometry source now, so toggling this no longer selects an alternate path.
-    internal static bool LayoutGeometryCacheEnabled = true;
-
     /// <summary>
     /// Runs <paramref name="evaluate"/> with the shared-geometry snapshot installed for the
     /// pass, then tears it down. Only sound for a read pass over a static layout snapshot
@@ -36,9 +32,6 @@ public sealed partial class DomBridge
     /// </summary>
     private T WithLayoutGeometryCache<T>(Func<T> evaluate)
     {
-        if (!LayoutGeometryCacheEnabled)
-            return evaluate();
-
         var owner = !_layoutGeometryPassActive;
         if (owner)
         {

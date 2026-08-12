@@ -230,10 +230,10 @@ public sealed partial class DomBridge
     /// (RF-BRIDGE-1b), returning it in the same containing-block-relative frame the
     /// CSS-property estimator uses. This is the accurate path for inline anchors
     /// (inline flow + font metrics), which the estimator cannot model. Returns
-    /// <c>false</c> — so the caller falls back to the estimator — whenever the shared
-    /// geometry path is disabled (<see cref="UseSharedLayoutGeometry"/>, the default)
-    /// or the element produced no usable box, keeping this a no-op until the parity
-    /// gate enables real-layout geometry.
+    /// <c>false</c> — so the caller falls back to the CSS-property estimator — when
+    /// the element produced no usable box, or in the event
+    /// <see cref="UseSharedLayoutGeometry"/> is turned off; it defaults to on, so the
+    /// real-layout path is what normally answers.
     /// </summary>
     private bool TryGetAnchorLayoutBox(DomElement element, out AnchorInfo box)
     {
