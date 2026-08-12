@@ -162,11 +162,11 @@ count below is reproducible with the command in its batch.
   now compares the current internal stub while naming it Skia. A focused run of
   the Skia/cutover/stabilization cluster failed 8 of 20 cases (7 + 6 + 7, failing
   1 + 5 + 2); the stabilization suite alone performs about 50 full renders per run.
-- `tests/browser-wasm-phase0` through `tests/browser-wasm-phase5` are historical
-  feasibility fixtures rather than supported test entry points — 18 tracked files.
-  Phase 0 contains two applications, not test projects, and its baseline path
-  cannot reach comparison because its composition root registers no
-  `Broiler.Graphics` image-codec catalog. Phase 1-5 are orphaned Playwright
+- `tests/browser-wasm-phase0` through `tests/browser-wasm-phase5` were historical
+  feasibility fixtures rather than supported test entry points — 18 tracked files,
+  now deleted (batch 5). Phase 0 held two applications, not test projects, and its
+  baseline path could not reach comparison because its composition root registered
+  no `Broiler.Graphics` image-codec catalog. Phase 1-5 were orphaned Playwright
   scripts (one `smoke.mjs` each) with no package, runner, CI job, or matching
   application globals and selectors.
 - [`SharedGeometryExclusiveCutoverTests`](../src/Broiler.Cli.Tests/SharedGeometryExclusiveCutoverTests.cs)
@@ -382,26 +382,34 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    returns nothing.
 
 5. **Retire browser WebAssembly phase 0-5 scaffolding (root browser/WASM).**
-   - Delete all 18 tracked files under `tests/browser-wasm-phase0` through
-     `tests/browser-wasm-phase5`.
-   - Remove the phase-zero application roots from
-     [`eng/solutions.json`](../eng/solutions.json), regenerate
-     `Broiler.WebAssembly.Tests.slnx`, and update the complete inbound reference
-     set in the same change: `docs/README.md`, `docs/architecture/browser-webassembly.md`
-     (which today describes phase 0 as verifying "the exact dependency closure and
-     deterministic baseline" — the opposite of this item), and the duplicate next
-     action in this file's own Browser WebAssembly section. No CI workflow,
-     script, or Broiler Code document references these directories.
-   - Keep the current WebAssembly Demo and Writer projects, Graphics WebAssembly
-     tests, and Broiler Code payload probes. Move a still-required deterministic
-     closure assertion into one of those supported entry points instead of
-     repairing the historical verifier.
-   - **Decide where the dependency-closure check lands before deleting.**
-     `Broiler.BrowserWasm.Phase0.csproj` pins 28 explicit project references, and
-     they are the only reason `Broiler.WebAssembly.Tests.slnx` compiles the
-     Broiler.UI closure against the `browser-wasm` runtime identifier. Removing
-     the two phase-zero roots takes that solution from 58 projects to about 7 and
-     deletes that check outright. "Loads and builds" does not detect the loss.
+   *Landed.*
+   - Deleted all 18 tracked files under `tests/browser-wasm-phase0` through
+     `tests/browser-wasm-phase5`, removed the two phase-zero roots from
+     [`eng/solutions.json`](../eng/solutions.json), regenerated
+     `Broiler.WebAssembly.Tests.slnx` (58 projects to 7), and updated the
+     complete inbound reference set: `docs/README.md`,
+     `docs/architecture/browser-webassembly.md`, and this file's own Browser
+     WebAssembly section. No CI workflow, script, or Broiler Code document
+     referenced these directories.
+   - Kept the current WebAssembly Demo and Writer projects, Graphics WebAssembly
+     tests, and Broiler Code payload probes.
+   - **The dependency-closure worry did not survive checking.** The concern was
+     that `Broiler.BrowserWasm.Phase0.csproj`'s 28 pinned project references were
+     the only thing compiling the Broiler.UI closure against the `browser-wasm`
+     runtime identifier. They were not. That project's browser-RID build compiles
+     a single empty marker class, and no workflow ever built it with that RID —
+     `Broiler.WebAssembly.Tests.slnx` is not built by CI at all. The real, live
+     closure check is `src/Broiler.Writer.WebAssembly`, which the
+     preview-package workflow publishes for `browser-wasm` over a comparably
+     wide Broiler.UI graph. Nothing enforced was lost.
+   - What *was* lost is smaller and worth rebuilding deliberately rather than
+     restoring: the normalized input-trace baseline over the `UiInputEvent`
+     projection, with its documented losses for keyboard repeat count, key
+     location, and composition selection. The render-list half is already
+     covered by the Graphics WebAssembly tests. Even that baseline was never
+     enforced — the generator failed before comparison because its composition
+     root registered no image-codec catalog, so the committed blobs were checked
+     against nothing.
 
    **Gate:** the regenerated WebAssembly solution loads and builds; current
    browser applications compile; and repository searches find no retired phase
@@ -566,18 +574,15 @@ cost from the per-element wrapper cost in
 
 The durable ownership and rendering decisions are in
 [the browser WebAssembly architecture](architecture/browser-webassembly.md).
-The phase 0–5 fixtures record implementation history, but they are not current
-support gates: phase 0 cannot complete baseline comparison and the phase 1–5
-scripts have no current runner or matching application surface. Their retirement
-is tracked in
-[the test-suite cleanup item](#retire-obsolete-test-suites-and-historical-test-artifacts).
-Browser support claims must come from the current Demo and Writer applications
-and supported WebAssembly test projects.
+The phase 0–5 fixtures recorded implementation history rather than gating
+anything, and have been retired. Browser support claims must come from the
+current Demo and Writer applications and supported WebAssembly test projects.
 
 **Next actions:**
 
-- Retire the historical phase fixtures and move any still-required deterministic
-  closure assertion into a supported WebAssembly test or application project.
+- Rebuild a normalized input-trace baseline over the `UiInputEvent` projection.
+  It is the one thing the retired phase-0 fixture covered that nothing else does,
+  and it was never actually enforced — its generator stopped before comparison.
 - Add committed Chromium and Firefox CI for the current published application,
   not for the historical phase smoke scripts.
 - Record frame time, input-to-present latency, memory, resize retention, payload,

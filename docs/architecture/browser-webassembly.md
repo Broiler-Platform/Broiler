@@ -37,11 +37,16 @@ contracts.
   is the reusable control/host proof.
 - [`Broiler.Writer.WebAssembly`](../../src/Broiler.Writer.WebAssembly/) is the
   application port.
-- [`tests/browser-wasm-phase0`](../../tests/browser-wasm-phase0/) verifies the
-  exact dependency closure and deterministic baseline.
-- `tests/browser-wasm-phase1` through `phase5` contain browser smoke scripts for
-  the successive runtime, presenter, input, text/accessibility, and renderer
-  slices.
+- [`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/)
+  and the [Broiler Code payload probes](../../tests/broiler-code-phase0/payload-probes/)
+  are the supported WebAssembly test entry points, registered in
+  `Broiler.WebAssembly.Tests.slnx`.
+
+The `browser-wasm` dependency closure is proved by publishing
+`Broiler.Writer.WebAssembly`, which the preview-package workflow builds for that
+runtime identifier over a wide Broiler.UI graph. A set of `tests/browser-wasm-phase0`
+through `phase5` fixtures used to sit alongside these; they recorded
+implementation history rather than gating anything, and were retired.
 
 The existing `Broiler.Browser.Windows` name remains reserved for the desktop
 browser application. Browser WebAssembly packages use explicit `.WebAssembly`
@@ -105,18 +110,23 @@ evidence on the declared browser/OS combinations.
 
 ## Baselines and support gates
 
-The deterministic closure fixture is
-[`tests/browser-wasm-phase0/baselines`](../../tests/browser-wasm-phase0/baselines/).
-It contains the CPU PNG, render-list JSON, normalized input trace, and a manifest
-with their hashes.
+There is no committed deterministic baseline for the browser presenter. The
+`tests/browser-wasm-phase0/baselines` fixture — a CPU PNG, render-list JSON,
+normalized input trace, and a hash manifest — was retired with the phase
+scaffolding: its generator never reached comparison, because the composition
+root registered no `Broiler.Graphics` image-codec catalog, so the blobs were
+never checked against anything. Render-command semantics that the fixture was
+meant to pin (clip and transform stacks unwinding independently, run
+interleaving) are covered by
+[`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/).
 
-The fixture blobs are unchanged from their former documentation location. The
-verifier currently builds, but baseline generation stops before comparison
-because its composition root does not register a `Broiler.Graphics` image-codec
-catalog. Repairing that executable path is tracked in the root roadmap.
+What remains uncovered, and worth rebuilding deliberately rather than restoring,
+is a normalized input-trace baseline over the `UiInputEvent` projection —
+including the documented projection losses for keyboard repeat count, key
+location, and composition selection.
 
-Local smoke evidence through phase 5 proves implementation feasibility. A
-published support statement additionally requires:
+Historical local smoke evidence proved implementation feasibility. A published
+support statement additionally requires:
 
 - committed Chromium and Firefox runs;
 - frame-time, input-latency, memory, resize-retention, payload, and soak results;

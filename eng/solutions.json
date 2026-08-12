@@ -184,11 +184,9 @@
     },
     {
       "path": "Broiler.WebAssembly.Tests.slnx",
-      "description": "WebAssembly backend tests, browser-WASM validation baselines, and the Broiler Code payload probes.",
+      "description": "WebAssembly backend tests and the Broiler Code payload probes.",
       "roots": [
         "Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj",
-        "tests/browser-wasm-phase0/Broiler.BrowserWasm.Phase0/Broiler.BrowserWasm.Phase0.csproj",
-        "tests/browser-wasm-phase0/Broiler.Wasm.EmptyBaseline/Broiler.Wasm.EmptyBaseline.csproj",
         "tests/broiler-code-phase0/payload-probes/Probe.Wasm.Baseline/Probe.Wasm.Baseline.csproj",
         "tests/broiler-code-phase0/payload-probes/Probe.Wasm.Roslyn/Probe.Wasm.Roslyn.csproj"
       ],
