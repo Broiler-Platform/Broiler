@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 /// their container, which a DomDocument cannot be.) These characterizations exercise the
 /// script-visible surface of a regime-B document end-to-end.
 /// </summary>
-public sealed class BrowsingContextRootMigrationTests
+public sealed class DomImplementationDocumentCreationTests
 {
     private static DomBridge Attach(out JSContext context)
     {

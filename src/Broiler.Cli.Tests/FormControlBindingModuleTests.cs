@@ -28,26 +28,6 @@ public sealed class FormControlBindingModuleTests
     }
 
     [Fact]
-    public void FormControl_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsGetValue106Core", "JsJsObjectsSetValue107Core",
-                     "JsJsObjectsGetChecked108Core", "JsJsObjectsSetChecked109Core",
-                     "JsJsObjectsGetType110Core", "JsJsObjectsSetType111Core",
-                     "JsJsObjectsGetName112Core", "JsJsObjectsSetName113Core",
-                     "JsJsObjectsSetDisabled115Core", "JsJsObjectsSetHidden117Core",
-                     "JsJsObjectsGetTabIndex118Core", "JsJsObjectsSetTabIndex119Core",
-                     "JsJsObjectsSetRequired121Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Value_Type_Name_TabIndex_Reflect_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// (doctype + html), getElementById/querySelector, getRootNode()/isConnected returning the document,
 /// and serialization round-tripping the doctype + html.
 /// </summary>
-public sealed class DocumentSentinelMigrationTests
+public sealed class DocumentNodeSemanticsTests
 {
     private static string Run(string bodyScript, string headExtra = "")
     {

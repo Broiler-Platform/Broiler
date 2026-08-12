@@ -28,24 +28,6 @@ public sealed class ElementReflectionBindingModuleTests
     }
 
     [Fact]
-    public void ElementReflection_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsElementInterfacesSetHtmlFor047Core", "JsElementInterfacesSetHttpEquiv049Core",
-                     "JsElementInterfacesGetData050Core", "JsElementInterfacesSetType053Core",
-                     "JsElementInterfacesGetHref056Core", "JsElementInterfacesSetHref057Core",
-                     "JsElementInterfacesCallback059Core", "JsElementInterfacesGetHref060Core",
-                     "JsElementInterfacesSetHref061Core", "JsElementInterfacesCallback063Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Href_Reflection_Resolves_And_Round_Trips_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

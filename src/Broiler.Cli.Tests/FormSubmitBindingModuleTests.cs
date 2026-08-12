@@ -27,14 +27,6 @@ public sealed class FormSubmitBindingModuleTests
     }
 
     [Fact]
-    public void FormSubmit_Callback_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(bridge.GetMethod("JsJsObjectsSubmit125Core", all));
-    }
-
-    [Fact]
     public void Submit_Fires_The_Submit_Listener_And_Honors_PreventDefault()
     {
         var html = @"<!DOCTYPE html>

@@ -15,17 +15,8 @@ namespace Broiler.Cli.Tests;
 /// exercise every construction path that used to feed the set and assert the DOM still behaves; the
 /// guard test asserts the field is gone.
 /// </summary>
-public sealed class KnownNodesRemovalTests
+public sealed class NodeConstructionRoundTripTests
 {
-    [Fact]
-    public void DomBridge_Has_No_KnownNodes_Parallel_Set()
-    {
-        // The parallel node-tracking set must not be reintroduced: the canonical tree is the single
-        // authority for node membership.
-        var field = typeof(DomBridge).GetField("_knownNodes", BindingFlags.NonPublic | BindingFlags.Instance);
-        Assert.Null(field);
-    }
-
     [Fact]
     public void Element_Creation_And_Insertion_Round_Trip()
     {

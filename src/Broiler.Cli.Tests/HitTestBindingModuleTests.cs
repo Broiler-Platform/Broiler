@@ -27,15 +27,6 @@ public sealed class HitTestBindingModuleTests
     }
 
     [Fact]
-    public void HitTest_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(bridge.GetMethod("JsRegistrationElementFromPoint011Core", all));
-        Assert.Null(bridge.GetMethod("JsRegistrationElementsFromPoint012Core", all));
-    }
-
-    [Fact]
     public void ElementFromPoint_And_ElementsFromPoint_Hit_The_Box_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

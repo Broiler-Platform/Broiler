@@ -30,15 +30,6 @@ public sealed class VisualViewportEventTargetBindingModuleTests
     }
 
     [Fact]
-    public void VisualViewport_EventTarget_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(bridge.GetMethod("JsRegistrationAddEventListener146Core", all));
-        Assert.Null(bridge.GetMethod("JsRegistrationRemoveEventListener147Core", all));
-    }
-
-    [Fact]
     public void VisualViewport_Add_And_Remove_Are_Callable_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

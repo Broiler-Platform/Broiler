@@ -43,25 +43,6 @@ public sealed class ElementGeometryBindingModuleTests
     }
 
     [Fact]
-    public void Geometry_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsElementInterfacesGetScrollTop072Core", "JsElementInterfacesSetScrollTop073Core",
-                     "JsElementInterfacesGetScrollLeft074Core", "JsElementInterfacesSetScrollLeft075Core",
-                     "JsElementInterfacesGetOffsetParent078Core", "JsElementInterfacesGetBoundingClientRect079Core",
-                     "JsElementInterfacesGetClientRects080Core", "JsElementInterfacesScrollIntoView081Core",
-                     "JsElementInterfacesScroll082Core", "JsElementInterfacesScrollTo083Core",
-                     "JsElementInterfacesScrollBy084Core", "JsElementInterfacesScrollParent085Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Box_Model_Metrics_Report_Own_Css_Pixels()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";

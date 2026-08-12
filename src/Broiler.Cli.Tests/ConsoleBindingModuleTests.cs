@@ -28,26 +28,6 @@ public sealed class ConsoleBindingModuleTests
     }
 
     [Fact]
-    public void Console_Object_And_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        var moved = new[]
-        {
-            "BuildConsoleObject",
-            "JsRegistrationLog156Core",
-            "JsRegistrationWarn157Core",
-            "JsRegistrationError158Core",
-            "JsRegistrationInfo159Core",
-        };
-
-        foreach (var name in moved)
-        {
-            Assert.Null(bridge.GetMethod(name,
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static));
-        }
-    }
-
-    [Fact]
     public void Console_Methods_Are_Callable_Through_The_Bridge_And_Return_Undefined()
     {
         var html = @"<!DOCTYPE html>

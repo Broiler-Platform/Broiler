@@ -34,22 +34,6 @@ public sealed class TimerBindingModuleTests
     }
 
     [Fact]
-    public void Timer_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationSetTimeout070Core", "JsRegistrationClearTimeout071Core",
-                     "JsRegistrationSetInterval072Core", "JsRegistrationClearInterval073Core",
-                     "JsRegistrationRequestAnimationFrame074Core", "JsRegistrationCancelAnimationFrame075Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Schedule_And_Cancel_Flow_Through_The_Module_And_Event_Loop()
     {
         var html = @"<!DOCTYPE html>

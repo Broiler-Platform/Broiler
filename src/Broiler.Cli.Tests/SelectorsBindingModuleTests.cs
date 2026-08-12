@@ -31,22 +31,6 @@ public sealed class SelectorsBindingModuleTests
     }
 
     [Fact]
-    public void Selectors_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsQuerySelector126Core", "JsJsObjectsQuerySelectorAll127Core",
-                     "JsJsObjectsMatches128Core", "JsJsObjectsClosest129Core",
-                     "JsJsObjectsGetElementsByTagName133Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Selector_API_Flows_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body>" +

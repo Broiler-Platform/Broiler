@@ -23,21 +23,6 @@ public sealed class AnimationObjectBindingModuleTests
     }
 
     [Fact]
-    public void Animation_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationGetCurrentTime152Core", "JsRegistrationSetCurrentTime153Core",
-                     "JsRegistrationThen154Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void CurrentTime_And_Ready_Then_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

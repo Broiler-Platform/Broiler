@@ -28,20 +28,6 @@ public sealed class WindowScrollBindingModuleTests
     }
 
     [Fact]
-    public void Scroll_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationScroll133Core", "JsRegistrationScrollTo134Core", "JsRegistrationScrollBy135Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void ScrollTo_ScrollBy_And_Scroll_Update_The_Offset_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

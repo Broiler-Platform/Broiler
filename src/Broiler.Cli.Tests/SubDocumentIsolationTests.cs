@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// pin: the sentinel is gone from the tree; <c>contentDocument</c> still works; subframe geometry still
 /// composes; and <c>srcdoc</c> serialization + reassignment still round-trip through the map.
 /// </summary>
-public sealed class SubDocumentSeverMigrationTests
+public sealed class SubDocumentIsolationTests
 {
     private const string FrameHost = """
 <!DOCTYPE html>

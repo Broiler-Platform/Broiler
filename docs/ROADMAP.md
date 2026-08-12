@@ -445,25 +445,40 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    generator does not recurse below the repository root.
 
 7. **Consolidate the remaining historical wrappers (component owners).**
-   Audit `PhaseZero`, `Phase1`, cutover, removal, migration, and diagnostic
-   suites method by method. Delete assertions that only prove an
-   already-completed file layout or migration, move durable behavior to the
-   owning component, and rename retained tests for the behavior they protect.
-   Do not delete Broiler Code or formatting-code measurement harnesses without
-   separate evidence that their current budget or fixture is superseded.
-   - The largest single surface is unnamed above and sizes this batch: the 58
-     `src/Broiler.Cli.Tests/*BindingModuleTests.cs` files carry 250 cases, of
-     which 47 assert only that a private member was moved off the bridge and 34
-     assert only that a type is internal or co-located. Roughly a third of the
-     batch is there. The `*RemovalTests`/`*MigrationTests` group and
-     `DomExtractionPhaseZeroTests` are the same shape.
-   - Resolve duplicated tombstones toward the guard suites the keep boundary
-     already protects rather than deleting both copies, and say explicitly where
-     `HtmlBridgePromotionPhaseZeroTests` lands — it is currently neither kept nor
-     listed for audit.
-   - `scripts/run-rf-dom-validation.ps1` asserts a minimum discovered-test count
-     and `run-rf-css-validation.ps1` filters on a phase name; both break on the
-     renames this batch performs. Update them in the same change.
+   *Landed.* Audited `PhaseZero`, cutover, removal, migration, and diagnostic
+   suites method by method: deleted the assertions that only prove an
+   already-completed migration, kept the behavior, and renamed the suites for
+   what they protect. Broiler Code and formatting-code measurement harnesses
+   were left alone, having no evidence their budget or fixture is superseded.
+   - The 58 `src/Broiler.Cli.Tests/*BindingModuleTests.cs` files went from 250
+     cases to 207. The 45 deleted asserted only that a private, generated-looking
+     callback name — `JsRegistrationGetCurrentTime152Core` and its like — is
+     absent from `DomBridge`. Nothing will reintroduce a method by that name, and
+     the module that replaced it is separately asserted to exist, be internal,
+     and live in the right namespace and assembly. Two similarly named tests were
+     kept and renamed: they assert *state ownership* — that the feature module
+     holds the registry field and the bridge does not — which is a live
+     encapsulation property rather than a name tombstone.
+   - **The `*RemovalTests`/`*MigrationTests` group is not the same shape**, which
+     is worth recording because the batch was scoped as if it were. Across those
+     nine suites, 54 cases, exactly four were tombstones. The rest test DOM node
+     types, `ownerDocument` resolution across iframes, child and sibling
+     navigation, `innerHTML` round-trips, doctype and fragment semantics, and
+     serialization stability. Their *names* were the problem, not their contents,
+     so all nine were renamed and only the four tombstones deleted.
+   - Duplicated tombstones were resolved toward the guard suites, not deleted
+     twice: the `DomElement`/`HtmlTreeBuilder` removal is now asserted once, and
+     so is the `ElementRuntimeState` absence. `HtmlBridgePromotionPhaseZeroTests`
+     is a boundary guard in substance — three seam-removal guards plus three
+     dependency-direction guards — so it is renamed `HtmlBridgeOwnershipGuardTests`
+     and joins the keep boundary below, resolving the question of where it lands.
+   - `scripts/run-rf-dom-validation.ps1`'s `dom-boundary` group is updated for the
+     renames. Its `MinimumTests` was **already unsatisfiable**: it demanded 20
+     discovered tests from a filter that matched 18. It now matches 24 and demands
+     23. Its one failure, `Core_JavaScript_Dependencies_Are_Frozen_For_Dom_Extraction`,
+     is pre-existing and unrelated. `run-rf-css-validation.ps1`'s
+     `Phase5SharedCascade` term still resolves — `Phase5SharedCascadeTests` exists
+     and was not renamed.
 
    **Gate:** every retained test protects current behavior or an explicitly
    supported compatibility boundary, and every removed assertion has
@@ -473,7 +488,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
 `GraphicsAbstractionTests` (75 of its 86 methods), the current diagnostic portion
 of `GraphicsBackendCutoverTests` — which includes the renamed capture-metadata
 fact, the only `renderBackend` sidecar coverage in the repository — the
-`SharedGeometryStatics` collection, HtmlBridge architecture/boundary/API guards,
+`SharedGeometryStatics` collection, HtmlBridge architecture/boundary/ownership/API guards,
 or behavior-focused suites solely because their names contain a historical phase.
 Keep `UseSharedLayoutGeometry` and its five production branches; it is not part
 of batch 4. Keep `tests/wpt`, `tests/wpt-baseline`, `tests/m0-baseline`,

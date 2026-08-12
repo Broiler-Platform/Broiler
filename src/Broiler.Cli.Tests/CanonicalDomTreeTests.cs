@@ -6,29 +6,17 @@ using Broiler.JavaScript.Engine;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// Characterization tests for the extraction end state. The RF-BRIDGE-1c effort
-/// removed the <c>DomElement</c> compatibility facade and the <c>HtmlTreeBuilder</c>
-/// materializer at the <c>htmlbridge-public-surface/v2</c> boundary (Phase F4); these
-/// checks assert the facade types are gone and the bridge holds only canonical
-/// <c>Broiler.Dom</c> nodes.
+/// The bridge holds only canonical <c>Broiler.Dom</c> nodes: its element seams surface
+/// <c>Broiler.Dom.DomElement</c>, it parses implicit html/head/body structure with
+/// consistent parent links through the shared <c>HtmlDocumentParser</c>, it owns the
+/// canonical document, and it serializes stably and survives script mutation.
+///
+/// That the removed <c>DomElement</c> facade and <c>HtmlTreeBuilder</c> materializer
+/// cannot silently reappear is asserted once, by
+/// <see cref="HtmlBridgeOwnershipGuardTests"/>, not duplicated here.
 /// </summary>
-public sealed class DomExtractionPhaseZeroTests
+public sealed class CanonicalDomTreeTests
 {
-    [Fact]
-    public void Facade_DomElement_And_HtmlTreeBuilder_Types_Are_Removed_At_V2()
-    {
-        // RF-BRIDGE-1c Phase F4 (final cutover): the Core-owned compatibility facade
-        // Broiler.HtmlBridge.DomElement and the Dom-owned materializer
-        // Broiler.HtmlBridge.HtmlTreeBuilder no longer exist. The bridge builds its
-        // whole tree from canonical Broiler.Dom nodes via the shared HtmlDocumentParser.
-        var coreAssembly = typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime).Assembly;
-        var domAssembly = typeof(DomBridge).Assembly;
-
-        Assert.Null(coreAssembly.GetType("Broiler.HtmlBridge.DomElement"));
-        Assert.Null(domAssembly.GetType("Broiler.HtmlBridge.DomElement"));
-        Assert.Null(domAssembly.GetType("Broiler.HtmlBridge.HtmlTreeBuilder"));
-    }
-
     [Fact]
     public void DomBridge_Exposes_Canonical_Dom_Elements_Only()
     {

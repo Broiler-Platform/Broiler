@@ -20,19 +20,8 @@ namespace Broiler.Cli.Tests;
 /// navigation, style-collection, serialization and getRootNode paths whose <c>#subdoc-root</c> filters
 /// were removed, on both a normal tree and an iframe host, to pin behaviour-preservation.
 /// </summary>
-public sealed class SubdocRootGuardRemovalTests
+public sealed class NodeNavigationAcrossSubDocumentsTests
 {
-    [Theory]
-    [InlineData("IsSubDocRoot")]
-    [InlineData("IsSubDocRootNode")]
-    public void DomBridge_Has_No_SubdocRoot_TagName_Helper(string methodName)
-    {
-        // The dead sentinel-tag guards must not be reintroduced: no #subdoc-root element is ever
-        // constructed (P4.4b), so any TagName check on it is unreachable.
-        var method = typeof(DomBridge).GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static);
-        Assert.Null(method);
-    }
-
     private static DomBridge Attach(string html, out JSContext context)
     {
         context = new JSContext();

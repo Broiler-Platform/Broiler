@@ -20,30 +20,8 @@ namespace Broiler.Cli.Tests;
 /// sub-document connected / sub-document detached-created / iframe content) plus iframe hit-testing,
 /// which relied on the old null-OwnerDocRoot heuristic.
 /// </summary>
-public sealed class OwnerDocRootRemovalTests
+public sealed class OwnerDocumentResolutionTests
 {
-    [Fact]
-    public void ElementRuntimeState_Has_No_OwnerDocRoot_Field()
-    {
-        // The node-runtime-state composite (formerly ElementRuntimeState) was renamed
-        // InlineStyleRuntimeState by the Phase 2 items 3/4 de-globalization (2026-07-17), once every
-        // non-inline-style concern had been split into its own per-bridge table. Look it up under the
-        // current name; the OwnerDocRoot parallel-state field (P4.4c) must not exist on it.
-        var ers = typeof(DomBridge).Assembly.GetType("Broiler.HtmlBridge.Dom.Runtime.InlineStyleRuntimeState");
-        Assert.NotNull(ers);
-        Assert.Null(ers!.GetProperty("OwnerDocRoot", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
-        Assert.Null(ers.GetField("OwnerDocRoot", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance));
-    }
-
-    [Fact]
-    public void DomBridge_Has_No_AdoptSubtreeIntoDocument_Helper()
-    {
-        // Subtree owner-root propagation is gone: connected nodes derive their owning document from
-        // tree position. The tree-derivation helper must exist in its place.
-        Assert.Null(typeof(DomBridge).GetMethod("AdoptSubtreeIntoDocument", BindingFlags.NonPublic | BindingFlags.Static));
-        Assert.NotNull(typeof(DomBridge).GetMethod("GetOwningDocument", BindingFlags.NonPublic | BindingFlags.Static));
-    }
-
     private static DomBridge Attach(string html, out JSContext context)
     {
         context = new JSContext();

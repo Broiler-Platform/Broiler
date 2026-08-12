@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// bridge — the parsed <c>&lt;!DOCTYPE&gt;</c>, <c>createDocumentType</c>, <c>createHTMLDocument</c>,
 /// <c>cloneNode</c>, and serialization — and pin the observable behaviour across the migration.
 /// </summary>
-public sealed class DoctypeSentinelMigrationTests
+public sealed class DoctypeNodeTests
 {
     private static DomBridge Attach(string html, out JSContext context)
     {

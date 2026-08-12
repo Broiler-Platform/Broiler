@@ -37,11 +37,18 @@ in its own change.
 | `Phase1FixTests` | **Kept.** `ToFixed_NegativeZero_Returns_PositiveString` and `NullByte_In_Regex_Test` are the only coverage of those behaviors in the tree |
 | `scripts/run-rf-layout-validation.ps1`, `scripts/run-rf-css-validation.ps1` | `Acid3CascadeDebugTests` dropped from the `acid3-layout` / `acid3-css-layout` filters, and only its `Without_Important_Higher_Specificity_Red_Wins` allowed-failure entry removed. `Border_Shorthand_Expands_Color_To_Individual_Sides` kept — it belongs to `Acid3CssComplianceTests`, which stays and is still red |
 
-## Batch 2b — Broiler.JS · pending (patch)
+## Batch 2b — Broiler.JS · done (patch `0007`)
 
-`ReproTests`, `ReproT`, `BroilerJS.sln`, the standalone `JIntPerfTests`
-executable, and the status-count reconciliation. `OtherTests/JIntPerfTests/Scripts`
-must survive — the engine benchmark project globs it directly.
+`ReproTests` and `ReproT` deleted — no assertion between them. What `ReproTests`
+was probing (super property lookup in a class field initializer under eval) is
+now `ClassFieldInitializerEvalSuperTests`, six asserting tests, all passing;
+`ReproT`'s regex probes were already covered. `BroilerJS.sln` and the standalone
+`JIntPerfTests` executable deleted, the `Scripts` corpus kept.
+
+`Broiler.JavaScript.Network` and `Broiler.JavaScript.NodePollyfill` were
+deliberately **not** registered in `Broiler.JS.slnx`: neither compiles. Both still
+open `Broiler.JavaScript.Core`, a namespace the engine refactor removed. They were
+only reachable through a solution that could not restore.
 
 ## Batch 3a — Skia-era transition, main repo · done (except `GraphicsAbstractionTests`)
 
@@ -64,11 +71,12 @@ answered before deciding between replacing and removing them. Deleting eleven
 failing tests without that diagnosis risks deleting evidence of a real defect,
 which is the one thing this whole item is written to avoid.
 
-## Batch 3b — Broiler.HTML · pending (patch)
+## Batch 3b — Broiler.HTML · done (patch `0008`)
 
-Three `InternalsVisibleTo("Broiler.HTML.WPF")` entries in
-`Source/Broiler.HTML.{Core,Dom,Orchestration}/Properties/AssemblyInfo.cs`, plus
-stale adapter references in the submodule's README and architecture notes.
+Three `InternalsVisibleTo("Broiler.HTML.WPF")` grants removed, plus the README,
+architecture, graphics-backend, and roadmap text that still advertised the
+deleted adapter as a shipped backend with four public types and its own gate
+entries.
 
 ## Batch 4 — geometry cutover seams · done
 
@@ -77,19 +85,30 @@ stale adapter references in the submodule's README and architecture notes.
 | `SharedGeometryExclusiveCutoverTests.Exclusive_Boxed_Element_Reads_Real_Shared_Geometry` | **Relocated** to `ElementGeometryBindingModuleTests.Boxed_Element_Reads_Real_Shared_Geometry` |
 | `SharedGeometryExclusiveCutoverTests.Exclusive_DisplayNone_Element_Reads_Zero_Not_Estimator` | **Relocated** to `ElementGeometryBindingModuleTests.DisplayNone_Element_Reads_Zero_Geometry`. This was the only coverage anywhere of the `display:none` zero-geometry read |
 | `SharedGeometryExclusiveCutoverTests.DefaultsOn` | Deleted with the flag it asserted |
-| `LayoutGeometryCacheEquivalenceTests` | Deleted. Its two fixtures were **re-expressed**, not dropped, as absolute check-layout assertions in `SharedLayoutGeometryParityTests` — a stronger statement than "cached equals uncached", which loses meaning once there is no uncached path |
+| `LayoutGeometryCacheEquivalenceTests` | Deleted. Its two fixtures were **re-expressed**, not dropped, in `SharedLayoutGeometryParityTests`: two independent read passes over the same document must agree exactly and produce no NaN. "Cached equals uncached" loses meaning once there is no uncached path. They deliberately do **not** assert the fixtures' declared WPT values — those do not hold (margin-collapsing offsets come out 10 where WPT declares 15, and 0 where it declares 3), and those gaps belong to the layout engine, not to this cutover |
 | `DomBridge.UseSharedGeometryExclusively` | Deleted. It gated no production branch at all |
 | `DomBridge.LayoutGeometryCacheEnabled` | Deleted, with the single two-line early return it gated in `WithLayoutGeometryCache` |
 | `SharedGeometryTestCollection` | **Kept.** Comment rewritten to name the suites that really need serialization: the nine `NativeAnchor*`/`NativePositionTry*` pipeline suites and `ZoomBakeVsEngineEquivalenceTests` |
 | `DomBridge.UseSharedLayoutGeometry` | **Kept.** It gates five live production branches and is toggled from a second assembly. Two stale comments claiming it defaults to disabled were corrected |
 
-## Batch 5 — browser WebAssembly phases · pending
+## Batch 5 — browser WebAssembly phases · done
 
-Blocked on a decision, not on effort: `Broiler.BrowserWasm.Phase0.csproj` pins 28
-project references and is the only thing compiling the Broiler.UI closure against
-the `browser-wasm` runtime identifier. Deleting it takes
-`Broiler.WebAssembly.Tests.slnx` from 58 projects to about 7 and removes that
-check with no replacement. "Loads and builds" does not detect the loss.
+18 tracked files deleted, the two phase-zero roots removed from the manifest, and
+`Broiler.WebAssembly.Tests.slnx` regenerated from 58 projects to 7.
+
+The blocking concern did not survive checking. Phase 0's 28 pinned project
+references were thought to be the only thing compiling the Broiler.UI closure
+against the `browser-wasm` runtime identifier; in fact its browser-RID build
+compiles a single empty marker class, no workflow ever built it with that RID,
+and no workflow builds that solution at all. The live closure check is
+`src/Broiler.Writer.WebAssembly`, published for `browser-wasm` by the
+preview-package workflow over a comparably wide Broiler.UI graph.
+
+Genuinely lost: the normalized input-trace baseline over the `UiInputEvent`
+projection. The render-list half is covered by `Broiler.Graphics.WebAssembly.Tests`.
+Even the input trace was never enforced — its generator failed before comparison,
+so the committed blobs were compared against nothing. Rebuilding it is now a next
+action on the Browser WebAssembly item.
 
 ## Batch 6 — historical generated output · done
 
@@ -102,8 +121,19 @@ check with no replacement. "Loads and builds" does not detect the loss.
 | `tests/octane/jint-host` | **No change.** Unregistered by design, with the reason recorded in the project file: it references no repository project and is built directly by `scripts/run-octane-benchmarks.sh` |
 | `tests/wpt-baseline` | Untouched |
 
-## Batch 7 — consolidation · pending
+## Batch 7 — consolidation · done
 
-Sized by the 58 `src/Broiler.Cli.Tests/*BindingModuleTests.cs` files: 250 cases,
-of which 47 assert only that a private member moved off the bridge and 34 assert
-only that a type is internal or co-located.
+`*BindingModuleTests`: 250 cases to 207. The 45 removed asserted only that a
+private generated-looking callback name is absent from `DomBridge`. Two similarly
+named tests were kept and renamed — they assert state *ownership*, which is live.
+
+The `*RemovalTests`/`*MigrationTests` group turned out **not** to be the same
+shape: of 54 cases across nine suites, four were tombstones and the rest test real
+DOM behavior. All nine were renamed for what they protect; only the four were
+deleted.
+
+Duplicated tombstones resolved toward the guard suites.
+`HtmlBridgePromotionPhaseZeroTests` is a boundary guard in substance and is now
+`HtmlBridgeOwnershipGuardTests`, added to the keep boundary.
+`scripts/run-rf-dom-validation.ps1`'s `dom-boundary` group was already demanding
+20 tests from a filter matching 18; it now matches 24 and demands 23.

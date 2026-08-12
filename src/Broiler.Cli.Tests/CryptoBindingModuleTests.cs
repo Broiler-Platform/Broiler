@@ -25,14 +25,6 @@ public sealed class CryptoBindingModuleTests
     }
 
     [Fact]
-    public void GetRandomValues_Callback_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        Assert.Null(bridge.GetMethod("JsRegistrationGetRandomValues150Core",
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static));
-    }
-
-    [Fact]
     public void Crypto_GetRandomValues_And_RandomUUID_Work_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

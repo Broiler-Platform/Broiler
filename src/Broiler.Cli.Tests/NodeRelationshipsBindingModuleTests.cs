@@ -31,23 +31,6 @@ public sealed class NodeRelationshipsBindingModuleTests
     }
 
     [Fact]
-    public void NodeRelationships_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsContains073Core", "JsJsObjectsCompareDocumentPosition074Core",
-                     "JsJsObjectsIsSameNode075Core", "JsJsObjectsNormalize076Core",
-                     "JsJsObjectsIsEqualNode077Core", "JsJsObjectsGetRootNode078Core",
-                     "JsJsObjectsCloneNode079Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void NodeRelationships_Flow_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body>" +

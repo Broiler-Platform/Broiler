@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// characterise the behaviours the removal must preserve.
 /// </summary>
 [Xunit.Collection("SharedGeometryStatics")]
-public sealed class InnerHtmlParallelStateRemovalTests
+public sealed class CanonicalChildContentTests
 {
     private static DomElement? FindById(DomNode node, string id)
     {

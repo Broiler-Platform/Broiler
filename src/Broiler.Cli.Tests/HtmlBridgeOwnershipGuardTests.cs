@@ -19,7 +19,7 @@ namespace Broiler.Cli.Tests;
 /// <c>docs/architecture/htmlbridge.md#public-v2-seam</c> for the seam
 /// inventory, caller catalog, and ownership rationale.
 /// </summary>
-public sealed class HtmlBridgePromotionPhaseZeroTests
+public sealed class HtmlBridgeOwnershipGuardTests
 {
     /// <summary>
     /// The canonical DOM/CSS/JS assembly names. Guard tests reflect over the
@@ -95,7 +95,6 @@ public sealed class HtmlBridgePromotionPhaseZeroTests
         ];
 
         Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.ElementRuntimeState"));
-        Assert.Null(bridgeAssembly.GetType("Broiler.HtmlBridge.Dom.Runtime.ElementRuntimeState"));
         Assert.All(runtimeStateTypes, typeName =>
         {
             var runtimeState = bridgeAssembly.GetType(typeName);

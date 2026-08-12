@@ -28,17 +28,6 @@ public sealed class ShadowDomBindingModuleTests
     }
 
     [Fact]
-    public void ShadowDom_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[] { "JsJsObjectsGetShadowRoot019Core", "JsJsObjectsAttachShadow087Core" })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void AttachShadow_Open_Exposes_The_Root_And_Rejects_A_Second_Attach()
     {
         var html = @"<!DOCTYPE html>

@@ -29,22 +29,6 @@ public sealed class DocumentQueryBindingModuleTests
     }
 
     [Fact]
-    public void Query_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationGetElementById006Core", "JsRegistrationGetElementsByTagName007Core",
-                     "JsRegistrationGetElementsByClassName008Core", "JsRegistrationQuerySelector009Core",
-                     "JsRegistrationQuerySelectorAll010Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Queries_Find_Elements_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

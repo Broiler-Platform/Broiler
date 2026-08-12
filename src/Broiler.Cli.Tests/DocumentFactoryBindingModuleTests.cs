@@ -29,22 +29,6 @@ public sealed class DocumentFactoryBindingModuleTests
     }
 
     [Fact]
-    public void Factory_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsRegistrationCreateElement014Core", "JsRegistrationCreateTextNode015Core",
-                     "JsRegistrationCreateAttribute016Core", "JsRegistrationCreateDocumentFragment017Core",
-                     "JsRegistrationCreateElementNS051Core", "JsRegistrationCreateAttributeNS052Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Factories_Construct_Nodes_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

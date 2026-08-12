@@ -29,21 +29,6 @@ public sealed class IframeElementBindingModuleTests
     }
 
     [Fact]
-    public void Iframe_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsGetContentDocument135Core", "JsJsObjectsGetContentWindow136Core",
-                     "JsJsObjectsGetSVGDocument137Core", "JsJsObjectsSetSrc139Core", "JsJsObjectsSetSrcdoc141Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Iframe_ContentDocument_ContentWindow_And_GetSVGDocument_Resolve_Same_Origin()
     {
         var html = @"<!DOCTYPE html>

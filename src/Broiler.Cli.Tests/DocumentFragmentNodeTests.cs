@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 /// child manipulation, unpack-on-insert, querying, cloneNode, and Range-produced fragments — and pin
 /// the observable behaviour across the migration.
 /// </summary>
-public sealed class DocumentFragmentSentinelMigrationTests
+public sealed class DocumentFragmentNodeTests
 {
     private static DomBridge Attach(string html, out JSContext context)
     {

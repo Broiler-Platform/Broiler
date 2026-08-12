@@ -28,15 +28,6 @@ public sealed class ComputedStyleBindingModuleTests
     }
 
     [Fact]
-    public void ComputedStyle_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        Assert.Null(bridge.GetMethod("JsRegistrationGetComputedStyle121Core", all));
-        Assert.Null(bridge.GetMethod("JsElementInterfacesCallback062Core", all));
-    }
-
-    [Fact]
     public void Img_Width_Height_Report_Used_Dimension_With_Attribute_Fallback()
     {
         var html = @"<!DOCTYPE html>

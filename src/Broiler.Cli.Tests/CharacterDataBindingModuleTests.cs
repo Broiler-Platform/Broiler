@@ -28,22 +28,6 @@ public sealed class CharacterDataBindingModuleTests
     }
 
     [Fact]
-    public void CharacterData_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(Broiler.HtmlBridge.DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsGetData045Core", "JsJsObjectsSetData046Core", "JsJsObjectsGetLength047Core",
-                     "JsJsObjectsSplitText048Core", "JsJsObjectsSubstringData049Core", "JsJsObjectsAppendData050Core",
-                     "JsJsObjectsDeleteData051Core", "JsJsObjectsInsertData052Core", "JsJsObjectsReplaceData053Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void CharacterData_Interface_Flows_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

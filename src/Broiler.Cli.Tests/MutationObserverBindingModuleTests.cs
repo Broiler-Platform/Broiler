@@ -34,7 +34,7 @@ public sealed class MutationObserverBindingModuleTests
     }
 
     [Fact]
-    public void Observer_Registry_Moved_Off_The_Bridge_Into_The_Module()
+    public void Observer_Registry_Is_Owned_By_The_Module_Not_The_Bridge()
     {
         // The MutationObserverHub state authority is now owned by the feature module, not the bridge.
         var hubType = typeof(DomBridge).Assembly.GetType("Broiler.HtmlBridge.Dom.Runtime.MutationObserverHub");

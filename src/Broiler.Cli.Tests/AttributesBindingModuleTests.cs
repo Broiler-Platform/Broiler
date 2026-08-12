@@ -142,27 +142,6 @@ public sealed class AttributesBindingModuleTests
     }
 
     [Fact]
-    public void Element_Attribute_Callbacks_Moved_Off_The_Bridge()
-    {
-        var bridge = typeof(DomBridge);
-        const BindingFlags all = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
-        foreach (var name in new[]
-                 {
-                     "JsJsObjectsSetAttribute027Core", "JsJsObjectsGetAttribute028Core",
-                     "JsJsObjectsGetAttributeNode029Core", "JsJsObjectsGetAttributeNodeNS030Core",
-                     "JsJsObjectsHasAttribute060Core", "JsJsObjectsRemoveAttribute063Core",
-                     "JsJsObjectsToggleAttribute064Core", "JsJsObjectsSetAttributeNode065Core",
-                     "JsJsObjectsSetAttributeNodeNS066Core", "JsJsObjectsRemoveAttributeNode067Core",
-                     "JsJsObjectsRemoveAttributeNodeNS068Core", "JsJsObjectsSetAttributeNS069Core",
-                     "JsJsObjectsGetAttributeNS070Core", "JsJsObjectsRemoveAttributeNS071Core",
-                     "JsJsObjectsHasAttributeNS072Core",
-                 })
-        {
-            Assert.Null(bridge.GetMethod(name, all));
-        }
-    }
-
-    [Fact]
     public void Element_Attribute_Methods_Flow_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";

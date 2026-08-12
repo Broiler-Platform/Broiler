@@ -41,7 +41,7 @@ public sealed class TraversalBindingModuleTests
     }
 
     [Fact]
-    public void Traversal_Scoped_State_Moved_Off_The_Bridge_Into_The_Module()
+    public void Traversal_Scoped_State_Is_Owned_By_The_Module_Not_The_Bridge()
     {
         // The active-range and active-node-iterator registries are now owned by the feature module;
         // the bridge no longer declares those weak-reference lists.
