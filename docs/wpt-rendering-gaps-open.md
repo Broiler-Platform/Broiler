@@ -361,8 +361,9 @@ the two defects at the end of this entry.
   - **Five of the 14 losses were passing by rendering nothing** — test and reference both blank, so
     they matched at 100%. They now render real content and expose the two separate bugs below.
   - **The other nine are sub-1.5% differences** just under the 99% threshold. One test moved
-    materially without changing state and is worth a look:
-    `css-images/cross-fade-natural-size` 96.0% → 76.0%, failing either way.
+    materially without changing state — `css-images/cross-fade-natural-size`, 96.0% → 76.0% — and it
+    is [diagnosed below](#cross-fade-is-unimplemented-and-chromium-does-not-implement-it-either): not
+    a regression, the same blank-on-blank artefact disappearing.
 - **The eleven tests this started from still do not pass**, and that is the honest result: the
   `<polygon>` now renders, but they are blocked on the two defects below. Four improved against the
   Chromium golden — `transform-root-bg-001`/`-004` and `transform-background-007` from 49.1% to 60.8%,
@@ -416,6 +417,47 @@ reference, and the two disagree. Not triaged further:
 
 The last belongs to the [`massive-element-*` family](#the-snapshot-clone-lays-its-children-out-horizontally);
 the other five are unexamined.
+
+### `cross-fade()` is unimplemented, and Chromium does not implement it either
+
+- **Test:** `css-images/cross-fade-natural-size`. Failing on CI in **both** suites before this work and
+  after it; only the local reftest percentage moved, 96.0% → 76.0%.
+- **The move is not a regression.** The test's `::before` content is
+  `cross-fade(75% url(…), 25% url(…))` over two `data:image/svg+xml` documents, and its reference is a
+  single pre-composited SVG. Every SVG in both files is written with **single-quoted attributes**, so
+  before [the quoting fix](#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed) neither
+  side drew anything and two blank canvases matched at 96%. The reference draws now; the test still
+  does not, because **nothing in the engine parses `cross-fade()`** — there is no such symbol in
+  `Broiler.CSS`, `Broiler.Layout` or `Broiler.HTML`.
+- **Chromium fails this reftest too, and by more.** Rendering all four documents:
+
+  | | match |
+  | --- | --- |
+  | Chromium test vs Chromium reference | **67.8%** |
+  | Broiler test vs Broiler reference | 76.0% |
+  | Broiler test vs Chromium test — *what the golden suite scores* | 95.7% |
+  | Broiler reference vs Chromium reference | 67.4% |
+
+  Chromium's render of the test is 99.19% white: it does not implement the CSS Images 4 percentage
+  syntax either, so the declaration is dropped. The two engines agree closely on the *test* (95.7%)
+  precisely because both render nothing — which is why the golden score is nowhere near as alarming as
+  the reftest one. **Both engines fail this test**, so it belongs with the pair below rather than being
+  read as something this work broke.
+- **The reference render exposes three separate `SvgRenderer` gaps**, each small and each now visible
+  because the document finally parses. The reference asks for tinted rects over a black background and
+  Broiler paints solid colours on white:
+  - **`fill-opacity` is unhandled** — the green rect paints `rgb(0,128,0)` where it should be 50% over
+    black. Only `flood-opacity` on an `feFlood` is read today.
+  - **`mix-blend-mode` on a shape is unhandled**, so the `screen` compositing the reference relies on
+    does not happen.
+  - **`style="background: …"` on the root `<svg>` is not painted**, leaving white where the reference
+    wants black.
+
+  Those three are worth more than this test: they apply to every SVG document Broiler renders, inline
+  or as an image. They are the reason `Broiler reference vs Chromium reference` is only 67.4%.
+- **Exit gate:** `fill-opacity`, `mix-blend-mode` and a root `<svg>` background all render, which takes
+  the reference to Chromium's; `cross-fade()` is a separate feature and a separate decision, given
+  Chromium does not implement this syntax.
 
 ### Two where both engines fail the test
 
