@@ -91,6 +91,189 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(17, word.Height, 3);
     }
 
+    // ─────────── CSS2.1 §10.4/§10.7: min-/max-* on an inline replaced element ───────────
+    //
+    // These are WPT css-sizing/block-image-percentage-max-height-inside-inline and
+    // css-sizing/image-percentage-max-height-in-anonymous-block, which both put a 1×1 image with
+    // `height: 1000px; max-width: 100px; max-height: 100%` inside a 100px-tall <div> and expect a
+    // 100px green square. Every expectation below was taken from Chromium rather than read off the
+    // spec — which is how the third case got written down correctly.
+
+    /// <summary>The image sits in <c>div{height:100px}</c> → (optionally an anonymous block) → img,
+    /// which is the shape both WPT tests build.</summary>
+    private static CssRectImage MeasureInDefiniteBlock(
+        string width, string height, string maxWidth, string maxHeight,
+        bool throughAnonymousBlock, double imageWidth = 1, double imageHeight = 1)
+    {
+        var environment = new FakeLayoutEnvironment(new ImageIntrinsics(imageWidth, imageHeight, true));
+
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Display = "block",
+            Size = new SizeF(400, 400),
+            LayoutEnvironment = environment,
+        };
+        var definite = new CssBox(root, new HtmlTag("div", false, null), BaseUrl)
+        {
+            Display = "block",
+            Width = "100px",
+            Height = "100px",
+            Size = new SizeF(100, 0),
+            LayoutEnvironment = environment,
+        };
+        // An anonymous block has no HtmlTag and never an author height, so it must not be the
+        // percentage basis — the walk has to climb past it to the <div>.
+        var parent = throughAnonymousBlock
+            ? new CssBox(definite, null, BaseUrl) { Display = "block", LayoutEnvironment = environment }
+            : definite;
+
+        var box = new CssBox(parent, new HtmlTag("img", true, null), BaseUrl)
+        {
+            Display = "inline",
+            Width = width,
+            Height = height,
+            MaxWidth = maxWidth,
+            MaxHeight = maxHeight,
+            LayoutEnvironment = environment,
+        };
+        var word = new CssRectImage(box) { Image = new object() };
+
+        CssLayoutEngine.MeasureImageSize(environment, word);
+        return word;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_Percentage_Max_Height_Resolves_Against_The_Nearest_Definite_Element(bool throughAnonymousBlock)
+    {
+        var word = MeasureInDefiniteBlock("auto", "1000px", "100px", "100%", throughAnonymousBlock);
+
+        Assert.Equal(100, word.Width, 3);
+        Assert.Equal(100, word.Height, 3);
+    }
+
+    // A stated height is the author's: max-width shortens the ratio-derived width and leaves it be.
+    [Fact]
+    public void Max_Width_Shortens_The_Derived_Width_Only()
+    {
+        var word = MeasureInDefiniteBlock("auto", "1000px", "100px", "none", throughAnonymousBlock: false);
+
+        Assert.Equal(100, word.Width, 3);
+        Assert.Equal(1000, word.Height, 3);
+    }
+
+    // Both axes auto and both maximums violated: §10.4's table, which keeps the ratio rather than
+    // taking one bound per axis (that would be 120×100 here).
+    [Fact]
+    public void Both_Maximums_Violated_Keeps_The_Intrinsic_Ratio()
+    {
+        var word = MeasureInDefiniteBlock("auto", "auto", "120px", "100px", throughAnonymousBlock: false,
+            imageWidth: 8000, imageHeight: 8000);
+
+        Assert.Equal(100, word.Width, 3);
+        Assert.Equal(100, word.Height, 3);
+    }
+
+    // CSS2.1 §10.7: with nothing definite above it, a percentage max-height is `none`.
+    [Fact]
+    public void A_Percentage_Max_Height_Against_An_Indefinite_Ancestor_Does_Not_Clamp()
+    {
+        var environment = new FakeLayoutEnvironment(new ImageIntrinsics(1, 1, true));
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Display = "block",
+            Size = new SizeF(400, 400),
+            LayoutEnvironment = environment,
+        };
+        var autoHeight = new CssBox(root, new HtmlTag("div", false, null), BaseUrl)
+        {
+            Display = "block",
+            LayoutEnvironment = environment,
+        };
+        var box = new CssBox(autoHeight, new HtmlTag("img", true, null), BaseUrl)
+        {
+            Display = "inline",
+            Height = "1000px",
+            MaxHeight = "10%",
+            LayoutEnvironment = environment,
+        };
+        var word = new CssRectImage(box) { Image = new object() };
+
+        CssLayoutEngine.MeasureImageSize(environment, word);
+
+        Assert.Equal(1000, word.Height, 3);
+    }
+
+    // ParseLength resolves an unrecognised unit to 0px, so a keyword max-* must be rejected before
+    // it reaches the parser rather than clamping the image out of existence.
+    [Theory]
+    [InlineData("fit-content")]
+    [InlineData("max-content")]
+    [InlineData("stretch")]
+    public void A_Keyword_Max_Width_Leaves_The_Image_Alone(string keyword)
+    {
+        var word = MeasureInDefiniteBlock("auto", "auto", keyword, "none", throughAnonymousBlock: false,
+            imageWidth: 40, imageHeight: 20);
+
+        Assert.Equal(40, word.Width, 3);
+        Assert.Equal(20, word.Height, 3);
+    }
+
+    // The other half of that guard: zero is min-*'s initial value but a real clamp for max-*, so it
+    // must not be filtered out with the keywords (WPT CSS2/normal-flow/max-height-101).
+    [Fact]
+    public void A_Zero_Max_Height_Clamps_To_Nothing()
+    {
+        var word = MeasureInDefiniteBlock("auto", "auto", "none", "0", throughAnonymousBlock: false,
+            imageWidth: 40, imageHeight: 20);
+
+        Assert.Equal(0, word.Height, 3);
+    }
+
+    // CSS2.1 §10.3.8/§10.6.5: an absolutely positioned replaced element is sized by the *replaced*
+    // rules — the insets decide where it goes, never how big it is, and `right`/`bottom` are what
+    // give way when they over-constrain. Broiler used to solve the §10.3.7 inset equation for it
+    // (stretching an `<img left:4em; right:0; top:4em; bottom:0>` across the whole inset box) or, if
+    // `right` was absent, shrink-to-fit it against its non-existent children and get zero — which
+    // is why an `<img position:absolute; left:4em; top:4em>` painted nothing at all.
+    // WPT CSS2/positioning/abspos-025 and the 22 `absolute-replaced-*` tests pin the rendering; this
+    // pins the sizing rule the call sites now share.
+    [Theory]
+    [InlineData("auto", "auto", 15d, 15d)]
+    [InlineData("40px", "auto", 40d, 40d)]
+    [InlineData("auto", "40px", 40d, 40d)]
+    public void An_Abspos_Replaced_Box_Is_Sized_By_Its_Natural_Size_Not_By_Its_Insets(
+        string width, string height, double expectedWidth, double expectedHeight)
+    {
+        var environment = new FakeLayoutEnvironment(new ImageIntrinsics(15, 15, true));
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Display = "block",
+            Size = new SizeF(400, 400),
+            LayoutEnvironment = environment,
+        };
+        var box = new CssBox(root, new HtmlTag("canvas", false, null), BaseUrl)
+        {
+            Display = "block",
+            Position = "absolute",
+            Left = "64px",
+            Right = "0",
+            Top = "64px",
+            Bottom = "0",
+            Width = width,
+            Height = height,
+            IntrinsicReplacedSize = new SizeF(15, 15),
+            LayoutEnvironment = environment,
+        };
+
+        box.ResolveReplacedContentSize(box.IntrinsicReplacedSize.Value, 400,
+            out double contentWidth, out double contentHeight);
+
+        Assert.Equal(expectedWidth, contentWidth, 3);
+        Assert.Equal(expectedHeight, contentHeight, 3);
+    }
+
     // Minimal ILayoutEnvironment: a fixed font, and the one image's intrinsics.
     private sealed class FakeLayoutEnvironment(ImageIntrinsics intrinsics) : Broiler.Layout.ILayoutEnvironment
     {

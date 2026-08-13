@@ -40,8 +40,9 @@
   [#1538 (2026-08-05)](#the-next-run-issue-1538-2026-08-05),
   [#1562 (2026-08-07)](#the-next-run-issue-1562-2026-08-07),
   [#1612 (2026-08-12)](#the-next-run-issue-1612-2026-08-12),
-  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12) and
-  [#1618 (2026-08-12)](#the-next-run-issue-1618-2026-08-12). Where a re-run
+  [#1615 (2026-08-12)](#the-next-run-issue-1615-2026-08-12),
+  [#1618 (2026-08-12)](#the-next-run-issue-1618-2026-08-12) and
+  [#1624 (2026-08-12)](#the-next-run-issue-1624-2026-08-12). Where a re-run
   contradicts something below, the section says so and the row here is struck
   through — read the newest section first. #1612 contradicts two of them: the
   frameset test was not a frameset bug, and `image-animation: paused` is no
@@ -49,7 +50,8 @@
   unjudgeable offline, because the runner now performs the substitution itself.
   #1618 stops the pattern repeating: the run reports these verdicts itself now,
   so a test that is right by its own reference is no longer ranked as the run's
-  worst render.
+  worst render — and #1624 is the first list that split produced, three of whose
+  entries turned out to be one replaced element.
 - **Not in scope:** problem 1 (the `DomDocument.CreateElement` crash) is fixed —
   frames no longer parse a non-HTML resource as markup, and `patches/0035-…`
   carried the DOM-layer fix (since applied). Problems 2 and 3 are both per-test
@@ -2456,6 +2458,302 @@ a wrong impression of the engine:
 - **The paged-reftest figure was one release out of date** — 212, not 213
   (`docs/wpt-reftests.md` was updated and the citation here, plus the runner's
   `--help`, were not).
+
+## The next run (issue #1624, 2026-08-12)
+
+7 651 failures, no incomplete shards. This is the **first severity list the
+reference-disagreement split produced** ([#1618](#the-next-run-issue-1618-2026-08-12)):
+40 mismatches are reported under their own *Not ranked* heading, and the 30
+*Biggest problems* above them are tests that really do render wrong. The three
+previous runs' lists were almost entirely tests that had already been triaged and
+judged correct, which is the thing that work was for. It shows in what this run
+was able to be about: an engine defect rather than the reporting of one.
+
+Three of the 30 turned out to be the same element, and two more joined them.
+
+Five of the 30 are fixed here: problems 12, 14 and 15 are one replaced element
+between them, problem 24 turned out to be the same subject seen from the
+out-of-flow side, and problem 29 is unrelated — a whole CSS feature that was
+simply absent.
+
+### Three tests, three defects, one replaced element — problems 12, 14 and 15, **fixed**
+
+- **Tests.** `css-sizing/replaced-max-size-saturation` (8.3 % on CI),
+  `css-sizing/block-image-percentage-max-height-inside-inline` (9.7 %) and
+  `css-sizing/image-percentage-max-height-in-anonymous-block` (9.7 %). Each asks
+  for a 100 px green square; Broiler drew a 1000×1000 or 8000×8000 block, clipped
+  by the viewport into a full-page slab.
+- **None is a reference disagreement.** All three reproduce offline against the
+  `rel=match` reference the test itself declares — **8.6 %, 10.1 % and 10.1 %**,
+  within rounding of CI's numbers. The engine is wrong, not the golden.
+- **The three defects were already named.** The
+  [#1562 problem 30 section](#canvas-is-not-a-replaced-element--problem-30-diagnosed-not-fixed)
+  diagnosed `replaced-max-size-saturation` down to three separate gaps and closed
+  with "left for a session that can do all three". This is that session, and the
+  diagnosis held on all three counts. A fourth turned up on the way.
+
+**1. The min/max pass clamped four properties one at a time.** A replaced box's
+two axes are coupled by its ratio: an axis left `auto` was *derived* from the
+other one, so clamping the stated axis has to re-derive it — and when both axes
+are auto and both maximums are violated, neither clamp can simply win. CSS2.1
+§10.4 settles that with a constraint-violation table that compares how hard each
+bound bites (`max-width/w` against `max-height/h`) and keeps the shape. Broiler
+had no `max-width` arm for a replaced element at all, and applied the other three
+independently. The table now lives in `Broiler.Layout.Engine.ReplacedBoxSizing`,
+shared by the two paths that size a replaced box so they cannot drift.
+
+**2. `max-height` was never applied to an `inline-block`.** `FlowInlineBlock` had
+a `min-height` arm and nothing beside it, so `height: 1000px; max-height: 60px`
+stayed 1000 px tall on an `inline-block` while the same declarations on a
+`display: block` box clamped correctly. That is gap (2) of the three, and it was
+never about replaced elements — every atomic inline-level box had it.
+
+**3. `<canvas>` was not a replaced element.** HTML §4.12.5 makes its
+`width`/`height` content attributes the dimensions of its *bitmap* — its natural
+size — and the Rendering section maps no presentation `width`/`height` for it,
+unlike `<img>` or `<table>`. `DomParser.TranslateAttributes` projected them onto
+CSS `width`/`height` regardless, which made both axes independently *stated*, so
+even a correct §10.4 pass would clamp each on its own and give 120×100 where the
+test wants 100×100. Left alone entirely, a `<canvas>` laid out as a non-replaced
+inline — the one box type `max-width`/`max-height` do not apply to.
+`CorrectCanvasBoxes` now records the attributes as the box's natural size and
+makes it an atomic inline-level box. Only the UA default `display` is replaced; an
+author `display` is theirs to keep.
+
+**4. A percentage `min-`/`max-height` resolved against an anonymous block** — and
+an anonymous block is not an element, has no author height, and so is *always*
+indefinite, which turned the percentage into its initial value (`0` / `none`) and
+made it clamp nothing. Browsers climb to the nearest real element. This is not a
+detail: both percentage-max-height tests are built around an image that lands in
+an anonymous block — one after a sibling `<div>`, one through a `<span>` that a
+block-inside-inline split has to break up — and that is the whole point of having
+two of them. This one is not in the #1562 diagnosis; it only became visible once
+defect 1 stopped masking it.
+
+#### Every expectation here is Chromium's, measured rather than read off the spec
+
+Chromium is installed in this container for the golden-image suite, so each case
+was put to it directly through `getBoundingClientRect` rather than argued from
+§10.4. That was worth doing: it overturned one reading of the spec that looked
+obvious and is wrong (row 2).
+
+| Probe | Chromium | Broiler before | Broiler after |
+| --- | --- | --- | --- |
+| 1×1 img, `max-width:100px; height:1000px; max-height:100%` in a 100 px block | 100×100 | 1000×1000 | **100×100** |
+| 1×1 img, `max-width:100px; height:1000px` (no max-height) | 100×**1000** | 1000×1000 | **100×1000** |
+| `<canvas width=8000 height=8000>`, `max-width:120px; max-height:100px` | 100×100 | 8000×8000 | **100×100** |
+| `<canvas width=400 height=200>`, `max-width:100px` | 100×50 | 400×200 | **100×50** |
+| `<canvas width=400 height=200>`, no CSS | 400×200 | 0-sized inline | **400×200** |
+| `inline-block`, `width:200px; height:1000px; max-height:60px` | 200×60 | 200×1000 | **200×60** |
+| `inline-block`, `height:1000px; max-height:100%` in a 100 px block | 50×100 | 50×1000 | **50×100** |
+| block img in a `<span>`, `max-height:100%` in a 100 px block | 100×100 | 1000×1000 | **100×100** |
+| img, `width:1000px; max-width:100px`, auto height | 100×100 | 1000×1000 | **100×100** |
+
+Row 2 is the one to keep. `height: 1000px; max-width: 100px` on a 1:1 image is
+**100×1000**, not the 100×100 the §10.4 table would give — because the table is
+written for "both `width` and `height` specified as `auto`", and a *stated* axis
+is never re-derived from a clamp on the other one. Applying the table
+unconditionally would have "fixed" three tests and quietly broken every image
+with a stated height and a `max-width`, which is a common shape. The gate on
+`widthIsAuto && heightIsAuto` is the whole difference and it is pinned by a test.
+
+#### Where it landed, and what is on CI now
+
+- **Main repo, live on CI:** `ReplacedBoxSizing` (the table), the replaced
+  block-level/out-of-flow sizing path (`CssBox.ResolveReplacedContentSize`,
+  `TryGetNaturalReplacedSize`, `TryResolveReplacedBorderBoxSize`), the `max-height` arm
+  in `FlowInlineBlock`, `CssBox.ResolveInlineSizeBounds`/`ResolveBlockSizeBounds`
+  (which also stop a keyword `max-width: fit-content` from being parsed as `0px`
+  and collapsing the box — `CssLengthParser` resolves an unrecognised unit to
+  zero), `CssBox.TryGetPercentageBlockSizeBasis` (the anonymous-block walk), and
+  `CssBoxProperties.IntrinsicReplacedSize`.
+- **`Broiler.HTML`, as a patch:** the 61-line `DomParser` change. Its push to
+  `Broiler-Platform/Broiler.HTML` is denied (403 — the submodule remote is outside
+  this session's GitHub scope), so it ships as a patch with the gitlink left
+  unbumped, and it is registered in `scripts/apply-pending-wpt-patches.sh` so the
+  WPT run exercises it rather than the un-fixed pointer. Identify it by its commit
+  subject, *"parse: size a `<canvas>` as a replaced element, not from presentation
+  width/height"* — not by its number, which is recycled.
+- **The type is in the main repo and the call is in the submodule**, deliberately:
+  `IntrinsicReplacedSize` is a main-repo box property, so the submodule patch is
+  the parse-time code that fills it in and nothing else.
+
+#### Verified
+
+- **The three tests pass**, and `css/css-sizing` as a whole goes from **253 to 260
+  of 562** reftests.
+- **`Broiler.Layout.Tests`: 663 passing, 0 failing**, including 25 new cases. The
+  §10.4 table gets one per row of the table plus both orders of each two-bound
+  case; the layout-level ones pin the anonymous-block walk (both with and without
+  the anonymous box, so the walk is doing something), the indefinite-basis case
+  where a percentage must clamp nothing, and the keyword-`max-width` guard.
+- **A 17 077-test reftest sweep across 18 directories** (`css/CSS2`, `css/css-sizing`,
+  `css/css-flexbox`, `css/css-grid`, `css/css-images`, `css/css-backgrounds`,
+  `css/css-display`, `css/css-tables`, `css/css-position`, `css/css-overflow`,
+  `css/css-inline`, `css/css-text`, `css/css-align`, `css/css-ui`, `css/css-box`,
+  `css/css-writing-modes`, `html`, `canvas`), run before and after: **11 674 →
+  11 705 passing**, with **34 newly passing and 3 newly failing**. The 34 are not
+  only the three: unifying the §10.7 clamp picks up ten `CSS2/normal-flow/max-height-*`
+  tests, the percentage-basis walk picks up
+  `css-sizing/intrinsic-height-{abspos,fixedpos}-percentage-child` and two
+  `css-tables/percent-height-replaced-in-percent-cell-*`, and modelling `<canvas>`
+  picks up `css-flexbox/canvas-contain-size`,
+  `css-grid/grid-items/percentage-size-indefinite-replaced` and four
+  `css-sizing/intrinsic-percent-replaced-*`.
+- **The three that regressed are all `<canvas>`, and two of them were passing by
+  rendering nothing** — the trap this document warns about, now sprung in the
+  other direction:
+  - `css-images/object-view-box-writing-mode-canvas` (94.3 %). The test's canvas
+    carries `background-color: black` and the reference's does not; Broiler cannot
+    paint a canvas bitmap, so with the canvas sized at zero *both* sides were blank
+    white and agreed. Giving it its real size paints the black box the test asks
+    for against a reference whose canvas shows a painted bitmap Broiler has no 2D
+    context to produce. Nothing here is a sizing bug.
+  - `css-grid/alignment/grid-align-baseline-005` (92.3 %) is the same in a grid,
+    plus a placement gap it uncovers: the two items land in separate rows where the
+    template asks for one.
+  - `css-sizing/intrinsic-percent-replaced-012` (98.7 %, against a 99 % threshold)
+    is a genuine near-miss on a `display: block` canvas under `height: 100%`.
+- **One rule was tried and removed on the evidence.** Declining the ratio transfer
+  into a percentage block size with no definite basis looked right and improved
+  `grid-align-baseline-005` from 92.3 % to 96.8 % — and cost three other tests
+  (`css-sizing/intrinsic-percent-replaced-008`, `-dynamic-008` and
+  `css-grid/grid-items/percentage-size-indefinite-replaced`, all of which assert
+  that behaviour and all of which want the transfer). It is not in the change. The
+  sweep is what settled it; the reasoning on its own pointed the wrong way twice.
+
+### #1624 problems, at a glance
+
+`rel=match` is this container's reftest-suite result — Broiler against the
+reference the test itself declares, no other engine involved. 19 of the 30 carry
+one; the other 11 can only be judged against a Chromium golden, and are recorded
+as reported. Measured after this run's fix.
+
+| # | Test | CI | `rel=match` | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `css-page/page-margin-002-print` | 0.0% | 89.2% | **won't fix** — a `-print` test scored on screen; unchanged from [#1618](#page-margin-002-print-is-not-the-exception-it-looks-like) |
+| 2 | `css-grid/…/column-subgrid-auto-fill-003` | 0.8% | **94.0%** | open — see the note below; `grid-lanes` is an unshipped draft feature |
+| 3 | `css-grid/…/column-subgrid-orthogonal-writing-mode-004` | 0.9% | **94.8%** | open — same |
+| 4 | `css-view-transitions/view-transition-waituntil-animation-manipulation` | 1.3% | 1.3% | open — view transitions do not capture the document |
+| 5 | `css-view-transitions/root-to-shared-animation-start` | 1.5% | 1.5% | open — same |
+| 6–9 | `css-view-transitions/massive-element-*-of-viewport-partially-onscreen-{new,old}` (4) | 2.0–2.6% | 2.0–2.7% | open — same |
+| 10 | `css-backgrounds/background-image-shared-stylesheet` | 5.7% | 5.7% | open — a script-injected `data:text/css` stylesheet never applies ([re-diagnosed in the audit](#one-test-reclassified-css-backgroundsbackground-image-shared-stylesheet)) |
+| 11 | `filter-effects/svg-filter-filter-units-user-space` | 8.0% | **95.3%** | open — see the note below |
+| 12 | `css-sizing/replaced-max-size-saturation` | 8.3% | **passes (100%)** | **fixed** — this run |
+| 13 | `css-grid/abspos/grid-sizing-positioned-items-001` | 9.1% | — | open — no `rel=match`; judged from CI |
+| 14 | `css-sizing/block-image-percentage-max-height-inside-inline` | 9.7% | **passes (100%)** | **fixed** — this run |
+| 15 | `css-sizing/image-percentage-max-height-in-anonymous-block` | 9.7% | **passes (100%)** | **fixed** — this run |
+| 16 | `cssom-view/scrollIntoView-fixed` | 10.9% | — | open — no `rel=match`; needs scripted scrolling |
+| 17, 20, 23, 28, 30 | `conformance-checkers/html-svg/*-isvalid` (5) | 11.1–19.3% | — | open — no `rel=match`; large inline-SVG documents, not triaged this run |
+| 18, 19 | `css-view-transitions/{new,old}-content-has-scrollbars` (2) | 11.1% | 11.1% | open — view transitions |
+| 21 | `scroll-animations/css/scroll-timeline-nearest-with-absolute-positioned-element` | 11.3% | — | open — no `rel=match` |
+| 22 | `css-grid/…/column-subgrid-auto-fill-008` | 11.5% | 10.4% | open — reproduces; `grid-lanes` track sizing |
+| 24 | `CSS2/positioning/abspos-025` | 13.6% | **passes (99.6%)** | **fixed** — this run; see below |
+| 25, 26 | `conformance-checkers/html/elements/{track,video}/src-isvalid` (2) | 14.4% | — | open — no `rel=match` |
+| 27 | `css-flexbox/percentage-heights-003` | 15.4% | — | open — no `rel=match`; a `check-layout-th.js` test |
+| 29 | `css-overflow/overflow-body-propagation-009` | 18.1% | **passes (100%)** | **fixed** — this run; see below |
+
+**Five fixed, fourteen of the nineteen reproduce against their own reference.**
+That last number is the reference-disagreement split doing its job: before #1618
+this list would have been padded with tests Broiler renders correctly, and now it
+is almost entirely tests it does not.
+
+### An absolutely positioned `<img>` rendered nothing at all — problem 24, **fixed**
+
+- **Test:** `CSS2/positioning/abspos-025`, 13.6 % on CI and 13.7 % against its own
+  reference. An `<img>` with `position: absolute; left: 4em; right: 0; top: 4em;
+  bottom: 0` must keep its natural 15×15 size and let `right`/`bottom` give way
+  (CSS2.1 §10.3.8/§10.6.5); Broiler stretched it across the whole inset box.
+- **Probing it turned up something worse than the test.** The stretch only happens
+  when `right` is set. With `left`/`top` alone — the ordinary way anyone positions
+  an image — an absolutely positioned `<img>` **rendered nothing at all**, and the
+  same was true of a `<canvas>`. That is not in the reported list because no test
+  in the top 30 exercises it; it came out of nine constructed probes measured
+  against Chromium.
+- **Both are the same missing clause, in two places that each say the right thing
+  in a comment and then do not do it.** `ResolveBlockUsedWidth` solves the §10.3.7
+  inset equation "for absolutely positioned, **non-replaced** elements", and falls
+  back to shrink-to-fit "for absolutely positioned **non-replaced** elements with
+  auto width" — but neither branch excluded replaced boxes. With `right` set the
+  first branch stretched the image to the insets; without it the second measured
+  the box's *children*, of which an `<img>` has none, and produced zero. A
+  zero-width box paints no image, which is why nothing appeared.
+- **The fix** routes a block-level or out-of-flow replaced box through the same
+  `CssBox.ResolveReplacedContentSize` the inline path already used, and skips both
+  non-replaced branches for it. `TryGetNaturalReplacedSize` is what makes that
+  possible for an `<img>` as well as a `<canvas>`: the natural size comes from
+  `IntrinsicReplacedSize` when the element declares one and from the decoded
+  bitmap's intrinsics otherwise.
+- **Verified against Chromium on seven inset combinations** — all four insets, each
+  pair, none at all, and `width: 40px` with four insets (40×40: the height follows
+  the width through the ratio). Broiler now matches on every one.
+- **The sweep is what shows the size of it.** Re-running the same 17 077 reftests:
+  **11 705 → 11 749 passing**, and the 45 newly-passing tests are almost entirely
+  the family this rule governs — 22 `CSS2/positioning/absolute-replaced-{width,height}-*`,
+  `abspos-025` and `abspos-026`, six `css-flexbox/flex-aspect-ratio-img-row-*`,
+  four `css-flexbox/flex-minimum-width-flex-items-*`, and
+  `css-position/position-absolute-replaced-no-intrinsic-size.tentative`. Against
+  the run's own baseline that is **+79 newly passing and 4 newly failing**.
+- **The one new failure** is `css-flexbox/flexbox-min-width-auto-002b` at 98.5 %
+  against a 99 % threshold: it measures `min-width: auto` on a flex item that has
+  an intrinsic ratio and a `min-height`, which CSS Flexbox §4.5 resolves through
+  the ratio from the cross axis. Broiler does not implement that transfer, and the
+  item was only landing on the reference by having no natural size to transfer
+  from. Left open — it is a flexbox rule, not a replaced-sizing one.
+
+### `overflow` on `<body>` was never propagated to the viewport — problem 29, **fixed**
+
+- **Test:** `css-overflow/overflow-body-propagation-009`, 18.1 % on CI and 18.1 %
+  against its own reference. `body { overflow: clip }` on a 30×30 body holding a
+  10 000 px child: CSS Overflow 3 §3.3 applies that `overflow` to the **viewport**
+  and leaves the body's own used value `visible`, so the child fills the canvas.
+  Broiler clipped it to the body — 0.3 % of the canvas blue against a reference
+  that is 82 %.
+- **Nothing was propagated, for any value.** Three probes (`hidden`, `clip`,
+  `auto`) all clipped the body's own box, so this is not a missing keyword in a
+  list — the rule was absent.
+- **The fix is a used-value adjustment, and the interesting half is the
+  disqualifications.** The value goes to the viewport, which Broiler already clips
+  at the canvas edge, so propagating means *removing* the body's own clip rather
+  than moving it onto the root element's box — those are different rectangles once
+  the body has margins, and putting it on the root scored 25 % where dropping it
+  scores 100 %. It must also apply to the **first** `<body>` only, and only if that
+  one generates a box: `overflow-body-propagation-016` is a document with two of
+  them where the first is `display: none`, and there the second has to keep its own
+  `overflow: hidden`. A first pass without that guard fixed 009 and broke 016.
+- **Sweep: 11 749 → 11 750 passing, +4 and −3.** The gains are 009 and two more of
+  its own family (`-014`, `-015`) plus `css-sizing/fit-content-block-size-abspos`.
+  The three losses are pre-existing gaps the propagation exposes rather than
+  causes: `css-flexbox/flexbox-definite-sizes-003` and `-004` (92.2 %) both set
+  `body { overflow: hidden }` and then resolve a descendant's `max-height: 100%`,
+  which is CSS Flexbox's definite-size rule and not this one, and
+  `css-images/image-orientation/image-orientation-img-object-fit` is at 98.7 %
+  against a 99 % threshold. Net +1 on the sweep, +1 on the reported list, and a
+  feature that was not there before.
+- **What this is not.** The viewport is still not a real clip container in Broiler
+  — it is the canvas edge. That is indistinguishable for a top-level document, and
+  it is why this fix is small; a nested browsing context with its own propagated
+  overflow would need the real thing.
+
+### The split has a threshold, and two entries fall through it
+
+Problems 2, 3 and 11 are the exception, and they are worth a note because they
+point at the next improvement to the report rather than to the renderer. Each
+scores **94–95 % against the reference the test itself declares** while CI reports
+**0.8–8.0 %** against Chromium's golden. A gap that large in that direction is the
+signature of a reference disagreement — but `--verify-reference` only sets
+`suspectReference` when Broiler *reproduces* the declared reference, and
+"reproduces" means clearing the same 99 % pass threshold. At 94 % they do not
+clear it, so they are ranked as though nothing were known about them.
+
+Problems 2 and 3 are `css-grid/grid-lanes`, which
+[#1538 problems 12 and 13](#problems-12-and-13-are-an-unshipped-draft-feature-not-a-layout-bug)
+already established is an unshipped draft feature Chromium drops to `display:
+block` — exactly the shape that produces a permanent 0.x % against a golden.
+Recording the reference score alongside the golden one, rather than only using it
+as a pass/fail gate, would separate "wrong everywhere" from "wrong only against
+Chromium" without needing a second threshold to be tuned. Left for a run that owns
+the report.
 
 ## Reported problems, at a glance
 

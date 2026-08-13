@@ -1,0 +1,157 @@
+From ffa04e728d4899d5689b3c3b71b7e2d2d80ea49d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 12 Aug 2026 21:27:33 +0000
+Subject: [PATCH] parse: size a <canvas> as a replaced element, and mark a
+ blockified inline split
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Two parse-time facts the layout engine needs, both feeding main-repo types.
+
+HTML §4.12.5 gives <canvas> its bitmap dimensions from the width/height content
+attributes (300x150 by default). They are the element's *natural* size, and the
+Rendering section maps no presentation width/height for it — unlike <img> or
+<table>. TranslateAttributes projected them onto CSS width/height anyway, which
+made both axes independently stated, so max-width and max-height clamped each on
+its own instead of keeping the natural ratio: an 8000x8000 canvas under
+`max-width: 120px; max-height: 100px` came out 120x100 where every browser draws
+the 100x100 square WPT css-sizing/replaced-max-size-saturation asks for. Left
+alone entirely, a <canvas> laid out as a non-replaced inline — the one box type
+max-width and max-height do not apply to. CorrectCanvasBoxes now records the
+attributes as CssBox.IntrinsicReplacedSize and makes the box atomic inline-level,
+so the layout engine sizes it through CSS2.1 §10.4. Only the UA default display
+is replaced; an author `display` is theirs to keep. Fallback content between the
+tags is hidden, as in any UA that supports canvas.
+
+CSS2.1 §9.2.1.1: breaking an inline around a block-level child sets the inline's
+own display to block, in both arms of CorrectBlockInsideInlineImp. The element is
+still inline as far as CSS is concerned, so that box must not act as a containing
+block a percentage resolves against — any more than the anonymous blocks the same
+split creates do. CssBox.IsBlockifiedInlineSplit records it. Without it a
+`display: block` <img> inside a <span> inside a `height: 100px` <div> resolved
+its `max-height: 100%` against an indefinite block size, so §10.7 turned it into
+`none` and the image kept its 1000px height (WPT
+css-sizing/block-image-percentage-max-height-inside-inline).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01JHgRgAUtWB14ZWuPrN4f4E
+---
+ .../Parse/DomParser.cs                        | 68 +++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index 7735727..dd827a0 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -121,6 +121,7 @@ internal sealed class DomParser
+             CorrectFramesetBoxes(root);
+             CorrectIframeBoxes(root);
+             CorrectVideoBoxes(root);
++            CorrectCanvasBoxes(root);
+             CorrectProgressBoxes(root, baseUrl);
+             CorrectSelectMultipleBoxes(root, baseUrl);
+ 
+@@ -674,10 +675,20 @@ internal sealed class DomParser
+         if (!tag.HasAttributes())
+             return;
+ 
++        // HTML §4.12.5: a <canvas>'s width/height content attributes are the dimensions of its
++        // *bitmap*, and the Rendering section maps no presentation width/height for it — unlike
++        // <img>, <table> and the rest below. Projecting them onto CSS width/height made the two axes
++        // independently stated, so `max-width`/`max-height` clamped each on its own instead of
++        // keeping the natural ratio; CorrectCanvasBoxes records them as the natural size instead.
++        bool isCanvas = tag.Name.Equals("canvas", StringComparison.OrdinalIgnoreCase);
++
+         foreach (string att in tag.Attributes.Keys)
+         {
+             string value = tag.Attributes[att];
+ 
++            if (isCanvas && (att == HtmlConstants.Width || att == HtmlConstants.Height))
++                continue;
++
+             switch (att)
+             {
+                 case HtmlConstants.Align:
+@@ -1015,6 +1026,56 @@ internal sealed class DomParser
+             CorrectVideoBoxes(child);
+     }
+ 
++    /// <summary>
++    /// HTML §4.12.5: a <c>&lt;canvas&gt;</c> is a replaced element whose <b>natural</b> size is its
++    /// <c>width</c>/<c>height</c> content attributes, defaulting to the 300×150 bitmap. Natural, not
++    /// a CSS width and height: the distinction only shows once <c>max-width</c>/<c>max-height</c>
++    /// clamp it, where the two axes stay tied by the natural ratio (CSS2.1 §10.4), which is what WPT
++    /// <c>css-sizing/replaced-max-size-saturation</c> asserts. Broiler has no 2D context, so the
++    /// bitmap is transparent and only the element's own background and border paint — and, like any
++    /// UA that supports canvas, it never renders the fallback content between the tags. Runs
++    /// post-cascade for the same reason <see cref="CorrectIframeBoxes"/> does: a cascade-time hide of
++    /// a block fallback child can be re-shown afterwards.
++    /// </summary>
++    private static void CorrectCanvasBoxes(CssBox box)
++    {
++        if (box.HtmlTag != null
++            && box.HtmlTag.Name.Equals("canvas", StringComparison.OrdinalIgnoreCase))
++        {
++            // Only the UA default display is replaced by the atomic inline-level box; an author
++            // `display` (block, grid, none, …) is theirs to keep.
++            if (box.Display == CssConstants.Inline)
++                box.Display = CssConstants.InlineBlock;
++
++            box.IntrinsicReplacedSize = new System.Drawing.SizeF(
++                CanvasBitmapDimension(box, "width", 300),
++                CanvasBitmapDimension(box, "height", 150));
++
++            foreach (var child in box.Boxes)
++                child.Display = CssConstants.None;
++            return;
++        }
++
++        foreach (var child in box.Boxes)
++            CorrectCanvasBoxes(child);
++    }
++
++    /// <summary>
++    /// HTML §4.12.5: reads a <c>&lt;canvas&gt;</c>'s <c>width</c>/<c>height</c> content attribute as
++    /// a valid non-negative integer, falling back to the default bitmap dimension when it is absent,
++    /// malformed or zero (a zero-area canvas has no natural size to size the box from).
++    /// </summary>
++    private static float CanvasBitmapDimension(CssBox box, string attribute, float fallback)
++    {
++        var raw = box.HtmlTag?.TryGetAttribute(attribute);
++
++        return !string.IsNullOrWhiteSpace(raw)
++               && uint.TryParse(raw.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out uint bitmap)
++               && bitmap > 0
++            ? bitmap
++            : fallback;
++    }
++
+     /// <summary>
+     /// Reads a numeric <c>width</c>/<c>height</c> presentation attribute as a pixel length, falling back to
+     /// <paramref name="fallback"/> when the attribute is absent or non-numeric (percentages and other units
+@@ -1611,7 +1672,13 @@ internal sealed class DomParser
+         // Also inherit any split-positioned-ancestor from a higher level.
+         CssBox splitAncestor = wasPositioned ? box : box.SplitPositionedAncestor;
+         if (box.Display == CssConstants.Inline)
++        {
+             box.Display = CssConstants.Block;
++            // The element is still inline as far as CSS is concerned; the block-level display is
++            // an artefact of how this split is modelled. Layout needs to know, because a box like
++            // this is not a containing block a percentage resolves against.
++            box.IsBlockifiedInlineSplit = true;
++        }
+ 
+         if (box.Boxes.Count > 1 || box.Boxes[0].Boxes.Count > 1)
+         {
+@@ -1685,6 +1752,7 @@ internal sealed class DomParser
+         else if (box.Boxes[0].Display == CssConstants.Inline)
+         {
+             box.Boxes[0].Display = CssConstants.Block;
++            box.Boxes[0].IsBlockifiedInlineSplit = true;
+         }
+ 
+         return null;
+-- 
+2.43.0
+
