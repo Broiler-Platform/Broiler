@@ -291,10 +291,11 @@ low score against a golden.
 only reason they matched. Chromium paints substantial content in both. Every one is a
 real gap, and they are now carried in *not fixed*:
 
-- **Eleven share one cause:** [an external SVG used as an image is never
-  decoded](wpt-rendering-gaps-open.md#an-external-svg-used-as-an-image-is-never-decoded).
-  That was the suspicion about the nine entries sitting at exactly 49.1%, and it was
-  right — it is one cause, and it covers eleven.
+- **Eleven share one cause:** [SVG-as-an-image goes through a second, weaker SVG
+  renderer](wpt-rendering-gaps-open.md#svg-as-an-image-goes-through-a-second-weaker-svg-renderer)
+  with no `<polygon>` arm, and a `<polygon>` is the entire content of the file all
+  eleven load. That was the suspicion about the nine entries sitting at exactly
+  49.1%, and it was right — it is one cause, and it covers eleven.
 - **Six more** are individually distinct: [AVIF decode, the CSS Paint API, a canvas
   2D context, `<foreignObject>`, a percentage-sized inline SVG under `perspective`,
   and `backdrop-filter` with a mask](wpt-rendering-gaps-open.md#other-image-formats-and-inline-svg-edge-cases).

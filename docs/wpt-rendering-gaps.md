@@ -156,8 +156,9 @@ are current.
 
 **Three flags held. 25 did not.** Seventeen of the 25 render a blank canvas on both
 sides; eleven of those seventeen share one cause —
-[an external SVG used as an image is never decoded](wpt-rendering-gaps-open.md#an-external-svg-used-as-an-image-is-never-decoded),
-which reaches at least 70 currently-failing tests. Full breakdown:
+[SVG-as-an-image goes through a second, weaker SVG renderer](wpt-rendering-gaps-open.md#svg-as-an-image-goes-through-a-second-weaker-svg-renderer)
+that has no `<polygon>` arm, which reaches at least 70 currently-failing tests. Full
+breakdown:
 [won't fix](wpt-rendering-gaps-wont-fix.md#the-other-28-flags-triaged-2026-08-13--only-three-held).
 
 ## Reproducing one of these locally

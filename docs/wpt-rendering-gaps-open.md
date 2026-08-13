@@ -278,42 +278,58 @@ other direction. None is a sizing bug.
 
 ## Images
 
-### An external SVG used as an image is never decoded
+### SVG-as-an-image goes through a second, weaker SVG renderer
 
-**The largest single cause found in the 2026-08-13 triage** — 11 of the 28
+**Tracked as [issue #1627](https://github.com/Broiler-Platform/Broiler/issues/1627).**
+The largest single cause found in the 2026-08-13 triage — 11 of the 28
 previously-unexamined reference-disagreement flags, and it reaches well beyond them.
 
 - **Tests:** `css-transforms/transform-background-005`, `-006`, `-007`, `-008`;
   `css-transforms/transform-root-bg-001`, `-002`, `-004`;
   `compositing/root-element-background-image-transparency-001` … `-004`. CI 49.1–51.0%.
-  Every one of them loads `support/transform-triangle-{left,down}.svg` as a CSS
-  background.
+  Every one loads `support/transform-triangle-{left,down}.svg` as a CSS background, and
+  that file's entire content is one `<polygon>`.
 - **Broiler renders a blank white canvas for all eleven** — and for their references,
   which is why `--verify-reference` cleared them.
-- **Isolated to one capability, by probe rather than by inference.** Four
-  one-line documents, rendered against the same checkout:
+- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Image/BSvgRasterizer.cs`).
+- **There are two SVG renderers, and only one of them is missing shapes.** Inline
+  `<svg>` markup in a document is rendered by `Broiler.Layout/IR/SvgRenderer.cs`, which
+  handles rect, circle, ellipse, line, path, text, **polygon**, **polyline** and groups.
+  An SVG loaded as an *image* — `background: url(x.svg)`, `<img src=x.svg>` — is routed
+  by `StubImageAdapter` to `BSvgRasterizer` instead, a separate regex-based renderer
+  whose whole element set is `RenderRectangles`, `RenderCircles`, `RenderEllipses`,
+  `RenderLines`, `RenderPaths` and `RenderText`. **Anything else in the file is silently
+  dropped and the bitmap comes back transparent.**
+- **Narrowed by probe rather than inferred.** Six one-line documents against the same
+  checkout:
 
   | Probe | Broiler renders |
   | --- | --- |
   | `html { background: blue }` | 100% blue ✓ |
   | `html { background: url(/images/green.png) }` | 100% green ✓ |
   | inline `<svg><polygon fill=blue …></svg>` | 5.7% blue triangle ✓ |
-  | `html { background: url(support/…​.svg) }` | **100% white ✗** |
-  | `<img src="support/…​.svg" width=200 height=200>` | **100% white ✗** |
+  | `<img src="probe-rect.svg">` (an external SVG holding a `<rect>`) | 5.1% blue ✓ |
+  | `<img src="probe-poly.svg">` (the same square as a `<polygon>`) | **100% white ✗** |
+  | `html { background: url(support/…​.svg) }` (the tests' file) | **100% white ✗** |
 
-  So raster images decode, colour backgrounds paint, and the SVG renderer works on
-  *inline* markup. What fails is specifically **an SVG loaded as an external image
-  resource** — the document is fetched and then nothing rasterises it. The `<img>`
-  case failing identically to the background case says the gap is in the image
-  pipeline, not in background painting.
-- **It is much broader than these eleven.** Of the 3 952 currently-failing tests
-  present in a local checkout, **70 reference an external `.svg` as an image** —
-  concentrated in `css-masking` (20), `css-transforms` (9), `css-images` (8),
-  `html/canvas` (8) and `css-ui` (5). Not all fail *because* of this, but it is the
-  first thing to rule out for any of them.
-- **Exit gate:** `background: url(x.svg)` and `<img src=x.svg>` both paint the
-  document's content, with the eleven tests above matching and a sweep over
-  `css-masking`, `css-images` and `css-transforms` showing no regression.
+  Rows 4 and 5 are the pair that matters: the *same shape*, in the *same position*, as
+  an external SVG image — one paints and one does not. So the file is fetched, sniffed
+  as SVG (`BSvgRasterizer.IsSvgData`) and rasterised; the rasteriser just has no arm for
+  `<polygon>`. An earlier reading of this — "an external SVG is never decoded" — was
+  too strong and is superseded by these two probes.
+- **It is much broader than these eleven.** Of the 3 952 currently-failing tests present
+  in a local checkout, **70 reference an external `.svg` as an image** — concentrated in
+  `css-masking` (20), `css-transforms` (9), `css-images` (8), `html/canvas` (8) and
+  `css-ui` (5). Not all fail *because* of this, but it is the first thing to rule out
+  for any of them, and any element outside the six above will hit it.
+- **Two ways to close it, and the cheap one is not obviously the right one.** Adding
+  `RenderPolygons`/`RenderPolylines` to `BSvgRasterizer` fixes these eleven for a few
+  dozen lines. Routing SVG-as-image through the renderer the inline path already uses
+  retires the duplicate instead — the two will otherwise keep diverging, and this gap is
+  what that divergence looks like.
+- **Exit gate:** the same SVG file renders identically whether it is inline markup or an
+  external image, the eleven tests match, and a sweep over `css-masking`, `css-images`
+  and `css-transforms` shows no regression.
 
 ### Other image formats and inline-SVG edge cases
 
