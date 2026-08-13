@@ -131,6 +131,14 @@ public sealed class ComputedStyle
     /// <summary>The resolved <c>src</c> attribute for image elements, or null if not applicable.</summary>
     public string? ImageSource { get; init; }
 
+    // --- Replaced content placement ---
+
+    /// <summary>CSS Images 3 §5.5 <c>object-fit</c>. See <see cref="ObjectFitPlacement"/>.</summary>
+    public string ObjectFit { get; init; } = "fill";
+
+    /// <summary>CSS Images 3 §5.6 <c>object-position</c>. See <see cref="ObjectFitPlacement"/>.</summary>
+    public string ObjectPosition { get; init; } = "50% 50%";
+
     // --- Opacity ---
 
     public string Opacity { get; init; } = "1";

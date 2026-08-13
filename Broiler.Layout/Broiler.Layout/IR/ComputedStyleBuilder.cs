@@ -151,6 +151,10 @@ internal static class ComputedStyleBuilder
             // Phase 2: Image source
             ImageSource = box.ImageSource,
 
+            // Replaced content placement
+            ObjectFit = box.ObjectFit,
+            ObjectPosition = box.ObjectPosition,
+
             // Opacity
             Opacity = box.Opacity,
 

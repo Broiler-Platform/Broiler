@@ -114,15 +114,19 @@ set -euo pipefail
 # itself is unit-tested in the main repo (ReplacedBoxSizingTests); only the pixel
 # suite can say a real <canvas> reaches it.
 #
-# 0001 (Broiler.HTML, SVG image through SvgRenderer) is listed because without it every
-# SVG used as an image is drawn by the image backend's own regex renderer, which has no
-# <polygon> arm — the document rasterises to a fully transparent bitmap and the image
-# does not appear at all. That is the plainest kind of pixel-moving change. Its logic is
-# all main-repo (Broiler.Layout.IR.SvgImageRaster and the percentage-length support in
-# SvgRenderer, and its attribute-quoting fix); this patch is the six-line call site.
-# Measured over 3974 reftests with the main-repo half on both sides: 2675 -> 2756
-# passing. See patches/README.md.
+# The SVG-image patch that was 0001 before this one ("image: render an SVG image through
+# Broiler.Layout's SvgRenderer") landed upstream as Broiler.HTML c77f0f0 and its pointer
+# is bumped, so it reaches CI through the pointer and its entry is gone with it.
+#
+# 0001 (Broiler.HTML, object-fit and object-position at the paint site) is listed because
+# without it EmitReplacedImage draws every replaced element into its content box — `fill`
+# behaviour whatever the author wrote — and background-position keeps reading a <position>
+# positionally, which drops the three- and four-component edge-offset forms silently. Both
+# are plainly pixel-moving, and between them they are 28 tests in css/css-images alone. Its
+# logic is all main-repo (Broiler.Layout.IR.ObjectFitPlacement and IR.CssPositionValue);
+# this patch is the call site. See patches/README.md.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0001-paint-place-replaced-content-by-object-fit-and-objec.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

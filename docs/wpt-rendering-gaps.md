@@ -36,16 +36,17 @@ being hidden by [a missing check in the runner](wpt-rendering-gaps-open.md#--ver
    inverse exists too: two `css-view-transitions` tests
    [pass on CI and are demonstrably wrong](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
 3. **One patch is waiting, and a patch number identifies nothing.** The `patches/`
-   directory was emptied on 2026-08-13 (main `d710a02`) when its last file landed
-   upstream, and refilled the same day with a single entry —
-   [`0001`](../patches/README.md), the image backend's six-line call site for
-   [the SVG-renderer unification](wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed).
+   directory holds a single entry — [`0001`](../patches/README.md), the paint call
+   site for
+   [`object-fit` and `object-position`](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all).
    Every *other* submodule fix in these documents is an ancestor of the pinned
-   pointer and live on CI. `patches/` is a backlog rather than an archive — a file is
-   deleted once its fix is upstream and numbering restarts from `0001` — so the same
-   number names different changes at different times, and a `patches/NNNN` reference
-   in an older commit or comment is almost always dangling. Fixes are identified here
-   by **commit subject**:
+   pointer and live on CI, including the SVG-renderer unification that was `0001`
+   before this one (`Broiler.HTML` `c77f0f0`, pointer bumped). That is the whole
+   problem with numbering them: `patches/` is a backlog rather than an archive — a
+   file is deleted once its fix is upstream and numbering restarts from `0001` — so
+   the same number names different changes at different times, and a `patches/NNNN`
+   reference in an older commit or comment is almost always dangling. Fixes are
+   identified here by **commit subject**:
 
    ```sh
    git -C <Submodule> log --oneline --grep '<commit subject>'

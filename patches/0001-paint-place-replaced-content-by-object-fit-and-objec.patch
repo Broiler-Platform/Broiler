@@ -1,0 +1,261 @@
+From 2d7049fde86002aaebc84a071f5b90253aa47c00 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 13 Aug 2026 11:08:36 +0000
+Subject: [PATCH] paint: place replaced content by object-fit and
+ object-position
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+EmitReplacedImage drew every replaced element into its content box, which is
+`fill` behaviour whatever the author wrote: object-fit-contain-svg-001i,
+-fill-svg-001i and -none-svg-001i differ only in that one declaration and
+rendered to byte-identical PNGs. It now asks Broiler.Layout.IR.ObjectFitPlacement
+where the content goes, and clips to the content box when the concrete object
+size leaves it — `cover` always does on one axis, and `none` does whenever the
+image is larger than its box. Clipping rather than cropping the source rectangle
+is what CSS Images 3 describes, and it is also the only reading that survives a
+decoded bitmap that is not the intrinsic size, as a supersampled SVG's is not.
+
+The other half of those tests is their references, which state the same layout
+with background-position — and four of their seven positions are written in the
+three- or four-component edge-offset syntax (`top 25% left 25%`,
+`bottom 1px right 2px`). A <position> was read positionally here, first component
+horizontal and second vertical, which is only the one- and two-component forms;
+the longer ones resolved to the origin, silently. Both background-position call
+sites now go through Broiler.Layout.IR.CssPositionValue, which reads the whole
+grammar — so the image-layer and gradient-layer copies of the positional reading
+are gone with it, and one declaration can no longer mean two things depending on
+which kind of layer is behind it.
+
+GetImageIntrinsics reports the intrinsic aspect ratio and whether the size it
+returns is real, alongside the size itself. They are not derivable from each
+other: an SVG with a viewBox and no width/height has a ratio and no size, and the
+size reported for it is the 300x150 default object size, whose ratio is unrelated.
+Sizing `contain` by that ratio put a 1:2 image in a 48x24 box and cost
+object-fit-cover-svg-004i, which had been passing.
+
+css/css-images goes 234 -> 262 of 460 reftests, +28 and -0; the 42 object-fit-*i
+tests go 21 -> 42.
+---
+ Source/Broiler.HTML.Dom/LayoutEnvironment.cs  |  6 +-
+ .../IR/PaintWalker.Background.cs              | 83 +++----------------
+ .../IR/PaintWalker.Decorations.cs             | 23 ++++-
+ .../IR/PaintWalker.Gradients.cs               | 37 +++------
+ 4 files changed, 48 insertions(+), 101 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Dom/LayoutEnvironment.cs b/Source/Broiler.HTML.Dom/LayoutEnvironment.cs
+index b6d86f0..07d251c 100644
+--- a/Source/Broiler.HTML.Dom/LayoutEnvironment.cs
++++ b/Source/Broiler.HTML.Dom/LayoutEnvironment.cs
+@@ -64,7 +64,11 @@ internal sealed class HtmlLayoutEnvironment(IHtmlContainerInt container) : ILayo
+         bool bothIntrinsic = image.HasIntrinsicWidth && image.HasIntrinsicHeight;
+         double width = bothIntrinsic ? image.IntrinsicWidth : DefaultObjectWidth;
+         double height = bothIntrinsic ? image.IntrinsicHeight : DefaultObjectHeight;
+-        return new ImageIntrinsics(width, height, image.HasIntrinsicRatio);
++
++        // The ratio and whether the size above is real are reported separately, because paint needs
++        // to tell "16×8" from "no size, but 2∶1" and the two report the same width and height here.
++        return new ImageIntrinsics(
++            width, height, image.HasIntrinsicRatio, image.IntrinsicAspectRatio, bothIntrinsic);
+     }
+ 
+     public BColor ParseColor(string value) => container.ParseColor(value);
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Background.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Background.cs
+index 38fc616..5bf3b89 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Background.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Background.cs
+@@ -270,28 +270,17 @@ internal static partial class PaintWalker
+         if (string.IsNullOrEmpty(position))
+             return;
+ 
+-        var parts = position.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+-        string? xVal = null, yVal = null;
+-        foreach (var p in parts)
+-        {
+-            if (IsHorizontalKeyword(p))
+-                xVal = p;
+-            else if (IsVerticalKeyword(p))
+-                yVal = p;
+-            else if (p.Equals("center", StringComparison.OrdinalIgnoreCase))
+-            {
+-                if (xVal == null) xVal = p;
+-                else yVal ??= p;
+-            }
+-            else
+-            {
+-                if (xVal == null) xVal = p;
+-                else yVal ??= p;
+-            }
+-        }
+-
+-        tileOrigin.X += ParsePositionValue(xVal, containerWidth, imageWidth, emSize);
+-        tileOrigin.Y += ParsePositionValue(yVal, containerHeight, imageHeight, emSize);
++        // `background-position` and `object-position` are the same <position> grammar, resolved by
++        // the same code — which is what brings the three- and four-component edge-offset forms
++        // (`top 25% left 25%`) here; reading the components positionally dropped them silently.
++        var offset = CssPositionValue.Resolve(
++            position,
++            new SizeF(containerWidth, containerHeight),
++            new SizeF(imageWidth, imageHeight),
++            emSize);
++
++        tileOrigin.X += offset.X;
++        tileOrigin.Y += offset.Y;
+     }
+ 
+     /// <summary>
+@@ -314,48 +303,6 @@ internal static partial class PaintWalker
+         }
+     }
+ 
+-    /// <summary>Parses a single CSS background-position value (keyword, px, %, or length).</summary>
+-    /// <param name="val">The position token (e.g. "right", "50%", "10px").</param>
+-    /// <param name="containerSize">Width or height of the positioning area.</param>
+-    /// <param name="imageSize">Width or height of the background image.</param>
+-    /// <returns>Offset in pixels from the origin.</returns>
+-    private static float ParsePositionValue(string val, float containerSize, float imageSize, float emSize)
+-    {
+-        if (string.IsNullOrEmpty(val)) return 0;
+-
+-        // CSS2.1 §14.2.1 keyword equivalences.
+-        if (val.Equals("left", StringComparison.OrdinalIgnoreCase)
+-            || val.Equals("top", StringComparison.OrdinalIgnoreCase))
+-            return 0;
+-        if (val.Equals("right", StringComparison.OrdinalIgnoreCase)
+-            || val.Equals("bottom", StringComparison.OrdinalIgnoreCase))
+-            return containerSize - imageSize;
+-        if (val.Equals("center", StringComparison.OrdinalIgnoreCase))
+-            return (containerSize - imageSize) / 2f;
+-
+-        if (val.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+-        {
+-            if (float.TryParse(val.AsSpan(0, val.Length - 2), NumberStyles.Float, CultureInfo.InvariantCulture, out float px))
+-                return px;
+-        }
+-        else if (val.EndsWith('%'))
+-        {
+-            // CSS2.1 §14.2.1: percentage positions use (container - image) as
+-            // the reference length so that 100% places the image flush-right.
+-            if (float.TryParse(val.AsSpan(0, val.Length - 1), NumberStyles.Float, CultureInfo.InvariantCulture, out float pct))
+-                return (containerSize - imageSize) * pct / 100f;
+-        }
+-        else if (CssLengthParser.IsValidLength(val))
+-        {
+-            return (float)CssLengthParser.ParseLength(val, hundredPercent: 0, emFactor: emSize, defaultUnit: null);
+-        }
+-        else if (float.TryParse(val, NumberStyles.Float, CultureInfo.InvariantCulture, out float raw))
+-        {
+-            return raw;
+-        }
+-        return 0;
+-    }
+-
+     private static float GetPositionEmSize(ComputedStyle style)
+     {
+         float fontSize;
+@@ -377,14 +324,6 @@ internal static partial class PaintWalker
+         return fontSize > 0 ? fontSize : DefaultFontSize;
+     }
+ 
+-    private static bool IsHorizontalKeyword(string val) =>
+-        val.Equals("left", StringComparison.OrdinalIgnoreCase)
+-        || val.Equals("right", StringComparison.OrdinalIgnoreCase);
+-
+-    private static bool IsVerticalKeyword(string val) =>
+-        val.Equals("top", StringComparison.OrdinalIgnoreCase)
+-        || val.Equals("bottom", StringComparison.OrdinalIgnoreCase);
+-
+     /// <summary>
+     /// CSS Backgrounds Level 4 <c>background-clip: border-area</c>:
+     /// Emits 4 tiled-image items, one for each border strip.
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+index 0fe8dea..11a00c2 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Decorations.cs
+@@ -440,13 +440,32 @@ internal static partial class PaintWalker
+ 
+             if (r.Width > 0 && r.Height > 0)
+             {
++                // CSS Images 3 §5.5/§5.6: object-fit sizes the content against its intrinsic size
++                // and object-position places it, so the drawn rectangle is only the content box
++                // when object-fit is `fill` — which is the initial value, and returned as-is.
++                var placement = ObjectFitPlacement.Resolve(
++                    r, fragment.ImageIntrinsicSize, fragment.ImageIntrinsicRatio,
++                    fragment.Style.ObjectFit, fragment.Style.ObjectPosition,
++                    GetPositionEmSize(fragment.Style));
++
++                if (placement.IsEmpty)
++                    continue;
++
++                // The concrete object size can leave the content box — `cover` always does on one
++                // axis — and CSS Images 3 clips the overflow to it rather than scaling it away.
++                if (placement.NeedsClip)
++                    items.Add(new ClipItem { Bounds = r, ClipRect = r });
++
+                 items.Add(new DrawImageItem
+                 {
+-                    Bounds = r,
++                    Bounds = placement.Dest,
+                     ImageHandle = fragment.ImageHandle,
+                     SourceRect = fragment.ImageSourceRect,
+-                    DestRect = r,
++                    DestRect = placement.Dest,
+                 });
++
++                if (placement.NeedsClip)
++                    items.Add(new RestoreItem { Bounds = r });
+             }
+         }
+     }
+diff --git a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs
+index 02876ef..01c6e4b 100644
+--- a/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs
++++ b/Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs
+@@ -117,32 +117,17 @@ internal static partial class PaintWalker
+             float tileH = positioningArea.Height;
+             ParseBackgroundSize(sizeStr, positioningArea.Width, positioningArea.Height, out tileW, out tileH);
+ 
+-            // Apply background-position offset.
+-            var posParts = posStr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+-            if (posParts.Length >= 1)
+-            {
+-                string xVal = null, yVal = null;
+-                foreach (var p in posParts)
+-                {
+-                    if (IsHorizontalKeyword(p))
+-                        xVal = p;
+-                    else if (IsVerticalKeyword(p))
+-                        yVal = p;
+-                    else if (p.Equals("center", StringComparison.OrdinalIgnoreCase))
+-                    {
+-                        if (xVal == null) xVal = p;
+-                        else if (yVal == null) yVal = p;
+-                    }
+-                    else
+-                    {
+-                        if (xVal == null) xVal = p;
+-                        else if (yVal == null) yVal = p;
+-                    }
+-                }
+-                float emSize = GetPositionEmSize(style);
+-                tileOrigin.X += ParsePositionValue(xVal, positioningArea.Width, tileW, emSize);
+-                tileOrigin.Y += ParsePositionValue(yVal, positioningArea.Height, tileH, emSize);
+-            }
++            // Apply background-position offset, through the same <position> resolver a background
++            // image and an object-position go through — one declaration must not mean two things
++            // depending on whether the layer behind it is a gradient or a bitmap.
++            var gradientOffset = CssPositionValue.Resolve(
++                posStr,
++                new SizeF(positioningArea.Width, positioningArea.Height),
++                new SizeF(tileW, tileH),
++                GetPositionEmSize(style));
++
++            tileOrigin.X += gradientOffset.X;
++            tileOrigin.Y += gradientOffset.Y;
+ 
+             items.Add(new DrawTiledGradientItem
+             {
+-- 
+2.43.0
+

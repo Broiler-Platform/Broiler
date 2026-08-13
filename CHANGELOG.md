@@ -9,6 +9,17 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `Broiler.Layout` — CSS Images 3 §5.5 `object-fit` and §5.6 `object-position`,
+  which nothing read: every replaced element was stretched to its content box, so
+  `object-fit-contain-svg-001i`, `-fill-svg-001i` and `-none-svg-001i` rendered to
+  byte-identical PNGs. `IR.ObjectFitPlacement` resolves the concrete object size and
+  where it sits, clipping to the content box when it overflows, and
+  `IR.CssPositionValue` reads the whole `<position>` grammar — including the three-
+  and four-component edge-offset forms (`top 25% left 25%`), which paint dropped
+  silently and which `background-position` and gradient layers now share. `css/css-images`
+  goes 234 → 262 of 460 reftests with no losses; the 42 `object-fit-*i` tests go 21 → 42.
+  `ImageIntrinsics` reports the intrinsic aspect ratio and whether its size is real
+  alongside them, since an SVG with only a `viewBox` has a ratio and no size.
 - `Broiler.Wpt` — a WPT `-print` reftest now renders the paint its own `@page`
   rule puts on the sheet (CSS Paged Media 3 §7): the page background over the
   whole page box, margins included, and the page's border and padding on the box

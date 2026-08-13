@@ -87,6 +87,8 @@ internal static partial class CssUtils
             "background-size" => cssBox.BackgroundSize,
             "background-gradient" => cssBox.BackgroundGradient,
             "background-gradient-angle" => cssBox.BackgroundGradientAngle,
+            "object-fit" => cssBox.ObjectFit,
+            "object-position" => cssBox.ObjectPosition,
             "content" => cssBox.Content,
             "color" => cssBox.Color,
             "display" => cssBox.Display,
@@ -655,6 +657,12 @@ internal static partial class CssUtils
                 break;
             case "background-position":
                 cssBox.BackgroundPosition = value;
+                break;
+            case "object-fit":
+                cssBox.ObjectFit = value;
+                break;
+            case "object-position":
+                cssBox.ObjectPosition = value;
                 break;
             case "background-repeat":
                 cssBox.BackgroundRepeat = value;
