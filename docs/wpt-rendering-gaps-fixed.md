@@ -897,7 +897,11 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   42**. Every one of the five fit keywords, against a raster image and against three
   kinds of SVG, at seven `object-position` values each.
 - **Owner:** `Broiler.Layout` (`IR/ObjectFitPlacement.cs`, `IR/CssPositionValue.cs`) with
-  a 21-line call site in `Broiler.HTML` (`IR/PaintWalker.Decorations.cs`).
+  the paint call sites in `Broiler.HTML` **`d762937`** ("paint: place replaced content
+  by object-fit and object-position"), upstream and pinned. It shipped as a patch for
+  one afternoon, while the push to that remote was denied; the main-repo half is inert
+  without it and the call site does not compile without the main-repo half, so the two
+  had to land together.
 - **The gap was total.** `EmitReplacedImage` drew every replaced element into its content
   box, which is `fill` behaviour whatever the author wrote. `object-fit-contain-svg-001i`,
   `-fill-svg-001i` and `-none-svg-001i` differ only in that one declaration and rendered

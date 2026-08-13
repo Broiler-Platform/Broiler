@@ -35,18 +35,19 @@ being hidden by [a missing check in the runner](wpt-rendering-gaps-open.md#--ver
    ([details](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)). And the
    inverse exists too: two `css-view-transitions` tests
    [pass on CI and are demonstrably wrong](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
-3. **One patch is waiting, and a patch number identifies nothing.** The `patches/`
-   directory holds a single entry — [`0001`](../patches/README.md), the paint call
-   site for
-   [`object-fit` and `object-position`](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all).
-   Every *other* submodule fix in these documents is an ancestor of the pinned
-   pointer and live on CI, including the SVG-renderer unification that was `0001`
-   before this one (`Broiler.HTML` `c77f0f0`, pointer bumped). That is the whole
-   problem with numbering them: `patches/` is a backlog rather than an archive — a
-   file is deleted once its fix is upstream and numbering restarts from `0001` — so
-   the same number names different changes at different times, and a `patches/NNNN`
-   reference in an older commit or comment is almost always dangling. Fixes are
-   identified here by **commit subject**:
+3. **No patch is waiting, and a patch number identifies nothing.** The `patches/`
+   directory does not exist: every submodule fix in these documents is an ancestor
+   of the pinned pointer and live on CI. The last two to go through it are worth
+   naming precisely because they were *both* called `0001` — the SVG-renderer
+   unification (`Broiler.HTML` `c77f0f0`) and, days later, the paint call site for
+   [`object-fit` and `object-position`](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all)
+   (`Broiler.HTML` `d762937`), which took the number the moment the first one landed
+   and the directory drained. That is the whole problem with numbering them:
+   `patches/` is a backlog rather than an archive — a file is deleted once its fix is
+   upstream and numbering restarts from `0001` — so the same number names different
+   changes at different times, and a `patches/NNNN` reference in an older commit or
+   comment is almost always dangling, as is any link into the directory itself.
+   Fixes are identified here by **commit subject**:
 
    ```sh
    git -C <Submodule> log --oneline --grep '<commit subject>'
