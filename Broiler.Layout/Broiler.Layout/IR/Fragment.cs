@@ -66,6 +66,23 @@ public sealed class Fragment
     public RectangleF ImageSourceRect { get; init; }
 
     /// <summary>
+    /// Intrinsic size of <see cref="ImageHandle"/> in CSS px, or <see cref="SizeF.Empty"/> when the
+    /// content has none (or there is no content). Paint needs it to resolve <c>object-fit</c>, which
+    /// scales the content against its natural size rather than against the box — see
+    /// <see cref="ObjectFitPlacement"/>. It is not the used size: the box is already laid out at
+    /// that, and the two differ by exactly the ratio <c>object-fit</c> exists to control.
+    /// </summary>
+    public SizeF ImageIntrinsicSize { get; init; }
+
+    /// <summary>
+    /// Intrinsic aspect ratio (width ÷ height) of <see cref="ImageHandle"/>, or 0 when it has none.
+    /// Separate from <see cref="ImageIntrinsicSize"/> because content can carry a ratio without a
+    /// size — an SVG with only a <c>viewBox</c> — and <c>object-fit: contain</c>/<c>cover</c> are
+    /// defined over the ratio, not the size.
+    /// </summary>
+    public float ImageIntrinsicRatio { get; init; }
+
+    /// <summary>
     /// SVG markup for replaced elements (e.g. <c>&lt;object data="file.svg"&gt;</c>)
     /// that should be rendered via <c>SvgRenderer</c> instead of as a raster image.
     /// </summary>

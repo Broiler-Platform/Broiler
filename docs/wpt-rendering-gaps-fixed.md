@@ -891,6 +891,68 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   holds the green frame Chromium never shows. See
   [won't fix](wpt-rendering-gaps-wont-fix.md#image-animation-paused--the-worked-example-of-the-cost).
 
+### `object-fit` and `object-position` were not read at all
+
+- **Tests:** the 42 `css/css-images/object-fit-*i` (the `<img>` variants), **21 → 42 of
+  42**. Every one of the five fit keywords, against a raster image and against three
+  kinds of SVG, at seven `object-position` values each.
+- **Owner:** `Broiler.Layout` (`IR/ObjectFitPlacement.cs`, `IR/CssPositionValue.cs`) with
+  a 21-line call site in `Broiler.HTML` (`IR/PaintWalker.Decorations.cs`).
+- **The gap was total.** `EmitReplacedImage` drew every replaced element into its content
+  box, which is `fill` behaviour whatever the author wrote. `object-fit-contain-svg-001i`,
+  `-fill-svg-001i` and `-none-svg-001i` differ only in that one declaration and rendered
+  to **byte-identical PNGs**; the `object-position` classes in them (`top right`,
+  `bottom 1px right 2px`, …) had no effect either. Nothing in the engine named either
+  property outside `Broiler.CSS`'s list of ones it claims to support.
+- **Half the fix is on the reference side, and that is the part worth recording.** Each of
+  these tests states its reference with `background-size` and `background-position` rather
+  than with `object-fit`, and **four of its seven positions are written in the
+  three- or four-component edge-offset syntax** — `top 25% left 25%`,
+  `bottom 1px right 2px`, `top 3px center`, `center right 25%`. Paint read a
+  `<position>` positionally, first component horizontal and second vertical, which is only
+  the one- and two-component forms; the longer ones resolved to the origin, silently. So
+  the reference was wrong before the test had a chance to be, and implementing
+  `object-fit` alone would have moved nothing.
+- **One resolver, three callers.** `CssPositionValue` reads the whole grammar and is
+  shared by `object-position`, `background-position` on an image layer, and
+  `background-position` on a gradient layer — which were two copies of the positional
+  reading, so the same declaration could mean two things depending on whether the layer
+  behind it was a bitmap or a gradient. The count of components is the spec's own
+  disambiguation and the reason a `<position>` cannot be read token by token:
+  `right 25%` is two components and means *x: right, y: 25%*, while `center right 25%` is
+  three and means *25% of the free width in from the right edge*.
+- **The concrete object size is defined over the ratio, not the size, and an SVG can carry
+  one without the other.** `colors-8x16-noSize.svg` has a `viewBox` and no
+  `width`/`height`, and `GetImageIntrinsics` reports the 300×150 default object size for
+  it — deliberately, since that is what replaced *sizing* uses. Taking the ratio from that
+  size put a 1∶2 image in a 48×24 box and cost `object-fit-cover-svg-004i`, which had been
+  passing. `ImageIntrinsics` now reports the aspect ratio and whether the size is real
+  alongside it, so `contain`/`cover` use the ratio and `none` can tell "no intrinsic size"
+  from "an intrinsic size of 300×150" — which is exactly the distinction §5.1's default
+  sizing algorithm turns on.
+- **Overflow is clipped, not cropped.** `cover` always leaves the content box on one axis
+  and `none` does whenever the image is larger than its box, so the call site emits a clip
+  to the content box and draws the whole image into a rectangle that may exceed it.
+  Cropping the *source* rectangle instead would have been wrong for the same reason the
+  ratio was: the decoded bitmap is not the intrinsic size when an SVG is
+  [supersampled at 2×](wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed).
+  An object that fits emits no clip and paints exactly as it did before.
+- **Measured.** `css/css-images` **234 → 262 of 460**, +28 and **−0**. By element:
+  `<img>` **21 → 42 of 42**, `<object>` 5 → 12 of 40. The `<object>` gains are all the
+  `<position>` half rather than this one — `<object data="…svg">` paints through
+  `EmitSvgContent`, which this does not touch, so those seven crossed the threshold on
+  their references alone (98.81% → 99.11%) and the rest stay just under it. `<embed>`,
+  `<canvas>` and `<video poster>` do not move, and none of them is blocked on
+  `object-fit`: their content is not painted at all, which for `<canvas>` is
+  [the bitmap gap](wpt-rendering-gaps-open.md#canvas-cannot-paint-its-bitmap)
+  and for the other two is element support Broiler does not have.
+- **Tests:** `Broiler.Layout.Tests/ObjectFitPlacementTests.cs` (the five keywords against
+  a box wider and narrower than the content's ratio, `scale-down`'s choice between two of
+  them, a ratio without an intrinsic size, and which placements need the clip) and
+  `CssPositionValueTests.cs` (all four grammar forms, the two-versus-three component
+  disambiguation, percentages against the free space, and a `calc()` staying one component
+  however much whitespace it holds).
+
 ---
 
 ## DOM and the bridge

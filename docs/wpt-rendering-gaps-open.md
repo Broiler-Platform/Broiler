@@ -25,6 +25,7 @@ measured 2026-08-13; CI is the golden-image score from the
 - [View transitions](#view-transitions)
 - [Grid](#grid)
 - [Sizing and layout](#sizing-and-layout)
+- [Images](#images)
 - [Masking](#masking)
 - [Dynamic stylesheets](#dynamic-stylesheets)
 - [Quirks](#quirks)
@@ -383,9 +384,11 @@ the two defects at the end of this entry.
   Chromium golden — `transform-root-bg-001`/`-004` and `transform-background-007` from 49.1% to 60.8%,
   `perspective-svg-001` from 27.3% to 47.1%.
 - **Where it landed.** `SvgImageRaster` and the percentage support are main repo. The image backend's
-  six-line call site is `patches/0001` — the push to `Broiler.HTML` is denied (403), so it ships as a
-  patch registered in `scripts/apply-pending-wpt-patches.sh`. **The two halves must land together:**
-  the patch alone regresses ~70 `background-size/vector` tests, which is exactly what percentages fix.
+  six-line call site shipped as a patch while the push to `Broiler.HTML` was denied (403); it has
+  since landed upstream as `Broiler.HTML` **`c77f0f0`** ("image: render an SVG image through
+  Broiler.Layout's SvgRenderer") and the submodule pointer is bumped, so it reaches CI through the
+  pointer. **The two halves must stay together:** the submodule half alone regresses ~70
+  `background-size/vector` tests, which is exactly what percentages fix.
 - **Two smaller things the attempt exposed**, both pre-existing and both invisible while SVG images
   rendered nothing:
   - **A supersampled SVG tiles at its raster size, not its intrinsic size.** `GetSvgRasterizationScale`
@@ -414,6 +417,28 @@ Each renders blank, each was cleared by the same flag, and each is its own gap:
 
 The canvas gap is the same one that keeps
 [three `<canvas>` sizing tests](#canvas-cannot-paint-its-bitmap) from passing.
+
+### A replaced element other than `<img>` paints no image, and an SVG one ignores `object-fit`
+
+Named by the 178 non-`<img>` members of the `css-images/object-fit-*` family, which
+[the `<img>` fix](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all)
+left where they were. They are two gaps, not one, and each of the five element variants of
+every one of those tests is one or the other:
+
+- **`<embed>`, `<video poster>` and `<object data="…png">` paint no content at all.** All
+  three report `MissingContent` at 98.4–98.5% against references whose marks are small —
+  `object-fit-contain-png-001{e,o,c}` are 98.50% each. The `<canvas>` variants are the
+  already-recorded [bitmap gap](#canvas-cannot-paint-its-bitmap); the other three are
+  element support that does not exist. **Nothing here is an `object-fit` gap** — there is
+  no content to place.
+- **`<object data="…svg">` paints, and stretches.** It goes through
+  `PaintWalker.EmitSvgContent` rather than the `<img>` path, and that renders the document
+  into the content box unconditionally. Seven of the 40 crossed the 99% threshold on the
+  reference-side `<position>` fix alone (98.81% → 99.11%) and the rest sit at 98.4–98.6%.
+- **Exit gate:** `EmitSvgContent` places its document by the same
+  `Broiler.Layout.IR.ObjectFitPlacement` the `<img>` path uses — it needs the SVG's own
+  intrinsic size and ratio on the fragment, which `<img>` gets from the decoded image and
+  this path does not have — and the `-svg-*o` tests match.
 
 ### Six that render content and are still wrong
 
@@ -464,8 +489,9 @@ the other five are unexamined.
 - **The gap it exposed is separate, real, and much bigger than these tests** — see
   [a floated image disappears](#a-floated-image-disappears-entirely--fixed) below, now fixed. Every
   `<img>` in all 80 of those tests is `float: left`.
-- **Exit gate — met.** The 80 are ordinary comparisons now: 14 of them pass, and the rest fail on
-  [`object-fit`](#object-fit-and-object-position-are-not-implemented), which is the honest verdict.
+- **Exit gate — met.** The 80 are ordinary comparisons now: 14 of them passed at the time, and the
+  rest failed on `object-fit`, which was the honest verdict —
+  [since implemented](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all).
 
 ### A floated image disappears entirely — **fixed**
 
@@ -509,7 +535,9 @@ the other five are unexamined.
     two branches above.
 - **`object-fit-contain-svg-001i` renders.** It went from a canvas with **0** non-white pixels to
   24 061, against a reference with 13 849, and the float rows, box sizes, `clear: both` and dashed
-  borders line up with the reference exactly. What is left between them is `object-fit` itself.
+  borders line up with the reference exactly. What was left between them was `object-fit` itself, and
+  [that is read now](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all):
+  the test passes.
 - **Sweep: net zero, and that is the interesting part.** The same 3 974 reftests stay at **2 680**
   passing, +14 and −14, and every move is an `<img>` variant of `css-images/object-fit-*`:
 
@@ -524,8 +552,8 @@ the other five are unexamined.
   The `none` and `scale-down` rows were passing at 99.5% **because the image did not draw** — a
   mostly-white canvas against a reference whose marks are small. They now draw at the wrong size, which
   is worse against the reference and truer about the engine. `fill` passes because stretching to the
-  box is what `fill` means. See
-  [`object-fit` is not implemented](#object-fit-and-object-position-are-not-implemented).
+  box is what `fill` means. All five rows are 8 / 8 now that
+  [`object-fit` is read](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all).
 - **The two `svg/painting/reftests/non-scaling-stroke-00{2,3}` moves in that diff are not this change.**
   Both are `reftest-wait` animation tests; re-run single-worker they give 98.86% and 99.29% identically
   with and against the fix, so the sweep-to-sweep difference is scheduling under four workers.
@@ -538,19 +566,6 @@ the other five are unexamined.
   floated image overlaps it. That is not replaced-specific — see
   [text does not flow around a float](#text-does-not-flow-around-a-float) — and is unchanged by this
   fix in both directions.
-
-### `object-fit` and `object-position` are not implemented
-
-- **Owner:** `Broiler.Layout`. Surfaced by the float fix above, which is what made these tests draw.
-- **Nothing reads either property.** `object-fit-contain-svg-001i`, `object-fit-fill-svg-001i` and
-  `object-fit-none-svg-001i` differ only in that one declaration, and Broiler renders all three to
-  **byte-identical PNGs**: every image is stretched to its box, which is `fill` behaviour. The
-  `object-position` classes in those tests (`top right`, `bottom 1px right 2px`, …) have no effect
-  either.
-- **Scored:** of the 40 `css-images/object-fit-*-00Ni` tests, 18 pass — the `fill` and `cover` families
-  and one `contain` — and the remaining 22 fail between 97.3% and 98.4%.
-- **Exit gate:** `object-fit-contain-svg-001i` and `object-fit-none-svg-001i` render differently from
-  each other, and the `contain`, `none` and `scale-down` families pass.
 
 ### `cross-fade()` is unimplemented, and Chromium does not implement it either
 

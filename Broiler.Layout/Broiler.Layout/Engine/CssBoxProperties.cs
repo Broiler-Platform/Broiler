@@ -690,6 +690,19 @@ internal abstract partial class CssBoxProperties
     public SizeF? IntrinsicReplacedSize { get; set; }
 
     /// <summary>
+    /// CSS Images 3 §5.5 <c>object-fit</c> — how a replaced element's content is scaled into its
+    /// content box. Resolved at paint time by <see cref="IR.ObjectFitPlacement"/>; it moves and
+    /// resizes the drawn content only, never the box, so layout does not read it.
+    /// </summary>
+    public string ObjectFit { get; set; } = "fill";
+
+    /// <summary>
+    /// CSS Images 3 §5.6 <c>object-position</c> — where that content sits inside the content box
+    /// once <see cref="ObjectFit"/> has sized it.
+    /// </summary>
+    public string ObjectPosition { get; set; } = "50% 50%";
+
+    /// <summary>
     /// CSS2.1 §9.2.1.1: set on an <b>inline</b> element's box that the block-inside-inline
     /// correction has blockified in order to break it around a block-level child. The element is
     /// still inline as far as CSS is concerned — the block-level <c>display</c> is an artefact of
@@ -2765,6 +2778,8 @@ internal abstract partial class CssBoxProperties
         MinHeight = p.MinHeight;
         MaxHeight = p.MaxHeight;
         IntrinsicReplacedSize = p.IntrinsicReplacedSize;
+        ObjectFit = p.ObjectFit;
+        ObjectPosition = p.ObjectPosition;
         _wordSpacing = p._wordSpacing;
         Opacity = p.Opacity;
         BoxShadow = p.BoxShadow;

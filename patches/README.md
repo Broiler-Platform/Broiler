@@ -46,44 +46,36 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 | # | submodule | subject |
 | --- | --- | --- |
-| `0001` | `Broiler.HTML` | image: render an SVG image through Broiler.Layout's SvgRenderer |
+| `0001` | `Broiler.HTML` | paint: place replaced content by object-fit and object-position |
 
-### `0001` — one SVG renderer instead of two
+The number was last used for "image: render an SVG image through Broiler.Layout's
+SvgRenderer", which landed upstream as `Broiler.HTML` `c77f0f0` and whose pointer
+is bumped. It is a different change; see the warning above.
 
-Six lines at the seam, and it is the second half of a two-repo change; the first
-half is already in the main repo and is where all the logic lives
-(`Broiler.Layout.IR.SvgImageRaster`, plus percentage-length support in
-`SvgRenderer`). Issue
-[#1627](https://github.com/Broiler-Platform/Broiler/issues/1627) has the full
-story.
+### `0001` — read `object-fit` and `object-position` at the paint site
 
-**Why it is listed for the WPT run.** Without it, every SVG used as an image is
-still drawn by the image backend's own regex renderer, which has no `<polygon>`
-arm — so the document renders as a fully transparent bitmap and the image does
-not appear. That is squarely a pixel-moving change, which is the bar for this
-list.
+The second half of a two-repo change, and the small half: all of the logic is in
+the main repo (`Broiler.Layout.IR.ObjectFitPlacement` for the placement,
+`IR.CssPositionValue` for the `<position>` grammar), and this is the call site
+plus the two lines that report an image's aspect ratio and whether its reported
+size is really intrinsic. Recorded in
+[the gaps document](../docs/wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all).
 
-**Measured before landing**, over 3 974 reftests in `css-masking`, `css-images`,
-`css-transforms`, `css-backgrounds`, `compositing`, `filter-effects`, `css-ui`
-and `svg`, with the main-repo half in place on both sides:
+**Why it is listed for the WPT run.** Without it `EmitReplacedImage` draws every
+replaced element into its content box — `fill` behaviour whatever the author
+wrote — and `background-position` keeps reading a `<position>` positionally, which
+drops the three- and four-component edge-offset forms (`top 25% left 25%`)
+silently. Both are plainly pixel-moving.
 
-- **2 675 → 2 756 passing**, +95 and −14, and average match 98.562% → 98.599%.
-- `css-images/object-fit-*-svg-*` goes **52/120 → 120/120**.
-- Of the 14 losses, five were *passing by rendering nothing* — the test and its
-  reference were both blank, so they matched at 100% — and now render real
-  content that exposes two separate pre-existing bugs, both recorded in
-  [the gaps document](../docs/wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed).
-  The other nine are sub-1.5% differences that fall just under the 99% threshold.
+**Measured** over the full reftest suite with the main-repo half in place on both
+sides: `css/css-images` **234 → 262 of 460**, with the 42 `object-fit-*i` tests
+going 21 → 42 and no losses anywhere in that directory. The whole-suite numbers
+are in the gaps document.
 
-**Do not apply this patch without the main-repo half.** On its own it regresses
-~70 `css-backgrounds/background-size/vector` tests, whose SVGs are built on
-percentage lengths that `SvgRenderer` did not resolve until the same change
-taught it to. The two are one fix in two repositories.
+**Do not apply this patch without the main-repo half.** It calls types that only
+exist there, so it does not compile on its own. The main-repo half is inert
+without it — the new types are simply unreferenced — which is why the pointer can
+stay where it is.
 
-**When it lands upstream:** bump the pointer, delete this patch and its entry in
-`scripts/apply-pending-wpt-patches.sh`, and delete the now-unreachable private
-renderers in `BSvgRasterizer` (`RenderRectangles`, `RenderCircles`,
-`RenderEllipses`, `RenderLines`, `RenderPaths`, `RenderText` and the helpers only
-they use — roughly 450 lines). They are deliberately left in place here to keep
-the patch to 23 lines and so hand-applying it cannot conflict; removing them is a
-trivial in-repo follow-up once the pointer moves.
+**When it lands upstream:** bump the pointer, and delete this patch and its entry
+in `scripts/apply-pending-wpt-patches.sh`.

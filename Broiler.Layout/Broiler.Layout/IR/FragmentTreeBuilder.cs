@@ -106,6 +106,8 @@ internal static class FragmentTreeBuilder
         // Phase 3: Capture replaced image handle (e.g. <img> elements)
         object? imgHandle = null;
         RectangleF imgSourceRect = RectangleF.Empty;
+        SizeF imgIntrinsicSize = SizeF.Empty;
+        float imgIntrinsicRatio = 0;
         string svgContent = null;
         if (box is CssBoxImage imgBox)
         {
@@ -113,6 +115,20 @@ internal static class FragmentTreeBuilder
             // CssBoxImage stores source rect on its internal CssRectImage word
             if (imgBox.Words.Count > 0 && imgBox.Words[0] is CssRectImage rectImage)
                 imgSourceRect = rectImage.ImageRectangle;
+
+            // The natural size and ratio `object-fit` scales against. Layout has already consumed
+            // them to size the box, but not in a form paint can recover — a box sized by the CSS
+            // alone keeps no trace of either — so they are carried onto the fragment. Content with
+            // a ratio and no size reports the default object size here, which is not intrinsic and
+            // must not be read as though it were.
+            if (imgHandle != null && box.LayoutEnvironment?.GetImageIntrinsics(imgHandle) is { } intrinsics)
+            {
+                if (intrinsics.HasIntrinsicSize)
+                    imgIntrinsicSize = new SizeF((float)intrinsics.Width, (float)intrinsics.Height);
+
+                if (intrinsics.HasIntrinsicRatio)
+                    imgIntrinsicRatio = (float)intrinsics.AspectRatio;
+            }
         }
 
         // Check for <object> elements referencing SVG content.  When the
@@ -202,6 +218,8 @@ internal static class FragmentTreeBuilder
             BackgroundImageHandle = bgImage,
             ImageHandle = imgHandle,
             ImageSourceRect = imgSourceRect,
+            ImageIntrinsicSize = imgIntrinsicSize,
+            ImageIntrinsicRatio = imgIntrinsicRatio,
             SvgContent = svgContent,
             EmbeddedDocumentHtml = embeddedHtml,
             EmbeddedDocumentBaseUrl = embeddedBaseUrl,
