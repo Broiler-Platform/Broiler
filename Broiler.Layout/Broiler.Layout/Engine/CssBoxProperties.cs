@@ -2713,8 +2713,23 @@ internal abstract partial class CssBoxProperties
         BlockEllipsis = p.BlockEllipsis;
         WebkitBoxOrient = p.WebkitBoxOrient;
 
+        // HTML Rendering §Tables: in quirks mode a <table> starts the font and text properties from
+        // their initial values instead of inheriting them. Applied at the end of the inherited-value
+        // copy so that the element's own declarations, which the cascade applies next, still win —
+        // the spec states the reset as a UA-origin rule — and so that a descendant cell's percentage
+        // font-size, resolved eagerly when it is set, resolves against the reset size.
+        //
+        // Deliberately not on the `everything` path. That one is a *clone* rather than an
+        // inheritance: the inline-splitting code copies an already-cascaded box's own values onto
+        // the two halves it splits it into, carrying the original's HtmlTag with them, so re-running
+        // the reset there would throw away the author values the original had ended up with.
         if (!everything)
+        {
+            if (this is CssBox self && TableFontInheritanceQuirk.AppliesTo(self))
+                TableFontInheritanceQuirk.Apply(self);
+
             return;
+        }
 
         BackgroundColor = p.BackgroundColor;
         BackgroundGradient = p.BackgroundGradient;
