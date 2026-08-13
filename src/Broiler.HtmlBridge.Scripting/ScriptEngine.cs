@@ -61,15 +61,16 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         var allSucceeded = true;
         for (var i = 0; i < scripts.Count; i++)
         {
+            var label = ScriptLabel.Inline(i);
             try
             {
                 var source = PrepareSource(scripts[i]);
-                RunMeasured($"inline-{i}", () => context.Eval(source));
+                RunMeasured(label, () => context.Eval(source, label));
                 MicroTasks.Drain();
             }
             catch (Exception ex)
             {
-                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script inline-{i} failed: {ex.Message}", ex);
+                RenderLogger.LogError(LogCategory.JavaScript, "ScriptEngine.Execute", $"Script {label} failed: {ex.Message}", ex);
                 allSucceeded = false;
             }
         }
@@ -235,15 +236,16 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         {
             if (i < scriptElements.Count)
                 bridge.CurrentScriptIndex = scriptElements[i];
+            var label = ScriptLabel.Inline(i);
             try
             {
                 var source = PrepareSource(scripts[i]);
-                RunMeasured($"inline-{i}", () => context.Eval(source));
+                RunMeasured(label, () => context.Eval(source, label));
                 interScriptDrain(bridge);
             }
             catch (Exception ex)
             {
-                RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Script inline-{i} failed: {ex.Message}", ex);
+                RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Script {label} failed: {ex.Message}", ex);
             }
         }
         bridge.CurrentScriptIndex = -1;
@@ -251,15 +253,16 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         // Execute deferred scripts after all regular scripts (end-of-parsing for <script defer>).
         for (var i = 0; i < deferredScripts.Count; i++)
         {
+            var label = ScriptLabel.Deferred(i);
             try
             {
                 var source = PrepareSource(deferredScripts[i]);
-                RunMeasured($"deferred-{i}", () => context.Eval(source));
+                RunMeasured(label, () => context.Eval(source, label));
                 interScriptDrain(bridge);
             }
             catch (Exception ex)
             {
-                RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Deferred script failed: {ex.Message}", ex);
+                RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Script {label} failed: {ex.Message}", ex);
             }
         }
 
@@ -273,7 +276,7 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
             {
                 try
                 {
-                    RunMeasured($"module-{root.Key}", () =>
+                    RunMeasured(ScriptLabel.Module(root.Key), () =>
                         moduleContext.RunScriptAsync(root.Source, root.BaseUrl ?? url ?? string.Empty, uniqueModuleID: root.Key)
                             .GetAwaiter().GetResult());
                     interScriptDrain(bridge);
