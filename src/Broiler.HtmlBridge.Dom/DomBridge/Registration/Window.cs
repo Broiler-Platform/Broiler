@@ -161,8 +161,12 @@ public sealed partial class DomBridge
 
         _messaging.RegisterWindowMessaging(window);
 
+        // `frames` is the one member registered twice with *different* shapes: a live getter on the
+        // window and, historically, a static snapshot on the global for the unqualified spelling.
+        // Now that the window IS the global the second write would simply overwrite the first,
+        // freezing `frames` to whatever existed before any <iframe> was scripted. The accessor is
+        // the correct one for both spellings, so it is the only registration.
         window.FastAddProperty((KeyString)"frames", new DomFunction((in _) => BuildWindowFramesArray(), "get frames"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        context["frames"] = BuildWindowFramesArray();
 
         // window.screen — basic stub for screen dimensions
         var screenObj = new JSObject();

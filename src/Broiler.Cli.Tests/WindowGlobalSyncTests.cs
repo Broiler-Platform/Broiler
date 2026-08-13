@@ -5,16 +5,23 @@ using Broiler.JavaScript.Engine;
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// <c>DomBridge.SyncWindowMembersOntoGlobal</c>: the window → global mirror re-run over whatever
-/// the scripts that have run since last time added to <c>window</c>.
+/// A member a script adds to <c>window</c> is reachable unqualified — the behaviour
+/// <c>DomBridge.SyncWindowMembersOntoGlobal</c> used to have to manufacture.
 /// <para>
 /// In a browser <c>window</c> <em>is</em> the global object, so a library's
-/// <c>window.foo = …</c> makes the unqualified <c>foo</c> work for free. The bridge keeps the two
-/// apart, so that unqualified reference is a <c>ReferenceError</c> — which aborts the whole
-/// <c>&lt;script&gt;</c> that made it, not just the one statement. That is the shape of every WPT
+/// <c>window.foo = …</c> makes the unqualified <c>foo</c> work for free. The bridge used to keep the
+/// two apart, which made that reference a <c>ReferenceError</c> — and that aborts the whole
+/// <c>&lt;script&gt;</c> which made it, not just the one statement. That is the shape of every WPT
 /// support library, <c>/css/support/interpolation-testcommon.js</c> most of all: it exports
 /// <c>test_interpolation</c> and five siblings, and each of the ~100 <c>*-interpolation</c> tests
-/// calls them unqualified from its own inline script (issue #1552 problems 4, 18 and 22).
+/// calls them unqualified from its own inline script (issue #1552 problems 4, 18 and 22). The sync
+/// closed that gap after the fact, once per script, and every host had to remember to call it.
+/// </para>
+/// <para>
+/// The bridge now makes <c>window</c> the global object outright
+/// (<see cref="WindowIsTheGlobalObjectTests"/>), so these hold with no sync at all — asserted here
+/// <em>before</em> the sync runs, because that is the property the pages depend on. The sync itself
+/// stays exercised: it is public API a host may still call, and it must remain harmless.
 /// </para>
 /// </summary>
 public sealed class WindowGlobalSyncTests
@@ -35,20 +42,20 @@ public sealed class WindowGlobalSyncTests
         context.Eval($"String({expression})").ToString();
 
     /// <summary>
-    /// The bug itself: a member a script adds to <c>window</c> is not reachable unqualified until
-    /// the mirror is re-run. Both halves are asserted, so a change that made the two objects one
-    /// (the real fix, were the bridge ever to make <c>window</c> the global object) fails the
-    /// first assertion loudly rather than silently making the test vacuous.
+    /// The bug this file was written for: a member a script adds to <c>window</c> used to be
+    /// unreachable unqualified until the mirror was re-run. It is reachable immediately now, so the
+    /// assertion is made before the sync — the sync is then run to prove it changes nothing.
     /// </summary>
     [Fact]
-    public void RuntimeWindowMember_IsUnreachableUnqualified_UntilSynced()
+    public void RuntimeWindowMember_IsReachableUnqualified_WithoutSyncing()
     {
         var (context, bridge) = Attach();
         using var _ = context;
         using var __ = bridge;
 
         context.Eval("window.test_interpolation = function() { return 'called'; };");
-        Assert.Equal("undefined", TypeOf(context, "typeof test_interpolation === 'undefined' ? undefined : test_interpolation"));
+        Assert.Equal("function", TypeOf(context, "test_interpolation"));
+        Assert.Equal("called", ValueOf(context, "test_interpolation()"));
 
         bridge.SyncWindowMembersOntoGlobal();
 
@@ -132,20 +139,32 @@ Object.defineProperty(window, 'liveTick', { configurable: true, get: function() 
     }
 
     /// <summary>
-    /// A name the global already has wins: the sweep fills gaps and never overwrites, so an engine
-    /// builtin cannot be shadowed by a same-named window member.
+    /// Publishing the DOM surface leaves the engine's own builtins intact — <c>window.document</c>,
+    /// <c>window.location</c> and the rest land on the global object itself now, so a name collision
+    /// would overwrite a builtin outright rather than being skipped by a gap-filling sweep.
+    /// <para>
+    /// A <em>page</em> that assigns <c>window.JSON = …</c> does replace the global <c>JSON</c>, and
+    /// that is correct: those are writable, configurable properties of the global object, and a
+    /// browser lets a page clobber them exactly this way. The guarantee is about registration, not
+    /// about defending the realm from the page.
+    /// </para>
     /// </summary>
     [Fact]
-    public void ExistingGlobal_IsNotOverwritten()
+    public void EngineBuiltins_SurviveRegistration()
     {
         var (context, bridge) = Attach();
         using var _ = context;
         using var __ = bridge;
 
-        context.Eval("window.JSON = 'not the real JSON';");
         bridge.SyncWindowMembersOntoGlobal();
 
         Assert.Equal("function", TypeOf(context, "JSON.stringify"));
+        Assert.Equal("function", TypeOf(context, "Object"));
+        Assert.Equal("function", TypeOf(context, "Array"));
+        Assert.Equal("function", TypeOf(context, "Promise"));
+        Assert.Equal("object", TypeOf(context, "Math"));
+        Assert.Equal("function", TypeOf(context, "setTimeout"));
+        Assert.Equal("object", TypeOf(context, "document"));
     }
 
     /// <summary>

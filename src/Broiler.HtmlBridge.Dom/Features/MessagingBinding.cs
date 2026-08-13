@@ -392,7 +392,17 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
             if (string.Equals(href, "about:srcdoc", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(href, "about:blank", StringComparison.OrdinalIgnoreCase))
             {
-                return GetWindowOrigin(window[(KeyString)"parent"] as JSObject);
+                // An about:blank / about:srcdoc document has no origin of its own and inherits its
+                // parent's — but only while there IS a parent above it. A top-level window is its own
+                // parent (`window.parent === window`, in a browser and now here too), so following the
+                // link unconditionally never terminates for a top-level about:blank document; it used
+                // to terminate only because `window.parent` was the raw global object, which carried no
+                // `location` for the next round to recurse on. Stopping at the window that parents
+                // itself is the real base case, and it is the one a frame tree actually defines.
+                var parent = window[(KeyString)"parent"] as JSObject;
+                return parent == null || ReferenceEquals(parent, window)
+                    ? string.Empty
+                    : GetWindowOrigin(parent);
             }
 
             var origin = location[(KeyString)"origin"]?.ToString() ?? string.Empty;

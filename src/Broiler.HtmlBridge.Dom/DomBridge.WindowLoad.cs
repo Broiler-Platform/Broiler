@@ -36,7 +36,12 @@ public sealed partial class DomBridge
         ThrowIfDisposed();
         if (_jsContext == null) return;
 
-        _jsContext["frames"] = BuildWindowFramesArray();
+        // Building the frames array is what mints each nested browsing context's window — and so
+        // what runs that frame's scripts — so it is done eagerly here, before load fires, rather
+        // than left until a page happens to read `frames`. The result is deliberately discarded:
+        // `frames` is a live accessor on the window, which IS the global object, so assigning the
+        // array here would replace that accessor with a snapshot frozen at load time.
+        BuildWindowFramesArray();
 
         FireDomContentLoadedEvent();
 
