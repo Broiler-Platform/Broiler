@@ -126,7 +126,6 @@ set -euo pipefail
 # logic is all main-repo (Broiler.Layout.IR.ObjectFitPlacement and IR.CssPositionValue);
 # this patch is the call site. See patches/README.md.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0001-paint-place-replaced-content-by-object-fit-and-objec.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
