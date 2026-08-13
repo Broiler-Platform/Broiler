@@ -90,6 +90,17 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — `eval` and the
+  `Function` constructor's body were all compiled as `vm.js`, one name for every program that
+  has no script of its own. A stack trace through a module loader is then unreadable, because
+  its frames cannot be attributed: `vm.js:1,14` and `vm.js:5060,25473` give no way to tell
+  whether that is one program or two, and which it is decides whether the failing function was
+  defined where it was called or somewhere else entirely. They are numbered now, the way
+  devtools shows `VM123` — `vm1.js`, `vm2.js`, one name per compiled program. A script that
+  already has a name keeps it; only the fallback changed. Re-evaluating identical source may
+  reuse a cached compilation, and its name with it, which is right: the name still identifies
+  exactly one piece of code.
+
 - `Broiler.HtmlBridge` — CSS Font Loading (css-font-loading-3): `FontFace` and the
   `document.fonts` `FontFaceSet` did not exist, so `document.fonts` was undefined and
   `document.fonts.load(…)` a TypeError. That does not stop at the font code asking for it — on

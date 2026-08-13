@@ -136,11 +136,13 @@ set -euo pipefail
 # The postfix-++ parser patch that was 0001 before this one landed upstream as Broiler.JS
 # 434db760 — the pinned pointer itself — so it reaches CI through the pointer and its entry and
 # file are gone with it. The @supports-evaluator patch that replaced it went the same way, as
-# Broiler.CSS 8be7a65, which is why nothing is listed below.
+# Broiler.CSS 8be7a65.
 #
-# Nothing pending. This is the expected steady state, not a sign the mechanism is unused: a
-# patch is added here only while its submodule fix is waiting, and removed the moment the
-# pointer carries it.
+# 0001 (Broiler.JS, number the programs that have no script name) is deliberately NOT listed. It
+# changes what a stack frame is *called* — "vm1.js" where every anonymous program used to be
+# "vm.js" — and nothing about what any of them computes. No pixel moves either way, and its
+# behaviour is unit-tested inside the patch itself (AnonymousProgramNamingTests). Listing it
+# would only add a patch application to every pixel run for no observable difference.
 PENDING_PATCHES=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
