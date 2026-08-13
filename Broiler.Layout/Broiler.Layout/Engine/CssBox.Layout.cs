@@ -35,11 +35,67 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             or "start" or "flex-start" or "self-start" or "left";
     }
 
+    /// <summary>
+    /// CSS Overflow 3 §3.3 (overflow viewport propagation): when the root element's <c>overflow</c>
+    /// is <c>visible</c>, the <c>&lt;body&gt;</c>'s is applied to the <b>viewport</b> instead, and
+    /// the body's own used value becomes <c>visible</c>. The root element's own non-<c>visible</c>
+    /// value is propagated the same way and the body's is then left alone.
+    /// </summary>
+    /// <remarks>
+    /// Broiler had no propagation at all, so <c>body { overflow: hidden }</c> — one of the most
+    /// common declarations there is — clipped the body's own box instead of the viewport. WPT
+    /// <c>css-overflow/overflow-body-propagation-009</c> is the sharp version: a 30×30 body clipped
+    /// a 10 000px child down to 0.3 % of the canvas where the reference fills 82 %. Idempotent, so
+    /// running it on every layout pass is safe: once the body reads <c>visible</c> there is nothing
+    /// left to move.
+    /// </remarks>
+    internal void ApplyViewportOverflowPropagation()
+    {
+        if (HtmlTag == null || !HtmlTag.Name.Equals("body", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (ParentBox is not { HtmlTag: not null } root
+            || !root.HtmlTag.Name.Equals("html", StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (string.IsNullOrEmpty(Overflow) || Overflow == CssConstants.Visible)
+            return;
+
+        // The root's own value wins and is what the viewport already uses; the body's is then not
+        // propagated, and (per §3.3) it keeps it.
+        if (!string.IsNullOrEmpty(root.Overflow) && root.Overflow != CssConstants.Visible)
+            return;
+
+        // Only the *first* <body> propagates, and only if it generates a box. A document with two
+        // of them (WPT css-overflow/overflow-body-propagation-016) must leave the second one's
+        // `overflow: hidden` clipping its own contents — and if the first generates no box, nothing
+        // propagates at all rather than the turn passing to the second.
+        foreach (var child in root.Boxes)
+        {
+            if (child.HtmlTag == null
+                || !child.HtmlTag.Name.Equals("body", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (child != this || child.Display == CssConstants.None)
+                return;
+
+            break;
+        }
+
+        // The value goes to the *viewport*, not to the root element's box: Broiler's canvas already
+        // clips there, so the propagation is exactly the removal of the body's own clip. Putting it
+        // on the root box instead would clip at the root's border box, which is not the same
+        // rectangle once the body has margins.
+        Overflow = CssConstants.Visible;
+    }
+
     protected virtual void PerformLayoutImp(ILayoutEnvironment g)
     {
         LayoutWorkTrace.Count(LayoutWorkTrace.Counters.BoxesLaidOut);
 
         ResetCollapsedMarginState();
+
+        ApplyViewportOverflowPropagation();
 
         if (Display != CssConstants.None)
         {

@@ -2469,11 +2469,12 @@ previous runs' lists were almost entirely tests that had already been triaged an
 judged correct, which is the thing that work was for. It shows in what this run
 was able to be about: an engine defect rather than the reporting of one.
 
-Three of the 30 turned out to be the same element, and a fourth joined them.
+Three of the 30 turned out to be the same element, and two more joined them.
 
-Four of the 30 are fixed here: problems 12, 14 and 15 are one replaced element
-between them, and problem 24 turned out to be the same subject seen from the
-out-of-flow side.
+Five of the 30 are fixed here: problems 12, 14 and 15 are one replaced element
+between them, problem 24 turned out to be the same subject seen from the
+out-of-flow side, and problem 29 is unrelated — a whole CSS feature that was
+simply absent.
 
 ### Three tests, three defects, one replaced element — problems 12, 14 and 15, **fixed**
 
@@ -2650,9 +2651,9 @@ as reported. Measured after this run's fix.
 | 24 | `CSS2/positioning/abspos-025` | 13.6% | **passes (99.6%)** | **fixed** — this run; see below |
 | 25, 26 | `conformance-checkers/html/elements/{track,video}/src-isvalid` (2) | 14.4% | — | open — no `rel=match` |
 | 27 | `css-flexbox/percentage-heights-003` | 15.4% | — | open — no `rel=match`; a `check-layout-th.js` test |
-| 29 | `css-overflow/overflow-body-propagation-009` | 18.1% | 18.1% | open — reproduces; `overflow: clip` propagation from `<body>` |
+| 29 | `css-overflow/overflow-body-propagation-009` | 18.1% | **passes (100%)** | **fixed** — this run; see below |
 
-**Four fixed, fifteen of the nineteen reproduce against their own reference.**
+**Five fixed, fourteen of the nineteen reproduce against their own reference.**
 That last number is the reference-disagreement split doing its job: before #1618
 this list would have been padded with tests Broiler renders correctly, and now it
 is almost entirely tests it does not.
@@ -2699,6 +2700,40 @@ is almost entirely tests it does not.
   the ratio from the cross axis. Broiler does not implement that transfer, and the
   item was only landing on the reference by having no natural size to transfer
   from. Left open — it is a flexbox rule, not a replaced-sizing one.
+
+### `overflow` on `<body>` was never propagated to the viewport — problem 29, **fixed**
+
+- **Test:** `css-overflow/overflow-body-propagation-009`, 18.1 % on CI and 18.1 %
+  against its own reference. `body { overflow: clip }` on a 30×30 body holding a
+  10 000 px child: CSS Overflow 3 §3.3 applies that `overflow` to the **viewport**
+  and leaves the body's own used value `visible`, so the child fills the canvas.
+  Broiler clipped it to the body — 0.3 % of the canvas blue against a reference
+  that is 82 %.
+- **Nothing was propagated, for any value.** Three probes (`hidden`, `clip`,
+  `auto`) all clipped the body's own box, so this is not a missing keyword in a
+  list — the rule was absent.
+- **The fix is a used-value adjustment, and the interesting half is the
+  disqualifications.** The value goes to the viewport, which Broiler already clips
+  at the canvas edge, so propagating means *removing* the body's own clip rather
+  than moving it onto the root element's box — those are different rectangles once
+  the body has margins, and putting it on the root scored 25 % where dropping it
+  scores 100 %. It must also apply to the **first** `<body>` only, and only if that
+  one generates a box: `overflow-body-propagation-016` is a document with two of
+  them where the first is `display: none`, and there the second has to keep its own
+  `overflow: hidden`. A first pass without that guard fixed 009 and broke 016.
+- **Sweep: 11 749 → 11 750 passing, +4 and −3.** The gains are 009 and two more of
+  its own family (`-014`, `-015`) plus `css-sizing/fit-content-block-size-abspos`.
+  The three losses are pre-existing gaps the propagation exposes rather than
+  causes: `css-flexbox/flexbox-definite-sizes-003` and `-004` (92.2 %) both set
+  `body { overflow: hidden }` and then resolve a descendant's `max-height: 100%`,
+  which is CSS Flexbox's definite-size rule and not this one, and
+  `css-images/image-orientation/image-orientation-img-object-fit` is at 98.7 %
+  against a 99 % threshold. Net +1 on the sweep, +1 on the reported list, and a
+  feature that was not there before.
+- **What this is not.** The viewport is still not a real clip container in Broiler
+  — it is the canvas edge. That is indistinguishable for a top-level document, and
+  it is why this fix is small; a nested browsing context with its own propagated
+  overflow would need the real thing.
 
 ### The split has a threshold, and two entries fall through it
 
