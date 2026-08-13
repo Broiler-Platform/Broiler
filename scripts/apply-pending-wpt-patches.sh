@@ -123,17 +123,27 @@ set -euo pipefail
 # is bumped, so it reaches CI through the pointer and its entry is gone with it. That
 # emptied patches/ entirely, which is why the numbering restarts at 0001 below.
 #
-# 0001 (Broiler.HTML, root-relative stylesheet href) is listed because without it a
-# `<link href="/style.css">` is looked for on the local filesystem instead of being fetched
-# from the page's origin, so the sheet silently does not apply and the page renders wholly
-# unstyled. That is the `seven-zip` case of the real-world render suite, whose workflow also
-# runs this script. It moves no WPT pixels — the WPT runner installs its own `wptRoot`
-# stylesheet handler, which resolves root-relative paths through args.SetSrc before this
-# code is reached, and that is also why the bug survived so long — but it is listed because
-# the real-world suite is a pixel suite too, and there it is the difference between a styled
-# page and none. See patches/README.md.
+# The root-relative stylesheet-href patch that was 0001 before this one landed upstream as
+# Broiler.HTML 1d11065 — which is the pinned pointer itself — so it reaches CI through the
+# pointer and its entry and file are gone with it. Worth recording *how* it was found, because
+# the idempotence guard did not catch it: its reverse-apply check failed rather than succeeded
+# (the upstream commit is not byte-identical to the patch as exported), so instead of being
+# skipped it was reported as drifted and this script exited 1 on every run — taking down the
+# runs it exists to serve, and every later entry with it. A stale entry here is not inert. When
+# this script reports drift, check whether the fix is simply upstream before regenerating:
+#   git -C <Submodule> log --oneline --grep '<the commit subject>'
+#
+# 0001 (Broiler.JS, postfix ++ after a prefix unary operator) is listed because a syntax error
+# rejects a *whole script*, not the statement holding it. `!c++ && …` is the ordinary minified
+# spelling of a run-once guard, so the construct is everywhere in real-world bundles: without
+# this patch google.com's 1.1 MB main script does not compile at all, and a page whose largest
+# script never ran renders as something no reference matches. That is the real-world suite's
+# core case. Its grammar is unit-tested inside the patch itself (ParserTests); only a pixel
+# suite can say the parsed script reached the render. Note this is a different Broiler.JS
+# patch from the test-parallelization one listed as deliberately-not-listed above — that one
+# changed only how a test assembly schedules itself, whereas this one changes what parses.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0001-stylesheet-root-relative-href.patch"
+  "Broiler.JS|patches/0001-postfix-after-prefix-unary.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

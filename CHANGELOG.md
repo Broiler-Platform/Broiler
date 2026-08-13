@@ -90,6 +90,22 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — the parser
+  rejected `!c++ && 1`. A postfix `++`/`--` belongs to the *operand* of a prefix unary
+  operator (`!c++` is `!(c++)`, the grammar reaching it through
+  `UpdateExpression : LeftHandSideExpression ++`, below
+  `UnaryExpression : ! UnaryExpression`), but the postfix was taken only when no prefix
+  operator had been parsed, leaving the `++` of `!c++` in the token stream. Invisible
+  when the expression ends there — `!c++` and `(!c++)` both parsed — and fatal as soon
+  as anything follows, since the stray token made the next operator unexpected. Every
+  operator class was affected under every prefix operator: `!c++ || 1`, `!c++ + 1`,
+  `!c++ === false`, `!c++ ? 1 : 2`, `-c++ && 1`, `~c++ && 1`, `typeof c++ && 1`,
+  `void c++ && 1`. One syntax error rejects an entire script, and `!c++ && …` is the
+  ordinary minified spelling of a run-once guard, so this kept google.com's 1.1 MB main
+  bundle from compiling at all — it failed at line 466 over a single `++`, leaving
+  nothing the page's largest script defines in existence. ASI is unaffected: the postfix
+  still may not cross a line terminator, so `!c\n++d` stays two statements.
+
 - `Broiler.HtmlBridge` — `btoa` and `atob`, the base64 pair on
   `WindowOrWorkerGlobalScope` (HTML §8.3), which the bridge did not provide at all. An
   unqualified `atob(…)` was a `ReferenceError`, and that aborts the whole script that
