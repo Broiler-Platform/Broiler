@@ -90,6 +90,23 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge` — `Element.dataset`, the HTML `DOMStringMap` view over an
+  element's `data-*` attributes (HTML §3.2.6.6), which did not exist at all. A missing
+  object is not a quiet failure here: reading through it throws, and a thrown error
+  aborts the whole `<script>`. google.com's async-request module — `inline-6`, the code
+  that runs *when a search is issued* — reads `b.dataset.ved` and writes ids back
+  through the same map, so its absence stopped that script with `Cannot set property
+  eqid of undefined` and took every later statement and listener with it. The map is a
+  `Proxy` over the element's attributes rather than a snapshot object: a page may read
+  an attribute the markup carries, overwrite it, **or invent one no attribute backs
+  yet**, and a snapshot serves the first two while silently dropping the third onto a
+  throwaway copy. Nothing is cached, so `getAttribute` and `dataset` cannot disagree;
+  names map both ways (`dataset.fooBar` ↔ `data-foo-bar`); and `in`, `delete`,
+  `Object.keys` and `JSON.stringify` all work, the latter two because the proxy answers
+  `getOwnPropertyDescriptor` as well as `ownKeys` — answering only `ownKeys` enumerates
+  as empty. Built on first read and memoized, so a document's thousands of elements do
+  not each allocate a map that nothing asks for, and `el.dataset === el.dataset` holds.
+
 - `Broiler.HtmlBridge` — `window` is the global object, as it is in a browser, so a
   page's `window.x = …` and its unqualified `x` name one property. They were separate
   objects, and identifier resolution consults only the global, so `window.google = _g`

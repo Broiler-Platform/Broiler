@@ -132,6 +132,31 @@ public sealed partial class DomBridge
             Dom.Features.ClassListBinding.Build(element, bridge.InvalidateStyleScope),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // dataset — the live DOMStringMap over the element's data-* attributes.
+        //
+        // Built on first read rather than with the rest of the element: a document has thousands of
+        // elements and few of them are ever asked for their dataset, so building every map up front
+        // would allocate a proxy and four callbacks per element for nothing. The built map replaces
+        // this accessor with a value property, which both memoizes it and keeps
+        // `el.dataset === el.dataset` true as it is in a browser — the map reads and writes the
+        // attributes on every trap, so one instance is already live and a second would be redundant
+        // rather than fresher.
+        obj.FastAddProperty((KeyString)"dataset",
+            new DomFunction((in _) =>
+            {
+                if (bridge._jsContext is not { } datasetContext
+                    || Dom.Features.DatasetBinding.Build(datasetContext, element, bridge.InvalidateStyleScope) is not { } dataset)
+                {
+                    // No Proxy in this realm to build the map from. Undefined is honest: an absent
+                    // dataset is at least not one that silently drops writes.
+                    return JSUndefined.Value;
+                }
+
+                obj.FastAddValue((KeyString)"dataset", dataset, JSPropertyAttributes.EnumerableConfigurableValue);
+                return dataset;
+            }, "get dataset"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // attributes — NamedNodeMap interface
         obj.FastAddProperty((KeyString)"attributes",
             new DomFunction((in _) => _attributes.BuildNamedNodeMap(element, obj), "get attributes"),
