@@ -113,13 +113,15 @@ set -euo pipefail
 # WPT css-sizing/replaced-max-size-saturation stays at its 8.3 %. The §10.4 table
 # itself is unit-tested in the main repo (ReplacedBoxSizingTests); only the pixel
 # suite can say a real <canvas> reaches it.
+#
 # 0001 (Broiler.HTML, SVG image through SvgRenderer) is listed because without it every
 # SVG used as an image is drawn by the image backend's own regex renderer, which has no
 # <polygon> arm — the document rasterises to a fully transparent bitmap and the image
 # does not appear at all. That is the plainest kind of pixel-moving change. Its logic is
 # all main-repo (Broiler.Layout.IR.SvgImageRaster and the percentage-length support in
-# SvgRenderer); this patch is the six-line call site. Measured over 3974 reftests with
-# the main-repo half on both sides: 2675 -> 2751 passing. See patches/README.md.
+# SvgRenderer, and its attribute-quoting fix); this patch is the six-line call site.
+# Measured over 3974 reftests with the main-repo half on both sides: 2675 -> 2756
+# passing. See patches/README.md.
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0001-html-svg-image-through-svgrenderer.patch"
 )

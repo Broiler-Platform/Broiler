@@ -575,7 +575,9 @@ internal static partial class SvgRenderer
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (Match m in ParseAttrRegex().Matches(attrStr))
         {
-            dict[m.Groups[1].Value] = m.Groups[2].Value;
+            // Exactly one of the two quote styles matched; the other group is unset.
+            var value = m.Groups["dq"];
+            dict[m.Groups["name"].Value] = value.Success ? value.Value : m.Groups["sq"].Value;
         }
         return dict;
     }
@@ -758,7 +760,21 @@ internal static partial class SvgRenderer
     [GeneratedRegex(@"<(fe[A-Za-z]+)\b([^>]*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex FilterPrimitiveRegex();
 
-    [GeneratedRegex(@"([\w\-]+)\s*=\s*""([^""]*)""")]
+    /// <summary>
+    /// One attribute of an element's tag: a name, then a value in <em>either</em> quote style.
+    /// </summary>
+    /// <remarks>
+    /// XML gives the two quote styles equal standing, and this matched double quotes only — so an
+    /// element written <c>&lt;rect x='0' width='100'&gt;</c> parsed as an element with **no attributes
+    /// at all** and drew nothing, silently. 101 documents under the directories the SVG sweep covers
+    /// are written that way.
+    /// <para>
+    /// The alternation is deliberate over a backreference with a lazy body: a negated class is bounded
+    /// by construction and lets the *other* quote appear inside a value (<c>title='He said "hi"'</c>),
+    /// which is legal and which a <c>[^"']*</c> body would reject.
+    /// </para>
+    /// </remarks>
+    [GeneratedRegex(@"(?<name>[\w\-]+)\s*=\s*(?:""(?<dq>[^""]*)""|'(?<sq>[^']*)')")]
     private static partial Regex ParseAttrRegex();
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]

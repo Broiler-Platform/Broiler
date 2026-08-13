@@ -67,13 +67,13 @@ list.
 `css-transforms`, `css-backgrounds`, `compositing`, `filter-effects`, `css-ui`
 and `svg`, with the main-repo half in place on both sides:
 
-- **2 675 → 2 751 passing**, +94 and −18, and average match 98.562% → 98.602%.
+- **2 675 → 2 756 passing**, +95 and −14, and average match 98.562% → 98.599%.
 - `css-images/object-fit-*-svg-*` goes **52/120 → 120/120**.
-- Of the 18 losses, five were *passing by rendering nothing* — the test and its
+- Of the 14 losses, five were *passing by rendering nothing* — the test and its
   reference were both blank, so they matched at 100% — and now render real
   content that exposes two separate pre-existing bugs, both recorded in
   [the gaps document](../docs/wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed).
-  The other 13 are sub-1.5% differences that fall just under the 99% threshold.
+  The other nine are sub-1.5% differences that fall just under the 99% threshold.
 
 **Do not apply this patch without the main-repo half.** On its own it regresses
 ~70 `css-backgrounds/background-size/vector` tests, whose SVGs are built on

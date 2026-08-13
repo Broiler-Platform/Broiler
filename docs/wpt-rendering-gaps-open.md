@@ -332,20 +332,37 @@ the two defects at the end of this entry.
   | --- | --- | --- |
   | Elements | rect, circle, ellipse, line, path, text, **polygon**, **polyline**, groups, textPath | rect, circle, ellipse, line, path, text |
   | Percentage lengths | **was: none at all** — now resolved | resolved against the viewport |
+  | Attribute quoting | **was: double quotes only** — now either | either |
 
   `SvgRenderer` had no percentage handling anywhere, so `<rect width="100%">` parsed as `0` and drew
   nothing. It now resolves percentages per SVG 1.1 §7.10 — horizontal lengths against the viewport
   width, vertical against its height, and `r`/`stroke-width`/`font-size` against the normalised
   diagonal — taking the viewport from the `viewBox` when there is one and from the destination box
   when there is not. **That fixes inline SVG too**, which ignored percentages for the same reason.
+- **And a second parser gap, found by the tests for the first.** `ParseAttributes` matched
+  **double-quoted attributes only**, so `<rect x='0' width='100'>` parsed as an element with *no
+  attributes at all* and drew nothing — silently, since an element with no attributes is not an error.
+  XML gives the two quote styles equal standing, and **101 documents** under the directories this sweep
+  covers are written with single quotes. Both styles parse now, and a value may contain the other quote
+  (`title='He said "hi"'`). It was found because the first draft of the new tests **passed while
+  asserting nothing**: written with single quotes, every element parsed bare.
 - **Measured over 3 974 reftests**, before and after, on the same build:
-  **2 675 → 2 751 passing (+94, −18)**, average match **98.562% → 98.602%**. The headline cluster is
-  `css-images/object-fit-*-svg-*`, **52/120 → 120/120**.
-  - **Five of the 18 losses were passing by rendering nothing** — test and reference both blank, so
+
+  | | passing | avg match |
+  | --- | --- | --- |
+  | baseline | 2 675 | 98.562% |
+  | + the switch and percentages | 2 751 | 98.602% |
+  | **+ attribute quoting** | **2 756** | 98.599% |
+
+  **+95 / −14 against baseline.** The headline cluster is `css-images/object-fit-*-svg-*`,
+  **52/120 → 120/120**. The quoting fix is **+5 / −0** on its own, and three of those five —
+  `non-scaling-stroke-003/-009/-010` — are tests the switch itself had regressed, because they are
+  written with single quotes and the renderer it switched *to* could not read them.
+  - **Five of the 14 losses were passing by rendering nothing** — test and reference both blank, so
     they matched at 100%. They now render real content and expose the two separate bugs below.
-  - **The other 13 are sub-1.5% differences** that fall just under the 99% threshold
-    (`non-scaling-stroke-002/-009/-010`, `transform-background-001`–`004`, three `svg/linking` and
-    `svg/embedded` tests). Not investigated individually.
+  - **The other nine are sub-1.5% differences** just under the 99% threshold. One test moved
+    materially without changing state and is worth a look:
+    `css-images/cross-fade-natural-size` 96.0% → 76.0%, failing either way.
 - **The eleven tests this started from still do not pass**, and that is the honest result: the
   `<polygon>` now renders, but they are blocked on the two defects below. Four improved against the
   Chromium golden — `transform-root-bg-001`/`-004` and `transform-background-007` from 49.1% to 60.8%,
