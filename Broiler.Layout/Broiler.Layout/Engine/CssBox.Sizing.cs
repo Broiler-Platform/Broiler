@@ -298,6 +298,56 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 ActualBorderTopWidth + ActualBorderBottomWidth + ActualPaddingTop + ActualPaddingBottom));
     }
 
+    /// <summary>
+    /// The natural (intrinsic) size of a replaced box, from whichever source it has one: the
+    /// <c>width</c>/<c>height</c> content attributes a <c>&lt;canvas&gt;</c> records in
+    /// <see cref="CssBoxProperties.IntrinsicReplacedSize"/>, or the decoded bitmap behind an
+    /// <c>&lt;img&gt;</c>'s word. <see langword="false"/> for every non-replaced box, and for a
+    /// replaced one whose content has not loaded (which has no natural size to offer).
+    /// </summary>
+    private bool TryGetNaturalReplacedSize(out SizeF natural)
+    {
+        if (IntrinsicReplacedSize is { Width: > 0, Height: > 0 } declared)
+        {
+            natural = declared;
+            return true;
+        }
+
+        if (LayoutEnvironment != null
+            && Words.Count == 1 && Words[0] is CssRectImage { Image: not null } imageWord
+            && LayoutEnvironment.GetImageIntrinsics(imageWord.Image) is { Width: > 0, Height: > 0 } bitmap)
+        {
+            natural = new SizeF((float)bitmap.Width, (float)bitmap.Height);
+            return true;
+        }
+
+        natural = default;
+        return false;
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.3.4/§10.6.5: the used border-box size of a <em>block-level or out-of-flow</em>
+    /// replaced box. Both axes come from the replaced rules (§10.3.2/§10.6.2), never from the
+    /// containing block's width or from an inset constraint equation — an
+    /// <c>&lt;img position:absolute; left:4em; right:0; top:4em; bottom:0&gt;</c> keeps its natural
+    /// size and lets <c>right</c>/<c>bottom</c> give way, rather than stretching across the inset
+    /// box (WPT CSS2/positioning/abspos-025).
+    /// </summary>
+    internal bool TryResolveReplacedBorderBoxSize(double availableInlineSize, out double width, out double height)
+    {
+        width = 0;
+        height = 0;
+
+        if (!TryGetNaturalReplacedSize(out SizeF natural))
+            return false;
+
+        ResolveReplacedContentSize(natural, availableInlineSize, out double contentWidth, out double contentHeight);
+
+        width = ResolveSpecifiedWidthToBorderBox(contentWidth);
+        height = ResolveSpecifiedHeightToBorderBox(contentHeight);
+        return true;
+    }
+
     internal double GetMinimumWidth()
     {
         LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);

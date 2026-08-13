@@ -160,14 +160,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
         }
 
-        // CSS2.1 §10.3.4: a block-level *replaced* element resolves its width with the inline rules
-        // (§10.3.2) — an auto width is its natural width, not the containing block's. Only a box
-        // carrying a natural size reaches this (a `display: block` <canvas>); the min/max pass
-        // inside settles both axes together, and ResolveUsedBlockHeight reads the block one back.
-        if (IntrinsicReplacedSize is { Width: > 0, Height: > 0 } naturalSize)
+        // CSS2.1 §10.3.4/§10.3.8: a block-level or out-of-flow *replaced* element resolves its width
+        // with the inline rules (§10.3.2) — an auto width is its natural width, not the containing
+        // block's, and for an absolutely positioned one it is not the inset constraint equation
+        // either (`right` is what gives way). The min/max pass inside settles both axes together,
+        // and ResolveUsedBlockHeight reads the block one back.
+        if (TryResolveReplacedBorderBoxSize(width, out double replacedWidth, out _))
         {
-            ResolveReplacedContentSize(naturalSize, width, out double replacedWidth, out _);
-            width = ResolveSpecifiedWidthToBorderBox(replacedWidth);
+            width = replacedWidth;
         }
         else if (IsIntrinsicWidthKeyword(Width) && Float == CssConstants.None)
         {
@@ -245,7 +245,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // Width is auto — the tentative used width must not exceed
         // max-width. A replaced box has already had both bounds applied to both axes together
         // above, and re-clamping here would use a different percentage basis.
-        bool replacedSizeSettled = IntrinsicReplacedSize is { Width: > 0, Height: > 0 };
+        bool replacedSizeSettled = TryGetNaturalReplacedSize(out _);
 
         if (!replacedSizeSettled && MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
         {
@@ -342,7 +342,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // with auto width use shrink-to-fit when at least one of
         // left/right is auto.  Shrink-to-fit =
         //   min(max(preferred_minimum, available), preferred)
-        if ((Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+        //
+        // Non-replaced is the operative word, and it was not being honoured: a replaced box's auto
+        // width is its natural width (§10.3.8), and shrink-to-fit measures *children*, of which an
+        // <img> or <canvas> has none — so an `<img position:absolute; left:4em; top:4em>` came out
+        // zero pixels wide and painted nothing at all. With `right` also set the branch was skipped
+        // and the same image stretched across the inset box instead; both are now the natural size.
+        if (!replacedSizeSettled
+            && (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
             && (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
             && (Left == null || Left == CssConstants.Auto
              || Right == null || Right == CssConstants.Auto))
@@ -1383,18 +1390,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             ActualBottom = Location.Y + borderBoxH;
         }
 
-        // CSS2.1 §10.6.2: a block-level replaced box's block size comes from its natural size and
-        // ratio, not from its (hidden) content — the same pass that settled its width in
-        // ResolveBlockUsedWidth, re-run now that Size.Width is final. Without it a
-        // `display: block` <canvas> measured its content height as zero and vanished.
-        if (IntrinsicReplacedSize is { Width: > 0, Height: > 0 } naturalSize)
+        // CSS2.1 §10.6.2/§10.6.5: a block-level or out-of-flow replaced box's block size comes from
+        // its natural size and ratio, not from its (hidden) content and not from a top/bottom inset
+        // pair — the same pass that settled its width in ResolveBlockUsedWidth, re-run now that
+        // Size.Width is final. Without it a `display: block` <canvas> measured its content height as
+        // zero and vanished, and an absolutely positioned <img> with four insets stretched to fill
+        // them.
         {
             double availableInlineSize = ContainingBlock.Size.Width
                 - ContainingBlock.ActualPaddingLeft - ContainingBlock.ActualPaddingRight
                 - ContainingBlock.ActualBorderLeftWidth - ContainingBlock.ActualBorderRightWidth;
 
-            ResolveReplacedContentSize(naturalSize, availableInlineSize, out _, out double replacedHeight);
-            ActualBottom = Location.Y + ResolveSpecifiedHeightToBorderBox(replacedHeight);
+            if (TryResolveReplacedBorderBoxSize(availableInlineSize, out _, out double replacedHeight))
+                ActualBottom = Location.Y + replacedHeight;
         }
 
         // CSS Sizing 4 §4: a box with a preferred aspect-ratio and an auto block

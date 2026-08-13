@@ -231,6 +231,49 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(0, word.Height, 3);
     }
 
+    // CSS2.1 §10.3.8/§10.6.5: an absolutely positioned replaced element is sized by the *replaced*
+    // rules — the insets decide where it goes, never how big it is, and `right`/`bottom` are what
+    // give way when they over-constrain. Broiler used to solve the §10.3.7 inset equation for it
+    // (stretching an `<img left:4em; right:0; top:4em; bottom:0>` across the whole inset box) or, if
+    // `right` was absent, shrink-to-fit it against its non-existent children and get zero — which
+    // is why an `<img position:absolute; left:4em; top:4em>` painted nothing at all.
+    // WPT CSS2/positioning/abspos-025 and the 22 `absolute-replaced-*` tests pin the rendering; this
+    // pins the sizing rule the call sites now share.
+    [Theory]
+    [InlineData("auto", "auto", 15d, 15d)]
+    [InlineData("40px", "auto", 40d, 40d)]
+    [InlineData("auto", "40px", 40d, 40d)]
+    public void An_Abspos_Replaced_Box_Is_Sized_By_Its_Natural_Size_Not_By_Its_Insets(
+        string width, string height, double expectedWidth, double expectedHeight)
+    {
+        var environment = new FakeLayoutEnvironment(new ImageIntrinsics(15, 15, true));
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Display = "block",
+            Size = new SizeF(400, 400),
+            LayoutEnvironment = environment,
+        };
+        var box = new CssBox(root, new HtmlTag("canvas", false, null), BaseUrl)
+        {
+            Display = "block",
+            Position = "absolute",
+            Left = "64px",
+            Right = "0",
+            Top = "64px",
+            Bottom = "0",
+            Width = width,
+            Height = height,
+            IntrinsicReplacedSize = new SizeF(15, 15),
+            LayoutEnvironment = environment,
+        };
+
+        box.ResolveReplacedContentSize(box.IntrinsicReplacedSize.Value, 400,
+            out double contentWidth, out double contentHeight);
+
+        Assert.Equal(expectedWidth, contentWidth, 3);
+        Assert.Equal(expectedHeight, contentHeight, 3);
+    }
+
     // Minimal ILayoutEnvironment: a fixed font, and the one image's intrinsics.
     private sealed class FakeLayoutEnvironment(ImageIntrinsics intrinsics) : Broiler.Layout.ILayoutEnvironment
     {

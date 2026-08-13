@@ -2469,7 +2469,11 @@ previous runs' lists were almost entirely tests that had already been triaged an
 judged correct, which is the thing that work was for. It shows in what this run
 was able to be about: an engine defect rather than the reporting of one.
 
-Three of the 30 turned out to be the same element.
+Three of the 30 turned out to be the same element, and a fourth joined them.
+
+Four of the 30 are fixed here: problems 12, 14 and 15 are one replaced element
+between them, and problem 24 turned out to be the same subject seen from the
+out-of-flow side.
 
 ### Three tests, three defects, one replaced element — problems 12, 14 and 15, **fixed**
 
@@ -2554,7 +2558,9 @@ with a stated height and a `max-width`, which is a common shape. The gate on
 
 #### Where it landed, and what is on CI now
 
-- **Main repo, live on CI:** `ReplacedBoxSizing` (the table), the `max-height` arm
+- **Main repo, live on CI:** `ReplacedBoxSizing` (the table), the replaced
+  block-level/out-of-flow sizing path (`CssBox.ResolveReplacedContentSize`,
+  `TryGetNaturalReplacedSize`, `TryResolveReplacedBorderBoxSize`), the `max-height` arm
   in `FlowInlineBlock`, `CssBox.ResolveInlineSizeBounds`/`ResolveBlockSizeBounds`
   (which also stop a keyword `max-width: fit-content` from being parsed as `0px`
   and collapsing the box — `CssLengthParser` resolves an unrecognised unit to
@@ -2641,15 +2647,58 @@ as reported. Measured after this run's fix.
 | 18, 19 | `css-view-transitions/{new,old}-content-has-scrollbars` (2) | 11.1% | 11.1% | open — view transitions |
 | 21 | `scroll-animations/css/scroll-timeline-nearest-with-absolute-positioned-element` | 11.3% | — | open — no `rel=match` |
 | 22 | `css-grid/…/column-subgrid-auto-fill-008` | 11.5% | 10.4% | open — reproduces; `grid-lanes` track sizing |
-| 24 | `CSS2/positioning/abspos-025` | 13.6% | 13.7% | open — reproduces; an abspos replaced element with four offsets |
+| 24 | `CSS2/positioning/abspos-025` | 13.6% | **passes (99.6%)** | **fixed** — this run; see below |
 | 25, 26 | `conformance-checkers/html/elements/{track,video}/src-isvalid` (2) | 14.4% | — | open — no `rel=match` |
 | 27 | `css-flexbox/percentage-heights-003` | 15.4% | — | open — no `rel=match`; a `check-layout-th.js` test |
 | 29 | `css-overflow/overflow-body-propagation-009` | 18.1% | 18.1% | open — reproduces; `overflow: clip` propagation from `<body>` |
 
-**Three fixed, sixteen of the nineteen reproduce against their own reference.**
+**Four fixed, fifteen of the nineteen reproduce against their own reference.**
 That last number is the reference-disagreement split doing its job: before #1618
 this list would have been padded with tests Broiler renders correctly, and now it
 is almost entirely tests it does not.
+
+### An absolutely positioned `<img>` rendered nothing at all — problem 24, **fixed**
+
+- **Test:** `CSS2/positioning/abspos-025`, 13.6 % on CI and 13.7 % against its own
+  reference. An `<img>` with `position: absolute; left: 4em; right: 0; top: 4em;
+  bottom: 0` must keep its natural 15×15 size and let `right`/`bottom` give way
+  (CSS2.1 §10.3.8/§10.6.5); Broiler stretched it across the whole inset box.
+- **Probing it turned up something worse than the test.** The stretch only happens
+  when `right` is set. With `left`/`top` alone — the ordinary way anyone positions
+  an image — an absolutely positioned `<img>` **rendered nothing at all**, and the
+  same was true of a `<canvas>`. That is not in the reported list because no test
+  in the top 30 exercises it; it came out of nine constructed probes measured
+  against Chromium.
+- **Both are the same missing clause, in two places that each say the right thing
+  in a comment and then do not do it.** `ResolveBlockUsedWidth` solves the §10.3.7
+  inset equation "for absolutely positioned, **non-replaced** elements", and falls
+  back to shrink-to-fit "for absolutely positioned **non-replaced** elements with
+  auto width" — but neither branch excluded replaced boxes. With `right` set the
+  first branch stretched the image to the insets; without it the second measured
+  the box's *children*, of which an `<img>` has none, and produced zero. A
+  zero-width box paints no image, which is why nothing appeared.
+- **The fix** routes a block-level or out-of-flow replaced box through the same
+  `CssBox.ResolveReplacedContentSize` the inline path already used, and skips both
+  non-replaced branches for it. `TryGetNaturalReplacedSize` is what makes that
+  possible for an `<img>` as well as a `<canvas>`: the natural size comes from
+  `IntrinsicReplacedSize` when the element declares one and from the decoded
+  bitmap's intrinsics otherwise.
+- **Verified against Chromium on seven inset combinations** — all four insets, each
+  pair, none at all, and `width: 40px` with four insets (40×40: the height follows
+  the width through the ratio). Broiler now matches on every one.
+- **The sweep is what shows the size of it.** Re-running the same 17 077 reftests:
+  **11 705 → 11 749 passing**, and the 45 newly-passing tests are almost entirely
+  the family this rule governs — 22 `CSS2/positioning/absolute-replaced-{width,height}-*`,
+  `abspos-025` and `abspos-026`, six `css-flexbox/flex-aspect-ratio-img-row-*`,
+  four `css-flexbox/flex-minimum-width-flex-items-*`, and
+  `css-position/position-absolute-replaced-no-intrinsic-size.tentative`. Against
+  the run's own baseline that is **+79 newly passing and 4 newly failing**.
+- **The one new failure** is `css-flexbox/flexbox-min-width-auto-002b` at 98.5 %
+  against a 99 % threshold: it measures `min-width: auto` on a flex item that has
+  an intrinsic ratio and a `min-height`, which CSS Flexbox §4.5 resolves through
+  the ratio from the cross axis. Broiler does not implement that transfer, and the
+  item was only landing on the reference by having no natural size to transfer
+  from. Left open — it is a flexbox rule, not a replaced-sizing one.
 
 ### The split has a threshold, and two entries fall through it
 
