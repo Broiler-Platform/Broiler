@@ -386,6 +386,16 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
         if (window == null)
             return string.Empty;
 
+        // The top window's origin is the document's, taken from the host rather than read back out
+        // of `location`. The window IS the global object, and RunWithWindowContext swaps `location`
+        // (and `document`/`self`/`parent`) to a frame's for the duration of that frame's scripts —
+        // which is precisely when a frame calls parent.postMessage. Reading the property there would
+        // see the frame's own about:srcdoc and report the parent as having no origin. Taking the
+        // fact instead of the mutable view is also what terminates the walk below: a top-level
+        // window is its own `parent`, so an about:blank page has no further parent to inherit from.
+        if (ReferenceEquals(window, _host.WindowJSObject))
+            return _host.PageOrigin;
+
         if (window[(KeyString)"location"] is JSObject location)
         {
             var href = location[(KeyString)"href"]?.ToString() ?? string.Empty;
@@ -393,12 +403,8 @@ internal sealed class MessagingBinding(IMessagingHost host, EventTargetRegistry 
                 string.Equals(href, "about:blank", StringComparison.OrdinalIgnoreCase))
             {
                 // An about:blank / about:srcdoc document has no origin of its own and inherits its
-                // parent's — but only while there IS a parent above it. A top-level window is its own
-                // parent (`window.parent === window`, in a browser and now here too), so following the
-                // link unconditionally never terminates for a top-level about:blank document; it used
-                // to terminate only because `window.parent` was the raw global object, which carried no
-                // `location` for the next round to recurse on. Stopping at the window that parents
-                // itself is the real base case, and it is the one a frame tree actually defines.
+                // parent's. A window that parents itself is the top of the tree and has nothing left
+                // to inherit from, so it ends the walk rather than recurring forever.
                 var parent = window[(KeyString)"parent"] as JSObject;
                 return parent == null || ReferenceEquals(parent, window)
                     ? string.Empty
