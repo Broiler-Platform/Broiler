@@ -44,6 +44,9 @@ internal static partial class SvgRenderer
         // 1:1 to CSS pixels, so they must scale by zoom like any other used length. A viewBox overrides
         // this below with a scale derived from the (already-zoomed) bounds, so it is not compounded.
         float sx = (float)effectiveZoom, sy = (float)effectiveZoom, tx = 0f, ty = 0f;
+        // The viewport a percentage length resolves against, in user units (SVG 1.1 §7.10). Zero until
+        // a viewBox establishes one; the fallback below derives it from the bounds instead.
+        float viewportW = 0f, viewportH = 0f;
         var pathStartsById = new Dictionary<string, PointF>(StringComparer.OrdinalIgnoreCase);
         var svgMatch = ParseRegex().Match(svgXml);
         if (svgMatch.Success)
@@ -67,9 +70,26 @@ internal static partial class SvgRenderer
                     sy = scale;
                     tx = -vbX * scale + (bounds.Width - vbW * scale) / 2f;
                     ty = -vbY * scale + (bounds.Height - vbH * scale) / 2f;
+                    // A viewBox establishes the viewport for its children, so a percentage inside it
+                    // resolves against the viewBox extent rather than against the CSS box.
+                    viewportW = vbW;
+                    viewportH = vbH;
                 }
             }
         }
+
+        // No viewBox: user units map to CSS pixels through the same scale seeded above, so the
+        // viewport in user units is the destination box divided by it.
+        if (viewportW <= 0)
+            viewportW = sx > 0 ? bounds.Width / sx : bounds.Width;
+        if (viewportH <= 0)
+            viewportH = sy > 0 ? bounds.Height / sy : bounds.Height;
+
+        // SVG 1.1 §7.10: a percentage on a length in the horizontal axis resolves against the viewport
+        // width, one in the vertical axis against its height, and one on a length that is in neither
+        // (r, stroke-width, font-size) against the normalised diagonal.
+        float pctW = viewportW, pctH = viewportH;
+        float pctD = (float)(Math.Sqrt(viewportW * viewportW + viewportH * viewportH) / Math.Sqrt(2));
 
         foreach (Match m in ParseSvgRegex().Matches(svgXml))
         {
@@ -92,10 +112,10 @@ internal static partial class SvgRenderer
             // box expanded by -10%/+10% on each side (x-10%, y-10%, w+20%, h+20%).
             if (TryResolveFloodFilter(attrs, out var floodColor))
             {
-                float bx = GetFloat(attrs, "x"), by = GetFloat(attrs, "y");
-                float bw = GetFloat(attrs, "width"), bh = GetFloat(attrs, "height");
+                float bx = GetLength(attrs, "x", pctW), by = GetLength(attrs, "y", pctH);
+                float bw = GetLength(attrs, "width", pctW), bh = GetLength(attrs, "height", pctH);
                 float fx = bx - 0.1f * bw, fy = by - 0.1f * bh, fw = 1.2f * bw, fh = 1.2f * bh;
-                items.Add(new DrawSvgRectItem
+                AddShape(items, bounds, attrs, new DrawSvgRectItem
                 {
                     Bounds = bounds,
                     X = fx * sx + tx,
@@ -109,8 +129,8 @@ internal static partial class SvgRenderer
                 continue;
             }
 
-            var rectFill = GetColor(attrs, "fill", BColor.Black);
-            var rectStroke = GetColor(attrs, "stroke", BColor.Empty);
+            var rectFill = GetPaint(attrs, "fill", BColor.Black);
+            var rectStroke = GetPaint(attrs, "stroke", BColor.Empty);
 
             // A colour-only filter chain over a solid fill is equivalent to recolouring the shape;
             // its geometry is untouched (WPT css/filter-effects/fecolormatrix-negative, whose
@@ -118,16 +138,16 @@ internal static partial class SvgRenderer
             if (TryResolveColorFilter(attrs, rectFill, rectStroke, out var filteredFill))
                 rectFill = filteredFill;
 
-            items.Add(new DrawSvgRectItem
+            AddShape(items, bounds, attrs, new DrawSvgRectItem
             {
                 Bounds = bounds,
-                X = GetFloat(attrs, "x") * sx + tx,
-                Y = GetFloat(attrs, "y") * sy + ty,
-                Width = GetFloat(attrs, "width") * sx,
-                Height = GetFloat(attrs, "height") * sy,
+                X = GetLength(attrs, "x", pctW) * sx + tx,
+                Y = GetLength(attrs, "y", pctH) * sy + ty,
+                Width = GetLength(attrs, "width", pctW) * sx,
+                Height = GetLength(attrs, "height", pctH) * sy,
                 Fill = rectFill,
                 Stroke = rectStroke,
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -135,17 +155,17 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseCircleRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            float r = GetFloat(attrs, "r");
-            items.Add(new DrawSvgEllipseItem
+            float r = GetLength(attrs, "r", pctD);
+            AddShape(items, bounds, attrs, new DrawSvgEllipseItem
             {
                 Bounds = bounds,
-                Cx = GetFloat(attrs, "cx") * sx + tx,
-                Cy = GetFloat(attrs, "cy") * sy + ty,
+                Cx = GetLength(attrs, "cx", pctW) * sx + tx,
+                Cy = GetLength(attrs, "cy", pctH) * sy + ty,
                 Rx = r * sx,
                 Ry = r * sy,
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -153,16 +173,16 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseEllipseRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgEllipseItem
+            AddShape(items, bounds, attrs, new DrawSvgEllipseItem
             {
                 Bounds = bounds,
-                Cx = GetFloat(attrs, "cx") * sx + tx,
-                Cy = GetFloat(attrs, "cy") * sy + ty,
-                Rx = GetFloat(attrs, "rx") * sx,
-                Ry = GetFloat(attrs, "ry") * sy,
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                Cx = GetLength(attrs, "cx", pctW) * sx + tx,
+                Cy = GetLength(attrs, "cy", pctH) * sy + ty,
+                Rx = GetLength(attrs, "rx", pctW) * sx,
+                Ry = GetLength(attrs, "ry", pctH) * sy,
+                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -170,41 +190,41 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseLineRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgLineItem
+            AddShape(items, bounds, attrs, new DrawSvgLineItem
             {
                 Bounds = bounds,
-                X1 = GetFloat(attrs, "x1") * sx + tx,
-                Y1 = GetFloat(attrs, "y1") * sy + ty,
-                X2 = GetFloat(attrs, "x2") * sx + tx,
-                Y2 = GetFloat(attrs, "y2") * sy + ty,
-                Stroke = GetColor(attrs, "stroke", BColor.Black),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                X1 = GetLength(attrs, "x1", pctW) * sx + tx,
+                Y1 = GetLength(attrs, "y1", pctH) * sy + ty,
+                X2 = GetLength(attrs, "x2", pctW) * sx + tx,
+                Y2 = GetLength(attrs, "y2", pctH) * sy + ty,
+                Stroke = GetPaint(attrs, "stroke", BColor.Black),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
         foreach (Match m in ParsePolygonRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgPolygonItem
+            AddShape(items, bounds, attrs, new DrawSvgPolygonItem
             {
                 Bounds = bounds,
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
         foreach (Match m in ParsePolyLineRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgPolylineItem
+            AddShape(items, bounds, attrs, new DrawSvgPolylineItem
             {
                 Bounds = bounds,
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
-                Fill = GetColor(attrs, "fill", BColor.Empty),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                Fill = GetPaint(attrs, "fill", BColor.Empty),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -225,9 +245,9 @@ internal static partial class SvgRenderer
                 Bounds = bounds,
                 X = start.X * sx + tx,
                 Y = start.Y * sy + ty,
-                FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
+                FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
-                Fill = GetColor(attrs, "fill", BColor.Black),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
                 Text = DrawSvgTextRegex().Replace(m.Groups[3].Value, string.Empty).Trim(),
             });
         }
@@ -241,11 +261,11 @@ internal static partial class SvgRenderer
             items.Add(new DrawSvgTextItem
             {
                 Bounds = bounds,
-                X = GetFloat(attrs, "x") * sx + tx,
-                Y = GetFloat(attrs, "y") * sy + ty,
-                FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
+                X = GetLength(attrs, "x", pctW) * sx + tx,
+                Y = GetLength(attrs, "y", pctH) * sy + ty,
+                FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
-                Fill = GetColor(attrs, "fill", BColor.Black),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
                 Text = m.Groups[2].Value.Trim(),
             });
         }
@@ -555,7 +575,9 @@ internal static partial class SvgRenderer
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (Match m in ParseAttrRegex().Matches(attrStr))
         {
-            dict[m.Groups[1].Value] = m.Groups[2].Value;
+            // Exactly one of the two quote styles matched; the other group is unset.
+            var value = m.Groups["dq"];
+            dict[m.Groups["name"].Value] = value.Success ? value.Value : m.Groups["sq"].Value;
         }
         return dict;
     }
@@ -568,9 +590,169 @@ internal static partial class SvgRenderer
         return defaultValue;
     }
 
+    /// <summary>
+    /// Reads a presentation property from the element's <c>style</c> declaration if it is there, and
+    /// from the presentation attribute of the same name otherwise.
+    /// </summary>
+    /// <remarks>
+    /// SVG 1.1 §6.4 ranks a <c>style</c> declaration above the matching presentation attribute, which
+    /// is the order used here. Only the properties this renderer models are ever asked for, so this is
+    /// a lookup rather than a cascade.
+    /// </remarks>
+    private static string? GetPresentationValue(Dictionary<string, string> attrs, string property)
+    {
+        if (attrs.TryGetValue("style", out var style) && !string.IsNullOrWhiteSpace(style))
+        {
+            foreach (var declaration in style.Split(';'))
+            {
+                int colon = declaration.IndexOf(':');
+                if (colon <= 0)
+                    continue;
+
+                if (declaration.AsSpan(0, colon).Trim()
+                        .Equals(property, StringComparison.OrdinalIgnoreCase))
+                {
+                    var value = declaration.AsSpan(colon + 1).Trim();
+                    if (!value.IsEmpty)
+                        return value.ToString();
+                }
+            }
+        }
+
+        return attrs.TryGetValue(property, out var attribute) ? attribute : null;
+    }
+
+    /// <summary>
+    /// An SVG <c>&lt;alpha-value&gt;</c>: a number, or a percentage. Out-of-range values clamp rather
+    /// than being rejected, which is what SVG 1.1 §4.4 asks for.
+    /// </summary>
+    private static float ParseAlpha(string? raw, float defaultValue = 1f)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return defaultValue;
+
+        var value = raw.AsSpan().Trim();
+        bool percent = value[^1] == '%';
+        if (percent)
+            value = value[..^1];
+
+        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed))
+            return defaultValue;
+
+        return Math.Clamp(percent ? parsed / 100f : parsed, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Resolves a shape's <c>fill</c> or <c>stroke</c> to a colour with its
+    /// <c>fill-opacity</c>/<c>stroke-opacity</c> folded into the alpha channel.
+    /// </summary>
+    /// <remarks>
+    /// Folding the opacity into the colour rather than pushing an opacity layer is exact for a single
+    /// shape, which is all this renderer draws: SVG 1.1 §14.5 applies <c>fill-opacity</c> to the fill
+    /// operation itself, not to a group. It is <em>not</em> the same as the element's <c>opacity</c>
+    /// property, which composites fill and stroke together and is deliberately not modelled here —
+    /// with a translucent stroke over its own fill the two differ, and inventing the group behaviour
+    /// would be wrong in the commoner case.
+    /// </remarks>
+    private static BColor GetPaint(Dictionary<string, string> attrs, string property, BColor defaultColor)
+    {
+        // An absent paint is "no paint", not the default colour — the default is only the fallback for
+        // a value that is present and unparseable. Returning the default here instead would paint every
+        // fill-less shape solid black; it cost 104 reftests when this was written the other way round.
+        var raw = GetPresentationValue(attrs, property);
+        BColor color = raw is null
+            ? BColor.Empty
+            : ParseColorValue(raw, defaultColor);
+
+        if (color.IsEmpty || color.A == 0)
+            return color;
+
+        float opacity = ParseAlpha(GetPresentationValue(attrs, property + "-opacity"));
+        if (opacity >= 1f)
+            return color;
+
+        return BColor.FromArgb((int)Math.Round(color.A * opacity), color.R, color.G, color.B);
+    }
+
+    /// <summary>
+    /// Adds one shape, wrapped in a blend layer when the element carries a non-normal
+    /// <c>mix-blend-mode</c>.
+    /// </summary>
+    /// <remarks>
+    /// The layer pair is the same one the CSS <c>mix-blend-mode</c> path emits
+    /// (<c>PaintWalker.Stacking</c>), so the raster backend already knows how to composite it and
+    /// already reports which modes it can keep on the raster path. Emitting nothing for
+    /// <c>normal</c> keeps the display list byte-identical for the overwhelming majority of shapes,
+    /// which is what makes this safe to apply at every shape site.
+    /// </remarks>
+    private static void AddShape(
+        List<DisplayItem> items, RectangleF bounds, Dictionary<string, string> attrs, DisplayItem shape)
+    {
+        string? mode = GetPresentationValue(attrs, "mix-blend-mode");
+        bool blended = !string.IsNullOrWhiteSpace(mode)
+            && !mode.Equals("normal", StringComparison.OrdinalIgnoreCase);
+
+        if (blended)
+            items.Add(new BlendModeItem { Bounds = bounds, Mode = mode! });
+
+        items.Add(shape);
+
+        if (blended)
+            items.Add(new RestoreBlendModeItem { Bounds = bounds });
+    }
+
+    /// <summary>
+    /// Reads a geometric attribute as a length in user units, resolving a percentage against
+    /// <paramref name="percentBasis"/> — the viewport extent for that length's axis (SVG 1.1 §7.10).
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="GetFloat"/> deliberately: <c>k1</c>–<c>k4</c> on an
+    /// <c>feComposite</c> are numbers rather than lengths, and a percentage there is not a length
+    /// either, so they must keep going through the plain reader.
+    /// <para>
+    /// Before this existed every percentage fell through <c>float.TryParse</c> to the default — zero
+    /// for a coordinate or an extent — so an SVG built on percentages (<c>&lt;rect width="100%"&gt;</c>)
+    /// drew nothing at all. That is invisible for inline markup, which is nearly always authored in
+    /// user units, and total for an SVG used as an image, where percentage sizing is the norm: it is
+    /// what the <c>css-backgrounds/background-size/vector</c> family is built on. See issue #1627.
+    /// </para>
+    /// </remarks>
+    private static float GetLength(
+        Dictionary<string, string> attrs, string name, float percentBasis, float defaultValue = 0)
+    {
+        if (!attrs.TryGetValue(name, out var val))
+            return defaultValue;
+
+        var value = val.AsSpan().Trim();
+        if (value.IsEmpty)
+            return defaultValue;
+
+        if (value[^1] == '%')
+        {
+            return float.TryParse(
+                value[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out float percent)
+                ? percentBasis * percent / 100f
+                : defaultValue;
+        }
+
+        return float.TryParse(
+            val.Replace("px", ""), NumberStyles.Float, CultureInfo.InvariantCulture, out float f)
+            ? f
+            : defaultValue;
+    }
+
     private static BColor GetColor(Dictionary<string, string> attrs, string name, BColor defaultColor)
     {
-        if (!attrs.TryGetValue(name, out var val) || string.IsNullOrEmpty(val) || val == "none")
+        if (!attrs.TryGetValue(name, out var val))
+            return BColor.Empty;
+
+        return ParseColorValue(val, defaultColor);
+    }
+
+    /// <summary>Parses one already-resolved colour value; <c>none</c> and empty are "no paint".</summary>
+    private static BColor ParseColorValue(string val, BColor defaultColor)
+    {
+        if (string.IsNullOrEmpty(val) || val == "none")
             return BColor.Empty;
 
         // rgba(r, g, b, a)
@@ -698,7 +880,21 @@ internal static partial class SvgRenderer
     [GeneratedRegex(@"<(fe[A-Za-z]+)\b([^>]*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex FilterPrimitiveRegex();
 
-    [GeneratedRegex(@"([\w\-]+)\s*=\s*""([^""]*)""")]
+    /// <summary>
+    /// One attribute of an element's tag: a name, then a value in <em>either</em> quote style.
+    /// </summary>
+    /// <remarks>
+    /// XML gives the two quote styles equal standing, and this matched double quotes only — so an
+    /// element written <c>&lt;rect x='0' width='100'&gt;</c> parsed as an element with **no attributes
+    /// at all** and drew nothing, silently. 101 documents under the directories the SVG sweep covers
+    /// are written that way.
+    /// <para>
+    /// The alternation is deliberate over a backreference with a lazy body: a negated class is bounded
+    /// by construction and lets the *other* quote appear inside a value (<c>title='He said "hi"'</c>),
+    /// which is legal and which a <c>[^"']*</c> body would reject.
+    /// </para>
+    /// </remarks>
+    [GeneratedRegex(@"(?<name>[\w\-]+)\s*=\s*(?:""(?<dq>[^""]*)""|'(?<sq>[^']*)')")]
     private static partial Regex ParseAttrRegex();
 
     [GeneratedRegex(@"-?\d*\.?\d+(?:[eE][+-]?\d+)?")]

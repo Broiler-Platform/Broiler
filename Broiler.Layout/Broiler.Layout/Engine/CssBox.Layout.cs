@@ -9,6 +9,32 @@ namespace Broiler.Layout.Engine;
 internal partial class CssBox : CssBoxProperties, IDisposable
 {
     /// <summary>
+    /// CSS2.1 §9.7: a float has its computed <c>display</c> blockified, exactly as an out-of-flow box
+    /// does. Only the out-of-flow half of that rule was implemented, and this is the part of the
+    /// missing half that is a rendering defect rather than a refinement.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A floated <em>replaced</em> element — an <c>&lt;img&gt;</c>, a <c>&lt;canvas&gt;</c> — stayed
+    /// inline-level and took <see cref="PerformLayoutImp"/>'s else-branch, which resolves no size of
+    /// its own: an inline box is sized from its words, and a replaced box has none. It laid out 0×0
+    /// at (0, 0) and painted nothing whatsoever — no image, no border, no background — and occupied
+    /// no layout space either, so any floated image on a page simply vanished. Measured before the
+    /// fix: an <c>&lt;img&gt;</c> that paints 4 096 pixels unfloated painted zero anywhere on the
+    /// canvas with <c>float: left</c>. Found on WPT <c>css-images/object-fit-contain-svg-001i</c>,
+    /// which floats every one of its images and so rendered a blank page.
+    /// </para>
+    /// <para>
+    /// Narrowed to replaced boxes deliberately. A floated non-replaced inline is sized from its words
+    /// today and does render, so blockifying <em>every</em> float is a wider behavioural change than
+    /// this defect needs. §9.7 asks for that too and it is worth doing — on its own evidence and its
+    /// own sweep, not smuggled in here.
+    /// </para>
+    /// </remarks>
+    internal bool IsBlockifiedFloatedReplaced =>
+        Float != CssConstants.None && (IsImage || IntrinsicReplacedSize is { Width: > 0, Height: > 0 });
+
+    /// <summary>
     /// Whether a concrete <c>justify-self</c> alignment (one that actually shifts
     /// the box) is in effect, after resolving <c>auto</c> to the parent's
     /// <c>justify-items</c> and the legacy <c>text-align:-webkit-*</c> fallback.
@@ -134,7 +160,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // it report the static line-box rectangle instead of its inset box.
         bool isOutOfFlow = Position == CssConstants.Absolute || Position == CssConstants.Fixed;
 
-        if (IsBlock || isOutOfFlow || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
+        if (IsBlock || isOutOfFlow || IsBlockifiedFloatedReplaced || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
         {
             // Because their width and height are set by CssTable
             if (Display != CssConstants.TableCell && Display != CssConstants.Table)
@@ -461,11 +487,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             Size = new SizeF((float)stfWidth, Size.Height);
         }
-        else if ((Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+        else if (!replacedSizeSettled
+            && (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
             && Float != CssConstants.None)
         {
             // CSS2.1 §10.3.5: Floating non-replaced elements with
             // 'width: auto' use shrink-to-fit width.
+            //
+            // Non-replaced is the operative word here as much as it is in the §10.3.7 branch above:
+            // §10.3.6 gives a *floating replaced* box its natural width, and shrink-to-fit measures
+            // children, of which an <img> or a <canvas> has none. Without the guard a
+            // `float: left` image with no stated width settled at zero — its border box collapsed,
+            // so it reserved no space for text to flow around and drew no border or background,
+            // even though its word still carried the natural size. ResolveBlockUsedWidth had
+            // already resolved the right answer a few lines up and this branch overwrote it.
             EnsureDescendantWordsMeasured(g);
 
             double preferred = ComputeShrinkToFitWidth();

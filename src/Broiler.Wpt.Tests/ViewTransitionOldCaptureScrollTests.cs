@@ -26,7 +26,7 @@ public class ViewTransitionOldCaptureScrollTests : IDisposable
     /// Rendered at the runner's default 1024x768. A smaller viewport does not work: the scroll
     /// metrics resolve against the default size rather than the configured one, so `vh` lengths and
     /// the maximum scroll offset disagree with the canvas. That is a separate defect — see the
-    /// note in docs/wpt-rendering-gaps.md — not something this test should paper over.
+    /// note in docs/wpt-rendering-gaps-open.md — not something this test should paper over.
     /// </para>
     /// </summary>
     private static int GreenPixels(string script, string bandPosition = "", int w = 1024, int h = 768)

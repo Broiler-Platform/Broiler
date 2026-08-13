@@ -19,7 +19,7 @@ namespace Broiler.Cli.Tests;
 /// how WPT <c>old-content-captures-root</c>, <c>new-content-captures-root</c> and
 /// <c>root-captured-as-different-tag</c> (issue #1500 problems 13, 15 and 17) rendered as a flat
 /// pink page. A capture that is exact in both cases wants a rasterised snapshot from the renderer,
-/// not a DOM clone — see <c>docs/wpt-rendering-gaps.md</c>.
+/// not a DOM clone — see <c>docs/wpt-rendering-gaps-open.md</c>.
 /// </para>
 /// </summary>
 public class ViewTransitionRootCaptureTests

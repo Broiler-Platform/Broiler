@@ -1,0 +1,1358 @@
+# WPT rendering gaps — fixed
+
+> Part of the [WPT rendering gaps](wpt-rendering-gaps.md) set:
+> **fixed** · [not fixed](wpt-rendering-gaps-open.md) · [won't fix](wpt-rendering-gaps-wont-fix.md).
+> Every status here was re-measured on **2026-08-13**; see
+> [How this was verified](wpt-rendering-gaps.md#how-the-2026-08-13-split-was-verified).
+
+Gaps that are closed. Each entry keeps the root cause, what landed, the evidence,
+and — where there was one — the wrong turn worth not repeating. **Nothing here is
+waiting on a patch:** the `patches/` directory was deleted on 2026-08-13 and every
+submodule fix named below is an ancestor of the pinned pointer.
+
+Where a fix landed in a submodule it is identified by its **commit subject**, not
+by a patch number. Patch numbers named nothing durable — `patches/` was a backlog,
+not an archive, and numbering restarted from `0001` each time it drained. To check
+one:
+
+```sh
+git -C <Submodule> log --oneline --grep '<commit subject>'
+git -C <Submodule> merge-base --is-ancestor <sha> HEAD
+```
+
+## Contents
+
+- [The runner and the report](#the-runner-and-the-report)
+- [CSS engine](#css-engine)
+- [Layout](#layout)
+- [Paint and the renderer](#paint-and-the-renderer)
+- [DOM and the bridge](#dom-and-the-bridge)
+- [View transitions](#view-transitions)
+- [Conformance fixes that closed no test](#conformance-fixes-that-closed-no-test)
+
+---
+
+## The runner and the report
+
+### The run reported correct renders as its worst failures
+
+- **Owner:** the WPT runner (`src/Broiler.Wpt`), the shard merger
+  (`scripts/merge-wpt-shards.py`) and the workflow's shard action. Main repo.
+- **The bug.** The golden-image suite scores Broiler against *Chromium's* pixels.
+  When Broiler implements something Chromium does not, the test drops to 0.0% and
+  stays there permanently, by construction. The severity issue ranked strictly by
+  `100 − matchPercent`, so those tests took the top of the list every run and
+  pushed real bugs off it. Three consecutive runs' severity lists were almost
+  entirely tests that had already been triaged and judged correct.
+- **The evidence was already available and never gathered.** The runner had had a
+  `--verify-reference` switch for some time
+  (`WptTestRunner.VerifyAgainstReferenceHtml`): on a pixel-mismatch failure it
+  re-renders the test's own `rel=match` reference and records `suspectReference`
+  when Broiler reproduces *it* but not the committed PNG. The flag was serialised
+  into the per-test results and **nothing ever ran it** — CI never passed the
+  switch, and the ranking never read the field.
+- **What landed.**
+  1. **The switch is on in CI.** `scripts/run-wpt-tests.sh` forwards
+     `--verify-reference` when `BROILER_WPT_VERIFY_REFERENCE=1`, and
+     `.github/actions/run-wpt-shard` sets it. It costs one extra render per
+     *failing* test and **changes no test's pass/fail** — only how a failure is
+     described. Measured on `css/css-page` (280 tests, 37 failures): 43 s without,
+     36 s with, inside the run-to-run noise.
+  2. **The flag reaches the ranker**, carried on each `lowestMatchTests` triage
+     entry rather than only on the full result.
+  3. **The ranking excludes them.** A flagged mismatch is never a "biggest
+     problem". It is listed under its own heading — *Not ranked — reference
+     disagreements* — so the information stays in the issue. Dropping it silently
+     would be indistinguishable from losing a 0.0%.
+  4. **A shard offers candidates of both kinds.** `lowestMatchTests` was the five
+     lowest matches overall; five reference disagreements would have starved the
+     ranking of every real mismatch in that shard — and the tests that would do it
+     are exactly the ones stuck at 0.0%. It is now the five lowest *rankable*
+     mismatches plus the five lowest cleared ones.
+- **Verified end to end.** `--verify-reference` flagged exactly the six then-known
+  disagreements and left `page-margin-002-print` alone — precise discrimination,
+  not a blanket amnesty for 0.0%. Four focused cases pin the behaviour, including
+  the negative halves: a run *without* the switch ranks exactly as before, a
+  cleared test does not drive threshold escalation, and an all-cleared run yields
+  no biggest problems rather than falling back to ranking them.
+- **It worked.** The next run's severity list
+  ([#1624](https://github.com/Broiler-Platform/Broiler/issues/1624)) put 40
+  mismatches under *Not ranked* and 30 real ones above them — the first list in
+  four runs that was about the engine rather than about the report. Five of those
+  30 were fixed the same day.
+- **What this does not do.** It does not change the pass rate, hide a failure, or
+  mark any test as passing. It changes only which failures are called the run's
+  *worst*, and only on evidence the runner produced itself. The reftest suite is
+  unaffected — it renders both sides with Broiler, so it never sets the flag.
+
+### The runner never performed WPT's `.sub` substitution
+
+- **Test:** `css/css-color-adjust/…/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub`.
+  0.0% → **passing**, and 100.00% pixel-identical to the test's own `rel=match`.
+- **Owner:** the WPT runner and its reference generator, with a two-line hook in
+  `Broiler.Layout`. Main repo.
+- **No server is needed, and the earlier diagnosis said there was.** A `.sub` file
+  is a **template**: WPT's server expands `{{host}}`, `{{ports[http][0]}}` and
+  friends before sending it (`tools/wptserve/wptserve/handlers.py` — the rule is a
+  literal `".sub." in path`). Read straight off disk the placeholders survive into
+  the markup, so this test's frame pointed at the uninterpretable URL
+  `http://{{hosts[alt][]}}:{{ports[http][0]}}/css/…/support/light-frame.html`,
+  loaded nothing, and the page rendered 100% `#121212` — the parent's dark canvas
+  through an empty frame. **Neither side of the comparison substituted**, so
+  Chromium's golden was blank for the same reason and the score was meaningless in
+  both directions. There are **1 419 `.sub.html` files** in the tree; 51 are
+  reftests.
+- **The second half: WPT's hosts are all one checkout.** Substituting alone only
+  moves the problem — the URL becomes `http://not-web-platform.test:8000/css/…`,
+  which a local render still cannot fetch. But WPT serves *every* one of its hosts
+  from the same document root, so that URL and `/css/…` name one file. Recognising
+  that is what makes a cross-origin frame reachable offline.
+- **What landed.** `WptSubstitution` performs the substitution with WPT's own
+  defaults (`tools/serve/serve.py`): primary host `web-platform.test`, alternate
+  `not-web-platform.test`, the subdomain set closed under the two-deep products
+  `_make_subdomains_product` builds, IDNA-encoded, and ports pinned to the
+  documented numbers so a render is reproducible.
+  `Broiler.Layout.Engine.DocumentRoot` gains a list of hosts served from that root,
+  and `FragmentTreeBuilder` strips such an origin before its existing
+  root-relative branch. The runner's stylesheet and image loaders take the same
+  view through `TryResolveWptRootRelativePath`.
+  `scripts/generate-wpt-references.js` mirrors both halves, because the two sides
+  must render the same bytes.
+- **Only what a file on disk can answer is substituted.** `{{uuid()}}`,
+  `{{headers[…]}}`, `{{GET[…]}}`, `{{file_hash(…)}}` and `{{$var}}` describe a live
+  request and are left **verbatim**. `{{not_domains[nonexistent]}}` is left alone
+  for a stronger reason — it names a host that is *meant* not to resolve — and the
+  served-host match is exact rather than by suffix for the same reason, so
+  `nonexistent.web-platform.test` is never served content.
+- **Empty by default.** A host that declares no served hosts renders byte-for-byte
+  as before.
+- **`CACHE_EPOCH` is bumped to 7.** Every `.sub` test's golden changes, so the
+  cached reference slice must be regenerated or the two sides disagree by
+  construction.
+- **Verified:** 47 focused substitution cases and 16 frame-loading cases, including
+  the negative halves — an unknown or request-scoped placeholder left verbatim,
+  `not_domains` left verbatim, an unlisted host and a subdomain of a listed one
+  both refused, a non-http scheme left alone, `..` unable to escape the root, and a
+  served URL naming nothing still painting empty. The reference generator's own 28
+  node tests assert the JS mirror agrees case for case.
+- **What else moved.** Outside the cross-origin-iframe family the change is inert
+  (121 tests identical both ways). Inside it, four tests moved and the net was zero
+  because two were **passing for the wrong reason** — see
+  [the frame-canvas fix](#a-frames-canvas-was-never-transparent) and the
+  [cross-origin twin](wpt-rendering-gaps-wont-fix.md#color-scheme-mismatch--chromium-fails-its-own-reftest).
+
+### A root-relative resolver returned a working-directory-relative path
+
+- **Owner:** the WPT runner (`WptTestRunner.TryResolveWptRootRelativePath`).
+- **The bug.** The resolver mapped a root-relative URL onto the checkout with
+  `Path.Combine(wptRoot, rel)` and returned it as-is. With a **relative**
+  `--wpt-dir` that result is relative to the *process working directory* — and the
+  engine resolves what it is handed against the **document's** base URL, so it went
+  looking for `…/css/css-backgrounds/tests/wpt/checkout/images/green.png` and found
+  nothing. The `File.Exists` guard inside the resolver still passed, because *it*
+  resolves against the working directory, so nothing anywhere reported a failure:
+  the render simply came out with no image.
+- **Why it mattered more than it looks.** CI passes an absolute path, so CI was
+  never affected. Every *local* command in this document set and in `CLAUDE.md`
+  passes a relative one. So the bug was invisible in the one place that gates
+  merges and active in the one place the local evidence came from — which is the
+  signature already recorded as *"a higher local score than CI usually means both
+  engines rendered nothing"*, without knowing the cause was ours.
+- **The fix** is to return `Path.GetFullPath(local)`. Absolute always, because the
+  path is consumed by something that resolves relative paths against a different
+  base.
+- **Verified, including the negative half.** Across 1 553 reftests
+  (`css-backgrounds`, `css-images`, `fullscreen`, `css-masking`): a relative
+  `--wpt-dir` and an absolute one now produce **identical** results, where before
+  they differed on 22 tests. CI's own configuration is unmoved — pre-fix and
+  post-fix runs with an absolute root differ on one already-failing test by
+  0.05 pp, with no pass/fail change.
+- **Net on pass counts: zero, and that is the honest number.** Three tests went
+  from failing to passing (`fullscreen/rendering/backdrop-object` reached 100%) and
+  three from passing to failing — those three had been *passing by rendering
+  nothing*, and now that the image loads on both sides a real difference is
+  exposed.
+
+> **Still true, and worth keeping:** a *higher* local score than CI is a warning,
+> not good news. Check whether the resource actually loaded before concluding a
+> test cannot be judged locally.
+
+### A `manual/` test was being scored
+
+- **Test:** `html/canvas/element/manual/draw-element-image/dialog-paints-in-top-layer.tentative`.
+- **Owner:** the WPT runner. Main repo.
+- **The bug.** The test sits under a `manual/` path segment and is `.tentative`,
+  but it was discovered and scored as a Regular test. Its reference is a 100% white
+  Chromium canvas, because Chromium does not implement the proposed
+  `draw-element-image` API either — so the only way to "pass" was to render
+  nothing. Broiler paints a dialog (98% `#e5e5e5` + 2% green), which is arguably
+  the more useful behaviour.
+- **What landed:** `WptTestRunner.IsManualTest` treats a `manual/` directory
+  segment as the manual signal alongside the `-manual` filename suffix, mirroring
+  how `IsCrashTest` already accepts `/crashtests/` and `IsTentativeTest` accepts
+  `/tentative/`. `ClassifyTestKind` checks Manual before Tentative, so such a test
+  lands in the Manual bucket and leaves the scored set.
+- **Verified:** focused tests cover the segment on both separators and
+  case-insensitively, and pin that `manual` only counts as a *whole* segment
+  (`manually/`, `semi-manual/` stay automated). Re-checked 2026-08-13: the test is
+  reported `skipped / ManualTest` by the reftest runner.
+- **One stale artifact to expect.** `tests/wpt-baseline/failed-tests.json` is a
+  scope-aware **merged** manifest — a run refreshes only the tests it exercised.
+  A test that became *skipped* is no longer exercised, so its old failure entry is
+  preserved rather than cleared. 204 `manual/`-segment entries are still in that
+  file for this reason. They are historical, not current.
+
+---
+
+## CSS engine
+
+### System colour keywords did not resolve at all
+
+- **Test:** `forced-colors-mode/forced-colors-mode-20`. Ours 98% black; Chromium's
+  98% white.
+- **Owner:** `Broiler.CSS`.
+- **Root cause: not a dark palette, as first suspected.** `CssSystemColors`
+  carried only `Field` and `FieldText`. Every other system colour fell through to
+  the named-colour lookup, which does not know them, and resolved to the
+  unknown-colour fallback: **black**. That turned every system-colour test into a
+  whole-canvas mismatch, and this one was only the worst-scoring member of the
+  family.
+- **What landed:** the CSS Color 4 §6 table filled in from the light palette
+  (matched to what Chromium reports, since the references are Chromium
+  screenshots), the §6.2 deprecated keywords mapped onto their aliases, and a
+  `CssColorScheme` overload so a dark used colour scheme selects the dark palette —
+  `Canvas` there is the same `rgb(18, 18, 18)` the canvas-background paint path
+  already uses. `forced-colors` still computes to `none`; nothing emulates it.
+  Both existing call sites (the renderer's colour hook and `CssAnimationResolver`)
+  already went through `TryResolve`, so filling the table lit up both.
+- **Verified:** `background-color: Canvas` paints 100% white and `ButtonFace`
+  paints `rgb(239, 239, 239)` — a value only the new table produces, so the render
+  path demonstrably goes through it. 45 focused tests cover the light palette, the
+  `color-scheme: dark` switch, and the deprecated aliases.
+
+### `contrast-color()` and style container queries
+
+- **Test:** `css/css-color/contrast-color-style-query`. Ours 100% white; Chromium
+  100% green.
+- **Owner:** `Broiler.CSS`.
+- **Which of the three features were missing.** The test needs an
+  `@property`-registered `<color>` custom property, `contrast-color(#000)`
+  resolving to an absolute colour, and `@container style(--contrast-color: white)`
+  matching on it. Registration already worked; the other two did not — and the
+  earlier guess that the test would "distinguish the two once either lands" was
+  wrong. It needs *both*, so neither alone moved it.
+- **What landed.**
+  1. `contrast-color(<color>)` resolves to whichever of black or white contrasts
+     more with its argument, via the WCAG 2 contrast ratio over relative luminance.
+     The comparison collapses to one threshold — white wins below luminance
+     `√(1.05 × 0.05) − 0.05 ≈ 0.1791`, where the two ratios are equal. **That is
+     not mid-grey:** `#767676` takes black while `#757575` takes white, and a test
+     pins exactly that boundary. Wired into `CssValueParser.TryParseColor`, so it
+     is a `<color>` everywhere; the system colours are routed there in the same
+     pass, since they are `<color>` keywords too.
+  2. `style()` container queries, which were explicitly unsupported and forced the
+     whole query false. A *style* container needs no `container-type` —
+     css-contain-3 makes every element one — so size and style containers are now
+     resolved separately and a style-only query works where no size container
+     exists. Comparison is colour-aware, because a registered `<color>` property
+     computes to an absolute colour: `white` and `rgb(255, 255, 255)` are the same
+     computed value.
+- **Two parsing traps this uncovered,** both of which made *every* style query
+  silently false rather than erroring:
+  - `SplitContainerName` read the leading identifier of `style(...)` as a container
+    **name**, so the lookup hunted for `container-name: style`, found nothing, and
+    bailed. An identifier immediately followed by `(` is a function.
+  - The condition tokenizer split `style` from its parenthesised argument, leaving
+    the argument looking like a nested condition and the name like a bare size
+    feature. Function tokens now keep their argument list.
+- **Verified:** the composed scenario renders red with the change reverted and
+  green with it applied. The negative half — `contrast-color(#fff)` is *black*, so
+  the `white` query must **not** match — is what makes that meaningful; an early
+  version of the check passed only because the query never matched at all.
+- **Known gaps, deliberate:** only the custom-property form of `style()` is
+  supported (a standard-property query returns false rather than guessing), and an
+  `@property` registration with `inherits: false` is not honoured by the ancestor
+  walk. The walk reads cascaded declarations rather than `GetComputedStyle` because
+  it runs *during* style computation and re-entering it for an ancestor would
+  recurse.
+
+### `@container` prelude evaluation recursed without bound — 71 worker crashes
+
+- **Owner:** `Broiler.CSS`.
+- **The run's largest single problem, and its signature named the wrong
+  component.** Both crash signatures — `Worker closed stdout before returning a
+  result` (68 tests) and `Worker exited with code 134` (3) — were one unbounded
+  recursion. Every `(` was read as the start of a nested condition, so a prelude
+  whose parentheses belong to a *value* function (`(width = calc(100px + 10rem))`)
+  or to a *query* function other than `style()` (`anchored(fallback: --foo)`,
+  `scroll-state(scrollable: block-end)`) handed the tokenizer the identical text at
+  every level. A .NET stack overflow cannot be caught, so it killed the worker
+  outright — which is why the reported signature named the runner rather than the
+  CSS engine.
+- **Measured** over the 302 `container-queries` tests in both affected
+  directories: **68 crashes → 0**, no test regressed.
+
+### Shadow trees leaked their styles into the whole page
+
+- **Tests:** `css/css-shadow/shadow-directionality-001.tentative` and `-002`,
+  1.1% / 1.3% → **99.55%**.
+- **Owner:** HtmlBridge (`DomBridge/ShadowTreeSelectors.cs`) with a `Broiler.CSS`
+  half.
+- **Two independent bugs, and the pixels only move when both are understood.** A
+  shadow root's `<style>` is serialized inline into the render document, so the
+  renderer saw its rules as ordinary global rules with no provenance — a shadow
+  tree's `div { background: red }` repainted **every** `div` in the page. On top of
+  that, `:dir()` sat in `CssSelectorMatcher`'s `RecognizedPseudoClasses` with no arm
+  in the pseudo-class switch, so it fell through to the deliberately lenient default
+  for recognised-but-unmodelled names and matched *every* element — `:dir(ltr)` and
+  `:dir(rtl)` at once. Together they turned each test's four small shadow rules
+  into one canvas-wide repaint.
+- **What landed.**
+  1. **`ScopeShadowTreeSelectors`** reuses the shape `ScopeShadowHostSelectors`
+     established for the mirror-image `:host` problem: stamp every element of the
+     tree with `data-broiler-shadow-scope="N"` (the host is deliberately *not*
+     stamped — it belongs to the outer tree and is reachable only through `:host`),
+     then append `[data-broiler-shadow-scope="N"]` to each selector's subject
+     compound. It runs *before* the `:host` pass, which rewrites the keyword this
+     one keys off.
+  2. **`:dir()`** now resolves HTML's directionality: nearest ancestor-or-self with
+     a valid `dir`, `ltr` at the root, `dir=auto` (and `<bdi>`, whose default it is)
+     from the first strong directional character. Strictly a narrowing, so it can
+     only remove matches the lenient default invented.
+- **The subject compound, not every compound — a deliberate choice.** Scoping the
+  subject is what stops the leak: a rule whose subject is outside the tree cannot
+  apply. Scoping *every* compound is closer to the spec but adds one attribute
+  selector per compound, so it changes specificity **unevenly** between rules of the
+  same sheet — `div span` (0,0,2) and `.foo` (0,1,0) swap cascade order once they
+  become `div[s] span[s]` (0,2,2) and `.foo[s]` (0,2,0). Subject-only adds exactly
+  (0,1,0) to every rule, so their order relative to each other is preserved exactly.
+- **Compounds left alone, each for a reason:** `:host`/`:host-context` (the host is
+  not in the tree), `::slotted`/`::part` (their subject is a light-DOM node).
+  `@keyframes`, `@font-face` and friends are copied verbatim — their blocks hold
+  keyframe selectors and descriptors, not selectors — while the conditional group
+  rules (`@media`, `@supports`, `@container`, `@layer`, `@scope`,
+  `@starting-style`) are recursed into.
+- **A serialization pass is not free, and the suite said so.** Running this pass and
+  the `animate({pseudoElement})` one unconditionally pushed
+  `RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out` — a
+  6-second budget on a `grid-template-columns` with five million tracks — over its
+  limit. It only failed in a full-suite run, never in isolation, which is exactly
+  the shape that reads as flakiness; the control that settled it was running the
+  *same full suite* against unmodified sources, where the test passes. Both passes
+  now early-out on a flag (`_hasShadowRoots`, `_hasAnimatedPseudoStyles`).
+- **Measured.** `css/css-shadow` **153 → 157 of 207 with nothing lost** — the other
+  two gains being `css-scoping-shadow-with-rules-no-style-leak` (98.1% → 99.2%, the
+  test named for exactly this bug) and `host-specificity-003` (88.0% → 99.6%).
+  Checked for regressions over **1 669 further tests** in `css-view-transitions`,
+  `css-masking`, `css-position` and `css-pseudo`: no test changed state in either
+  direction.
+
+### `font-size: math` collapsed the element it was on
+
+- **Test:** `css/css-fonts/math-script-level-and-math-style/font-size-math-001.tentative`,
+  3.9% → **99.86%**.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxProperties.cs`). Main repo.
+- **The keyword is `1em`, and the bug was not that it failed to scale.** MathML
+  Core makes `font-size: math` the inherited size times the math scaling factor,
+  and that factor is driven entirely by a *change* in `math-depth` — with no change
+  it is 1. Broiler models no math depth, so the keyword is always `1em`, which is
+  exactly what the test's reference asserts: the same document with `math` written
+  as `1em`. `math` had no arm in the font-size keyword switch, so it fell through to
+  the length parser, which reads an unrecognised token as **0** — and the zero clamp
+  turned that into a **0.001pt** font. Every relative size beneath it then resolved
+  against 0.001pt, so the whole subtree vanished.
+- **Two call sites, because the computed and used sizes resolve keywords
+  separately** (`ComputedFontSizePoints` and `ActualFont`, the latter on the
+  non-zoom path).
+- **Measured:** the one arm carries **five more tests** with it — the 14-test
+  subset goes **7 → 13 passing** — and the whole 552-test `css/css-fonts` directory
+  goes **347 → 353, nothing lost and nothing else moved.**
+
+### Media query range syntax and `@custom-media`
+
+- **Owner:** `Broiler.CSS` (`56eea09`, "media queries: range syntax and
+  @custom-media"), upstream and pinned.
+- Media Queries 5 §3, with substitution and cycle detection covered by
+  `CssStyleEngineTests`. It decides whether an `@media` block's rules cascade at
+  all, so getting it wrong is a whole stylesheet applying — or not applying — to a
+  page.
+- **It moves one test the wrong way, and that is correct.**
+  `mediaqueries/at-custom-media-basic` now renders the green its own reference asks
+  for, and Chromium — which does not implement `@custom-media` — renders white. See
+  [won't fix](wpt-rendering-gaps-wont-fix.md#custom-media--chromium-does-not-implement-it).
+
+---
+
+## Layout
+
+### A replaced element's two axes were sized independently
+
+- **Tests:** `css-sizing/replaced-max-size-saturation` (8.3% on CI),
+  `css-sizing/block-image-percentage-max-height-inside-inline` (9.7%) and
+  `css-sizing/image-percentage-max-height-in-anonymous-block` (9.7%) — **all three
+  pass (100%)** against their own references. Each asks for a 100px green square;
+  Broiler drew a 1000×1000 or 8000×8000 block, clipped by the viewport into a
+  full-page slab.
+- **None was a reference disagreement.** All three reproduced offline against the
+  `rel=match` reference the test itself declares — 8.6%, 10.1% and 10.1%, within
+  rounding of CI's numbers. The engine was wrong, not the golden.
+- **Four defects, three of them diagnosed a run earlier.**
+  1. **The min/max pass clamped four properties one at a time.** A replaced box's
+     two axes are coupled by its ratio: an axis left `auto` was *derived* from the
+     other one, so clamping the stated axis has to re-derive it — and when both axes
+     are auto and both maximums are violated, neither clamp can simply win. CSS2.1
+     §10.4 settles that with a constraint-violation table that compares how hard
+     each bound bites (`max-width/w` against `max-height/h`) and keeps the shape.
+     Broiler had **no `max-width` arm for a replaced element at all**, and applied
+     the other three independently. The table now lives in
+     `Broiler.Layout.Engine.ReplacedBoxSizing`, shared by the two paths that size a
+     replaced box so they cannot drift.
+  2. **`max-height` was never applied to an `inline-block`.** `FlowInlineBlock` had
+     a `min-height` arm and nothing beside it, so `height: 1000px; max-height: 60px`
+     stayed 1000px tall while the same declarations on a `display: block` box
+     clamped correctly. Never about replaced elements — every atomic inline-level
+     box had it.
+  3. **`<canvas>` was not a replaced element.** HTML §4.12.5 makes its
+     `width`/`height` content attributes the dimensions of its *bitmap* — its
+     natural size — and the Rendering section maps no presentation `width`/`height`
+     for it, unlike `<img>` or `<table>`. `DomParser.TranslateAttributes` projected
+     them onto CSS `width`/`height` regardless, which made both axes independently
+     *stated*, so even a correct §10.4 pass would give 120×100 where the test wants
+     100×100. Left alone entirely, a `<canvas>` laid out as a non-replaced inline —
+     the one box type `max-width`/`max-height` do not apply to. `CorrectCanvasBoxes`
+     records the attributes as the box's natural size and makes it an atomic
+     inline-level box; only the UA default `display` is replaced, an author
+     `display` is theirs to keep.
+  4. **A percentage `min-`/`max-height` resolved against an anonymous block** — and
+     an anonymous block is not an element, has no author height, and so is *always*
+     indefinite, which turned the percentage into its initial value (`0` / `none`)
+     and made it clamp nothing. Browsers climb to the nearest real element. Both
+     percentage-max-height tests are built around an image that lands in an
+     anonymous block — one after a sibling `<div>`, one through a `<span>` that a
+     block-inside-inline split has to break up. This one only became visible once
+     defect 1 stopped masking it.
+- **Every expectation was Chromium's, measured rather than read off the spec** —
+  through `getBoundingClientRect` on nine constructed probes. That was worth doing:
+  it overturned one reading that looked obvious and is wrong.
+
+  | Probe | Chromium | Before | After |
+  | --- | --- | --- | --- |
+  | 1×1 img, `max-width:100px; height:1000px; max-height:100%` in a 100px block | 100×100 | 1000×1000 | **100×100** |
+  | 1×1 img, `max-width:100px; height:1000px` (no max-height) | 100×**1000** | 1000×1000 | **100×1000** |
+  | `<canvas width=8000 height=8000>`, `max-width:120px; max-height:100px` | 100×100 | 8000×8000 | **100×100** |
+  | `<canvas width=400 height=200>`, `max-width:100px` | 100×50 | 400×200 | **100×50** |
+  | `<canvas width=400 height=200>`, no CSS | 400×200 | 0-sized inline | **400×200** |
+  | `inline-block`, `width:200px; height:1000px; max-height:60px` | 200×60 | 200×1000 | **200×60** |
+  | `inline-block`, `height:1000px; max-height:100%` in a 100px block | 50×100 | 50×1000 | **50×100** |
+  | block img in a `<span>`, `max-height:100%` in a 100px block | 100×100 | 1000×1000 | **100×100** |
+  | img, `width:1000px; max-width:100px`, auto height | 100×100 | 1000×1000 | **100×100** |
+
+  **Row 2 is the one to keep.** `height: 1000px; max-width: 100px` on a 1:1 image is
+  **100×1000**, not the 100×100 the §10.4 table would give — because the table is
+  written for "both `width` and `height` specified as `auto`", and a *stated* axis is
+  never re-derived from a clamp on the other one. Applying the table unconditionally
+  would have "fixed" three tests and quietly broken every image with a stated height
+  and a `max-width`, which is a common shape. The gate on
+  `widthIsAuto && heightIsAuto` is the whole difference and it is pinned by a test.
+- **Where it landed.** Main repo: `ReplacedBoxSizing`, the replaced
+  block-level/out-of-flow sizing path, the `max-height` arm in `FlowInlineBlock`,
+  `CssBox.ResolveInlineSizeBounds`/`ResolveBlockSizeBounds` (which also stop a
+  keyword `max-width: fit-content` from being parsed as `0px` and collapsing the
+  box), `CssBox.TryGetPercentageBlockSizeBasis` and
+  `CssBoxProperties.IntrinsicReplacedSize`. The `DomParser` half is `Broiler.HTML`
+  **`1071e48`**, "parse: size a `<canvas>` as a replaced element, and mark a
+  blockified inline split" — **upstream and pinned since 2026-08-13**, so it is live
+  on CI. The type sits in the main repo and the call in the submodule deliberately,
+  which is what kept the submodule change to the parse-time code and nothing else.
+- **Verified.** `css/css-sizing` **253 → 260 of 562** reftests.
+  `Broiler.Layout.Tests` 663 passing with 25 new cases. A **17 077-test reftest
+  sweep across 18 directories**, before and after: **11 674 → 11 705 passing**, 34
+  newly passing and 3 newly failing. The 34 are not only the three — the unified
+  §10.7 clamp picks up ten `CSS2/normal-flow/max-height-*`, the percentage-basis
+  walk picks up two `css-sizing/intrinsic-height-*-percentage-child` and two
+  `css-tables/percent-height-replaced-in-percent-cell-*`, and modelling `<canvas>`
+  picks up `css-flexbox/canvas-contain-size`,
+  `css-grid/grid-items/percentage-size-indefinite-replaced` and four
+  `css-sizing/intrinsic-percent-replaced-*`.
+- **The three that regressed are all `<canvas>`, and two were passing by rendering
+  nothing** — the trap, sprung in the other direction.
+  `css-images/object-view-box-writing-mode-canvas` (94.3%): the test's canvas
+  carries `background-color: black` and the reference's does not, so with the canvas
+  sized at zero *both* sides were blank white and agreed.
+  `css-grid/alignment/grid-align-baseline-005` (92.3%) is the same in a grid.
+  `css-sizing/intrinsic-percent-replaced-012` (98.7% against a 99% threshold) is a
+  genuine near-miss. All three are carried in
+  [not fixed](wpt-rendering-gaps-open.md#canvas-cannot-paint-its-bitmap).
+- **One rule was tried and removed on the evidence.** Declining the ratio transfer
+  into a percentage block size with no definite basis looked right and improved
+  `grid-align-baseline-005` from 92.3% to 96.8% — and cost three other tests, all of
+  which assert that behaviour and all of which want the transfer. The sweep settled
+  it; the reasoning on its own pointed the wrong way twice.
+
+### An absolutely positioned `<img>` rendered nothing at all
+
+- **Test:** `CSS2/positioning/abspos-025`, 13.6% on CI → **passes (99.6%)**. An
+  `<img>` with `position: absolute; left: 4em; right: 0; top: 4em; bottom: 0` must
+  keep its natural 15×15 size and let `right`/`bottom` give way (CSS2.1
+  §10.3.8/§10.6.5); Broiler stretched it across the whole inset box.
+- **Probing it turned up something worse than the test.** The stretch only happens
+  when `right` is set. With `left`/`top` alone — the ordinary way anyone positions an
+  image — an absolutely positioned `<img>` **rendered nothing at all**, and the same
+  was true of a `<canvas>`. That is not in any reported list because no test in the
+  top 30 exercises it; it came out of nine constructed probes measured against
+  Chromium.
+- **Both are the same missing clause, in two places that each say the right thing in
+  a comment and then do not do it.** `ResolveBlockUsedWidth` solves the §10.3.7 inset
+  equation "for absolutely positioned, **non-replaced** elements", and falls back to
+  shrink-to-fit "for absolutely positioned **non-replaced** elements with auto
+  width" — but neither branch excluded replaced boxes. With `right` set the first
+  branch stretched the image to the insets; without it the second measured the box's
+  *children*, of which an `<img>` has none, and produced zero. A zero-width box
+  paints no image.
+- **The fix** routes a block-level or out-of-flow replaced box through the same
+  `CssBox.ResolveReplacedContentSize` the inline path already used, and skips both
+  non-replaced branches for it. `TryGetNaturalReplacedSize` is what makes that
+  possible for an `<img>` as well as a `<canvas>`.
+- **Verified against Chromium on seven inset combinations** — all four insets, each
+  pair, none at all, and `width: 40px` with four insets (40×40: the height follows
+  the width through the ratio). Broiler matches on every one.
+- **The sweep shows the size of it.** The same 17 077 reftests: **11 705 → 11 749
+  passing**, and the 45 newly-passing tests are almost entirely the family this rule
+  governs — 22 `CSS2/positioning/absolute-replaced-{width,height}-*`, `abspos-025`
+  and `-026`, six `css-flexbox/flex-aspect-ratio-img-row-*`, four
+  `css-flexbox/flex-minimum-width-flex-items-*`, and
+  `css-position/position-absolute-replaced-no-intrinsic-size.tentative`. Against the
+  run's own baseline that is **+79 newly passing and 4 newly failing**.
+
+### `overflow` on `<body>` was never propagated to the viewport
+
+- **Test:** `css-overflow/overflow-body-propagation-009`, 18.1% → **passes (100%)**.
+  `body { overflow: clip }` on a 30×30 body holding a 10 000px child: CSS Overflow 3
+  §3.3 applies that `overflow` to the **viewport** and leaves the body's own used
+  value `visible`, so the child fills the canvas. Broiler clipped it to the body —
+  0.3% of the canvas blue against a reference that is 82%.
+- **Nothing was propagated, for any value.** Three probes (`hidden`, `clip`, `auto`)
+  all clipped the body's own box, so this was not a missing keyword in a list — the
+  rule was absent.
+- **The fix is a used-value adjustment, and the interesting half is the
+  disqualifications.** The value goes to the viewport, which Broiler already clips at
+  the canvas edge, so propagating means *removing* the body's own clip rather than
+  moving it onto the root element's box — those are different rectangles once the
+  body has margins, and putting it on the root scored 25% where dropping it scores
+  100%. It must also apply to the **first** `<body>` only, and only if that one
+  generates a box: `overflow-body-propagation-016` is a document with two of them
+  where the first is `display: none`, and there the second has to keep its own
+  `overflow: hidden`. A first pass without that guard fixed 009 and broke 016.
+- **Sweep: 11 749 → 11 750 passing, +4 and −3.** The gains are 009 and two more of
+  its own family (`-014`, `-015`) plus `css-sizing/fit-content-block-size-abspos`.
+  The three losses are pre-existing gaps the propagation exposes rather than causes.
+- **What this is not.** The viewport is still not a real clip container — it is the
+  canvas edge. That is indistinguishable for a top-level document, and it is why this
+  fix is small; a nested browsing context with its own propagated overflow would need
+  the real thing.
+
+### Containment other than `paint` never stopped background propagation
+
+- **Tests:** `css/css-contain/contain-body-bg-001` (layout), `-003` (size), `-004`
+  (style) and `contain-html-bg-001`/`-003`/`-004` — all six 7.5% → **99.8%**,
+  and all six pass their own reference at 100%.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.CanvasBackground.cs`,
+  `HtmlContainerInt.cs`), upstream and pinned.
+- **One condition, one keyword too narrow.** Each test paints `<body>` red under a
+  white `<p>` that covers it exactly, so the only red that can reach the screen is
+  red the *canvas* took from body. `FindCanvasBackgroundAndImage` suppressed
+  propagation for `contain: paint` only (plus `strict`/`content`, the shorthands that
+  include it), so `layout`, `size` and `style` propagated as if no containment were
+  set and flooded the canvas. That is why `-002` — the `paint` member of each family
+  — was the one already passing.
+- **The spec names all four, and it names both elements.** CSS Contain 2 §2: *"when
+  any containments are active on either the html or body elements, propagation of
+  properties from the body element to the initial containing block, the viewport, or
+  the canvas background, is disabled"*. So the check is now "is **any** containment
+  active", tokenised rather than substring-matched (`none` must not read as a
+  keyword), and it also answers yes for `content-visibility: hidden`/`auto`. Both
+  halves of the cascade were fixed together: `PaintWalker` decides what paints the
+  canvas and `HtmlContainerInt.GetRootBackgroundColor` decides the colour the surface
+  is erased with — they have to agree, or the erase colour wins in the margins.
+- **The mirror-image half, which the tests do not cover and Chromium settles.** The
+  old code applied the same suppression to the *root's own* background, so
+  `html { contain: paint; background: green }` painted a white canvas. That is wrong
+  in the other direction: the root element's background **is** the canvas background
+  rather than something propagated to it. Asked directly — Chromium under Playwright,
+  five documents differing only in the `contain` value — the whole canvas comes back
+  `rgb(0,128,0)` for `layout`, `paint`, `size`, `style` and no containment alike. Only
+  `display: none` still holds the root's background back.
+- **Calibrated against Chromium rather than inferred.** Ten further probes fixed the
+  edges. Suppressing, on body: `contain: layout`, `style`, `inline-size`,
+  `content-visibility: hidden` and `auto`. On html: `contain: inline-size` and
+  `content-visibility: auto`. **Not** suppressing: `contain: none`, and no `contain`
+  at all — both still flood the canvas red, which is what keeps the fix from
+  over-suppressing.
+- **One divergence, recorded rather than papered over.** Containment does not apply
+  to a non-atomic inline, and Chromium duly keeps propagating for
+  `body { display: inline; contain: layout }`. Broiler cannot reproduce that
+  distinction: instrumenting both code paths shows the box tree reporting `<body>` as
+  `display: block` whatever `display` says, so a guard for it would be unreachable.
+  The first draft carried one; it was removed once the instrumentation said so.
+- **Measured.** `css/css-contain` **413 → 419 of 584**, and the failing-test set
+  differs by exactly those six in one direction and nothing in the other. Average
+  match 96.57% → 97.62% — and that +1.05 is precisely the six tests' own contribution
+  (6 × (99.8 − 7.5) ÷ 524), so no other test in the subset moved even sub-threshold.
+  **Regression-checked on the two subsets that own the canvas:** `css-backgrounds`
+  (956 tests) and `css-color-adjust` (36) — **all 991 result lines byte-identical**.
+
+### Logical viewport units did not parse
+
+- **Test:** `css/css-page/page-box-008-print` — ours 99% hotpink where Chromium is
+  99% yellow, because the `block-size: 100vb` box had no size. **Now passing on CI.**
+- `vb`/`vi` did not parse at all. They now resolve against the **root element's**
+  writing mode, which is what CSS Values 4 §6.1.4 specifies (not the element the unit
+  appears on), so a per-pass factor set from the root's mode is the right
+  granularity; `Broiler.HTML`'s layout pass hands that mode to the parser alongside
+  the viewport size. The small/large/dynamic variants coincide with the default
+  viewport in a headless render with no retractable UA chrome, so they canonicalise
+  onto it.
+- **Verified end-to-end:** `100vi × 100vb` fills the viewport, a `vertical-rl` root
+  swaps the axes, and `100dvw × 50svh` covers half the canvas. A focused suite pins
+  both axes, both writing modes, and all four viewport sizes.
+- **Trap this uncovered:** canonicalising `svmin` → `vmin` means the unit *as
+  written* can be longer than the unit reported. Three call sites split
+  number-from-unit by the canonical length, so `"100svmin"` parsed its number as
+  `"100s"` and silently resolved to 0. `GetUnit` now also reports the written length;
+  any new site that splits a length must use it.
+- **Its own reference still disagrees (4.0%)** for the same reason
+  [`page-margin-002-print` does](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact)
+  — a `-print` test scored on screen. The golden comparison, which is what CI reports,
+  passes.
+
+### A table painted no background, and a block in a row group got no box
+
+- **Test:** `css/css-page/monolithic-overflow-011-print`, 0.0% on CI → **passing,
+  and 100% against its own reference** (95.1% yellow + 4.9% hotpink, which is what
+  Chromium renders).
+- **Neither half was the paged-media problem the test's name suggests**, and neither
+  was `contain: size` — a `contain: size` box paints fine on its own. Two separate
+  faults sat behind it, found by bisecting the test down to
+  `<table style="background: yellow">`:
+  1. **A table never painted its own background or borders at all** — CSS2.1 §17.5.1
+     layer 1. The six-layer model covers a table's *internals*, but the painter
+     handed the whole table to that pass (which starts at layer 2) while the
+     background phase skipped `display: table` children outright and the foreground
+     phase suppresses block backgrounds. Nobody emitted layer 1. Diagnosed at the
+     source rather than from pixels: the fragment had correct bounds and a computed
+     `background-color` of yellow and still emitted no fill. `TableBackgroundPaintTests`
+     is the landed check.
+  2. **A block child of a `display: table-row-group` got no box.** The row group
+     measured 0×0 and its child computed `display: inline`, so the hotpink rectangle
+     had nowhere to paint and the table was only as tall as its stray text. That is
+     table fixup — a block inside a row group needs wrapping in an anonymous
+     table-cell — and it is now implemented in
+     `Broiler.Layout/Engine/CssLayoutEngineTable.cs` (CSS2.1 §17.2.1 anonymous
+     table-row and table-cell generation).
+- **This was recorded as open — it is not.** The earlier write-up had the second
+  half holding the test at 2.26%. Re-measured 2026-08-13: it renders the reference
+  exactly and is absent from the CI failure manifest.
+
+---
+
+## Paint and the renderer
+
+### `clip-path` modelled only `inset()`
+
+- **Tests:** `css/css-masking/clip-path/clip-path-document-element` and
+  `-will-change`, 1.0% on CI → **both pass their own reference at 100%**, and both
+  are absent from the CI failure manifest.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.Geometry.cs`) and `Broiler.Graphics`.
+- **The gap.** `TryCreateInsetClipPathItem` parsed `inset()` and nothing else, and
+  modelled it as a **rectangle**. These two tests use `polygon()` — an L-shape on
+  the document element, which must also clip the propagated root background — so
+  the render was the unclipped page.
+- **What landed, in both submodules and both upstream and pinned:**
+  - `Broiler.Graphics` **`b8aefa2`**, "Add a polygon clip to the graphics clip
+    stack" — a real path clip rather than a `ClipItem` rect.
+  - `Broiler.HTML` **`cabb66c`** ("Clip to clip-path: circle() and ellipse()") and
+    **`e2fe977`** ("Resolve clip-path: url(#id) against the document's `<clipPath>`
+    definitions"). `PaintWalker.Geometry` now dispatches `polygon()`, `circle()`,
+    `ellipse()` and `url(#…)` alongside `inset()`.
+- **This was recorded as open**, on the grounds that a path clip needed a submodule
+  the session could not push to. It has since landed. `clip-path-element-userSpaceOnUse-004`
+  moved with it — 2.9% → **82.6%** — but is [still failing](wpt-rendering-gaps-open.md#svg-clippath-referenced-by-url).
+
+### A `visibility: hidden` box stopped clipping its visible descendants
+
+- **Test:** `css/css-overflow/overflow-scroll-resize-visibility-hidden`, 5.9% →
+  **100%**. Two `visibility: hidden` 100×100 scrollers each hold a 1000×1000 green
+  child that re-declares `visibility: visible`; the reference is the two 100×100
+  green squares the scrollers clip it to. Ours was the whole viewport green.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.Stacking.cs`, `f056363` "Keep the
+  overflow clip of a visibility:hidden box"), upstream and pinned.
+- **Neither `resize` nor `scroll` is the interesting part of the test name.** Five
+  constructed probes separate the variables: the same scroller with
+  `visibility: visible` clips correctly **with and without `resize: both`**, and
+  swapping `overflow: scroll` for `overflow: hidden` makes no difference either. The
+  single variable that changes the outcome is `visibility: hidden` on the scroller.
+- **The cause is one early return.** `PaintWalker.PaintFragment` handles a
+  non-visible fragment by calling `PaintChildren` and returning — correctly, since
+  CSS2.1 §11.2 makes `visibility: hidden` suppress only the box's *own* rendering and
+  a descendant may re-declare `visible`. But that early return jumps over everything
+  the visible path sets up afterwards, including the overflow clip. The box is still
+  generated and still clips; only its own painting is suppressed.
+- **Not changed: the foreground phase.** `PaintFragmentForegroundPhase` returns on a
+  non-visible fragment *without* descending at all, so a visible descendant of a
+  hidden box inside a table never paints. That is a separate pre-existing gap with a
+  different fix.
+- **Measured.** `css/css-overflow` **441 → 442 of 772**, and the per-test diff across
+  that whole subset is **two lines**. Checked for over-reach on the subset that
+  shares the clip path: `css/css-contain` re-run gives **583 result lines identical
+  to the pristine baseline**. 10 cases cover every clipping `overflow` value plus
+  `contain: paint`, `visibility: collapse`, the `resize: both` the test is named for,
+  and three controls — including that the child still paints *inside* the clip, since
+  a fix that simply suppressed the visible descendant would pass the clip assertion
+  and be wrong.
+
+### A frame's canvas was never transparent
+
+- **Tests:** `…/color-scheme-iframe-background-mismatch-opaque-cross-origin-003.sub`
+  (94.7% → **99.8%, passing**), `…/color-scheme-iframe-background` (69.0% → 98.9%,
+  then **99.4% passing** with the bevel fix) and
+  `…/color-scheme-iframe-background-mismatch-used-preferred` (94.6% → **99.5%,
+  passing**), which fell out with them.
+- **Owner:** `Broiler.HTML` (`HtmlRender`, `PaintWalker.CanvasBackground`) for the
+  renderer half — `d1cdad4`, upstream and pinned; `Broiler.Layout` for the rule and
+  the cascade fix.
+- **The rule.** CSS Color Adjust 1 §2.4: a nested browsing context's canvas is
+  **transparent** — the embedder shows through it — *unless* the used colour scheme
+  of the **embedding element** differs from the embedded root's, in which case the UA
+  paints an opaque backdrop of the embedded root's scheme. The comparison is
+  element-to-root, not document-to-document.
+- **Two bugs, not one.**
+  1. **The canvas was always opaque.** `RenderToImageCore` erased every embedded
+     document to its resolved canvas colour, `PaintWalker.EmitCanvasBackground`
+     painted the UA dark fill unconditionally, and `BlitOnto` copied the result
+     pixel-for-pixel with no alpha. A frame could not be transparent at all, so the
+     embedding element's `color-scheme` was never consulted.
+  2. **`color-scheme` did not inherit.** §2.1 makes it an inherited property, but it
+     was missing from `CssBoxProperties.InheritStyle` — unnoticed because it was only
+     ever read off the root element, which inherits nothing. Fixing only the first bug
+     regressed `…-002.sub` (the frame went transparent when the schemes genuinely
+     *did* differ); the two have to land together.
+- **What landed where.** `Broiler.Layout.Engine.EmbeddedCanvas` is the rule — a
+  thread-static, scope-restoring lever like `CanvasBackdrop` and `DocumentRoot`,
+  carrying the embedding element's computed `color-scheme` and answering
+  `PaintsOpaqueBackdrop`. Unpinned means "not embedded", so it answers `true` and a
+  top-level render is byte-identical.
+- **Verified:** the `dark-color-scheme` directory goes **22 → 24 of 29** with nothing
+  lost, and `html/semantics/embedded-content/the-iframe-element` is **unchanged
+  across all 161 tests** — the change is inert for a frame that fills its own canvas,
+  which is nearly all of them. 22 focused cases cover the rule, the cascade and the
+  render.
+
+### A 3D border was painted flat
+
+- **Tests:** `…/color-scheme-iframe-background` (98.9% → **99.4%, passing**) and 89
+  tests across `html/rendering` and `the-iframe-element` that carry an `<iframe>` or
+  an `<hr>`.
+- **Owner:** `Broiler.HTML` (`PaintWalker.Decorations`, `CssDefaults`) — `f8db3c6`,
+  upstream and pinned; `Broiler.Layout` for the rule.
+- **The gap.** CSS 2.1 §8.5.3 paints `inset`, `outset`, `groove` and `ridge` as a
+  bevel — two sides in a darkened shade of the border colour, two in the colour
+  itself. The IR paint path used the colour flat on all four sides, so the border the
+  HTML Standard puts on every `<iframe>` (`2px inset`) and `<hr>` (`1px inset`) came
+  out **solid black** where every browser paints `#9A9A9A` over `#EEEEEE`, and the
+  `border: 2px groove` on every `<fieldset>` came out flat too. On a 600×400 frame
+  that ring is 4 012 px — half of the test's residual, and exactly the half that kept
+  it under the threshold.
+- **Measured, not guessed.** The spec leaves the shades to the UA, so the rule came
+  from screenshotting Chromium and sampling each side. The darkened side scales all
+  three channels by the factor that takes the *largest* one down by 0.33 of full
+  intensity — which is what keeps the hue: `rgb(200,100,50)` darkens to
+  `rgb(116,58,29)`, all ×0.58, where the per-channel subtraction the greys alone
+  suggested would have given `rgb(116,16,0)` and turned brown into red. The lit side
+  is the colour itself, except black, whose lit side is `#545454`.
+- **The second half is the UA stylesheet.** CSS makes the initial `border-color`
+  `currentColor`, which bevels black-on-black; browsers substitute a light grey at
+  paint time. Broiler states that grey in the UA stylesheet instead. **The two halves
+  must land together:** shading while `hr` still carried its pre-bevelled per-side
+  colours would darken `#9A9A9A` a second time and regress every `<hr>`.
+- **`groove` and `ridge` split each side lengthwise**, and are emitted as two nested
+  rings rather than one. A groove reads as `inset` on its outer half and `outset` on
+  its inner half; a ridge is the mirror. The split sits at `ceil(width / 2)` from the
+  outer edge — a 3px groove is two dark rows then one light — and below 2px there is
+  no room for two halves, where Chromium paints a single stroke of the *lit* shade on
+  all four sides. That 1px case is the one place the two styles agree, and it was
+  found by measuring all four sides rather than just the top, which is where a
+  per-side rule would have looked right and been wrong.
+- **Verified:** across 665 tests, **89 changed and every one improved** — none worse
+  — with one more passing. 30 focused cases pin the shading numbers against the
+  Chromium measurements. Against Chromium directly, a page of groove and ridge boxes
+  matches to 99.95%.
+
+### A border corner had no mitre, and no anti-aliasing
+
+- **Owner:** `Broiler.HTML` (`RGraphicsRasterBackend`, `BCanvas`) — `f86b655`,
+  upstream and pinned; `Broiler.Layout` for the coverage rule.
+- **Two gaps, found one behind the other.** CSS 2.1 §8.5.4 divides a border at its
+  corners by a straight line.
+  1. **A stroke has no mitre.** Only `solid` was painted as a trapezoid; `inset`,
+     `outset`, `groove` and `ridge` were stroked along their centre lines, and a
+     stroke butts square into its neighbour — so whichever side was drawn last owned
+     the whole corner. Invisible while two sides share a colour, glaring when they do
+     not, which is exactly what a `groove` does.
+  2. **The mitre was a staircase.** Filled by testing each pixel's centre, the
+     diagonal steps one pixel per row where a browser lays one blended pixel along it.
+- **Coverage, not a 45° special case.** The mitre is only diagonal when the two sides
+  are equally wide. A 12px top against a 4px left slopes one-in-three, and the pixel
+  coverages come out 1/6, 1/2, 5/6 — against Chromium's measured 0.158, 0.503, 0.842.
+  The rule is the area of the pixel the trapezoid covers, and it reproduces both.
+- **Only the mitres blend.** The first attempt anti-aliased *every* edge of the
+  trapezoid and regressed 210 tests, five of them out of passing. A border's own
+  edges are straight lines the layout puts where it puts them, and feathering them
+  turns a 1px form-control border sitting on a half-pixel into two grey rows instead
+  of one solid one. Axis-aligned edges keep the pixel-centre test; only the diagonals
+  carry coverage. **That failure is the useful part of this entry** — the obvious
+  version of the fix is the wrong one, and only a broad measurement said so.
+- **Why the corner fill is opt-in.** Two trapezoids meeting along a mitre each cover
+  about half of the pixels on it, so blended independently onto the page they leave
+  the background showing through the seam. The corner rectangle already filled for
+  same-coloured sides is now filled for every corner, with the colour of whichever
+  side is drawn first, so the second blends over an opaque corner. A translucent side
+  disables the whole thing, since that fill would composite its alpha twice.
+- **Verified:** against Chromium directly, a 12px four-colour border's corners go from
+  **48 differing pixels to 12** (the rest off by 1/255), and a page of groove and
+  ridge boxes from **425 to 21**. Across 1 949 tests of `css/css-backgrounds`,
+  `html/rendering`, `css/css-gaps` and this directory, **no test changes state in
+  either direction** and the net is **+1.578 points**.
+
+### A colour-only SVG filter chain now recolours the shape
+
+- **Test:** `css/filter-effects/fecolormatrix-negative`, 7.7% → **99.6%**, and it
+  passes its own reference at 100%. Its reference is a cyan rectangle, which is what
+  the test's own assertion says to expect; Broiler painted the unfiltered `#ffaa00`.
+- **Owner:** `Broiler.Layout` (`IR/SvgColorFilter.cs`, `IR/SvgRenderer.cs`,
+  `IR/SvgFilterTable.cs`). Main repo.
+- **What the filter does, in closed form.** `feColorMatrix` with the negative entries
+  inverts each channel — `#ffaa00` → (0, 0.333, 1) — and the arithmetic `feComposite`
+  with `k2="255"` multiplies the premultiplied channels by 255, so every non-zero one
+  saturates: (0, 1, 1), cyan. **No raster pipeline is needed to know that, because a
+  shape filled with one solid colour has a source graphic that is that colour inside
+  it and transparent black outside**, so a chain of per-pixel colour operations
+  produces exactly two colours. Same modelling the engine already applied to an
+  `feFlood`-only filter, extended to a chain.
+- **Why the region does not have to be modelled too** — the trap that makes this cheap
+  rather than a filter engine. Every step modelled here maps zero alpha to zero alpha,
+  so the *outside* colour stays transparent and the filter region never becomes
+  visible. `AMatrixThatZeroesAlpha_MakesTheShapeTransparent` pins that property rather
+  than leaving it as a comment.
+- **Deliberately narrow, and every bail-out renders unfiltered.** Only `feColorMatrix`
+  (`type="matrix"`) and `feComposite` (`operator="arithmetic"`); only a straight chain;
+  only when the filter declares `color-interpolation-filters="sRGB"`, because the
+  default is linearRGB and the conversion is not modelled. Applied only to an
+  **unstroked** `<rect>`: a stroked shape is not one colour.
+- **A pre-existing over-match found while testing this, and left alone.**
+  `CollectFloodFilters` takes the first `feFlood` in a filter body whatever else is in
+  the chain, so a filter that is `feColorMatrix` + `feFlood` is treated as flood-only.
+  This change neither introduces nor fixes it; the test file records it and declines
+  to pin it.
+- **Measured.** `css/filter-effects` **180 → 181 of 388**, and the per-test diff across
+  the whole subset is two lines — that test, and `fecolormatrix-display-p3` improving
+  97.2% → 98.0% without crossing the threshold (its residual is the Display-P3 colour
+  space, a separate gap). **Nothing else moved in either direction.**
+
+### Animated images always painted their first frame
+
+- **Tests:** the four `css/css-image-animation/image-animation-*-paused`. For all four
+  Broiler's canvas was 100% `rgb(0,255,0)` and Chromium's 100% `rgb(255,0,0)`.
+- **Owner:** Broiler.Media (frame selection) with `Broiler.HTML` (a paint-time clock).
+- **What landed.** `ImageSequence.FrameAt` / `FrameIndexAt` answer "which frame is
+  showing at time *t*", and `ImageAnimationClock` carries the presentation time a
+  still render is taken at. The WPT runner pins that clock per test from the test's own
+  `takeScreenshotDelayed(N)`, read from the source before the script pass and the
+  post-processor strip the `<script>` that carries it. `StubImageAdapter`'s decode — the
+  single seam where a decoded sequence collapses to one bitmap — selects the frame at
+  that clock instead of taking `FirstFrame` (`BBitmap.DecodeFrameAt`, upstream and
+  pinned).
+- **The clamp is what makes the numbers work.** `anim-gr.gif`'s green frame carries a
+  **10 ms** delay and its red frame 100 s. Taken literally, a 300 ms screenshot would
+  land deep in a fast loop; every engine instead treats a delay that short as
+  "unspecified" and substitutes 100 ms (Blink's threshold is 11 ms, and the references
+  are Chromium's). So green occupies 0–100 ms and red everything after.
+- **Verified:** the four tests went **0.0% → 100%** against locally generated Chromium
+  references. Four focused tests cover the timeline (selection at successive times, the
+  short-delay clamp, loop-count wrap versus hold, and the clock's nested pin/restore),
+  and 14 cases cover the runner's delay extraction — including the negative half, that
+  a test with no literal delay resolves to zero rather than guessing.
+- **A cost worth naming:** the clock is process-wide, not thread-local, because image
+  loading is dispatched to the thread pool — a `[ThreadStatic]` value would be invisible
+  to the code that reads it. Concurrent renders at *different* presentation times are
+  therefore unsupported, which is the honest state of a stack that renders one document
+  per process.
+- **Two of the four have since gone back to 0.0%, and that is correct.**
+  `image-animation` was implemented afterwards, so Broiler now honours `paused` and
+  holds the green frame Chromium never shows. See
+  [won't fix](wpt-rendering-gaps-wont-fix.md#image-animation-paused--the-worked-example-of-the-cost).
+
+---
+
+## DOM and the bridge
+
+### A root-relative frame `src` resolved against the wrong directory
+
+- **Test:** `resource-timing/initiator-type/frameset`, 0.0% → **99.7%, passing**.
+- **Owner:** `Broiler.Layout` (`FragmentTreeBuilder`) with the WPT runner. Main repo.
+- **The previous diagnosis was wrong, and it named the wrong feature entirely.** This
+  was filed as the frameset grid painting neither its canvas nor its frames' documents,
+  with "render frames as nested browsing contexts on that grid" as the next action. None
+  of that was needed: the grid, the sub-viewport projection and the frame document load
+  all already worked. Bisecting the test down found the whole difference in the URL —
+  the same page with `src="../resources/green.html"` rendered its frame correctly, and
+  only `src="/resource-timing/resources/green.html"` came out blank. `<frameset>` was a
+  red herring, and so was `<frame>`: an `<iframe>` with a root-relative `src` failed
+  identically.
+- **The bug.** HTML §"resolve a URL" resolves a leading `/` against the document's
+  origin. A `file://` render has no origin, and
+  `FragmentTreeBuilder.TryLoadEmbeddedDocument` joined the URL onto the containing
+  directory like any other relative reference. **`Path.Combine` discards its left
+  operand when the right one is rooted**, so the result was an absolute path at the
+  filesystem root, `File.Exists` failed, and the frame painted empty. Silent, and it had
+  nothing to do with framesets.
+- **What landed.** `Broiler.Layout.Engine.DocumentRoot` is a thread-static,
+  scope-restoring render lever (the shape of `CanvasBackdrop.Current` and
+  `NativeZoom.Enabled`) carrying the directory a root-relative sub-document URL resolves
+  against; `TryLoadEmbeddedDocument` takes a root-relative branch that reads from it,
+  stripping the query and fragment and refusing to leave the root. The WPT runner pins it
+  to the checkout around both render paths — the same root its stylesheet, image and
+  script loaders already resolve `/`-paths against. **This was the one sub-resource kind
+  with no such hook.**
+- **Null by default is the point.** A host that sets nothing renders exactly as before.
+- **Verified:** the render is the *right* pixels — 99.8% `#00FF00` plus the reference's
+  own `<h1>Placeholder</h1>` text, matching Chromium's 99.8%/0.1% split. The
+  `resource-timing/initiator-type` subset goes 8 → 9 passing with nothing lost. 13 focused
+  cases pin the behaviour, including the negative halves: no root set → still empty; the
+  root is *not* the page's own directory; `//host/path` is scheme-relative and must not be
+  read off the local disk; `..` cannot escape the root; a bare `/` is not a document; and a
+  directory-relative `src` is unaffected either way.
+- **A genuine frameset bug, found alongside and also fixed:** a frameset with more than
+  one frame painted only its first cell. `<frame>` was missing from `Broiler.DOM`'s
+  void-element set, though `Broiler.HTML` has it, so `<frame src=a><frame src=b>` parsed
+  the second frame as a *child* of the first and `DomParser.LayoutFramesetChildren` was
+  handed one cell instead of two. Confirmed by writing the same markup with explicit
+  `</frame>` tags, which renders both cells. Fixed in `Broiler.DOM` **`55057b8`**, "Treat
+  `<frame>` as a void element in the parser and serializer", which is the pinned pointer.
+  Both `cols` and `rows` framesets go from half-painted to both cells painting their own
+  document. **No test in the current subset covers it** either way.
+
+### `Node.moveBefore` was missing — and it was only half the test
+
+- **Test:** `dom/nodes/moveBefore/preserve-render-blocking-style`. Ours white, Chromium
+  100% green. **Now passing.**
+- **Owner:** `Broiler.DOM` with HtmlBridge for the binding.
+- **The canonical method.** `Broiler.DOM` **`994e196`**, "dom: implement
+  Node.moveBefore" — the genuinely atomic version, upstream and pinned. The state it
+  preserves follows from one spec constraint: both parents must share a shadow-including
+  root, so a moved node's *connectedness cannot change*. That is why the document's id
+  index is deliberately not torn down and rebuilt, and why an `<iframe>` must not reload.
+  Observers still see the move (records are queued for both parents); only the
+  disconnection is skipped. `DomBridge.MoveNodeBefore` delegates to `parent.MoveBefore`
+  and keeps only what is genuinely the bridge's — marshalling the canonical `DomException`
+  into a JavaScript `DOMException`, and invalidating the style scopes the reposition
+  dirtied.
+- **Why validity is stricter than `insertBefore`:** `moveBefore` rejects a node that is
+  not already in the tree, and one from a different root. Both would be silently accepted
+  by an insert; a caller relying on the atomic guarantee needs the exception instead of
+  insert-shaped behaviour.
+- **The test stayed at 0.0% anyway, and this is the part worth keeping.** It was recorded
+  as fixed and was not. The real gap: **`<link>` had no IDL reflectors at all**, so the
+  ordinary way to inject a stylesheet — `createElement("link")`, set `.rel` and `.href`,
+  append — wrote *nothing*, and the element serialized as a bare `<link>` that never
+  reached the cascade. `setAttribute("rel", …)` worked, which is how it stayed hidden.
+  `<link>`/`<base>` now reflect `href` as a URL like `<a>`/`<area>`, and `<link>` reflects
+  `rel`, `as`, `media`, `hreflang`, `integrity` and `referrerPolicy`. **0.0% → 100%**, in
+  the main repo. The `?pipe=trickle(d1)` query and the `moveBefore` call in that test were
+  both red herrings — a static `<link>` with the same query already rendered correctly.
+- **Verified:** 16 DOM-level tests and 10 bridge-level tests cover moves within and across
+  parents, the render-blocking `<style>` case, the observer records, and every pre-move
+  validity rejection.
+
+### `<base href>` was ignored for `<link rel=stylesheet>` in the render path
+
+- **Test:** `html/semantics/document-metadata/the-link-element/stylesheet-with-base`.
+  Ours 100% red; **now 100% green and passing.**
+- **The trap the test sets.** It sets `<base href="resources/">` and links
+  `stylesheet.css`, so only `resources/stylesheet.css` (green) may load — the sibling
+  `stylesheet.css` next to the test sets red. Broiler resolved the href against the
+  document URL and loaded the trap file, which is exactly what the `<base>` is there to
+  prevent.
+- **Root cause: a second site.** An earlier commit taught the DomBridge serialization
+  transform to honour `<base>`, but the WPT runner's `InlineLinkedStylesheets` reads
+  linked sheets off disk *before* those transforms run — resolving against the test's own
+  directory. It inlined the trap as a `<style>`, so by the time `ApplyBaseHrefToStyleUrls`
+  ran there was no `<link>` left to rebase.
+- **What landed:** rather than a third implementation, `HtmlBaseHref`
+  (`src/Broiler.HtmlBridge.Dom/HtmlBaseHref.cs`) is the one seam both sites resolve
+  through — it finds the document base (from raw HTML or the DOM) and resolves a URL
+  against it, **keeping the base's shape** so downstream mapping still works: absolute
+  base → absolute URL, root-relative base → root-relative path (the `wptRoot` handler
+  still matches), document-relative base → a document-relative path when no page URL is
+  known, which is what a caller holding a directory needs.
+  - `@import` was the same bug one layer down: `InlineStyleSheetImports` resolved a
+    relative import against `_pageUrl`, never the base. It now folds the base in via
+    `HtmlBaseHref.ResolveDocumentBaseUrl`.
+- **Verified:** focused tests assert the trap file is never loaded (not merely outranked in
+  the cascade), that a document with no `<base>` still picks the sibling, and that
+  non-stylesheet `<link>`s are untouched.
+- **Note for the next reader:** on a Unix host `Uri.TryCreate("/css/", UriKind.Absolute)`
+  succeeds as the *file path* `file:///css/`. Base resolution must check for a scheme
+  before treating a base as absolute or it silently drops the page's origin — the helper
+  does, and a test pins it.
+
+### A `<template>`'s styles leaked into the page
+
+- **Test:** `shadow-dom/focus-navigation/delegatesFocus-highlight-sibling`, 0.0% →
+  **97.8%**, and **now passing on CI**.
+- **It was never about focus.** The old next action was "establish what Broiler is
+  painting grey before touching focus delegation", and that was the right instinct: the
+  answer had nothing to do with focus, delegation, or control chrome. A `<style>` inside a
+  `<template>` was being collected into the **document** cascade. HTML §4.12.3 keeps a
+  template's children in a separate fragment as *template contents* — inert until stamped
+  out. The test keeps its component styles in a template, as components normally do, so
+  `:host { background-color: #aaa }` and `:host(:focus) { background-color: #ccc }` leaked
+  into the page, matched it, and painted 99% of the canvas `#ccc`.
+- **How it was narrowed,** since the signature pointed the wrong way. Bisecting the three
+  ways to get a style into a shadow root separates the causes cleanly: a plain host
+  populated by `innerHTML` renders correctly (2.8% `#aaa`); the same rules delivered by
+  `<template>` + `importNode` fill the viewport (99.7%); and a custom element populated by
+  `innerHTML` renders nothing. Removing the `:host(:focus)` rule still filled the viewport,
+  which ruled the focus rule out. The serialized DOM then settled it: the shadow root was
+  **empty** while the page rendered grey.
+- **What landed:** `DomParser.CascadeParseStyles` stops at a `<template>` box. Narrow by
+  design — template *contents* already produce no boxes and correctly do not render; only
+  the stylesheet walk descended into them.
+- **This is not specific to one test.** Any component that keeps its styles in a template
+  — the ordinary way to write one — was leaking them into the page.
+- **Four further bugs were found chasing the residual, and three are general.**
+  1. **The `customElements` shim never worked at all.** The DOM globals were unreachable
+     by bare name (a bare identifier does not resolve through `window` the way it does in
+     a browser, so `class extends HTMLElement` threw); the upgrade threw on any element
+     with attributes (it read `element.attributes[i].name`, but the bridge's `attributes`
+     reports a length without answering to numeric indexing); `connectedCallback` was never
+     called; and `template.content` / `document.importNode` did not exist, so the
+     `importNode(template.content, true)` idiom every one of these components uses yielded
+     nothing. All four fixed. One deviation is deliberate and pinned by a test: the spec has
+     the parser move a template's children into the content fragment, leaving the element
+     childless, whereas Broiler's parser keeps them as children so a template round-trips
+     through serialization — so `content` is a stable *snapshot copy*.
+  2. **The min/max-content passes measured `display: none` text.** `GetMinMaxSumWords` and
+     `GetMinimumWidth_LongestWord` walked every child collecting words with **no
+     `display:none` guard**, while the shrink-to-fit *height* paths beside them had one. So
+     UA-hidden elements that carry text (`<style>`, `<script>`, `<title>`) were measured,
+     and their **source text set the width of any shrink-to-fit ancestor**. Every shadow
+     host is such a box holding its component's `<style>`, which is why it surfaced here,
+     but a plain `<div style="display:inline-block">` holding one `<li>` and a stylesheet
+     measured 861px wide against 65px without it. A `display:none` box generates no boxes at
+     all (CSS 2.1 §9.2.4), so both passes now skip it. **90.5% → 95.7%.**
+  3. **A collapsible space between inline-block siblings counted as zero.** A space between
+     siblings is normally carried as a flag on an adjacent *word*, but between two
+     inline-blocks the neighbours live in other boxes, so the space is a text box of its own
+     whose words collapsing clears — and the intrinsic pass measured nothing. The
+     shrink-to-fit container then came out exactly one space too narrow and its last child
+     wrapped: two 10px inline-blocks measured 20px and **stacked**, the second at `y=34`,
+     where 24px would have put them side by side. `GetMinMaxSumWords` now counts a collapsed
+     whitespace separator as one space advance; preserved whitespace (`pre`, `pre-wrap`,
+     `pre-line`) keeps its words and takes the normal path. **95.7% → 97.8%**, and
+     reproducible with no shadow DOM, template or custom element in sight:
+
+     ```html
+     <style>
+       .row { display: inline-block; background-color: #aaa; }
+       .row span { display: inline-block; background-color: #eee; }
+     </style>
+     <div class="row"><span>Item One</span> <span>Item Two</span> <span>Item Three</span></div>
+     ```
+- **The score going *down* was the useful part.** With the custom-element fixes the test
+  read 90.5% against 98.2% for the template fix alone. Nothing regressed: the shadow
+  content simply rendered for the first time, at the wrong size, where before it was
+  absent.
+- **Two wrong turns, recorded so they are not repeated.** First, the width cause was
+  ascribed to the CSS *text length*, then "refuted" by a pure-comment stylesheet that left
+  the host at 1008×19 — but that case had no `:host` rule, so the host was full-width and
+  the comment fit on one line; the test did not discriminate, and the refutation was wrong.
+  Holding `:host` fixed and varying only inert text settles it: a 600-character comment takes
+  the box from 468px to 6014px. Second, `getBoundingClientRect` is the bridge's own
+  measurement taken while scripts run, *before* the shadow style is projected, so it reported
+  some cases as unchanged when the render had in fact improved. **Measure the render.**
+- **Two more attempts were measured and reverted**, and both are recorded under
+  [inline-block line height](wpt-rendering-gaps-open.md#an-inline-blocks-height-ignores-line-height).
+- **The durable answer is still `customElements` in HtmlBridge proper.** Items in (1) live
+  in the runner's browser-API shim, which exists only because the bridge implements no
+  custom elements.
+
+### A Web Animation on a pseudo-element was silently inert
+
+- **Test:** `css/css-pseudo/backdrop-animate-002`, 0.8% → **99.74%**.
+- **Owner:** HtmlBridge (`DomBridge/WebAnimations.cs`, `DomBridge.Serialization.cs`,
+  `Dialogs.cs`). Main repo.
+- **Two gaps, and the test needs both.** It animates `::backdrop` to a 10%-opacity green
+  and got the UA modal scrim. **Its own reference writes the same declarations as CSS and
+  already rendered correctly** — which is what said the gap was the API rather than the
+  pseudo-element.
+  1. **The property-indexed keyframe form was not parsed at all.**
+     `ParseAnimationKeyframes` required a `JSArray`, so `{ opacity: [0, 1] }` — the other
+     half of the Web Animations keyframe argument — resolved to zero keyframes and the
+     whole animation was inert. Each property is now turned into its own keyframes, which
+     is exactly how `ResolveKeyframeProperties` reads them: it brackets each property
+     against only the keyframes that define it, so properties with different list lengths
+     need no common offset grid.
+  2. **`pseudoElement` was ignored.** A pseudo-element has no node, so the element-inline
+     bake `animate()` performs has nowhere to land. Those values are kept aside per element
+     and pseudo, and emitted at serialization as `#id::pseudo { … !important }` author
+     rules.
+- **The rule alone did not close it, and the reason is worth recording.** With the rule
+  emitted and verifiably present in the serialized HTML, the backdrop went green but stayed
+  opaque. The WPT path renders a modal backdrop as a *synthesized* `<div>`, and a
+  `#id::backdrop` selector cannot match a `<div>` — the div is filled from the bridge's own
+  `::backdrop` cascade instead. So the animated values are merged into that cascade too, in
+  `BackdropDeclarationsFor`, which both the synthesized div and the native marker read.
+- **Measured:** `css-pseudo` **236 → 237 of 358** with nothing lost. Checked wider, because
+  keyframe parsing touches every `animate()` call: `css-view-transitions` 346/490,
+  `css-masking` 222/439, `css-shadow` 157/207, `css-transforms/animation` 30/64 and
+  `css-align/animation` 4/6 — all unchanged.
+- **A method note that cost real time.** The first `css-view-transitions` diff showed
+  `auto-name-from-id` falling 97.46% → 1.27%. Neither was this change: the reference set had
+  been regenerated between the two runs, and **this directory's references are
+  timing-sensitive enough to differ between generations**. **Compare runs only against
+  references generated in the same pass.**
+
+### An `overlay` entry transition that never finished
+
+- **Test:** `css/css-position/overlay/overlay-transition-finished`, 1.8% → **100%**.
+- **Owner:** HtmlBridge (`DomBridge/AnchorResolver/Dialogs.cs`). Main repo.
+- **The CSSOM answer and the painted answer are taken at different instants, and
+  conflating them made the test unwinnable.** It reads `getComputedStyle(el).overlay`
+  synchronously after `showPopover()` and paints itself pink unless it sees `none` — the
+  transition must be observed *running* at script time — then screenshots from
+  `transitionend`, by which point the popover must be in the top layer covering a fixed red
+  div. `PopoverHeldOutByOverlayTransitionIn` answered "held out" for both, because it
+  returns true whenever an element merely *declares* a discrete `overlay` transition.
+- **What landed.** `ComputeOverlayValue` keeps answering for t≈0; only the two paint sites
+  move, through `PopoverHeldOutOfTopLayerForPaint`. The renderer has no clock, so "which
+  instant" is read from what the page says — the same thing the runner already does for
+  `takeScreenshotDelayed(N)`. A test that gates its screenshot on `transitionend` is making
+  that statement without a number, and `ScreenshotWaitsForTransitionEnd` recognises the
+  shape: the document is still `reftest-wait` *and* a `transitionend` listener is reachable
+  from the element (itself, an ancestor, the document, or the window — it bubbles).
+- **The `reftest-wait` half is what keeps it from being a one-way door.** Broiler dispatches
+  no transition events, so a page waiting on one waits forever and the class survives to
+  serialization. If transition events are implemented later, the natural shape — dispatch
+  `transitionend`, the listener calls `takeScreenshot()`, the class goes — makes the
+  predicate false while the transition is genuinely over, and the ordinary path elevates the
+  popover. **The rule degrades into the real one rather than inverting.**
+- **Nothing else in the directory matches the shape**, which is what says this is a rule and
+  not a fit to one test: the three tests that must keep the popover held out screenshot
+  immediately and register no such listener, and `overlay-transition-dialog` is
+  `reftest-wait` but releases it from a `requestAnimationFrame`.
+- **Measured: `css-position` 238 → 239 of 382 with nothing lost.**
+
+### `close()` did not honour `transition: overlay allow-discrete`
+
+- **Test:** `css/css-position/overlay/overlay-transition-dialog`, 0.4% → **99.89%**.
+- An asymmetry between two code paths that model the same rule. `hidePopover()` had
+  honoured it since the popover work — a popover hidden mid-transition stays in the top
+  layer, so a static render still paints it and its `::backdrop`. `close()` did not, and tore
+  a modal dialog down unconditionally.
+- `close()` now applies the same rule, in the two halves the spec actually has: `overlay`
+  keeps the top-layer flag (so the backdrop paints), and `display` keeps the `open` attribute
+  (because the UA sheet's `dialog:not([open]) { display: none }` is what decides whether a
+  box is generated at all). A dialog transitioning `overlay` alone stays in the top layer but
+  generates no box — a third test pins that, so the two halves cannot be collapsed into one
+  flag.
+- **`css-position` 241 → 242 of 382.** Main repo.
+
+### A stylesheet `<link>` dispatched no `load` event
+
+- Part of `uievents/…/UIEvent.load.stylesheet`. Nothing dispatched a stylesheet link's
+  `load` event at all. It does now — once per href, only for a link in the document, and
+  `error` rather than `load` when the fetch fails, decided by the same CSP gate and fetch the
+  cascade uses. That last part matters: the loader only accepts absolute URLs, and skipping
+  the resolution against the page URL dispatched `error` for every relative href while the
+  sheet applied fine.
+- **The test renders `PASS` where it rendered `FAIL`** and is still
+  [below the threshold](wpt-rendering-gaps-open.md#bold-and-italic-never-reach-the-face) on
+  bold text.
+
+### `transform: scale()` with percentages
+
+- **Test:** `css/css-transforms/transform-scale-percent-001`, 0.5% → **99.99%**.
+- Two bugs in one spec rule. css-transforms-2 makes a scale factor
+  `<number> | <percentage>` where the percentage is *the ratio* — `scale(50%)` is
+  `scale(0.5)`. The paint parser resolved every percentage against the element's box (right
+  for `translate`, wrong for `scale`), so a 100px square came out 50× and filled the canvas;
+  the bridge's geometry parser had no percentage branch for scale at all, so `50%` fell back
+  to `0` and collapsed the box.
+- **The 939-test `css-transforms` subset goes 376 → 377 passing.**
+
+---
+
+## View transitions
+
+### An explicit `view-transition-group` name matched a non-ancestor
+
+- **Test:** `css/css-view-transitions/nested/compute-explicit-name-non-ancestor.tentative`,
+  0.0% → **100%**.
+- **It was recorded as an untrustworthy pass, and it was neither.** The old verdict was
+  "passes only by rendering nothing — the reference is a blank white canvas". That stopped
+  being true: Chromium's reference became **100% green** and Broiler rendered **100% red**.
+  **Re-checking what a reference actually contains is cheap; carrying a stale verdict is
+  not** — and once re-triaged as an ordinary failure it turned out to be a one-line rule.
+- **`view-transition-group: <custom-ident>` resolves against the *ancestor* chain**, not
+  against the whole document (css-view-transitions-2) — the test's own title is "Explicit
+  view-transition-group name can only match ancestors". `ResolveGroupParentName` accepted
+  any captured element with that name, so a group nested under its **sibling**. The colour
+  follows from there: `::view-transition-group(test) { background: inherit }` then inherited
+  the sibling's red instead of the green `::view-transition` root, and since every group in
+  that family is `position: absolute; inset: 0`, the last one painted takes the whole canvas.
+- **The family is six tests against one reference**, which is what makes the rule checkable
+  rather than guessable: `-direct` (parent) and `-nested` (grandparent) must keep nesting,
+  while `-non-ancestor` (sibling), `-non-existent`, `-self` and `-nested-vt-names` must not.
+  All six render 100% green after the change. `root` keeps qualifying explicitly, since the
+  document element is an ancestor of every other captured element.
+- **`css-view-transitions` 344 → 345 of 490 with nothing lost and nothing else moved.** Four
+  focused tests read the nesting off one colour — green when the group nested, blue when it
+  stayed top-level — and cover both directions, so the fix cannot degenerate into "never
+  nest".
+
+### Three narrower corrections to the pseudo tree
+
+All three landed; none closes a test on its own, and the remaining root-capture work is in
+[not fixed](wpt-rendering-gaps-open.md#the-root-capture-is-not-rasterised).
+
+1. **The root's captured name was hardcoded to `root`.** It is really whatever
+   `view-transition-name` the document element carries; the UA sheet only supplies `root` as
+   the default. `root-captured-as-different-tag` renames it to `another-root` and paints
+   `::view-transition-group(root)` red *precisely to assert the `root` rules stop applying* —
+   so the 100% red canvas was the test working as designed. `auto`/`match-element` on the
+   document element resolve to `root` rather than a generated name.
+2. **`::view-transition-image-pair` was never materialised.** The spec puts it between a
+   group and its old/new pair so one rule can address both; `old-content-captures-root` hides
+   an entire group through it, and with no such box the rule had nowhere to land.
+3. **The pair box alone was not enough** — and this is the sort of thing only a real render
+   catches. The snapshot content box bakes the captured element's computed style, so it
+   re-asserted `visibility: visible` (the initial value nearly everything has) *over* the
+   pair's inherited `hidden`. Only a non-initial `visibility` is carried now.
+
+**Verified:** 25 `ViewTransition*` tests pass — three new ones covering the renamed root and
+the image-pair hide *with its negative half* (the same group paints without the rule, so the
+test cannot be satisfied by a blank group). Swept over all 458 local
+`css-view-transitions` tests to confirm they cost nothing.
+
+### Page selectors leaked into the pseudo tree
+
+- **Test:** `css/css-view-transitions/names-are-tree-scoped`, 0% → 96.19%. Still failing on
+  a separate cause — see
+  [not fixed](wpt-rendering-gaps-open.md#a-captured-element-still-paints-in-place).
+- The pseudo tree is materialised as real `<div>`s, so the test's page-level
+  `div { background: red }` matched every box in it, including the viewport-sized overlay root
+  that paints at z-index 2147483646. Each box now re-asserts a transparent background beneath
+  its own base style and the author's `::view-transition*` declarations.
+- **The interesting part is why the obvious version of this is wrong.** The reset is written
+  as longhands and an author writes the `background` shorthand, so the two land on different
+  keys of the inline-style dict and the longhands win by coming later — silently cancelling
+  `::view-transition { background: lightpink }`. Layering them cost **341 → 264** passing
+  across the 490-test subset, with individual tests falling from 100% to 1%; narrowing the
+  reset to backgrounds alone changed nothing (263), which is what identified the shorthand
+  collision rather than the extra properties. **The reset has to stand aside entirely when the
+  author paints the box.**
+- **Net: 341 → 341 passing**, one genuine gain
+  (`shadow-part-with-name-overridden-by-important`, 1.3% → 100%) against one apparent loss
+  that is `new-content-transform-change-001` — [a flaky
+  test](wpt-rendering-gaps-open.md#one-test-is-flaky) which scores 1.03% on three consecutive
+  runs of the *unmodified* build, identically to the patched one.
+
+### The old capture was not in the snapshot containing block
+
+- **Tests:** the `massive-element-*` family. `css-view-transitions` **346 → 349 of 490**,
+  nothing lost.
+- Both captures call the same `GetBoundingClientRectForDomElement`, but at different moments
+  against different layouts, and only one has the scroll folded in: the new capture runs on
+  the render projection, where the scroll is already baked into box positions, while the old
+  one runs during script, where it is not. The page scroll is now subtracted from the old
+  capture, which reproduces the new capture's −38 986 exactly.
+- **A `position: fixed` element — or anything inside one — is excluded**, since it does not
+  move with the page and its document coordinates are already viewport coordinates; without
+  that exception `new-content-transform-position-fixed` falls from 100% to 98.73%, **which is
+  how the exception was found rather than guessed**.
+- The gains are `massive-element-on-top-of-viewport-partially-onscreen-old`/`-new`
+  (96.70% → 99.58% — the *vertical*-scroll members of the family) and
+  `transformed-element-scroll-transform` (98.73% → 100%). The horizontal-scroll members are
+  [still failing](wpt-rendering-gaps-open.md#the-snapshot-clone-lays-its-children-out-horizontally).
+
+### The root snapshot now clones when the page cannot show through
+
+- **Tests:** `new-content-captures-root`, `old-content-captures-root`,
+  `root-captured-as-different-tag`, all three of which had rendered as a flat pink page.
+  **All three now pass on CI**, at 98.5% against their own reference.
+- **What did *not* work, and why it is worth knowing.** The root capture used to carry only a
+  background colour, no content, so `::view-transition-old(root)` was transparent and the
+  author backdrop showed through the page. Reproducing the page by **cloning the DOM** into the
+  snapshot box was implemented, measured, and reverted. It fixed three tests outright
+  (0.0% → 100%), but across the 458 local `css-view-transitions` tests it was **+8 / −7** — and
+  it cost 79 pixel points on `root-to-shared-animation-end` (82.7% → 3.1%). Restricting the
+  clone to the *old* snapshot did not rescue those. **The reason is structural, not a missing
+  detail: a DOM clone re-lays-out and is only *close*, while the transparent box let the live
+  page show through — and the live page is pixel-exact. Anywhere the old root snapshot is
+  genuinely visible, exact beats close.**
+- **What did work: gate the clone on whether the page can show through at all.** The two cases
+  are distinguishable without a rasteriser. The live page can only stand in for the snapshot
+  while nothing paints between them; once the author gives the bare `::view-transition` a
+  background, that backdrop hides the page and a content-less snapshot has nothing left to fall
+  back on — which is exactly when the viewport comes out a flat wash of the backdrop colour. So
+  the root snapshot clones **only when `::view-transition` paints a background**
+  (`RootOverlayOccludesPage`). That is why this does not reintroduce the −7:
+  `root-to-shared-animation-end` and `content-with-transform-old-/new-image` set no
+  `::view-transition` background.
+- **Two details the clone needs to be worth anything:** it must skip
+  `<head>`/`<style>`/`<script>`/`<link>` (re-inserting them duplicates author rules into the
+  document and re-fetches resources) and it must **keep `id` attributes**, which the
+  per-element snapshot path strips — a whole page of id-styled content otherwise reproduces as
+  unstyled boxes. Keeping them is safe because the pseudo tree is materialised on a fresh render
+  projection, so the duplicate ids never reach the tree page script observes.
+- **A trap for whoever does the raster version.** The overlay serializes after `</body>` and the
+  HTML parser foster-parents it back *inside* `<body>`, so a rule anchored on an ancestor outside
+  the snapshot — `body.updated #box` — repaints the **old** snapshot with the **new** state the
+  update callback just produced. Any DOM-shaped snapshot has to freeze its paint at capture time.
+
+---
+
+## Conformance fixes that closed no test
+
+Kept because they are right and covered, not because they moved a number.
+
+### A scroll past the end did not stop at the end
+
+- CSSOM View §"scroll an element" normalizes the requested position to the scrolling box's
+  scrolling area, so a scroll past either end comes to rest at the end. `scrollTo`/`scrollBy`
+  — window and element alike — passed `clamp: false`, so `scrollBy({top: scrollHeight})`, the
+  standard "scroll to the bottom" idiom (since `scrollHeight` is always at least the maximum
+  offset), landed *beyond* the content and painted the bare canvas.
+- Reduced to a probe: a page with a `lightblue` canvas, a `lightgreen` body and a 200vh block
+  renders 96.36/3.61 unscrolled — Chromium's numbers exactly — and 100% canvas after that
+  `scrollBy`. With the clamp it is 98.42/1.56.
+- **Measured honestly: this closed no test at the time.** `css/cssom-view` was 193/234 and
+  `css/css-view-transitions` 345/490 **both before and after**. `ScrollClampingTests`, five
+  cases, four of which fail without it.
+- **Its test has since closed anyway.**
+  `css-view-transitions/reset-state-after-scrolled-view-transition` was carried as *part-fixed*,
+  blocked on the root snapshot. Re-measured 2026-08-13: it renders 98.4% `lightgreen` /
+  1.6% `lightblue`, **passes its own reference at 100%**, and is absent from the CI failure
+  manifest.
+
+### A runner note: scroll metrics ignore the configured viewport size
+
+Hit twice while writing tests for the fixes above, so it is recorded rather than worked around
+a third time. `new WptTestRunner(w, h)` renders at the given size, but the scroll metrics —
+`vh` lengths and the maximum scroll offset — resolve against the default 1024×768 regardless.
+A page built to be "taller than the viewport" at 200×200 therefore scrolls to somewhere that is
+not the bottom of the canvas, and a test asserting on what is on screen fails for a reason that
+has nothing to do with what it is testing. Both `ScrollClampingTests` and
+`ViewTransitionOldCaptureScrollTests` pin their renders to the default size for this reason.
+**Still open as a runner defect** — see
+[not fixed](wpt-rendering-gaps-open.md#the-runner-resolves-scroll-metrics-against-the-wrong-viewport).
