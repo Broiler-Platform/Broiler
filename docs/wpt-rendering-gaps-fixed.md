@@ -941,8 +941,27 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   ratio was: the decoded bitmap is not the intrinsic size when an SVG is
   [supersampled at 2×](wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed).
   An object that fits emits no clip and paints exactly as it did before.
-- **Measured.** `css/css-images` **234 → 262 of 460**, +28 and **−0**. By element:
-  `<img>` **21 → 42 of 42**, `<object>` 5 → 12 of 40. The `<object>` gains are all the
+- **Measured over the whole reftest suite**, before and after on the same checkout —
+  24 820 compared tests, **16 641 → 16 710 passing**, **+74 and −5**, average match
+  98.23% → 98.24%:
+
+  | directory | gained | lost |
+  | --- | --- | --- |
+  | `css/CSS2/backgrounds` | 40 | — |
+  | `css/css-images` | 28 | — |
+  | `css/css-backgrounds` | 3 | 4 |
+  | `css/css-sizing`, `css/css-overflow`, `css/css-contain` | 1 each | — |
+  | `svg/painting` | — | 1 |
+
+  **The larger half of the gain is not `object-fit` at all.** 40 of the 74 are
+  `css/CSS2/backgrounds/background-position-*`, at 97.66% → **100%** each, and two more
+  are `css-backgrounds/background-position-three-four-values` and
+  `-xy-three-four-values-passthru` at 93.48% → **100%** — the tests named for the syntax
+  that was being dropped. The strays are the same cause reaching further:
+  `content-visibility-auto-img-001` 89.64% → 100%, `aspect-ratio/replaced-element-024`
+  96.69% → 100%, `overflow-img-object-position` 98.73% → 99.36%.
+- **Within `css/css-images`: 234 → 262 of 460, +28 and −0.** By element, `<img>`
+  **21 → 42 of 42** and `<object>` 5 → 12 of 40. The `<object>` gains are all the
   `<position>` half rather than this one — `<object data="…svg">` paints through
   `EmitSvgContent`, which this does not touch, so those seven crossed the threshold on
   their references alone (98.81% → 99.11%) and the rest stay just under it. `<embed>`,
@@ -950,6 +969,27 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   `object-fit`: their content is not painted at all, which for `<canvas>` is
   [the bitmap gap](wpt-rendering-gaps-open.md#canvas-cannot-paint-its-bitmap)
   and for the other two is element support Broiler does not have.
+- **Four of the five losses are one gap being unmasked, and it is worth the detail.**
+  `css-backgrounds/background-attachment-local/attachment-local-clipping-image-{1,2,4,5}`
+  go 99.0–100% → 93.8–95.6%. Each test scrolls a `background-attachment: local` element
+  to `scrollTop = 15`, and each reference states the same result statically as
+  `background: url(…) padding-box top -15px left 0` — the four-component form. **Both
+  sides were wrong and agreed:** the reference dropped its offset, the test does not
+  offset a local background by the scroll position, and two unscrolled tiles matched.
+  Measured after: the reference's tile pattern starts at y=24 and the test's at y=39,
+  exactly the 15px. The reference is right now and the test side is
+  [its own gap](wpt-rendering-gaps-open.md#a-local-background-does-not-scroll-with-its-content).
+  Their `attachment-local-clipping-color-*` siblings, identical but for painting a colour
+  rather than an image, are untouched in both directions — which is what confines this to
+  the declaration and not to local attachment generally.
+- **The fifth loss is not this change**, and was checked rather than assumed.
+  `svg/painting/reftests/non-scaling-stroke-001` reads 99.54% in the before sweep and
+  98.86% in the after one, but re-run single-worker it gives **98.9% on both builds** —
+  with the paint call site and with the submodule reverted to the pointer before it. The
+  before-sweep reading is the outlier. This family is
+  [already on record](wpt-rendering-gaps-open.md#a-floated-image-disappears-entirely--fixed)
+  for moving between sweeps under multiple workers without a change behind it, and the
+  test contains no image, no background and no `<position>` — nothing here can reach it.
 - **Tests:** `Broiler.Layout.Tests/ObjectFitPlacementTests.cs` (the five keywords against
   a box wider and narrower than the content's ratio, `scale-down`'s choice between two of
   them, a ratio without an intrinsic size, and which placements need the clip) and

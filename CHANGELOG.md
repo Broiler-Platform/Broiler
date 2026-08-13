@@ -16,8 +16,13 @@ are versioned in lockstep during the preview.
   where it sits, clipping to the content box when it overflows, and
   `IR.CssPositionValue` reads the whole `<position>` grammar — including the three-
   and four-component edge-offset forms (`top 25% left 25%`), which paint dropped
-  silently and which `background-position` and gradient layers now share. `css/css-images`
-  goes 234 → 262 of 460 reftests with no losses; the 42 `object-fit-*i` tests go 21 → 42.
+  silently and which `background-position` and gradient layers now share. Over the whole
+  reftest suite, 16 641 → 16 710 of 24 820 passing: +74 and −5, of which 40 are
+  `CSS2/backgrounds/background-position-*` at 97.66% → 100% and 28 are `css-images`
+  (the 42 `object-fit-*i` tests go 21 → 42). Four of the five losses are one gap
+  unmasked — a `background-attachment: local` layer does not scroll with its content,
+  which those tests' references had also been dropping — and the fifth reproduces
+  identically on a build without the change.
   `ImageIntrinsics` reports the intrinsic aspect ratio and whether its size is real
   alongside them, since an SVG with only a `viewBox` has a ratio and no size.
 - `Broiler.Wpt` — a WPT `-print` reftest now renders the paint its own `@page`

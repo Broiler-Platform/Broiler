@@ -440,6 +440,32 @@ every one of those tests is one or the other:
   intrinsic size and ratio on the fragment, which `<img>` gets from the decoded image and
   this path does not have — and the `-svg-*o` tests match.
 
+### A local background does not scroll with its content
+
+- **Tests:** `css-backgrounds/background-attachment-local/attachment-local-clipping-image-{1,2,4,5}`,
+  93.8–95.6% against their own references.
+- **Owner:** `Broiler.HTML` (`IR/PaintWalker.Background.cs`, `IR/PaintWalker.Geometry.cs`) with
+  `Broiler.Layout` — the scroll offset is not on the fragment for paint to read.
+- CSS Backgrounds §3.10: a `background-attachment: local` layer is fixed to the element's
+  *contents*, so scrolling the element moves the background with them. Each of these four
+  scrolls its element to `scrollTop = 15` from script and states the expected result
+  statically in the reference, as `background: url(…) padding-box top -15px left 0`.
+  Broiler paints the tile at the unscrolled origin: measured, the reference's pattern
+  starts at y=24 and ours at y=39, exactly the 15px.
+- **`GetLocalBackgroundPositioningAreaRect` is half of it already** — it grows the
+  positioning area to the scrollable content extent — but nothing offsets the origin,
+  because `Fragment` carries no scroll position. That is the missing piece, and it is a
+  two-repo change: layout has the used scroll offset (`CssBox.Scroll`), paint does not.
+- **These four passed until 2026-08-13, by agreeing with an equally wrong reference.**
+  The reference's offset is stated in the four-component `<position>` syntax, which paint
+  [silently dropped](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all)
+  until that was fixed; both sides then painted an unscrolled tile and matched. The
+  `attachment-local-clipping-color-*` siblings are identical but for painting a colour
+  instead of an image and never depended on it, which is why they neither moved nor pass
+  by accident.
+- **Exit gate:** the four match, with `attachment-local-positioning-2`…`-5` and
+  `attachment-scroll-positioning-1` — which pass today — staying passing.
+
 ### Six that render content and are still wrong
 
 Broiler draws something, Chromium is self-consistent at 100% against its own
