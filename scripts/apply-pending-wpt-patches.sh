@@ -118,14 +118,22 @@ set -euo pipefail
 # Broiler.Layout's SvgRenderer") landed upstream as Broiler.HTML c77f0f0 and its pointer
 # is bumped, so it reaches CI through the pointer and its entry is gone with it.
 #
-# 0001 (Broiler.HTML, object-fit and object-position at the paint site) is listed because
-# without it EmitReplacedImage draws every replaced element into its content box — `fill`
-# behaviour whatever the author wrote — and background-position keeps reading a <position>
-# positionally, which drops the three- and four-component edge-offset forms silently. Both
-# are plainly pixel-moving, and between them they are 28 tests in css/css-images alone. Its
-# logic is all main-repo (Broiler.Layout.IR.ObjectFitPlacement and IR.CssPositionValue);
-# this patch is the call site. See patches/README.md.
+# The object-fit patch that was 0001 before this one ("paint: place replaced content by
+# object-fit and object-position") landed upstream as Broiler.HTML d762937 and its pointer
+# is bumped, so it reaches CI through the pointer and its entry is gone with it. That
+# emptied patches/ entirely, which is why the numbering restarts at 0001 below.
+#
+# 0001 (Broiler.HTML, root-relative stylesheet href) is listed because without it a
+# `<link href="/style.css">` is looked for on the local filesystem instead of being fetched
+# from the page's origin, so the sheet silently does not apply and the page renders wholly
+# unstyled. That is the `seven-zip` case of the real-world render suite, whose workflow also
+# runs this script. It moves no WPT pixels — the WPT runner installs its own `wptRoot`
+# stylesheet handler, which resolves root-relative paths through args.SetSrc before this
+# code is reached, and that is also why the bug survived so long — but it is listed because
+# the real-world suite is a pixel suite too, and there it is the difference between a styled
+# page and none. See patches/README.md.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0001-stylesheet-root-relative-href.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

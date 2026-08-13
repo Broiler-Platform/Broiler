@@ -5,18 +5,22 @@ case (<https://www.7-zip.org/>) renders in Broiler with text far smaller than
 Chromium produces.
 
 **Two independent defects are involved**, and they mask each other. The page's
-stylesheet is currently dropped entirely, so today's CLI render shows *unstyled,
-too-large* text; the moment that first defect is fixed, the second one takes over
-and the page renders with the tiny text that was reported.
+stylesheet was dropped entirely, so the CLI render showed *unstyled, too-large*
+text; the moment that first defect is fixed, the second one takes over and the
+page renders with the tiny text that was reported.
 
-| | Chromium | Broiler |
-| --- | --- | --- |
-| `TD` at table nesting depth 1 | 12.8px | 10.22px |
-| `TD` at table nesting depth 2 | 12.8px | 8.18px |
-| `TD` at table nesting depth 3 | 12.8px | 6.49px |
+| | Chromium | Broiler (before) | Broiler (after) |
+| --- | --- | --- | --- |
+| `TD` at table nesting depth 1 | 12.8px | 10.22px | 12.80px |
+| `TD` at table nesting depth 2 | 12.8px | 8.18px | 12.80px |
+| `TD` at table nesting depth 3 | 12.8px | 6.49px | 12.80px |
 
 Numbers measured with the calibrated probe described under
 [Measurement method](#measurement-method).
+
+**Both are fixed**; see [Resolution](#resolution). One of the two lives in the
+`Broiler.HTML` submodule and ships as a patch under `patches/`, because the
+submodule remote is outside this session's GitHub scope.
 
 ## The page
 
@@ -95,8 +99,8 @@ if (Uri.TryCreate(src, UriKind.Absolute, out var abs) && IsHttp(abs))
 **Confirmed by experiment.** Adding the equivalent guard to
 `ResolveStylesheetSource` and rebuilding makes the root-relative probe fetch and
 apply its sheet (`GET /probe.css` appears in the request log, background turns
-lime), and makes the live 7-Zip page load `style.css`. The change was reverted
-after measuring; no submodule edit is carried in this branch.
+lime), and makes the live 7-Zip page load `style.css`. This is the fix that
+shipped, as a submodule patch.
 
 `HtmlContainerInt.ResolveHref` (used for link clicks and form actions) contains the
 same unguarded idiom and is likely affected in the same way. Image loading is *not*
@@ -178,27 +182,61 @@ here is in place. The reset is a natural sibling of the existing colour quirk, a
 `TablesInheritColorFromBodyQuirk` is a good structural precedent for it (including
 its handling of re-inheritance into descendants after the value changes).
 
-One caveat for whoever implements it: `DocumentModeContext.IsQuirksHtml` decides
-quirks mode with a regex that only accepts a bare `<!DOCTYPE html>` as standards
-mode. That happens to give the right answer for 7-Zip, but it is not the HTML
-Standard's algorithm — `HTML 4.01 Transitional` **with** a system identifier is
-limited-quirks, not full quirks, and would be misclassified. Worth checking which
-of the two quirks-mode sources actually feeds the render path before relying on it
-for a new rule.
+### The quirks-mode flag was itself wrong, and 7-Zip was on the wrong side of it
+
+`DocumentModeContext.IsQuirksHtml` decided the mode from the doctype **name**
+alone: no doctype, or a name that is not `html`, meant quirks. 7-Zip's doctype is
+`<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">`, whose name *is*
+`html` — so the page was classified **standards mode**, and every quirks-mode
+behaviour keyed off the flag (the body/html viewport fill, the colour quirk, and
+the reset above) was silently inert on it. `WptDocumentRenderer.SelectsQuirksMode`
+had the same limitation independently.
+
+This is not a detail that can be deferred: the whole point of the reset is legacy
+pages, and legacy pages are exactly the ones that declare a public identifier. The
+fix implements the HTML Standard's DOCTYPE conditions — the exact-match and
+prefix lists for the public identifier, the listed system identifier, and the
+HTML 4.01 Transitional/Frameset rule whose answer depends on whether a system
+identifier is present (full quirks without one, limited-quirks with one, and
+limited-quirks is not what this predicate reports).
 
 ### Verification
 
-Injecting the spec's seven declarations into the page as an author rule and
-re-rendering:
-
-- The calibrated probe reports **12.80px at all three nesting depths**, matching
-  Chromium exactly (was 10.22 / 8.18 / 6.49px).
-- The full 7-Zip page renders at Chromium's typographic scale; content-match
-  against the Chromium reference rises from 17.5% to 22.2%.
+With the reset in place the calibrated probe reports **12.80px at all three
+nesting depths**, matching Chromium exactly (was 10.22 / 8.18 / 6.49px), and the
+full 7-Zip page renders at Chromium's typographic scale.
 
 The residual gap is unrelated to font sizing — `TABLE.News { width: 220px }` is not
 honoured, `TD.NewsTitle { color: white }` does not apply, and cell padding differs.
 Those are separate issues and were not investigated here.
+
+## Resolution
+
+| defect | where the fix lives | ships as |
+| --- | --- | --- |
+| Root-relative stylesheet href read off the local disk | `Broiler.HTML`, `StylesheetLoadHandler.ResolveStylesheetSource` | `patches/0001-stylesheet-root-relative-href.patch` |
+| Quirks-mode table font reset missing | `Broiler.Layout.Engine.TableFontInheritanceQuirk`, applied from `CssBoxProperties.InheritStyle` | in-repo |
+| Quirks mode decided from the doctype name alone | `Broiler.Layout.DocumentModeContext.IsQuirksHtml` | in-repo |
+
+The reset runs during inheritance rather than as a pass over the finished tree,
+which is what separates it from its neighbour `TablesInheritColorFromBodyQuirk`.
+That quirk has to run afterwards because it reads the *document's* body, which need
+not be an ancestor. This one reads nothing outside the box — it only declines to
+copy the parent's values — and doing it inline gets the ordering right for free:
+the cascade is strictly top-down, so a cell's `80%` is resolved after its table has
+been reset. A later pass could not fix that without re-resolving every descendant's
+font size, because `FontSize` resolves percentages eagerly when they are set. It is
+also what gives the spec's UA-origin precedence for free: the element's own
+declarations are applied next and still win.
+
+The submodule half could not be pushed — the git proxy answers 403 for
+`Broiler-Platform/Broiler.HTML`, which is outside this session's GitHub scope — so
+it follows the repository's patch workflow: committed in the submodule, exported
+with `git format-patch`, the working tree reverted, and **the gitlink left
+unbumped**. It is registered in `scripts/apply-pending-wpt-patches.sh`, which the
+real-world render workflow runs, so the `seven-zip` case exercises the fix rather
+than testing against the un-fixed pointer. Until a maintainer applies it, a build
+from the pinned pointer still drops the sheet and renders 7-Zip unstyled.
 
 ## Measurement method
 
