@@ -6,12 +6,14 @@ documents, split by verdict:
 
 | Document | What is in it | Tests |
 | --- | --- | --- |
-| [**Not fixed**](wpt-rendering-gaps-open.md) | real gaps, each with an owner, evidence and an exit gate | 30 |
-| [**Won't fix**](wpt-rendering-gaps-wont-fix.md) | tests Broiler renders correctly and the golden image does not | 14 |
+| [**Not fixed**](wpt-rendering-gaps-open.md) | real gaps, each with an owner, evidence and an exit gate | 55 |
+| [**Won't fix**](wpt-rendering-gaps-wont-fix.md) | tests Broiler renders correctly and the golden image does not | 17 |
 | [**Fixed**](wpt-rendering-gaps-fixed.md) | closed gaps, with root cause, what landed, and the wrong turns | 43 |
 
-Start with *not fixed*. Read *won't fix* before starting on any 0.0% — a third of
-the tail is there, and closing one of those means deleting working support.
+Start with *not fixed*. Read *won't fix* before starting on any 0.0% — closing one of
+those means deleting working support. But do not read a run's *Not ranked* heading as
+that verdict: of the 28 such flags checked by hand on 2026-08-13, **25 were real gaps**
+being hidden by [a missing check in the runner](wpt-rendering-gaps-open.md#--verify-reference-clears-a-test-that-renders-nothing).
 
 ## Read this first — four things that are true of the whole set
 
@@ -22,11 +24,16 @@ the tail is there, and closing one of those means deleting working support.
    the run detects this itself and reports those failures under *Not ranked —
    reference disagreements* instead of ranking them. The
    [#1624 run](https://github.com/Broiler-Platform/Broiler/issues/1624) flagged 40.
-2. **Passing a test's own reference is necessary evidence, not sufficient.**
-   `css-grid/subgrid/orthogonal-writing-mode-006` passes its `rel=match` at 100%
-   *because the test and its reference share the broken layout* — see
-   [the false negative](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative).
-   And the inverse exists too: two `css-view-transitions` tests
+2. **A `suspectReference` flag is a triage queue, not a verdict.** Of the 28 flags
+   nobody had checked by hand, **25 were wrong** — 17 of them because Broiler renders
+   a *blank canvas* for the test and for its reference, and blank-on-blank matches at
+   100%. `--verify-reference`
+   [never asks whether anything was drawn](wpt-rendering-gaps-open.md#--verify-reference-clears-a-test-that-renders-nothing).
+   Passing a test's own reference is necessary evidence, not sufficient — the same
+   way `css-grid/subgrid/orthogonal-writing-mode-006` passes its `rel=match` at 100%
+   *because the test and its reference share the broken layout*
+   ([details](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)). And the
+   inverse exists too: two `css-view-transitions` tests
    [pass on CI and are demonstrably wrong](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
 3. **Nothing is waiting on a patch, and a patch number identifies nothing.** The
    `patches/` directory was **deleted on 2026-08-13** (main `d710a02`) once its last
@@ -130,6 +137,29 @@ upstream as `Broiler.HTML` `1071e48` and its pointer was bumped the same morning
 the eight links to `../patches/README.md` were dead, because that file was deleted with
 the rest of `patches/`.
 
+### The 28 unexamined reference-disagreement flags, triaged
+
+The #1624 run reported 40 reference disagreements; twelve had been checked, and the
+other 28 had never been looked at. All 28 were triaged the same day, by rendering each
+test **and its declared reference** under the pinned Chromium as well as Broiler:
+
+- **Chromium fails its own reftest** → the golden is not what the test asks for →
+  genuine reference disagreement.
+- **Chromium passes** while Broiler also reproduces the reference and the two engines
+  disagree → both of Broiler's renders are wrong the same way → a real gap.
+
+Comparisons used an 8/255 per-channel tolerance so antialiasing was not mistaken for a
+structural difference — that alone moved 12 tests out of the "Chromium fails" column.
+Broiler's render of each test was then compared against the fresh Chromium render and
+**reproduced CI's reported percentage on 27 of 28**, confirming the committed goldens
+are current.
+
+**Three flags held. 25 did not.** Seventeen of the 25 render a blank canvas on both
+sides; eleven of those seventeen share one cause —
+[an external SVG used as an image is never decoded](wpt-rendering-gaps-open.md#an-external-svg-used-as-an-image-is-never-decoded),
+which reaches at least 70 currently-failing tests. Full breakdown:
+[won't fix](wpt-rendering-gaps-wont-fix.md#the-other-28-flags-triaged-2026-08-13--only-three-held).
+
 ## Reproducing one of these locally
 
 The golden-image suite compares Broiler's render against a Chromium screenshot, so a
@@ -197,7 +227,10 @@ works and is how the 86 files above were run in one pass.
 CI is the golden-image result from the
 [#1624 run](https://github.com/Broiler-Platform/Broiler/issues/1624); `rel=match` is
 Broiler against the reference the test itself declares, measured 2026-08-13. *Flagged*
-means the run reported it under *Not ranked — reference disagreements*.
+means the run reported it under *Not ranked — reference disagreements*. **(blank)**
+marks a `rel=match` score earned by rendering a uniform empty canvas on both sides —
+a match that means nothing. Rows marked **#1624 RD** came from that run's
+reference-disagreement list rather than from its severity ranking.
 
 | Test | Status | CI (#1624) | `rel=match` | First reported |
 | --- | --- | --- | --- | --- |
@@ -231,6 +264,34 @@ means the run reported it under *Not ranked — reference disagreements*.
 | `cssom-view/scrollIntoView-fixed` | **not fixed** | fails | n/a | #1624.16 |
 | `quirks/tables-inherit-color-from-body-quirk-007` | **not fixed** | fails | 94.9% | #1562.17 |
 | `scroll-animations/css/scroll-timeline-nearest-with-absolute-positioned-element` | **not fixed** | fails | n/a | #1624.21 |
+| `avif/animated-avif-timeout` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `compositing/root-element-background-image-transparency-001` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `compositing/root-element-background-image-transparency-002` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `compositing/root-element-background-image-transparency-003` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `compositing/root-element-background-image-transparency-004` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-backgrounds/animations/background-color-scroll-into-viewport` | **not fixed** | fails (flagged) | 100.0% | #1624 RD |
+| `css-conditional/container-queries/query-style-color` | **not fixed** | fails (flagged) | 98.0% | #1624 RD |
+| `css-gaps/flex/fragmentation/flex-gap-decorations-fragmentation-024` | **not fixed** | fails (flagged) | 97.3% | #1624 RD |
+| `css-grid/layout-algorithm/auto-margins-ignored-during-track-sizing-001` | **not fixed** | fails (flagged) | 97.7% | #1624 RD |
+| `css-inline/text-box-trim/text-box-trim-accumulation-004` | **not fixed** | fails (flagged) | 100.0% | #1624 RD |
+| `css-paint-api/one-custom-property-animation-half-opaque.https` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-ruby/block-ruby-003` | **not fixed** | fails (flagged) | 98.7% | #1624 RD |
+| `css-transforms/perspective-svg-001` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-background-005` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-background-006` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-background-007` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-background-008` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-root-bg-001` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-root-bg-002` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-transforms/transform-root-bg-004` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-view-transitions/massive-element-right-of-viewport-offscreen-new` | **not fixed** | fails (flagged) | 98.6% | #1624 RD |
+| `filter-effects/backdrop-filter-clip-rect-zoom` | **not fixed** | fails (flagged) | 100.0% | #1624 RD |
+| `filter-effects/backdrop-filter-plus-mask-large` | **not fixed** | fails (flagged) | 43.8% (blank) | #1624 RD |
+| `resize-observer/devicepixel2` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `svg/extensibility/foreignObject/foreign-object-paints-before-rect` | **not fixed** | fails (flagged) | 100.0% (blank) | #1624 RD |
+| `css-grid/alignment/grid-item-mixed-baseline-001` | **won't fix** | fails (flagged) | 100.0% | #1624 RD |
+| `css-grid/grid-lanes/baseline/column-grid-lanes-item-baseline-005` | **won't fix** | fails (flagged) | 99.5% | #1624 RD |
+| `css-overflow/scrollbar-gutter-003` | **won't fix** | fails (flagged) | 100.0% | #1624 RD |
 | `css-color-adjust/…/color-scheme-iframe-background-mismatch-dynamic` | **won't fix** | fails (flagged) | 100.0% | #1497.25 |
 | `css-color-adjust/…/mismatch-dynamic-cross-origin.sub` | **won't fix** | fails (flagged) | 100.0% | #1615 |
 | `css-image-animation/image-animation-body-background-root-propagation-paused` | **won't fix** | fails (flagged) | 100.0% | #1491.9 |

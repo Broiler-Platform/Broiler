@@ -244,46 +244,74 @@ The same threshold is why the two `css-grid/grid-lanes` entries
 ([#1624 problems 2 and 3](wpt-rendering-gaps-open.md#grid-lanes-is-an-unshipped-draft-feature))
 sit in *not fixed* rather than here at 94.0% and 94.8%.
 
-## Untriaged candidates
+## The other 28 flags, triaged 2026-08-13 — only three held
 
 The [#1624 run](https://github.com/Broiler-Platform/Broiler/issues/1624) reported
-**40** reference disagreements. Twelve are accounted for: the eleven settled entries
-above, plus `css-grid/subgrid/orthogonal-writing-mode-006`, which is flagged and
-[is not one](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative). **The
-remaining 28 have never been triaged by hand** and are listed here so the class is
-not mistaken for closed:
+**40** reference disagreements. Twelve were already accounted for: the eleven settled
+entries above, plus `css-grid/subgrid/orthogonal-writing-mode-006`, which is flagged
+and [is not one](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative). The
+remaining 28 had never been checked by hand. They have been now, and **the flag was
+wrong on 25 of them.**
 
-| Match | Test |
-| --- | --- |
-| 27.3% | `css-transforms/perspective-svg-001` |
-| 41.4% | `filter-effects/backdrop-filter-clip-rect-zoom` |
-| 43.7% | `filter-effects/backdrop-filter-plus-mask-large` |
-| 49.1% | `compositing/root-element-background-image-transparency-001` … `-004` (4) |
-| 49.1% | `css-transforms/transform-background-007`, `-008` |
-| 49.1% | `css-transforms/transform-root-bg-001`, `-002`, `-004` |
-| 50.0% | `resize-observer/devicepixel2` |
-| 51.0% | `css-transforms/transform-background-005`, `-006` |
-| 51.0% | `css-backgrounds/animations/background-color-scroll-into-viewport` |
-| 53.0% | `css-grid/alignment/grid-item-mixed-baseline-001` |
-| 61.0% | `css-inline/text-box-trim/text-box-trim-accumulation-004` |
-| 64.8% | `css-conditional/container-queries/query-style-color` |
-| 65.4% | `css-grid/grid-lanes/baseline/column-grid-lanes-item-baseline-005` |
-| 66.1% | `css-grid/layout-algorithm/auto-margins-ignored-during-track-sizing-001` |
-| 68.0% | `avif/animated-avif-timeout` |
-| 68.2% | `css-paint-api/one-custom-property-animation-half-opaque.https` |
-| 68.2% | `svg/extensibility/foreignObject/foreign-object-paints-before-rect` |
-| 70.0% | `css-ruby/block-ruby-003` |
-| 78.8% | `css-view-transitions/massive-element-right-of-viewport-offscreen-new` |
-| 78.9% | `css-gaps/flex/fragmentation/flex-gap-decorations-fragmentation-024` |
-| 79.0% | `css-overflow/scrollbar-gutter-003` |
+### How they were checked
 
-**A flag is a candidate, not a verdict.** The nine `transform-background-*` /
-`transform-root-bg-*` / `root-element-background-image-transparency-*` entries all
-sitting at exactly 49.1% is the shape of one shared cause, not nine independent
-Chromium bugs, and it is worth looking at before any of them is called won't-fix.
-`orthogonal-writing-mode-006` is the cautionary case: the runner flags it, and the
-hand diagnosis in
-[not fixed](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative) shows
-Broiler reproduces its own reference **because the test and the reference share
-the broken layout**. Passing your own reference is necessary evidence, not
-sufficient.
+The flag says only *"Broiler reproduces the test's own reference"*. That is
+compatible with two opposite situations, and the discriminator is cheap: render the
+test **and** its reference under Chromium as well.
+
+- **Chromium fails its own reftest** → its golden is not what the test asks for →
+  genuine reference disagreement.
+- **Chromium passes its own reftest** while Broiler also reproduces the reference,
+  and the two engines disagree → both of Broiler's renders are wrong in the same way
+  → a real gap the flag is hiding.
+
+All 28 tests and their 21 references were rendered under the pinned Chromium via
+`generate-wpt-references.js`, compared with an 8/255 per-channel tolerance so
+antialiasing is not mistaken for a structural difference. Broiler's own render of
+each test was then compared against the fresh Chromium render: **it reproduced CI's
+reported percentage on 27 of 28**, which is what confirms the committed goldens are
+current and the gaps real.
+
+### The three that held
+
+| Test | CI | Broiler vs own ref | Chromium vs own ref |
+| --- | --- | --- | --- |
+| `css-grid/alignment/grid-item-mixed-baseline-001` | 53.0% | **100%** | 97.8% |
+| `css-overflow/scrollbar-gutter-003` | 79.0% | **100%** | 95.8% |
+| `css-grid/grid-lanes/baseline/column-grid-lanes-item-baseline-005` | 65.4% | **99.5%** | 68.4% |
+
+Broiler reproduces what each test asks for and Chromium does not. The third is a
+`grid-lanes` test — the [unshipped draft feature](wpt-rendering-gaps-open.md#grid-lanes-is-an-unshipped-draft-feature)
+Chromium drops to `display: block`, which is the same shape that produces a permanent
+low score against a golden.
+
+### The 25 that did not
+
+**Seventeen render a blank white canvas** — and so do their references, which is the
+only reason they matched. Chromium paints substantial content in both. Every one is a
+real gap, and they are now carried in *not fixed*:
+
+- **Eleven share one cause:** [an external SVG used as an image is never
+  decoded](wpt-rendering-gaps-open.md#an-external-svg-used-as-an-image-is-never-decoded).
+  That was the suspicion about the nine entries sitting at exactly 49.1%, and it was
+  right — it is one cause, and it covers eleven.
+- **Six more** are individually distinct: [AVIF decode, the CSS Paint API, a canvas
+  2D context, `<foreignObject>`, a percentage-sized inline SVG under `perspective`,
+  and `backdrop-filter` with a mask](wpt-rendering-gaps-open.md#other-image-formats-and-inline-svg-edge-cases).
+
+**Six render content** and are still wrong against a self-consistent Chromium; they
+are [listed in *not fixed*](wpt-rendering-gaps-open.md#six-that-render-content-and-are-still-wrong).
+**Two are cases where both engines fail the test**, one of which is worth reporting
+upstream rather than fixing — see
+[there](wpt-rendering-gaps-open.md#two-where-both-engines-fail-the-test).
+
+### What this says about the flag
+
+25 wrong out of 28 is not a tuning problem, it is a missing check:
+**`--verify-reference` never asks whether anything was drawn.** Blank-on-blank scores
+100% and clears. The defect and the two cheap fixes for it are recorded under
+[not fixed](wpt-rendering-gaps-open.md#--verify-reference-clears-a-test-that-renders-nothing).
+
+Until that lands, treat the *Not ranked* heading in a run as a **triage queue, not a
+verdict**. The [settled set](#the-settled-set) above is the part that has been checked
+by hand; a flag on its own establishes nothing.

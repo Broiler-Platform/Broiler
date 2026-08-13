@@ -276,6 +276,92 @@ other direction. None is a sizing bug.
 
 ---
 
+## Images
+
+### An external SVG used as an image is never decoded
+
+**The largest single cause found in the 2026-08-13 triage** — 11 of the 28
+previously-unexamined reference-disagreement flags, and it reaches well beyond them.
+
+- **Tests:** `css-transforms/transform-background-005`, `-006`, `-007`, `-008`;
+  `css-transforms/transform-root-bg-001`, `-002`, `-004`;
+  `compositing/root-element-background-image-transparency-001` … `-004`. CI 49.1–51.0%.
+  Every one of them loads `support/transform-triangle-{left,down}.svg` as a CSS
+  background.
+- **Broiler renders a blank white canvas for all eleven** — and for their references,
+  which is why `--verify-reference` cleared them.
+- **Isolated to one capability, by probe rather than by inference.** Four
+  one-line documents, rendered against the same checkout:
+
+  | Probe | Broiler renders |
+  | --- | --- |
+  | `html { background: blue }` | 100% blue ✓ |
+  | `html { background: url(/images/green.png) }` | 100% green ✓ |
+  | inline `<svg><polygon fill=blue …></svg>` | 5.7% blue triangle ✓ |
+  | `html { background: url(support/…​.svg) }` | **100% white ✗** |
+  | `<img src="support/…​.svg" width=200 height=200>` | **100% white ✗** |
+
+  So raster images decode, colour backgrounds paint, and the SVG renderer works on
+  *inline* markup. What fails is specifically **an SVG loaded as an external image
+  resource** — the document is fetched and then nothing rasterises it. The `<img>`
+  case failing identically to the background case says the gap is in the image
+  pipeline, not in background painting.
+- **It is much broader than these eleven.** Of the 3 952 currently-failing tests
+  present in a local checkout, **70 reference an external `.svg` as an image** —
+  concentrated in `css-masking` (20), `css-transforms` (9), `css-images` (8),
+  `html/canvas` (8) and `css-ui` (5). Not all fail *because* of this, but it is the
+  first thing to rule out for any of them.
+- **Exit gate:** `background: url(x.svg)` and `<img src=x.svg>` both paint the
+  document's content, with the eleven tests above matching and a sweep over
+  `css-masking`, `css-images` and `css-transforms` showing no regression.
+
+### Other image formats and inline-SVG edge cases
+
+Each renders blank, each was cleared by the same flag, and each is its own gap:
+
+| Test | CI | What is missing |
+| --- | --- | --- |
+| `avif/animated-avif-timeout` | 68.0% | AVIF decode — the test is one `<img src=…​.avif>` |
+| `css-paint-api/one-custom-property-animation-half-opaque.https` | 68.2% | the CSS Paint API — `paintWorklet.addModule` and `paint()` |
+| `resize-observer/devicepixel2` | 50.0% | a canvas 2D context: the page builds its background from a canvas `toDataURL` under a `ResizeObserver` |
+| `svg/extensibility/foreignObject/foreign-object-paints-before-rect` | 68.2% | `<foreignObject>` content inside an inline `<svg>` |
+| `css-transforms/perspective-svg-001` | 27.3% | a percentage-sized inline `<svg>` under `perspective` with `backface-visibility: hidden` and 3D transforms |
+| `filter-effects/backdrop-filter-plus-mask-large` | 43.7% | `backdrop-filter` combined with a mask — the only blank one that also **fails its own reference** (43.8%), so it is not hidden by the flag |
+
+The canvas gap is the same one that keeps
+[three `<canvas>` sizing tests](#canvas-cannot-paint-its-bitmap) from passing.
+
+### Six that render content and are still wrong
+
+Broiler draws something, Chromium is self-consistent at 100% against its own
+reference, and the two disagree. Not triaged further:
+
+| Test | CI | Broiler vs its own ref |
+| --- | --- | --- |
+| `filter-effects/backdrop-filter-clip-rect-zoom` | 41.4% | 100% |
+| `css-backgrounds/animations/background-color-scroll-into-viewport` | 51.0% | 100% |
+| `css-inline/text-box-trim/text-box-trim-accumulation-004` | 61.0% | 100% |
+| `css-grid/layout-algorithm/auto-margins-ignored-during-track-sizing-001` | 66.1% | 97.7% |
+| `css-ruby/block-ruby-003` | 70.0% | 98.7% |
+| `css-view-transitions/massive-element-right-of-viewport-offscreen-new` | 78.8% | 98.6% |
+
+The last belongs to the [`massive-element-*` family](#the-snapshot-clone-lays-its-children-out-horizontally);
+the other five are unexamined.
+
+### Two where both engines fail the test
+
+Worth separating from the rest, because the test itself may be at fault:
+
+- `css-conditional/container-queries/query-style-color` — CI 64.8%. Chromium scores
+  **86.1%** against its own reference and Broiler **98.0%**. Both fail; Broiler is
+  closer. Given the [style-query work](wpt-rendering-gaps-fixed.md#contrast-color-and-style-container-queries)
+  deliberately supports only the custom-property form of `style()`, the residual is
+  probably the standard-property form.
+- `css-gaps/flex/fragmentation/flex-gap-decorations-fragmentation-024` — CI 78.9%.
+  Chromium and Broiler each score **97.3%** against the reference. Two independent
+  engines failing by the same margin points at the test or its reference rather than
+  at either engine; check it upstream before spending time on it.
+
 ## Masking
 
 ### SVG `<clipPath>` referenced by `url()`
@@ -453,6 +539,36 @@ is exactly one page area), and on both sides only the first block paints:
 
 Neither can change what CI reports for that test, which is scored unpaginated against
 [a blank Chromium capture](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact).
+
+### `--verify-reference` clears a test that renders nothing
+
+**The most consequential defect on this page**, because it silently moves real gaps
+off the severity list.
+
+`WptTestRunner.VerifyAgainstReferenceHtml` clears a pixel-mismatch failure whenever
+Broiler reproduces the test's own `rel=match` reference. It does not check that
+anything was **drawn**. A test that renders a blank white canvas, whose reference
+also renders a blank white canvas, matches at 100% and is reported as a reference
+disagreement — the exact "passing by rendering nothing" trap this document set warns
+about, now built into the mechanism that decides what counts as a real bug.
+
+**Measured on the 2026-08-13 triage of the 28 unexamined flags: 17 of them are
+blank-on-blank.** Broiler paints a uniform white canvas for the test *and* for the
+reference, while Chromium paints substantial content in both. Every one is a real
+gap that had been moved out of the ranking.
+
+Two cheap checks would separate them, and either alone would have caught all 17:
+
+1. **Reject a clear when the render is uniform.** A test and reference that are both
+   a single colour across the whole canvas are not evidence of agreement. The runner
+   already computes a colour histogram for its `subCategory` classification.
+2. **Compare against the committed golden's content, not just its pixels.** A golden
+   with substantial content and a render with none is the signature; today that pair
+   scores 0.0% and is cleared anyway.
+
+Until one of them lands, **a `suspectReference` flag is a candidate for triage, not a
+verdict** — the tables in [won't fix](wpt-rendering-gaps-wont-fix.md#the-settled-set)
+are the flags that survived being checked by hand.
 
 ### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium"
 
