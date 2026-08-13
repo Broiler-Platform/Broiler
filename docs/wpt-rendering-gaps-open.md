@@ -261,6 +261,19 @@ other direction. None is a sizing bug.
   rows are 76px against 54px), with `position-area-scrolling-002` and the `lh`-unit
   tests staying green.
 
+### Text does not flow around a float
+
+- **Owner:** `Broiler.Layout`. Long-standing; the
+  [floated-image fix](#a-floated-image-disappears-entirely--fixed) only made it visible for images,
+  which until then were not on the canvas to be overlapped.
+- **Measured:** `<img style="float:left;width:100px;height:20px">TEXT` paints the image and then paints
+  `TEXT` starting at x=4, straight over it, rather than beside it at x≥100. The line box is not
+  shortened by the float.
+- **Not replaced-specific, and worse for non-replaced floats:** with a floated `<div>` or `<span>` of
+  the same size the trailing `TEXT` is not painted **at all**. Both behave identically with and without
+  the float fix, so this is its own defect.
+- **Exit gate:** in all three probes the text paints, beside the float rather than over it.
+
 ### Not triaged
 
 - `css-flexbox/percentage-heights-003`, CI 15.4%. A `check-layout-th.js` test with
@@ -448,51 +461,96 @@ the other five are unexamined.
   stopped agreeing. Worth knowing why this was ever passing: the image backend's old renderer returned
   the *default* colour for a missing attribute, so it painted these rects solid black; the shared
   renderer returns "no paint", so after the switch both sides drew nothing and matched at ~100%.
-- **The gap it exposes is separate, real, and much bigger than these tests** — see
-  [a floated image disappears](#a-floated-image-disappears-entirely) below. Every `<img>` in all 80 of
-  those tests is `float: left`.
-- **Exit gate:** a floated `<img>` renders, at which point the 80 become an ordinary comparison rather
-  than a blank page against a correct reference.
+- **The gap it exposed is separate, real, and much bigger than these tests** — see
+  [a floated image disappears](#a-floated-image-disappears-entirely--fixed) below, now fixed. Every
+  `<img>` in all 80 of those tests is `float: left`.
+- **Exit gate — met.** The 80 are ordinary comparisons now: 14 of them pass, and the rest fail on
+  [`object-fit`](#object-fit-and-object-position-are-not-implemented), which is the honest verdict.
 
-### A floated image disappears entirely
+### A floated image disappears entirely — **fixed**
 
-**The most consequential rendering bug found in this work**, and nothing about it is SVG-specific:
-`float` on an `<img>` makes it vanish — no image, no border, no background, and no layout space.
+**The most consequential rendering bug found in this work**, and nothing about it was SVG-specific:
+`float` on an `<img>` made it vanish — no image, no border, no background, and no layout space.
 
-- **Owner:** `Broiler.Layout` (`Engine/CssBox.Layout.cs`).
-- **Measured, on a bare probe rather than a test:** one `<img src="/images/green.png"
-  style="width:64px;height:64px">` alone on a page paints exactly **4 096 non-white pixels** at (0,0).
-  Add `float: left` and the canvas has **zero** non-white pixels anywhere — not mispositioned, not
-  drawn.
-- **It is the box, not the image.** Give the same `<img>` a `border: 3px solid red` and a
-  `background: blue` and, floated, neither paints either. So no box is produced at all.
-- **And it occupies no space.** A floated 100px `<img>` followed by text leaves the text starting at
-  `x=1` rather than `x=100`, so the float is absent from layout, not merely invisible.
-- **Narrowed by probe:**
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Layout.cs`). Main repo, no patch.
+- **Measured, on a bare probe rather than a test.** One `<img src="/images/green.png"
+  style="width:64px;height:64px;border:3px solid red;background:blue">` alone on a page paints 4 900
+  non-white pixels. Every floated variant painted **zero** non-white pixels anywhere — not
+  mispositioned, not drawn, and not merely the image: the border and background went with it, so no box
+  was produced at all. The same probes after the fix:
 
-  | Probe | Result |
-  | --- | --- |
-  | `<img>` with width/height, border, background | paints ✓ |
-  | the same, `float: left` | **nothing** ✗ |
-  | `float: left` with no width/height | **nothing** ✗ |
-  | `float: left` with `display: block` | **nothing** ✗ |
-  | `<span style="float:left">` (non-replaced control) | paints ✓ |
-  | `<div style="float:left">` (non-replaced control) | paints ✓ |
+  | Probe | before | after |
+  | --- | --- | --- |
+  | `<img>` with width/height, border, background | 4 900 | 4 900 |
+  | the same, `float: left` | **0** | 4 900 |
+  | `float: left`, no width/height (natural 100×50) | **0** | 5 936 |
+  | `float: left; display: block` | **0** | 4 900 |
+  | `float: left; display: block`, no width/height | **0** | 5 936 |
+  | `float: right` | **0** | 4 900 |
+  | `<span style="float:left">` (non-replaced control) | 4 900 | 4 900 |
+  | `<div style="float:left">` (non-replaced control) | 4 900 | 4 900 |
 
-  So it is specific to **replaced** elements, and neither an explicit size nor blockifying rescues it.
-- **The likely site is already annotated as the bug.** `CssBox.Layout.cs`'s float branch reads
-  *"CSS2.1 §10.3.5: Floating **non-replaced** elements with `width: auto` use shrink-to-fit width"* and
-  then applies to every floated box without excluding replaced ones — the same shape as the
-  [absolutely positioned `<img>` defect](wpt-rendering-gaps-fixed.md#an-absolutely-positioned-img-rendered-nothing-at-all)
-  fixed earlier in this work, where two branches each said "non-replaced" in a comment and then did not
-  do it. CSS2.1 §10.3.6, "Floating, replaced elements", is the rule with no implementation.
-  `CssBox.ResolveReplacedContentSize` is the helper the abspos fix routed through and is the obvious
-  candidate here too — though that fix alone will not explain the missing *box*, so the float
-  placement path needs looking at as well.
-- **Why it matters beyond WPT:** a floated image is one of the oldest and commonest layouts on the
-  web. Any real page that floats an image renders without it.
-- **Exit gate:** the probe table above paints in every row; `object-fit-contain-svg-001i` renders its
-  borders and images; and the 80 `css-images/object-fit-*-svg-*` tests become ordinary comparisons.
+- **Two rules were missing, not one**, and the fix is one clause for each.
+  - **CSS2.1 §9.7 blockifies a float** exactly as it blockifies an out-of-flow box. Only the
+    out-of-flow half had been implemented, so a floated *replaced* element stayed inline-level and took
+    the inline branch of `PerformLayoutImp`, which sizes a box from its words — and a replaced box has
+    none. It came out 0×0 at (0, 0); and being a float it was also skipped when the line boxes were
+    built, so the image word inside it was never placed either. Nothing drew and nothing was reserved.
+    `CssBox.IsBlockifiedFloatedReplaced` is the new predicate. It is deliberately narrow: a floated
+    non-replaced inline is sized from its words today and does render, so blockifying *every* float —
+    which §9.7 does ask for — is a wider change that deserves its own evidence and its own sweep.
+  - **CSS2.1 §10.3.6 gives a floating replaced box its natural width.** `ResolveBlockUsedWidth`'s float
+    branch says *"Floating **non-replaced** elements with `width: auto` use shrink-to-fit width"* in its
+    comment and then applied to every float; shrink-to-fit measures children, of which an image has
+    none. Blockifying alone therefore moved the box from 0×0 to *0 wide* whenever the CSS stated no
+    width — the commonest way anyone floats an image. It is the same shape as the
+    [absolutely positioned `<img>` defect](wpt-rendering-gaps-fixed.md#an-absolutely-positioned-img-rendered-nothing-at-all)
+    fixed earlier in this work, and takes the same `replacedSizeSettled` guard, which was already sitting
+    two branches above.
+- **`object-fit-contain-svg-001i` renders.** It went from a canvas with **0** non-white pixels to
+  24 061, against a reference with 13 849, and the float rows, box sizes, `clear: both` and dashed
+  borders line up with the reference exactly. What is left between them is `object-fit` itself.
+- **Sweep: net zero, and that is the interesting part.** The same 3 974 reftests stay at **2 680**
+  passing, +14 and −14, and every move is an `<img>` variant of `css-images/object-fit-*`:
+
+  | family | passing before | after |
+  | --- | --- | --- |
+  | `object-fit-fill-*-00Ni` | 1 / 8 | **8 / 8** |
+  | `object-fit-cover-*-00Ni` | 1 / 8 | **8 / 8** |
+  | `object-fit-contain-*-00Ni` | 1 / 8 | 1 / 8 |
+  | `object-fit-none-*-00Ni` | 7 / 8 | **1 / 8** |
+  | `object-fit-scale-down-*-00Ni` | 7 / 8 | **1 / 8** |
+
+  The `none` and `scale-down` rows were passing at 99.5% **because the image did not draw** — a
+  mostly-white canvas against a reference whose marks are small. They now draw at the wrong size, which
+  is worse against the reference and truer about the engine. `fill` passes because stretching to the
+  box is what `fill` means. See
+  [`object-fit` is not implemented](#object-fit-and-object-position-are-not-implemented).
+- **The two `svg/painting/reftests/non-scaling-stroke-00{2,3}` moves in that diff are not this change.**
+  Both are `reftest-wait` animation tests; re-run single-worker they give 98.86% and 99.29% identically
+  with and against the fix, so the sweep-to-sweep difference is scheduling under four workers.
+- **Tests:** `Broiler.Layout.Tests/FloatedReplacedBlockificationTests.cs` — which boxes the rule claims
+  (both float sides, an intrinsic replaced size, and the non-replaced and zero-intrinsic-size controls
+  it must *not* claim), that a claimed one lays out at its stated and at its natural size after a real
+  layout pass, that a right float lands right of a left one, and that a floating non-replaced box still
+  shrink-to-fits.
+- **What this fix does not do.** Line boxes are still not shortened around a float: text beside a
+  floated image overlaps it. That is not replaced-specific — see
+  [text does not flow around a float](#text-does-not-flow-around-a-float) — and is unchanged by this
+  fix in both directions.
+
+### `object-fit` and `object-position` are not implemented
+
+- **Owner:** `Broiler.Layout`. Surfaced by the float fix above, which is what made these tests draw.
+- **Nothing reads either property.** `object-fit-contain-svg-001i`, `object-fit-fill-svg-001i` and
+  `object-fit-none-svg-001i` differ only in that one declaration, and Broiler renders all three to
+  **byte-identical PNGs**: every image is stretched to its box, which is `fill` behaviour. The
+  `object-position` classes in those tests (`top right`, `bottom 1px right 2px`, …) have no effect
+  either.
+- **Scored:** of the 40 `css-images/object-fit-*-00Ni` tests, 18 pass — the `fill` and `cover` families
+  and one `contain` — and the remaining 22 fail between 97.3% and 98.4%.
+- **Exit gate:** `object-fit-contain-svg-001i` and `object-fit-none-svg-001i` render differently from
+  each other, and the `contain`, `none` and `scale-down` families pass.
 
 ### `cross-fade()` is unimplemented, and Chromium does not implement it either
 
