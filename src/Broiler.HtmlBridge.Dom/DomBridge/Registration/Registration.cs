@@ -113,7 +113,22 @@ public sealed partial class DomBridge
         _documentJSObject = document;
         context["document"] = document;
 
-        var window = new JSObject();
+        // `window` IS the global object, exactly as it is in a browser — the JSContext derives from
+        // JSObject and is the realm's global. It used to be a separate `new JSObject()`, which made
+        // every `window.foo = …` invisible to the unqualified `foo` that a page writes next, because
+        // identifier resolution consults the global object and nothing else. That is not a corner
+        // case: it is how google.com bootstraps itself, in one script —
+        //   (function(){var _g={kEI:…}; (function(){… window.google=_g;}).call(this);})();
+        //   (function(){google.sn='webhp'; google.kHL='en';})();
+        // — so the second IIFE threw `google is not defined`, which aborts the whole <script>. Every
+        // later Google script then referenced the `google` namespace the aborted one would have
+        // published and died the same way, and the page rendered with none of its script-driven
+        // content. The window→global mirror (MirrorWindowMembersOntoGlobal) papered over the
+        // between-scripts half of this by copying window members onto the global after the fact; it
+        // could never cover the within-one-script half, because there is no point between the write
+        // and the read at which a host could run. Making the two one object removes the class of bug
+        // rather than the symptom, and the mirror becomes the no-op it should always have been.
+        JSObject window = context;
         _windowJSObject = window;
 
         var windowBasicsScope = Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowBasics);
@@ -195,6 +210,16 @@ public sealed partial class DomBridge
     /// </summary>
     private static void MirrorWindowMembersOntoGlobal(JSContext context, JSObject window)
     {
+        // The bridge now makes `window` the global object (see RegisterDocumentCore), so there is
+        // nothing to copy and no gap to close — the sweep would define every own property of the
+        // global onto itself. Returning here keeps that off the per-script path a host runs
+        // (WptTestRunner calls SyncWindowMembersOntoGlobal after every script) instead of paying for
+        // an Object.getOwnPropertyNames walk of the whole global that skips all of its own results.
+        // The sweep is kept rather than deleted because it is still correct for any realm where the
+        // two are genuinely distinct objects.
+        if (ReferenceEquals(context, window))
+            return;
+
         context["__broilerWindowForGlobalMirror"] = window;
         try
         {

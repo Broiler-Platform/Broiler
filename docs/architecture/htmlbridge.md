@@ -89,6 +89,22 @@ under [`src/Broiler.Cli.Tests`](../../src/Broiler.Cli.Tests/).
 6. Session disposal tears down queued work, layout resources, bridge state, and
    the JavaScript context.
 
+`window` is the global object, not a separate object published under that name.
+A page's `window.x = …` and its unqualified `x` therefore name one property, in
+one script as in the next, which is what every real page assumes. The bridge
+formerly published a distinct `window` and copied its members onto the global
+afterwards; that copy could never cover a write and a read inside a single
+script, because no host runs between them. `MirrorWindowMembersOntoGlobal` and
+its public re-run `SyncWindowMembersOntoGlobal` are retained but return
+immediately when the two are the same object.
+
+A nested browsing context still gets its own `window`, built by
+`SubWindowBinding`. Frame scripts run in the shared context with the
+`window`/`document`/`location`/`parent`/`self`/`top` globals swapped to that
+frame for the duration (`WindowContextManager.RunWithWindowContext`), and a
+top-level window is its own `parent`, so any walk up the frame tree must stop
+at the window that parents itself.
+
 ## Layout and geometry
 
 `DomBridge` obtains real box geometry through the neutral
