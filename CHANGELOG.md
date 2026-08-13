@@ -75,6 +75,40 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge` — `window` is the global object, as it is in a browser, so a
+  page's `window.x = …` and its unqualified `x` name one property. They were separate
+  objects, and identifier resolution consults only the global, so `window.google = _g`
+  left the bare `google` a `ReferenceError` — which aborts the whole `<script>`, not
+  just the statement. google.com bootstraps exactly that way *within one script*
+  (`window.google=_g` in one IIFE, `google.sn='webhp'` in the next), so its namespace
+  was never finished and every later script that named it died the same way: five
+  `google is not defined` errors from one broken script, and a homepage with none of
+  its script-driven content. The window→global mirror covered the between-scripts
+  half by copying members across afterwards; nothing could cover the within-one-script
+  half, because no host runs between the write and the read. The mirror and its public
+  re-run `SyncWindowMembersOntoGlobal` are kept and return immediately when the two
+  objects are one. Three things the split had hidden came with it: `frames` was
+  registered twice with different shapes (a live getter on the window, a static
+  snapshot on the global) and is now the accessor alone; `GetWindowOrigin` walked
+  `parent` to inherit an `about:blank` document's origin and only terminated because
+  the top window's `parent` used to be the bare global, so a top-level `about:blank`
+  page now recursed 33 707 frames into a stack overflow; and the top window's origin
+  can no longer be read back out of its `location`, because `RunWithWindowContext`
+  swaps that to a frame's while the frame's scripts run — which is when a frame calls
+  `parent.postMessage` — so it comes from the document through a new
+  `IMessagingHost.PageOrigin` seam.
+- `Broiler.HtmlBridge` — `fetch` resolves its input against the document's base URL
+  (Fetch §5.4) instead of handing the string to `HttpClient` untouched. A relative
+  request URI with no `BaseAddress` is not a request at all: `PrepareRequestMessage`
+  throws `InvalidOperationException("An invalid request URI was provided…")` before
+  anything reaches the wire. google.com hits it on every page view, beaconing timing to
+  `/gen_204?atyp=i&…` through `navigator.sendBeacon`, which delegates to this `fetch`;
+  so does any `XMLHttpRequest` opened on a path, because the XHR polyfill calls
+  `fetch(this._url)`. It adopts the same `UrlResolver` that `Response.redirect`
+  already used, which also makes `response.url` the resolved URL as the spec requires.
+  A target that resolves against nothing is reported as an error `Response`, like any
+  other failed fetch, rather than thrown — throwing would abort the calling script over
+  one beacon.
 - `Broiler.Layout` — `position: relative` now offsets an inline-level box. CSS 2.1
   §9.4.3's offset is visual, so it has to reach the box's words; `PerformLayout`
   applied it for every box it lays out, but an inline-level box is laid out by
