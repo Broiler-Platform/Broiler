@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Text;
+using Broiler.HtmlBridge.Internal.Scripting;
 using Broiler.HtmlBridge.Logging;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Function;
@@ -59,11 +60,22 @@ internal sealed partial class FetchBinding
     {
         if (a.Length == 0)
             throw new JSException("Failed to execute 'fetch': 1 argument required.");
-        var fetchUrl = a[0].ToString();
+        var requestedUrl = a[0].ToString();
         if (a[0] is JSObject requestInput)
         {
-            fetchUrl = tryGetJsPropertyString(requestInput, "url", "href") ?? fetchUrl;
+            requestedUrl = tryGetJsPropertyString(requestInput, "url", "href") ?? requestedUrl;
         }
+
+        // §5.4 of Fetch: the input is parsed against the entry settings object's base URL. This is
+        // the same one shared resolver Response.redirect uses (Phase 7 item 4) — an absolute URL is
+        // kept, a relative or root-relative one resolves against the page. Without it a root-relative
+        // target went to HttpClient verbatim as a relative request URI, which is an
+        // InvalidOperationException out of PrepareRequestMessage rather than a request. That is not
+        // an exotic spelling: google.com beacons its timing to `/gen_204?atyp=i&…` through
+        // navigator.sendBeacon, which delegates to this fetch, and so does every XMLHttpRequest
+        // opened on a path (the XHR polyfill calls fetch(this._url)).
+        var resolvedUri = UrlResolver.Resolve(requestedUrl, _host.PageUrl);
+        var fetchUrl = resolvedUri?.AbsoluteUri ?? requestedUrl;
 
         JSValue responseObj = new JSObject();
         // Parse options (method, headers, body)
@@ -107,7 +119,19 @@ internal sealed partial class FetchBinding
 
         try
         {
-            if (!rejected)
+            if (!rejected && resolvedUri == null)
+            {
+                // A URL that will not parse against the page's base is the spec's "network error"
+                // for this binding's error model, which reports every failed fetch as an error
+                // Response rather than throwing. Throwing here would abort the whole calling script,
+                // which for a relative URL is a far worse outcome than one failed request.
+                RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.fetch",
+                    $"Fetch error: '{requestedUrl}' is not an absolute URL and does not resolve against the page URL '{_host.PageUrl}'.",
+                    new JSException("Failed to parse URL"));
+                responseObj = createResponse(string.Empty, 0, "Invalid URL", requestedUrl, "error", false,
+                    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+            }
+            else if (!rejected)
             {
                 var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
                 if (requestBody != null)

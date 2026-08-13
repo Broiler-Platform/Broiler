@@ -20,6 +20,19 @@ internal interface IMessagingHost
     /// <summary>The top-level window JS wrapper (<c>null</c> before attach).</summary>
     JSObject? WindowJSObject { get; }
 
+    /// <summary>
+    /// The document's own origin, as parsed from the page URL at attach.
+    /// <para>
+    /// The top window's origin cannot be read back out of its <c>location</c> property: the window
+    /// IS the global object, and <see cref="RunWithWindowContext"/> temporarily swaps
+    /// <c>location</c> (with <c>document</c>, <c>self</c>, <c>parent</c> and the rest) to a frame's
+    /// while that frame's scripts run — which is exactly when a frame posts to its parent. Reading
+    /// the property there yields the frame's own <c>about:srcdoc</c>, not the page's origin. This is
+    /// the fact rather than the mutable view of it.
+    /// </para>
+    /// </summary>
+    string PageOrigin { get; }
+
     /// <summary>The active JS execution context (<c>null</c> before attach), used to raise
     /// <c>DataCloneError</c> and to structured-clone message payloads.</summary>
     JSContext? JsContext { get; }

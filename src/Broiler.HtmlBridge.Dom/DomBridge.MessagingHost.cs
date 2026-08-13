@@ -18,6 +18,8 @@ public sealed partial class DomBridge : IMessagingHost
 {
     JSObject? IMessagingHost.WindowJSObject => _windowJSObject;
 
+    string IMessagingHost.PageOrigin => _pageOrigin;
+
     JSContext? IMessagingHost.JsContext => _jsContext;
 
     JSObject? IMessagingHost.ResolveCurrentWindow() => ResolveCurrentWindow();
