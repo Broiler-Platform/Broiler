@@ -114,7 +114,10 @@ historical test artifacts is tracked in
   Root tracking should cover only cross-component runner, timeout, reference, and
   ownership problems. The worst-scoring pixel mismatches of the current run, with
   the capability each is missing and the component that owns it, are in
-  [WPT rendering gaps](wpt-rendering-gaps.md).
+  [WPT rendering gaps](wpt-rendering-gaps.md) — start with
+  [not fixed](wpt-rendering-gaps-open.md), and read
+  [won't fix](wpt-rendering-gaps-wont-fix.md) before taking on any 0.0%, since a
+  third of that tail is tests Broiler already renders correctly.
 - Prototype per-component stress attribution with a small Broiler.JS slice before
   investing in full coverage-guided selection.
 
