@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Function;
@@ -72,56 +71,17 @@ internal static class CssBinding
         "(" + property + ":" + value + ")";
 
     /// <summary>
-    /// Calls the CSS engine's public <c>@supports</c> evaluator, by reflection so that this
-    /// assembly compiles against a <c>Broiler.CSS</c> that does not expose one yet.
+    /// Defers to the CSS engine's <c>@supports</c> evaluator — the same grammar and the same
+    /// feature-support oracle the cascade applies to an <c>@supports</c> prelude.
     /// </summary>
     /// <remarks>
-    /// The evaluator lives in the <c>Broiler.CSS</c> submodule, whose remote this session cannot
-    /// push to, so it arrives as a patch a maintainer applies rather than as a pointer bump that
-    /// lands with this file. A direct call would therefore fail to compile until then and take
-    /// ordinary CI down with it. Binding by name instead means the honest answer switches on the
-    /// moment the pointer moves, with no change here, and until then <c>supports</c> reports
-    /// false — the conservative direction, where a page takes the fallback it already carries
-    /// rather than committing to a feature nothing will render. Once the evaluator is in the
-    /// pinned pointer this should collapse to a direct call.
+    /// This was reached by name for a while, because the evaluator arrived as a patch against
+    /// <c>Broiler.CSS</c> rather than as a pointer bump landing with this file, and a direct call
+    /// would not have compiled until it was applied. It is in the pinned pointer now, so the
+    /// lookup is gone and so is the conservative false it fell back to.
     /// </remarks>
-    private static bool Evaluate(string condition)
-    {
-        var evaluator = _evaluator ??= ResolveEvaluator();
-        if (evaluator is null)
-            return false;
-
-        try
-        {
-            return evaluator(condition);
-        }
-        catch (TargetInvocationException)
-        {
-            // A malformed condition is false, not an error — CSS.supports never throws.
-            return false;
-        }
-    }
-
-    private static Func<string, bool>? _evaluator;
-    private static bool _evaluatorResolved;
-
-    private static Func<string, bool>? ResolveEvaluator()
-    {
-        if (_evaluatorResolved)
-            return null;
-        _evaluatorResolved = true;
-
-        var method = typeof(CSS.Dom.CssStyleEngine).GetMethod(
-            "EvaluatesSupportsCondition",
-            BindingFlags.Public | BindingFlags.Static,
-            binder: null,
-            types: new[] { typeof(string) },
-            modifiers: null);
-
-        return method is null
-            ? null
-            : (Func<string, bool>)method.CreateDelegate(typeof(Func<string, bool>));
-    }
+    private static bool Evaluate(string condition) =>
+        CSS.Dom.CssStyleEngine.EvaluatesSupportsCondition(condition);
 
     /// <summary>
     /// <c>CSS.escape(value)</c> — CSSOM §2, escaping a string so it can be used as a CSS

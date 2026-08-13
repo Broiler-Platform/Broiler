@@ -90,6 +90,21 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge` — CSS Font Loading (css-font-loading-3): `FontFace` and the
+  `document.fonts` `FontFaceSet` did not exist, so `document.fonts` was undefined and
+  `document.fonts.load(…)` a TypeError. That does not stop at the font code asking for it — on
+  google.com the *first* inline script is a font preloader whose entire body is one
+  `document.fonts.load` loop, so it died on its first statement. Both halves ship together:
+  a set without the constructor is the shape that hid the `AbortSignal` gap, and
+  `fonts.add(new FontFace(…))` needs both names. Broiler resolves fonts synchronously against
+  what it has when it lays text out, so from a page's side nothing is ever in flight —
+  `status` is `loaded`, `ready` is an already-resolved (and stable) promise, `check()` is true,
+  and `load()` resolves rather than rejecting. The failure mode that matters is a promise that
+  never settles, which would strand any page waiting behind `document.fonts.ready` before it
+  renders. An absent or empty font shorthand is a `SyntaxError` as the spec requires; beyond
+  that the shorthand is not parsed, so a malformed but non-empty font resolves rather than
+  being rejected over a diagnostic Broiler cannot actually produce.
+
 - `Broiler.HtmlBridge` — the CSSOM `CSS` namespace object (`CSS.supports()`, `CSS.escape()`)
   did not exist. An unqualified `CSS.supports(…)` is therefore a `ReferenceError`, which
   aborts the whole calling script rather than the one line; google.com's main bundle calls it

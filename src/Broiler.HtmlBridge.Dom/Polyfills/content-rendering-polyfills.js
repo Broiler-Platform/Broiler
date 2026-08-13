@@ -340,3 +340,183 @@ URL.prototype.toJSON = function() { return this.href; };
     globalThis.AbortSignal = AbortSignal;
     globalThis.AbortController = AbortController;
 })();
+
+// CSS Font Loading (css-font-loading-3) — FontFace and the document.fonts FontFaceSet.
+//
+// The API did not exist, so `document.fonts` was undefined and `document.fonts.load(…)` a
+// TypeError. That is not confined to the font code that asks for it: on google.com the very first
+// inline script is a font preloader whose whole body is one `document.fonts.load` loop, so the
+// script dies on its first statement and everything it would have gone on to do never happens.
+//
+// Both halves ship together deliberately. A FontFaceSet with no FontFace constructor is the shape
+// that hid the AbortSignal gap for so long — `document.fonts.add(new FontFace(…))` is the ordinary
+// way to use this API, and it needs both names to exist.
+//
+// What it models: Broiler resolves fonts synchronously against what it already has when it lays
+// text out, so from a page's point of view there is never a load in flight. `status` is therefore
+// "loaded", `ready` is already resolved, and `check()` is true. `load()` resolves rather than
+// rejecting — a page calling it is asking Broiler to *start* a load it has no pending work for,
+// and the failure mode that matters is a promise that never settles, which would strand a page
+// waiting behind `document.fonts.ready` before it renders anything.
+(function () {
+    function FontFace(family, source, descriptors) {
+        this.family = family !== undefined ? String(family) : '';
+        this.style = 'normal';
+        this.weight = 'normal';
+        this.stretch = 'normal';
+        this.unicodeRange = 'U+0-10FFFF';
+        this.variant = 'normal';
+        this.featureSettings = 'normal';
+        this.variationSettings = 'normal';
+        this.display = 'auto';
+        this.ascentOverride = 'normal';
+        this.descentOverride = 'normal';
+        this.lineGapOverride = 'normal';
+
+        if (descriptors) {
+            for (var key in descriptors) {
+                if (Object.prototype.hasOwnProperty.call(descriptors, key)) this[key] = descriptors[key];
+            }
+        }
+
+        // A FontFace built from a source is "unloaded" until load() is called; one whose source is
+        // already binary data (an ArrayBuffer rather than a url()) is loaded on construction, per
+        // the spec's split between the two constructor forms.
+        var isBinarySource = source !== undefined && typeof source !== 'string';
+        this.status = isBinarySource ? 'loaded' : 'unloaded';
+        this._source = source;
+
+        var self = this;
+        this.loaded = isBinarySource
+            ? Promise.resolve(self)
+            : new Promise(function (resolve) { self._resolveLoaded = resolve; });
+        if (isBinarySource) this._resolveLoaded = null;
+    }
+
+    FontFace.prototype.load = function () {
+        if (this.status === 'unloaded' || this.status === 'loading') {
+            this.status = 'loaded';
+            if (this._resolveLoaded) { this._resolveLoaded(this); this._resolveLoaded = null; }
+        }
+        return this.loaded;
+    };
+
+    function FontFaceSet() {
+        this._faces = [];
+        this.onloading = null;
+        this.onloadingdone = null;
+        this.onloadingerror = null;
+        this._listeners = {};
+    }
+
+    // Set-like, which is what iteration and `size` on document.fonts rely on.
+    Object.defineProperty(FontFaceSet.prototype, 'size', {
+        get: function () { return this._faces.length; },
+        configurable: true
+    });
+
+    // Nothing is ever in flight, so the set is loaded and ready from the start. `ready` is cached
+    // rather than rebuilt per access: a page may await it more than once, and each access handing
+    // back a different promise is a subtle way to strand one of them.
+    Object.defineProperty(FontFaceSet.prototype, 'status', {
+        get: function () { return 'loaded'; },
+        configurable: true
+    });
+
+    Object.defineProperty(FontFaceSet.prototype, 'ready', {
+        get: function () {
+            if (!this._ready) this._ready = Promise.resolve(this);
+            return this._ready;
+        },
+        configurable: true
+    });
+
+    FontFaceSet.prototype.add = function (face) {
+        if (face && this._faces.indexOf(face) === -1) this._faces.push(face);
+        return this;
+    };
+
+    FontFaceSet.prototype.delete = function (face) {
+        var index = this._faces.indexOf(face);
+        if (index === -1) return false;
+        this._faces.splice(index, 1);
+        return true;
+    };
+
+    FontFaceSet.prototype.clear = function () { this._faces.length = 0; };
+    FontFaceSet.prototype.has = function (face) { return this._faces.indexOf(face) !== -1; };
+
+    FontFaceSet.prototype.forEach = function (callback, thisArg) {
+        for (var i = 0; i < this._faces.length; i++) {
+            callback.call(thisArg, this._faces[i], this._faces[i], this);
+        }
+    };
+
+    FontFaceSet.prototype.values = function () { return this._faces.slice()[Symbol.iterator](); };
+    FontFaceSet.prototype.keys = function () { return this.values(); };
+    FontFaceSet.prototype.entries = function () {
+        var pairs = [];
+        for (var i = 0; i < this._faces.length; i++) pairs.push([this._faces[i], this._faces[i]]);
+        return pairs[Symbol.iterator]();
+    };
+    if (typeof Symbol !== 'undefined' && Symbol.iterator) {
+        FontFaceSet.prototype[Symbol.iterator] = function () { return this.values(); };
+    }
+
+    // load()/check() take a CSS `font` shorthand. An absent or empty one is a SyntaxError, as the
+    // spec requires; beyond that Broiler does not parse the shorthand, so a malformed but non-empty
+    // font resolves rather than rejecting. That is the deliberate direction: a page's font string
+    // is rarely the thing it is testing, and rejecting one Broiler merely failed to parse would
+    // break pages over a diagnostic Broiler cannot actually produce.
+    function requireFontShorthand(font) {
+        if (font === undefined || String(font).trim() === '') {
+            throw new DOMException("Failed to parse the 'font' property.", 'SyntaxError');
+        }
+    }
+
+    FontFaceSet.prototype.load = function (font, text) {
+        try {
+            requireFontShorthand(font);
+        } catch (e) {
+            return Promise.reject(e);
+        }
+
+        // Resolves with the faces this set holds for the family, which is the empty list unless the
+        // page added FontFace objects itself — Broiler's own fonts are not modelled as FontFace
+        // instances, so claiming them here would hand back objects that describe nothing.
+        var matching = [];
+        for (var i = 0; i < this._faces.length; i++) {
+            var face = this._faces[i];
+            if (face.status !== 'loaded') face.load();
+            if (String(font).indexOf(face.family) !== -1) matching.push(face);
+        }
+        return Promise.resolve(matching);
+    };
+
+    FontFaceSet.prototype.check = function (font, text) {
+        requireFontShorthand(font);
+        // Text is laid out with whatever Broiler resolves the family to, so from the page's side
+        // the font it asked about is always available to draw with.
+        return true;
+    };
+
+    FontFaceSet.prototype.addEventListener = function (type, listener) {
+        if (typeof listener !== 'function') return;
+        if (!this._listeners[type]) this._listeners[type] = [];
+        if (this._listeners[type].indexOf(listener) === -1) this._listeners[type].push(listener);
+    };
+
+    FontFaceSet.prototype.removeEventListener = function (type, listener) {
+        var listeners = this._listeners[type];
+        if (!listeners) return;
+        var index = listeners.indexOf(listener);
+        if (index !== -1) listeners.splice(index, 1);
+    };
+
+    globalThis.FontFace = FontFace;
+    globalThis.FontFaceSet = FontFaceSet;
+
+    if (typeof document !== 'undefined' && document && !document.fonts) {
+        document.fonts = new FontFaceSet();
+    }
+})();

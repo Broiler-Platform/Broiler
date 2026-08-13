@@ -1,4 +1,3 @@
-using System.Reflection;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Dom;
 using Broiler.JavaScript.Engine;
@@ -15,27 +14,12 @@ namespace Broiler.Cli.Tests;
 /// </para>
 /// </summary>
 /// <remarks>
-/// <c>supports()</c> answers from the CSS engine's own <c>@supports</c> evaluator, which lives in
-/// the <c>Broiler.CSS</c> submodule and arrives as a patch a maintainer applies (this session
-/// cannot push there). So these tests run against two supported states and say which is which:
-/// the negative answers and all of <c>escape()</c> hold either way, while the truthful positive
-/// answers are asserted only where the evaluator is actually present. <see cref="EvaluatorPresent"/>
-/// probes for it the same way the binding does.
+/// <c>supports()</c> answers from the CSS engine's own <c>@supports</c> evaluator. That evaluator
+/// arrived as a patch against <c>Broiler.CSS</c>, so these tests were written to hold both with and
+/// without it; it is in the pinned pointer now, and they assert the truthful answers directly.
 /// </remarks>
 public sealed class CssBindingTests
 {
-    /// <summary>
-    /// Whether the <c>Broiler.CSS</c> evaluator this binding defers to is in the build — that is,
-    /// whether the pending patch has been applied (or landed and had its pointer bumped).
-    /// </summary>
-    private static bool EvaluatorPresent { get; } =
-        typeof(CSS.Dom.CssStyleEngine).GetMethod(
-            "EvaluatesSupportsCondition",
-            BindingFlags.Public | BindingFlags.Static,
-            binder: null,
-            types: new[] { typeof(string) },
-            modifiers: null) is not null;
-
     private static (JSContext Context, DomBridge Bridge) Attach()
     {
         var context = new JSContext();
@@ -95,24 +79,20 @@ public sealed class CssBindingTests
         Assert.Equal("false", Eval(context, expression));
     }
 
-    /// <summary>
-    /// A feature the engine recognises. With the evaluator this is true; without it the binding
-    /// reports false — the conservative direction, where a page uses the fallback it already
-    /// carries rather than committing to something nothing will render.
-    /// </summary>
+    /// <summary>A feature the engine recognises.</summary>
     [Theory]
     [InlineData("CSS.supports('display', 'grid')")]
     [InlineData("CSS.supports('color', 'red')")]
     [InlineData("CSS.supports('(display: grid)')")]
     [InlineData("CSS.supports('(display: grid) and (color: red)')")]
     [InlineData("CSS.supports('not (totally-bogus-prop: 1)')")]
-    public void SupportedQueriesAreTrueOnceTheEvaluatorIsPresent(string expression)
+    public void SupportedQueriesAreTrue(string expression)
     {
         var (context, bridge) = Attach();
         using var _ = context;
         using var __ = bridge;
 
-        Assert.Equal(EvaluatorPresent ? "true" : "false", Eval(context, expression));
+        Assert.Equal("true", Eval(context, expression));
     }
 
     /// <summary>
@@ -127,14 +107,11 @@ public sealed class CssBindingTests
         using var _ = context;
         using var __ = bridge;
 
-        Assert.Equal(
-            EvaluatorPresent ? "true" : "false",
-            Eval(context, "CSS.supports('animation-timing-function', 'linear(0, 1)')"));
+        Assert.Equal("true", Eval(context, "CSS.supports('animation-timing-function', 'linear(0, 1)')"));
     }
 
     /// <summary>
-    /// <c>CSS.escape()</c> is a pure algorithm (CSSOM §2) with no engine dependency, so it is exact
-    /// in either state — including the parts that are easy to get wrong: a leading digit becomes a
+    /// <c>CSS.escape()</c> is a pure algorithm (CSSOM §2) with no engine dependency — including the parts that are easy to get wrong: a leading digit becomes a
     /// hexadecimal escape *with* its trailing space, a leading digit after a hyphen does too, a lone
     /// hyphen is escaped while <c>--</c> is not, and NULL becomes the replacement character rather
     /// than being escaped or dropped.
