@@ -46,37 +46,46 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 | # | submodule | subject |
 | --- | --- | --- |
-| `0001` | `Broiler.JS` | Let the anonymous programs be dumped to disk |
+| `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
 
-### `0001` — a frame naming `vm16.js` still does not say what `vm16.js` is
+### `0001` — a closure a direct eval created lost the eval site's bindings
 
-Numbering the programs that have no script of their own (`eval`, and the
-`Function` constructor's body) made a trace through a module loader
-attributable: frames say `vm16.js` now, rather than every one of them saying
-`vm.js`. That patch has landed — the pinned `Broiler.JS` pointer is its commit,
-`1c8ec446`.
+`eval("(function(){ return b; })")` threw `b is not defined` when the function it
+returned was called, even though `eval("b")` at the same spot read the same
+binding fine.
 
-But a name is only half of it. Knowing that a `b is not defined` came from
-`vm16.js:1,14` still does not say what `vm16.js` *is*, and a payload a loader
-evaluated exists nowhere on disk to go and look at. That is exactly the position
-the google.com report is in, five traces later.
+A direct eval's scope is **lexical**: the closure keeps the eval site's bindings
+after that call has returned. Broiler made the caller's bindings reachable by
+installing them as an overlay for the duration of the eval and withdrawing it on
+return — right for code the eval *runs*, wrong for code the eval *creates*. The
+names stop resolving at exactly the moment such a function is first called.
 
-So each anonymous program is written to a file named exactly what the frames call
-it: `vm16.js` in the trace is `vm16.js` in the dump directory, holding that
-program's source.
+So a function created by directly-evalled code now captures those bindings — as
+one created inside a `with` block already captured its with-chain — and
+re-establishes them for the duration of a call. The live `JSVariable` objects are
+captured rather than their values, so the binding stays shared in both
+directions: a later write by the enclosing function is visible to the closure,
+and a write by the closure lands on the caller's binding rather than on a fresh
+global.
 
-**Off unless `BROILER_JS_DUMP_PROGRAMS` names a directory.** Page script is page
-content: dumping it by default would write whatever a page evaluates — including
-anything personal a response embedded — to disk on every render, and that should
-be a deliberate act rather than a default. The directory is also settable
-directly, as the other compiler switches are, so a test can drive it without the
-environment. A failure to write is swallowed, because a diagnostic must never be
-able to break the execution it is observing.
+**Consulted only after every ordinary scope has failed**, on the read and the
+write path alike, so nothing that resolves today resolves differently. Placing it
+alongside the eval-binding walk instead broke Annex B block-level function
+declarations, which own their name through `globalVars` and must not be shadowed
+by the snapshot (`Issue619.AnnexBEvalFuncBlockScoping`,
+`Issue912EvalHoistChar`) — worth knowing before anyone tries to "simplify" the
+placement.
 
-**Why it is not listed for the pixel suites.** It writes files when explicitly
-asked to and changes nothing about what any program computes, so no pixel moves
-either way. Its behaviour is unit-tested inside the patch
-(`AnonymousProgramDumpTests`).
+**Where it came from.** Five reports of `b is not defined` on google.com. Its
+module loader is `function(e){return eval(e)}(src)` with `src` being
+`0,function(){b(2,57,1,w)}` — the result stored and invoked later by the bundle.
+The fragment that made it readable came from the program dump added for exactly
+that purpose, which has since landed upstream.
+
+**Why it is not listed for the pixel suites.** It decides whether page script
+runs at all rather than what any of it paints, and the pixel suites do not
+execute a loader of this shape. Its behaviour is unit-tested inside the patch
+(`DirectEvalClosureScopeTests`).
 
 **When it lands upstream:** bump the pointer and delete this patch.
 

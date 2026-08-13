@@ -138,13 +138,13 @@ set -euo pipefail
 # file are gone with it. The @supports-evaluator patch that replaced it went the same way, as
 # Broiler.CSS 8be7a65.
 #
-# The program-numbering patch that was 0001 before this one landed upstream as Broiler.JS
-# 1c8ec446 — the pinned pointer itself — so its file is gone with it.
+# The program-numbering and program-dump patches that held 0001 before this one both landed
+# upstream, so their files are gone with them.
 #
-# 0001 (Broiler.JS, dump the anonymous programs to disk) is deliberately NOT listed, for the same
-# reason its predecessor was not: it writes files when explicitly asked to via an environment
-# variable, and changes nothing about what any program computes. No pixel moves either way, and
-# its behaviour is unit-tested inside the patch itself (AnonymousProgramDumpTests).
+# 0001 (Broiler.JS, keep a direct eval's scope alive for the closures it creates) is deliberately
+# NOT listed. It decides whether page script runs at all rather than what any of it paints, and
+# the pixel suites do not execute a module loader of the shape that trips it. Its behaviour is
+# unit-tested inside the patch itself (DirectEvalClosureScopeTests).
 PENDING_PATCHES=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
