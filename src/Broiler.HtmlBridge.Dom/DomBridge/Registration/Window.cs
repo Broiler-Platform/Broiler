@@ -46,6 +46,12 @@ public sealed partial class DomBridge
         // window.alert(msg) — logs to debug output
         window.FastAddValue((KeyString)"alert", new DomFunction(Dom.Features.WindowDocumentMiscBinding.Alert, "alert", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // btoa / atob — the WindowOrWorkerGlobalScope base64 pair (HTML §8.3), co-located in the
+        // Base64Binding feature module. The window IS the global object, so registering here is
+        // what makes the unqualified `atob(…)` a page writes resolve as well.
+        window.FastAddValue((KeyString)"btoa", new DomFunction((in a) => Dom.Features.Base64Binding.Btoa(_jsContext!, in a), "btoa", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"atob", new DomFunction((in a) => Dom.Features.Base64Binding.Atob(_jsContext!, in a), "atob", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
         // console object (shared between window.console and global console)
         var console = Dom.Features.ConsoleBinding.Build();
         window.FastAddValue((KeyString)"console", console, JSPropertyAttributes.EnumerableConfigurableValue);
