@@ -1,7 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Nothing is waiting on a maintainer right now.** This directory is empty of
-patches, which is the expected steady state — see below.
+**One patch is waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -45,25 +44,50 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 ## The index
 
-_Empty._ The two patches that were here — the `Broiler.JS` postfix-`++` parser fix and the
-`Broiler.CSS` `@supports` evaluator — both landed upstream, and both pinned pointers carry
-them (`434db760` and `8be7a65`). They reach CI through the pointer now, so their files and
-their `scripts/apply-pending-wpt-patches.sh` entries are gone with them: this directory is a
-backlog, not an archive.
+| # | submodule | subject |
+| --- | --- | --- |
+| `0001` | `Broiler.JS` | Number the programs that have no script name of their own |
 
-Numbering therefore restarts at `0001` for the next patch added.
+### `0001` — every anonymous program was called `vm.js`
+
+`eval`, and the `Function` constructor's body, were all compiled as `vm.js`. One
+name for every such program makes a stack trace through a module loader
+unreadable, because the frames cannot be attributed: two frames reading
+`vm.js:1,14` and `vm.js:5060,25473` give no way to tell whether that is one
+program or two — and which it is decides whether the failing function was
+defined where it was called or somewhere else entirely.
+
+That is not hypothetical. A `b is not defined` on google.com has been reported
+four times with exactly that pair of frames, and this ambiguity is why it cannot
+be read: the identifier is in a module payload the loader evaluates, but the
+trace cannot say *which* payload, or even that a payload is involved at all
+rather than one program calling itself.
+
+So the fallback numbers them, the way devtools shows `VM123`: frames read
+`vm1.js`, `vm2.js` and so on, one name per compiled program. A script that
+already has a name — every script from the document, since the script-naming
+work — keeps it; only the fallback changes.
+
+**Why it is not listed for the pixel suites.** It changes what a frame is
+*called* and nothing about what any program computes, so no pixel moves either
+way. Its behaviour is unit-tested inside the patch
+(`AnonymousProgramNamingTests`), and listing it would add a patch application to
+every pixel run for no observable difference.
+
+**When it lands upstream:** bump the pointer and delete this patch.
 
 ## A stale entry in the apply script is not inert
 
-An earlier `0001` (`Broiler.HTML`, root-relative stylesheet href) had **landed upstream** — the
-pinned pointer *was* its commit — but was still listed. The idempotence guard did not save it:
-the guard skips a patch whose *reverse* apply succeeds, and the upstream commit was not
-byte-identical to the patch as exported, so the reverse check failed too. Applying neither way,
-it was reported as drifted and `scripts/apply-pending-wpt-patches.sh` exited 1 on **every** run
-— taking down the suites it exists to serve, and every later entry with it.
+An earlier `0001` (`Broiler.HTML`, root-relative stylesheet href) had **landed
+upstream** — the pinned pointer *was* its commit — but was still listed. The
+idempotence guard did not save it: the guard skips a patch whose *reverse* apply
+succeeds, and the upstream commit was not byte-identical to the patch as
+exported, so the reverse check failed too. Applying neither way, it was reported
+as drifted and `scripts/apply-pending-wpt-patches.sh` exited 1 on **every** run —
+taking down the suites it exists to serve, and every later entry with it.
 
-So when that script reports drift, check whether the fix is simply upstream before regenerating
-anything:
+So when that script reports drift, check whether the fix is simply upstream
+before regenerating anything:
 
 ```sh
 git -C <Submodule> log --oneline --grep '<the commit subject>'

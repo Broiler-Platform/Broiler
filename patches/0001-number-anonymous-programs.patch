@@ -1,0 +1,158 @@
+From f5888958353cbca89a27ea08f64d8037e6f4603a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 13 Aug 2026 18:52:32 +0000
+Subject: [PATCH] Number the programs that have no script name of their own
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+eval, and the Function constructor's body, were all compiled as "vm.js". One
+name for every such program makes a stack trace through a module loader
+unreadable, because the frames cannot be attributed to anything: two frames
+reading `vm.js:1,14` and `vm.js:5060,25473` give no way to tell whether that
+is one program or two — and which it is decides whether the failing function
+was defined where it was called or somewhere else entirely.
+
+That is not hypothetical. A `b is not defined` on google.com has been
+reported four times with exactly that pair of frames, and the ambiguity is
+the reason it cannot be read: the identifier is in a module payload the
+loader evaluates, but the trace cannot say which payload, or even that a
+payload is involved at all rather than one program calling itself.
+
+So number them, the way a browser's devtools does with VM123. Frames now read
+vm1.js, vm2.js and so on, one name per compiled program, and a trace spanning
+several says which is which. A script that already has a name — every script
+that comes from the document, since #1636 — keeps it; this only replaces the
+fallback.
+
+Re-evaluating identical source may reuse a cached compilation and its name
+with it, which is right: the name still identifies exactly one piece of code.
+
+Compiler 1297 passed (3 new), Parser 111, BuiltIns 2118, Integration 4598
+(the one failure is an unrelated docs/roadmap.md existence check).
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01725QNtRPh4U2BQhxuubox3
+---
+ .../AnonymousProgramNamingTests.cs            | 74 +++++++++++++++++++
+ .../FastCompiler.cs                           | 14 +++-
+ 2 files changed, 87 insertions(+), 1 deletion(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramNamingTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramNamingTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramNamingTests.cs
+new file mode 100644
+index 00000000..0c0f47cc
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramNamingTests.cs
+@@ -0,0 +1,74 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Naming for programs that have no script of their own: eval, and the Function constructor's body.
++//
++// They were all compiled as "vm.js". One name for every such program makes a stack trace through a
++// module loader unreadable, because the frames cannot be attributed: two frames reading
++// `vm.js:1,14` and `vm.js:5060,25473` give no way to tell whether that is one program or two — and
++// which it is decides whether the failing function was defined where it was called or somewhere
++// else entirely. Numbering them (the way devtools shows VM123) makes each program identifiable.
++public class AnonymousProgramNamingTests
++{
++    private static string StackOf(JSContext context, string script, string label) =>
++        context.Eval($"(function(){{ try {{ {script} }} catch (e) {{ return e.stack; }} }})()", label).ToString();
++
++    // The reported shape: one eval'd program defines a function, a second calls it. The two frames
++    // have to name different programs.
++    [Fact]
++    public void TwoEvaluatedPrograms_AreNamedApart()
++    {
++        using var context = new JSContext();
++
++        var stack = StackOf(
++            context,
++            "globalThis.NS = {};" +
++            " (0,eval)('(function(_){ _.f = function(){ return nosuchvalue; }; })(globalThis.NS)');" +
++            " (0,eval)('(function(){ return globalThis.NS.f(); })()');",
++            "outer.js");
++
++        var names = new HashSet<string>();
++        foreach (var line in stack.Split('\n'))
++        {
++            var start = line.IndexOf("vm", StringComparison.Ordinal);
++            if (start < 0)
++                continue;
++            var end = line.IndexOf(".js", start, StringComparison.Ordinal);
++            if (end > start)
++                names.Add(line.Substring(start, end - start + 3));
++        }
++
++        // Both programs appear, under names that differ.
++        Assert.True(names.Count >= 2, $"expected at least two distinct program names, got [{string.Join(", ", names)}] in: {stack}");
++        Assert.DoesNotContain("vm.js", names);
++    }
++
++    // Distinct sources get distinct names, so a name never covers two different programs.
++    // (Re-evaluating the *same* source may reuse a cached compilation, and reusing its name with
++    // it is right — the name still identifies exactly one piece of code.)
++    [Fact]
++    public void DistinctEvaluatedSources_GetDistinctNames()
++    {
++        using var context = new JSContext();
++
++        var first = StackOf(context, "(0,eval)('nosuchvalue;');", "outer.js");
++        var second = StackOf(context, "(0,eval)('\\n nosuchvalue;');", "outer.js");
++
++        Assert.NotEqual(first, second);
++        Assert.DoesNotContain("vm.js", first);
++        Assert.DoesNotContain("vm.js", second);
++    }
++
++    // A script that HAS a name keeps it — the numbering is only the fallback.
++    [Fact]
++    public void ANamedScript_KeepsItsName()
++    {
++        using var context = new JSContext();
++
++        var stack = StackOf(context, "nosuchvalue;", "inline-3");
++
++        Assert.Contains("inline-3", stack);
++        Assert.DoesNotContain("vm.js", stack);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
+index cfa5d4a1..015795fb 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
+@@ -1,4 +1,5 @@
+ ﻿using System;
++using System.Threading;
+ using System.Collections.Generic;
+ using System.Reflection;
+ using Broiler.JavaScript.ExpressionCompiler.Expressions;
+@@ -76,11 +77,22 @@ public partial class FastCompiler : AstMapVisitor<BExpression>
+ 
+     public BExpression<JSFunctionDelegate> Method { get; }
+ 
++    // Numbers the anonymous programs above. Static and interlocked because compilation is not
++    // confined to one thread, and a repeated name would defeat the point of numbering at all.
++    private static int anonymousProgramSequence;
++
+     public FastCompiler(in StringSpan code, string location = null, IList<string> argsList = null, ICodeCache codeCache = null)
+     {
+         pool = new FastPool();
+ 
+-        location = location ?? "vm.js";
++        // Code with no script of its own — eval, and the Function constructor's body — was named
++        // "vm.js" without distinction, so every such program shared one name. A stack trace
++        // spanning several of them then could not be read: frames reading `vm.js:1,14` and
++        // `vm.js:5060,25473` give no way to tell whether that is one program or two, which is
++        // exactly what a trace through a module loader looks like. Number them, the way a
++        // browser's devtools does with VM123, so each compiled program is identifiable and its
++        // frames can be attributed to it.
++        location = location ?? "vm" + Interlocked.Increment(ref anonymousProgramSequence).ToString() + ".js";
+         this.location = location;
+         var context = JSEngine.Current as JSContext;
+         isDirectEvalCompilation = context?.IsCompilingDirectEval ?? false;
+-- 
+2.43.0
+
