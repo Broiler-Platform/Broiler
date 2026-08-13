@@ -51,6 +51,17 @@ are versioned in lockstep during the preview.
   not set it is unchanged. Read by a one-line `Broiler.HTML` change, upstream and
   pinned (`1bf117a`).
 
+- `Broiler.JS` — the programs that have
+  no script of their own (`eval`, and the `Function` constructor's body) can be written to disk,
+  each under the name its stack frames use: `vm16.js` in a trace is `vm16.js` in the dump
+  directory. Numbering those programs made a trace through a module loader attributable, but a
+  name is only half of it — knowing a `b is not defined` came from `vm16.js:1,14` still does not
+  say what `vm16.js` *is*, and a payload a loader evaluated exists nowhere on disk to go and look
+  at. Off unless `BROILER_JS_DUMP_PROGRAMS` names a directory, because page script is page
+  content and writing it on every render should be a deliberate act; the directory is also
+  settable directly, as the other compiler switches are. A failure to write is swallowed — a
+  diagnostic must never be able to break the execution it observes.
+
 ### Changed
 
 - `Broiler.HtmlBridge` — a script names itself in the stack traces of the errors it
@@ -88,20 +99,23 @@ are versioned in lockstep during the preview.
   `BROILER_IMAGE_DECODE_THREADS=1` to decode on the calling thread only, which a
   host that already runs several decodes at once should do.
 
-### Added
-
-- `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — the programs that have
-  no script of their own (`eval`, and the `Function` constructor's body) can be written to disk,
-  each under the name its stack frames use: `vm16.js` in a trace is `vm16.js` in the dump
-  directory. Numbering those programs made a trace through a module loader attributable, but a
-  name is only half of it — knowing a `b is not defined` came from `vm16.js:1,14` still does not
-  say what `vm16.js` *is*, and a payload a loader evaluated exists nowhere on disk to go and look
-  at. Off unless `BROILER_JS_DUMP_PROGRAMS` names a directory, because page script is page
-  content and writing it on every render should be a deliberate act; the directory is also
-  settable directly, as the other compiler switches are. A failure to write is swallowed — a
-  diagnostic must never be able to break the execution it observes.
-
 ### Fixed
+
+- `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — a closure created by a
+  direct `eval` lost the eval site's bindings the moment the eval returned, so
+  `eval("(function(){ return b; })")` threw `b is not defined` when the function it returned was
+  called — even though `eval("b")` at the same spot read the same binding fine. A direct eval's
+  scope is *lexical*: the closure keeps those bindings afterwards. They were made reachable by an
+  overlay installed for the duration of the eval and withdrawn on return, which is right for code
+  the eval runs and wrong for code the eval creates. A function created by directly-evalled code
+  now captures them — as one created inside a `with` block already captured its with-chain — and
+  re-establishes them for the duration of a call. The live bindings are captured rather than their
+  values, so a later write by the enclosing function is visible to the closure and a write by the
+  closure reaches the caller's binding instead of a fresh global. Consulted only after every
+  ordinary scope has failed, on the read and write paths alike, so nothing that resolves today
+  resolves differently. This is what made google.com's module loader
+  (`function(e){return eval(e)}("0,function(){b(2,57,1,w)}")`, the result stored and invoked later)
+  fail with `b is not defined`.
 
 - `Broiler.JS` — `eval` and the
   `Function` constructor's body were all compiled as `vm.js`, one name for every program that
