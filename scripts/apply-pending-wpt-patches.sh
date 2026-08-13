@@ -135,19 +135,13 @@ set -euo pipefail
 #
 # The postfix-++ parser patch that was 0001 before this one landed upstream as Broiler.JS
 # 434db760 — the pinned pointer itself — so it reaches CI through the pointer and its entry and
-# file are gone with it.
+# file are gone with it. The @supports-evaluator patch that replaced it went the same way, as
+# Broiler.CSS 8be7a65, which is why nothing is listed below.
 #
-# 0001 (Broiler.CSS, expose the @supports evaluator) is listed because CSS.supports() decides
-# which CSS a page writes about itself. Without it the main-repo CSS object still exists — the
-# ReferenceError that stopped google.com's bundle is fixed either way — but supports() answers
-# false to everything, so a site that feature-detects `(display: grid)` takes its pre-grid
-# fallback and lays out down a different path than the reference. That is a whole-page
-# difference only a pixel suite can see; the evaluator itself is unit-tested on both sides of
-# the seam in the main repo (CssBinding tests cover the false-answering fallback, and assert
-# the truthful answers once this is applied).
-PENDING_PATCHES=(
-  "Broiler.CSS|patches/0001-css-supports-public-evaluator.patch"
-)
+# Nothing pending. This is the expected steady state, not a sign the mechanism is unused: a
+# patch is added here only while its submodule fix is waiting, and removed the moment the
+# pointer carries it.
+PENDING_PATCHES=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
