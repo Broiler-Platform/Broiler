@@ -90,6 +90,21 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge` — `AbortSignal` (DOM §3.2) did not exist as an interface. The signal
+  was an object literal built inside `AbortController`, so everything reached *through the
+  controller* worked and the gap was invisible from that side — but the name itself was
+  undefined, and a script that so much as mentions `AbortSignal` gets a `ReferenceError`,
+  which aborts the whole script rather than the one line. google.com's main bundle does
+  exactly that, and it is where the bundle stopped once the parser fix let it run at all.
+  It is now a real constructor with a real prototype: `aborted`, `reason` and `onabort`
+  stay *own* properties of each signal because the host reads them directly off the object,
+  while the methods moved to the prototype, which is what makes `instanceof AbortSignal`
+  (and `instanceof EventTarget`) true and lets the statics exist. Added with it:
+  `AbortSignal.abort()`, `AbortSignal.timeout()` — whose reason is a `TimeoutError`, not an
+  `AbortError`, so code that distinguishes "cancelled" from "took too long" can — and
+  `AbortSignal.any()`, which is already aborted if any input is, so composing signals cannot
+  miss an abort that happened first. Constructing one directly throws, as the spec requires.
+
 - `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — the parser
   rejected `!c++ && 1`. A postfix `++`/`--` belongs to the *operand* of a prefix unary
   operator (`!c++` is `!(c++)`, the grammar reaching it through

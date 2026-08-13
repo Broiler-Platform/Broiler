@@ -223,37 +223,120 @@ function URL(url, base) {
 URL.prototype.toString = function() { return this.href; };
 URL.prototype.toJSON = function() { return this.href; };
 
-// AbortController / AbortSignal — basic stubs
-function AbortController() {
-    this.signal = {
-        aborted: false,
-        reason: undefined,
-        onabort: null,
-        _listeners: [],
-        addEventListener: function(type, listener) {
-            if (type !== 'abort' || typeof listener !== 'function') return;
-            if (this._listeners.indexOf(listener) === -1) this._listeners.push(listener);
-        },
-        removeEventListener: function(type, listener) {
-            if (type !== 'abort') return;
-            var index = this._listeners.indexOf(listener);
-            if (index !== -1) this._listeners.splice(index, 1);
-        },
-        throwIfAborted: function() {
-            if (this.aborted) throw (this.reason !== undefined ? this.reason : new DOMException('The operation was aborted.', 'AbortError'));
+// AbortController / AbortSignal (DOM §3.2).
+//
+// The signal used to be an object literal built inside the controller, with no AbortSignal
+// constructor anywhere. Everything that touches a signal *through the controller* worked, so this
+// looked complete — but the name itself did not exist, and a script that so much as mentions
+// `AbortSignal` gets a ReferenceError, which aborts the whole script rather than the one line.
+// That is what google.com's main bundle does, and it is where the bundle stopped once it began
+// parsing at all: nothing it defines after that point came into existence.
+//
+// So AbortSignal is a real constructor with a real prototype. `aborted`, `reason` and `onabort`
+// stay *own* properties of each signal, because the host reads them directly off the object; only
+// the methods moved to the prototype, which is what makes `instanceof` and the static factories
+// work.
+(function () {
+    function AbortSignal() {
+        // The interface has no constructor of its own: a signal only ever comes from an
+        // AbortController or from one of the statics below.
+        throw new TypeError("Failed to construct 'AbortSignal': Illegal constructor.");
+    }
+
+    // A signal is an EventTarget, so inherit when there is one to inherit from — that is what
+    // makes `signal instanceof EventTarget` true. Guarded rather than assumed: if EventTarget is
+    // absent the plain prototype below still carries everything a signal is actually used for.
+    if (typeof EventTarget === 'function' && EventTarget.prototype) {
+        AbortSignal.prototype = Object.create(EventTarget.prototype);
+        AbortSignal.prototype.constructor = AbortSignal;
+    }
+
+    function createSignal() {
+        var signal = Object.create(AbortSignal.prototype);
+        signal.aborted = false;
+        signal.reason = undefined;
+        signal.onabort = null;
+        signal._listeners = [];
+        return signal;
+    }
+
+    // The abort steps, shared by the controller and by AbortSignal.abort/timeout/any. Aborting an
+    // already-aborted signal is a no-op, so a listener fires at most once however it was reached.
+    function abortSignal(signal, reason) {
+        if (signal.aborted) return;
+        signal.aborted = true;
+        signal.reason = reason !== undefined ? reason : new DOMException('The operation was aborted.', 'AbortError');
+        var event = { type: 'abort', target: signal, currentTarget: signal };
+        if (typeof signal.onabort === 'function') {
+            try { signal.onabort(event); } catch (e) {}
         }
+        var listeners = signal._listeners.slice();
+        for (var i = 0; i < listeners.length; i++) {
+            try { listeners[i].call(signal, event); } catch (e) {}
+        }
+    }
+
+    AbortSignal.prototype.addEventListener = function (type, listener) {
+        if (type !== 'abort' || typeof listener !== 'function') return;
+        if (this._listeners.indexOf(listener) === -1) this._listeners.push(listener);
     };
-}
-AbortController.prototype.abort = function(reason) {
-    if (this.signal.aborted) return;
-    this.signal.aborted = true;
-    this.signal.reason = reason !== undefined ? reason : new DOMException('The operation was aborted.', 'AbortError');
-    var event = { type: 'abort', target: this.signal, currentTarget: this.signal };
-    if (typeof this.signal.onabort === 'function') {
-        try { this.signal.onabort(event); } catch(e) {}
+
+    AbortSignal.prototype.removeEventListener = function (type, listener) {
+        if (type !== 'abort') return;
+        var index = this._listeners.indexOf(listener);
+        if (index !== -1) this._listeners.splice(index, 1);
+    };
+
+    AbortSignal.prototype.throwIfAborted = function () {
+        if (this.aborted) throw (this.reason !== undefined ? this.reason : new DOMException('The operation was aborted.', 'AbortError'));
+    };
+
+    // AbortSignal.abort(reason) — a signal that is already aborted.
+    AbortSignal.abort = function (reason) {
+        var signal = createSignal();
+        abortSignal(signal, reason);
+        return signal;
+    };
+
+    // AbortSignal.timeout(ms) — aborts with a TimeoutError, which is deliberately not an
+    // AbortError: code that distinguishes "the user cancelled" from "it took too long" reads
+    // reason.name to tell them apart.
+    AbortSignal.timeout = function (milliseconds) {
+        var signal = createSignal();
+        setTimeout(function () {
+            abortSignal(signal, new DOMException('The operation was aborted due to timeout.', 'TimeoutError'));
+        }, milliseconds);
+        return signal;
+    };
+
+    // AbortSignal.any(signals) — follows whichever aborts first, and is already aborted if any of
+    // them is, so a caller cannot miss an abort that happened before it composed them.
+    AbortSignal.any = function (signals) {
+        var composite = createSignal();
+        var sources = signals ? Array.prototype.slice.call(signals) : [];
+        for (var i = 0; i < sources.length; i++) {
+            if (sources[i] && sources[i].aborted) {
+                abortSignal(composite, sources[i].reason);
+                return composite;
+            }
+        }
+        for (var j = 0; j < sources.length; j++) {
+            (function (source) {
+                if (!source || typeof source.addEventListener !== 'function') return;
+                source.addEventListener('abort', function () { abortSignal(composite, source.reason); });
+            })(sources[j]);
+        }
+        return composite;
+    };
+
+    function AbortController() {
+        this.signal = createSignal();
     }
-    var listeners = this.signal._listeners.slice();
-    for (var i = 0; i < listeners.length; i++) {
-        try { listeners[i].call(this.signal, event); } catch(e) {}
-    }
-};
+
+    AbortController.prototype.abort = function (reason) {
+        abortSignal(this.signal, reason);
+    };
+
+    globalThis.AbortSignal = AbortSignal;
+    globalThis.AbortController = AbortController;
+})();
