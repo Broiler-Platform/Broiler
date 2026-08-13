@@ -352,7 +352,8 @@ the two defects at the end of this entry.
   | --- | --- | --- |
   | baseline | 2 675 | 98.562% |
   | + the switch and percentages | 2 751 | 98.602% |
-  | **+ attribute quoting** | **2 756** | 98.599% |
+  | + attribute quoting | 2 756 | 98.599% |
+  | **+ fill-opacity and mix-blend-mode** | **2 680** | 98.586% |
 
   **+95 / −14 against baseline.** The headline cluster is `css-images/object-fit-*-svg-*`,
   **52/120 → 120/120**. The quoting fix is **+5 / −0** on its own, and three of those five —
@@ -417,6 +418,43 @@ reference, and the two disagree. Not triaged further:
 
 The last belongs to the [`massive-element-*` family](#the-snapshot-clone-lays-its-children-out-horizontally);
 the other five are unexamined.
+
+### `fill-opacity`, `stroke-opacity` and `mix-blend-mode` on an SVG shape — **fixed**
+
+- **Owner:** `Broiler.Layout` (`IR/SvgRenderer.cs`). Main repo, no patch.
+- **What landed.** A shape's `fill`/`stroke` now resolve through the element's `style` declaration as
+  well as its presentation attribute (SVG 1.1 §6.4 ranks `style` higher), `fill-opacity` and
+  `stroke-opacity` fold into the paint's alpha, and a non-`normal` `mix-blend-mode` wraps the shape in
+  the same `BlendModeItem`/`RestoreBlendModeItem` pair the CSS `mix-blend-mode` path already emits — so
+  the raster backend composites it with machinery it already had, and already reports which modes it
+  can keep on the raster path.
+- **Folding opacity into the alpha is exact here** and is not the same as the element's `opacity`
+  property, which composites fill and stroke together. `opacity` is deliberately not modelled: with a
+  translucent stroke over its own fill the two differ, and inventing the group behaviour would be wrong
+  in the commoner case.
+- **Direct evidence it works:** `css/compositing/svg/mix-blend-mode-svg-rectangle` and
+  `mix-blend-mode-in-svg-image` both go **98.7% → 100%**.
+- **And it costs 76 reftests, every one of them a fake pass unmasked.** The sweep goes
+  **2 718 → 2 642**, +4 and −80, with all 80 losses in `css-images/object-fit-*-svg-*`. Those tests load
+  `support/colors-16x8.svg`, whose rects are styled `style="fill: blue"` with **no `fill` attribute**,
+  and their reference paints it as a `background-image`. Measured on both sides:
+
+  | | test | reference | match |
+  | --- | --- | --- | --- |
+  | before | 100.00% white | 99.73% white — borders only, the SVG painted nothing | 99.7%, **passing** |
+  | after | 100.00% white | 98.24% white + the four colours | 98.2%, failing |
+
+  **The test side is blank before and after.** The change made the *reference* correct, and the pair
+  stopped agreeing. Worth knowing why this was ever passing: the image backend's old renderer returned
+  the *default* colour for a missing attribute, so it painted these rects solid black; the shared
+  renderer returns "no paint", so after the switch both sides drew nothing and matched at ~100%.
+- **The gap it exposes is separate and real:** `object-fit-contain-svg-001i` renders a **completely
+  blank page** — no dashed borders either — while a bare `<img src="colors-16x8.svg" width=200
+  height=200>` probe paints the SVG correctly through all three of `<img>`, `object-fit: contain` and
+  `background-image`. Something in those tests fails at the document level, not in the image. That is
+  what the 80 tests are actually blocked on, and it is untriaged.
+- **Exit gate:** `object-fit-contain-svg-001i` renders its borders and images at all, at which point
+  the 80 become an ordinary comparison rather than a blank page against a correct reference.
 
 ### `cross-fade()` is unimplemented, and Chromium does not implement it either
 

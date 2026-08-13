@@ -115,7 +115,7 @@ internal static partial class SvgRenderer
                 float bx = GetLength(attrs, "x", pctW), by = GetLength(attrs, "y", pctH);
                 float bw = GetLength(attrs, "width", pctW), bh = GetLength(attrs, "height", pctH);
                 float fx = bx - 0.1f * bw, fy = by - 0.1f * bh, fw = 1.2f * bw, fh = 1.2f * bh;
-                items.Add(new DrawSvgRectItem
+                AddShape(items, bounds, attrs, new DrawSvgRectItem
                 {
                     Bounds = bounds,
                     X = fx * sx + tx,
@@ -129,8 +129,8 @@ internal static partial class SvgRenderer
                 continue;
             }
 
-            var rectFill = GetColor(attrs, "fill", BColor.Black);
-            var rectStroke = GetColor(attrs, "stroke", BColor.Empty);
+            var rectFill = GetPaint(attrs, "fill", BColor.Black);
+            var rectStroke = GetPaint(attrs, "stroke", BColor.Empty);
 
             // A colour-only filter chain over a solid fill is equivalent to recolouring the shape;
             // its geometry is untouched (WPT css/filter-effects/fecolormatrix-negative, whose
@@ -138,7 +138,7 @@ internal static partial class SvgRenderer
             if (TryResolveColorFilter(attrs, rectFill, rectStroke, out var filteredFill))
                 rectFill = filteredFill;
 
-            items.Add(new DrawSvgRectItem
+            AddShape(items, bounds, attrs, new DrawSvgRectItem
             {
                 Bounds = bounds,
                 X = GetLength(attrs, "x", pctW) * sx + tx,
@@ -156,15 +156,15 @@ internal static partial class SvgRenderer
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
             float r = GetLength(attrs, "r", pctD);
-            items.Add(new DrawSvgEllipseItem
+            AddShape(items, bounds, attrs, new DrawSvgEllipseItem
             {
                 Bounds = bounds,
                 Cx = GetLength(attrs, "cx", pctW) * sx + tx,
                 Cy = GetLength(attrs, "cy", pctH) * sy + ty,
                 Rx = r * sx,
                 Ry = r * sy,
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
@@ -173,15 +173,15 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseEllipseRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgEllipseItem
+            AddShape(items, bounds, attrs, new DrawSvgEllipseItem
             {
                 Bounds = bounds,
                 Cx = GetLength(attrs, "cx", pctW) * sx + tx,
                 Cy = GetLength(attrs, "cy", pctH) * sy + ty,
                 Rx = GetLength(attrs, "rx", pctW) * sx,
                 Ry = GetLength(attrs, "ry", pctH) * sy,
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
@@ -190,14 +190,14 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseLineRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgLineItem
+            AddShape(items, bounds, attrs, new DrawSvgLineItem
             {
                 Bounds = bounds,
                 X1 = GetLength(attrs, "x1", pctW) * sx + tx,
                 Y1 = GetLength(attrs, "y1", pctH) * sy + ty,
                 X2 = GetLength(attrs, "x2", pctW) * sx + tx,
                 Y2 = GetLength(attrs, "y2", pctH) * sy + ty,
-                Stroke = GetColor(attrs, "stroke", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Black),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
@@ -205,12 +205,12 @@ internal static partial class SvgRenderer
         foreach (Match m in ParsePolygonRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgPolygonItem
+            AddShape(items, bounds, attrs, new DrawSvgPolygonItem
             {
                 Bounds = bounds,
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
-                Fill = GetColor(attrs, "fill", BColor.Black),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
@@ -218,12 +218,12 @@ internal static partial class SvgRenderer
         foreach (Match m in ParsePolyLineRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgPolylineItem
+            AddShape(items, bounds, attrs, new DrawSvgPolylineItem
             {
                 Bounds = bounds,
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
-                Fill = GetColor(attrs, "fill", BColor.Empty),
-                Stroke = GetColor(attrs, "stroke", BColor.Empty),
+                Fill = GetPaint(attrs, "fill", BColor.Empty),
+                Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
@@ -247,7 +247,7 @@ internal static partial class SvgRenderer
                 Y = start.Y * sy + ty,
                 FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
-                Fill = GetColor(attrs, "fill", BColor.Black),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
                 Text = DrawSvgTextRegex().Replace(m.Groups[3].Value, string.Empty).Trim(),
             });
         }
@@ -265,7 +265,7 @@ internal static partial class SvgRenderer
                 Y = GetLength(attrs, "y", pctH) * sy + ty,
                 FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
-                Fill = GetColor(attrs, "fill", BColor.Black),
+                Fill = GetPaint(attrs, "fill", BColor.Black),
                 Text = m.Groups[2].Value.Trim(),
             });
         }
@@ -591,6 +591,117 @@ internal static partial class SvgRenderer
     }
 
     /// <summary>
+    /// Reads a presentation property from the element's <c>style</c> declaration if it is there, and
+    /// from the presentation attribute of the same name otherwise.
+    /// </summary>
+    /// <remarks>
+    /// SVG 1.1 §6.4 ranks a <c>style</c> declaration above the matching presentation attribute, which
+    /// is the order used here. Only the properties this renderer models are ever asked for, so this is
+    /// a lookup rather than a cascade.
+    /// </remarks>
+    private static string? GetPresentationValue(Dictionary<string, string> attrs, string property)
+    {
+        if (attrs.TryGetValue("style", out var style) && !string.IsNullOrWhiteSpace(style))
+        {
+            foreach (var declaration in style.Split(';'))
+            {
+                int colon = declaration.IndexOf(':');
+                if (colon <= 0)
+                    continue;
+
+                if (declaration.AsSpan(0, colon).Trim()
+                        .Equals(property, StringComparison.OrdinalIgnoreCase))
+                {
+                    var value = declaration.AsSpan(colon + 1).Trim();
+                    if (!value.IsEmpty)
+                        return value.ToString();
+                }
+            }
+        }
+
+        return attrs.TryGetValue(property, out var attribute) ? attribute : null;
+    }
+
+    /// <summary>
+    /// An SVG <c>&lt;alpha-value&gt;</c>: a number, or a percentage. Out-of-range values clamp rather
+    /// than being rejected, which is what SVG 1.1 §4.4 asks for.
+    /// </summary>
+    private static float ParseAlpha(string? raw, float defaultValue = 1f)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return defaultValue;
+
+        var value = raw.AsSpan().Trim();
+        bool percent = value[^1] == '%';
+        if (percent)
+            value = value[..^1];
+
+        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed))
+            return defaultValue;
+
+        return Math.Clamp(percent ? parsed / 100f : parsed, 0f, 1f);
+    }
+
+    /// <summary>
+    /// Resolves a shape's <c>fill</c> or <c>stroke</c> to a colour with its
+    /// <c>fill-opacity</c>/<c>stroke-opacity</c> folded into the alpha channel.
+    /// </summary>
+    /// <remarks>
+    /// Folding the opacity into the colour rather than pushing an opacity layer is exact for a single
+    /// shape, which is all this renderer draws: SVG 1.1 §14.5 applies <c>fill-opacity</c> to the fill
+    /// operation itself, not to a group. It is <em>not</em> the same as the element's <c>opacity</c>
+    /// property, which composites fill and stroke together and is deliberately not modelled here —
+    /// with a translucent stroke over its own fill the two differ, and inventing the group behaviour
+    /// would be wrong in the commoner case.
+    /// </remarks>
+    private static BColor GetPaint(Dictionary<string, string> attrs, string property, BColor defaultColor)
+    {
+        // An absent paint is "no paint", not the default colour — the default is only the fallback for
+        // a value that is present and unparseable. Returning the default here instead would paint every
+        // fill-less shape solid black; it cost 104 reftests when this was written the other way round.
+        var raw = GetPresentationValue(attrs, property);
+        BColor color = raw is null
+            ? BColor.Empty
+            : ParseColorValue(raw, defaultColor);
+
+        if (color.IsEmpty || color.A == 0)
+            return color;
+
+        float opacity = ParseAlpha(GetPresentationValue(attrs, property + "-opacity"));
+        if (opacity >= 1f)
+            return color;
+
+        return BColor.FromArgb((int)Math.Round(color.A * opacity), color.R, color.G, color.B);
+    }
+
+    /// <summary>
+    /// Adds one shape, wrapped in a blend layer when the element carries a non-normal
+    /// <c>mix-blend-mode</c>.
+    /// </summary>
+    /// <remarks>
+    /// The layer pair is the same one the CSS <c>mix-blend-mode</c> path emits
+    /// (<c>PaintWalker.Stacking</c>), so the raster backend already knows how to composite it and
+    /// already reports which modes it can keep on the raster path. Emitting nothing for
+    /// <c>normal</c> keeps the display list byte-identical for the overwhelming majority of shapes,
+    /// which is what makes this safe to apply at every shape site.
+    /// </remarks>
+    private static void AddShape(
+        List<DisplayItem> items, RectangleF bounds, Dictionary<string, string> attrs, DisplayItem shape)
+    {
+        string? mode = GetPresentationValue(attrs, "mix-blend-mode");
+        bool blended = !string.IsNullOrWhiteSpace(mode)
+            && !mode.Equals("normal", StringComparison.OrdinalIgnoreCase);
+
+        if (blended)
+            items.Add(new BlendModeItem { Bounds = bounds, Mode = mode! });
+
+        items.Add(shape);
+
+        if (blended)
+            items.Add(new RestoreBlendModeItem { Bounds = bounds });
+    }
+
+    /// <summary>
     /// Reads a geometric attribute as a length in user units, resolving a percentage against
     /// <paramref name="percentBasis"/> — the viewport extent for that length's axis (SVG 1.1 §7.10).
     /// </summary>
@@ -632,7 +743,16 @@ internal static partial class SvgRenderer
 
     private static BColor GetColor(Dictionary<string, string> attrs, string name, BColor defaultColor)
     {
-        if (!attrs.TryGetValue(name, out var val) || string.IsNullOrEmpty(val) || val == "none")
+        if (!attrs.TryGetValue(name, out var val))
+            return BColor.Empty;
+
+        return ParseColorValue(val, defaultColor);
+    }
+
+    /// <summary>Parses one already-resolved colour value; <c>none</c> and empty are "no paint".</summary>
+    private static BColor ParseColorValue(string val, BColor defaultColor)
+    {
+        if (string.IsNullOrEmpty(val) || val == "none")
             return BColor.Empty;
 
         // rgba(r, g, b, a)

@@ -300,6 +300,133 @@ public sealed class SvgImageRasterTests
         Assert.Equal(50f, rect.Height, 3);
     }
 
+    // ─────────────────────────── fill-opacity and mix-blend-mode ───────────────────────────
+
+    private static DrawSvgRectItem Rect(string rectMarkup) =>
+        SvgImageRaster
+            .BuildDisplayList(
+                $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>{rectMarkup}</svg>", Bounds)
+            .Items.OfType<DrawSvgRectItem>().Single();
+
+    /// <summary>
+    /// <c>fill-opacity</c> folds into the fill's alpha. Unhandled, a shape painted solid where the
+    /// document asked for a tint — which is how <c>css-images/cross-fade-natural-size</c>'s reference
+    /// came out solid green on white instead of a tinted green over black.
+    /// </summary>
+    [Theory]
+    [InlineData("0.5", 128)]
+    [InlineData("0.25", 64)]
+    [InlineData("50%", 128)]
+    [InlineData("1", 255)]
+    [InlineData("0", 0)]
+    public void Fill_Opacity_Folds_Into_The_Alpha(string opacity, int expectedAlpha)
+    {
+        var rect = Rect($"<rect fill='green' fill-opacity='{opacity}' width='50' height='50' />");
+
+        Assert.Equal(expectedAlpha, rect.Fill.A);
+    }
+
+    /// <summary>Out-of-range values clamp rather than being rejected (SVG 1.1 §4.4).</summary>
+    [Theory]
+    [InlineData("2", 255)]
+    [InlineData("-1", 0)]
+    [InlineData("nonsense", 255)]
+    public void An_Out_Of_Range_Or_Malformed_Opacity_Clamps(string opacity, int expectedAlpha)
+    {
+        var rect = Rect($"<rect fill='green' fill-opacity='{opacity}' width='50' height='50' />");
+
+        Assert.Equal(expectedAlpha, rect.Fill.A);
+    }
+
+    /// <summary><c>stroke-opacity</c> is the same rule on the other paint, and does not touch the fill.</summary>
+    [Fact]
+    public void Stroke_Opacity_Applies_To_The_Stroke_Only()
+    {
+        var rect = Rect(
+            "<rect fill='green' stroke='blue' stroke-opacity='0.5' stroke-width='4' width='50' height='50' />");
+
+        Assert.Equal(128, rect.Stroke.A);
+        Assert.Equal(255, rect.Fill.A);
+    }
+
+    /// <summary>
+    /// A <c>style</c> declaration outranks the presentation attribute of the same name (SVG 1.1 §6.4).
+    /// The reference this work came from writes both its opacity and its blend mode in <c>style</c>.
+    /// </summary>
+    [Fact]
+    public void A_Style_Declaration_Outranks_The_Presentation_Attribute()
+    {
+        var rect = Rect(
+            "<rect fill='green' fill-opacity='1' style='fill-opacity: 0.25' width='50' height='50' />");
+
+        Assert.Equal(64, rect.Fill.A);
+    }
+
+    /// <summary>
+    /// An absent paint is "no paint", not the default colour — the default is only the fallback for a
+    /// value that is present and unparseable. Writing it the other way round painted every fill-less
+    /// shape solid black and cost 104 reftests, almost all of `css-images/object-fit-*-svg-*`.
+    /// </summary>
+    [Fact]
+    public void An_Absent_Paint_Is_No_Paint_Rather_Than_The_Default()
+    {
+        var noFill = Rect("<rect width='50' height='50' />");
+        var badFill = Rect("<rect fill='not-a-colour' width='50' height='50' />");
+
+        Assert.Equal(0, noFill.Fill.A);
+        Assert.Equal(0, noFill.Stroke.A);
+        // Present but unparseable falls back to the caller's default, which for a rect fill is black.
+        Assert.Equal(255, badFill.Fill.A);
+    }
+
+    /// <summary>The paint itself may come from <c>style</c> too, not only its opacity.</summary>
+    [Fact]
+    public void A_Fill_May_Come_From_The_Style_Declaration()
+    {
+        var viaStyle = Rect("<rect style='fill: blue' width='50' height='50' />");
+        var viaAttribute = Rect("<rect fill='blue' width='50' height='50' />");
+
+        Assert.Equal(viaAttribute.Fill, viaStyle.Fill);
+    }
+
+    /// <summary>
+    /// A non-normal <c>mix-blend-mode</c> wraps the shape in the same blend-layer pair the CSS
+    /// <c>mix-blend-mode</c> path emits, so the raster backend composites it with machinery it already
+    /// has.
+    /// </summary>
+    [Fact]
+    public void Mix_Blend_Mode_Wraps_The_Shape_In_A_Blend_Layer()
+    {
+        var items = SvgImageRaster.BuildDisplayList(
+            "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>" +
+            "<rect fill='blue' width='50' height='50' style='mix-blend-mode: screen' /></svg>",
+            Bounds).Items;
+
+        Assert.Collection(items,
+            i => Assert.Equal("screen", Assert.IsType<BlendModeItem>(i).Mode),
+            i => Assert.IsType<DrawSvgRectItem>(i),
+            i => Assert.IsType<RestoreBlendModeItem>(i));
+    }
+
+    /// <summary>
+    /// The negative half, and what makes this safe to apply at every shape site: a shape with no blend
+    /// mode, or an explicitly <c>normal</c> one, emits exactly the display list it did before — one
+    /// item, no layer.
+    /// </summary>
+    [Theory]
+    [InlineData("<rect fill='blue' width='50' height='50' />")]
+    [InlineData("<rect fill='blue' width='50' height='50' style='mix-blend-mode: normal' />")]
+    [InlineData("<rect fill='blue' width='50' height='50' mix-blend-mode='normal' />")]
+    public void A_Normal_Or_Absent_Blend_Mode_Emits_No_Layer(string rectMarkup)
+    {
+        var items = SvgImageRaster.BuildDisplayList(
+            $"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'>{rectMarkup}</svg>",
+            Bounds).Items;
+
+        Assert.Single(items);
+        Assert.IsType<DrawSvgRectItem>(items[0]);
+    }
+
     // ─────────────────────────── the replay contract ───────────────────────────
 
     /// <summary>A document that draws something is replayed onto the caller's surface, once.</summary>
