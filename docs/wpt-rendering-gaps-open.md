@@ -448,13 +448,51 @@ the other five are unexamined.
   stopped agreeing. Worth knowing why this was ever passing: the image backend's old renderer returned
   the *default* colour for a missing attribute, so it painted these rects solid black; the shared
   renderer returns "no paint", so after the switch both sides drew nothing and matched at ~100%.
-- **The gap it exposes is separate and real:** `object-fit-contain-svg-001i` renders a **completely
-  blank page** — no dashed borders either — while a bare `<img src="colors-16x8.svg" width=200
-  height=200>` probe paints the SVG correctly through all three of `<img>`, `object-fit: contain` and
-  `background-image`. Something in those tests fails at the document level, not in the image. That is
-  what the 80 tests are actually blocked on, and it is untriaged.
-- **Exit gate:** `object-fit-contain-svg-001i` renders its borders and images at all, at which point
-  the 80 become an ordinary comparison rather than a blank page against a correct reference.
+- **The gap it exposes is separate, real, and much bigger than these tests** — see
+  [a floated image disappears](#a-floated-image-disappears-entirely) below. Every `<img>` in all 80 of
+  those tests is `float: left`.
+- **Exit gate:** a floated `<img>` renders, at which point the 80 become an ordinary comparison rather
+  than a blank page against a correct reference.
+
+### A floated image disappears entirely
+
+**The most consequential rendering bug found in this work**, and nothing about it is SVG-specific:
+`float` on an `<img>` makes it vanish — no image, no border, no background, and no layout space.
+
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Layout.cs`).
+- **Measured, on a bare probe rather than a test:** one `<img src="/images/green.png"
+  style="width:64px;height:64px">` alone on a page paints exactly **4 096 non-white pixels** at (0,0).
+  Add `float: left` and the canvas has **zero** non-white pixels anywhere — not mispositioned, not
+  drawn.
+- **It is the box, not the image.** Give the same `<img>` a `border: 3px solid red` and a
+  `background: blue` and, floated, neither paints either. So no box is produced at all.
+- **And it occupies no space.** A floated 100px `<img>` followed by text leaves the text starting at
+  `x=1` rather than `x=100`, so the float is absent from layout, not merely invisible.
+- **Narrowed by probe:**
+
+  | Probe | Result |
+  | --- | --- |
+  | `<img>` with width/height, border, background | paints ✓ |
+  | the same, `float: left` | **nothing** ✗ |
+  | `float: left` with no width/height | **nothing** ✗ |
+  | `float: left` with `display: block` | **nothing** ✗ |
+  | `<span style="float:left">` (non-replaced control) | paints ✓ |
+  | `<div style="float:left">` (non-replaced control) | paints ✓ |
+
+  So it is specific to **replaced** elements, and neither an explicit size nor blockifying rescues it.
+- **The likely site is already annotated as the bug.** `CssBox.Layout.cs`'s float branch reads
+  *"CSS2.1 §10.3.5: Floating **non-replaced** elements with `width: auto` use shrink-to-fit width"* and
+  then applies to every floated box without excluding replaced ones — the same shape as the
+  [absolutely positioned `<img>` defect](wpt-rendering-gaps-fixed.md#an-absolutely-positioned-img-rendered-nothing-at-all)
+  fixed earlier in this work, where two branches each said "non-replaced" in a comment and then did not
+  do it. CSS2.1 §10.3.6, "Floating, replaced elements", is the rule with no implementation.
+  `CssBox.ResolveReplacedContentSize` is the helper the abspos fix routed through and is the obvious
+  candidate here too — though that fix alone will not explain the missing *box*, so the float
+  placement path needs looking at as well.
+- **Why it matters beyond WPT:** a floated image is one of the oldest and commonest layouts on the
+  web. Any real page that floats an image renders without it.
+- **Exit gate:** the probe table above paints in every row; `object-fit-contain-svg-001i` renders its
+  borders and images; and the 80 `css-images/object-fit-*-svg-*` tests become ordinary comparisons.
 
 ### `cross-fade()` is unimplemented, and Chromium does not implement it either
 
