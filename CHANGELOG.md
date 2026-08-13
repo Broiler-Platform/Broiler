@@ -88,9 +88,22 @@ are versioned in lockstep during the preview.
   `BROILER_IMAGE_DECODE_THREADS=1` to decode on the calling thread only, which a
   host that already runs several decodes at once should do.
 
+### Added
+
+- `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — the programs that have
+  no script of their own (`eval`, and the `Function` constructor's body) can be written to disk,
+  each under the name its stack frames use: `vm16.js` in a trace is `vm16.js` in the dump
+  directory. Numbering those programs made a trace through a module loader attributable, but a
+  name is only half of it — knowing a `b is not defined` came from `vm16.js:1,14` still does not
+  say what `vm16.js` *is*, and a payload a loader evaluated exists nowhere on disk to go and look
+  at. Off unless `BROILER_JS_DUMP_PROGRAMS` names a directory, because page script is page
+  content and writing it on every render should be a deliberate act; the directory is also
+  settable directly, as the other compiler switches are. A failure to write is swallowed — a
+  diagnostic must never be able to break the execution it observes.
+
 ### Fixed
 
-- `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — `eval` and the
+- `Broiler.JS` — `eval` and the
   `Function` constructor's body were all compiled as `vm.js`, one name for every program that
   has no script of its own. A stack trace through a module loader is then unreadable, because
   its frames cannot be attributed: `vm.js:1,14` and `vm.js:5060,25473` give no way to tell

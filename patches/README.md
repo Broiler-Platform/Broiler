@@ -46,33 +46,37 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 | # | submodule | subject |
 | --- | --- | --- |
-| `0001` | `Broiler.JS` | Number the programs that have no script name of their own |
+| `0001` | `Broiler.JS` | Let the anonymous programs be dumped to disk |
 
-### `0001` — every anonymous program was called `vm.js`
+### `0001` — a frame naming `vm16.js` still does not say what `vm16.js` is
 
-`eval`, and the `Function` constructor's body, were all compiled as `vm.js`. One
-name for every such program makes a stack trace through a module loader
-unreadable, because the frames cannot be attributed: two frames reading
-`vm.js:1,14` and `vm.js:5060,25473` give no way to tell whether that is one
-program or two — and which it is decides whether the failing function was
-defined where it was called or somewhere else entirely.
+Numbering the programs that have no script of their own (`eval`, and the
+`Function` constructor's body) made a trace through a module loader
+attributable: frames say `vm16.js` now, rather than every one of them saying
+`vm.js`. That patch has landed — the pinned `Broiler.JS` pointer is its commit,
+`1c8ec446`.
 
-That is not hypothetical. A `b is not defined` on google.com has been reported
-four times with exactly that pair of frames, and this ambiguity is why it cannot
-be read: the identifier is in a module payload the loader evaluates, but the
-trace cannot say *which* payload, or even that a payload is involved at all
-rather than one program calling itself.
+But a name is only half of it. Knowing that a `b is not defined` came from
+`vm16.js:1,14` still does not say what `vm16.js` *is*, and a payload a loader
+evaluated exists nowhere on disk to go and look at. That is exactly the position
+the google.com report is in, five traces later.
 
-So the fallback numbers them, the way devtools shows `VM123`: frames read
-`vm1.js`, `vm2.js` and so on, one name per compiled program. A script that
-already has a name — every script from the document, since the script-naming
-work — keeps it; only the fallback changes.
+So each anonymous program is written to a file named exactly what the frames call
+it: `vm16.js` in the trace is `vm16.js` in the dump directory, holding that
+program's source.
 
-**Why it is not listed for the pixel suites.** It changes what a frame is
-*called* and nothing about what any program computes, so no pixel moves either
-way. Its behaviour is unit-tested inside the patch
-(`AnonymousProgramNamingTests`), and listing it would add a patch application to
-every pixel run for no observable difference.
+**Off unless `BROILER_JS_DUMP_PROGRAMS` names a directory.** Page script is page
+content: dumping it by default would write whatever a page evaluates — including
+anything personal a response embedded — to disk on every render, and that should
+be a deliberate act rather than a default. The directory is also settable
+directly, as the other compiler switches are, so a test can drive it without the
+environment. A failure to write is swallowed, because a diagnostic must never be
+able to break the execution it is observing.
+
+**Why it is not listed for the pixel suites.** It writes files when explicitly
+asked to and changes nothing about what any program computes, so no pixel moves
+either way. Its behaviour is unit-tested inside the patch
+(`AnonymousProgramDumpTests`).
 
 **When it lands upstream:** bump the pointer and delete this patch.
 

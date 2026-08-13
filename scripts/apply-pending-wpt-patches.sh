@@ -138,11 +138,13 @@ set -euo pipefail
 # file are gone with it. The @supports-evaluator patch that replaced it went the same way, as
 # Broiler.CSS 8be7a65.
 #
-# 0001 (Broiler.JS, number the programs that have no script name) is deliberately NOT listed. It
-# changes what a stack frame is *called* — "vm1.js" where every anonymous program used to be
-# "vm.js" — and nothing about what any of them computes. No pixel moves either way, and its
-# behaviour is unit-tested inside the patch itself (AnonymousProgramNamingTests). Listing it
-# would only add a patch application to every pixel run for no observable difference.
+# The program-numbering patch that was 0001 before this one landed upstream as Broiler.JS
+# 1c8ec446 — the pinned pointer itself — so its file is gone with it.
+#
+# 0001 (Broiler.JS, dump the anonymous programs to disk) is deliberately NOT listed, for the same
+# reason its predecessor was not: it writes files when explicitly asked to via an environment
+# variable, and changes nothing about what any program computes. No pixel moves either way, and
+# its behaviour is unit-tested inside the patch itself (AnonymousProgramDumpTests).
 PENDING_PATCHES=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

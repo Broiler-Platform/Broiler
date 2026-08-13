@@ -1,0 +1,261 @@
+From ecad2b123f9e3744cd5acb044b2582aecdd17fd6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 13 Aug 2026 19:13:33 +0000
+Subject: [PATCH] Let the anonymous programs be dumped to disk
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Numbering them made a trace through a module loader attributable: frames say
+vm16.js now rather than every one of them saying vm.js. But a name is only
+half of it. Knowing that a `b is not defined` came from vm16.js:1,14 still
+does not say what vm16.js *is*, and a payload a loader evaluated exists
+nowhere on disk to go and look at — which is exactly the position the
+google.com report is in, five traces later.
+
+So each program with no script of its own is written to a file named exactly
+what the frames call it. vm16.js in the trace is vm16.js in the dump
+directory, holding that program's source.
+
+Off unless BROILER_JS_DUMP_PROGRAMS names a directory. Page script is page
+content: dumping it by default would write whatever a page evaluates —
+including anything personal a response embedded — to disk on every render,
+and that should be a deliberate act rather than a default. The directory is
+also settable directly, as the other compiler switches are, so a test can
+drive it without the environment.
+
+A failure to write is swallowed. A diagnostic must never be able to break the
+execution it is observing, so an unwritable directory costs the dump and
+nothing else.
+
+Compiler 1301 passed (4 new), Parser 111, BuiltIns 2118, Integration 4598
+(its one failure is an unrelated docs/roadmap.md existence check). The dump
+switch is process-global, so the new tests read what to expect off their own
+stack trace rather than off the directory, which a test class running in
+parallel also writes into.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01725QNtRPh4U2BQhxuubox3
+---
+ .../AnonymousProgramDumpTests.cs              | 108 ++++++++++++++++++
+ .../AnonymousProgramDump.cs                   |  73 ++++++++++++
+ .../FastCompiler.cs                           |   7 ++
+ 3 files changed, 188 insertions(+)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramDumpTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Compiler/AnonymousProgramDump.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramDumpTests.cs b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramDumpTests.cs
+new file mode 100644
+index 00000000..0372392c
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler.Tests/AnonymousProgramDumpTests.cs
+@@ -0,0 +1,108 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Compiler.Tests;
++
++// Dumping the source of programs that have no script of their own.
++//
++// Numbering them made a trace attributable — frames say vm16.js rather than every one saying
++// vm.js — but a name is only half of it. A frame naming vm16.js still does not say what vm16.js
++// is, and a payload a loader evaluated exists nowhere on disk to go and look at. These cover the
++// half that closes: the program reaches a file named exactly what the frames call it.
++public class AnonymousProgramDumpTests : IDisposable
++{
++    private readonly string root = Path.Combine(Path.GetTempPath(), "broiler-jsdump-" + Guid.NewGuid().ToString("n"));
++    private readonly string previous = AnonymousProgramDump.Directory;
++
++    public void Dispose()
++    {
++        AnonymousProgramDump.Directory = previous;
++        try
++        {
++            if (Directory.Exists(root))
++                Directory.Delete(root, recursive: true);
++        }
++        catch (IOException)
++        {
++            // A leftover temp directory is not worth failing a test over.
++        }
++    }
++
++    // The reported shape: one program defines a wrapper, another calls it, and the failing
++    // identifier is inside the wrapper. Both programs have to land on disk under the names their
++    // frames use, because that correspondence is the whole point.
++    [Fact]
++    public void EvaluatedPrograms_AreWrittenUnderTheNameTheirFramesUse()
++    {
++        AnonymousProgramDump.Directory = root;
++        using var context = new JSContext();
++
++        var stack = context.Eval(
++            "(function(){ try {" +
++            " globalThis.NS = {};" +
++            " (0,eval)('globalThis.NS.mod = (function(_){ return function(){ return nosuchvalue; }; });');" +
++            " (0,eval)('(function(){ return globalThis.NS.mod(1)(); })()');" +
++            " } catch (e) { return e.stack; } })()",
++            "outer.js").ToString();
++
++        // Read the expectation off the trace rather than off the directory: the dump switch is
++        // process-global, so a test class running in parallel drops its own programs in here too.
++        // What matters is that every program THIS trace names has a file holding its source.
++        var named = System.Text.RegularExpressions.Regex.Matches(stack, @"vm\d+\.js")
++            .Select(m => m.Value)
++            .Distinct()
++            .ToArray();
++
++        Assert.True(named.Length >= 2, $"expected the trace to name at least two programs: {stack}");
++
++        var sources = new List<string>();
++        foreach (var name in named)
++        {
++            var path = Path.Combine(root, name);
++            Assert.True(File.Exists(path), $"{name} is named by the trace but was not written");
++            var source = File.ReadAllText(path);
++            Assert.NotEmpty(source);
++            sources.Add(source);
++        }
++
++        // The wrapper's own source is recoverable, which is what makes an unresolved identifier
++        // inside it readable at all.
++        Assert.Contains(sources, s => s.Contains("nosuchvalue"));
++    }
++
++    // Off unless asked for: page script is page content, and writing it on every render is not
++    // something a diagnostic should decide on a page's behalf.
++    [Fact]
++    public void NothingIsWritten_WhenNoDirectoryIsConfigured()
++    {
++        AnonymousProgramDump.Directory = string.Empty;
++        Assert.False(AnonymousProgramDump.Enabled);
++
++        using var context = new JSContext();
++        context.Eval("(0,eval)('1 + 1');", "outer.js");
++
++        Assert.False(Directory.Exists(root));
++    }
++
++    // A script that has a name of its own is not an anonymous program and is not dumped.
++    [Fact]
++    public void ANamedScript_IsNotDumped()
++    {
++        AnonymousProgramDump.Directory = root;
++        using var context = new JSContext();
++
++        context.Eval("var dumpProbe = 1;", "inline-3");
++
++        var written = Directory.Exists(root) ? Directory.GetFiles(root).Select(Path.GetFileName).ToArray() : [];
++        Assert.DoesNotContain("inline-3", written);
++    }
++
++    // Writing must never be able to break the execution it observes.
++    [Fact]
++    public void AnUnwritableDirectory_DoesNotDisturbExecution()
++    {
++        AnonymousProgramDump.Directory = "\0:/nowhere/that/can/exist";
++        using var context = new JSContext();
++
++        Assert.Equal("2", context.Eval("String((0,eval)('1 + 1'))", "outer.js").ToString());
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/AnonymousProgramDump.cs b/Broiler.JS/Broiler.JavaScript.Compiler/AnonymousProgramDump.cs
+new file mode 100644
+index 00000000..57fbdf4f
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/AnonymousProgramDump.cs
+@@ -0,0 +1,73 @@
++using System;
++using System.IO;
++using System.Text;
++using System.Threading;
++
++namespace Broiler.JavaScript.Compiler;
++
++/// <summary>
++/// Writes out the source of programs that have no script of their own — <c>eval</c>, and the
++/// <c>Function</c> constructor's body — so a stack frame naming one can be read against its code.
++/// </summary>
++/// <remarks>
++/// <para>
++/// Numbering those programs made a trace through a module loader attributable: frames say
++/// <c>vm16.js</c> now, rather than every one of them saying <c>vm.js</c>. But a name is only half
++/// of it. Knowing a <c>b is not defined</c> came from <c>vm16.js:1,14</c> still does not say what
++/// <c>vm16.js</c> *is*, and a payload a loader evaluated exists nowhere on disk to go and look at.
++/// This closes that gap: each program is written to a file named exactly as the frames name it.
++/// </para>
++/// <para>
++/// Off unless <c>BROILER_JS_DUMP_PROGRAMS</c> names a directory, because page script is page
++/// content: dumping it by default would write whatever a page evaluates — including anything
++/// personal a response embedded — to disk on every render. Opt-in keeps that a deliberate act.
++/// A failure to write is swallowed, because a diagnostic must never be able to break the
++/// execution it is observing.
++/// </para>
++/// </remarks>
++public static class AnonymousProgramDump
++{
++    /// <summary>Names the directory to write programs to. Unset disables the dump.</summary>
++    public const string EnvironmentVariable = "BROILER_JS_DUMP_PROGRAMS";
++
++    private static string directory = Environment.GetEnvironmentVariable(EnvironmentVariable) ?? string.Empty;
++
++    /// <summary>
++    /// Directory the programs are written to; empty disables the dump. Defaults from
++    /// <see cref="EnvironmentVariable"/> and is settable so a test can drive it without the
++    /// environment, as the other compiler switches are.
++    /// </summary>
++    public static string Directory
++    {
++        get => Volatile.Read(ref directory);
++        set => Volatile.Write(ref directory, value ?? string.Empty);
++    }
++
++    /// <summary>Whether a dump directory is configured.</summary>
++    public static bool Enabled => Directory.Length != 0;
++
++    /// <summary>
++    /// Writes <paramref name="source"/> to <c>&lt;directory&gt;/&lt;name&gt;</c>.
++    /// <paramref name="name"/> is the compiler-assigned program name, so the file is called
++    /// exactly what the stack frames call it.
++    /// </summary>
++    public static void Write(string name, string source)
++    {
++        var target = Directory;
++        if (target.Length == 0 || string.IsNullOrEmpty(name))
++            return;
++
++        try
++        {
++            System.IO.Directory.CreateDirectory(target);
++            // The name is generated, but a path separator reaching Path.Combine would escape the
++            // dump directory, and a diagnostic has no business writing outside the one it was given.
++            var safe = name.Replace('/', '_').Replace('\\', '_');
++            File.WriteAllText(Path.Combine(target, safe), source ?? string.Empty, Encoding.UTF8);
++        }
++        catch (Exception)
++        {
++            // Deliberately swallowed - see the remarks above.
++        }
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
+index 015795fb..252faa38 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/FastCompiler.cs
+@@ -92,7 +92,14 @@ public partial class FastCompiler : AstMapVisitor<BExpression>
+         // exactly what a trace through a module loader looks like. Number them, the way a
+         // browser's devtools does with VM123, so each compiled program is identifiable and its
+         // frames can be attributed to it.
++        var wasAnonymous = location == null;
+         location = location ?? "vm" + Interlocked.Increment(ref anonymousProgramSequence).ToString() + ".js";
++
++        // A frame naming vm16.js still does not say what vm16.js *is*, and a payload a loader
++        // evaluated exists nowhere on disk to go and look at. Opt-in, via
++        // BROILER_JS_DUMP_PROGRAMS - see AnonymousProgramDump for why it is not on by default.
++        if (wasAnonymous && AnonymousProgramDump.Enabled)
++            AnonymousProgramDump.Write(location, code.Value);
+         this.location = location;
+         var context = JSEngine.Current as JSContext;
+         isDirectEvalCompilation = context?.IsCompilingDirectEval ?? false;
+-- 
+2.43.0
+
