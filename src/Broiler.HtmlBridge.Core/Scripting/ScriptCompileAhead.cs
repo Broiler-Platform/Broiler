@@ -70,6 +70,19 @@ namespace Broiler.HtmlBridge;
 /// in the order it used to, on the thread it used to. That is what the exit gate compares against.
 /// </para>
 /// </remarks>
+/// <summary>
+/// One classic script source together with the location its consuming <c>Eval</c> will pass. The
+/// two travel as a pair because the code cache keys on both: compiling a source under a location
+/// the evaluation will not use files the entry where nothing looks.
+/// </summary>
+/// <param name="Source">The top-level classic script source.</param>
+/// <param name="Location">
+/// The location the consuming <c>Eval</c> passes — the script's name in a stack trace.
+/// <c>null</c> is not a "missing" value: it is what a host that calls <c>Eval(source)</c> without a
+/// path passes, and matching it is the point.
+/// </param>
+public readonly record struct ScriptCompileUnit(string Source, string? Location);
+
 public sealed class ScriptCompileAhead : IDisposable
 {
     /// <summary>Environment variable that overrides the default thread budget.</summary>
@@ -170,16 +183,41 @@ public sealed class ScriptCompileAhead : IDisposable
         IReadOnlyList<string> sources,
         string? location = null)
     {
-        ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(sources);
+
+        var units = new ScriptCompileUnit[sources.Count];
+        for (var i = 0; i < sources.Count; i++)
+            units[i] = new ScriptCompileUnit(sources[i], location);
+
+        return Start(context, units);
+    }
+
+    /// <summary>
+    /// As <see cref="Start(JSContext, IReadOnlyList{string}, string?)"/>, but with a location <em>per
+    /// source</em> rather than one for all of them.
+    /// <para>
+    /// A host that names each script — so a stack trace says which one threw instead of the
+    /// engine's default <c>vm.js</c> — passes a different location for every source, and the
+    /// location is part of the cache key. Compiling them all under one location would file every
+    /// entry where the consuming <c>Eval</c> does not look, so the work would be done twice and the
+    /// overlap this type exists for would be lost silently. This overload is how a naming host keeps
+    /// it.
+    /// </para>
+    /// </summary>
+    public static ScriptCompileAhead? Start(
+        JSContext context,
+        IReadOnlyList<ScriptCompileUnit> units)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        ArgumentNullException.ThrowIfNull(units);
 
         var budget = _maxDegreeOfParallelism;
         if (budget <= 1)
             return null;
 
-        if (sources.Count < MinimumScriptsToOverlap)
+        if (units.Count < MinimumScriptsToOverlap)
         {
-            if (CollectDiagnostics && sources.Count > 0)
+            if (CollectDiagnostics && units.Count > 0)
                 Interlocked.Increment(ref _documentsBelowMinimum);
             return null;
         }
@@ -197,14 +235,14 @@ public sealed class ScriptCompileAhead : IDisposable
         if (CollectDiagnostics)
         {
             Interlocked.Increment(ref _documentsCompiledAhead);
-            Interlocked.Add(ref _scriptsQueued, sources.Count);
+            Interlocked.Add(ref _scriptsQueued, units.Count);
         }
 
-        var pending = new List<string>(sources.Count);
-        foreach (var source in sources)
+        var pending = new List<ScriptCompileUnit>(units.Count);
+        foreach (var unit in units)
         {
-            if (!string.IsNullOrEmpty(source))
-                pending.Add(source);
+            if (!string.IsNullOrEmpty(unit.Source))
+                pending.Add(unit);
         }
 
         if (pending.Count == 0)
@@ -218,7 +256,7 @@ public sealed class ScriptCompileAhead : IDisposable
             0,
             pending.Count,
             new ParallelOptions { MaxDegreeOfParallelism = threads },
-            i => CompileOne(pending[i], location, cache, options)));
+            i => CompileOne(pending[i].Source, pending[i].Location, cache, options)));
 
         return new ScriptCompileAhead(work);
     }

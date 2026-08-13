@@ -3175,8 +3175,12 @@ internal sealed partial class WptTestRunner
                     }
                     else
                     {
+                        // Named by its position among the *page's* scripts, so the label matches the
+                        // document rather than counting the runner's injected stubs. The stubs above
+                        // keep the engine default: they are compile-time constants served from the
+                        // process-shared cache, whose key includes the location.
                         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
-                            context.Eval(scripts[si]);
+                            context.Eval(scripts[si], ScriptLabel.Inline(si - injectedScriptCount));
                     }
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
                         PromoteWindowGlobalsToContext(bridge);
@@ -3190,12 +3194,13 @@ internal sealed partial class WptTestRunner
                 }
             }
 
-            foreach (var script in deferredScripts)
+            for (var di = 0; di < deferredScripts.Count; di++)
             {
+                var deferredLabel = ScriptLabel.Deferred(di);
                 try
                 {
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
-                        context.Eval(script);
+                        context.Eval(deferredScripts[di], deferredLabel);
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
                         PromoteWindowGlobalsToContext(bridge);
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
@@ -3204,7 +3209,7 @@ internal sealed partial class WptTestRunner
                 catch (Exception ex)
                 {
                     RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
-                        $"Deferred script error: {ex.Message}", ex);
+                        $"Script {deferredLabel} failed: {ex.Message}", ex);
                 }
             }
 

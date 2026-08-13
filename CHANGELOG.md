@@ -53,6 +53,21 @@ are versioned in lockstep during the preview.
 
 ### Changed
 
+- `Broiler.HtmlBridge` — a script names itself in the stack traces of the errors it
+  raises. `JSContext.Eval` takes the location it reports in stack frames and every
+  host passed none, so every frame of every script read `vm.js`: an exception at
+  `vm.js:3,159` could be any of a dozen scripts on a real page, one of which is a
+  megabyte of minified vendor code, and nothing in the trace narrowed it down. The
+  labels the hosts already used for their profiling entries and error messages —
+  `inline-{n}`, `deferred-{n}`, `module-{key}`, per bucket in document order — are now
+  the evaluation's location too, so the trace, the profiling timeline and the logged
+  message all name the same thing. `CaptureService` reports which script failed at all
+  now, where it used to log a bare "Script execution error". Because the location is
+  part of the code-cache key, `ScriptCompileAhead` gained a per-source overload
+  (`ScriptCompileUnit`): compiling every source under one location while evaluating
+  under per-script ones would have filed each entry where the evaluation does not look
+  and silently lost the compile/evaluate overlap.
+
 - `Broiler.Layout` / `Broiler.HTML.Image` — a page's display list is now replayed
   into disjoint horizontal strips of the target surface at once, and the managed
   rasterizer no longer walks pixels its clip is certain to reject. The raster

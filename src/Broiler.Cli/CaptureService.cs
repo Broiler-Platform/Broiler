@@ -582,7 +582,16 @@ public class CaptureService
         // untouched: the loop below still evaluates the same sources in the same order on this
         // thread, and finds the compile already done instead of doing it inline. Disposed (joined)
         // before the context, so no compile outlives the cache it writes into.
-        using var compileAhead = ScriptCompileAhead.Start(context, [.. scripts, .. deferredScripts]);
+        // Each unit carries the label the eval below will pass, because the location is part of the
+        // code-cache key: compiling under one shared location while evaluating under per-script ones
+        // would file every entry where the eval does not look, and the overlap would be lost with no
+        // symptom other than being slower.
+        using var compileAhead = ScriptCompileAhead.Start(
+            context,
+            [
+                .. scripts.Select((s, i) => new ScriptCompileUnit(s, ScriptLabel.Inline(i))),
+                .. deferredScripts.Select((s, i) => new ScriptCompileUnit(s, ScriptLabel.Deferred(i))),
+            ]);
         // Disposed with this call, and declared after the context so it is torn down first: the
         // bridge owns a per-document session — the headless layout view and its HtmlContainer
         // (hence the whole box tree and every sub-resource its image load handlers hold), timer
@@ -642,9 +651,10 @@ public class CaptureService
         {
             if (si < scriptElements.Count)
                 bridge.CurrentScriptIndex = scriptElements[si].idx;
+            var label = ScriptLabel.Inline(si);
             try
             {
-                context.Eval(scripts[si]);
+                context.Eval(scripts[si], label);
                 // Event-loop ordering (EL-3): only a microtask checkpoint between synchronous scripts; timers
                 // are deferred to the post-load drain below, so they fire (in deadline order) after all script
                 // execution rather than eagerly between scripts.
@@ -652,23 +662,26 @@ public class CaptureService
             }
             catch (Exception ex)
             {
-                // Script execution errors are non-fatal for capture
-                RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script execution error: {ex.Message}", ex);
+                // Script execution errors are non-fatal for capture. The label names which script:
+                // this used to report only "Script execution error", which on a document with a dozen
+                // scripts said nothing about which one had stopped running.
+                RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script {label} failed: {ex.Message}", ex);
             }
         }
         bridge.CurrentScriptIndex = -1;
 
         // Execute deferred scripts after all regular scripts (simulates end-of-parsing)
-        foreach (var script in deferredScripts)
+        for (var di = 0; di < deferredScripts.Count; di++)
         {
+            var label = ScriptLabel.Deferred(di);
             try
             {
-                context.Eval(script);
+                context.Eval(deferredScripts[di], label);
                 microTasks.Drain(); // microtask checkpoint only; timers deferred to the post-load drain (EL-3)
             }
             catch (Exception ex)
             {
-                RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Deferred script error: {ex.Message}", ex);
+                RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script {label} failed: {ex.Message}", ex);
             }
         }
 
