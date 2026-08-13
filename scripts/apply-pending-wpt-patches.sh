@@ -114,7 +114,6 @@ set -euo pipefail
 # itself is unit-tested in the main repo (ReplacedBoxSizingTests); only the pixel
 # suite can say a real <canvas> reaches it.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0004-html-canvas-replaced-element.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
