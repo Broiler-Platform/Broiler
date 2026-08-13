@@ -322,11 +322,38 @@ previously-unexamined reference-disagreement flags, and it reaches well beyond t
   `css-masking` (20), `css-transforms` (9), `css-images` (8), `html/canvas` (8) and
   `css-ui` (5). Not all fail *because* of this, but it is the first thing to rule out
   for any of them, and any element outside the six above will hit it.
-- **Two ways to close it, and the cheap one is not obviously the right one.** Adding
-  `RenderPolygons`/`RenderPolylines` to `BSvgRasterizer` fixes these eleven for a few
-  dozen lines. Routing SVG-as-image through the renderer the inline path already uses
-  retires the duplicate instead — the two will otherwise keep diverging, and this gap is
-  what that divergence looks like.
+- **Routing it through the inline renderer was tried, measured and held back.** That is the fix that
+  retires the duplicate rather than growing it, and the seam for it is landed
+  (`Broiler.Layout.IR.SvgImageRaster`, with 17 tests). It is not switched on, because the two renderers
+  are each a superset of the other and the swap trades one gap for another:
+
+  | | `SvgRenderer` (inline) | `BSvgRasterizer` (image) |
+  | --- | --- | --- |
+  | Elements | rect, circle, ellipse, line, path, text, **polygon**, **polyline**, groups, textPath | rect, circle, ellipse, line, path, text |
+  | **Percentage lengths** | **not resolved at all** | resolved against the viewport |
+
+  Measured over **3 974 reftests** in `css-masking`, `css-images`, `css-transforms`,
+  `css-backgrounds`, `compositing`, `filter-effects`, `css-ui` and `svg`, before and after the switch:
+  **2 675 → 2 703 passing, +108 and −80.** The 108 gains are documents the image backend could not
+  draw — 36 `background-size/vector`, 68 `css-images/object-fit-*-svg-*`, three `svg/embedded`. The 80
+  losses are almost all one thing: `background-size/vector` tests whose SVG is
+  `<svg width="25%" height="50%">` with `<rect width="100%" height="50%">` children, which render
+  **blank** once percentages stop resolving. Verified directly rather than inferred —
+  `tall--cover--percent-width-percent-height` renders 99.8% white after the switch and passed at 100%
+  before.
+- **So the order is: percentages first, then the switch.** `SvgRenderer` is handed the viewport already,
+  as its `bounds` argument, so resolving `%` against it is contained and lands in the main repo with no
+  patch. It would also fix inline SVG, which ignores percentages today for the same reason. Re-run the
+  3 974-test sweep after it and the switch becomes a strict improvement.
+- **Two smaller things the attempt exposed**, both pre-existing and both invisible while SVG images
+  rendered nothing:
+  - **A supersampled SVG tiles at its raster size, not its intrinsic size.** `GetSvgRasterizationScale`
+    rasterises an SVG whose longest side is under 128px at 2× for quality, and the background tiling
+    then uses the 200×200 bitmap instead of the 100×100 intrinsic size. Measured: a 100px SVG tiles
+    every 200px, a 150px one (above the threshold, so scale 1) tiles correctly every 150px.
+  - **A transform on the root element moves the canvas background.** With the images rendering,
+    `transform-root-bg-001` shows Broiler flipping the tiled background under `transform: scale(-1)`,
+    which is exactly what the test asserts must not happen.
 - **Exit gate:** the same SVG file renders identically whether it is inline markup or an
   external image, the eleven tests match, and a sweep over `css-masking`, `css-images`
   and `css-transforms` shows no regression.
