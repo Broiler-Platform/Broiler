@@ -35,14 +35,17 @@ being hidden by [a missing check in the runner](wpt-rendering-gaps-open.md#--ver
    ([details](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)). And the
    inverse exists too: two `css-view-transitions` tests
    [pass on CI and are demonstrably wrong](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
-3. **Nothing is waiting on a patch, and a patch number identifies nothing.** The
-   `patches/` directory was **deleted on 2026-08-13** (main `d710a02`) once its last
-   file landed upstream, and `scripts/apply-pending-wpt-patches.sh` has an empty
-   `PENDING_PATCHES`. Every submodule fix in these documents is an ancestor of the
-   pinned pointer, so all of it is live on CI. `patches/` was a backlog rather than
-   an archive — a file was deleted once its fix was upstream and numbering restarted
-   from `0001` — so the same number named different changes at different times. Fixes
-   are identified here by **commit subject**:
+3. **One patch is waiting, and a patch number identifies nothing.** The `patches/`
+   directory was emptied on 2026-08-13 (main `d710a02`) when its last file landed
+   upstream, and refilled the same day with a single entry —
+   [`0001`](../patches/README.md), the image backend's six-line call site for
+   [the SVG-renderer unification](wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed).
+   Every *other* submodule fix in these documents is an ancestor of the pinned
+   pointer and live on CI. `patches/` is a backlog rather than an archive — a file is
+   deleted once its fix is upstream and numbering restarts from `0001` — so the same
+   number names different changes at different times, and a `patches/NNNN` reference
+   in an older commit or comment is almost always dangling. Fixes are identified here
+   by **commit subject**:
 
    ```sh
    git -C <Submodule> log --oneline --grep '<commit subject>'
@@ -156,7 +159,7 @@ are current.
 
 **Three flags held. 25 did not.** Seventeen of the 25 render a blank canvas on both
 sides; eleven of those seventeen share one cause —
-[SVG-as-an-image goes through a second, weaker SVG renderer](wpt-rendering-gaps-open.md#svg-as-an-image-goes-through-a-second-weaker-svg-renderer)
+[SVG-as-an-image goes through a second, weaker SVG renderer](wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed)
 that has no `<polygon>` arm, which reaches at least 70 currently-failing tests. Full
 breakdown:
 [won't fix](wpt-rendering-gaps-wont-fix.md#the-other-28-flags-triaged-2026-08-13--only-three-held).

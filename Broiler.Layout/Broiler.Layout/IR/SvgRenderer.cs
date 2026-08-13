@@ -44,6 +44,9 @@ internal static partial class SvgRenderer
         // 1:1 to CSS pixels, so they must scale by zoom like any other used length. A viewBox overrides
         // this below with a scale derived from the (already-zoomed) bounds, so it is not compounded.
         float sx = (float)effectiveZoom, sy = (float)effectiveZoom, tx = 0f, ty = 0f;
+        // The viewport a percentage length resolves against, in user units (SVG 1.1 §7.10). Zero until
+        // a viewBox establishes one; the fallback below derives it from the bounds instead.
+        float viewportW = 0f, viewportH = 0f;
         var pathStartsById = new Dictionary<string, PointF>(StringComparer.OrdinalIgnoreCase);
         var svgMatch = ParseRegex().Match(svgXml);
         if (svgMatch.Success)
@@ -67,9 +70,26 @@ internal static partial class SvgRenderer
                     sy = scale;
                     tx = -vbX * scale + (bounds.Width - vbW * scale) / 2f;
                     ty = -vbY * scale + (bounds.Height - vbH * scale) / 2f;
+                    // A viewBox establishes the viewport for its children, so a percentage inside it
+                    // resolves against the viewBox extent rather than against the CSS box.
+                    viewportW = vbW;
+                    viewportH = vbH;
                 }
             }
         }
+
+        // No viewBox: user units map to CSS pixels through the same scale seeded above, so the
+        // viewport in user units is the destination box divided by it.
+        if (viewportW <= 0)
+            viewportW = sx > 0 ? bounds.Width / sx : bounds.Width;
+        if (viewportH <= 0)
+            viewportH = sy > 0 ? bounds.Height / sy : bounds.Height;
+
+        // SVG 1.1 §7.10: a percentage on a length in the horizontal axis resolves against the viewport
+        // width, one in the vertical axis against its height, and one on a length that is in neither
+        // (r, stroke-width, font-size) against the normalised diagonal.
+        float pctW = viewportW, pctH = viewportH;
+        float pctD = (float)(Math.Sqrt(viewportW * viewportW + viewportH * viewportH) / Math.Sqrt(2));
 
         foreach (Match m in ParseSvgRegex().Matches(svgXml))
         {
@@ -92,8 +112,8 @@ internal static partial class SvgRenderer
             // box expanded by -10%/+10% on each side (x-10%, y-10%, w+20%, h+20%).
             if (TryResolveFloodFilter(attrs, out var floodColor))
             {
-                float bx = GetFloat(attrs, "x"), by = GetFloat(attrs, "y");
-                float bw = GetFloat(attrs, "width"), bh = GetFloat(attrs, "height");
+                float bx = GetLength(attrs, "x", pctW), by = GetLength(attrs, "y", pctH);
+                float bw = GetLength(attrs, "width", pctW), bh = GetLength(attrs, "height", pctH);
                 float fx = bx - 0.1f * bw, fy = by - 0.1f * bh, fw = 1.2f * bw, fh = 1.2f * bh;
                 items.Add(new DrawSvgRectItem
                 {
@@ -121,13 +141,13 @@ internal static partial class SvgRenderer
             items.Add(new DrawSvgRectItem
             {
                 Bounds = bounds,
-                X = GetFloat(attrs, "x") * sx + tx,
-                Y = GetFloat(attrs, "y") * sy + ty,
-                Width = GetFloat(attrs, "width") * sx,
-                Height = GetFloat(attrs, "height") * sy,
+                X = GetLength(attrs, "x", pctW) * sx + tx,
+                Y = GetLength(attrs, "y", pctH) * sy + ty,
+                Width = GetLength(attrs, "width", pctW) * sx,
+                Height = GetLength(attrs, "height", pctH) * sy,
                 Fill = rectFill,
                 Stroke = rectStroke,
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -135,17 +155,17 @@ internal static partial class SvgRenderer
         foreach (Match m in ParseCircleRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
-            float r = GetFloat(attrs, "r");
+            float r = GetLength(attrs, "r", pctD);
             items.Add(new DrawSvgEllipseItem
             {
                 Bounds = bounds,
-                Cx = GetFloat(attrs, "cx") * sx + tx,
-                Cy = GetFloat(attrs, "cy") * sy + ty,
+                Cx = GetLength(attrs, "cx", pctW) * sx + tx,
+                Cy = GetLength(attrs, "cy", pctH) * sy + ty,
                 Rx = r * sx,
                 Ry = r * sy,
                 Fill = GetColor(attrs, "fill", BColor.Black),
                 Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -156,13 +176,13 @@ internal static partial class SvgRenderer
             items.Add(new DrawSvgEllipseItem
             {
                 Bounds = bounds,
-                Cx = GetFloat(attrs, "cx") * sx + tx,
-                Cy = GetFloat(attrs, "cy") * sy + ty,
-                Rx = GetFloat(attrs, "rx") * sx,
-                Ry = GetFloat(attrs, "ry") * sy,
+                Cx = GetLength(attrs, "cx", pctW) * sx + tx,
+                Cy = GetLength(attrs, "cy", pctH) * sy + ty,
+                Rx = GetLength(attrs, "rx", pctW) * sx,
+                Ry = GetLength(attrs, "ry", pctH) * sy,
                 Fill = GetColor(attrs, "fill", BColor.Black),
                 Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -173,12 +193,12 @@ internal static partial class SvgRenderer
             items.Add(new DrawSvgLineItem
             {
                 Bounds = bounds,
-                X1 = GetFloat(attrs, "x1") * sx + tx,
-                Y1 = GetFloat(attrs, "y1") * sy + ty,
-                X2 = GetFloat(attrs, "x2") * sx + tx,
-                Y2 = GetFloat(attrs, "y2") * sy + ty,
+                X1 = GetLength(attrs, "x1", pctW) * sx + tx,
+                Y1 = GetLength(attrs, "y1", pctH) * sy + ty,
+                X2 = GetLength(attrs, "x2", pctW) * sx + tx,
+                Y2 = GetLength(attrs, "y2", pctH) * sy + ty,
                 Stroke = GetColor(attrs, "stroke", BColor.Black),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -191,7 +211,7 @@ internal static partial class SvgRenderer
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
                 Fill = GetColor(attrs, "fill", BColor.Black),
                 Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -204,7 +224,7 @@ internal static partial class SvgRenderer
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
                 Fill = GetColor(attrs, "fill", BColor.Empty),
                 Stroke = GetColor(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetFloat(attrs, "stroke-width", 1) * Math.Max(sx, sy),
+                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
         }
 
@@ -225,7 +245,7 @@ internal static partial class SvgRenderer
                 Bounds = bounds,
                 X = start.X * sx + tx,
                 Y = start.Y * sy + ty,
-                FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
+                FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
                 Fill = GetColor(attrs, "fill", BColor.Black),
                 Text = DrawSvgTextRegex().Replace(m.Groups[3].Value, string.Empty).Trim(),
@@ -241,9 +261,9 @@ internal static partial class SvgRenderer
             items.Add(new DrawSvgTextItem
             {
                 Bounds = bounds,
-                X = GetFloat(attrs, "x") * sx + tx,
-                Y = GetFloat(attrs, "y") * sy + ty,
-                FontSize = GetFloat(attrs, "font-size", 16) * Math.Max(sx, sy),
+                X = GetLength(attrs, "x", pctW) * sx + tx,
+                Y = GetLength(attrs, "y", pctH) * sy + ty,
+                FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
                 Fill = GetColor(attrs, "fill", BColor.Black),
                 Text = m.Groups[2].Value.Trim(),
@@ -566,6 +586,46 @@ internal static partial class SvgRenderer
             float.TryParse(val.Replace("px", ""), NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
             return f;
         return defaultValue;
+    }
+
+    /// <summary>
+    /// Reads a geometric attribute as a length in user units, resolving a percentage against
+    /// <paramref name="percentBasis"/> — the viewport extent for that length's axis (SVG 1.1 §7.10).
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="GetFloat"/> deliberately: <c>k1</c>–<c>k4</c> on an
+    /// <c>feComposite</c> are numbers rather than lengths, and a percentage there is not a length
+    /// either, so they must keep going through the plain reader.
+    /// <para>
+    /// Before this existed every percentage fell through <c>float.TryParse</c> to the default — zero
+    /// for a coordinate or an extent — so an SVG built on percentages (<c>&lt;rect width="100%"&gt;</c>)
+    /// drew nothing at all. That is invisible for inline markup, which is nearly always authored in
+    /// user units, and total for an SVG used as an image, where percentage sizing is the norm: it is
+    /// what the <c>css-backgrounds/background-size/vector</c> family is built on. See issue #1627.
+    /// </para>
+    /// </remarks>
+    private static float GetLength(
+        Dictionary<string, string> attrs, string name, float percentBasis, float defaultValue = 0)
+    {
+        if (!attrs.TryGetValue(name, out var val))
+            return defaultValue;
+
+        var value = val.AsSpan().Trim();
+        if (value.IsEmpty)
+            return defaultValue;
+
+        if (value[^1] == '%')
+        {
+            return float.TryParse(
+                value[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out float percent)
+                ? percentBasis * percent / 100f
+                : defaultValue;
+        }
+
+        return float.TryParse(
+            val.Replace("px", ""), NumberStyles.Float, CultureInfo.InvariantCulture, out float f)
+            ? f
+            : defaultValue;
     }
 
     private static BColor GetColor(Dictionary<string, string> attrs, string name, BColor defaultColor)

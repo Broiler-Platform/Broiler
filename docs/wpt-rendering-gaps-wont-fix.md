@@ -292,7 +292,7 @@ only reason they matched. Chromium paints substantial content in both. Every one
 real gap, and they are now carried in *not fixed*:
 
 - **Eleven share one cause:** [SVG-as-an-image goes through a second, weaker SVG
-  renderer](wpt-rendering-gaps-open.md#svg-as-an-image-goes-through-a-second-weaker-svg-renderer)
+  renderer](wpt-rendering-gaps-open.md#svg-as-an-image-went-through-a-second-weaker-svg-renderer--fixed)
   with no `<polygon>` arm, and a `<polygon>` is the entire content of the file all
   eleven load. That was the suspicion about the nine entries sitting at exactly
   49.1%, and it was right — it is one cause, and it covers eleven.

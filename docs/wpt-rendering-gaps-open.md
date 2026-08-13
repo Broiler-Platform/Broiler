@@ -278,11 +278,12 @@ other direction. None is a sizing bug.
 
 ## Images
 
-### SVG-as-an-image goes through a second, weaker SVG renderer
+### SVG-as-an-image went through a second, weaker SVG renderer — **fixed**
 
-**Tracked as [issue #1627](https://github.com/Broiler-Platform/Broiler/issues/1627).**
-The largest single cause found in the 2026-08-13 triage — 11 of the 28
-previously-unexamined reference-disagreement flags, and it reaches well beyond them.
+**[Issue #1627](https://github.com/Broiler-Platform/Broiler/issues/1627).** The largest single cause
+found in the 2026-08-13 triage — 11 of the 28 previously-unexamined reference-disagreement flags, and
+it reached well beyond them. The renderer duplication is retired; the eleven tests are still open on
+the two defects at the end of this entry.
 
 - **Tests:** `css-transforms/transform-background-005`, `-006`, `-007`, `-008`;
   `css-transforms/transform-root-bg-001`, `-002`, `-004`;
@@ -322,29 +323,37 @@ previously-unexamined reference-disagreement flags, and it reaches well beyond t
   `css-masking` (20), `css-transforms` (9), `css-images` (8), `html/canvas` (8) and
   `css-ui` (5). Not all fail *because* of this, but it is the first thing to rule out
   for any of them, and any element outside the six above will hit it.
-- **Routing it through the inline renderer was tried, measured and held back.** That is the fix that
-  retires the duplicate rather than growing it, and the seam for it is landed
-  (`Broiler.Layout.IR.SvgImageRaster`, with 17 tests). It is not switched on, because the two renderers
-  are each a superset of the other and the swap trades one gap for another:
+- **Fixed, in two repositories.** SVG images now render through the same `SvgRenderer` as inline
+  markup — `Broiler.Layout.IR.SvgImageRaster` builds the display list and the image backend replays it
+  through the raster backend it already implements. The two renderers were each a superset of the
+  other, so the switch needed a second change to be safe:
 
   | | `SvgRenderer` (inline) | `BSvgRasterizer` (image) |
   | --- | --- | --- |
   | Elements | rect, circle, ellipse, line, path, text, **polygon**, **polyline**, groups, textPath | rect, circle, ellipse, line, path, text |
-  | **Percentage lengths** | **not resolved at all** | resolved against the viewport |
+  | Percentage lengths | **was: none at all** — now resolved | resolved against the viewport |
 
-  Measured over **3 974 reftests** in `css-masking`, `css-images`, `css-transforms`,
-  `css-backgrounds`, `compositing`, `filter-effects`, `css-ui` and `svg`, before and after the switch:
-  **2 675 → 2 703 passing, +108 and −80.** The 108 gains are documents the image backend could not
-  draw — 36 `background-size/vector`, 68 `css-images/object-fit-*-svg-*`, three `svg/embedded`. The 80
-  losses are almost all one thing: `background-size/vector` tests whose SVG is
-  `<svg width="25%" height="50%">` with `<rect width="100%" height="50%">` children, which render
-  **blank** once percentages stop resolving. Verified directly rather than inferred —
-  `tall--cover--percent-width-percent-height` renders 99.8% white after the switch and passed at 100%
-  before.
-- **So the order is: percentages first, then the switch.** `SvgRenderer` is handed the viewport already,
-  as its `bounds` argument, so resolving `%` against it is contained and lands in the main repo with no
-  patch. It would also fix inline SVG, which ignores percentages today for the same reason. Re-run the
-  3 974-test sweep after it and the switch becomes a strict improvement.
+  `SvgRenderer` had no percentage handling anywhere, so `<rect width="100%">` parsed as `0` and drew
+  nothing. It now resolves percentages per SVG 1.1 §7.10 — horizontal lengths against the viewport
+  width, vertical against its height, and `r`/`stroke-width`/`font-size` against the normalised
+  diagonal — taking the viewport from the `viewBox` when there is one and from the destination box
+  when there is not. **That fixes inline SVG too**, which ignored percentages for the same reason.
+- **Measured over 3 974 reftests**, before and after, on the same build:
+  **2 675 → 2 751 passing (+94, −18)**, average match **98.562% → 98.602%**. The headline cluster is
+  `css-images/object-fit-*-svg-*`, **52/120 → 120/120**.
+  - **Five of the 18 losses were passing by rendering nothing** — test and reference both blank, so
+    they matched at 100%. They now render real content and expose the two separate bugs below.
+  - **The other 13 are sub-1.5% differences** that fall just under the 99% threshold
+    (`non-scaling-stroke-002/-009/-010`, `transform-background-001`–`004`, three `svg/linking` and
+    `svg/embedded` tests). Not investigated individually.
+- **The eleven tests this started from still do not pass**, and that is the honest result: the
+  `<polygon>` now renders, but they are blocked on the two defects below. Four improved against the
+  Chromium golden — `transform-root-bg-001`/`-004` and `transform-background-007` from 49.1% to 60.8%,
+  `perspective-svg-001` from 27.3% to 47.1%.
+- **Where it landed.** `SvgImageRaster` and the percentage support are main repo. The image backend's
+  six-line call site is `patches/0001` — the push to `Broiler.HTML` is denied (403), so it ships as a
+  patch registered in `scripts/apply-pending-wpt-patches.sh`. **The two halves must land together:**
+  the patch alone regresses ~70 `background-size/vector` tests, which is exactly what percentages fix.
 - **Two smaller things the attempt exposed**, both pre-existing and both invisible while SVG images
   rendered nothing:
   - **A supersampled SVG tiles at its raster size, not its intrinsic size.** `GetSvgRasterizationScale`

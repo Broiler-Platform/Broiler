@@ -31,8 +31,16 @@ public sealed class SvgImageRasterTests
 {
     private static readonly RectangleF Bounds = new(0, 0, 100, 100);
 
+    /// <summary>
+    /// Normalises the single quotes these literals are written with to the double quotes SVG files
+    /// actually use. <c>SvgRenderer.ParseAttributes</c> matches double-quoted attributes only, so a
+    /// single-quoted literal parses as an element with no attributes at all — which silently turns an
+    /// assertion about geometry into an assertion about nothing.
+    /// </summary>
+    private static string Q(string markup) => markup.Replace('\'', '"');
+
     private static string Doc(string body) =>
-        $"<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'>{body}</svg>";
+        Q($"<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'>{body}</svg>");
 
     /// <summary>Records what it was asked to replay, standing in for the image backend's raster backend.</summary>
     private sealed class RecordingBackend : IRasterBackend
@@ -126,13 +134,113 @@ public sealed class SvgImageRasterTests
         const string svg =
             "<svg xmlns='http://www.w3.org/2000/svg'><rect fill='blue' x='0' y='0' width='10' height='10' /></svg>";
 
-        var atOne = SvgImageRaster.BuildDisplayList(svg, Bounds, 1.0).Items;
-        var atTwo = SvgImageRaster.BuildDisplayList(svg, Bounds, 2.0).Items;
+        var atOne = SvgImageRaster.BuildDisplayList(Q(svg), Bounds, 1.0).Items;
+        var atTwo = SvgImageRaster.BuildDisplayList(Q(svg), Bounds, 2.0).Items;
 
         Assert.Equal(
-            SvgRenderer.RenderSvgContent(svg, Bounds, 2.0).Select(i => i.GetType().Name),
+            SvgRenderer.RenderSvgContent(Q(svg), Bounds, 2.0).Select(i => i.GetType().Name),
             atTwo.Select(i => i.GetType().Name));
         Assert.NotEmpty(atOne);
+    }
+
+    // ─────────────────────────── percentage lengths ───────────────────────────
+
+    private static DrawSvgRectItem SingleRect(string svg, RectangleF bounds) =>
+        SvgImageRaster.BuildDisplayList(svg, bounds).Items.OfType<DrawSvgRectItem>().Single();
+
+    /// <summary>
+    /// The shape of every <c>css-backgrounds/background-size/vector</c> test: no viewBox, and children
+    /// sized in percentages. Before percentages resolved, both extents parsed as <c>0</c> and the
+    /// document drew nothing at all.
+    /// </summary>
+    [Fact]
+    public void Percentage_Extents_Resolve_Against_The_Bounds_When_There_Is_No_ViewBox()
+    {
+        var rect = SingleRect(
+            Q("<svg xmlns='http://www.w3.org/2000/svg'><rect y='0' width='100%' height='50%' fill='lime'/></svg>"),
+            new RectangleF(0, 0, 200, 80));
+
+        Assert.Equal(200f, rect.Width, 3);
+        Assert.Equal(40f, rect.Height, 3);
+    }
+
+    /// <summary>
+    /// A percentage offset resolves on the same basis as an extent, so the second band of the
+    /// two-band SVG those tests use starts halfway down rather than at the origin.
+    /// </summary>
+    [Fact]
+    public void Percentage_Offsets_Resolve_On_The_Same_Basis()
+    {
+        var items = SvgImageRaster.BuildDisplayList(
+            Q("<svg xmlns='http://www.w3.org/2000/svg'>" +
+              "<rect y='0' width='100%' height='50%' fill='lime'/>" +
+              "<rect y='50%' width='100%' height='50%' fill='aqua'/></svg>"),
+            new RectangleF(0, 0, 100, 100)).Items.OfType<DrawSvgRectItem>().ToList();
+
+        Assert.Equal(2, items.Count);
+        Assert.Equal(0f, items[0].Y, 3);
+        Assert.Equal(50f, items[1].Y, 3);
+    }
+
+    /// <summary>
+    /// A viewBox establishes the viewport for its children, so a percentage inside it resolves against
+    /// the viewBox extent — in user units — and is then scaled to the box like any other coordinate.
+    /// Here 50% of a 200-unit viewBox is 100 units, drawn into a 100px box at scale 0.5, so 50px.
+    /// </summary>
+    [Fact]
+    public void Percentage_Resolves_Against_The_ViewBox_When_There_Is_One()
+    {
+        var rect = SingleRect(
+            Q("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'>" +
+            "<rect x='0' y='0' width='50%' height='50%' fill='blue'/></svg>"),
+            new RectangleF(0, 0, 100, 100));
+
+        Assert.Equal(50f, rect.Width, 3);
+        Assert.Equal(50f, rect.Height, 3);
+    }
+
+    /// <summary>
+    /// A length in neither axis — a circle's <c>r</c> — takes the normalised diagonal, not the width.
+    /// On a square viewport the two coincide, so the test uses a non-square one where they cannot:
+    /// √(300² + 100²)/√2 ≈ 223.6, so 10% is ≈ 22.36 rather than 30.
+    /// </summary>
+    [Fact]
+    public void A_Radius_Percentage_Uses_The_Normalised_Diagonal()
+    {
+        var circle = SvgImageRaster.BuildDisplayList(
+            Q("<svg xmlns='http://www.w3.org/2000/svg'><circle cx='0' cy='0' r='10%' fill='blue'/></svg>"),
+            new RectangleF(0, 0, 300, 100)).Items.OfType<DrawSvgEllipseItem>().Single();
+
+        Assert.Equal(22.36f, circle.Rx, 1);
+    }
+
+    /// <summary>
+    /// The negative half. A plain user-unit length must be read exactly as before — this change is a
+    /// strict addition, and a regression here would move every SVG that never used a percentage.
+    /// </summary>
+    [Theory]
+    [InlineData("40", 40f)]
+    [InlineData("40px", 40f)]
+    [InlineData("40.5", 40.5f)]
+    public void Non_Percentage_Lengths_Are_Unchanged(string raw, float expected)
+    {
+        var rect = SingleRect(
+            Q($"<svg xmlns='http://www.w3.org/2000/svg'><rect width='{raw}' height='{raw}' fill='blue'/></svg>"),
+            new RectangleF(0, 0, 100, 100));
+
+        Assert.Equal(expected, rect.Width, 3);
+    }
+
+    /// <summary>A malformed percentage falls back to the attribute's default rather than throwing.</summary>
+    [Fact]
+    public void A_Malformed_Percentage_Falls_Back_To_The_Default()
+    {
+        var rect = SingleRect(
+            Q("<svg xmlns='http://www.w3.org/2000/svg'><rect width='abc%' height='50%' fill='blue'/></svg>"),
+            new RectangleF(0, 0, 100, 100));
+
+        Assert.Equal(0f, rect.Width, 3);
+        Assert.Equal(50f, rect.Height, 3);
     }
 
     // ─────────────────────────── the replay contract ───────────────────────────
@@ -168,7 +276,7 @@ public sealed class SvgImageRasterTests
     {
         var backend = new RecordingBackend();
 
-        bool drew = SvgImageRaster.Render(svg, Bounds, backend, new object());
+        bool drew = SvgImageRaster.Render(Q(svg), Bounds, backend, new object());
 
         Assert.False(drew);
         Assert.Empty(backend.Calls);
