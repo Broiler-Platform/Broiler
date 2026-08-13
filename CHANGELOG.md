@@ -90,6 +90,18 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge` — `btoa` and `atob`, the base64 pair on
+  `WindowOrWorkerGlobalScope` (HTML §8.3), which the bridge did not provide at all. An
+  unqualified `atob(…)` was a `ReferenceError`, and that aborts the whole script that
+  called it rather than the one call — the failure mode google.com's script loader hit.
+  Both work on *binary strings* rather than text: `btoa` treats each code point as one
+  byte and throws `InvalidCharacterError` above U+00FF instead of mangling it, and
+  `atob` returns a string built the same way, so the two round-trip arbitrary bytes.
+  Decoding follows Infra's *forgiving-base64*, written out rather than delegated to
+  `Convert.FromBase64String` because the two disagree exactly where pages notice: ASCII
+  whitespace is stripped from anywhere, unpadded input decodes, and the one-character
+  tail that cannot encode a byte is rejected rather than silently truncated.
+
 - `Broiler.HtmlBridge` — `Element.dataset`, the HTML `DOMStringMap` view over an
   element's `data-*` attributes (HTML §3.2.6.6), which did not exist at all. A missing
   object is not a quiet failure here: reading through it throws, and a thrown error
