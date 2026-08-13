@@ -133,17 +133,20 @@ set -euo pipefail
 # this script reports drift, check whether the fix is simply upstream before regenerating:
 #   git -C <Submodule> log --oneline --grep '<the commit subject>'
 #
-# 0001 (Broiler.JS, postfix ++ after a prefix unary operator) is listed because a syntax error
-# rejects a *whole script*, not the statement holding it. `!c++ && …` is the ordinary minified
-# spelling of a run-once guard, so the construct is everywhere in real-world bundles: without
-# this patch google.com's 1.1 MB main script does not compile at all, and a page whose largest
-# script never ran renders as something no reference matches. That is the real-world suite's
-# core case. Its grammar is unit-tested inside the patch itself (ParserTests); only a pixel
-# suite can say the parsed script reached the render. Note this is a different Broiler.JS
-# patch from the test-parallelization one listed as deliberately-not-listed above — that one
-# changed only how a test assembly schedules itself, whereas this one changes what parses.
+# The postfix-++ parser patch that was 0001 before this one landed upstream as Broiler.JS
+# 434db760 — the pinned pointer itself — so it reaches CI through the pointer and its entry and
+# file are gone with it.
+#
+# 0001 (Broiler.CSS, expose the @supports evaluator) is listed because CSS.supports() decides
+# which CSS a page writes about itself. Without it the main-repo CSS object still exists — the
+# ReferenceError that stopped google.com's bundle is fixed either way — but supports() answers
+# false to everything, so a site that feature-detects `(display: grid)` takes its pre-grid
+# fallback and lays out down a different path than the reference. That is a whole-page
+# difference only a pixel suite can see; the evaluator itself is unit-tested on both sides of
+# the seam in the main repo (CssBinding tests cover the false-answering fallback, and assert
+# the truthful answers once this is applied).
 PENDING_PATCHES=(
-  "Broiler.JS|patches/0001-postfix-after-prefix-unary.patch"
+  "Broiler.CSS|patches/0001-css-supports-public-evaluator.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

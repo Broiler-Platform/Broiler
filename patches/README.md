@@ -46,57 +46,58 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 | # | submodule | subject |
 | --- | --- | --- |
-| `0001` | `Broiler.JS` | Parse a postfix `++`/`--` as part of a prefix unary operand |
+| `0001` | `Broiler.CSS` | Expose the `@supports` evaluator for CSSOM `CSS.supports()` |
 
-### `0001` — `!c++ && 1` was a syntax error
+### `0001` — `CSS.supports()` had no truthful answer to give
 
-The postfix belongs to the operand: `!c++` is `!(c++)`, because the grammar
-reaches the postfix through `UpdateExpression : LeftHandSideExpression ++`, which
-sits *below* `UnaryExpression : ! UnaryExpression`.
-`FastParser.SinglePrefixPostfixExpression` took the postfix only on the path
-where no prefix operator had been parsed — the `previous != None` branch returned
-before the postfix loop — so the `++` of `!c++` was left in the token stream.
+The cascade already resolves an `@supports` prelude with the full
+`<supports-condition>` grammar and the feature-support oracle beside it, but only
+internally. CSSOM's `CSS.supports()` has to answer the same question the same
+way — a page that asks whether a feature is supported and then styles with it
+must not get one answer from the method and another from the rule. This patch
+makes that existing evaluation reachable, validating the grammar first so a
+malformed condition is `false` rather than an error (`CSS.supports()` never
+throws). Nineteen lines, most of them comment.
 
-That is invisible when the expression ends there, which is why `!c++` and
-`(!c++)` both parsed fine, and fatal the moment anything follows: the stray token
-made the next operator unexpected. Every operator class was affected, under every
-prefix operator — `!c++ && 1`, `!c++ || 1`, `!c++ + 1`, `!c++ === false`,
-`!c++ ? 1 : 2`, `-c++ && 1`, `~c++ && 1`, `typeof c++ && 1`, `void c++ && 1`.
+**The main-repo half ships without it.** `window.CSS` and `CSS.escape()` are in
+this repo (`Dom.Features.CssBinding`), and the binding reaches the evaluator *by
+name* rather than by a direct call, so the assembly compiles against a
+`Broiler.CSS` that does not expose one yet. Until this patch is applied
+`CSS.supports()` reports `false` for everything; once the pointer moves it starts
+answering truthfully with no change on this side. That fallback is the
+conservative direction on purpose — a page told a feature is missing uses the
+fallback it already carries, whereas a page wrongly told a feature works commits
+to something nothing will render.
 
-The fix moves the postfix loop above the prefix wrap. ASI is untouched: the
-loop's own `LinesSkipped` guard still refuses a postfix across a line terminator,
-so `!c\n++d` stays two statements.
+**Why the fallback is not simply "good enough".** Answering `false` to everything
+is safe but not free: a site that feature-detects `(display: grid)` takes its
+pre-grid fallback and lays out down an entirely different path from the
+reference. That is why the entry is in
+`scripts/apply-pending-wpt-patches.sh` — the difference is a whole page, and only
+a pixel suite can see it.
 
-**Why it is listed for the pixel suites.** A syntax error rejects a *whole
-script*, not the statement holding it, and `!c++ && …` is the ordinary minified
-spelling of a run-once guard — so the construct is everywhere in real-world
-bundles. Without this patch google.com's 1.1 MB main script does not compile at
-all (it failed at line 466 over a single `++`), so nothing the page's largest
-script defines ever exists. A page whose largest script never ran renders as
-something no reference matches, which makes this the real-world render suite's
-core case; its entry lives in `scripts/apply-pending-wpt-patches.sh`.
-
-**There is no main-repo fallback**, and that is not an oversight — the fix is
-parser logic and cannot move to a main-repo layer. So the main repo carries no
-test asserting the fixed behaviour either: until the patch is applied such a test
-would fail CI. The regression tests travel *inside* the patch
-(`ParserTests.ParseProgram_PostfixAfterPrefixUnary_*`, 20 cases covering each
-prefix operator, each following operator class, the AST shape, and the ASI
-guard), so they land exactly when the fix does.
+**What it is deliberately not.** The obvious implementation — round-tripping the
+declaration through a detached element's `style` — does not work here: Broiler's
+CSSOM stores what it is given without validating, so `totally-bogus-prop`
+survives the round trip and that technique answers "supported" to everything.
+Note also what the oracle models, which the patch does not change: what the
+reference browser understands, not what Broiler's layout engine implements. That
+is the right basis for `CSS.supports()`, since a page feature-detects to decide
+which CSS to write, not to predict how it will be painted.
 
 **When it lands upstream:** bump the pointer, delete this patch and its entry in
-`scripts/apply-pending-wpt-patches.sh`.
+`scripts/apply-pending-wpt-patches.sh`, and collapse `CssBinding`'s by-name
+lookup to a direct call.
 
 ## A stale entry in the apply script is not inert
 
-The patch that held `0001` before this one (`Broiler.HTML`, root-relative
-stylesheet href) had **landed upstream** — the pinned `Broiler.HTML` pointer *is*
-its commit, `1d11065` — but it was still listed. The idempotence guard did not
-save it: the guard skips a patch whose *reverse* apply succeeds, and the upstream
-commit is not byte-identical to the patch as exported, so the reverse check
-failed too. Neither applying nor reverse-applying, it was reported as drifted and
-`scripts/apply-pending-wpt-patches.sh` exited 1 on **every** run — taking down the
-suites it exists to serve, and every later entry with it.
+An earlier `0001` (`Broiler.HTML`, root-relative stylesheet href) had **landed
+upstream** — the pinned pointer *was* its commit — but was still listed. The
+idempotence guard did not save it: the guard skips a patch whose *reverse* apply
+succeeds, and the upstream commit was not byte-identical to the patch as
+exported, so the reverse check failed too. Applying neither way, it was reported
+as drifted and `scripts/apply-pending-wpt-patches.sh` exited 1 on **every** run —
+taking down the suites it exists to serve, and every later entry with it.
 
 So when that script reports drift, check whether the fix is simply upstream
 before regenerating anything:

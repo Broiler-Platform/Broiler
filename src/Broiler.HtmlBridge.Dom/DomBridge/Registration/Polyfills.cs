@@ -33,6 +33,14 @@ public sealed partial class DomBridge
         window.FastAddValue((KeyString)"crypto", cryptoObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["crypto"] = cryptoObj;
 
+        // window.CSS — the CSSOM namespace object (supports/escape). Host-driven rather than a
+        // pure-JS polyfill because supports() has to answer from the CSS engine's own @supports
+        // evaluator; answering from the CSSOM instead would claim support for everything, since
+        // Broiler's CSSOM stores declarations without validating them.
+        var cssObj = Dom.Features.CssBinding.Build();
+        window.FastAddValue((KeyString)"CSS", cssObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["CSS"] = cssObj;
+
         // DOMException constructor
         RegisterDOMException(context);
 
