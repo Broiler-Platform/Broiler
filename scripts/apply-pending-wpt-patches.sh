@@ -123,7 +123,6 @@ set -euo pipefail
 # Measured over 3974 reftests with the main-repo half on both sides: 2675 -> 2756
 # passing. See patches/README.md.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0001-html-svg-image-through-svgrenderer.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
