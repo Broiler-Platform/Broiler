@@ -1,0 +1,260 @@
+From affcb67aa4110106efa186a6b92b75570f7de96e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 14 Aug 2026 08:40:27 +0000
+Subject: [PATCH] Report promises rejected with nobody to handle them
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A rejected promise that nothing is waiting on is a failure the engine had no
+notion of. A browser reports it as "Uncaught (in promise)"; here it vanished.
+Three spellings, all silent: a throw inside .then, Promise.reject with no
+.catch, and an async function that throws. On a page whose control flow is
+mostly promises, that is most of its failures.
+
+The report has to be deferred, which is why this is a tracker and not a log
+line inside Reject. Promise.reject(x) is already rejected before the .catch on
+the next line runs, and an await attaches its handler a microtask after the
+promise settles — so reporting at the rejection would call almost every
+correctly-handled rejection unhandled. Collect at the rejection, withdraw when
+a handler arrives, and let the host ask what is left once its microtask
+checkpoint has drained.
+
+Both places a promise becomes rejected are tracked, because they are genuinely
+two: Reject, and the (value, state) constructor that Promise.reject and
+CreateResolvedOrRejectedPromise use to mint one already rejected. Hooking only
+Reject caught the throw-inside-then case and neither of the other two.
+
+Then marks [[PromiseIsHandled]] whether or not an onRejected was passed. With
+none, the rejection forwards to the derived promise and it is that one which is
+then unhandled — which is what makes p.then(f) on a rejecting p report against
+the derived promise, as a browser does.
+
+Off by default: Rejected and Handled read one bool and return, so an unenabled
+run pays nothing and no existing behaviour changes. Wiring this to
+window.onunhandledrejection, which would make it always-on, is the natural next
+step and is deliberately not part of this.
+
+Verified against seven correctly-handled shapes — .catch, .then(null, f),
+await in try/catch, Promise.all with a catch, and a .catch attached a microtask
+after the promise had already settled — none of which is reported; and against
+the three unhandled shapes, all of which now are.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Jc3MaJErm4iQJ3g5DAQwRt
+---
+ .../Promise/JSPromise.cs                      |  25 +++
+ .../Promise/JSPromiseRejectionTracker.cs      | 144 ++++++++++++++++++
+ 2 files changed, 169 insertions(+)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs
+index 6a6ed960..5aa4249d 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromise.cs
+@@ -40,6 +40,12 @@ public partial class JSPromise : JSObject, IJSPromise
+ 
+     internal PromiseState state = PromiseState.Pending;
+ 
++    /// <summary>
++    /// The spec's [[PromiseIsHandled]]: set once any reaction is attached, and the difference
++    /// between a rejection nobody is listening for and one that is somebody's job.
++    /// </summary>
++    private bool isHandled;
++
+     private Sequence<Reaction> thenList;
+     private Sequence<Reaction> rejectList;
+     JSFunction resolveFunction;
+@@ -86,6 +92,12 @@ public partial class JSPromise : JSObject, IJSPromise
+         InitPromise();
+         this.state = state;
+         result = value;
++
++        // Born rejected, which never passes through Reject: this is how Promise.reject and an async
++        // function that throws before its first await both produce their promise. Tracking only
++        // Reject would miss the two commonest unhandled rejections a page produces.
++        if (state == PromiseState.Rejected)
++            JSPromiseRejectionTracker.Rejected(this, value);
+     }
+ 
+     /// <summary>
+@@ -251,6 +263,12 @@ public partial class JSPromise : JSObject, IJSPromise
+ 
+         pending.TryRemove(promiseID, out var __);
+ 
++        // Nothing is waiting on this one: collect it as a candidate "Uncaught (in promise)". It is
++        // only a candidate, because a handler may still arrive in this turn — see
++        // JSPromiseRejectionTracker for why the report cannot be raised here.
++        if (!isHandled)
++            JSPromiseRejectionTracker.Rejected(this, value);
++
+         var rejectList = this.rejectList;
+         if (rejectList != null)
+         {
+@@ -321,6 +339,13 @@ public partial class JSPromise : JSObject, IJSPromise
+             @return.InitPromise();
+         }
+ 
++        // PerformPromiseThen sets [[PromiseIsHandled]] whether or not an onRejected was supplied:
++        // with none, the rejection is forwarded to @return, and it is @return that is then the
++        // unhandled one. That is what makes `p.then(f)` on a rejecting p report against the derived
++        // promise, exactly as a browser does.
++        isHandled = true;
++        JSPromiseRejectionTracker.Handled(this);
++
+         var resolved = new Reaction { Promise = @return, Type = ReactionType.Resolve, Handler = resolve };
+         var rejected = new Reaction { Promise = @return, Type = ReactionType.Reject, Handler = fail };
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs
+new file mode 100644
+index 00000000..5a48c00b
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs
+@@ -0,0 +1,144 @@
++using Broiler.JavaScript.Runtime;
++using System;
++using System.Collections.Generic;
++
++namespace Broiler.JavaScript.BuiltIns.Promise;
++
++/// <summary>One promise that was rejected and, so far, has nobody to tell.</summary>
++public readonly struct UnhandledRejection
++{
++    internal UnhandledRejection(JSValue reason)
++    {
++        Reason = reason;
++    }
++
++    /// <summary>The rejection reason — an <c>Error</c> object, or whatever else was thrown.</summary>
++    public JSValue Reason { get; }
++
++    /// <summary>
++    /// The reason rendered the way the console would render it: an <c>Error</c>'s message when it
++    /// has one, otherwise the value's own string form.
++    /// </summary>
++    public string Describe()
++    {
++        try
++        {
++            if (Reason is JSObject error && error[KeyStrings.message] is { } message && !message.IsUndefined)
++            {
++                var name = error[KeyStrings.name];
++                return name.IsUndefined ? message.ToString() : name + ": " + message;
++            }
++
++            return Reason?.ToString() ?? "undefined";
++        }
++        catch (Exception)
++        {
++            // Describing a rejection must never replace it: the reason can be a hostile object
++            // whose toString throws, and this is called while reporting a failure.
++            return "<rejection reason could not be described>";
++        }
++    }
++}
++
++/// <summary>
++/// Tracks promises that were rejected with no handler attached — what a browser reports as
++/// <c>Uncaught (in promise)</c>, and what this engine had no notion of at all.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>Why the report is deferred rather than raised at the rejection.</b> <c>Promise.reject(x)</c>
++/// is rejected before <c>.catch(…)</c> on the next line has run, and an <c>await</c> attaches its
++/// handler a microtask after the promise settles. Reporting from inside <see cref="JSPromise.Reject"/>
++/// would therefore call almost every correctly-handled rejection unhandled. The spec's answer, and
++/// this one, is to collect at the rejection, withdraw when a handler arrives, and let the host ask
++/// what is left once its microtask checkpoint has drained.
++/// </para>
++/// <para>
++/// <b>Opt-in.</b> Off by default, so no existing run changes shape and a promise-heavy page pays
++/// nothing: <see cref="Rejected"/> and <see cref="Handled"/> read one static <see langword="bool"/>
++/// and return. A host that wants the reports sets <see cref="Enabled"/> and drains
++/// <see cref="TakePending"/>. Reporting them through <c>window.onunhandledrejection</c> — which
++/// would make this always-on — is the natural next step and is deliberately not done here.
++/// </para>
++/// <para>
++/// <b>Identity, not equality.</b> The pending set is keyed on the promise instance by reference,
++/// because two distinct promises rejected with the same reason are two rejections, and <c>JSValue</c>
++/// equality is a JavaScript question this must not ask.
++/// </para>
++/// </remarks>
++public static class JSPromiseRejectionTracker
++{
++    private static readonly Dictionary<object, JSValue> _pending = new(ReferenceEqualityComparer.Instance);
++    private static readonly object _sync = new();
++    private static bool _enabled;
++
++    /// <summary>
++    /// Whether rejections are tracked. Off by default. Setting it to <see langword="false"/>
++    /// discards anything already collected, so a host cannot pick up another host's rejections.
++    /// </summary>
++    public static bool Enabled
++    {
++        get { lock (_sync) return _enabled; }
++        set
++        {
++            lock (_sync)
++            {
++                _enabled = value;
++                if (!value)
++                    _pending.Clear();
++            }
++        }
++    }
++
++    /// <summary>
++    /// A promise was rejected while nothing was waiting on it. Called from
++    /// <see cref="JSPromise.Reject"/>.
++    /// </summary>
++    internal static void Rejected(object promise, JSValue reason)
++    {
++        lock (_sync)
++        {
++            if (!_enabled)
++                return;
++
++            _pending[promise] = reason;
++        }
++    }
++
++    /// <summary>
++    /// A handler was attached to <paramref name="promise"/>, so its rejection — whether it has
++    /// happened yet or not — is somebody's business now. Called from <see cref="JSPromise.Then"/>.
++    /// </summary>
++    internal static void Handled(object promise)
++    {
++        lock (_sync)
++        {
++            if (!_enabled)
++                return;
++
++            _pending.Remove(promise);
++        }
++    }
++
++    /// <summary>
++    /// The rejections still unclaimed, in rejection order, and clears them. A host calls this after
++    /// draining its microtask checkpoint: anything left has had every chance to be handled.
++    /// </summary>
++    public static IReadOnlyList<UnhandledRejection> TakePending()
++    {
++        lock (_sync)
++        {
++            // A collection expression rather than Array.Empty: from inside this namespace the
++            // sibling Broiler.JavaScript.BuiltIns.Array shadows System.Array by simple-name lookup.
++            if (_pending.Count == 0)
++                return [];
++
++            var taken = new List<UnhandledRejection>(_pending.Count);
++            foreach (var reason in _pending.Values)
++                taken.Add(new UnhandledRejection(reason));
++
++            _pending.Clear();
++            return taken;
++        }
++    }
++}
+-- 
+2.43.0
+

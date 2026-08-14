@@ -11,6 +11,20 @@
     <NoWarn>$(NoWarn);CS0618</NoWarn>
   </PropertyGroup>
 
+  <!--
+    Mirrors the probe in Broiler.Cli.csproj: the unhandled-rejection coverage can only pass once the
+    Broiler.JS patch adding JSPromiseRejectionTracker is applied, so without it the file is not
+    compiled rather than failing against an engine that cannot report them.
+  -->
+  <PropertyGroup>
+    <BroilerJsRejectionTracking Condition="Exists('$(MSBuildThisFileDirectory)..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.BuiltIns\Promise\JSPromiseRejectionTracker.cs')">true</BroilerJsRejectionTracking>
+    <DefineConstants Condition="'$(BroilerJsRejectionTracking)' == 'true'">$(DefineConstants);BROILER_JS_REJECTION_TRACKING</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(BroilerJsRejectionTracking)' != 'true'">
+    <Compile Remove="UnhandledPromiseRejectionTests.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />

@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**Three patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -48,6 +48,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
 | `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
+| `0003` | `Broiler.JS` | Report promises rejected with nobody to handle them |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -116,6 +117,49 @@ covering for it.
 paints. `UndefinedPropertyReadMessageTests` covers it.
 
 **When it lands upstream:** bump the pointer and delete this patch.
+
+### `0003` — a rejected promise nobody handled was reported nowhere
+
+A browser reports it as `Uncaught (in promise)`. Here it vanished. Three
+spellings, all silent: a `throw` inside `.then`, `Promise.reject` with no
+`.catch`, and an `async` function that throws. On a page whose control flow is
+mostly promises — which now means most pages — that is the bulk of its failures,
+and the reason a `--diagnostic-dir` bundle could report **zero** JavaScript
+failures for a page that plainly did not work.
+
+**The report has to be deferred**, which is why this is a tracker and not a log
+line inside `Reject`. `Promise.reject(x)` is already rejected before the `.catch`
+on the next line runs, and an `await` attaches its handler a microtask after the
+promise settles. Reporting at the rejection would therefore call almost every
+correctly-handled rejection unhandled. So: collect at the rejection, withdraw
+when a handler arrives, and let the host ask what is left once its microtask
+checkpoint has drained.
+
+**Both places a promise becomes rejected are tracked**, because they are
+genuinely two — `Reject`, and the `(value, state)` constructor that
+`Promise.reject` and `CreateResolvedOrRejectedPromise` use to mint one already
+rejected. Hooking only `Reject` caught the throw-inside-`then` case and neither
+of the other two.
+
+**Off by default**, so no existing run changes shape: `Rejected` and `Handled`
+read one `bool` and return. Wiring it to `window.onunhandledrejection` — which
+would make it always-on and is the point of having it — is the natural next step
+and is deliberately not in this patch.
+
+**The main repo builds without it.** `Broiler.Cli` reports what the tracker
+collects, and `Broiler.JS` references nothing in this repository, so the type
+could not be moved here the way a `Broiler.Layout` type would be. Instead
+`Broiler.Cli.csproj` and `Broiler.Cli.Tests.csproj` probe for the file and define
+`BROILER_JS_REJECTION_TRACKING`, the same shape
+`Broiler.Render.Stage.Benchmarks.csproj` uses for `BRasterParallelism`. Without
+the patch the reporting compiles out and the capture behaves as before; with it
+applied, `UnhandledPromiseRejectionTests` compiles in and covers it.
+
+**Not listed for the pixel suites** — it reports a failure, it does not change
+what a page paints.
+
+**When it lands upstream:** bump the pointer, delete this patch, and drop the two
+`BroilerJsRejectionTracking` probes with their `#if`s.
 
 ## A stale entry in the apply script is not inert
 
