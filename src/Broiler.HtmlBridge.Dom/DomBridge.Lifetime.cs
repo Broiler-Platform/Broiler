@@ -90,6 +90,11 @@ public sealed partial class DomBridge : IDisposable
         _smoothScrollTokens.Clear();
         _smoothScrollTokenCounter = 0;
 
+        // Drops the mutation subscription and the pending script list: a re-attached document's
+        // injected scripts are its own, and a previous document's already-started flags would
+        // suppress the identical script in the next one.
+        _scriptInsertion.Clear();
+
         _eventTargets.Clear();
         _browsingContexts.ResetSession();
 

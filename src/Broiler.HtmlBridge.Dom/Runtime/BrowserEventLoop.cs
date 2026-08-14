@@ -26,9 +26,12 @@ namespace Broiler.HtmlBridge.Dom.Runtime;
 internal sealed class BrowserEventLoop
 {
     private int _timerIdCounter;
+    // Host-task ids descend from 0 so they cannot collide with the ascending setTimeout/setInterval
+    // ids the page holds; see QueueTask.
+    private int _hostTaskIdCounter;
 
     /// <summary>
-    /// A queued timer — a one-shot <c>setTimeout</c> (<paramref name="Period"/> <c>null</c>) or a repeating
+    /// A queued task — a one-shot <c>setTimeout</c> (<paramref name="Period"/> <c>null</c>) or a repeating
     /// <c>setInterval</c> (<paramref name="Period"/> = its interval in ms). <paramref name="Deadline"/> is its
     /// virtual firing time (ms on the loop's virtual clock — <c>now + max(0, delay)</c> at registration; an
     /// interval reschedules to <c>Deadline + Period</c> after each tick), and <paramref name="Seq"/> a
@@ -36,8 +39,14 @@ internal sealed class BrowserEventLoop
     /// <c>(Deadline, Seq)</c> order so an earlier-deadline timer runs first (HTML event-loop timer ordering) —
     /// e.g. <c>setTimeout(a, 100); setTimeout(b, 0)</c> runs <c>b</c> before <c>a</c>, and a fast
     /// <c>setInterval</c> ticks the right number of times before a slower <c>setTimeout</c>.
+    /// <para>
+    /// Exactly one of <paramref name="Fn"/> (a page callback) and <paramref name="HostTask"/> (host work
+    /// queued through <see cref="QueueTask"/>) is set. Keeping them as separate fields rather than wrapping
+    /// every callback in an <see cref="Action"/> keeps <c>setTimeout</c> — which busy pages call constantly —
+    /// free of a closure allocation per registration.
+    /// </para>
     /// </summary>
-    private readonly record struct TimerEntry(double Deadline, long Seq, JSFunction Fn, double? Period);
+    private readonly record struct TimerEntry(double Deadline, long Seq, JSFunction? Fn, Action? HostTask, double? Period);
 
     private long _timerSeqCounter;
     // The loop's virtual clock (ms). Advances to the earliest pending deadline as timers fire, so a timer
@@ -69,9 +78,35 @@ internal sealed class BrowserEventLoop
         {
             var delay = double.IsNaN(delayMs) || delayMs < 0 ? 0 : delayMs;
             var seq = Interlocked.Increment(ref _timerSeqCounter);
-            _timers[id] = new TimerEntry(_virtualNowMs + delay, seq, callback, Period: null);
+            _timers[id] = new TimerEntry(_virtualNowMs + delay, seq, callback, HostTask: null, Period: null);
         }
         return id;
+    }
+
+    /// <summary>
+    /// Queues host work as a task on this queue, due now — the same queue the page's timers are in, so it
+    /// takes its turn in <c>(Deadline, Seq)</c> order rather than after every timer that happens to be due.
+    /// </summary>
+    /// <remarks>
+    /// This is what a script-inserted <c>&lt;script src&gt;</c>'s fetch-and-run is queued as, and the
+    /// ordering is the point. A frame action would run after <em>all</em> due timers in the step, so a page
+    /// that injects a script and then schedules <c>setTimeout(check, 100)</c> would run its check against a
+    /// script that had not loaded — the drain advances the virtual clock to the earliest deadline, so 100 ms
+    /// is "due" in the very first step. Due-now-in-registration-order instead means the load beats a timer
+    /// scheduled after it and any timer with a later deadline, which is what a browser does: a fetch that
+    /// completes in milliseconds settles before a timeout waiting on it.
+    /// <para>
+    /// The id comes from a separate descending counter, so host tasks occupy negative ids and page timers
+    /// positive ones. They share the queue but not the id space: <c>clearTimeout</c> only ever sees ids
+    /// <c>setTimeout</c> handed out, so the "clear every timer" loop some pages run
+    /// (<c>for (i = 1; i &lt; n; i++) clearTimeout(i)</c>) cannot cancel a pending script load.
+    /// </para>
+    /// </remarks>
+    public void QueueTask(Action task)
+    {
+        var id = Interlocked.Decrement(ref _hostTaskIdCounter);
+        var seq = Interlocked.Increment(ref _timerSeqCounter);
+        _timers[id] = new TimerEntry(_virtualNowMs, seq, Fn: null, task, Period: null);
     }
 
     /// <summary>Cancels a timeout and marks its id cleared so an in-flight drain skips it.</summary>
@@ -87,7 +122,7 @@ internal sealed class BrowserEventLoop
         {
             var period = double.IsNaN(periodMs) || periodMs < 0 ? 0 : periodMs;
             var seq = Interlocked.Increment(ref _timerSeqCounter);
-            _timers[id] = new TimerEntry(_virtualNowMs + period, seq, callback, period);
+            _timers[id] = new TimerEntry(_virtualNowMs + period, seq, callback, HostTask: null, period);
         }
         return id;
     }
@@ -222,14 +257,20 @@ internal sealed class BrowserEventLoop
         foreach (var (id, entry) in pending)
         {
             if (_clearedTimerIds.ContainsKey(id)) continue;
-            try { entry.Fn.InvokeFunction(new Arguments(JSUndefined.Value)); }
+            try
+            {
+                if (entry.Fn is { } fn)
+                    fn.InvokeFunction(new Arguments(JSUndefined.Value));
+                else
+                    entry.HostTask?.Invoke();
+            }
             catch (Exception ex) { RenderLogger.LogError(LogCategory.JavaScript, "BrowserEventLoop.DrainStep", $"timer callback error: {ex.Message}", ex); }
             finally { RunTaskCheckpoint(); }
 
             if (entry.Period is double period && !_clearedTimerIds.ContainsKey(id))
             {
                 var nextSeq = Interlocked.Increment(ref _timerSeqCounter);
-                _timers[id] = new TimerEntry(entry.Deadline + period, nextSeq, entry.Fn, period);
+                _timers[id] = new TimerEntry(entry.Deadline + period, nextSeq, entry.Fn, entry.HostTask, period);
             }
         }
 
@@ -260,6 +301,7 @@ internal sealed class BrowserEventLoop
         _rafCallbacks.Clear();
         _frameActions.Clear();
         _timerIdCounter = 0;
+        _hostTaskIdCounter = 0;
         _timerSeqCounter = 0;
         _virtualNowMs = 0;
         _rafIdCounter = 0;

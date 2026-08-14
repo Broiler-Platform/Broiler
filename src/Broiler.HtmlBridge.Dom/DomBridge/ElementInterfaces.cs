@@ -27,6 +27,37 @@ public sealed partial class DomBridge
         ("referrerPolicy", "referrerpolicy"),
     ];
 
+    /// <summary>
+    /// HTMLScriptElement's plain reflected DOMString IDL attributes (HTML §4.12.1), as IDL name →
+    /// content-attribute name. <c>src</c> is URL-typed and wired separately, and the boolean ones are
+    /// in <see cref="ScriptReflectedBooleans"/>.
+    /// </summary>
+    private static readonly (string IdlName, string AttributeName)[] ScriptReflectedAttributes =
+    [
+        ("type", "type"),
+        ("charset", "charset"),
+        ("integrity", "integrity"),
+        ("crossOrigin", "crossorigin"),
+        ("referrerPolicy", "referrerpolicy"),
+        ("fetchPriority", "fetchpriority"),
+        // Reflected plainly rather than with the spec's nonce-hiding (the content attribute is
+        // cleared once the element is inserted, the IDL value kept): what matters here is that a
+        // page setting s.nonce reaches the CSP check that authorises the script it is injecting.
+        ("nonce", "nonce"),
+    ];
+
+    /// <summary>
+    /// HTMLScriptElement's boolean reflected IDL attributes: present/absent, never the string
+    /// "false". A loader that sets <c>s.async = false</c> to keep injected scripts in order relies on
+    /// the removal half.
+    /// </summary>
+    private static readonly (string IdlName, string AttributeName)[] ScriptReflectedBooleans =
+    [
+        ("async", "async"),
+        ("defer", "defer"),
+        ("noModule", "nomodule"),
+    ];
+
     private void AddElementSpecificMembers(JSObject obj, Broiler.Dom.DomElement element)
     {
         // -- Phase 5: HTML DOM Interfaces --
@@ -163,6 +194,48 @@ public sealed partial class DomBridge
                     }, "set " + idlName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
+        }
+
+        // HTMLScriptElement — the reflected IDL attributes. None of them existed, so the one line
+        // every dynamic script loader on the web is built out of — `s = createElement("script");
+        // s.src = url; head.appendChild(s)` — set a plain JS property on the wrapper and wrote
+        // nothing to the DOM. The element serialized as a bare <script> with no attributes, and with
+        // no src there was nothing for ScriptInsertionRunner to fetch: the injected script never ran,
+        // and a page waiting on the global it defines waited forever (html5test.com's
+        // waitForWhichBrowser poll). Exactly the shape of the <link>.href gap fixed above.
+        if (tag == "script")
+        {
+            obj.FastAddProperty((KeyString)"src",
+                new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetSrc(this, element, in _), "get src"),
+                new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetSrc(element, in a), "set src"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            foreach (var (idlName, attrName) in ScriptReflectedAttributes)
+            {
+                var captured = attrName; // capture for closure
+                obj.FastAddProperty((KeyString)idlName,
+                    new DomFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
+                    new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + idlName),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+
+            foreach (var (idlName, attrName) in ScriptReflectedBooleans)
+            {
+                var captured = attrName; // capture for closure
+                obj.FastAddProperty((KeyString)idlName,
+                    new DomFunction((in _) => HasAttr(element, captured) ? JSBoolean.True : JSBoolean.False, "get " + idlName),
+                    new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedBoolean(captured, element, in a), "set " + idlName),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+
+            // .text is HTMLScriptElement's own name for its child text — the other half of the
+            // loader idiom, for an inline script built in JS rather than fetched. textContent is
+            // already installed on every element and does the same thing; this aliases it so
+            // `s.text = code` is not silently a plain JS property either.
+            obj.FastAddProperty((KeyString)"text",
+                new DomFunction((in _) => GetNodeTextValue(element), "get text"),
+                new DomFunction((in a) => { SetElementTextContent(element, a.Length > 0 ? a[0].ToString() : string.Empty); return JSUndefined.Value; }, "set text"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         // HTMLImageElement — height/width return computed CSS value or HTML attribute (Phase 3 P3.53:

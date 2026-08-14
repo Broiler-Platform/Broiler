@@ -87,6 +87,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // drain (FlushTimerStep/FlushTimers) now live in BrowserEventLoop, the single owner of the
     // document's task queues (was the eight scattered _timerIdCounter/_timeoutCallbacks/… fields).
     private readonly Dom.Runtime.BrowserEventLoop _eventLoop = new();
+    // Runs the <script> elements the page's own JavaScript inserts — nothing did, so the loader
+    // idiom (inject a <script src>, poll until the global it defines appears) never terminated. See
+    // ScriptInsertionRunner; fed by the document.createElement funnel below.
+    private readonly Dom.Runtime.ScriptInsertionRunner _scriptInsertion;
     // Smooth-scroll continuation tokens: a per-element monotonic marker so a queued smooth-scroll
     // frame action only commits if it is still the active scroll for that element. Touched by
     // scroll/frame-action callbacks that can run on ThreadPool threads, so keep it concurrent.
@@ -213,6 +217,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _subDocuments = new Dom.Features.SubDocumentBinding(this);
         _subWindows = new Dom.Features.SubWindowBinding(this, _browsingContexts, _eventTargets, _messaging);
         _windowContext = new Dom.Runtime.WindowContextManager(this, _browsingContexts, _eventTargets);
+        _scriptInsertion = new Dom.Runtime.ScriptInsertionRunner(this);
         _document = new DomDocument();
         DocumentElement = CreateBridgeElement("html");
         // Phase 4 item 1 (final sentinel): the canonical DomDocument is the document root — the JS
