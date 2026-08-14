@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Four patches are waiting on a maintainer.** See the index below.
+**Five patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -50,6 +50,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
 | `0003` | `Broiler.JS` | Report promises rejected with nobody to handle them |
 | `0004` | `Broiler.JS` | Record where an error was raised, not where its factory was wired |
+| `0005` | `Broiler.DOM` | Parse a `<noscript>` body as raw text, as a scripting-enabled parser must |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -212,6 +213,48 @@ report — that page script can read.
 page paints.
 
 **When it lands upstream:** bump the pointer and delete this patch.
+
+### `0005` — a `<noscript>` body was live content instead of raw text
+
+The tokenizer parsed `<noscript>` contents as ordinary markup, which made the
+fallback a live subtree: elements reachable with `querySelector`/`getElementById`,
+an `<img>` that would be requested, a nested `<script>` a host would find and run.
+All of it is content a page supplies for the case where scripts are **off**.
+
+A scripting-enabled parser instead follows the generic raw text element parsing
+algorithm for `noscript`, exactly as for `<script>` and `<style>`: the body becomes
+one text node, nothing in it is live, and character references are not decoded. So
+`noscript` joins `RawTextElements` in `HtmlTokenizer`.
+
+Membership is **conditional on scripting being enabled** — with scripting off the
+body must parse as markup so it can render — and the comment says so. The set can
+be flat only because this engine has no scripting-disabled mode; if one is ever
+added, that is the line that has to consult it.
+
+**Nothing downstream sees a different serialized document.** `HtmlSerializer`
+already listed `noscript` among the raw-text elements, so a text child round-trips
+back to the same markup. `HtmlScriptScanner`, which is tokenizer-backed, stops
+reporting a `<script>` nested inside a `noscript` — making true what
+`PreloadScanner` already documented as true ("Broiler runs scripts, so the parser
+treats a `noscript` body as text and nothing in it is ever loaded").
+
+**The main repo does not depend on it, and CI is green without it.** The two
+user-visible halves are fixed in this repository and stand alone:
+`HtmlPostProcessor.StripNoscriptContent` stops the fallback rendering (commit
+"Stop rendering `<noscript>` fallback while scripting is enabled"), and
+`CaptureService`'s `NoscriptSpans` skip stops a `<script>` inside one executing —
+that host extracts scripts with its own regex pass rather than through the parser,
+so it needs its own skip whether or not this patch is applied. `NoscriptRenderingTests`
+covers both and passes against the un-patched pointer; verified by reverting the
+submodule and re-running. The DOM half — the fallback being raw text rather than a
+reachable subtree — is what this patch adds, and its tests (`NoscriptRawTextTests`)
+travel inside it.
+
+**Not listed for the pixel suites** — it changes what the DOM holds, and the
+rendering half is already live in this repository.
+
+**When it lands upstream:** bump the pointer and delete this patch. The
+`CaptureService` skip stays: it is about that host's regex extraction, not the parser.
 
 ## A stale entry in the apply script is not inert
 

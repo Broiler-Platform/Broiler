@@ -91,4 +91,31 @@ public sealed class NoscriptRenderingTests
 
         Assert.DoesNotContain("no js", result, StringComparison.Ordinal);
     }
+
+    // Not rendering it is half of it; the other half is that nothing inside is live. A <script>
+    // written inside a <noscript> is exactly the code a page wants to run ONLY when scripts are
+    // off, so running it is worse than a cosmetic bug.
+    //
+    // This capture host does not extract scripts through the parser — it runs its own regex pass
+    // over the source, and a regex for <script> matches one nested inside a <noscript> — so the
+    // skip is its own, and this covers it. The DOM side of inertness (the fallback parsing as raw
+    // text rather than elements, so nothing inside it is even reachable) belongs to the HTML
+    // tokenizer in the Broiler.DOM submodule and is covered there, by NoscriptRawTextTests.
+    [Fact]
+    public void AScriptInsideTheFallbackDoesNotRun()
+    {
+        const string html = @"<!DOCTYPE html>
+<html><body>
+<noscript><script>window.__ranInsideNoscript = true;</script></noscript>
+<div id=""result""></div>
+<script>
+document.getElementById('result').textContent =
+    'ranInsideNoscript=' + (window.__ranInsideNoscript === true);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        Assert.Contains("ranInsideNoscript=false", result, StringComparison.Ordinal);
+    }
 }
