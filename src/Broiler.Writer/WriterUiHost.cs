@@ -14,7 +14,6 @@ internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
     private readonly Action<string>? _setClipboardText;
     private readonly Action<UiTextCaretInfo?>? _caretChanged;
     private readonly Func<IBroilerRenderer?>? _getRenderer;
-    private string _clipboardText = string.Empty;
 
     public WriterUiHost(
         Func<BSize> getViewportSize,
@@ -63,24 +62,22 @@ internal sealed class WriterUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
         IsInvalidated = false;
     }
 
+    /// <summary>
+    /// The platform clipboard, or none at all.
+    ///
+    /// There is deliberately no private string standing in when the shell wired
+    /// no accessor: a fallback makes copy and paste appear to work while
+    /// interoperating with nothing else on the machine — copy in Writer, paste
+    /// in a browser, and the browser produces whatever was copied before. With
+    /// none, the editing commands report themselves unavailable, which is true.
+    /// </summary>
     public bool TryGetText(out string text)
     {
-        if (_getClipboardText is not null)
-        {
-            text = _getClipboardText() ?? string.Empty;
-            return text.Length > 0;
-        }
-
-        text = _clipboardText;
-        return _clipboardText.Length > 0;
+        text = _getClipboardText?.Invoke() ?? string.Empty;
+        return text.Length > 0;
     }
 
-    public void SetText(string text)
-    {
-        text ??= string.Empty;
-        _clipboardText = text;
-        _setClipboardText?.Invoke(text);
-    }
+    public void SetText(string text) => _setClipboardText?.Invoke(text ?? string.Empty);
 
     public void PublishCaret(UiTextCaretInfo caret)
     {

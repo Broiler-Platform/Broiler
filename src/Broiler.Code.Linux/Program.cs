@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Broiler.App;
 using Broiler.Code.Core.Hosting;
 
 namespace Broiler.Code.Linux;
@@ -16,7 +17,11 @@ internal static class Program
         // what works.
         if (Array.IndexOf(args, "--services") >= 0)
         {
-            HostServiceReport report = CodeHost.DescribeServices(new LinuxFileDialogs().Helper);
+            // Probed rather than assumed: --services must answer for this
+            // machine, and whether a selection can be owned depends on whether
+            // there is a display to own it on.
+            using LinuxX11Clipboard? clipboard = LinuxX11Clipboard.TryOpen();
+            HostServiceReport report = CodeHost.DescribeServices(new LinuxFileDialogs().Helper, clipboard is not null);
             Console.WriteLine(report.Describe());
 
             IReadOnlyList<string> unavailable = CodeHost.UnavailableCommands(report);

@@ -18,6 +18,11 @@
     <RuntimeIdentifier Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows'">win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
+  <!-- The Win32 clipboard, shared with the other desktop heads. -->
+  <ItemGroup>
+    <Compile Include="..\Broiler.App\WindowsClipboard.cs" Link="WindowsClipboard.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Writer\Broiler.Writer.Core.csproj" />
     <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />

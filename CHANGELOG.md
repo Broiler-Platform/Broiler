@@ -9,6 +9,37 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- The desktop applications use the machine's clipboard. Broiler.UI has always had
+  a clipboard *port* — `IUiClipboardHost`, which every text control copies and
+  pastes through — but on Windows and Linux nothing was plugged into it: the
+  Browser and Writer hosts answered from a private string, so copying in Broiler
+  and pasting into a terminal produced whatever had been copied before, and text
+  copied anywhere else could not be pasted in. (Android and the WebAssembly
+  Writer were already wired to `ClipboardManager` and the browser's clipboard
+  events; Code on Windows already had the Win32 one.)
+  - `Broiler.App.LinuxX11Clipboard` — the X11 CLIPBOARD and PRIMARY selections.
+    X11 has no clipboard daemon holding a string: the application that copied
+    last owns a selection and every paste is a request answered by that owner, so
+    this owns one on a display connection of its own and answers
+    `SelectionRequest` from the head's existing loop. It offers and accepts
+    `UTF8_STRING`, `STRING` and `TEXT`, answers `TARGETS`, reads a chunked `INCR`
+    transfer from owners that send one, and gives the selection up when the
+    process exits rather than leaving other applications to find a dead owner.
+    PRIMARY goes with CLIPBOARD, so a middle-click paste into a terminal gets the
+    same text Ctrl+V does. It needed no Broiler.Graphics change: draining the
+    window's own queue for this would swallow the focus, resize and close events
+    the surface is waiting for.
+  - The Win32 clipboard moved from the Code head to `Broiler.App` and is now
+    shared by Browser, Writer and Code alike rather than existing once and being
+    reachable only from Code.
+  - Broiler Code on Linux consequently reports `clipboard: native` from
+    `--services` and enables Cut, Copy and Paste, where it previously declared
+    the service unavailable because "X11 selection ownership is not implemented".
+  - Where a machine has no clipboard to offer — no X display — the commands
+    report themselves unavailable. There is deliberately still no in-process
+    buffer standing in for one: that is the thing that made copy and paste look
+    like they worked while interoperating with nothing.
+
 - `Broiler.UI.Edit` — an editing context menu on the single-line edit, plus the
   clipboard shortcuts that were missing next to `Ctrl+C`/`X`/`V`: `Ctrl+Insert`
   copies, `Shift+Insert` pastes and `Shift+Delete` cuts, the chords several
@@ -79,6 +110,16 @@ are versioned in lockstep during the preview.
   diagnostic must never be able to break the execution it observes.
 
 ### Changed
+
+- `Broiler.Browser.Core` and `Broiler.Writer` — the UI hosts no longer keep a
+  private clipboard string for when the shell wired no platform accessor. A
+  fallback that only this process can see makes copy and paste appear to work
+  while interoperating with nothing on the machine, which is why the Code
+  heads already refused to carry one; with the desktop shells now wiring real
+  clipboards, the fallback's only remaining effect would be to hide a host
+  that has none. A host without an accessor reports no text, and the editing
+  commands show themselves unavailable — the single-line edit's context menu
+  greys Paste out on such a host rather than offering a no-op.
 
 - `Broiler.HtmlBridge` — a script names itself in the stack traces of the errors it
   raises. `JSContext.Eval` takes the location it reports in stack frames and every

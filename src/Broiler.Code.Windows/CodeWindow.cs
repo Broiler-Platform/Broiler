@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.Versioning;
+using Broiler.App;
 using Broiler.Code.Core.Hosting;
 using Broiler.Code.Core.Shell;
 using Broiler.Graphics;

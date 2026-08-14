@@ -19,6 +19,11 @@
        directly to allow the tests to run on any platform. -->
   <ItemGroup>
     <Compile Include="..\Broiler.App\FavoritesManager.cs" Link="FavoritesManager.cs" />
+    <Compile Include="..\Broiler.App\LinuxX11Clipboard.cs" Link="LinuxX11Clipboard.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Broiler.UI\src\Foundation\Broiler.UI\Broiler.UI.csproj" />
   </ItemGroup>
 
   <ItemGroup>

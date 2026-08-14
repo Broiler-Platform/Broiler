@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using Broiler.App;
 using Broiler.Graphics;
 using Broiler.Graphics.Windows;
 using Broiler.Input;
@@ -24,6 +25,10 @@ internal sealed class BrowserWindow : Direct2DWindow, IWindowsInputHost
     private readonly WindowsInputMessageSubscription[] _inputSubscriptions;
     private int _hostThreadId = Environment.CurrentManagedThreadId;
 
+    // Created in OnCreated: the Win32 clipboard is addressed by window handle,
+    // and there is no handle until the window exists.
+    private WindowsClipboard? _clipboard;
+
     public BrowserWindow(string? initialUrl)
         : base(new BWindowOptions
         {
@@ -39,7 +44,9 @@ internal sealed class BrowserWindow : Direct2DWindow, IWindowsInputHost
             () => DpiScale,
             Invalidate,
             static _ => { },
-            PostToUiThread);
+            PostToUiThread,
+            ReadClipboardText,
+            WriteClipboardText);
         _app = new BrowserApp(_host, () => Renderer, initialUrl, SetAnimationActive);
         _inputDispatcher = new WindowsInputMessageDispatcher(this);
         _keyboardProvider = new WindowsKeyboardProvider();
@@ -76,7 +83,18 @@ internal sealed class BrowserWindow : Direct2DWindow, IWindowsInputHost
     protected override void OnCreated()
     {
         _hostThreadId = Environment.CurrentManagedThreadId;
+        _clipboard = new WindowsClipboard(NativeHandle);
     }
+
+    /// <summary>
+    /// Null rather than empty when there is no clipboard to read: the host
+    /// treats that as "this machine offers none", which is what the window
+    /// reports before it exists and if the OS refuses the clipboard.
+    /// </summary>
+    private string? ReadClipboardText() =>
+        _clipboard is not null && _clipboard.TryGetText(out string text) ? text : null;
+
+    private void WriteClipboardText(string text) => _clipboard?.SetText(text);
 
     protected override BRenderList? BuildRenderList(BSize clientSize) => _app.RenderFrame();
 

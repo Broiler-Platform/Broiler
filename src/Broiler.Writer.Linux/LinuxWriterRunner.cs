@@ -44,6 +44,13 @@ internal static class LinuxWriterRunner
         if (options.EnableEvdevInput && x11Window is null)
             Console.WriteLine("evdev input requested, but no focus-capable X11 window exists; input is disabled.");
 
+        // The X11 clipboard, on its own connection. Absent when running
+        // offscreen with no display, and then copy and paste report themselves
+        // unavailable rather than silently working only inside this process.
+        using LinuxX11Clipboard? clipboard = x11Window is not null ? LinuxX11Clipboard.TryOpen() : null;
+        if (x11Window is not null && clipboard is null)
+            Console.WriteLine("No X11 clipboard is available; copy and paste are disabled.");
+
         using WriterUiHost host = new(
             () => surface.Size,
             () => surface.DpiScale,
@@ -53,6 +60,8 @@ internal static class LinuxWriterRunner
                 lastFrameContext = new BFrameContext(WriterPalette.Canvas, frameIndex++, RenderOptions);
                 renderer.Render(surface, renderList, lastFrameContext);
             },
+            () => clipboard is not null && clipboard.TryGetText(out string text) ? text : null,
+            text => clipboard?.SetText(text),
             getRenderer: () => renderer);
         using WriterApp app = new(host, () => closeRequested = true);
 
@@ -65,6 +74,10 @@ internal static class LinuxWriterRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
             bool processedWindowEvents = false;
+
+            // An X11 copy is a promise to answer requests: between these calls,
+            // another application pasting from Writer sees an empty clipboard.
+            clipboard?.ProcessPendingEvents();
             if (x11Window is not null)
             {
                 processedWindowEvents = x11Window.ProcessPendingEvents();
