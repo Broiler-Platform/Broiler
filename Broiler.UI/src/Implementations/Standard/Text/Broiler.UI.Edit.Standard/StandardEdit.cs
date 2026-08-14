@@ -8,7 +8,7 @@ using Broiler.UI.Standard;
 
 namespace Broiler.UI.Edit.Standard;
 
-public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
+public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
 {
     public void ApplyTheme(StandardThemeTokens theme)
     {
@@ -19,6 +19,11 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
         FocusRing = theme.FocusRing;
         SelectionBackground = theme.AccentSoft;
         CaretColor = theme.Text;
+        ContextMenuBackground = theme.Surface;
+        ContextMenuForeground = theme.Text;
+        ContextMenuDisabledForeground = theme.TextDisabled;
+        ContextMenuHighlight = theme.AccentSoft;
+        ContextMenuBorderColor = theme.Border;
     }
 
     private readonly List<string> _undoStack = [];
@@ -181,12 +186,23 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
         DrawCaret(context, inner);
         context.RenderList.PopClip();
         PublishCaretGeometry();
+
+        // Deferred so the popup paints over later siblings instead of being
+        // covered by whatever is arranged after this control.
+        if (IsContextMenuOpen)
+            context.Defer(RenderContextMenu);
     }
 
     protected override bool OnInput(UiInputEvent input)
     {
         if (!IsEnabled)
+        {
+            CloseContextMenu();
             return false;
+        }
+
+        if (IsContextMenuOpen && HandleContextMenuInput(input))
+            return true;
 
         return input.Kind switch
         {
@@ -200,6 +216,9 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
 
     private bool HandlePointerButton(UiInputEvent input)
     {
+        if (input.MouseButton == MouseButton.Right)
+            return HandleContextMenuPointerRequest(input);
+
         if (input.MouseButton != MouseButton.Left)
             return false;
 
@@ -248,10 +267,17 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
 
     protected override void OnDetached()
     {
+        CloseContextMenu();
         if (Session?.Host is IUiTextInputHost textInput)
             textInput.ClearCaret(this);
 
         base.OnDetached();
+    }
+
+    protected override UiSemanticNode GetSemanticNodeCore()
+    {
+        UiSemanticNode node = base.GetSemanticNodeCore();
+        return IsContextMenuOpen ? node with { Children = [CreateContextMenuSemanticNode()] } : node;
     }
 
     private bool HandleKeyboard(UiInputEvent input)
@@ -261,6 +287,9 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
 
         bool control = input.KeyModifiers.HasFlag(KeyboardModifierState.Control);
         bool shift = input.KeyModifiers.HasFlag(KeyboardModifierState.Shift);
+
+        if (IsContextMenuKey(input, shift))
+            return OpenContextMenuAtCaret();
 
         if (control && IsKey(input, BVirtualKey.A, "A"))
         {
@@ -275,6 +304,20 @@ public sealed class StandardEdit : UiEdit, IStandardThemedControl, IUiTextEditor
             return Paste();
         if (control && IsKey(input, 0x5A, "Z"))
             return Undo();
+
+        // The Insert-key clipboard chords predate the Ctrl-letter ones and are
+        // still what several editors and terminals send.
+        if (IsKey(input, 0x2D, "Insert"))
+        {
+            if (control)
+                return Copy();
+            if (shift)
+                return Paste();
+
+            return false;
+        }
+        if (shift && IsKey(input, 0x2E, "Delete"))
+            return Cut();
 
         if (IsKey(input, BVirtualKey.Enter, "Enter"))
         {

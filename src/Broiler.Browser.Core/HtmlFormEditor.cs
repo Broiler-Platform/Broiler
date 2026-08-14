@@ -195,7 +195,7 @@ internal sealed class HtmlFormEditor
 
         if (zoom <= 0 || viewportBounds.IsEmpty)
         {
-            _edit.Visibility = UiVisibility.Collapsed;
+            Hide();
             return;
         }
 
@@ -208,7 +208,7 @@ internal sealed class HtmlFormEditor
         // A field scrolled out of view must neither paint nor swallow pointer input.
         if (target.Intersect(viewportBounds).IsEmpty)
         {
-            _edit.Visibility = UiVisibility.Collapsed;
+            Hide();
             return;
         }
 
@@ -231,6 +231,17 @@ internal sealed class HtmlFormEditor
         FieldType = string.Empty;
         _edit.Text = string.Empty;
         _edit.IsPassword = false;
+        Hide();
+    }
+
+    /// <summary>
+    /// Takes the overlay out of the tree's visible set. An open context menu goes
+    /// with it: a hidden control receives no input, so a menu left open would hold
+    /// the session's input capture with nothing able to dismiss it.
+    /// </summary>
+    private void Hide()
+    {
+        _edit.CloseContextMenu();
         _edit.Visibility = UiVisibility.Collapsed;
     }
 }
