@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
+using Broiler.HtmlBridge.Core.Diagnostics;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
@@ -247,7 +249,7 @@ public class CaptureService
             Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
         };
 
-        var html = await httpClient.GetStringAsync(new Uri(options.Url));
+        var html = await FetchDocumentAsync(httpClient, new Uri(options.Url));
 
         // Follow the first link if requested (e.g. Acid2 landing page navigation).
         if (options.FollowFirstLink)
@@ -259,7 +261,7 @@ public class CaptureService
         ProcessCss(html);
 
         // Execute inline scripts using Broiler.JavaScript
-        ExecuteScripts(html);
+        ExecuteScripts(html, options.Url);
 
         // Save the captured content
         if (options.OutputFormat == OutputFormat.Text)
@@ -270,6 +272,27 @@ public class CaptureService
         else
         {
             await File.WriteAllTextAsync(options.OutputPath, html);
+        }
+    }
+
+    /// <summary>
+    /// Fetches the top-level document, recording it when a diagnostic run is listening. The page
+    /// itself is the one resource nothing below the CLI ever sees — the bridge is handed HTML, not a
+    /// URL — so it can only be archived from here.
+    /// </summary>
+    private static async Task<string> FetchDocumentAsync(HttpClient httpClient, Uri uri)
+    {
+        var attempt = ResourceTrace.Begin(ResourceTraceKind.Document, uri.AbsoluteUri);
+        try
+        {
+            var html = await httpClient.GetStringAsync(uri);
+            attempt.Completed(html);
+            return html;
+        }
+        catch (Exception ex)
+        {
+            attempt.Failed(ex);
+            throw;
         }
     }
 
@@ -322,11 +345,21 @@ public class CaptureService
 
         if (uri.IsFile)
         {
-            html = await File.ReadAllTextAsync(uri.LocalPath);
+            var attempt = ResourceTrace.Begin(ResourceTraceKind.Document, uri.AbsoluteUri);
+            try
+            {
+                html = await File.ReadAllTextAsync(uri.LocalPath);
+                attempt.Completed(html);
+            }
+            catch (Exception ex)
+            {
+                attempt.Failed(ex);
+                throw;
+            }
         }
         else
         {
-            html = await httpClient.GetStringAsync(uri);
+            html = await FetchDocumentAsync(httpClient, uri);
         }
 
         // Follow the first link if requested (e.g. Acid2 landing page navigation).
@@ -407,7 +440,7 @@ public class CaptureService
     /// This exercises the YantraJS engine as part of the rendering pipeline;
     /// script results can be extended in future to influence output content.
     /// </summary>
-    private static void ExecuteScripts(string html)
+    private static void ExecuteScripts(string html, string url)
     {
         var scripts = new List<string>();
         foreach (Match match in ScriptPattern.Matches(html))
@@ -424,16 +457,22 @@ public class CaptureService
             using var context = new JSContext();
             RegisterWindowStub(context);
 
-            foreach (var script in scripts)
+            for (var i = 0; i < scripts.Count; i++)
             {
+                // The same labels the DOM path uses, so an error and its archived source name the
+                // script identically whichever capture mode produced them.
+                var label = ScriptLabel.Inline(i);
+                if (ResourceTrace.IsActive)
+                    RecordExecutedScript(url, label, scripts[i]);
+
                 try
                 {
-                    context.Eval(script);
+                    context.Eval(scripts[i], label);
                 }
                 catch (Exception ex)
                 {
                     // Script execution errors are non-fatal for capture
-                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScripts", $"Script execution error: {ex.Message}", ex);
+                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScripts", $"Script {label} failed: {ex.Message}", ex);
                 }
             }
         }
@@ -554,6 +593,20 @@ public class CaptureService
                 deferredScripts.Add(scriptContent);
             else
                 scripts.Add(scriptContent);
+        }
+
+        // Archive the program text of everything that is about to run, under the labels the error log
+        // names it by, so "Script inline-7 failed" points at a file. External sources were already
+        // recorded as fetched; the sink stores identical bytes once, so the second entry costs a
+        // manifest row and yields the label→URL mapping. Off by default; see ResourceTrace.
+        if (ResourceTrace.IsActive)
+        {
+            for (var i = 0; i < scripts.Count; i++)
+                RecordExecutedScript(url, ScriptLabel.Inline(i), scripts[i]);
+            for (var i = 0; i < deferredScripts.Count; i++)
+                RecordExecutedScript(url, ScriptLabel.Deferred(i), deferredScripts[i]);
+            for (var i = 0; i < moduleRoots.Count; i++)
+                RecordExecutedScript(url, ScriptLabel.Module(i.ToString(CultureInfo.InvariantCulture)), moduleRoots[i]);
         }
 
         // No scripts to run: normally the raw HTML passes through untouched, but
@@ -716,8 +769,20 @@ public class CaptureService
         DrainAsyncWork(bridge, microTasks);
         bridge.ResolveAnimationSnapshots();
 
-        return bridge.SerializeToHtml();
+        var serialized = bridge.SerializeToHtml();
+        // The DOM as the scripts left it. Diffed against the fetched document — archived beside it —
+        // this is precisely what the page's JavaScript did or failed to do, which no other artefact
+        // of the run shows.
+        ResourceTrace.RecordBody(ResourceTraceKind.Document, url, serialized, DiagnosticSession.AfterScriptsLabel);
+        return serialized;
     }
+
+    /// <summary>
+    /// Archives one script as executed. <c>Url</c> carries the page and the label so an entry is
+    /// self-describing in the manifest even when the body is shared with an external fetch.
+    /// </summary>
+    private static void RecordExecutedScript(string pageUrl, string label, string source) =>
+        ResourceTrace.RecordBody(ResourceTraceKind.ExecutedScript, $"{pageUrl}#{label}", source, label);
 
     /// <summary>
     /// Resolves and downloads an external script from an HTTP/HTTPS/file URL.

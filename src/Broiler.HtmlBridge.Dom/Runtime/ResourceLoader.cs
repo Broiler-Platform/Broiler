@@ -1,4 +1,5 @@
 using System.Net.Http;
+using Broiler.HtmlBridge.Core.Diagnostics;
 
 namespace Broiler.HtmlBridge.Dom.Runtime;
 
@@ -53,17 +54,34 @@ internal sealed class ResourceLoader
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
             return null;
 
-        if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+        // Traced on the direct path, which both the inline load and the prefetch worker end at, so a
+        // stylesheet is recorded once however it was obtained. Off by default; see ResourceTrace.
+        var attempt = ResourceTrace.Begin(ResourceTraceKind.Stylesheet, url);
+        try
         {
-            var path = uri.LocalPath;
-            return File.Exists(path) ? File.ReadAllText(path) : null;
+            if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var path = uri.LocalPath;
+                var fileContent = File.Exists(path) ? File.ReadAllText(path) : null;
+                attempt.Completed(fileContent);
+                return fileContent;
+            }
+
+            if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
+                uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
+            {
+                var content = GetStringAsync(url).ConfigureAwait(false).GetAwaiter().GetResult();
+                attempt.Completed(content);
+                return content;
+            }
+
+            return null;
         }
-
-        if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
-            uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
-            return GetStringAsync(url).ConfigureAwait(false).GetAwaiter().GetResult();
-
-        return null;
+        catch (Exception ex)
+        {
+            attempt.Failed(ex);
+            throw;
+        }
     }
 
     /// <summary>

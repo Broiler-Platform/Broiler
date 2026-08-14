@@ -1,5 +1,6 @@
 using Broiler.HTML.Core.Entities;
 using Broiler.HTML.Image;
+using Broiler.HtmlBridge.Core.Diagnostics;
 using System.Drawing;
 
 namespace Broiler.Cli;
@@ -96,9 +97,30 @@ public static class LinkNavigator
                     return html;
             }
 
-            return await File.ReadAllTextAsync(uri.LocalPath);
+            return await RecordAsync(uri, File.ReadAllTextAsync(uri.LocalPath));
         }
 
-        return await httpClient.GetStringAsync(uri);
+        return await RecordAsync(uri, httpClient.GetStringAsync(uri));
+    }
+
+    /// <summary>
+    /// Archives the followed page when a diagnostic run is listening. It is a second top-level
+    /// document, and the one that is actually rendered, so a bundle that recorded only the landing
+    /// page would be missing the document the capture is about. Off by default; see ResourceTrace.
+    /// </summary>
+    private static async Task<string> RecordAsync(Uri uri, Task<string> load)
+    {
+        var attempt = ResourceTrace.Begin(ResourceTraceKind.Document, uri.AbsoluteUri);
+        try
+        {
+            var content = await load;
+            attempt.Completed(content);
+            return content;
+        }
+        catch (Exception ex)
+        {
+            attempt.Failed(ex);
+            throw;
+        }
     }
 }
