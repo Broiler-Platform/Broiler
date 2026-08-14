@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Text;
+using Broiler.HtmlBridge.Core.Diagnostics;
 using Broiler.HtmlBridge.Internal.Scripting;
 using Broiler.HtmlBridge.Logging;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -117,6 +118,13 @@ internal sealed partial class FetchBinding
             rejectedValue = createAbortErrorValue(signalValue);
         }
 
+        // Traced here rather than inside the loader, for two reasons: the body is already decoded at
+        // this level (asking the loader would decode the same bytes twice), and an aborted request —
+        // which never reaches the loader — must not be recorded as a request that was made. Begun
+        // before the try so a failure is recorded with the time it took to fail. Off by default; see
+        // ResourceTrace.
+        var attempt = rejected ? default : ResourceTrace.Begin(ResourceTraceKind.Fetch, fetchUrl);
+
         try
         {
             if (!rejected && resolvedUri == null)
@@ -128,6 +136,7 @@ internal sealed partial class FetchBinding
                 RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.fetch",
                     $"Fetch error: '{requestedUrl}' is not an absolute URL and does not resolve against the page URL '{_host.PageUrl}'.",
                     new JSException("Failed to parse URL"));
+                attempt.Failed($"'{requestedUrl}' does not resolve against the page URL");
                 responseObj = createResponse(string.Empty, 0, "Invalid URL", requestedUrl, "error", false,
                     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
             }
@@ -145,6 +154,11 @@ internal sealed partial class FetchBinding
                 var response = _resources.SendAsync(request).GetAwaiter().GetResult();
                 var body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
                 var statusCode = (int)response.StatusCode;
+                attempt.Completed(
+                    body,
+                    statusCode,
+                    response.Content.Headers.ContentType?.MediaType,
+                    method);
                 var allHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var h in response.Headers)
                     allHeaders[h.Key] = string.Join(", ", h.Value);
@@ -160,6 +174,7 @@ internal sealed partial class FetchBinding
         catch (Exception ex)
         {
             RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.fetch", $"Fetch error: {ex.Message}", ex);
+            attempt.Failed(ex);
             responseObj = createResponse(string.Empty, 0, ex.Message, fetchUrl, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
         }
 

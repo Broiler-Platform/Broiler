@@ -4,6 +4,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.HtmlBridge.Core.Diagnostics;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
 using Broiler.HtmlBridge.Internal.Scripting;
@@ -586,18 +587,27 @@ public sealed partial class DomBridge
             !resolvedUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
             return (null, extensionMime);
 
+        // Off by default; see ResourceTrace. Traced at this level because the sub-document's decoded
+        // text and its resolved content type are both known here, and a non-success status is a
+        // meaningful outcome the loader below reports as an ordinary response.
+        var attempt = ResourceTrace.Begin(ResourceTraceKind.SubDocument, resolvedUrl);
         try
         {
             using var response = _resources.GetAsync(resolvedUrl).GetAwaiter().GetResult();
             if (!response.IsSuccessStatusCode)
+            {
+                attempt.Completed(null, (int)response.StatusCode);
                 return (null, FetchFailedContentType);
+            }
 
             var contentType = response.Content.Headers.ContentType?.MediaType ?? extensionMime;
             var content = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            attempt.Completed(content, (int)response.StatusCode, contentType);
             return (content, contentType);
         }
-        catch
+        catch (Exception ex)
         {
+            attempt.Failed(ex);
             return (null, FetchFailedContentType);
         }
     }

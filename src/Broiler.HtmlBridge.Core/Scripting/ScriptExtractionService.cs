@@ -1,4 +1,5 @@
 using Broiler.Dom.Html;
+using Broiler.HtmlBridge.Core.Diagnostics;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
 using Broiler.HtmlBridge.Internal.Scripting;
@@ -327,19 +328,35 @@ public static partial class ScriptExtractionService
         if (!Uri.TryCreate(resolvedUrl, UriKind.Absolute, out var uri))
             return null;
 
-        // Handle file:// URLs — read from local filesystem
-        if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+        // Traced here rather than at the two callers, because this is the one place both of them
+        // reach: the inline consume path and the prefetch worker alike. Inactive by default, and the
+        // attempt is what carries the timing, so a slow script is visible as a slow script.
+        var attempt = ResourceTrace.Begin(ResourceTraceKind.Script, resolvedUrl);
+        try
         {
-            var path = uri.LocalPath;
-            return File.Exists(path) ? File.ReadAllText(path) : null;
-        }
+            // Handle file:// URLs — read from local filesystem
+            if (uri.Scheme.Equals("file", StringComparison.OrdinalIgnoreCase))
+            {
+                var path = uri.LocalPath;
+                var fileContent = File.Exists(path) ? File.ReadAllText(path) : null;
+                attempt.Completed(fileContent);
+                return fileContent;
+            }
 
-        // Synchronous HTTP fetch.  ConfigureAwait(false) prevents
-        // deadlocks when the caller is on a UI dispatcher.
-        return SharedHttpClient.GetStringAsync(resolvedUrl)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+            // Synchronous HTTP fetch.  ConfigureAwait(false) prevents
+            // deadlocks when the caller is on a UI dispatcher.
+            var content = SharedHttpClient.GetStringAsync(resolvedUrl)
+                .ConfigureAwait(false)
+                .GetAwaiter()
+                .GetResult();
+            attempt.Completed(content);
+            return content;
+        }
+        catch (Exception ex)
+        {
+            attempt.Failed(ex);
+            throw;
+        }
     }
 
     /// <summary>

@@ -154,6 +154,13 @@ something to attempt from inside the container.
     it keeps them testable with no Android setup at all; keep new Android
     translation work on that side of the line. Details:
     [Android development environment](docs/architecture/android.md#development-environment).
+- **Diagnosing a page whose JavaScript misbehaves:** add `--diagnostic-dir <DIR>`
+  to a `Broiler.Cli` capture. It writes every JS failure to a streamed log (so a
+  hang or timeout still leaves one), archives every page, script, stylesheet,
+  `fetch`/XHR response and sub-document the run touched, and produces a
+  `summary.md` ranking the distinct failures and the platform features the page
+  asked for and did not get. See
+  [Capture diagnostics](docs/cli-capture-diagnostics.md).
 - WPT runner: `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt
   --reference-dir tests/wpt/references [--subset <path>] [--failure-images <dir>]`.
   Pixel pass threshold defaults to 99% match (≤1% differing pixels) and is

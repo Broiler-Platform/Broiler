@@ -45,6 +45,8 @@ public class Program
         bool fuzzLayout = false;
         bool followFirstLink = false;
         bool diagnostics = false;
+        string? diagnosticDir = null;
+        string? diagnosticLog = null;
         int fuzzCount = 1000;
         int timeoutSeconds = 30;
         int width = 1024;
@@ -135,6 +137,12 @@ public class Program
                 case "--diagnostics":
                     diagnostics = true;
                     break;
+                case "--diagnostic-dir" when i + 1 < args.Length:
+                    diagnosticDir = args[++i];
+                    break;
+                case "--diagnostic-log" when i + 1 < args.Length:
+                    diagnosticLog = args[++i];
+                    break;
                 case "--count" when i + 1 < args.Length:
                     if (!int.TryParse(args[++i], out fuzzCount) || fuzzCount <= 0)
                     {
@@ -155,6 +163,8 @@ public class Program
                 case "--width":
                 case "--height":
                 case "--count":
+                case "--diagnostic-dir":
+                case "--diagnostic-log":
                     Console.Error.WriteLine($"Error: '{args[i]}' requires a value.");
                     PrintUsage();
                     return 1;
@@ -199,6 +209,7 @@ public class Program
             RenderLogger.EntryLogged += diagHandler;
         }
 
+        var diagnosticOptions = ResolveDiagnosticOptions(diagnosticDir, diagnosticLog);
         int exitCode;
 
         // Batch capture runs each input as its own child process rather than on a thread: the
@@ -206,6 +217,18 @@ public class Program
         // #9/#8), so a second render in this process would be a data race. See BatchRunner.
         if (captureImageUrls.Count > 1 || urls.Count > 1)
         {
+            // A batch's diagnostics are produced by the children, each into its own sub-bundle, for
+            // the same reason the captures themselves are: they run at once, and one log file or one
+            // resources/ directory shared between concurrent captures would interleave into evidence
+            // that cannot be attributed to a page. A bare --diagnostic-log has nowhere to put them.
+            if (diagnosticOptions.IsActive && diagnosticOptions.Directory is null)
+            {
+                Console.Error.WriteLine(
+                    "Error: capturing several URLs with diagnostics requires '--diagnostic-dir <DIR>'; " +
+                    "each capture is written to its own sub-directory of <DIR>.");
+                return 1;
+            }
+
             exitCode = RunBatchCapture(
                 captureImageUrls,
                 urls,
@@ -216,9 +239,23 @@ public class Program
                 height,
                 fullPage,
                 followFirstLink,
-                timeoutSeconds);
+                timeoutSeconds,
+                diagnosticOptions.Directory);
             EmitDiagnostics(diagHandler, diagnosticEntries);
             return exitCode;
+        }
+
+        DiagnosticSession? diagnosticSession;
+        try
+        {
+            diagnosticSession = DiagnosticSession.Start(diagnosticOptions);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            // Failing here rather than degrading to a silent no-op: a mistyped destination is the
+            // one diagnostics mistake that is invisible in the run's own output.
+            Console.Error.WriteLine($"Error: cannot open the diagnostics destination: {ex.Message}");
+            return 1;
         }
 
         string? url = urls.Count > 0 ? urls[0] : null;
@@ -379,9 +416,30 @@ public class Program
             }
         }
 
+        // Disposed before the summary so the manifest, digest and summary are on disk by the time the
+        // line pointing at them is printed.
+        if (diagnosticSession is not null)
+        {
+            diagnosticSession.Dispose();
+            Console.WriteLine(diagnosticSession.Describe());
+        }
+
         EmitDiagnostics(diagHandler, diagnosticEntries);
         return exitCode;
     }
+
+    /// <summary>
+    /// Resolves the two diagnostics arguments into one destination. <c>--diagnostic-dir</c> alone
+    /// puts the log inside the bundle, which is what a reader expects to find there;
+    /// <c>--diagnostic-log</c> alone records the JavaScript failures and archives nothing, for when
+    /// the errors are the whole question.
+    /// </summary>
+    internal static DiagnosticOptions ResolveDiagnosticOptions(string? directory, string? logPath) =>
+        new()
+        {
+            Directory = directory,
+            LogPath = logPath ?? (directory is null ? null : Path.Combine(directory, "javascript-errors.log")),
+        };
 
     /// <summary>
     /// Converts one document, or a batch of them across threads. Conversion touches no engine
@@ -445,7 +503,8 @@ public class Program
         int height,
         bool fullPage,
         bool followFirstLink,
-        int timeoutSeconds)
+        int timeoutSeconds,
+        string? diagnosticDir)
     {
         if (captureImageUrls.Count > 0 && urls.Count > 0)
         {
@@ -492,6 +551,15 @@ public class Program
                 arguments.Add("--full-page");
             if (followFirstLink)
                 arguments.Add("--follow-first-link");
+            if (diagnosticDir is not null)
+            {
+                // Named after the output file's stem, which is derived from the input, so a bundle is
+                // findable from the capture it explains without consulting an index.
+                arguments.Add("--diagnostic-dir");
+                arguments.Add(Path.Combine(
+                    diagnosticDir,
+                    Path.GetFileNameWithoutExtension(item.OutputPath)));
+            }
 
             return arguments;
         }).ExitCode;
@@ -531,6 +599,17 @@ public class Program
         Console.WriteLine("  --fuzz-layout          Run layout fuzz testing with random HTML/CSS");
         Console.WriteLine("  --count <N>            Number of fuzz cases to generate (default: 1000)");
         Console.WriteLine("  --diagnostics          Emit structured JSON log output on stdout after the operation");
+        Console.WriteLine("  --diagnostic-dir <DIR> Record a diagnostics bundle for the capture into <DIR>:");
+        Console.WriteLine("                           javascript-errors.log  every JS failure, written as it happens");
+        Console.WriteLine("                           console.log            console.log/warn/error/info, in order");
+        Console.WriteLine("                           resources/             every page, script, stylesheet, fetch and");
+        Console.WriteLine("                                                  sub-document, plus index.json describing them");
+        Console.WriteLine("                           summary.md             distinct failures ranked, and the platform");
+        Console.WriteLine("                                                  features the page asked for and did not get");
+        Console.WriteLine("                           diagnostics.json       all of the above, machine-readable");
+        Console.WriteLine("                         With several inputs, each capture gets its own sub-directory.");
+        Console.WriteLine("  --diagnostic-log <FILE>  Write the JavaScript failure log to FILE. On its own it records");
+        Console.WriteLine("                         only that log; with --diagnostic-dir it relocates the log.");
         Console.WriteLine("  --help                 Show this help message");
         Console.WriteLine();
         Console.WriteLine("PDF conversion requires the standalone Broiler.Pdf app.");
