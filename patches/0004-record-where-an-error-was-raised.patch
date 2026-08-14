@@ -1,0 +1,416 @@
+From 40d07acc92af26ffd675cf14e0b31323d708690c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 14 Aug 2026 09:36:32 +0000
+Subject: [PATCH] Record where an error was raised, not where its factory was
+ wired
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A TypeError from a page reported its origin as
+
+    at InitializeFactories:...\Engine\Core\JSValueCoreExtensions.cs:17,1
+
+which is the module initializer that installs the error factories at startup.
+It reads as an engine crash during initialization, and it is the same line for
+every TypeError the engine can raise, so it identifies nothing. A report of
+html5test.com's "Cannot get property length of undefined" arrived under that
+heading, pointing at the wrong file.
+
+JSException records the engine method that raised an error as the first frame
+of the JavaScript stack, from the [CallerMemberName]/[CallerFilePath]/
+[CallerLineNumber] trio JSEngine's NewTypeError and its siblings declare. The
+lower assemblies cannot call those directly — Runtime and Storage do not
+reference the Engine assembly that knows how to build a JSError — so they go
+through a factory delegate. Those delegates were Func<string, Exception>, which
+has nowhere to carry the caller info, so the compiler filled it in at the one
+place the arguments were actually written: the wiring lambda in the initializer.
+Nine delegates across three initializers collapsed to nine constants.
+
+Caller-info attributes are honoured on a delegate's Invoke parameters, so the
+factories are now named delegates that declare them — JSErrorFactory in Storage
+(where PropertySequence also needs it) and JSExceptionFactory in Runtime for the
+sites that need the JSException itself. Each throw site captures its own
+position and the initializers forward what they are handed.
+
+Same TypeError now reports its real origin:
+
+    at Item:...\Runtime\JSUndefined.cs:41,1
+
+The JavaScript frames below it are unchanged; this is the frame above them.
+
+Not addressed here, both visible in the same trace and both changes to a
+web-visible API rather than corrections of wrong data: error.stack still opens
+with an empty line where a browser writes "TypeError: <message>", and it still
+carries an engine source path that page script can read.
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01F8PXevAKfy36kyD3roFaJ2
+---
+ .../Core/JSValueCoreExtensions.cs             |   6 +-
+ .../Storage/PropertySequenceCoreExtensions.cs |   3 +-
+ .../EngineAssemblyInitializer.cs              |  24 ++--
+ .../EngineErrorOriginFrameTests.cs            | 110 ++++++++++++++++++
+ .../Broiler.JavaScript.Runtime/JSException.cs |   6 +-
+ .../JSExceptionFactory.cs                     |  21 ++++
+ .../Broiler.JavaScript.Runtime/JSObject.cs    |   4 +-
+ .../Broiler.JavaScript.Runtime/JSValue.cs     |   2 +-
+ .../Broiler.JavaScript.Runtime/JSVariable.cs  |   2 +-
+ .../Broiler.JavaScript.Runtime/UriHelper.cs   |   2 +-
+ .../JSErrorFactory.cs                         |  35 ++++++
+ .../PropertySequence.cs                       |   2 +-
+ 12 files changed, 199 insertions(+), 18 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/EngineErrorOriginFrameTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Runtime/JSExceptionFactory.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Storage/JSErrorFactory.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Engine/Core/JSValueCoreExtensions.cs b/Broiler.JS/Broiler.JavaScript.Engine/Core/JSValueCoreExtensions.cs
+index 88c1e6a5..64b9ec9a 100644
+--- a/Broiler.JS/Broiler.JavaScript.Engine/Core/JSValueCoreExtensions.cs
++++ b/Broiler.JS/Broiler.JavaScript.Engine/Core/JSValueCoreExtensions.cs
+@@ -14,7 +14,11 @@ internal static class JSValueCoreExtensions
+     {
+         JSValue.UndefinedValue = JSUndefined.Value;
+ 
+-        JSValue.NewTypeError = msg => JSEngine.NewTypeError(msg);
++        // Forward the caller info the throw site captured. Dropping it here — the
++        // shape this had while the field was a Func<string, Exception> — made this
++        // line the recorded origin of every TypeError the engine raises.
++        JSValue.NewTypeError = static (msg, function, filePath, line) =>
++            JSEngine.NewTypeError(msg, function, filePath, line);
+         JSValue.ForceConvertHelper = (jsValue, type, _) =>
+         {
+             var protoObj = (jsValue.prototypeChain as IJSPrototype)?.Object as JSObject;
+diff --git a/Broiler.JS/Broiler.JavaScript.Engine/Core/Storage/PropertySequenceCoreExtensions.cs b/Broiler.JS/Broiler.JavaScript.Engine/Core/Storage/PropertySequenceCoreExtensions.cs
+index 6cd03a7e..d28bf04c 100644
+--- a/Broiler.JS/Broiler.JavaScript.Engine/Core/Storage/PropertySequenceCoreExtensions.cs
++++ b/Broiler.JS/Broiler.JavaScript.Engine/Core/Storage/PropertySequenceCoreExtensions.cs
+@@ -20,6 +20,7 @@ public static class PropertySequenceCoreExtensions
+     [ModuleInitializer]
+     internal static void InitializeTypeErrorFactory()
+     {
+-        PropertySequence.TypeErrorFactory = msg => JSEngine.NewTypeError(msg);
++        PropertySequence.TypeErrorFactory = static (msg, function, filePath, line) =>
++            JSEngine.NewTypeError(msg, function, filePath, line);
+     }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Engine/EngineAssemblyInitializer.cs b/Broiler.JS/Broiler.JavaScript.Engine/EngineAssemblyInitializer.cs
+index b156e774..aae38cf7 100644
+--- a/Broiler.JS/Broiler.JavaScript.Engine/EngineAssemblyInitializer.cs
++++ b/Broiler.JS/Broiler.JavaScript.Engine/EngineAssemblyInitializer.cs
+@@ -22,8 +22,13 @@ internal static class EngineAssemblyInitializer
+         JSEngine.CreateObjectClass = ObjectClassFactory.CreateObjectClass;
+ 
+         // ── JSObject factory delegates ──────────────────────────────
+-        JSObject.NewTypeError = static msg => JSEngine.NewTypeError(msg);
+-        JSObject.NewRangeError = static msg => JSEngine.NewRangeError(msg);
++        // Each of these forwards the caller info its throw site captured, so the
++        // JavaScript stack names the engine method that raised the error rather
++        // than the line below that installed the factory.
++        JSObject.NewTypeError = static (msg, function, filePath, line) =>
++            JSEngine.NewTypeError(msg, function, filePath, line);
++        JSObject.NewRangeError = static (msg, function, filePath, line) =>
++            JSEngine.NewRangeError(msg, function, filePath, line);
+         JSObject.CoerceToNumber = static str => NumberParser.CoerceToNumber(str);
+         JSObject.CreatePrimitiveObject ??= static p => p is JSPrimitive primitive
+             ? new JSPrimitiveObject(primitive)
+@@ -32,18 +37,23 @@ internal static class EngineAssemblyInitializer
+         JSObject.TryUnmarshalObject = CoreInternalHelpers.TryUnmarshal;
+ 
+         // ── JSException delegates ───────────────────────────────────
+-        JSException.NewSyntaxErrorFactory = static msg => JSEngine.NewSyntaxError(msg);
+-        JSException.NewTypeErrorFactory = static msg => JSEngine.NewTypeError(msg);
+-        JSException.NewReferenceErrorFactory = static msg => JSEngine.NewReferenceError(msg);
++        JSException.NewSyntaxErrorFactory = static (msg, function, filePath, line) =>
++            JSEngine.NewSyntaxError(msg, function, filePath, line);
++        JSException.NewTypeErrorFactory = static (msg, function, filePath, line) =>
++            JSEngine.NewTypeError(msg, function, filePath, line);
++        JSException.NewReferenceErrorFactory = static (msg, function, filePath, line) =>
++            JSEngine.NewReferenceError(msg, function, filePath, line);
+         JSException.AppendStackTraceHelper = static (sb, trace) => JSEngine.AppendStackTrace?.Invoke(sb, trace);
+ 
+         // ── JSVariable delegate ─────────────────────────────────────
+         JSVariable.GetCurrentContext = static () => JSEngine.Current;
+         JSVariable.IsStrictMode = static () => JSEngine.IsStrictMode;
+-        JSVariable.NewReferenceErrorFactory = static msg => JSEngine.NewReferenceError(msg);
++        JSVariable.NewReferenceErrorFactory = static (msg, function, filePath, line) =>
++            JSEngine.NewReferenceError(msg, function, filePath, line);
+ 
+         // ── UriHelper delegate ──────────────────────────────────────
+-        UriHelper.NewURIError = static message => JSEngine.NewURIError(message);
++        UriHelper.NewURIError = static (message, function, filePath, line) =>
++            JSEngine.NewURIError(message, function, filePath, line);
+ 
+         // ── JSValue.MarshalObject delegate ──────────────────────────
+         JSValue.IsStrictModeEnabled = static () => JSEngine.IsStrictMode;
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/EngineErrorOriginFrameTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/EngineErrorOriginFrameTests.cs
+new file mode 100644
+index 00000000..54246e2e
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/EngineErrorOriginFrameTests.cs
+@@ -0,0 +1,110 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Integration.Tests;
++
++// The first frame of a JavaScript stack trace is the ENGINE method that raised the error — the
++// [CallerMemberName]/[CallerFilePath]/[CallerLineNumber] trio the JSException constructor
++// captures — followed by the JavaScript frames.
++//
++// Every error raised from a lower assembly reaches the Engine through a factory delegate, because
++// Runtime and Storage cannot reference the assembly that knows how to build a JSError. While those
++// delegates were shaped `Func<string, Exception>` there was nowhere to carry the caller info, so
++// the compiler filled it in at the line that WIRED the delegate rather than at the throw. Every
++// TypeError the engine could raise then reported the same origin —
++//
++//     at InitializeFactories:...\Engine\Core\JSValueCoreExtensions.cs:17,1
++//
++// — the module initializer, which has nothing to do with any failure. That is the shape a report
++// of html5test.com arrived in: a `Cannot get property length of undefined` whose only non-JS frame
++// named a line that installs a delegate at startup, sending the reader to the wrong file entirely.
++//
++// The delegates now declare the caller-info parameters themselves (JSErrorFactory /
++// JSExceptionFactory), so each throw site records its own position and the initializer forwards
++// what it is handed.
++public class EngineErrorOriginFrameTests
++{
++    /// <summary>The first <c>at</c> line of the stack of whatever <paramref name="source"/> throws.</summary>
++    /// <remarks>
++    /// The source runs as the whole body of its own function so that a leading <c>'use strict'</c>
++    /// is a directive prologue. Inlined into the <c>try</c> below it would be an ordinary
++    /// expression statement instead, and the cases that need strict mode to throw at all — a
++    /// <c>delete</c> of a non-configurable property — would quietly return false.
++    /// </remarks>
++    private static string OriginFrameOf(string source)
++    {
++        using var context = new JSContext();
++        return context.Eval(
++            """
++            String((function () {
++                try { (function () { SOURCE })(); }
++                catch (e) {
++                    var frames = e.stack.split('\n').filter(function (l) { return l.indexOf('    at ') === 0; });
++                    return frames.length ? frames[0].trim() : 'no frame';
++                }
++                return 'no throw';
++            })())
++            """.Replace("SOURCE", source),
++            "t.js").ToString();
++    }
++
++    // The regression itself. A module initializer runs once at startup and cannot be the origin of
++    // anything a script provokes, so naming one is always wrong — whichever of them it names.
++    //
++    // The cases cover the rewired factory delegates — JSValue.NewTypeError, JSObject.NewTypeError
++    // and NewRangeError, JSVariable.NewReferenceErrorFactory, UriHelper.NewURIError,
++    // PropertySequence.TypeErrorFactory — plus a few that always reached the Engine directly and
++    // so have to stay right.
++    [Theory]
++    [InlineData("var u; u.foo;")]
++    [InlineData("var u; u();")]
++    [InlineData("'use strict'; var o = {}; Object.defineProperty(o, 'x', { value: 1, configurable: false }); delete o.x;")]
++    [InlineData("decodeURIComponent('%');")]
++    [InlineData("{ q; let q; }")]
++    [InlineData("new Array(-1);")]
++    [InlineData("Object.create(5);")]
++    [InlineData("someGlobalThatIsNotDefined;")]
++    [InlineData("var o = {}; [...o];")]
++    [InlineData("'use strict'; var o = Object.freeze({}); Object.defineProperty(o, 'a', { value: 1 });")]
++    public void TheOriginFrameIsNeverAModuleInitializer(string source)
++    {
++        var frame = OriginFrameOf(source);
++
++        Assert.StartsWith("at ", frame);
++        Assert.DoesNotContain("JSValueCoreExtensions", frame);
++        Assert.DoesNotContain("EngineAssemblyInitializer", frame);
++        Assert.DoesNotContain("PropertySequenceCoreExtensions", frame);
++    }
++
++    // Being "not the initializer" is satisfied by any constant, so this pins that the frame tracks
++    // the throw site: two failures that reach the SAME factory delegate — both of these go through
++    // JSValue.NewTypeError — have to be told apart. Before the fix both read
++    // `InitializeFactories:JSValueCoreExtensions.cs:17,1`.
++    [Fact]
++    public void DistinctThrowSitesSharingAFactoryReportDistinctOrigins()
++    {
++        var read = OriginFrameOf("var u; u.foo;");
++        var call = OriginFrameOf("var u; u();");
++
++        Assert.NotEqual(read, call);
++    }
++
++    // The JavaScript frames are the part a page author can act on, and they sit below the origin
++    // frame. A trace that lost them would still pass the assertions above.
++    [Fact]
++    public void TheJavaScriptFramesFollowTheOriginFrame()
++    {
++        using var context = new JSContext();
++        var frames = context.Eval(
++            """
++            (function () {
++                function inner() { var u; return u.foo; }
++                function outer() { return inner(); }
++                try { outer(); } catch (e) { return e.stack; }
++            })()
++            """,
++            "t.js").ToString();
++
++        Assert.Contains("inner", frames);
++        Assert.Contains("outer", frames);
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs
+index 2d8cb2b7..5471f6d5 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs
+@@ -19,9 +19,9 @@ public class JSException : Exception
+     // ── Delegates for engine-level functionality (wired by Core's initializer) ──
+     // These replace the direct JSEngine references that existed when JSException
+     // lived inside the Core assembly.
+-    internal static Func<string, JSException> NewSyntaxErrorFactory;
+-    internal static Func<string, JSException> NewTypeErrorFactory;
+-    internal static Func<string, JSException> NewReferenceErrorFactory;
++    internal static JSExceptionFactory NewSyntaxErrorFactory;
++    internal static JSExceptionFactory NewTypeErrorFactory;
++    internal static JSExceptionFactory NewReferenceErrorFactory;
+     internal static Action<StringBuilder, List<(StringSpan target, string file, int line, int column)>> AppendStackTraceHelper;
+ 
+     // Error message constants (moved from JSError for Core accessibility)
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSExceptionFactory.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSExceptionFactory.cs
+new file mode 100644
+index 00000000..5a67fd50
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSExceptionFactory.cs
+@@ -0,0 +1,21 @@
++using System.Runtime.CompilerServices;
++using Broiler.JavaScript.Storage;
++
++namespace Broiler.JavaScript.Runtime;
++
++/// <summary>
++/// Creates an engine-raised <see cref="JSException"/>, recording the engine call site
++/// that raised it.
++/// </summary>
++/// <remarks>
++/// The <see cref="JSErrorFactory"/> counterpart for the throw sites that need the
++/// <see cref="JSException"/> itself — to read its <see cref="JSException.Error"/>, or
++/// to reject a promise with it — rather than a bare <see cref="System.Exception"/>.
++/// See <see cref="JSErrorFactory"/> for why the caller-info parameters are declared
++/// on the delegate.
++/// </remarks>
++public delegate JSException JSExceptionFactory(
++    string message,
++    [CallerMemberName] string function = null,
++    [CallerFilePath] string filePath = null,
++    [CallerLineNumber] int line = 0);
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+index 39101805..ea59cd49 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+@@ -34,8 +34,8 @@ public partial class JSObject : JSValue
+     // ── Factory delegates for abstracting Core dependencies ──
+     // These are wired by CoreAssemblyInitializer so that JSObject
+     // (in Runtime) can access Core functionality without a direct reference.
+-    internal new static Func<string, Exception> NewTypeError;
+-    internal static Func<string, Exception> NewRangeError;
++    internal new static JSErrorFactory NewTypeError;
++    internal static JSErrorFactory NewRangeError;
+     internal static Func<JSObject> GetCurrentObjectPrototype;
+     internal static Func<string, double> CoerceToNumber;
+     internal static Func<JSValue, JSValue> CreatePrimitiveObject;
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs
+index f1fb3333..13a3ed52 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSValue.cs
+@@ -50,7 +50,7 @@ public abstract partial class JSValue : IDynamicMetaObjectProvider, IPropertyAcc
+     /// </summary>
+     internal static Func<string, KeyString, JSValue> CreateStringWithKey;
+ 
+-    internal static Func<string, Exception> NewTypeError;
++    internal static JSErrorFactory NewTypeError;
+     internal static Func<bool> IsStrictModeEnabled;
+     internal static Func<object, JSValue> MarshalObject;
+     internal static Func<JSObject, int, bool> IsFeatureEnabledFactory;
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSVariable.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSVariable.cs
+index d97ec2ba..1df40520 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSVariable.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSVariable.cs
+@@ -273,7 +273,7 @@ public class JSVariable
+     /// </summary>
+     internal static Func<object> GetCurrentContext;
+     internal static Func<bool> IsStrictMode;
+-    internal static Func<string, JSException> NewReferenceErrorFactory;
++    internal static JSExceptionFactory NewReferenceErrorFactory;
+ 
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+     public JSVariable(JSValue v, string name)
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/UriHelper.cs b/Broiler.JS/Broiler.JavaScript.Runtime/UriHelper.cs
+index ad32f0df..3591e71e 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/UriHelper.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/UriHelper.cs
+@@ -5,7 +5,7 @@ namespace Broiler.JavaScript.Runtime;
+ 
+ internal static class UriHelper
+ {
+-    internal static Func<string, JSException> NewURIError = _ =>
++    internal static JSExceptionFactory NewURIError = static (_, _, _, _) =>
+         throw new InvalidOperationException("UriHelper.NewURIError delegate is not initialized.");
+ 
+     // Strict UTF-8 decoder: rejects overlong forms, values above U+10FFFF, and
+diff --git a/Broiler.JS/Broiler.JavaScript.Storage/JSErrorFactory.cs b/Broiler.JS/Broiler.JavaScript.Storage/JSErrorFactory.cs
+new file mode 100644
+index 00000000..4f7d7700
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Storage/JSErrorFactory.cs
+@@ -0,0 +1,35 @@
++using System;
++using System.Runtime.CompilerServices;
++
++namespace Broiler.JavaScript.Storage;
++
++/// <summary>
++/// Creates an engine-raised JavaScript error, recording the engine call site that
++/// raised it.
++/// </summary>
++/// <remarks>
++/// <para>
++/// The error factories are delegates because the lower assemblies — this one and
++/// Runtime — have to raise a real JavaScript error without referencing the Engine
++/// assembly that knows how to build one.
++/// </para>
++/// <para>
++/// The caller-info parameters are why this is a named delegate rather than a
++/// <c>Func&lt;string, Exception&gt;</c>. A <c>JSException</c> records the engine
++/// method that raised it as the first frame of the JavaScript stack, and the
++/// compiler fills those parameters in at the <c>throw</c> site. A plain
++/// <c>Func&lt;string, Exception&gt;</c> has nowhere to put them, so they were
++/// instead captured where the delegate was *wired* — collapsing the origin of every
++/// error in the engine to the one lambda in the module initializer. Every TypeError
++/// a page could provoke, from a property read on <c>undefined</c> on down, reported
++/// <c>at InitializeFactories:JSValueCoreExtensions.cs:17</c>, which named the line
++/// that installed the factory rather than anything to do with the failure. Declaring
++/// the parameters here lets each throw site record its own position; the initializer
++/// forwards what it is handed instead of substituting itself.
++/// </para>
++/// </remarks>
++public delegate Exception JSErrorFactory(
++    string message,
++    [CallerMemberName] string function = null,
++    [CallerFilePath] string filePath = null,
++    [CallerLineNumber] int line = 0);
+diff --git a/Broiler.JS/Broiler.JavaScript.Storage/PropertySequence.cs b/Broiler.JS/Broiler.JavaScript.Storage/PropertySequence.cs
+index 0e4625ea..19671830 100644
+--- a/Broiler.JS/Broiler.JavaScript.Storage/PropertySequence.cs
++++ b/Broiler.JS/Broiler.JavaScript.Storage/PropertySequence.cs
+@@ -123,7 +123,7 @@ public struct PropertySequence
+     /// Core assembly during initialization to produce the correct JavaScript
+     /// TypeError exception. If not set, falls back to InvalidOperationException.
+     /// </summary>
+-    public static Func<string, Exception>? TypeErrorFactory { get; set; }
++    public static JSErrorFactory? TypeErrorFactory { get; set; }
+ 
+     private SAUint32Map<JSObjectProperty> map;
+     private uint head;
+-- 
+2.43.0
+

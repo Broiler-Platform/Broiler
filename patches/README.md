@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Three patches are waiting on a maintainer.** See the index below.
+**Four patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -49,6 +49,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
 | `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
 | `0003` | `Broiler.JS` | Report promises rejected with nobody to handle them |
+| `0004` | `Broiler.JS` | Record where an error was raised, not where its factory was wired |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -160,6 +161,57 @@ what a page paints.
 
 **When it lands upstream:** bump the pointer, delete this patch, and drop the two
 `BroilerJsRejectionTracking` probes with their `#if`s.
+
+### `0004` — every engine error blamed the line that installed the error factories
+
+A TypeError raised while navigating to html5test.com reported its origin as
+
+```
+at InitializeFactories:...\Engine\Core\JSValueCoreExtensions.cs:17,1
+```
+
+which reads as a crash inside engine start-up. It is not one. Line 17 installs a
+factory delegate; the actual failure was an ordinary
+`Cannot get property length of undefined` in the page's fourth inline script.
+Worse, that frame was the same for **every** TypeError the engine can raise, so
+it distinguished nothing — and it sent the first reader of the report into the
+wrong file.
+
+`JSException` records the engine method that raised an error as the first frame
+of the JavaScript stack, taken from the
+`[CallerMemberName]`/`[CallerFilePath]`/`[CallerLineNumber]` trio that
+`JSEngine.NewTypeError` and its siblings declare. Runtime and Storage cannot call
+those directly — they do not reference the Engine assembly that knows how to
+build a `JSError` — so they raise through a factory delegate. The delegates were
+`Func<string, Exception>`, which has nowhere to carry caller info, so the
+compiler filled it in at the only place those arguments were written: the wiring
+lambda in the module initializer. **Nine delegates across three initializers,
+nine constants.**
+
+Caller-info attributes are honoured on a delegate's `Invoke` parameters, so the
+factories are now named delegates that declare them — `JSErrorFactory` in Storage
+(where `PropertySequence` needs it too) and `JSExceptionFactory` in Runtime for
+the sites that want the `JSException` itself. Each throw site captures its own
+position; the initializers forward what they are handed. The same TypeError now
+reports `at Item:...\Runtime\JSUndefined.cs:41,1`, and two failures reaching one
+factory can be told apart — which is what `EngineErrorOriginFrameTests` pins,
+since "not the initializer" alone would be satisfied by any other constant.
+
+**The JavaScript frames are untouched.** This is the frame above them, and it was
+the only wrong one.
+
+**Two things in the same trace are deliberately left alone**, because each is a
+change to a web-visible API rather than a correction of wrong data, and the call
+belongs to whoever owns that surface: `error.stack` opens with an **empty line**
+where a browser writes `TypeError: <message>` (the `JSError` constructor computes
+the stack before the `message` property exists), and it still carries an engine
+source path — an absolute build-machine path, `D:\Broiler\...` in the original
+report — that page script can read.
+
+**Not listed for the pixel suites** — it changes a diagnostic, not anything a
+page paints.
+
+**When it lands upstream:** bump the pointer and delete this patch.
 
 ## A stale entry in the apply script is not inert
 
