@@ -52,12 +52,23 @@ internal sealed class AttributesBinding(IAttributesHost host)
         // item(index) — returns Attr node at position
         map.FastAddValue((KeyString)"item", new DomFunction((in a) => Item(element, ownerObj, in a), "item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // Numeric index access — expose each attribute by index
+        // Numeric index access — expose each attribute by index.
+        //
+        // These have to go into the object's *indexed* storage, not its named storage: an
+        // integer-index key is canonicalized to the element array before the named property
+        // table is ever consulted, so a getter installed under the KeyString "0" is written
+        // where no read ever looks. `attributes.length` and `attributes.item(0)` were right
+        // while `attributes[0]` was undefined — and `Object.keys(attributes)` did not even
+        // list "0", which is what gives the mismatch away. That cost more than an html5test
+        // point: the WPT runner's custom-element shim had to route around it
+        // (WptTestRunner.cs, "the bridge's `attributes` reports a length but does not answer
+        // to numeric indexing"), because the obvious `attributes[i].name` loop read
+        // `undefined.name` and threw out of customElements.define.
         var attrKeys = DomBridge.AttributeNames(element).ToList();
         for (var i = 0; i < attrKeys.Count; i++)
         {
             var idx = i;
-            map.FastAddProperty((KeyString)idx.ToString(), new DomFunction((in _) => IndexedItem(element, idx, ownerObj, in _), "get " + idx), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+            map.FastAddProperty((uint)idx, new DomFunction((in _) => IndexedItem(element, idx, ownerObj, in _), "get " + idx), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         return map;

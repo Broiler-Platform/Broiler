@@ -705,10 +705,32 @@ internal sealed partial class WptTestRunner
 
     test_driver.Actions = Actions;
   }
-  if (typeof HTMLElement === 'undefined') {
-    window.HTMLElement = function HTMLElement() {
+  // The bridge now defines HTMLElement (see DomBridge RegisterDomInterfaceConstructors), so an
+  // `is it missing?` guard would skip this shim and leave `class X extends HTMLElement` building
+  // plain objects instead of elements. Probe the capability this shim actually needs — that
+  // `new HTMLElement()` yields an element node — rather than the name's mere existence. The
+  // bridge's version answers `instanceof` and is not constructible into an element, so the
+  // override still installs; a future real implementation would pass the probe and win.
+  var __broilerNeedsHtmlElementShim = true;
+  try {
+    if (typeof HTMLElement !== 'undefined') {
+      var __broilerHtmlElementProbe = new HTMLElement();
+      __broilerNeedsHtmlElementShim =
+        !(__broilerHtmlElementProbe && __broilerHtmlElementProbe.nodeType === 1);
+    }
+  } catch (e) {
+    __broilerNeedsHtmlElementShim = true;
+  }
+  if (__broilerNeedsHtmlElementShim) {
+    var __broilerHtmlElementShim = function HTMLElement() {
       return __broilerEnsureAnimate(__broilerNativeCreateElement(__broilerCurrentCustomElementName || 'div'));
     };
+    window.HTMLElement = __broilerHtmlElementShim;
+    // Assigned to the global scope as well as to window. A bare `HTMLElement` in
+    // `class X extends HTMLElement` resolves through the global scope, and the alias loop below
+    // only copies window onto globalThis for names the global scope is *missing* — which this one
+    // no longer is, now that the bridge declares it.
+    try { globalThis.HTMLElement = __broilerHtmlElementShim; } catch (e) {}
   }
   if (typeof customElements === 'undefined') {
     function __broilerUpgradeElement(tagName, ctor, sourceElement) {

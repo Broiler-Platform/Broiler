@@ -47,6 +47,10 @@ public sealed partial class DomBridge
         // Node constructor with type constants
         RegisterNodeConstructor(context);
 
+        // Element/HTMLElement/HTMLUnknownElement/… interface globals. After Node, whose
+        // @@hasInstance it installs.
+        RegisterDomInterfaceConstructors(context);
+
         // SVGLength interface constants
         RegisterSVGLength(context);
     }
