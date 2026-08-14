@@ -1,0 +1,302 @@
+From 329aecd80eca11f78f97837d998ad6c9d99ab000 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 14 Aug 2026 19:45:00 +0000
+Subject: [PATCH] Tell the end of a pattern apart from a NUL inside one
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The parser's cursor reports "past the last character" by returning '\0' from
+Peek(), and every end-of-pattern test compared against that sentinel. U+0000 is
+an ordinary pattern character, so a pattern that merely contained one looked as
+though it ended there.
+
+google.com's start page compiles a "no letters" character class whose first
+range runs from NUL to space. It reaches the parser as a decoded U+0000 — the
+page builds it with new RegExp(<string>), so the string literal's \0 is consumed
+by the string grammar and never reaches the pattern grammar — and the parse died
+on the very first atom with "Unterminated character class". The escaped spelling
+a regex literal preserves, [\0-...], was fine all along; only the decoded one
+was broken.
+
+The class was not confined to character classes: a NUL as an atom, as a range
+end, in a group name or inside \p{...} truncated the parse in the same way.
+
+Route every end-of-pattern test through an explicit AtEnd (and HasAt for the
+one lookahead that needed bounds rather than a value) so the sentinel is no
+longer load-bearing. Peek() still returns '\0' past the end — nothing reads it
+as a signal now.
+
+Separating the two also fixes the mirror-image bug at the real end of input: a
+pattern ending in a lone '\' had no EOF guard on the path that reads the escaped
+character, so ReadCharacterEscape ran off the end of the string and raised
+IndexOutOfRangeException in non-Unicode mode, where callers catch
+RegexSyntaxException. It is now reported as the syntax error it is.
+---
+ Broiler.Regex.Tests/NulCharacterTests.cs | 149 +++++++++++++++++++++++
+ Broiler.Regex/Parsing/RegexParser.cs     |  36 ++++--
+ 2 files changed, 177 insertions(+), 8 deletions(-)
+ create mode 100644 Broiler.Regex.Tests/NulCharacterTests.cs
+
+diff --git a/Broiler.Regex.Tests/NulCharacterTests.cs b/Broiler.Regex.Tests/NulCharacterTests.cs
+new file mode 100644
+index 0000000..5859878
+--- /dev/null
++++ b/Broiler.Regex.Tests/NulCharacterTests.cs
+@@ -0,0 +1,149 @@
++namespace Broiler.Regex.Tests;
++
++/// <summary>
++/// U+0000 is an ordinary pattern character, and the end of the pattern is a
++/// separate condition from it.
++/// <para>
++/// The parser's cursor returns <c>'\0'</c> for "past the last character", and every
++/// end-of-pattern test used to compare against that sentinel. A pattern that merely
++/// <em>contained</em> a NUL therefore looked as though it had ended there: the
++/// "no letters" character class google.com compiles on its start page — whose first
++/// range runs from NUL to space — failed with <c>Unterminated character class</c> at
++/// the very first atom.
++/// </para>
++/// <para>
++/// It arrives as a decoded U+0000 because the page builds it with
++/// <c>new RegExp(<em>string</em>)</c>: the string literal's <c>\0</c> is consumed by
++/// the *string* grammar, never reaching the pattern grammar. So the two spellings are
++/// different inputs to this parser, and only the decoded one was broken — a regex
++/// literal keeps its backslash, and <c>[\0-…]</c> parsed correctly all along. Both are
++/// covered below.
++/// </para>
++/// <para>
++/// Every NUL here is written as a <c>\uXXXX</c> escape. Raw control bytes in the source
++/// would be invisible to a reviewer, and would make <c>git format-patch</c> treat this
++/// file as binary — which matters while the fix travels to the submodule as a patch.
++/// </para>
++/// </summary>
++public class NulCharacterTests
++{
++    /// <summary>
++    /// The reported pattern, decoded exactly as <c>new RegExp(string)</c> hands it over,
++    /// with one range per line so the leading NUL is legible.
++    /// </summary>
++    private const string GoogleNoLetterClass =
++        "^[" +
++        "\u0000- " + // NUL … space — the range that used to end the parse
++        "!-@" +          // U+0021 … U+0040
++        "[-`" +          // U+005B … U+0060
++        "{-¿" +          // U+007B … U+00BF
++        "×÷" +           // U+00D7 and U+00F7
++        "ʹ-˿" +          // U+02B9 … U+02FF
++        "\u2000-⯿" +   // U+2000 … U+2BFF
++        "]*$";
++
++    [Fact]
++    public void GoogleNoLetterClass_Compiles_AndMatchesOnlyNonLetters()
++    {
++        var re = new BroilerRegex(GoogleNoLetterClass);
++
++        Assert.True(re.IsMatch(" ,.!"));
++        Assert.True(re.IsMatch("\u0000"));
++        Assert.True(re.IsMatch("×÷"));
++        Assert.False(re.IsMatch("a"));
++        Assert.False(re.IsMatch("abc"));
++    }
++
++    /// <summary>
++    /// The two spellings of one class — a decoded NUL and the <c>\0</c> escape —
++    /// compile and agree. Only the first was broken.
++    /// </summary>
++    [Theory]
++    [InlineData("[\u0000- ]")]
++    [InlineData("[\\0- ]")]
++    public void NulStartedRange_MatchesControlsAndSpace(string pattern)
++    {
++        var re = new BroilerRegex(pattern);
++        Assert.True(re.IsMatch("\u0000"));
++        Assert.True(re.IsMatch(" "));
++        Assert.True(re.IsMatch("\n"));
++        Assert.False(re.IsMatch("a"));
++    }
++
++    [Fact]
++    public void NulInsideClass_IsAMember_NotTheEndOfTheClass()
++    {
++        var re = new BroilerRegex("[a\u0000b]");
++        Assert.True(re.IsMatch("\u0000"));
++        Assert.True(re.IsMatch("a"));
++        Assert.True(re.IsMatch("b"));
++        Assert.False(re.IsMatch("c"));
++    }
++
++    [Fact]
++    public void NulAsRangeEnd_IsARange_NotTheEndOfTheClass()
++    {
++        // '-' before a NUL is a range operator like any other: [\0-\0] is the
++        // one-member class, and the range is still validated for order.
++        Assert.True(new BroilerRegex("[\u0000-\u0000]").IsMatch("\u0000"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("[a-\u0000]"));
++    }
++
++    [Fact]
++    public void NulAsAtom_IsMatchedLiterally_AndDoesNotTruncateThePattern()
++    {
++        var re = new BroilerRegex("a\u0000b");
++        Assert.True(re.IsMatch("a\u0000b"));
++        Assert.False(re.IsMatch("ab"));
++
++        // Everything after the NUL is still parsed: the quantifier binds to 'b'.
++        var quantified = new BroilerRegex("^a\u0000b+$");
++        Assert.True(quantified.IsMatch("a\u0000bbb"));
++        Assert.False(quantified.IsMatch("a\u0000"));
++    }
++
++    [Fact]
++    public void NulSurvivesAlternationAndQuantifiers()
++    {
++        var re = new BroilerRegex("^(x\u0000|y)*$");
++        Assert.True(re.IsMatch("x\u0000y"));
++        Assert.False(re.IsMatch("x"));
++
++        Assert.True(new BroilerRegex("^\u0000*$").IsMatch("\u0000\u0000"));
++    }
++
++    [Fact]
++    public void NulInAGroupName_IsPartOfTheName()
++    {
++        var re = new BroilerRegex("(?<a\u0000b>x)");
++        Assert.Equal(1, re.GroupNames["a\u0000b"]);
++        Assert.Equal("x", re.Match("x").Groups[1].Value);
++    }
++
++    /// <summary>
++    /// The other half of telling end-of-pattern apart from the sentinel: a pattern
++    /// ending in a lone '\' has no character to escape. Reading it used to run off the
++    /// end of the string and raise <see cref="System.IndexOutOfRangeException"/> in
++    /// non-Unicode mode — an unhandled runtime fault where callers catch
++    /// <see cref="RegexSyntaxException"/>.
++    /// </summary>
++    [Theory]
++    [InlineData(null)]
++    [InlineData("u")]
++    public void TrailingBackslash_IsASyntaxError(string? flags)
++    {
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("a\\", flags));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("[a\\", flags));
++    }
++
++    [Fact]
++    public void GenuinelyUnterminatedConstructs_AreStillReported()
++    {
++        // The end-of-pattern rewrite must not soften these: each really does end
++        // before its closer.
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("[a"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("[a-"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("(a"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("(?<name"));
++    }
++}
+diff --git a/Broiler.Regex/Parsing/RegexParser.cs b/Broiler.Regex/Parsing/RegexParser.cs
+index ce0fa5e..14ecbd0 100644
+--- a/Broiler.Regex/Parsing/RegexParser.cs
++++ b/Broiler.Regex/Parsing/RegexParser.cs
+@@ -116,8 +116,7 @@ public sealed class RegexParser
+         var terms = new List<RegexNode>();
+         while (true)
+         {
+-            var c = Peek();
+-            if (c is '\0' or '|' or ')')
++            if (AtEnd || Peek() is '|' or ')')
+                 break;
+             terms.Add(ParseTerm());
+         }
+@@ -254,6 +253,9 @@ public sealed class RegexParser
+ 
+     private RegexNode ParseAtom()
+     {
++        if (AtEnd)
++            throw new RegexSyntaxException("Unexpected end of atom", _pos);
++
+         var c = Peek();
+         switch (c)
+         {
+@@ -268,7 +270,6 @@ public sealed class RegexParser
+                 return ParseAtomEscape();
+             case ')':
+             case '|':
+-            case '\0':
+                 throw new RegexSyntaxException("Unexpected end of atom", _pos);
+             case '*':
+             case '+':
+@@ -431,9 +432,10 @@ public sealed class RegexParser
+ 
+         while (true)
+         {
+-            var c = Peek();
+-            if (c == '\0')
++            if (AtEnd)
+                 throw new RegexSyntaxException("Unterminated character class", _pos);
++
++            var c = Peek();
+             if (c == ']')
+             {
+                 _pos++;
+@@ -452,7 +454,7 @@ public sealed class RegexParser
+ 
+             // A range "a-z": only when '-' is followed by another class atom (not
+             // the closing ']') and both ends are literal code points.
+-            if (firstIsLiteral && Peek() == '-' && PeekAt(1) != ']' && PeekAt(1) != '\0')
++            if (firstIsLiteral && Peek() == '-' && HasAt(1) && PeekAt(1) != ']')
+             {
+                 _pos++; // consume '-'
+                 var second = ReadClassAtom(set, out var secondIsLiteral);
+@@ -528,6 +530,13 @@ public sealed class RegexParser
+     /// <summary>Reads a CharacterEscape (the '\' already consumed): \n \r \xHH \uHHHH \u{…} \cX \0 identity.</summary>
+     private int ReadCharacterEscape()
+     {
++        // A '\' with nothing after it: \ is never a pattern character of its own
++        // (ECMA-262 §22.2.1 — every production that admits it consumes a second
++        // character). Reported as a syntax error rather than running off the end of
++        // the string in ReadSourceCodePoint below.
++        if (AtEnd)
++            throw new RegexSyntaxException("Trailing '\\' at end of pattern", _pos);
++
+         var c = Peek();
+         switch (c)
+         {
+@@ -648,7 +657,7 @@ public sealed class RegexParser
+             throw new RegexSyntaxException("Expected '{' after \\p", _pos);
+         _pos++;
+         var sb = new StringBuilder();
+-        while (Peek() != '}' && Peek() != '\0')
++        while (!AtEnd && Peek() != '}')
+             sb.Append(_src[_pos++]);
+         if (Peek() != '}')
+             throw new RegexSyntaxException("Unterminated \\p{…}", _pos);
+@@ -679,7 +688,7 @@ public sealed class RegexParser
+     private string ReadGroupName()
+     {
+         var sb = new StringBuilder();
+-        while (Peek() != '>' && Peek() != '\0')
++        while (!AtEnd && Peek() != '>')
+         {
+             // RegExpIdentifierName allows \u escapes; decode them so the stored
+             // name matches a JS string key.
+@@ -702,6 +711,17 @@ public sealed class RegexParser
+ 
+     // ----- Low-level cursor helpers ------------------------------------------
+ 
++    /// <summary>
++    /// True once the cursor is past the last character. Every end-of-pattern test
++    /// goes through this rather than through <see cref="Peek"/>'s <c>'\0'</c>: U+0000
++    /// is a perfectly ordinary pattern character, so comparing against the sentinel
++    /// would end the parse in the middle of a pattern that merely contains one.
++    /// </summary>
++    private bool AtEnd => _pos >= _src.Length;
++
++    /// <summary>True when a character exists <paramref name="offset"/> ahead of the cursor.</summary>
++    private bool HasAt(int offset) => _pos + offset < _src.Length;
++
+     private char Peek() => _pos < _src.Length ? _src[_pos] : '\0';
+     private char PeekAt(int offset) => _pos + offset < _src.Length ? _src[_pos + offset] : '\0';
+ 
+-- 
+2.43.0
+
