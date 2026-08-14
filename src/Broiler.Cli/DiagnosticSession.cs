@@ -4,6 +4,9 @@ using System.Text;
 using System.Text.Json;
 using Broiler.HtmlBridge.Core.Diagnostics;
 using Broiler.HtmlBridge.Logging;
+#if BROILER_JS_REJECTION_TRACKING
+using Broiler.JavaScript.BuiltIns.Promise;
+#endif
 
 namespace Broiler.Cli;
 
@@ -141,6 +144,24 @@ internal sealed class DiagnosticSession : IDisposable
 
         _logHandler = OnLogEntry;
         RenderLogger.EntryLogged += _logHandler;
+
+        // A rejected promise nobody handled is a failure the host would otherwise never hear about:
+        // it propagates through the promise machinery rather than out of an Eval, so no catch block
+        // in the capture path sees it. The engine collects them only while this is on; the capture
+        // reports what is left once its microtask checkpoint has drained.
+        TrackPromiseRejections(true);
+    }
+
+    /// <summary>
+    /// Turns the engine's unhandled-rejection tracking on or off for this session. Compiled out
+    /// when the Broiler.JS patch that adds the tracker has not been applied — see the
+    /// <c>BroilerJsRejectionTracking</c> probe in <c>Broiler.Cli.csproj</c>.
+    /// </summary>
+    private static void TrackPromiseRejections(bool enabled)
+    {
+#if BROILER_JS_REJECTION_TRACKING
+        JSPromiseRejectionTracker.Enabled = enabled;
+#endif
     }
 
     private static StreamWriter OpenWriter(string path) =>
@@ -364,6 +385,9 @@ internal sealed class DiagnosticSession : IDisposable
             ResourceTrace.Recorded -= resourceHandler;
             _resourceHandler = null;
         }
+
+        // Discards anything still collected, so a later run in this process cannot inherit it.
+        TrackPromiseRejections(false);
 
         try
         {

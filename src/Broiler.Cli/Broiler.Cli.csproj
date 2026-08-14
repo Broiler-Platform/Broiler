@@ -9,6 +9,20 @@
     <DefineConstants>$(DefineConstants);BROILER_CLI</DefineConstants>
   </PropertyGroup>
 
+  <!--
+    Unhandled-promise-rejection reporting needs JSPromiseRejectionTracker, which lives in the
+    Broiler.JS submodule and ships as a patch under patches/ until a maintainer applies it (the git
+    proxy answers 403 for a submodule remote outside this session's scope). The type cannot move to
+    this repository the way Broiler.Layout types do, because Broiler.JS references nothing here — so
+    this probes for the file, exactly as Broiler.Render.Stage.Benchmarks does for
+    BRasterParallelism. With the patch applied the reporting compiles in; without it the capture
+    behaves as it did before, and the build is not broken by a call to a type that is not there.
+  -->
+  <PropertyGroup>
+    <BroilerJsRejectionTracking Condition="Exists('$(MSBuildThisFileDirectory)..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.BuiltIns\Promise\JSPromiseRejectionTracker.cs')">true</BroilerJsRejectionTracking>
+    <DefineConstants Condition="'$(BroilerJsRejectionTracking)' == 'true'">$(DefineConstants);BROILER_JS_REJECTION_TRACKING</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="Broiler.Cli.Tests" />
   </ItemGroup>

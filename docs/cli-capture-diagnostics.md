@@ -69,6 +69,35 @@ Every `JavaScript` log entry at `Warning` or above — thrown script errors,
 `console.error`, `console.warn`, fetch failures, and the drain-budget warning —
 with its exception and stack trace indented beneath it.
 
+#### What reaches it, and what does not
+
+| How the exception arises | Logged |
+| --- | --- |
+| Thrown at the top level of a script | yes |
+| Thrown inside a timer callback | yes |
+| Thrown inside an event listener | yes |
+| A promise rejected with no handler | yes, **once the `Broiler.JS` patch is applied** |
+| Caught by the page's own `try`/`catch` | **no** |
+
+**A caught exception is not reported**, because the log sits at the host's
+`catch` around script evaluation and a caught exception never reaches it. That
+matches a browser — DevTools needs "pause on caught exceptions" to see these —
+but it is worth knowing before reading a low failure count as good news. A page
+whose bootstrap wraps everything in `try`/`catch` and reports through its own
+error channel can fail throughout and log nothing here. When a bundle shows few
+failures and a document the scripts barely changed, that pattern, not success,
+is the first thing to suspect.
+
+**Unhandled promise rejections** need the patch under `patches/` that adds
+`JSPromiseRejectionTracker` to `Broiler.JS`; the engine has no notion of them
+otherwise. Without it the reporting compiles out and a rejected promise nobody
+handled is lost — which on a promise-driven page is most of what goes wrong.
+Check whether it is live with:
+
+```sh
+git -C Broiler.JS log --oneline --grep 'Report promises rejected with nobody'
+```
+
 It is written and flushed per entry, not buffered and dumped at exit. The runs
 that most need diagnosing are the ones that hang, blow `--timeout` or die, and
 those are exactly the runs a write-at-exit design leaves an empty file for.
