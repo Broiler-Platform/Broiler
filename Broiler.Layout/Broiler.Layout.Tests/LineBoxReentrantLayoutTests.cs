@@ -97,6 +97,53 @@ public sealed class LineBoxReentrantLayoutTests
             Assert.Equal(rectangle, box.Rectangles[line]);
     }
 
+    // The line the reported exception named had no words: the message renders the key with
+    // CssLineBox.ToString(), which joins the line's words, so it printed as empty. A line box
+    // holds rectangles as well as words — an atomic inline is on the line as a rectangle and
+    // puts no word there — so a wordless line is assigned like any other, and duplicates the
+    // same way when a forced break moves the text that follows onto the next line.
+    [Fact]
+    public void A_Line_With_No_Words_Is_Re_Entered_The_Same_Way()
+    {
+        var environment = new ReentrantLayoutEnvironment { ReenterOn = "beta" };
+        var (root, paragraph) = AtomicInlineThenBrokenText(environment);
+        environment.Reenter = () => root.PerformLayout(environment);
+
+        root.PerformLayout(environment);
+
+        Assert.True(environment.ReenterFired, "the callback never re-entered, so nothing was tested");
+        Assert.Empty(environment.Errors);
+
+        var first = paragraph.LineBoxes[0];
+        Assert.Empty(first.Words);
+        Assert.NotEmpty(first.Rectangles);
+    }
+
+    // ...and the reason a wordless line cannot collide with another one: the map is keyed by
+    // the line box itself, not by its text. Two empty lines both render as "" in the
+    // exception message and are still separate keys. Giving CssLineBox value equality — or a
+    // GetHashCode over its words — would make that message literally true and turn the
+    // duplicate into a real one, so this is what says it must not gain either.
+    [Fact]
+    public void Line_Boxes_Are_Keyed_By_Identity_Rather_Than_By_Their_Text()
+    {
+        var (_, paragraph) = Paragraph(new ReentrantLayoutEnvironment());
+        var box = paragraph.Boxes[0];
+
+        var first = new CssLineBox(paragraph);
+        var second = new CssLineBox(paragraph);
+
+        Assert.Equal(string.Empty, first.ToString());
+        Assert.Equal(first.ToString(), second.ToString());
+
+        box.Rectangles[first] = new RectangleF(0, 0, 10, 10);
+        box.Rectangles[second] = new RectangleF(0, 10, 10, 10);
+
+        Assert.Equal(2, box.Rectangles.Count);
+        Assert.Equal(new RectangleF(0, 0, 10, 10), box.Rectangles[first]);
+        Assert.Equal(new RectangleF(0, 10, 10, 10), box.Rectangles[second]);
+    }
+
     /// <summary>
     /// A block whose children are three inline boxes with words — the shape the reported
     /// stack was flowing (a paragraph of inline links) and the smallest one that has a
@@ -132,6 +179,70 @@ public sealed class LineBoxReentrantLayoutTests
 
             inline.ParseToWords();
         }
+
+        return (root, paragraph);
+    }
+
+    /// <summary>
+    /// A block holding an inline-block, then preserved text that opens with a newline. An
+    /// atomic inline is on its parent's line as a rectangle and puts no word there — its own
+    /// text belongs to its own line boxes — and the forced break moves the text that follows
+    /// onto a second line. The first line is therefore left carrying a rectangle and nothing
+    /// else, which is the wordless line the reported exception named.
+    /// </summary>
+    /// <remarks>
+    /// A soft wrap would not produce it (CSS Text §5.1 forbids breaking a line before its
+    /// first inline content, so the word joins the rectangle-only line instead), and an empty
+    /// plain inline would not either — <c>FlowBox</c> deliberately records those on
+    /// <c>Location</c> rather than as a line rectangle, to keep the line invisible.
+    /// </remarks>
+    private static (CssBox Root, CssBox Paragraph) AtomicInlineThenBrokenText(ILayoutEnvironment environment)
+    {
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Location = new PointF(0, 0),
+            Size = new SizeF(400, 400),
+            Display = CssConstants.Block,
+            FontSize = "16px",
+            WhiteSpace = CssConstants.Pre,
+            LayoutEnvironment = environment,
+        };
+
+        var paragraph = new CssBox(root, null, BaseUrl)
+        {
+            Location = new PointF(0, 0),
+            Size = new SizeF(400, 0),
+            Display = CssConstants.Block,
+            FontSize = "16px",
+            WhiteSpace = CssConstants.Pre,
+        };
+
+        var atomic = new CssBox(paragraph, null, BaseUrl)
+        {
+            Display = CssConstants.InlineBlock,
+            FontSize = "16px",
+            WhiteSpace = CssConstants.Pre,
+        };
+
+        var inside = new CssBox(atomic, null, BaseUrl)
+        {
+            Display = CssConstants.Inline,
+            FontSize = "16px",
+            WhiteSpace = CssConstants.Pre,
+            Text = "inside".AsMemory(),
+        };
+
+        inside.ParseToWords();
+
+        var text = new CssBox(paragraph, null, BaseUrl)
+        {
+            Display = CssConstants.Inline,
+            FontSize = "16px",
+            WhiteSpace = CssConstants.Pre,
+            Text = "\nbeta".AsMemory(),
+        };
+
+        text.ParseToWords();
 
         return (root, paragraph);
     }
