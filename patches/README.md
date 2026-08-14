@@ -1,6 +1,7 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**Nothing is waiting on a maintainer right now.** This directory holds only
+this README, which is the expected steady state — see below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -44,91 +45,25 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 ## The index
 
-| # | submodule | subject |
-| --- | --- | --- |
-| `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
-| `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
+_Empty._ The two patches that were here — `Broiler.JS` "keep a direct eval's scope alive for the
+closures it creates" and "name the property in Cannot read properties of undefined" — both landed
+upstream, and the pinned `Broiler.JS` pointer carries them. They reach CI through the pointer now,
+so their files and any `scripts/apply-pending-wpt-patches.sh` entries are gone with them: this
+directory is a backlog, not an archive.
 
-### `0001` — a closure a direct eval created lost the eval site's bindings
-
-`eval("(function(){ return b; })")` threw `b is not defined` when the function it
-returned was called, even though `eval("b")` at the same spot read the same
-binding fine.
-
-A direct eval's scope is **lexical**: the closure keeps the eval site's bindings
-after that call has returned. Broiler made the caller's bindings reachable by
-installing them as an overlay for the duration of the eval and withdrawing it on
-return — right for code the eval *runs*, wrong for code the eval *creates*. The
-names stop resolving at exactly the moment such a function is first called.
-
-So a function created by directly-evalled code now captures those bindings — as
-one created inside a `with` block already captured its with-chain — and
-re-establishes them for the duration of a call. The live `JSVariable` objects are
-captured rather than their values, so the binding stays shared in both
-directions: a later write by the enclosing function is visible to the closure,
-and a write by the closure lands on the caller's binding rather than on a fresh
-global.
-
-**Consulted only after every ordinary scope has failed**, on the read and the
-write path alike, so nothing that resolves today resolves differently. Placing it
-alongside the eval-binding walk instead broke Annex B block-level function
-declarations, which own their name through `globalVars` and must not be shadowed
-by the snapshot (`Issue619.AnnexBEvalFuncBlockScoping`,
-`Issue912EvalHoistChar`) — worth knowing before anyone tries to "simplify" the
-placement.
-
-**Where it came from.** Five reports of `b is not defined` on google.com. Its
-module loader is `function(e){return eval(e)}(src)` with `src` being
-`0,function(){b(2,57,1,w)}` — the result stored and invoked later by the bundle.
-The fragment that made it readable came from the program dump added for exactly
-that purpose, which has since landed upstream.
-
-**Why it is not listed for the pixel suites.** It decides whether page script
-runs at all rather than what any of it paints, and the pixel suites do not
-execute a loader of this shape. Its behaviour is unit-tested inside the patch
-(`DirectEvalClosureScopeTests`).
-
-**When it lands upstream:** bump the pointer and delete this patch.
-
-### `0002` — the message said only that *something* was read off nothing
-
-`Cannot read properties of undefined`, with no property named. On minified code
-that does not locate the line, let alone the cause: the report it came from is a
-TypeError at column 33839 of a 61 908-character line. Browsers append
-`(reading 'foo')`; so does this.
-
-Only the **computed** read was affected. A static one (`u.foo`) already named its
-property, and a literal computed key (`u['foo']`) folds into that same path —
-which is why it went unnoticed. The variable-key form `I[Y]` is what minified
-code actually emits, and the only one that reached the generic message.
-
-An **object** key is deliberately left undescribed: `GetValue` throws before
-`ToPropertyKey` precisely because `ToObject(base)` comes first (6.2.5.5), so
-describing such a key would run its `toString`/`@@toPrimitive` — user code, in an
-order the spec forbids. A diagnostic does not get to change evaluation.
-
-**Found while testing and not fixed here:** a numeric variable key
-(`var k = 3; u[k]`) does not throw at all, it evaluates to `undefined`. That is a
-separate defect in the indexed read path; the test records it rather than
-covering for it.
-
-**Not listed for the pixel suites** — it changes an error message, nothing a page
-paints. `UndefinedPropertyReadMessageTests` covers it.
-
-**When it lands upstream:** bump the pointer and delete this patch.
+Numbering restarts at `0001` for the next patch added.
 
 ## A stale entry in the apply script is not inert
 
-An earlier `0001` (`Broiler.HTML`, root-relative stylesheet href) had **landed
-upstream** — the pinned pointer *was* its commit — but was still listed. The
-idempotence guard did not save it: the guard skips a patch whose *reverse* apply
-succeeds, and the upstream commit was not byte-identical to the patch as
-exported, so the reverse check failed too. Applying neither way, it was reported
-as drifted and `scripts/apply-pending-wpt-patches.sh` exited 1 on **every** run —
-taking down the suites it exists to serve, and every later entry with it.
+An earlier `0001` (`Broiler.HTML`, root-relative stylesheet href) had **landed upstream** — the
+pinned pointer *was* its commit — but was still listed. The idempotence guard did not save it: the
+guard skips a patch whose *reverse* apply succeeds, and the upstream commit was not byte-identical
+to the patch as exported, so the reverse check failed too. Applying neither way, it was reported as
+drifted and `scripts/apply-pending-wpt-patches.sh` exited 1 on **every** run — taking down the
+suites it exists to serve, and every later entry with it.
 
-So when that script reports drift, check whether the fix is simply upstream
-before regenerating anything:
+So when that script reports drift, check whether the fix is simply upstream before regenerating
+anything:
 
 ```sh
 git -C <Submodule> log --oneline --grep '<the commit subject>'

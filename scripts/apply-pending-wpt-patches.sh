@@ -139,12 +139,9 @@ set -euo pipefail
 # Broiler.CSS 8be7a65.
 #
 # The program-numbering and program-dump patches that held 0001 before this one both landed
-# upstream, so their files are gone with them.
-#
-# 0001 (Broiler.JS, keep a direct eval's scope alive for the closures it creates) is deliberately
-# NOT listed. It decides whether page script runs at all rather than what any of it paints, and
-# the pixel suites do not execute a module loader of the shape that trips it. Its behaviour is
-# unit-tested inside the patch itself (DirectEvalClosureScopeTests).
+# upstream, so their files are gone with them. The direct-eval closure-scope fix and the
+# "name the property in the TypeError" message change that followed them went the same way:
+# both are in the pinned Broiler.JS pointer now, so patches/ holds no patch at all.
 PENDING_PATCHES=()
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
