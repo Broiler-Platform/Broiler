@@ -47,6 +47,18 @@ internal static class ElementReflectionBinding
     public static JSValue GetHref(IElementReflectionHost host, DomElement element, in Arguments _)
         => new JSString(ResolveReflectedUrl(host.PageUrl, element, "href"));
 
+    // <script>.src getter — reflected URL, resolved against the page URL like href/data. Absolute is
+    // what the IDL returns even when the content attribute is relative, which is what a page
+    // comparing script.src against a known URL expects.
+    public static JSValue GetSrc(IElementReflectionHost host, DomElement element, in Arguments _)
+        => new JSString(ResolveReflectedUrl(host.PageUrl, element, "src"));
+
+    public static JSValue SetSrc(DomElement element, in Arguments a)
+    {
+        DomBridge.SetAttr(element, "src", a.Length > 0 ? a[0].ToString() : string.Empty);
+        return JSUndefined.Value;
+    }
+
     public static JSValue SetHref(DomElement element, in Arguments a)
     {
         DomBridge.SetAttr(element, "href", a.Length > 0 ? a[0].ToString() : string.Empty);
@@ -64,6 +76,17 @@ internal static class ElementReflectionBinding
     public static JSValue SetReflectedDimension(string? name, DomElement element, in Arguments a)
     {
         DomBridge.SetAttr(element, name, a.Length > 0 ? a[0].ToString() : "0");
+        return JSUndefined.Value;
+    }
+
+    // Generic reflected-boolean setter: a boolean content attribute is present or absent, never
+    // "false" — writing the string would make the IDL getter read back true.
+    public static JSValue SetReflectedBoolean(string? name, DomElement element, in Arguments a)
+    {
+        if (a.Length > 0 && a[0].BooleanValue)
+            DomBridge.SetAttr(element, name, string.Empty);
+        else
+            DomBridge.RemoveAttr(element, name!);
         return JSUndefined.Value;
     }
 
