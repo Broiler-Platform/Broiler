@@ -3,20 +3,26 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Broiler.UI;
 
-namespace Broiler.Code.Windows;
+namespace Broiler.App;
 
 /// <summary>
-/// The Win32 clipboard.
+/// The Win32 clipboard, shared by the Browser, Writer and Code heads.
 ///
-/// There is deliberately no in-memory fallback. Writer's host keeps a private
-/// string and serves it when no OS accessor is wired, which makes copy and
-/// paste appear to work while silently not interoperating with anything else on
-/// the machine — a user copies from the editor, pastes into a browser, and gets
-/// their previous clipboard contents. This reports failure instead, and the
-/// caller shows the command as unavailable.
+/// There is deliberately no in-memory fallback. A private string standing in
+/// for the clipboard makes copy and paste appear to work while silently not
+/// interoperating with anything else on the machine — a user copies from the
+/// editor, pastes into a browser, and gets their previous clipboard contents.
+/// The Browser and Writer hosts did exactly that until they were wired to this;
+/// it reports failure instead, and the caller shows the command as unavailable.
+///
+/// The bindings are <c>DllImport</c> rather than <c>LibraryImport</c> on
+/// purpose: this file is compiled into the Browser, Writer and Code heads
+/// alike, and the generated marshalling stubs would require
+/// <c>AllowUnsafeBlocks</c> in every one of them. The two application heads use
+/// <c>DllImport</c> for their own interop for the same reason.
 /// </summary>
 [SupportedOSPlatform("windows5.0")]
-internal sealed partial class WindowsClipboard(IntPtr ownerWindow) : IUiClipboardHost
+internal sealed class WindowsClipboard(IntPtr ownerWindow) : IUiClipboardHost
 {
     private const uint CfUnicodeText = 13;
     private const uint GmemMoveable = 0x0002;
@@ -103,38 +109,38 @@ internal sealed partial class WindowsClipboard(IntPtr ownerWindow) : IUiClipboar
         }
     }
 
-    [LibraryImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool OpenClipboard(IntPtr owner);
+    private static extern bool OpenClipboard(IntPtr owner);
 
-    [LibraryImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool CloseClipboard();
+    private static extern bool CloseClipboard();
 
-    [LibraryImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool EmptyClipboard();
+    private static extern bool EmptyClipboard();
 
-    [LibraryImport("user32.dll", SetLastError = true)]
+    [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool IsClipboardFormatAvailable(uint format);
+    private static extern bool IsClipboardFormatAvailable(uint format);
 
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private static partial IntPtr GetClipboardData(uint format);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetClipboardData(uint format);
 
-    [LibraryImport("user32.dll", SetLastError = true)]
-    private static partial IntPtr SetClipboardData(uint format, IntPtr data);
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetClipboardData(uint format, IntPtr data);
 
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    private static partial IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
 
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    private static partial IntPtr GlobalFree(IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalFree(IntPtr handle);
 
-    [LibraryImport("kernel32.dll", SetLastError = true)]
-    private static partial IntPtr GlobalLock(IntPtr handle);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr GlobalLock(IntPtr handle);
 
-    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    private static partial bool GlobalUnlock(IntPtr handle);
+    private static extern bool GlobalUnlock(IntPtr handle);
 }

@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="..\Broiler.App\LinuxInputCoordinator.cs" Link="LinuxInputCoordinator.cs" />
+    <Compile Include="..\Broiler.App\LinuxX11Clipboard.cs" Link="LinuxX11Clipboard.cs" />
   </ItemGroup>
 
   <ItemGroup>

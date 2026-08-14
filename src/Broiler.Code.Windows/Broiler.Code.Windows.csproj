@@ -19,6 +19,12 @@
     <RuntimeIdentifier Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows'">win-x64</RuntimeIdentifier>
   </PropertyGroup>
 
+  <!-- The Win32 clipboard is shared with the Browser and Writer heads rather
+       than reimplemented in each. -->
+  <ItemGroup>
+    <Compile Include="..\Broiler.App\WindowsClipboard.cs" Link="WindowsClipboard.cs" />
+  </ItemGroup>
+
   <!--
     A thin head: the window, the platform services, and nothing else. Shell and
     workspace behaviour lives in Broiler.Code.Core, and an architecture test

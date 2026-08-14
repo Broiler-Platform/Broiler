@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Broiler.App;
 using Broiler.Code.Core.Hosting;
 using Broiler.Code.Core.Shell;
 using Broiler.Graphics;
@@ -32,7 +33,12 @@ namespace Broiler.Code.Linux;
 /// </summary>
 internal static class CodeHost
 {
-    public static HostServiceReport DescribeServices(string? fileDialogHelper = null) =>
+    /// <summary>
+    /// What this head provides. <paramref name="hasClipboard"/> and
+    /// <paramref name="fileDialogHelper"/> are passed in rather than probed
+    /// here, so the report describes the services this run actually opened.
+    /// </summary>
+    public static HostServiceReport DescribeServices(string? fileDialogHelper = null, bool hasClipboard = false) =>
         new("Broiler Code (Linux)",
     [
         new HostService(
@@ -43,11 +49,20 @@ internal static class CodeHost
             HostServiceReport.InputRouting,
             HostServiceQuality.Native,
             "explicit Broiler.Input events; evdev devices keep their own identity"),
-        new HostService(
-            HostServiceReport.Clipboard,
-            HostServiceQuality.Unavailable,
-            "X11 selection ownership is not implemented; copy and paste are " +
-            "disabled rather than backed by an in-process buffer"),
+        // Native rather than a substitute: the process owns the X11 CLIPBOARD
+        // selection and answers other applications' requests for it, so a copy
+        // here is a paste anywhere on the display.
+        hasClipboard
+            ? new HostService(
+                HostServiceReport.Clipboard,
+                HostServiceQuality.Native,
+                "the X11 CLIPBOARD and PRIMARY selections, owned on the head's " +
+                "own display connection")
+            : new HostService(
+                HostServiceReport.Clipboard,
+                HostServiceQuality.Unavailable,
+                "no X display to own a selection on; copy and paste are " +
+                "disabled rather than backed by an in-process buffer"),
         new HostService(
             HostServiceReport.TextInput,
             HostServiceQuality.Unavailable,
@@ -109,10 +124,13 @@ internal static class CodeHost
         var size = new BSize(1280, 840);
         var dialogs = new LinuxFileDialogs();
 
-        Console.WriteLine(DescribeServices(dialogs.Helper).Describe());
+        // The window opens first because it owns the clipboard connection, and
+        // the report describes the services this run actually has.
+        await using var window = new CodeWindow(size, Console.WriteLine, ignoreFocus);
+
+        Console.WriteLine(DescribeServices(dialogs.Helper, window.HasClipboard).Describe());
         Console.WriteLine();
 
-        await using var window = new CodeWindow(size, Console.WriteLine, ignoreFocus);
         (CodeShell shell, StandardCodeEditor editor) = CodeShellFactory.Create(size);
 
         // The real dispatcher, not the Standard immediate one. Everything the

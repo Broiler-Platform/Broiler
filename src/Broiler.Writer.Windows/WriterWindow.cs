@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Broiler.App;
 using Broiler.Graphics;
 using Broiler.Graphics.Windows;
 using Broiler.Input.Keyboard;
@@ -15,6 +16,10 @@ internal sealed class WriterWindow : Direct2DWindow
 {
     private readonly WriterUiHost _host;
     private readonly WriterApp _app;
+
+    // Created in OnCreated: the Win32 clipboard is addressed by window handle,
+    // and there is no handle until the window exists.
+    private WindowsClipboard? _clipboard;
 
 #pragma warning disable CS0618
     private readonly StandardLegacyGraphicsInputAdapter _legacyInput = new("broiler-writer");
@@ -35,9 +40,23 @@ internal sealed class WriterWindow : Direct2DWindow
             () => DpiScale,
             Invalidate,
             static _ => { },
+            ReadClipboardText,
+            WriteClipboardText,
             getRenderer: () => Renderer);
         _app = new WriterApp(_host, CloseNativeWindow);
     }
+
+    protected override void OnCreated() => _clipboard = new WindowsClipboard(NativeHandle);
+
+    /// <summary>
+    /// Null rather than empty when there is no clipboard to read: the host
+    /// treats that as "this machine offers none", which is what the window
+    /// reports before it exists and if the OS refuses the clipboard.
+    /// </summary>
+    private string? ReadClipboardText() =>
+        _clipboard is not null && _clipboard.TryGetText(out string text) ? text : null;
+
+    private void WriteClipboardText(string text) => _clipboard?.SetText(text);
 
     protected override BRenderList? BuildRenderList(BSize clientSize) => _app.RenderFrame();
 

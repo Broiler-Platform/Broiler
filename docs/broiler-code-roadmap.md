@@ -1,7 +1,7 @@
 # Broiler Code roadmap
 
 - **Status:** Phases 0-3 delivered. The composed shell runs on Windows and
-  Linux; the Linux head reports its clipboard and IME as unavailable, and its
+  Linux; the Linux head reports its IME as unavailable, and its
   window has not yet been exercised on a Linux display
 - **Scope:** A C#/.NET IDE that reuses the Broiler Writer application stack and
   supports multi-project workspaces, live diagnostics, and builds for ordinary
@@ -614,22 +614,26 @@ the real thing.
 | --- | --- | --- |
 | UI-thread dispatcher | Native — queued, drained on the message-loop thread | Native — drained on the event-loop thread |
 | Input routing | Native — explicit Broiler.Input with device identity and a monotonic sequence | Native — same, over evdev |
-| Clipboard | Native — Win32, no in-memory fallback | **Unavailable** — X11 selection ownership is not implemented |
+| Clipboard | Native — Win32, no in-memory fallback | Native — the X11 CLIPBOARD and PRIMARY selections, owned on the head's own display connection |
 | Text input and IME | Native — IMM32 composition, candidates placed at the caret | **Unavailable** — no XIM, ibus, or Wayland backend exists; US-layout typing only |
 | File dialogs | Native — the common dialogs, through comdlg32 | Native where zenity or kdialog is installed; **Unavailable** otherwise |
 
-The two Linux gaps are structural rather than unfinished wiring. Its graphics
-stack is an X11 surface driven by a polling loop and its input arrives through
-evdev — raw device events, not X11 key events — and an input method speaks XIM,
-ibus, or the Wayland text-input protocol. None of those are reachable from
-evdev, and the only `ITextInputProvider` in the repository is Android's. The
-head therefore reports both as unavailable and disables the affected commands,
-rather than substituting an in-process buffer that would make copy and paste
-appear to work while interoperating with nothing.
+The remaining Linux gap is structural rather than unfinished wiring. Its input
+arrives through evdev — raw device events, not X11 key events — and an input
+method speaks XIM, ibus, or the Wayland text-input protocol. None of those are
+reachable from evdev, and the only `ITextInputProvider` in the repository is
+Android's. The head therefore reports IME as unavailable, rather than
+substituting something that appears to work while dropping candidates.
 
-Closing them means adding a Linux text-input backend and X11 selection
-ownership, which is Broiler.Input and Broiler.Graphics work rather than the
-head's.
+The clipboard gap is closed. `LinuxX11Clipboard` owns the CLIPBOARD and PRIMARY
+selections on a display connection of its own and answers other applications'
+`SelectionRequest` events from the head's loop, so a copy here is a paste
+anywhere on the display and vice versa. It is the head's own connection rather
+than the renderer's because draining the window's queue here would swallow the
+focus, resize and close events the surface is waiting for — which is also why
+it needed no Broiler.Graphics change. Where there is no display to own a
+selection on, the service reports unavailable and the commands stay disabled;
+there is still no in-process buffer standing in for a clipboard.
 
 **The Linux head now runs the shell.** It opens an X11/OpenGL window through
 `Broiler.Graphics.Linux.OpenGL`, composes the same shell from the same
@@ -667,7 +671,8 @@ that genuinely lacks the service. `file dialogs` joined `HostServiceReport` for
 exactly that reason: a head without it cannot run those commands, so it belongs
 in the claim rather than in an implementation detail.
 
-Clipboard and IME remain unavailable, unchanged and for the reasons above.
+IME remains unavailable, unchanged and for the reason above; the clipboard is
+now native, and `--services` says so.
 
 **What could not be verified here.** This work was done on Windows. The Linux
 head builds clean and its `--services` claim runs and prints correctly, because
@@ -686,8 +691,10 @@ renders by visible range and is keyboard accessible; both generated desktop
 solution closures verify and build. Dispatcher and input-routing tests pass for
 both heads and no head carries any of Writer's three substitutes.
 
-Three clauses remain open. The Linux clipboard and IME integration tests cannot
-pass until the backends above exist. The gate's requirement that a newly
+Three clauses remain open. The Linux IME integration tests cannot pass until
+that backend exists; the Linux clipboard now has one, exercised against a real
+X server (`xvfb-run -a dotnet test src/Broiler.App.Tests`), including a paste
+of what Broiler copied by a second X client. The gate's requirement that a newly
 templated solution build its declared graph is covered here by a load-back test
 rather than by a reference CLI build — the templated output is asserted to
 contain only standard SDK files and to reload as a declared workspace with its

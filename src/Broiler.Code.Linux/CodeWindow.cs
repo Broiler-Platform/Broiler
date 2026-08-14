@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Broiler.App;
 using Broiler.Code.Core.Hosting;
 using Broiler.Code.Core.Shell;
 using Broiler.Graphics;
@@ -19,7 +20,7 @@ namespace Broiler.Code.Linux;
 /// and renders, in that order, and everything the analysis layers post is
 /// executed by it rather than on the thread that produced it.
 /// </summary>
-internal sealed class CodeWindow : IUiHost, IAsyncDisposable
+internal sealed class CodeWindow : IUiHost, IUiClipboardHost, IAsyncDisposable
 {
     private static readonly BRenderOptions RenderOptions =
         new(Antialias: true, VSync: true, SubpixelText: true);
@@ -31,6 +32,13 @@ internal sealed class CodeWindow : IUiHost, IAsyncDisposable
     private readonly LinuxCodeInput _input;
     private readonly TimeSpan _pollInterval;
     private readonly bool _ignoreFocus;
+
+    /// <summary>
+    /// The X11 selection, on its own connection. Null where there is no display
+    /// to own one on, and then the clipboard commands report themselves
+    /// unavailable rather than being backed by a buffer only this process sees.
+    /// </summary>
+    private readonly LinuxX11Clipboard? _clipboard = LinuxX11Clipboard.TryOpen();
     private CodeShell? _shell;
     private UiSession? _session;
     private UiElement? _editor;
@@ -62,7 +70,21 @@ internal sealed class CodeWindow : IUiHost, IAsyncDisposable
 
     public LinuxCodeInput Input => _input;
 
+    /// <summary>Whether this host has a real clipboard to offer.</summary>
+    public bool HasClipboard => _clipboard is not null;
+
     public BRenderList CreateRenderList(int capacity = 0) => new(capacity);
+
+    public bool TryGetText(out string text)
+    {
+        if (_clipboard is not null)
+            return _clipboard.TryGetText(out text);
+
+        text = string.Empty;
+        return false;
+    }
+
+    public void SetText(string text) => _clipboard?.SetText(text);
 
     public void Invalidate(UiInvalidation invalidation) => _invalidated = true;
 
@@ -102,6 +124,11 @@ internal sealed class CodeWindow : IUiHost, IAsyncDisposable
             cancellationToken.ThrowIfCancellationRequested();
 
             bool windowEvents = _surface.ProcessPendingEvents();
+
+            // An X11 copy is a promise to answer requests for as long as this
+            // process owns the selection: between these calls, another
+            // application pasting from Code sees an empty clipboard.
+            _clipboard?.ProcessPendingEvents();
             _router.SetViewport(_surface.Size);
 
             // Devices are only read while the window has focus, so typing into
@@ -139,6 +166,11 @@ internal sealed class CodeWindow : IUiHost, IAsyncDisposable
 
         _disposed = true;
         await _input.DisposeAsync().ConfigureAwait(false);
+
+        // Before the connection goes: releasing the selection tells other
+        // applications the clipboard is gone now rather than leaving them to
+        // find a dead owner at their next paste.
+        _clipboard?.Dispose();
         _surface.Dispose();
         _renderer.Dispose();
     }

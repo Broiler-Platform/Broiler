@@ -42,6 +42,13 @@ internal static class LinuxBrowserRunner
         LinuxOpenGlX11WindowSurface? x11Window = surface as LinuxOpenGlX11WindowSurface;
         bool canUseEvdev = x11Window is not null;
 
+        // The X11 clipboard, on its own connection. Absent when running
+        // offscreen with no display, and then copy and paste report themselves
+        // unavailable rather than silently working only inside this process.
+        using LinuxX11Clipboard? clipboard = x11Window is not null ? LinuxX11Clipboard.TryOpen() : null;
+        if (x11Window is not null && clipboard is null)
+            Console.WriteLine("No X11 clipboard is available; copy and paste are disabled.");
+
         using BrowserUiHost host = new(
             () => surface.Size,
             () => surface.DpiScale,
@@ -55,7 +62,9 @@ internal static class LinuxBrowserRunner
             {
                 postedActions.Enqueue(action);
                 return true;
-            });
+            },
+            () => clipboard is not null && clipboard.TryGetText(out string text) ? text : null,
+            text => clipboard?.SetText(text));
         using BrowserApp app = new(host, () => renderer, options.InitialUrl, static _ => { });
 
         await using LinuxInputCoordinator input = new(
@@ -73,6 +82,10 @@ internal static class LinuxBrowserRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
             bool processedWindowEvents = false;
+
+            // An X11 copy is a promise to answer requests: between these calls,
+            // another application pasting from Broiler sees an empty clipboard.
+            clipboard?.ProcessPendingEvents();
             if (x11Window is not null)
             {
                 processedWindowEvents = x11Window.ProcessPendingEvents();
