@@ -18,6 +18,9 @@ public sealed partial class DomBridge : Dom.Features.IDocumentCollectionHost
     void Dom.Features.IDocumentCollectionHost.CollectLinksInTreeOrder(DomElement root, List<JSValue> results)
         => CollectLinksInTreeOrder(root, results);
 
+    void Dom.Features.IDocumentCollectionHost.CollectByTagName(DomNode root, string tag, List<JSValue> results)
+        => CollectByTagName(root, tag, results);
+
     JSObject Dom.Features.IDocumentCollectionHost.BuildStyleSheetObject(DomElement styleElement)
         => BuildStyleSheetObject(styleElement);
 }
