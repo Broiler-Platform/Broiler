@@ -158,6 +158,43 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge` — `window.top` did not exist, so the unqualified `top` a page
+  writes raised `ReferenceError: top is not defined`. Because `window` *is* the global
+  object here, an unregistered member is not an undefined property but a reference
+  error, and that aborts the entire `<script>` rather than the one statement — taking
+  every function it would have defined and every listener it would have registered with
+  it. `top` was the one member of the `self`/`parent`/`top` trio never registered on the
+  main window: sub-documents got one from `SubWindowBinding`, and `WindowContextManager`
+  dutifully saved and restored a global that had never been defined in the first place,
+  so after the first frame ran the main document's `top` was `undefined` instead of
+  missing. A framing check (`if (top != self)`) is among the first things a page's
+  boilerplate runs, which is where this surfaced: google.com's One-Google-bar bundle died
+  on it. A top-level window's `top` is now that window, as its `parent` and `self` already
+  were, and it is bound to the global object so `top.foo()` reaches page globals the way
+  `parent.foo()` does.
+
+- `Broiler.JS`/`Broiler.Regex` (patch, awaiting a maintainer — see `patches/README.md`) —
+  the pattern parser could not tell the end of a pattern from a U+0000 inside one. Its
+  cursor reports "past the last character" by returning `'\0'` from `Peek()`, and every
+  end-of-pattern test compared against that sentinel, so a pattern that merely *contained*
+  a NUL appeared to end there. google.com's start page compiles a "no letters" character
+  class whose first range runs from NUL to space, and it failed at the very first atom
+  with `Unterminated character class`. The NUL is decoded by the time the parser sees it
+  because the page builds the class with `new RegExp(<string>)` — the string literal's
+  `\0` is consumed by the *string* grammar and never reaches the pattern grammar — so the
+  spelling a regex literal preserves, `[\0-…]`, parsed correctly all along; the two are
+  different inputs and only the decoded one was broken. It was not confined to character
+  classes either: a NUL as an atom, as a range end, in a group name or inside `\p{…}`
+  truncated the parse the same way. Every end-of-pattern test now goes through an explicit
+  `AtEnd`. Separating the two also fixed the mirror-image bug at the real end of input: a
+  pattern ending in a lone `\` had no guard on the path that reads the escaped character,
+  so it ran off the end of the string and raised `IndexOutOfRangeException` in non-Unicode
+  mode, where callers catch `RegexSyntaxException`. Nothing a page renders changes today —
+  `JSRegExp.TryBuildBroilerForGaps` catches the parse failure and falls back to the .NET
+  translator, so this pattern was mis-routed rather than fatal — but the exception was
+  real, and a NUL-bearing pattern that *does* need Broiler.Regex's semantics now reaches
+  it instead of silently falling back.
+
 - `Broiler.Layout` — a layout pass that started while another one was still running over
   the same box tree threw `ArgumentException` ("An item with the same key has already been
   added") out of `CssLineBox.AssignRectanglesToBoxes`, which `CssBox.PerformLayout` caught

@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Five patches are waiting on a maintainer.** See the index below.
+**Six patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -51,6 +51,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0003` | `Broiler.JS` | Report promises rejected with nobody to handle them |
 | `0004` | `Broiler.JS` | Record where an error was raised, not where its factory was wired |
 | `0005` | `Broiler.DOM` | Parse a `<noscript>` body as raw text, as a scripting-enabled parser must |
+| `0006` | `Broiler.JS/Broiler.Regex` | Tell the end of a pattern apart from a NUL inside one |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -255,6 +256,53 @@ rendering half is already live in this repository.
 
 **When it lands upstream:** bump the pointer and delete this patch. The
 `CaptureService` skip stays: it is about that host's regex extraction, not the parser.
+
+### `0006` — a NUL inside a pattern looked exactly like the end of one
+
+`Broiler.Regex`'s cursor reports "past the last character" by returning `'\0'` from
+`Peek()`, and every end-of-pattern test compared against that sentinel. U+0000 is an
+ordinary pattern character, so a pattern that merely *contained* one appeared to end
+there. google.com's start page compiles a "no letters" character class whose first
+range runs from NUL to space, and it died on the very first atom with
+`Unterminated character class`.
+
+**It arrives decoded**, which is the part worth keeping straight: the page builds the
+class with `new RegExp(`*string*`)`, so the string literal's `\0` is consumed by the
+*string* grammar and a real U+0000 is what reaches the pattern grammar. The escaped
+spelling a regex **literal** preserves, `[\0-…]`, parsed correctly all along — the two
+are different inputs to this parser, and only the decoded one was broken. Both are
+covered by the tests, so the distinction cannot quietly rot.
+
+Nor was it confined to character classes: a NUL as an atom, as a range end, in a group
+name or inside `\p{…}` truncated the parse the same way. Every end-of-pattern test now
+goes through an explicit `AtEnd` (plus `HasAt` for the one lookahead that wanted bounds
+rather than a value); `Peek()` still returns `'\0'` past the end, but nothing reads it
+as a signal.
+
+**Separating the two fixed the mirror-image bug at the real end of input.** A pattern
+ending in a lone `\` had no end-of-input guard on the path that reads the escaped
+character, so it ran off the end of the string and raised `IndexOutOfRangeException` in
+non-Unicode mode — an unhandled runtime fault where every caller catches
+`RegexSyntaxException`. It is now the syntax error it always was.
+
+**A nested submodule.** `Broiler.Regex` sits inside `Broiler.JS`, so applying this one
+means committing in `Broiler.JS/Broiler.Regex`, pushing, bumping the gitlink **in
+`Broiler.JS`**, and only then bumping `Broiler.JS` in this repository — two pointer
+bumps, not one.
+
+**No main-repo fallback, and none needed.** `JSRegExp.TryBuildBroilerForGaps` already
+wraps the parse in a `try`/`catch` and falls back to the .NET translator on failure, so
+the un-patched engine mis-routes this pattern rather than breaking the page — the
+exception is real but swallowed, which is why it surfaced from a debugger rather than
+as a page error. The fix cannot be staged at a main-repo layer either: the parser is
+the whole of it, and nothing here can stand in for it.
+
+**Not listed for the pixel suites.** Routing to `Broiler.Regex` happens only for
+patterns that exercise a JS/.NET semantic gap (`GapScan`), and this class has none — it
+compiles through the .NET translator with or without the patch, so no pixel moves
+either way. Its behaviour is unit-tested inside the patch (`NulCharacterTests`).
+
+**When it lands upstream:** bump both pointers and delete this patch.
 
 ## A stale entry in the apply script is not inert
 

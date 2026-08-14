@@ -80,6 +80,18 @@ public sealed partial class DomBridge
         // window.self — refers to this window
         window.FastAddValue((KeyString)"self", window, JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // window.top — the topmost browsing context. This document is the top-level one, so
+        // `top`, `parent` and `self` are all this window; a sub-document's window instead gets
+        // a `top` pointing back here (SubWindowBinding). It was the one member of that trio
+        // never registered, and because `window` IS the global object that made the unqualified
+        // `top` a ReferenceError rather than merely an undefined property — which aborts the
+        // whole <script>, not just the statement that read it. Framing checks spell it
+        // unqualified (`if (top != self)`), so this is the first thing a page's boilerplate
+        // touches: google.com's One-Google-bar bundle died on it, taking with it every listener
+        // the rest of that script would have registered.
+        window.FastAddValue((KeyString)"top", globalThis, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["top"] = globalThis;
+
         // document.defaultView — returns the window object
         document.FastAddValue((KeyString)"defaultView", window, JSPropertyAttributes.EnumerableConfigurableValue);
         context["console"] = console;
