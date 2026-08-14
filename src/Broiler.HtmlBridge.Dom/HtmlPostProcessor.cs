@@ -24,6 +24,18 @@ internal static class HtmlPostProcessor
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// Matches all <c>&lt;noscript …&gt;…&lt;/noscript&gt;</c> blocks, including their fallback
+    /// content.
+    /// </summary>
+    /// <remarks>
+    /// Non-greedy to the first <c>&lt;/noscript&gt;</c>, which cannot mis-nest: a
+    /// <c>noscript</c> may not contain another one.
+    /// </remarks>
+    private static readonly Regex NoscriptTagPattern = new(
+        @"<noscript(?<attrs>[^>]*)>(?<content>[\s\S]*?)</noscript>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
     /// Matches <c>&lt;iframe …&gt;…&lt;/iframe&gt;</c> elements including
     /// their inline fallback content.
     /// </summary>
@@ -111,6 +123,7 @@ internal static class HtmlPostProcessor
     private static string ApplyReplacedElementPasses(string html)
     {
         html = StripScriptTags(html);
+        html = StripNoscriptContent(html);
         html = StripIframeContent(html);
         return html;
     }
@@ -227,6 +240,36 @@ internal static class HtmlPostProcessor
     internal static string StripScriptTags(string html)
     {
         return ScriptTagPattern.Replace(html, string.Empty);
+    }
+
+    /// <summary>
+    /// Removes every <c>&lt;noscript&gt;</c> element together with its content.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>noscript</c> holds what a browser shows when it is <em>not</em> running scripts, so with
+    /// scripting enabled it renders nothing at all — no box, not even for its text. Broiler runs
+    /// scripts on both profiles here, and has no scripting-disabled mode, so the element is dropped
+    /// unconditionally. Removed whole rather than emptied, unlike
+    /// <see cref="StripIframeContent"/>: an <c>iframe</c> still paints its own replaced box once
+    /// the fallback is gone, a <c>noscript</c> paints nothing.
+    /// </para>
+    /// <para>
+    /// The same reason <see cref="StripScriptTags"/> exists, one step further on. A page's
+    /// "you need to enable JavaScript" block was rendering above the content its own scripts had
+    /// just built — the two stacked, because nothing suppressed the fallback once the scripts it
+    /// stands in for had run. html5test.com is the page that showed it.
+    /// </para>
+    /// <para>
+    /// This suppresses the rendering, not the DOM. Broiler's parser builds <c>noscript</c> content
+    /// as real elements; the HTML parsing spec says a scripting-enabled parser takes it as raw
+    /// text, so a page can still see markup inside a <c>noscript</c> through the DOM that a browser
+    /// would not. That is a parser conformance gap, separate from what this fixes.
+    /// </para>
+    /// </remarks>
+    internal static string StripNoscriptContent(string html)
+    {
+        return NoscriptTagPattern.Replace(html, string.Empty);
     }
 
     /// <summary>
