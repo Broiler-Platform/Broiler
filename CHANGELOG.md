@@ -9,6 +9,22 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `Broiler.UI.Edit` — an editing context menu on the single-line edit, plus the
+  clipboard shortcuts that were missing next to `Ctrl+C`/`X`/`V`: `Ctrl+Insert`
+  copies, `Shift+Insert` pastes and `Shift+Delete` cuts, the chords several
+  editors and terminals still send. Right-clicking the field — or pressing
+  `Shift+F10` or the menu key — offers Undo, Cut, Copy, Paste, Delete and Select
+  All, each enabled against the state the menu opened with: Paste only when the
+  clipboard holds text a single-line field would actually insert, and a password
+  field offers neither Cut nor Copy, the rule that already made `Copy()` refuse.
+  A right-click inside the selection keeps it, since that is what Cut and Copy
+  act on, while a click outside moves the caret there first. The menu is drawn by
+  the control the way the ComboBox draws its drop-down rather than composed from a
+  `UiMenu`, so an edit still costs one assembly and no host has to hand a menu to
+  every field it creates; while it is open the edit holds the input capture, so
+  the text behind it cannot be typed into, and it appears in the semantic tree as
+  an expanded menu. A host that would rather show a platform menu runs the same
+  commands through `StandardEdit.InvokeContextMenuCommand`.
 - `Broiler.Layout` — CSS Images 3 §5.5 `object-fit` and §5.6 `object-position`,
   which nothing read: every replaced element was stretched to its content box, so
   `object-fit-contain-svg-001i`, `-fill-svg-001i` and `-none-svg-001i` rendered to

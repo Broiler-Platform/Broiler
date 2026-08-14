@@ -498,6 +498,12 @@
     </Project>
   </Folder>
   <Folder Name="/tests/Text/">
+    <Project Path="tests/Text/Broiler.UI.Edit.Standard.Tests/Broiler.UI.Edit.Standard.Tests.csproj">
+      <BuildType Project="Debug" Solution="Debug-Linux|*" />
+      <BuildType Project="Release" Solution="Release-Linux|*" />
+      <BuildType Project="Debug" Solution="Debug-Windows|*" />
+      <BuildType Project="Release" Solution="Release-Windows|*" />
+    </Project>
     <Project Path="tests/Text/Broiler.UI.FormatCodeView.Tests/Broiler.UI.FormatCodeView.Tests.csproj">
       <BuildType Project="Debug" Solution="Debug-Linux|*" />
       <BuildType Project="Release" Solution="Release-Linux|*" />
