@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Three patches are waiting on a maintainer.** See the index below.
+**Five patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -49,6 +49,8 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
 | `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
 | `0003` | `Broiler.JS` | Report promises rejected with nobody to handle them |
+| `0004` | `Broiler.JS` | Record where an error was raised, not where its factory was wired |
+| `0005` | `Broiler.DOM` | Parse a `<noscript>` body as raw text, as a scripting-enabled parser must |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -160,6 +162,99 @@ what a page paints.
 
 **When it lands upstream:** bump the pointer, delete this patch, and drop the two
 `BroilerJsRejectionTracking` probes with their `#if`s.
+
+### `0004` — every engine error blamed the line that installed the error factories
+
+A TypeError raised while navigating to html5test.com reported its origin as
+
+```
+at InitializeFactories:...\Engine\Core\JSValueCoreExtensions.cs:17,1
+```
+
+which reads as a crash inside engine start-up. It is not one. Line 17 installs a
+factory delegate; the actual failure was an ordinary
+`Cannot get property length of undefined` in the page's fourth inline script.
+Worse, that frame was the same for **every** TypeError the engine can raise, so
+it distinguished nothing — and it sent the first reader of the report into the
+wrong file.
+
+`JSException` records the engine method that raised an error as the first frame
+of the JavaScript stack, taken from the
+`[CallerMemberName]`/`[CallerFilePath]`/`[CallerLineNumber]` trio that
+`JSEngine.NewTypeError` and its siblings declare. Runtime and Storage cannot call
+those directly — they do not reference the Engine assembly that knows how to
+build a `JSError` — so they raise through a factory delegate. The delegates were
+`Func<string, Exception>`, which has nowhere to carry caller info, so the
+compiler filled it in at the only place those arguments were written: the wiring
+lambda in the module initializer. **Nine delegates across three initializers,
+nine constants.**
+
+Caller-info attributes are honoured on a delegate's `Invoke` parameters, so the
+factories are now named delegates that declare them — `JSErrorFactory` in Storage
+(where `PropertySequence` needs it too) and `JSExceptionFactory` in Runtime for
+the sites that want the `JSException` itself. Each throw site captures its own
+position; the initializers forward what they are handed. The same TypeError now
+reports `at Item:...\Runtime\JSUndefined.cs:41,1`, and two failures reaching one
+factory can be told apart — which is what `EngineErrorOriginFrameTests` pins,
+since "not the initializer" alone would be satisfied by any other constant.
+
+**The JavaScript frames are untouched.** This is the frame above them, and it was
+the only wrong one.
+
+**Two things in the same trace are deliberately left alone**, because each is a
+change to a web-visible API rather than a correction of wrong data, and the call
+belongs to whoever owns that surface: `error.stack` opens with an **empty line**
+where a browser writes `TypeError: <message>` (the `JSError` constructor computes
+the stack before the `message` property exists), and it still carries an engine
+source path — an absolute build-machine path, `D:\Broiler\...` in the original
+report — that page script can read.
+
+**Not listed for the pixel suites** — it changes a diagnostic, not anything a
+page paints.
+
+**When it lands upstream:** bump the pointer and delete this patch.
+
+### `0005` — a `<noscript>` body was live content instead of raw text
+
+The tokenizer parsed `<noscript>` contents as ordinary markup, which made the
+fallback a live subtree: elements reachable with `querySelector`/`getElementById`,
+an `<img>` that would be requested, a nested `<script>` a host would find and run.
+All of it is content a page supplies for the case where scripts are **off**.
+
+A scripting-enabled parser instead follows the generic raw text element parsing
+algorithm for `noscript`, exactly as for `<script>` and `<style>`: the body becomes
+one text node, nothing in it is live, and character references are not decoded. So
+`noscript` joins `RawTextElements` in `HtmlTokenizer`.
+
+Membership is **conditional on scripting being enabled** — with scripting off the
+body must parse as markup so it can render — and the comment says so. The set can
+be flat only because this engine has no scripting-disabled mode; if one is ever
+added, that is the line that has to consult it.
+
+**Nothing downstream sees a different serialized document.** `HtmlSerializer`
+already listed `noscript` among the raw-text elements, so a text child round-trips
+back to the same markup. `HtmlScriptScanner`, which is tokenizer-backed, stops
+reporting a `<script>` nested inside a `noscript` — making true what
+`PreloadScanner` already documented as true ("Broiler runs scripts, so the parser
+treats a `noscript` body as text and nothing in it is ever loaded").
+
+**The main repo does not depend on it, and CI is green without it.** The two
+user-visible halves are fixed in this repository and stand alone:
+`HtmlPostProcessor.StripNoscriptContent` stops the fallback rendering (commit
+"Stop rendering `<noscript>` fallback while scripting is enabled"), and
+`CaptureService`'s `NoscriptSpans` skip stops a `<script>` inside one executing —
+that host extracts scripts with its own regex pass rather than through the parser,
+so it needs its own skip whether or not this patch is applied. `NoscriptRenderingTests`
+covers both and passes against the un-patched pointer; verified by reverting the
+submodule and re-running. The DOM half — the fallback being raw text rather than a
+reachable subtree — is what this patch adds, and its tests (`NoscriptRawTextTests`)
+travel inside it.
+
+**Not listed for the pixel suites** — it changes what the DOM holds, and the
+rendering half is already live in this repository.
+
+**When it lands upstream:** bump the pointer and delete this patch. The
+`CaptureService` skip stays: it is about that host's regex extraction, not the parser.
 
 ## A stale entry in the apply script is not inert
 

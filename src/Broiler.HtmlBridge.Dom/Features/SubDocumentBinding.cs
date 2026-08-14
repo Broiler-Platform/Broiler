@@ -184,6 +184,11 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in _) => GetLinks(docRoot), "get links"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // document.scripts
+        doc.FastAddProperty((KeyString)"scripts",
+            new DomFunction((in _) => GetScripts(docRoot), "get scripts"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.styleSheets
         doc.FastAddProperty((KeyString)"styleSheets",
             new DomFunction((in _) => _host.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
@@ -395,6 +400,13 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
     {
         var results = new List<JSValue>();
         _host.CollectByTagName(docRoot, "img", results);
+        return new JSArray(results);
+    }
+
+    private JSValue GetScripts(DomNode docRoot)
+    {
+        var results = new List<JSValue>();
+        _host.CollectByTagName(docRoot, "script", results);
         return new JSArray(results);
     }
 

@@ -137,6 +137,9 @@ public sealed partial class DomBridge
         // Uses tree-order traversal so dynamically appended elements are reflected.
         document.FastAddProperty((KeyString)"links", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetLinks(this, in a), "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // document.scripts — collection of all <script> elements, in tree order.
+        document.FastAddProperty((KeyString)"scripts", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetScripts(this, in a), "get scripts"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.styleSheets — collection of stylesheet objects for main document
         document.FastAddProperty((KeyString)"styleSheets", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetStyleSheets(this, in a), "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 

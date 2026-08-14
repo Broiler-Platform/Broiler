@@ -16,5 +16,14 @@ internal interface IDocumentCollectionHost
     IReadOnlyList<DomElement> Elements { get; }
 
     void CollectLinksInTreeOrder(DomElement root, List<JSValue> results);
+
+    /// <summary>
+    /// Collects the elements named <paramref name="tag"/> under <paramref name="root"/> in tree
+    /// order. The same collector <see cref="ISubDocumentHost"/> already exposes, needed here for
+    /// <c>document.scripts</c>: a script element's position in the collection is the whole point of
+    /// that property, and <see cref="Elements"/> cannot supply it.
+    /// </summary>
+    void CollectByTagName(DomNode root, string tag, List<JSValue> results);
+
     JSObject BuildStyleSheetObject(DomElement styleElement);
 }

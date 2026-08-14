@@ -191,6 +191,14 @@ public class CaptureService
         @"<script(?<attrs>[^>]*)>(?<content>[\s\S]*?)</script>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Matches <c>&lt;noscript …&gt;…&lt;/noscript&gt;</c> blocks, so the scripts inside one can be
+    /// skipped.
+    /// </summary>
+    private static readonly Regex NoscriptBlockPattern = new(
+        @"<noscript[^>]*>[\s\S]*?</noscript>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex SrcAttrPattern = new(
         @"\ssrc\s*=\s*(?:""(?<uri>data:[^""]+)""|'(?<uri>data:[^']+)'|(?<uri>data:[^\s>]+))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -439,6 +447,41 @@ public class CaptureService
     }
 
     /// <summary>
+    /// The source spans covered by <c>&lt;noscript&gt;</c> blocks.
+    /// </summary>
+    /// <remarks>
+    /// A <c>noscript</c> body is what a browser shows when it is <em>not</em> running scripts, so
+    /// with scripting enabled it is inert and a <c>&lt;script&gt;</c> written inside one must never
+    /// execute. The HTML parser gets this right on its own — it takes a <c>noscript</c> body as raw
+    /// text, so no script element ever reaches the DOM — but the two hosts below do not go through
+    /// it: they extract scripts with their own regex pass over the source, and a regex for
+    /// <c>&lt;script&gt;</c> matches one nested inside a <c>noscript</c> just as happily. Hence the
+    /// explicit skip. A host moved onto the tokenizer-backed <c>HtmlScriptScanner</c> — which
+    /// <c>ScriptExtractionService</c> already uses — would not need it.
+    /// </remarks>
+    private static List<(int Start, int End)> NoscriptSpans(string html)
+    {
+        var spans = new List<(int Start, int End)>();
+        foreach (Match match in NoscriptBlockPattern.Matches(html))
+            spans.Add((match.Index, match.Index + match.Length));
+        return spans;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="index"/> falls inside one of <paramref name="spans"/>.
+    /// </summary>
+    private static bool IsInsideNoscript(List<(int Start, int End)> spans, int index)
+    {
+        foreach (var span in spans)
+        {
+            if (index >= span.Start && index < span.End)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Extracts and executes inline scripts using Broiler.JavaScript.
     /// This exercises the YantraJS engine as part of the rendering pipeline;
     /// script results can be extended in future to influence output content.
@@ -446,8 +489,12 @@ public class CaptureService
     private static void ExecuteScripts(string html, string url)
     {
         var scripts = new List<string>();
+        var noscriptSpans = NoscriptSpans(html);
         foreach (Match match in ScriptPattern.Matches(html))
         {
+            if (IsInsideNoscript(noscriptSpans, match.Index))
+                continue;
+
             var content = match.Groups["content"].Value.Trim();
             if (!string.IsNullOrEmpty(content))
             {
@@ -541,8 +588,12 @@ public class CaptureService
         var moduleRoots = new List<string>();
         var csp = ContentSecurityPolicy.FromHtml(html);
         var scriptPrefetcher = StartScriptPrefetch(html, url, csp);
+        var noscriptSpans = NoscriptSpans(html);
         foreach (Match match in AnyScriptPattern.Matches(html))
         {
+            if (IsInsideNoscript(noscriptSpans, match.Index))
+                continue;
+
             var attrs = match.Groups["attrs"].Value;
             var isDefer = DeferAttrPattern.IsMatch(attrs);
             var isModule = TypeModuleAttrPattern.IsMatch(attrs);
