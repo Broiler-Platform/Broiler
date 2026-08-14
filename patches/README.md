@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**One patch is waiting on a maintainer.** See the index below.
+**Two patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -47,6 +47,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
+| `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -86,6 +87,33 @@ that purpose, which has since landed upstream.
 runs at all rather than what any of it paints, and the pixel suites do not
 execute a loader of this shape. Its behaviour is unit-tested inside the patch
 (`DirectEvalClosureScopeTests`).
+
+**When it lands upstream:** bump the pointer and delete this patch.
+
+### `0002` — the message said only that *something* was read off nothing
+
+`Cannot read properties of undefined`, with no property named. On minified code
+that does not locate the line, let alone the cause: the report it came from is a
+TypeError at column 33839 of a 61 908-character line. Browsers append
+`(reading 'foo')`; so does this.
+
+Only the **computed** read was affected. A static one (`u.foo`) already named its
+property, and a literal computed key (`u['foo']`) folds into that same path —
+which is why it went unnoticed. The variable-key form `I[Y]` is what minified
+code actually emits, and the only one that reached the generic message.
+
+An **object** key is deliberately left undescribed: `GetValue` throws before
+`ToPropertyKey` precisely because `ToObject(base)` comes first (6.2.5.5), so
+describing such a key would run its `toString`/`@@toPrimitive` — user code, in an
+order the spec forbids. A diagnostic does not get to change evaluation.
+
+**Found while testing and not fixed here:** a numeric variable key
+(`var k = 3; u[k]`) does not throw at all, it evaluates to `undefined`. That is a
+separate defect in the indexed read path; the test records it rather than
+covering for it.
+
+**Not listed for the pixel suites** — it changes an error message, nothing a page
+paints. `UndefinedPropertyReadMessageTests` covers it.
 
 **When it lands upstream:** bump the pointer and delete this patch.
 
