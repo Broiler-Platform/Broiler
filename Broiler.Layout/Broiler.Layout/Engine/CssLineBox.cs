@@ -87,10 +87,29 @@ internal sealed class CssLineBox
             UpdateRectangle(box.ParentBox, x, y, r, b);
     }
 
+    /// <summary>
+    /// Projects this line's per-box rectangles onto the boxes, as the per-line map
+    /// the paint walker and <c>FragmentTreeBuilder</c> read back.
+    /// </summary>
+    /// <remarks>
+    /// The write overwrites rather than inserts, because the projection has to be
+    /// idempotent: a line box can reach this twice. <c>CreateLineBoxes</c> empties
+    /// <see cref="CssBox.LineBoxes"/> when it starts, so a layout pass that lands
+    /// inside another one for the same block — a host callback made from inside the
+    /// flow (text measurement, an image that completes synchronously) that re-enters
+    /// <c>PerformLayout</c> — leaves the inner pass's already-assigned lines in the
+    /// list, and the outer pass then walks the same list and re-projects them. An
+    /// insert throws <see cref="ArgumentException"/> on the second one, which
+    /// <c>PerformLayout</c> catches as a layout error, so the block loses the rest of
+    /// its lines and everything below it lays out from a half-finished pass. The
+    /// outer pass has just recomputed each line's rectangles (BubbleRectangles and
+    /// vertical alignment run immediately before this), so overwriting is also what
+    /// leaves the boxes agreeing with the line boxes they came from.
+    /// </remarks>
     internal void AssignRectanglesToBoxes()
     {
         foreach (CssBox b in Rectangles.Keys)
-            b.Rectangles.Add(this, Rectangles[b]);
+            b.Rectangles[this] = Rectangles[b];
     }
 
     internal void SetBaseLine(CssBox b, double baseline)

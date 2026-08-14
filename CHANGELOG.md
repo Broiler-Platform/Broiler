@@ -158,6 +158,21 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — a layout pass that started while another one was still running over
+  the same box tree threw `ArgumentException` ("An item with the same key has already been
+  added") out of `CssLineBox.AssignRectanglesToBoxes`, which `CssBox.PerformLayout` caught
+  as a layout error, so the block silently lost the rest of its lines and everything below
+  it was placed from a half-finished pass. Layout calls back into the host while it flows —
+  text measurement runs for every word, and an image load can complete on the same stack —
+  and a host that re-enters `PerformLayout` from one of those callbacks lands inside an
+  in-flight `CreateLineBoxes`. Because `CreateLineBoxes` empties `CssBox.LineBoxes` when it
+  starts, the inner pass drops the line the outer pass is still filling and leaves its own
+  assigned lines in the list; the outer pass then walks that list and assigns the first of
+  them a second time. Projecting a line's rectangles onto its boxes is idempotent by
+  nature, so it now overwrites rather than inserts, and the values written are the ones the
+  surviving pass just recomputed. Seen in the browser on pages such as html5test.com, and
+  not in a single-shot capture, which never re-enters.
+
 - `Broiler.JS` (patch, awaiting a maintainer — see `patches/README.md`) — a closure created by a
   direct `eval` lost the eval site's bindings the moment the eval returned, so
   `eval("(function(){ return b; })")` threw `b is not defined` when the function it returned was
