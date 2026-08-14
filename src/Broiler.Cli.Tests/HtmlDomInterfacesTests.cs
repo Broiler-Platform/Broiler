@@ -297,6 +297,73 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
+    /// <summary>
+    /// A NamedNodeMap answers numeric indexing, not just <c>length</c> and <c>item()</c>.
+    /// The index properties used to be registered under numeric *string* keys, which the engine's
+    /// integer-index read path never consults, so <c>attributes[0]</c> was <c>undefined</c> while
+    /// <c>attributes.length</c> and <c>attributes.item(0)</c> both answered correctly — the
+    /// obvious `for (i…) attributes[i].name` loop read a property of undefined and threw.
+    /// </summary>
+    [Fact]
+    public void Attributes_Are_Reachable_By_Numeric_Index()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""d"" class=""foo"" title=""bar""></div>
+<div id=""result""></div>
+<script>
+var d = document.getElementById('d');
+var attrs = d.attributes;
+var r = [];
+r.push(attrs.length === 3);
+r.push(typeof attrs[0] === 'object');
+r.push(attrs[0].nodeName === 'id');
+r.push(attrs[0].name === 'id');
+r.push(attrs[0].value === 'd');
+// The string spelling of an index reaches the same property.
+r.push(attrs['1'].name === 'class');
+r.push(Object.prototype.hasOwnProperty.call(attrs, '0') === true);
+// Indexing and item() agree across the whole map.
+var agree = true;
+for (var i = 0; i < attrs.length; i++) {
+  if (!attrs[i] || attrs[i].name !== attrs.item(i).name) agree = false;
+}
+r.push(agree);
+r.push(attrs[attrs.length] === undefined);
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true,true,true,true,true,true,true", result);
+    }
+
+    /// <summary>
+    /// html5test.com's tokenizer probe: <c>&lt;div foo&lt;bar=''&gt;</c> yields an attribute
+    /// literally named <c>foo&lt;bar</c> (the attribute-name state appends <c>&lt;</c> as an
+    /// ordinary character), reached through <c>attributes[0]</c>.
+    /// </summary>
+    [Fact]
+    public void Attribute_Name_Containing_LessThan_Is_Parsed_And_Indexable()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var r = [];
+var e = document.createElement('div');
+e.innerHTML = ""<div foo<bar=''>"";
+r.push(e.firstChild.attributes.length === 1);
+r.push(e.firstChild.attributes[0].nodeName === 'foo<bar');
+r.push(e.firstChild.attributes[0].name === 'foo<bar');
+document.getElementById('result').textContent = r.join(',');
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+        Assert.Contains("true,true,true", result);
+    }
+
     [Fact]
     public void Element_HasAttributes_Reflects_Attribute_Presence()
     {
