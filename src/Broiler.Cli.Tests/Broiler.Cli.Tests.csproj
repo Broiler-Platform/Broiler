@@ -25,6 +25,20 @@
     <Compile Remove="UnhandledPromiseRejectionTests.cs" />
   </ItemGroup>
 
+  <!--
+    Mirrors the narrower probe in Broiler.HtmlBridge.Dom.csproj: the rejectionhandled coverage needs
+    the engine to say which promise was reported, so without the notification API the file is not
+    compiled rather than failing against an engine that cannot fire the event.
+  -->
+  <PropertyGroup>
+    <BroilerJsRejectionPromiseIdentity Condition="Exists('$(MSBuildThisFileDirectory)..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.BuiltIns\Promise\JSPromiseRejectionNotification.cs')">true</BroilerJsRejectionPromiseIdentity>
+    <DefineConstants Condition="'$(BroilerJsRejectionPromiseIdentity)' == 'true'">$(DefineConstants);BROILER_JS_REJECTION_PROMISE_IDENTITY</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(BroilerJsRejectionPromiseIdentity)' != 'true'">
+    <Compile Remove="RejectionHandledEventTests.cs" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
     <PackageReference Include="xunit" Version="2.5.3" />

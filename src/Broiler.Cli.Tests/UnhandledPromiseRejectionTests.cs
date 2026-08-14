@@ -36,7 +36,9 @@ public sealed class UnhandledPromiseRejectionTests
         RenderLogger.EntryLogged += Collect;
         try
         {
-            // Through a session, because the engine only tracks while one is running.
+            // Through a session because these are diagnostics-bundle assertions, not because the
+            // tracking needs one: attaching a bridge turns it on, so that `unhandledrejection` fires
+            // for any page rather than only for a run a diagnostic session happens to be watching.
             using (DiagnosticSession.Start(Program.ResolveDiagnosticOptions(directory, null)))
             {
                 CaptureService.ExecuteScriptsWithDom(

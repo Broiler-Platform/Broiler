@@ -76,7 +76,8 @@ with its exception and stack trace indented beneath it.
 | Thrown at the top level of a script | yes |
 | Thrown inside a timer callback | yes |
 | Thrown inside an event listener | yes |
-| A promise rejected with no handler | yes, **once the `Broiler.JS` patch is applied** |
+| A promise rejected with no handler | yes |
+| A rejection the page claimed with `preventDefault()` | **no** |
 | Caught by the page's own `try`/`catch` | **no** |
 
 **A caught exception is not reported**, because the log sits at the host's
@@ -88,14 +89,31 @@ error channel can fail throughout and log nothing here. When a bundle shows few
 failures and a document the scripts barely changed, that pattern, not success,
 is the first thing to suspect.
 
-**Unhandled promise rejections** need the patch under `patches/` that adds
-`JSPromiseRejectionTracker` to `Broiler.JS`; the engine has no notion of them
-otherwise. Without it the reporting compiles out and a rejected promise nobody
-handled is lost — which on a promise-driven page is most of what goes wrong.
-Check whether it is live with:
+**A rejection the page claims is not reported either**, and for a better reason
+than the one above. An unhandled rejection is fired at the window as the
+`unhandledrejection` event before it is logged, and the log line is that event's
+*default action* — so a page that calls `preventDefault()` has said it is
+handling the failure through its own error channel, and is not also told it
+failed to. That is what a browser console does, and it is the right behaviour;
+but it means a page with its own error reporting can run its failures past this
+log silently. `resources/` still holds everything such a page fetched, and the
+document diff still shows what its scripts did or did not build.
+
+```js
+window.addEventListener('unhandledrejection', e => {
+  myErrorChannel.report(e.reason);   // e.promise is the promise that rejected
+  e.preventDefault();                // …and this suppresses the log line
+});
+```
+
+`e.promise` — and the `rejectionhandled` event that retracts a report when a
+handler arrives late — need the `Broiler.JS` patch under `patches/` that lets the
+tracker say *which* promise it reported. Unpatched, the event still fires and
+cancelling still works; only the identity is missing. Check whether it is live
+with:
 
 ```sh
-git -C Broiler.JS log --oneline --grep 'Report promises rejected with nobody'
+git -C Broiler.JS log --oneline --grep 'Say which promise a tracked rejection'
 ```
 
 It is written and flushed per entry, not buffered and dumped at exit. The runs

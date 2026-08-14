@@ -8,6 +8,31 @@
     <Description>DOM bridge, HTML tree building, and JavaScript DOM object integration for HtmlBridge.</Description>
   </PropertyGroup>
 
+  <!--
+    Mirrors the probe in Broiler.Cli.csproj. Which promises are unhandled is decided by
+    JSPromiseRejectionTracker in Broiler.JS, which reaches this repository as a patch under
+    patches/ until a maintainer applies it (the git proxy answers 403 for that remote). With the
+    patch applied the drain in DomBridge.PromiseRejection.cs compiles in; without it the
+    unhandledrejection event still exists and still fires for anything the host reports by hand, and
+    the build is not broken by a call to a type that is not there.
+  -->
+  <PropertyGroup>
+    <BroilerJsRejectionTracking Condition="Exists('$(MSBuildThisFileDirectory)..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.BuiltIns\Promise\JSPromiseRejectionTracker.cs')">true</BroilerJsRejectionTracking>
+    <DefineConstants Condition="'$(BroilerJsRejectionTracking)' == 'true'">$(DefineConstants);BROILER_JS_REJECTION_TRACKING</DefineConstants>
+  </PropertyGroup>
+
+  <!--
+    A second, narrower probe. Tracking says a rejection went unhandled; the notification API says
+    *which promise* it was, which the unhandledrejection event carries and rejectionhandled cannot
+    work without. It is the newer of the two engine changes, so a checkout can have the first and
+    not the second — hence two symbols rather than one. Without this the event still fires and is
+    still cancelable; its `promise` is undefined and rejectionhandled does not fire.
+  -->
+  <PropertyGroup>
+    <BroilerJsRejectionPromiseIdentity Condition="Exists('$(MSBuildThisFileDirectory)..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.BuiltIns\Promise\JSPromiseRejectionNotification.cs')">true</BroilerJsRejectionPromiseIdentity>
+    <DefineConstants Condition="'$(BroilerJsRejectionPromiseIdentity)' == 'true'">$(DefineConstants);BROILER_JS_REJECTION_PROMISE_IDENTITY</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Phase 3 work item 6: content-rendering polyfill JavaScript as a versioned embedded asset
          (externalized from inline C# string literals in Registration/Polyfills.cs). -->

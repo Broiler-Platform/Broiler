@@ -10,9 +10,6 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
-#if BROILER_JS_REJECTION_TRACKING
-using Broiler.JavaScript.BuiltIns.Promise;
-#endif
 using Broiler.CSS;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Logging;
@@ -821,7 +818,7 @@ public class CaptureService
 
         // Drain queued microtasks and timer work before capture.
         DrainAsyncWork(bridge, microTasks);
-        ReportUnhandledRejections();
+        bridge.NotifyRejectedPromises();
         bridge.ResolveAnimationSnapshots();
 
         var serialized = bridge.SerializeToHtml();
@@ -830,30 +827,6 @@ public class CaptureService
         // of the run shows.
         ResourceTrace.RecordBody(ResourceTraceKind.Document, url, serialized, DiagnosticSession.AfterScriptsLabel);
         return serialized;
-    }
-
-    /// <summary>
-    /// Logs the promises that were rejected with nothing to handle them — a browser's
-    /// <c>Uncaught (in promise)</c>.
-    /// </summary>
-    /// <remarks>
-    /// Called after the async drain, not before: until the microtask checkpoint has run to
-    /// quiescence a rejection may still be claimed, and reporting earlier would call a handled
-    /// rejection unhandled. Empty unless a diagnostic run turned the engine's tracker on, so an
-    /// ordinary capture pays a single lock and an empty list.
-    /// </remarks>
-    private static void ReportUnhandledRejections()
-    {
-#if BROILER_JS_REJECTION_TRACKING
-        foreach (var rejection in JSPromiseRejectionTracker.TakePending())
-        {
-            RenderLogger.Log(
-                LogCategory.JavaScript,
-                LogLevel.Error,
-                "CaptureService.UnhandledRejection",
-                $"Unhandled promise rejection: {rejection.Describe()}");
-        }
-#endif
     }
 
     /// <summary>

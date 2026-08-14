@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Five patches are waiting on a maintainer.** See the index below.
+**One patch is waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -15,10 +15,18 @@ Applying one:
 
 ```sh
 cd <Submodule>
-git checkout -b <branch> && git am ../patches/NNNN-<slug>.patch
+git checkout -b <branch> && git am --keep-cr ../patches/NNNN-<slug>.patch
 git push origin HEAD
 cd .. && git add <Submodule>      # bump the pointer only once the push succeeds
 ```
+
+**`--keep-cr` is not optional here.** Many `Broiler.JS`, `Broiler.HTML` and
+`Broiler.CSS` sources are CRLF, and `git am` splits its mailbox with the CR
+stripped unless told otherwise — so the patch's context lines arrive LF-only,
+match nothing in a CRLF file, and it fails with `patch does not apply` against a
+tree that is in fact untouched. The give-away is that `git apply --check` on the
+same patch succeeds, because `git apply` never does that stripping. Reach for
+`--keep-cr` before concluding a patch has drifted.
 
 ## This directory is a backlog, not an archive
 
@@ -46,215 +54,38 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 
 | # | submodule | subject |
 | --- | --- | --- |
-| `0001` | `Broiler.JS` | Keep a direct eval's scope alive for the closures it creates |
-| `0002` | `Broiler.JS` | Name the property in "Cannot read properties of undefined" |
-| `0003` | `Broiler.JS` | Report promises rejected with nobody to handle them |
-| `0004` | `Broiler.JS` | Record where an error was raised, not where its factory was wired |
-| `0005` | `Broiler.DOM` | Parse a `<noscript>` body as raw text, as a scripting-enabled parser must |
+| `0001` | `Broiler.JS` | Say which promise a tracked rejection happened to |
 
-### `0001` — a closure a direct eval created lost the eval site's bindings
+### `0001` — the tracker knew a rejection happened, not what it happened to
 
-`eval("(function(){ return b; })")` threw `b is not defined` when the function it
-returned was called, even though `eval("b")` at the same spot read the same
-binding fine.
+`JSPromiseRejectionTracker` reports that a promise was rejected with nobody
+waiting on it, and reports it as a reason: `TakePending` returns the rejection
+reason alone, and the promise instance the tracker is keyed on never leaves its
+dictionary. That is all a log line needs, and less than the event a browser
+fires for these needs.
 
-A direct eval's scope is **lexical**: the closure keeps the eval site's bindings
-after that call has returned. Broiler made the caller's bindings reachable by
-installing them as an overlay for the duration of the eval and withdrawing it on
-return — right for code the eval *runs*, wrong for code the eval *creates*. The
-names stop resolving at exactly the moment such a function is first called.
+`unhandledrejection` carries the promise, and a page uses it as an **identity** —
+to match the report against the work it started, and to recognise the same
+promise if a handler arrives later. The reason cannot stand in for it: two
+promises rejected with the same error are two rejections.
 
-So a function created by directly-evalled code now captures those bindings — as
-one created inside a `with` block already captured its with-chain — and
-re-establishes them for the duration of a call. The live `JSVariable` objects are
-captured rather than their values, so the binding stays shared in both
-directions: a later write by the enclosing function is visible to the closure,
-and a write by the closure lands on the caller's binding rather than on a fresh
-global.
+The patch adds `TakeNotifications`, which is `TakePending` with the key included,
+and the state behind `rejectionhandled`: rejections already handed to the host
+are remembered, and a handler arriving for one moves it to a reclaimed list for
+the host to drain. `TakePending` stays and drains the same set, so a host that
+only logs is unaffected. The retention is capped, because unlike the pending set
+— emptied every time the host drains it — a rejection that is never handled is
+never removed, and an uncapped table would retain every rejection on a long-lived
+page.
 
-**Consulted only after every ordinary scope has failed**, on the read and the
-write path alike, so nothing that resolves today resolves differently. Placing it
-alongside the eval-binding walk instead broke Annex B block-level function
-declarations, which own their name through `globalVars` and must not be shadowed
-by the snapshot (`Issue619.AnnexBEvalFuncBlockScoping`,
-`Issue912EvalHoistChar`) — worth knowing before anyone tries to "simplify" the
-placement.
-
-**Where it came from.** Five reports of `b is not defined` on google.com. Its
-module loader is `function(e){return eval(e)}(src)` with `src` being
-`0,function(){b(2,57,1,w)}` — the result stored and invoked later by the bundle.
-The fragment that made it readable came from the program dump added for exactly
-that purpose, which has since landed upstream.
-
-**Why it is not listed for the pixel suites.** It decides whether page script
-runs at all rather than what any of it paints, and the pixel suites do not
-execute a loader of this shape. Its behaviour is unit-tested inside the patch
-(`DirectEvalClosureScopeTests`).
-
-**When it lands upstream:** bump the pointer and delete this patch.
-
-### `0002` — the message said only that *something* was read off nothing
-
-`Cannot read properties of undefined`, with no property named. On minified code
-that does not locate the line, let alone the cause: the report it came from is a
-TypeError at column 33839 of a 61 908-character line. Browsers append
-`(reading 'foo')`; so does this.
-
-Only the **computed** read was affected. A static one (`u.foo`) already named its
-property, and a literal computed key (`u['foo']`) folds into that same path —
-which is why it went unnoticed. The variable-key form `I[Y]` is what minified
-code actually emits, and the only one that reached the generic message.
-
-An **object** key is deliberately left undescribed: `GetValue` throws before
-`ToPropertyKey` precisely because `ToObject(base)` comes first (6.2.5.5), so
-describing such a key would run its `toString`/`@@toPrimitive` — user code, in an
-order the spec forbids. A diagnostic does not get to change evaluation.
-
-**Found while testing and not fixed here:** a numeric variable key
-(`var k = 3; u[k]`) does not throw at all, it evaluates to `undefined`. That is a
-separate defect in the indexed read path; the test records it rather than
-covering for it.
-
-**Not listed for the pixel suites** — it changes an error message, nothing a page
-paints. `UndefinedPropertyReadMessageTests` covers it.
-
-**When it lands upstream:** bump the pointer and delete this patch.
-
-### `0003` — a rejected promise nobody handled was reported nowhere
-
-A browser reports it as `Uncaught (in promise)`. Here it vanished. Three
-spellings, all silent: a `throw` inside `.then`, `Promise.reject` with no
-`.catch`, and an `async` function that throws. On a page whose control flow is
-mostly promises — which now means most pages — that is the bulk of its failures,
-and the reason a `--diagnostic-dir` bundle could report **zero** JavaScript
-failures for a page that plainly did not work.
-
-**The report has to be deferred**, which is why this is a tracker and not a log
-line inside `Reject`. `Promise.reject(x)` is already rejected before the `.catch`
-on the next line runs, and an `await` attaches its handler a microtask after the
-promise settles. Reporting at the rejection would therefore call almost every
-correctly-handled rejection unhandled. So: collect at the rejection, withdraw
-when a handler arrives, and let the host ask what is left once its microtask
-checkpoint has drained.
-
-**Both places a promise becomes rejected are tracked**, because they are
-genuinely two — `Reject`, and the `(value, state)` constructor that
-`Promise.reject` and `CreateResolvedOrRejectedPromise` use to mint one already
-rejected. Hooking only `Reject` caught the throw-inside-`then` case and neither
-of the other two.
-
-**Off by default**, so no existing run changes shape: `Rejected` and `Handled`
-read one `bool` and return. Wiring it to `window.onunhandledrejection` — which
-would make it always-on and is the point of having it — is the natural next step
-and is deliberately not in this patch.
-
-**The main repo builds without it.** `Broiler.Cli` reports what the tracker
-collects, and `Broiler.JS` references nothing in this repository, so the type
-could not be moved here the way a `Broiler.Layout` type would be. Instead
-`Broiler.Cli.csproj` and `Broiler.Cli.Tests.csproj` probe for the file and define
-`BROILER_JS_REJECTION_TRACKING`, the same shape
-`Broiler.Render.Stage.Benchmarks.csproj` uses for `BRasterParallelism`. Without
-the patch the reporting compiles out and the capture behaves as before; with it
-applied, `UnhandledPromiseRejectionTests` compiles in and covers it.
-
-**Not listed for the pixel suites** — it reports a failure, it does not change
-what a page paints.
-
-**When it lands upstream:** bump the pointer, delete this patch, and drop the two
-`BroilerJsRejectionTracking` probes with their `#if`s.
-
-### `0004` — every engine error blamed the line that installed the error factories
-
-A TypeError raised while navigating to html5test.com reported its origin as
-
-```
-at InitializeFactories:...\Engine\Core\JSValueCoreExtensions.cs:17,1
-```
-
-which reads as a crash inside engine start-up. It is not one. Line 17 installs a
-factory delegate; the actual failure was an ordinary
-`Cannot get property length of undefined` in the page's fourth inline script.
-Worse, that frame was the same for **every** TypeError the engine can raise, so
-it distinguished nothing — and it sent the first reader of the report into the
-wrong file.
-
-`JSException` records the engine method that raised an error as the first frame
-of the JavaScript stack, taken from the
-`[CallerMemberName]`/`[CallerFilePath]`/`[CallerLineNumber]` trio that
-`JSEngine.NewTypeError` and its siblings declare. Runtime and Storage cannot call
-those directly — they do not reference the Engine assembly that knows how to
-build a `JSError` — so they raise through a factory delegate. The delegates were
-`Func<string, Exception>`, which has nowhere to carry caller info, so the
-compiler filled it in at the only place those arguments were written: the wiring
-lambda in the module initializer. **Nine delegates across three initializers,
-nine constants.**
-
-Caller-info attributes are honoured on a delegate's `Invoke` parameters, so the
-factories are now named delegates that declare them — `JSErrorFactory` in Storage
-(where `PropertySequence` needs it too) and `JSExceptionFactory` in Runtime for
-the sites that want the `JSException` itself. Each throw site captures its own
-position; the initializers forward what they are handed. The same TypeError now
-reports `at Item:...\Runtime\JSUndefined.cs:41,1`, and two failures reaching one
-factory can be told apart — which is what `EngineErrorOriginFrameTests` pins,
-since "not the initializer" alone would be satisfied by any other constant.
-
-**The JavaScript frames are untouched.** This is the frame above them, and it was
-the only wrong one.
-
-**Two things in the same trace are deliberately left alone**, because each is a
-change to a web-visible API rather than a correction of wrong data, and the call
-belongs to whoever owns that surface: `error.stack` opens with an **empty line**
-where a browser writes `TypeError: <message>` (the `JSError` constructor computes
-the stack before the `message` property exists), and it still carries an engine
-source path — an absolute build-machine path, `D:\Broiler\...` in the original
-report — that page script can read.
-
-**Not listed for the pixel suites** — it changes a diagnostic, not anything a
-page paints.
-
-**When it lands upstream:** bump the pointer and delete this patch.
-
-### `0005` — a `<noscript>` body was live content instead of raw text
-
-The tokenizer parsed `<noscript>` contents as ordinary markup, which made the
-fallback a live subtree: elements reachable with `querySelector`/`getElementById`,
-an `<img>` that would be requested, a nested `<script>` a host would find and run.
-All of it is content a page supplies for the case where scripts are **off**.
-
-A scripting-enabled parser instead follows the generic raw text element parsing
-algorithm for `noscript`, exactly as for `<script>` and `<style>`: the body becomes
-one text node, nothing in it is live, and character references are not decoded. So
-`noscript` joins `RawTextElements` in `HtmlTokenizer`.
-
-Membership is **conditional on scripting being enabled** — with scripting off the
-body must parse as markup so it can render — and the comment says so. The set can
-be flat only because this engine has no scripting-disabled mode; if one is ever
-added, that is the line that has to consult it.
-
-**Nothing downstream sees a different serialized document.** `HtmlSerializer`
-already listed `noscript` among the raw-text elements, so a text child round-trips
-back to the same markup. `HtmlScriptScanner`, which is tokenizer-backed, stops
-reporting a `<script>` nested inside a `noscript` — making true what
-`PreloadScanner` already documented as true ("Broiler runs scripts, so the parser
-treats a `noscript` body as text and nothing in it is ever loaded").
-
-**The main repo does not depend on it, and CI is green without it.** The two
-user-visible halves are fixed in this repository and stand alone:
-`HtmlPostProcessor.StripNoscriptContent` stops the fallback rendering (commit
-"Stop rendering `<noscript>` fallback while scripting is enabled"), and
-`CaptureService`'s `NoscriptSpans` skip stops a `<script>` inside one executing —
-that host extracts scripts with its own regex pass rather than through the parser,
-so it needs its own skip whether or not this patch is applied. `NoscriptRenderingTests`
-covers both and passes against the un-patched pointer; verified by reverting the
-submodule and re-running. The DOM half — the fallback being raw text rather than a
-reachable subtree — is what this patch adds, and its tests (`NoscriptRawTextTests`)
-travel inside it.
-
-**Not listed for the pixel suites** — it changes what the DOM holds, and the
-rendering half is already live in this repository.
-
-**When it lands upstream:** bump the pointer and delete this patch. The
-`CaptureService` skip stays: it is about that host's regex extraction, not the parser.
+**Without it the feature degrades rather than breaks.** `Broiler.HtmlBridge.Dom`
+probes for the file it adds (`BroilerJsRejectionPromiseIdentity`, alongside the
+older `BroilerJsRejectionTracking`): unpatched, `unhandledrejection` still fires
+and is still cancelable, its `promise` is `undefined`, and `rejectionhandled`
+does not fire. `RejectionHandledEventTests` is excluded from the build for the
+same reason — the coverage cannot pass against an engine that cannot report the
+identity. Both probes are file-existence checks, so applying this patch is all it
+takes to turn the rest on.
 
 ## A stale entry in the apply script is not inert
 

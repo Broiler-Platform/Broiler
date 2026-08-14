@@ -576,6 +576,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument))
             RegisterDocument(context);
         EnforceConfiguredStyleContentSecurityPolicy();
+        EnablePromiseRejectionTracking();
     }
 
     /// <summary>
@@ -608,6 +609,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegisterDocument))
             RegisterDocument(context);
         EnforceConfiguredStyleContentSecurityPolicy();
+        EnablePromiseRejectionTracking();
     }
 
     /// <summary>
@@ -693,7 +695,27 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public void FlushTimers()
     {
         ThrowIfDisposed();
-        _eventLoop.DrainAll(TaskCheckpointCallback);
+        NotifyRejectedPromises();
+        _eventLoop.DrainAll(NotifyingTaskCheckpoint);
+    }
+
+    /// <summary>
+    /// The host's checkpoint followed by the promise-rejection report, which is where the spec puts
+    /// it: "notify about rejected promises" is the step after a microtask checkpoint, not something
+    /// done once at the end of the run.
+    /// </summary>
+    /// <remarks>
+    /// Reporting per checkpoint rather than once at the end is what makes a rejection's *timing*
+    /// observable, and <c>rejectionhandled</c> reachable at all. A promise rejected by a script and
+    /// caught from a later task is unhandled at the checkpoint in between — a browser reports it and
+    /// then retracts it — whereas a single report at the end would see it already handled and say
+    /// nothing about either. The report before the drain starts covers that first checkpoint, the
+    /// one that follows script execution.
+    /// </remarks>
+    private void NotifyingTaskCheckpoint()
+    {
+        TaskCheckpointCallback?.Invoke();
+        NotifyRejectedPromises();
     }
 
     /// <summary>
@@ -720,7 +742,8 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     public bool FlushTimerStep()
     {
         ThrowIfDisposed();
-        return _eventLoop.DrainStep(TaskCheckpointCallback);
+        NotifyRejectedPromises();
+        return _eventLoop.DrainStep(NotifyingTaskCheckpoint);
     }
 
 }

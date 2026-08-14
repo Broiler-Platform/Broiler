@@ -1,0 +1,214 @@
+From af1cd6d82944911047110490ff923710b28f53b0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 14 Aug 2026 15:22:58 +0000
+Subject: [PATCH] Say which promise a tracked rejection happened to
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The tracker could report that a promise was rejected with nobody waiting on it,
+but not which promise it was: TakePending returns the reason alone, and the
+promise instance it is keyed on never leaves the dictionary. That is enough for a
+log line and not enough for the event a browser fires for these.
+unhandledrejection carries the promise, and a page uses it as an identity — to
+match the report against the work it started, and to recognise the same promise
+if it is handled later. The reason cannot stand in: two promises rejected with
+the same error are two rejections.
+
+So TakeNotifications is TakePending with the key included. TakePending stays and
+drains the same set, because a host that only logs still wants the cheaper shape.
+
+Handled() gains the other half. A rejection can be claimed after it has been
+reported — a page that stores a promise and attaches its catch from a later task
+does exactly that — and the page that logged the failure is owed the retraction.
+Rejections already handed to the host are kept in _notified, and a handler
+arriving for one moves it to _reclaimed for the host to drain as
+rejectionhandled. Removed as it is reclaimed, so a promise handled twice is
+reported once.
+
+_notified is capped rather than unbounded, which _pending does not have to be:
+_pending is emptied every time the host drains it, while a rejection that is
+never handled is never removed from _notified, so on a long-lived page this would
+otherwise retain every rejection and its reason for the life of the context. Past
+the cap the oldest is dropped and a late handler for it fires nothing — by then
+the report it would retract is long gone from the console, which is the case the
+retraction exists to serve.
+
+Still off by default and still one bool on the hot path: a run that does not ask
+for tracking pays for none of this, and Enabled=false now clears all three
+collections rather than leaving the new two behind for the next host.
+---
+ .../Promise/JSPromiseRejectionNotification.cs | 36 +++++++
+ .../Promise/JSPromiseRejectionTracker.cs      | 93 +++++++++++++++++++
+ 2 files changed, 129 insertions(+)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionNotification.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionNotification.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionNotification.cs
+new file mode 100644
+index 00000000..1255f8eb
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionNotification.cs
+@@ -0,0 +1,36 @@
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.BuiltIns.Promise;
++
++/// <summary>
++/// One tracked rejection together with <em>which</em> promise it happened to.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <see cref="UnhandledRejection"/> carries only the reason, which is all a log line needs. The
++/// host-facing event a browser fires for these — <c>unhandledrejection</c> — is specified to carry
++/// the promise as well, and a page uses it as an identity: to match the rejection against work it
++/// started, and to recognise the same promise again if it is later handled. A reason cannot serve
++/// that purpose, because two promises rejected with the same error are two rejections.
++/// </para>
++/// </remarks>
++public readonly struct PromiseRejectionNotification
++{
++    internal PromiseRejectionNotification(JSValue promise, JSValue reason)
++    {
++        Promise = promise;
++        Reason = reason;
++    }
++
++    /// <summary>The promise that was rejected.</summary>
++    public JSValue Promise { get; }
++
++    /// <summary>The rejection reason — an <c>Error</c> object, or whatever else was thrown.</summary>
++    public JSValue Reason { get; }
++
++    /// <summary>
++    /// The reason as the console would render it. Delegates to <see cref="UnhandledRejection"/> so
++    /// the two descriptions cannot drift apart.
++    /// </summary>
++    public string Describe() => new UnhandledRejection(Reason).Describe();
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs
+index 7c5b7eaf..657d9e3d 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Promise/JSPromiseRejectionTracker.cs
+@@ -69,6 +69,26 @@ public readonly struct UnhandledRejection
+ public static class JSPromiseRejectionTracker
+ {
+     private static readonly Dictionary<object, JSValue> _pending = new(ReferenceEqualityComparer.Instance);
++
++    /// <summary>
++    /// Rejections already handed to the host, kept so a handler arriving <em>after</em> the report
++    /// can be recognised as claiming one — the spec's "outstanding rejected promises", and what
++    /// <c>rejectionhandled</c> is fired from.
++    /// </summary>
++    /// <remarks>
++    /// Capped, and oldest-first, because nothing else bounds it: an unhandled rejection that is
++    /// never handled is never removed, so on a long-lived page this would otherwise retain every
++    /// rejection and its reason for the life of the context. Past the cap the oldest is dropped and
++    /// a handler arriving for it fires nothing — the report it would retract is long gone from the
++    /// console by then, which is the case the retraction exists to serve.
++    /// </remarks>
++    private static readonly Dictionary<object, JSValue> _notified = new(ReferenceEqualityComparer.Instance);
++
++    /// <summary>Promises from <see cref="_notified"/> that have since been handled.</summary>
++    private static readonly List<PromiseRejectionNotification> _reclaimed = [];
++
++    /// <summary>How many reported rejections stay recognisable for <c>rejectionhandled</c>.</summary>
++    private const int NotifiedRetentionLimit = 1024;
+     private static readonly object _sync = new();
+     private static bool _enabled;
+ 
+@@ -85,7 +105,11 @@ public static class JSPromiseRejectionTracker
+             {
+                 _enabled = value;
+                 if (!value)
++                {
+                     _pending.Clear();
++                    _notified.Clear();
++                    _reclaimed.Clear();
++                }
+             }
+         }
+     }
+@@ -117,6 +141,12 @@ public static class JSPromiseRejectionTracker
+                 return;
+ 
+             _pending.Remove(promise);
++
++            // Already reported to the host, and now somebody's business after all: the host is owed
++            // the retraction. Removed as it is reclaimed, so a promise handled twice is reported
++            // once.
++            if (_notified.Remove(promise, out var reason))
++                _reclaimed.Add(new PromiseRejectionNotification(promise as JSValue ?? JSUndefined.Value, reason));
+         }
+     }
+ 
+@@ -141,4 +171,67 @@ public static class JSPromiseRejectionTracker
+             return taken;
+         }
+     }
++
++    /// <summary>
++    /// The rejections still unclaimed, each with the promise it happened to, and clears them.
++    /// <see cref="TakePending"/> with the identity a host needs to fire <c>unhandledrejection</c>;
++    /// draining through either one drains the same set.
++    /// </summary>
++    public static IReadOnlyList<PromiseRejectionNotification> TakeNotifications()
++    {
++        lock (_sync)
++        {
++            if (_pending.Count == 0)
++                return [];
++
++            var taken = new List<PromiseRejectionNotification>(_pending.Count);
++            foreach (var entry in _pending)
++            {
++                taken.Add(new PromiseRejectionNotification(entry.Key as JSValue ?? JSUndefined.Value, entry.Value));
++                RememberNotified(entry.Key, entry.Value);
++            }
++
++            _pending.Clear();
++            return taken;
++        }
++    }
++
++    /// <summary>
++    /// The already-reported rejections that have since been handled, and clears them. A host fires
++    /// <c>rejectionhandled</c> for each, so a page that logged the failure can retract it.
++    /// </summary>
++    public static IReadOnlyList<PromiseRejectionNotification> TakeReclaimed()
++    {
++        lock (_sync)
++        {
++            if (_reclaimed.Count == 0)
++                return [];
++
++            var taken = _reclaimed.ToArray();
++            _reclaimed.Clear();
++            return taken;
++        }
++    }
++
++    /// <summary>
++    /// Records a reported rejection as recognisable for a later <c>rejectionhandled</c>, evicting
++    /// the oldest once <see cref="NotifiedRetentionLimit"/> is reached. Caller holds the lock.
++    /// </summary>
++    private static void RememberNotified(object promise, JSValue reason)
++    {
++        if (_notified.Count >= NotifiedRetentionLimit)
++        {
++            // Whichever key enumerates first. Dictionary order is not part of its contract, so
++            // this evicts *a* retained rejection rather than provably the oldest — which is all
++            // the cap needs, since it exists to bound the table and not to age it precisely. The
++            // cost of evicting the wrong one is a late handler firing no rejectionhandled.
++            foreach (var oldest in _notified.Keys)
++            {
++                _notified.Remove(oldest);
++                break;
++            }
++        }
++
++        _notified[promise] = reason;
++    }
+ }
+-- 
+2.43.0
+
