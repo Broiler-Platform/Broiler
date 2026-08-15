@@ -234,14 +234,18 @@ golden suite never looks at a passing test's own reference.
   alone is broken; only the pair. The percentage height stops resolving against the
   grid area and resolves against the initial containing block, and the ratio then
   carries that wrong height into the inline axis.
-- **Where to look:** `CssBox.Sizing.cs` — `CanTransferAspectRatioToBlockHeight`
-  admits a box whose percentage height "computes to auto"
-  (`HeightPercentageResolvesToAuto`), which is right for an outer `<svg>` and wrong
-  for a grid item, whose area *is* a definite containing block.
+- **Where to look — and one place it is *not*.** The obvious suspect,
+  `CssBox.Sizing.cs`'s `CanTransferAspectRatioToBlockHeight`, is **ruled out**: the
+  item's containing block is the `height: 32px` grid container, so
+  `HeightPercentageResolvesToAuto()` is false, and that guard returns false before the
+  width→height transfer is reached. The remaining candidate is the path an
+  *inline-level* container's contents take — `CssBox.ContainingBlock.cs` notes that an
+  atomic inline computes its height in `CssLayoutEngine`'s inline flow rather than in
+  `ResolveUsedBlockHeight`, and `inline-grid` is the only row of the table that goes
+  through it. **Confirm that with a debugger before changing anything**; this entry
+  records a bisect, not a root cause.
 - **Exit gate:** the four-case table above stays correct in every row, and the test's
-  22 assertions pass. **Do not fix the transfer without the table** — the
-  computes-to-auto arm is what gives every `conformance-checkers/html-svg` page its
-  height, and narrowing it carelessly would take that back.
+  22 assertions pass.
 - `justify-self`'s eleven values are a *second* requirement the test makes and are
   not measured yet: nothing can be said about them until the item stays in its area.
 
