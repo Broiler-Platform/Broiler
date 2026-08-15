@@ -693,7 +693,55 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return width > 0 ? width : double.NaN;
     }
 
-    protected override BColor GetActualColor(string colorStr) => LayoutEnvironment.ParseColor(colorStr);
+    /// <summary>
+    /// Resolves a colour declaration to pixels, rewriting the CSS Color 4 functions the canonical
+    /// parser does not read (<c>oklch()</c>, <c>lab()</c>, <c>color()</c>, <c>color-mix()</c>, …)
+    /// into the <c>rgba()</c> form it does — see <see cref="IR.CssColor4"/> for why the conversion
+    /// lives on this side of the boundary rather than inside the parser.
+    /// </summary>
+    /// <remarks>
+    /// The rewrite has to happen before <c>ParseColor</c> rather than after it, because the
+    /// unresolved path does not fail visibly: an unrecognised value folds to <i>opaque black</i>,
+    /// so a colour merely unknown to the parser paints a solid black box rather than nothing.
+    /// </remarks>
+    protected override BColor GetActualColor(string colorStr) =>
+        LayoutEnvironment.ParseColor(
+            IR.CssColor4.NormalizeColorFunctions(colorStr, ResolveCurrentColorFor(colorStr)));
+
+    /// <summary>
+    /// This element's <c>color</c> in a spelling <see cref="IR.CssColor4"/> can read, but only when
+    /// the value being resolved actually names <c>currentcolor</c> inside a colour function — the
+    /// bare keyword is substituted by each property's own accessor, and computing
+    /// <see cref="CssBoxProperties.ActualColor"/> speculatively would cost a cascade read on every
+    /// colour in the document.
+    /// </summary>
+    /// <remarks>
+    /// Re-entrancy is real rather than theoretical: <c>ActualColor</c> resolves the <c>color</c>
+    /// property through this same method, so <c>color: color-mix(in srgb, currentcolor, red)</c>
+    /// would ask itself for its own answer. The guard returns null on the inner call, which leaves
+    /// that mix unconverted — the honest outcome, since the value is self-referential.
+    /// </remarks>
+    /// <inheritdoc/>
+    protected override string? ResolveCurrentColorFor(string? value)
+    {
+        if (!MayNeedCurrentColor(value) || _resolvingCurrentColor || LayoutEnvironment is null)
+            return null;
+
+        _resolvingCurrentColor = true;
+        try
+        {
+            var current = ActualColor;
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"rgba({current.R}, {current.G}, {current.B}, {(current.A / 255.0).ToString("0.###", CultureInfo.InvariantCulture)})");
+        }
+        finally
+        {
+            _resolvingCurrentColor = false;
+        }
+    }
+
+    private bool _resolvingCurrentColor;
 
     protected override PointF GetActualLocation(string X, string Y)
     {

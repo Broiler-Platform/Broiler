@@ -18,11 +18,16 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
   a "low percent match" problem only when it renders below the low-match
   threshold (50% by default); when too few mismatches clear that bar to fill the
   issue, the threshold is widened in 10-point steps until it does (or nothing
-  more can be found). A mismatch the runner flagged with ``suspectReference``
-  (``--verify-reference``: Broiler reproduces the reference the test itself
-  declares, so the committed golden is the outlier) is never ranked — it is
-  listed under its own heading instead, so a test that is correct by its own
-  reference stops being reported as the run's worst render. Each crash names an
+  more can be found). Severity is read from the test's score against the
+  reference *it itself declares* whenever ``--verify-reference`` measured one,
+  and from the committed golden only when it did not — see
+  ``_engine_gap_percent``. A mismatch the runner flagged with
+  ``suspectReference`` (Broiler reproduces the test's own reference outright, so
+  the committed golden is the outlier) is never ranked, and one whose own
+  reference says it is mostly right is ranked accordingly rather than by the
+  golden; both are listed under their own heading instead, so a test that is
+  correct by its own reference stops being reported as the run's worst render.
+  Each crash names an
   example gated test and the issue spells
   out the ``--render`` command to reproduce a listed test, so every entry points
   at its cause. This is the "what hurt most this run" companion to the
@@ -321,7 +326,7 @@ def _reference_score_note(test: dict) -> str:
     known about it — indistinguishable from one that is wrong against both. The two
     need opposite work: the first says the goldens disagree and "fixing" it would mean
     rendering less than the test asks for, the second is a real engine gap. Printing the
-    second number says which one this is.
+    second number says which one this is; ``_engine_gap_percent`` is what *ranks* on it.
     """
     reference_percent = test.get("referenceMatchPercent")
     if reference_percent is None:
@@ -337,8 +342,13 @@ def _reference_score_note(test: dict) -> str:
             " — far closer than to the committed golden, so most of this gap is the two"
             " references disagreeing rather than the feature under test"
         )
+    elif match_percent - reference_percent >= REFERENCE_DISAGREEMENT_MARGIN:
+        note += (
+            " — *worse* than against the committed golden, so the golden is flattering"
+            " this render and the feature under test is the gap"
+        )
 
-    return note + "."
+    return note + ". Severity above is ranked on that score, not the golden's."
 
 
 #: How far a test's score against its own ``rel=match`` reference must exceed its score
@@ -346,6 +356,51 @@ def _reference_score_note(test: dict) -> str:
 #: disagreeing rather than to the engine. Mirrors the runner's own margin; it is a
 #: comparative claim, so it needs no tuning against the run's pass threshold.
 REFERENCE_DISAGREEMENT_MARGIN = 25.0
+
+
+def _engine_gap_percent(test: dict) -> float:
+    """How wrong the *engine* is about this test, as a match percentage.
+
+    Two different numbers can be measured for one failing test, and they answer
+    different questions. ``matchPercent`` is against the committed golden — a
+    *Chromium* screenshot, so it also moves when the two engines merely disagree
+    about the reference. ``referenceMatchPercent`` is against the reference the
+    test itself declares via ``rel=match``, re-rendered by Broiler, so nothing but
+    Broiler is in it: it is WPT's own statement of the right answer.
+
+    When ``--verify-reference`` measured the second, it is the better estimate of
+    the engine's gap and severity is read from it — **in both directions**, which
+    is the point. Ranking on the golden alone got the 2026-08-15 run's severity
+    issue wrong at both ends: ``css-page/page-margin-002-print`` (0.0% golden,
+    89.2% against its own reference, and already settled as a reference
+    disagreement in ``docs/wpt-rendering-gaps-wont-fix.md``) was ranked the run's
+    single biggest problem, while ``column-subgrid-auto-fill-008`` (11.5% golden,
+    **0.2%** against its own reference — the worst real render in the list) was
+    ranked seventeenth.
+
+    Falls back to the golden when no reference score was measured, so a run
+    without ``--verify-reference`` ranks exactly as it always did.
+    """
+    reference_percent = test.get("referenceMatchPercent")
+    if reference_percent is None:
+        return float(test["matchPercent"])
+    return float(reference_percent)
+
+
+def _is_partial_reference_disagreement(test: dict) -> bool:
+    """Whether the test's own reference says most of its golden gap is not the engine.
+
+    The runner's ``suspectReference`` covers only the clean case, where Broiler
+    *clears the pass gate* against the test's own reference. This is the rest of
+    the same class: short of the gate, but far enough above the golden that the
+    references are demonstrably disagreeing. Such a test is still ranked — it has
+    a real residual gap — but on ``_engine_gap_percent``, and it is listed
+    alongside the cleared ones so a near-0% golden never disappears silently.
+    """
+    reference_percent = test.get("referenceMatchPercent")
+    if reference_percent is None:
+        return False
+    return float(reference_percent) - float(test["matchPercent"]) >= REFERENCE_DISAGREEMENT_MARGIN
 
 
 def _rank_biggest_problems(
@@ -372,13 +427,21 @@ def _rank_biggest_problems(
       the reference by less than ``low_match_threshold`` percent, worst match
       first.
 
+    Tier 2 is measured with ``_engine_gap_percent``, not with the raw golden
+    score: where the runner rendered the test's own ``rel=match`` reference, that
+    is the number that says how wrong the engine is, and both the threshold and
+    the ordering read it. A test the golden calls catastrophic and its own
+    reference calls nearly right therefore stops crowding out the run's real
+    worst renders, and a test the golden flatters stops hiding among them.
+
     A mismatch carrying ``suspectReference`` is excluded from tier 2 altogether.
     That flag means the runner re-rendered the test's own ``rel=match`` reference
     and Broiler *did* reproduce it — so the committed golden is the outlier and
     the render is not the run's worst problem, however low the percentage looks.
     Ranking these would (and repeatedly did) fill the severity issue with tests
     that are correct by the only authority the test itself names; they are
-    reported separately by ``_reference_disagreements``.
+    reported separately by ``_reference_disagreements``, which also lists the
+    partial cases this ranking demotes rather than clears.
 
     Selection is diversity-first: the single worst entry of each distinct kind is
     taken before any slot is spent on a second entry of a kind already shown, then
@@ -434,29 +497,37 @@ def _rank_biggest_problems(
     # the lowest match seen for each path.
     lowest_by_path: dict[str, dict] = {}
     for test in low_match_tests:
-        if test["matchPercent"] >= low_match_threshold:
+        if _engine_gap_percent(test) >= low_match_threshold:
             continue
         if test.get("suspectReference"):
             continue
         existing = lowest_by_path.get(test["relativeTestPath"])
-        if existing is None or test["matchPercent"] < existing["matchPercent"]:
+        if existing is None or _engine_gap_percent(test) < _engine_gap_percent(existing):
             lowest_by_path[test["relativeTestPath"]] = test
     for test in lowest_by_path.values():
         label = test["category"]
         if test["subCategory"]:
             label = f"{label} / {test['subCategory']}"
+        gap_percent = _engine_gap_percent(test)
         problems.append(
             {
                 "kind": "LowMatch",
                 "tier": 2,
-                "severity": 100.0 - test["matchPercent"],
+                "severity": 100.0 - gap_percent,
                 "impact": 1,
                 "matchPercent": test["matchPercent"],
+                # The number the ranking was read from: the same as matchPercent
+                # unless --verify-reference measured the test's own reference.
+                "engineGapPercent": gap_percent,
                 "relativeTestPath": test["relativeTestPath"],
-                "title": f"{test['matchPercent']:.1f}% match — {test['relativeTestPath']}",
+                "title": f"{gap_percent:.1f}% match — {test['relativeTestPath']}",
+                # Name which reference the first number is against as soon as there
+                # are two of them, so the headline percentage and the body cannot be
+                # read as disagreeing about the same measurement.
                 "detail": (
-                    f"Rendered output matches the reference by only "
-                    f"{test['matchPercent']:.1f}% ({label})."
+                    f"Rendered output matches the "
+                    f"{'committed golden' if test.get('referenceMatchPercent') is not None else 'reference'}"
+                    f" by only {test['matchPercent']:.1f}% ({label})."
                     + _reference_score_note(test)
                 ),
             }
@@ -490,20 +561,30 @@ def _rank_biggest_problems(
 
 
 def _reference_disagreements(low_match_tests: list[dict]) -> list[dict]:
-    """The mismatches the runner cleared as reference problems, worst match first.
+    """The mismatches whose own reference contradicts the golden, worst match first.
 
-    These carry ``suspectReference``: with ``--verify-reference`` the runner also
-    rendered the test's own ``rel=match`` reference and found that Broiler
-    reproduces it. The committed golden disagrees with the test's own statement of
-    what it should look like, so the render is not a Broiler bug.
+    Two classes, distinguished by ``cleared``:
 
-    They are excluded from the biggest-problems ranking but reported alongside it,
-    because "these six are not bugs" is itself worth telling a maintainer — and
-    silently dropping a 0.0% match would be indistinguishable from losing it.
+    * **cleared** — carrying ``suspectReference``: with ``--verify-reference`` the
+      runner also rendered the test's own ``rel=match`` reference and found that
+      Broiler reproduces it. The committed golden disagrees with the test's own
+      statement of what it should look like, so the render is not a Broiler bug.
+    * **partial** — short of that gate, but scoring at least
+      ``REFERENCE_DISAGREEMENT_MARGIN`` points better against its own reference
+      than against the golden. Most of the golden's gap is the two references
+      disagreeing; the remainder is real, so these stay in the ranking, demoted to
+      where ``_engine_gap_percent`` puts them. Listing them here as well is what
+      keeps a 0.0% golden score visible after the demotion — the report must not
+      make a catastrophic-looking number simply vanish.
+
+    A cleared one is excluded from the biggest-problems ranking entirely; a partial
+    one is only demoted within it. Either way it is reported here, because "these
+    six are not bugs" is itself worth telling a maintainer — and silently dropping a
+    0.0% match would be indistinguishable from losing it.
     """
     lowest_by_path: dict[str, dict] = {}
     for test in low_match_tests:
-        if not test.get("suspectReference"):
+        if not test.get("suspectReference") and not _is_partial_reference_disagreement(test):
             continue
         existing = lowest_by_path.get(test["relativeTestPath"])
         if existing is None or test["matchPercent"] < existing["matchPercent"]:
@@ -513,7 +594,9 @@ def _reference_disagreements(low_match_tests: list[dict]) -> list[dict]:
             {
                 "relativeTestPath": test["relativeTestPath"],
                 "matchPercent": test["matchPercent"],
-                "detail": test["suspectReference"],
+                "referenceMatchPercent": test.get("referenceMatchPercent"),
+                "cleared": bool(test.get("suspectReference")),
+                "detail": test.get("suspectReference"),
             }
             for test in lowest_by_path.values()
         ),
@@ -551,7 +634,7 @@ def _rank_biggest_problems_escalating(
     # not keep the escalation going after every real mismatch is already admitted.
     highest_match = max(
         (
-            test["matchPercent"]
+            _engine_gap_percent(test)
             for test in low_match_tests
             if not test.get("suspectReference")
         ),
@@ -1096,20 +1179,34 @@ def render_biggest_problems_markdown(merged: dict, run_url: str | None) -> str:
     # the golden is wrong, not the render.
     disagreements = merged.get("referenceDisagreements") or []
     if disagreements:
+        cleared = [entry for entry in disagreements if entry.get("cleared", True)]
+        partial = [entry for entry in disagreements if not entry.get("cleared", True)]
         lines += [
             "",
-            "### Not ranked — reference disagreements",
+            "### Reference disagreements",
             "",
-            f"_{len(disagreements)} mismatch(es) are excluded from the ranking above."
-            " For each, the runner re-rendered the reference the test itself declares"
-            " via `rel=match` and Broiler reproduced it, so the committed golden is the"
-            " outlier rather than the render. Fixing these would mean rendering *less*"
-            " than the test asks for._",
+            f"_For each of these {len(disagreements)} mismatch(es) the runner re-rendered"
+            " the reference the test itself declares via `rel=match`, and Broiler scored"
+            " far better against it than against the committed golden — so most of the"
+            " golden's gap is the two references disagreeing rather than the feature"
+            f" under test. {len(cleared)} reproduce that reference outright and are"
+            " excluded from the ranking above entirely; the other"
+            f" {len(partial)} keep a real residual gap and are ranked above on *that*"
+            " score instead of the golden's. Chasing the golden on any of them would"
+            " mean rendering *less* than the test asks for._",
             "",
         ]
         for entry in disagreements:
+            reference_percent = entry.get("referenceMatchPercent")
+            if reference_percent is None:
+                against = ""
+            elif entry.get("cleared", True):
+                against = f" — reproduces its own reference at {reference_percent:.1f}%"
+            else:
+                against = f" — {reference_percent:.1f}% against its own reference"
             lines.append(
-                f"- **{entry['matchPercent']:.1f}% match** — `{entry['relativeTestPath']}`"
+                f"- **{entry['matchPercent']:.1f}% golden** — "
+                f"`{entry['relativeTestPath']}`{against}"
             )
 
     # Point at the fix: spell out the exact command to render a listed test against

@@ -756,11 +756,42 @@ internal abstract partial class CssBoxProperties
             _actualBackgroundColor = BColor.Empty;
         }
     }
+    /// <remarks>
+    /// The CSS Color 4 rewrite has to reach the gradient stops too, and a gradient's colours are
+    /// never seen by <c>GetActualColor</c> — the paint walker parses the whole
+    /// <c>linear-gradient(…)</c> string itself and resolves each stop with the canonical parser. A
+    /// stop it cannot read is *dropped* rather than folded to black, so a single-stop
+    /// <c>linear-gradient(to right in srgb, color(srgb none 0.5 0.5))</c> lost its only stop and
+    /// painted nothing at all (WPT
+    /// <c>css-images/gradient/gradient-single-stop-none-interpolation</c>). Normalising here hands
+    /// the walker a stop list it already understands.
+    /// </remarks>
     public string BackgroundImage
     {
-        get => ResolveCssVariables(_backgroundImage);
+        get
+        {
+            var value = ResolveCssVariables(_backgroundImage);
+            return IR.CssColor4.NormalizeColorFunctions(value, ResolveCurrentColorFor(value));
+        }
         set => _backgroundImage = value;
     }
+
+    /// <summary>
+    /// This element's resolved <c>color</c>, but only when <paramref name="value"/> actually names
+    /// <c>currentcolor</c> inside a colour function — resolving it unconditionally would run the
+    /// colour cascade for every background image in the document, and does so at points in box
+    /// construction where there is no layout environment to run it against. Null when there is
+    /// nothing to resolve or no basis to resolve it. Overridden by <c>CssBox</c>; the base has no
+    /// cascade to read.
+    /// </summary>
+    protected virtual string? ResolveCurrentColorFor(string? value) => null;
+
+    /// <summary>The cheap half of <see cref="ResolveCurrentColorFor"/>, shared by the override: a
+    /// value with no parenthesised <c>currentcolor</c> in it can never need one.</summary>
+    private protected static bool MayNeedCurrentColor(string? value) =>
+        !string.IsNullOrEmpty(value) &&
+        value.IndexOf('(') >= 0 &&
+        value.IndexOf("currentcolor", StringComparison.OrdinalIgnoreCase) >= 0;
 
     public string BackgroundPosition { get; set; } = "0% 0%";
     public string BackgroundRepeat { get; set; } = "repeat";
@@ -1121,8 +1152,22 @@ internal abstract partial class CssBoxProperties
     // ordinary boxes, which stack normally.
     public int? TopLayerOrder { get; set; }
 
-    public string BoxShadow { get; set; } = "none";
-    public string TextShadow { get; set; } = "none";
+    // The shadow shorthands carry a <color> the paint walker parses out of the whole string rather
+    // than through GetActualColor, so they need the same CSS Color 4 rewrite BackgroundImage does.
+    public string BoxShadow
+    {
+        get => IR.CssColor4.NormalizeColorFunctions(_boxShadow, ResolveCurrentColorFor(_boxShadow));
+        set => _boxShadow = value;
+    }
+
+    public string TextShadow
+    {
+        get => IR.CssColor4.NormalizeColorFunctions(_textShadow, ResolveCurrentColorFor(_textShadow));
+        set => _textShadow = value;
+    }
+
+    private string _boxShadow = "none";
+    private string _textShadow = "none";
     public string MixBlendMode { get; set; } = "normal";
     public string BackgroundBlendMode { get; set; } = "normal";
     public string Filter { get; set; } = "none";

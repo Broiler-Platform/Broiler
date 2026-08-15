@@ -1248,6 +1248,19 @@ internal static partial class SvgRenderer
         if (Broiler.CSS.CssSystemColors.TryResolve(val, out var system))
             return BColor.FromArgb(system.Alpha, system.Red, system.Green, system.Blue);
 
+        // SVG paint takes any CSS <color>, which since Color 4 includes oklch()/lab()/color()/…
+        // None of the branches above reads one, and the fall-through below is the caller's default
+        // — solid black for a fill — so an SVG styled in a modern colour space painted black rather
+        // than the colour it names.
+        if (CssColor4.TryParse(val, out var color4))
+        {
+            return BColor.FromArgb(
+                (int)Math.Round(Math.Clamp(color4.A, 0, 1) * 255),
+                (int)Math.Round(Math.Clamp(color4.R, 0, 255)),
+                (int)Math.Round(Math.Clamp(color4.G, 0, 255)),
+                (int)Math.Round(Math.Clamp(color4.B, 0, 255)));
+        }
+
         return defaultColor;
     }
 
