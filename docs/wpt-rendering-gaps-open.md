@@ -201,10 +201,70 @@ golden suite never looks at a passing test's own reference.
   the check that subgrid stays a no-op while that is fixed, since the reference
   depends on it being one.
 
+### `aspect-ratio` on a grid item escapes an `inline-grid`
+
+- **Test:** `css-grid/alignment/grid-item-aspect-ratio-justify-self-001`, CI 3.9%
+  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).11). Was listed
+  here as not triaged; it now has an isolated repro.
+- **What the test asks.** A grid item with `aspect-ratio: 1/2`, `height: 100%` of a
+  32px grid and a *non-stretching* `justify-self` must take its inline size from the
+  height through the ratio: **16×32**. With `justify-self: normal`/`stretch` it fills
+  the 24px area instead and is 24×48.
+- **What we produce: 1008×2016** — the item escapes the grid entirely and fills the
+  page. `check-layout-th.js` reports it directly, which is what makes this precise
+  rather than a pixel percentage:
+
+  ```
+  div.item  width   expected 16  actual 1008
+  div.item  height  expected 32  actual 2016
+  ```
+
+- **It is the `inline-grid`, not the ratio and not the alignment.** Bisected with a
+  four-case repro:
+
+  | Container | Item | Result |
+  | --- | --- | --- |
+  | `inline-grid` | `height: 100%` | **correct** |
+  | `inline-grid` | `height: 100%` + `aspect-ratio` | **escapes** — 24 wide, the page's height tall |
+  | `grid` (block-level) | `height: 100%` + `aspect-ratio` | correct |
+  | `block` | `height: 100%` + `aspect-ratio` | correct |
+  | `inline-block` | `height: 100%` + `aspect-ratio` | correct |
+
+  So neither `aspect-ratio` alone nor an item's percentage height in an `inline-grid`
+  alone is broken; only the pair. The percentage height stops resolving against the
+  grid area and resolves against the initial containing block, and the ratio then
+  carries that wrong height into the inline axis.
+- **Where to look:** `CssBox.Sizing.cs` — `CanTransferAspectRatioToBlockHeight`
+  admits a box whose percentage height "computes to auto"
+  (`HeightPercentageResolvesToAuto`), which is right for an outer `<svg>` and wrong
+  for a grid item, whose area *is* a definite containing block.
+- **Exit gate:** the four-case table above stays correct in every row, and the test's
+  22 assertions pass. **Do not fix the transfer without the table** — the
+  computes-to-auto arm is what gives every `conformance-checkers/html-svg` page its
+  height, and narrowing it carelessly would take that back.
+- `justify-self`'s eleven values are a *second* requirement the test makes and are
+  not measured yet: nothing can be said about them until the item stays in its area.
+
 ### Not triaged
 
-- `css-grid/abspos/grid-sizing-positioned-items-001`, CI 9.1%. Declares no
-  `rel=match`, so it can only be judged from a CI artifact.
+- `css-grid/abspos/grid-sizing-positioned-items-001`, CI 9.1%
+  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).13). Declares no
+  `rel=match`, so the pixel score can only be judged from a CI artifact — but its
+  `check-layout-th.js` assertions can be read locally and say the abspos grid child is
+  placed at the padding edge rather than at its grid area, and sized against the wrong
+  box:
+
+  ```
+  div.absolute  offset-x  expected   0  actual   15
+  div.absolute  offset-y  expected   0  actual   15
+  div.absolute  height    expected 1030 actual   30
+  div.absolute  offset-x  expected 115  actual   15
+  div.absolute  width     expected 915  actual 1030
+  ```
+
+  Every `offset-*` is the container's 15px padding, so **the grid area is not being
+  used as the containing block for an absolutely positioned grid child at all**
+  (CSS Grid §9). That is one cause for the whole test, not eleven separate ones.
 
 ---
 
