@@ -809,13 +809,13 @@ the test that exposed it.
     effect is on the layout assertions above, which the pixel suite never reaches — the
     test declares no `rel=match`.
 - **Unit suites: `Broiler.Layout.Tests` 908 / 908, and `Broiler.Cli.Tests` holds its
-  baseline** — 53 pre-existing failures before, the same 53 after, plus the 13 new tests
-  passing. One test differed between the two full runs
-  (`ScriptCompileAheadOverlapTests.Every_Source_Is_Compiled_By_A_Worker_When_The_Budget_Is_On`)
-  and is **not** this change: it is a worker-scheduling budget assertion that touches no
-  layout code, and it passes in isolation on both builds. Re-run before believing it, the
-  way [the flaky view-transition test](wpt-rendering-gaps-open.md#one-test-is-flaky) had
-  to be.
+  baseline exactly** — 53 pre-existing failures before, the same 53 after, the failing set
+  identical name for name, plus the new tests passing. One intermediate run reported a 54th
+  (`ScriptCompileAheadOverlapTests.Every_Source_Is_Compiled_By_A_Worker_When_The_Budget_Is_On`);
+  it did not recur, it passes in isolation on both builds, and it is a worker-scheduling
+  budget assertion that touches no layout code — the machine was under memory pressure from
+  a concurrent sweep. Re-run before believing a diff, the way
+  [the flaky view-transition test](wpt-rendering-gaps-open.md#one-test-is-flaky) had to be.
 - **Tests:** `Broiler.Layout.Tests/AtomicInlineContainingBlockTests.cs` reads
   `CssBox.ContainingBlock` directly — the four atomic inline displays, their four
   block-level counterparts, and a plain `display: inline` control that must stay
@@ -862,6 +862,14 @@ the test that exposed it.
   arithmetic for the content-box row said 18 and was wrong; the engine and Chromium both
   say 20 × 36. The three rows whose block axis Chromium drives back through the ratio are
   recorded as the remaining gap rather than pinned at today's value.
+- **Sweep: the same 5 112 reftests, and it moves nothing at all** — 2 395 passing before and
+  after, `+0 / −0`, average match identical to three decimals. That is the expected result
+  rather than a disappointing one: the transfer fires only for a grid item that carries an
+  `aspect-ratio`, has an auto inline size *and* is not stretched, and no reftest in this
+  corpus combines the three. **The evidence for this change is the layout assertions and the
+  Chromium comparison, not the pixel suite** — the test it was written for declares no
+  `rel=match`, so the reftest runner never sees it. Worth stating plainly, because a `+0/−0`
+  sweep is only reassuring once you know it was capable of showing something.
 - **Tests:** `Broiler.Cli.Tests/GridItemAspectRatioInlineSizeTests.cs` — the nine
   non-stretching `justify-self` values, the `normal`/`stretch` control that must still fill
   its area (a fix that applied the ratio unconditionally would pass the first and fail the
