@@ -64,8 +64,13 @@ The largest remaining cluster, and it reduces to three causes.
 - **Read the fixed entry before attempting it.** Cloning the DOM unconditionally
   was implemented, measured at +8/−7 across 458 tests, and reverted; the reason is
   structural, not a missing detail.
-- **Exit gate:** a rasterised root snapshot composites at the group geometry so
-  `root-to-shared-animation-start` matches, with the other three staying passing.
+- **`root-to-shared-animation-start` now passes** on the narrower rule that
+  [a hidden new snapshot forces the old one to carry content](wpt-rendering-gaps-fixed.md#the-live-page-cannot-stand-in-for-the-old-root-snapshot-when-the-new-one-is-hidden),
+  which is not the rasterised snapshot this entry asks for — it is the same DOM clone,
+  reached by a gate that is right about one more case. The entry stands for the rest.
+- **Exit gate:** a rasterised root snapshot composites at the group geometry, with the
+  other three staying passing, and a page holding an `<iframe>` reproduces its frames —
+  the clone cannot, which is why the new gate excludes such pages.
 
 ### The snapshot clone lays its children out horizontally
 
@@ -78,15 +83,45 @@ The largest remaining cluster, and it reduces to three causes.
   so scrolling a vertical writing mode is right, and the gap is in the transition.
   [The old capture's containing block](wpt-rendering-gaps-fixed.md#the-old-capture-was-not-in-the-snapshot-containing-block)
   was the other half and is fixed; it closed the two *vertical*-scroll siblings.
-- **What remains.** Ours is green 85.1% — a green band ~651px tall where the
-  element is 100px tall — so `.middle`'s `block-size: 39800px` is resolving as a
-  height. It is **not** a lost `writing-mode` bake:
+- **What remains, traced rather than inferred.** Ours is a green band that fills the
+  viewport where the element is 100px tall, so `.middle`'s `block-size: 39800px` is
+  resolving as a height. It is **not** a lost `writing-mode` bake:
   `BuildViewTransitionSnapshotContent` carries `writing-mode: vertical-lr` onto the
-  content box correctly, so the miss is further in, in how the clone's box is
-  sized. These four are the horizontal-scroll members, where the block axis and the
-  scrolled axis are the same one.
+  content box correctly. The miss is two rules deep, and both were confirmed by probe:
+
+  1. **The pseudo-tree boxes are real `<div>`s under `<html>`, so they inherit
+     `:root { writing-mode: vertical-lr }` as well.** Broiler rotates a vertical subtree
+     from its *rotation root*, defined as a vertical box whose parent is not vertical
+     (`CssBox.cs` `isVerticalRoot`, `CssBox.WritingMode.cs` `WillBeVerticalTransposed`).
+     With every ancestor vertical the content box is never a root, so `ResolvePhysicalSize`
+     maps `block-size` onto physical height un-swapped. css-view-transitions-1 gives the
+     pseudo tree the *captured element's* writing mode, not the originating root's, so
+     resetting the snapshot boxes to `horizontal-tb` is both spec-correct and what makes
+     the content box a rotation root.
+  2. **And that is not sufficient**, which is the part worth recording. Once the content
+     box *is* a rotation root, its own `width: 100%` / `height: 100%` are read as the
+     frame's inline and block extents — but the percentage still resolves against the
+     containing block's **physical** width. A 40000×100 capture then lays out 40000 wide
+     and 40000 tall, and with `overflow: visible` on the group (a captured element that
+     establishes no clip) the whole viewport fills with the middle band.
+
+- **Two variants were measured and neither is a clean win**, which is why this stays open:
+
+  | change | `css/css-view-transitions` | the four subjects | cost |
+  | --- | --- | --- | --- |
+  | `writing-mode: horizontal-tb` on the snapshot boxes | 157 → 164 | 2.0/2.7% → 13.8% | `right-and-left-*-partially-onscreen` ×2, a byte-exact pass, breaks |
+  | the same **plus** the content box sized in px from the capture | 157 → 162 | two **pass**, two 98.5% | the four `*-offscreen-*` fall 98.65% → 91.26% |
+
+  `right-and-left-*-partially-onscreen` renders byte-identically to its reference today, so
+  it is a genuine pass and not an accidental one — checked against the pristine build.
+- **So the exit gate is a percentage basis, not a bake.** A rotation root's frame extent
+  must resolve a percentage against the containing block's *swapped* extent
+  (`CssBox.ContainingBlock.cs` already does the equivalent for out-of-flow descendants of a
+  transposed containing block). With that in place the writing-mode reset should close all
+  four without the px workaround; it is a change to the `BROILER_VERTICAL_FLOW` prototype's
+  percentage resolution and deserves its own sweep over `css-writing-modes` and `css-align`.
 - **Exit gate:** the four match; the family is 20 tests locally and the other 16
-  must not move.
+  must not move — in particular `right-and-left-*-partially-onscreen`, which passes now.
 
 ### A captured element still paints in place
 
@@ -122,10 +157,18 @@ The largest remaining cluster, and it reduces to three causes.
   into the parent, with a focused test pinning an iframe's old root snapshot
   against the parent's.
 
-### Scrollbars in a captured snapshot
+### Scrollbars in a captured snapshot — **fixed**, and never about scrollbars
 
-- **Tests:** `css-view-transitions/{new,old}-content-has-scrollbars`, CI 11.1% →
-  **11.1%** against their own references. Reproduces exactly; not triaged further.
+- **Tests:** `css-view-transitions/{new,old}-content-has-scrollbars`, 11.1% → **both
+  pass**. See
+  [the live page cannot stand in for a hidden snapshot](wpt-rendering-gaps-fixed.md#the-live-page-cannot-stand-in-for-the-old-root-snapshot-when-the-new-one-is-hidden).
+- **The name is misleading and the entry should not have kept it.** Broiler paints no
+  scrollbar and does not inset the viewport for one, and the two tests' references are
+  byte-identical to each other despite one page having scrollbars and the other
+  `overflow: hidden`. Both degenerated locally to one question — does the old root
+  snapshot carry content — and both hit 100% once it does. **The scrollbar semantics they
+  were written to verify are still untested here**; a future reader must not take these two
+  passing as evidence that scrollbars in a snapshot work.
 
 ### Two tests are green on CI and wrong
 

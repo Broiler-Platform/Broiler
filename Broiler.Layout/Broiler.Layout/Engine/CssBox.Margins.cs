@@ -151,7 +151,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             CollapsedMarginTop = value;
         }
-        else if (_parentBox != null && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
+        // CSS2.1 §8.3.1: "Margins of absolutely positioned boxes do not collapse." This branch is
+        // reached by any box with no previous *in-flow* sibling — GetPreviousSibling already skips
+        // out-of-flow ones — so an absolutely positioned first child was collapsing with its parent
+        // and, worse, propagating its excess margin into the parent's Location below, which drags
+        // every in-flow sibling down with it. A page whose first child is a fixed backdrop or an
+        // abspos panel therefore laid its real content out at the wrong offset.
+        else if (_parentBox != null && Position is not (CssConstants.Absolute or CssConstants.Fixed)
+            && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
             // CSS Box Alignment §5.4: align-content != normal establishes
             // a BFC, which prevents parent–child margin collapsing.
             && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal")
