@@ -65,7 +65,10 @@ public static class AmbientRenderState
         /// <summary><see cref="DocumentModeContext.CurrentQuirksMode"/>.</summary>
         DocumentMode = 2,
 
-        /// <summary><see cref="IR.SvgFilterTable"/> and <see cref="IR.SvgClipPathTable"/>.</summary>
+        /// <summary>
+        /// <see cref="IR.SvgFilterTable"/>, <see cref="IR.SvgClipPathTable"/> and
+        /// <see cref="IR.SvgTextEnvironment"/>.
+        /// </summary>
         SvgTables = 4,
 
         /// <summary>Everything a thread running layout or paint needs.</summary>
@@ -138,6 +141,7 @@ public static class AmbientRenderState
         DocumentModeContext.CurrentQuirksMode = quirksMode;
         IR.SvgFilterTable.ResetForThread();
         IR.SvgClipPathTable.ResetForThread();
+        IR.SvgTextEnvironment.ResetForThread();
         _established = Slots.All;
     }
 

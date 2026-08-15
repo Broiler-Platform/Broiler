@@ -1298,21 +1298,30 @@ body { margin: 0; }
     }
 
     // ──────────── Video element placeholder tests ────────────────────────
-    // <video> elements should render as replaced elements with a black
-    // placeholder matching the default browser dimensions (300×150).
+    // <video> is a replaced element that takes the default 300×150 object size
+    // and never lays out the fallback content between its tags.
+    //
+    // These assert the box, not a fill colour. The element's own painting is
+    // "the poster frame, or nothing" (HTML §4.8.9): with neither, the reference
+    // browser paints the box transparent, so a colour assertion here would be
+    // pinning a placeholder the engine is not supposed to draw. The author
+    // background each case sets is what makes the box's extent observable, and
+    // that one *is* the element's to paint. Transparency itself is pinned by
+    // conformance-checkers/html/elements/{video,track}/src-isvalid in the WPT run.
 
     /// <summary>
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-video-notref.html
-    /// Verifies that a <c>&lt;video&gt;</c> element is replaced with a black
-    /// placeholder box. The default intrinsic size is 300×150px.
+    /// Verifies that a <c>&lt;video&gt;</c> element is replaced by a box of the
+    /// default 300×150 object size.
     /// </summary>
     [Fact]
-    public void Video_Element_Renders_As_Black_Placeholder()
+    public void Video_Element_Renders_As_Default_Sized_Replaced_Box()
     {
         var html = @"<!DOCTYPE html>
 <html>
 <head><style>
 body { margin: 0; background-color: white; }
+video { background-color: black; }
 </style></head>
 <body>
 <video autoplay>
@@ -1323,13 +1332,13 @@ body { margin: 0; background-color: white; }
 </html>";
 
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
-        // The video placeholder should render as a 300×150 black box.
+        // The replaced box should cover 300×150 from the origin.
         var pInside = bitmap.GetPixel(150, 75);
         Assert.InRange(pInside.R, 0, 20);
         Assert.InRange(pInside.G, 0, 20);
         Assert.InRange(pInside.B, 0, 20);
 
-        // Outside the placeholder (to the right) should be white.
+        // Outside the box (to the right) should be white.
         var pOutside = bitmap.GetPixel(350, 75);
         Assert.InRange(pOutside.R, 245, 255);
         Assert.InRange(pOutside.G, 245, 255);
@@ -1338,7 +1347,7 @@ body { margin: 0; background-color: white; }
 
     /// <summary>
     /// Verifies that explicit width/height on <c>&lt;video&gt;</c> is
-    /// respected in the placeholder dimensions.
+    /// respected in the replaced box's dimensions.
     /// </summary>
     [Fact]
     public void Video_Element_Respects_Explicit_Dimensions()
@@ -1347,6 +1356,7 @@ body { margin: 0; background-color: white; }
 <html>
 <head><style>
 body { margin: 0; background-color: white; }
+video { background-color: black; }
 </style></head>
 <body>
 <video width=""200"" height=""100"" autoplay>
@@ -1356,7 +1366,7 @@ body { margin: 0; background-color: white; }
 </html>";
 
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
-        // 200×100 black box
+        // 200×100 box
         var pInside = bitmap.GetPixel(100, 50);
         Assert.InRange(pInside.R, 0, 20);
         Assert.InRange(pInside.G, 0, 20);
@@ -1388,12 +1398,46 @@ body { margin: 0; background-color: white; font-size: 20px; }
 </html>";
 
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
-        // The video placeholder should be a 300×150 black box.
-        // The fallback text "This is fallback text..." should NOT be rendered.
-        var pCenter = bitmap.GetPixel(150, 75);
-        Assert.InRange(pCenter.R, 0, 20);
-        Assert.InRange(pCenter.G, 0, 20);
-        Assert.InRange(pCenter.B, 0, 20);
+        // The fallback text must not be laid out, so the video's box — which
+        // paints nothing of its own — leaves the page background untouched.
+        for (int x = 0; x < 300; x += 20)
+        {
+            for (int y = 0; y < 150; y += 15)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                Assert.InRange(pixel.R, 245, 255);
+                Assert.InRange(pixel.G, 245, 255);
+                Assert.InRange(pixel.B, 245, 255);
+            }
+        }
+    }
+
+    /// <summary>
+    /// HTML rendering §15.4.7: <c>audio:not([controls])</c> is <c>display: none</c>,
+    /// so a source-less <c>&lt;audio&gt;</c> occupies no space and paints nothing.
+    /// </summary>
+    [Fact]
+    public void Audio_Element_Without_Controls_Is_Not_Rendered()
+    {
+        var html = @"<!DOCTYPE html>
+<html>
+<head><style>
+body { margin: 0; background-color: white; }
+</style></head>
+<body><audio src=""a.mp3""></audio></body>
+</html>";
+
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, 400, 300);
+        for (int x = 0; x < 320; x += 20)
+        {
+            for (int y = 0; y < 80; y += 10)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                Assert.InRange(pixel.R, 245, 255);
+                Assert.InRange(pixel.G, 245, 255);
+                Assert.InRange(pixel.B, 245, 255);
+            }
+        }
     }
 
     // ──────────── Isolation group tests ────────────────────────────────────

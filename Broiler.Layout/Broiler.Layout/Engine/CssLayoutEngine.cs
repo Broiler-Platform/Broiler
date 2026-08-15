@@ -1325,9 +1325,8 @@ internal static class CssLayoutEngine
         {
             ibHeight = Math.Max(0, b.ActualBottom - b.Location.Y);
         }
-        else if (b.Height != CssConstants.Auto && !string.IsNullOrEmpty(b.Height))
+        else if (TryResolveAtomicInlineSpecifiedHeight(b, containerWidth, out double cssHeight))
         {
-            double cssHeight = CssLengthParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
             ibHeight = b.BoxSizing.Equals("border-box", StringComparison.OrdinalIgnoreCase)
                 ? cssHeight
                 : cssHeight
@@ -1430,6 +1429,47 @@ internal static class CssLayoutEngine
                 line.Rectangles[b] = new RectangleF(
                     (float)(ibRect.X + rdx), (float)(ibRect.Y + rdy), ibRect.Width, ibRect.Height);
         }
+    }
+
+    /// <summary>
+    /// The specified block size an atomic inline-level box takes from its own <c>height</c>, or
+    /// <see langword="false"/> when it has none the caller can use — an <c>auto</c> height, or a
+    /// percentage the containing block cannot give a basis for.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A percentage used to be measured against <paramref name="containerWidth"/>: the wrong axis
+    /// outright, and the reason an outer <c>&lt;svg width="100%" height="100%"&gt;</c> — the shape
+    /// every <c>conformance-checkers/html-svg</c> page has — came out as tall as the page is wide
+    /// and then let "xMidYMid meet" centre its drawing a couple of hundred pixels down the box.
+    /// The in-flow grid-item branch above already sidesteps this basis for its own case and names it
+    /// as wrong.
+    /// </para>
+    /// <para>
+    /// CSS 2.1 §10.5: with no definite basis the percentage computes to <c>auto</c>, so this
+    /// declines and the caller falls through to the aspect-ratio transfer — which is what gives that
+    /// <c>&lt;svg&gt;</c> the height its <c>viewBox</c> ratio implies, the same height the reference
+    /// browser uses.
+    /// </para>
+    /// </remarks>
+    private static bool TryResolveAtomicInlineSpecifiedHeight(
+        CssBox b, double containerWidth, out double cssHeight)
+    {
+        cssHeight = 0;
+        if (b.Height == CssConstants.Auto || string.IsNullOrEmpty(b.Height))
+            return false;
+
+        if (!b.Height.Contains('%'))
+        {
+            cssHeight = CssLengthParser.ParseLength(b.Height, containerWidth, b.GetEmHeight());
+            return true;
+        }
+
+        if (!b.TryGetPercentageBlockSizeBasis(out double basis))
+            return false;
+
+        cssHeight = CssLengthParser.ParseLength(b.Height, basis, b.GetEmHeight());
+        return true;
     }
 
     /// <summary>
