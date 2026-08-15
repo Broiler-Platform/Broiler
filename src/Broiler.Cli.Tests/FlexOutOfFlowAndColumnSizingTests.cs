@@ -132,6 +132,45 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
     }
 
     [Fact]
+    public void A_Nested_Column_Container_That_Is_Itself_Flexed_Does_Not_Grow_To_Its_Height_Declaration()
+    {
+        // §9.7: for a flex item of a column parent, `height` is only the flex base size — the
+        // parent resolves the used main size from it. Growing this container's own children to
+        // the declaration contradicts the size it actually gets. Mirrors
+        // css-flexbox/flex-minimum-height-flex-items-029, where the inner container declares
+        // 500px, is used at 100px, and filling the 500 painted a rectangle five times the
+        // square the test asks for.
+        // Only the two items are asserted. The inner container itself is still left at its
+        // declared 500px: shrinking it to the 100px the outer container gives it is the outer
+        // container's own §9.7 pass, which does not exist yet (this one only grows). It paints
+        // nothing, so the WPT test matches its reference regardless — but the box is wrong, and
+        // asserting 100 here would be asserting behaviour Broiler does not have.
+        AssertCheckLayout(
+            "<div style=\"display:flex;flex-direction:column\">" +
+            "  <div style=\"display:flex;flex-direction:column;flex:1 0 0px;height:500px\">" +
+            "    <div style=\"flex:1 0 0px;width:100px\" data-expected-height=\"50\">" +
+            "      <div style=\"height:50px\"></div></div>" +
+            "    <div style=\"flex:1 0 0px;width:100px\" data-expected-height=\"50\">" +
+            "      <div style=\"height:50px\"></div></div>" +
+            "  </div>" +
+            "</div>");
+    }
+
+    [Fact]
+    public void A_Nested_Column_Container_With_No_Flex_Of_Its_Own_Still_Grows_Its_Children()
+    {
+        // The guard is scoped to items whose used main size can actually differ from their
+        // `height`: with no flex-basis and no flex-grow, the declaration stands and the inner
+        // container must still flex its own children.
+        AssertCheckLayout(
+            "<div style=\"display:flex;flex-direction:column\">" +
+            "  <div style=\"display:flex;flex-direction:column;height:100px\">" +
+            "    <div style=\"flex-grow:1\" data-expected-height=\"100\"></div>" +
+            "  </div>" +
+            "</div>");
+    }
+
+    [Fact]
     public void A_Column_Container_Without_Grow_Factors_Is_Left_Alone()
     {
         AssertCheckLayout(

@@ -557,6 +557,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
             return null;
 
+        // A `height` declaration is the used main size only while nothing outside this box
+        // overrides it. When this container is itself a flex item of a *column* parent, its
+        // block axis is that parent's main axis, and §9.7 there resolves its size from its
+        // flex base size and factors — `height` is only the base. Growing this box's own
+        // children to the declaration then contradicts the size the box actually gets:
+        // css-flexbox/flex-minimum-height-flex-items-029 nests a `flex: 1 0 0px; height: 500px`
+        // column container whose used height is 100px, and filling 500px of it painted a
+        // green rectangle five times the square the test asks for.
+        if (ParentBox is { } parent && parent.IsFlexContainer() && !parent.IsRowFlexContainer()
+            && MainSizeCanDifferFromHeightDeclaration())
+            return null;
+
         double basis = PercentageHeightContainingBlockHeight();
         double em = GetEmHeight();
 
@@ -586,6 +598,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         return height > 0 ? height : null;
+    }
+
+    /// <summary>
+    /// True when this flex item's used main size may come out different from its <c>height</c>
+    /// declaration — because a <c>flex-basis</c> of its own replaces the declaration as the flex
+    /// base size, or a non-zero <c>flex-grow</c> lets the parent's free space move it.
+    /// </summary>
+    /// <remarks>
+    /// <c>flex-shrink</c> is deliberately not consulted: it defaults to <c>1</c>, so treating it
+    /// as "may differ" would disable the growth pass for nearly every nested column container,
+    /// and shrinking is not implemented here in any case.
+    /// </remarks>
+    private bool MainSizeCanDifferFromHeightDeclaration()
+    {
+        var basis = FlexBasis?.Trim();
+
+        if (!string.IsNullOrEmpty(basis)
+            && !basis.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
+            && !basis.Equals("content", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return ParseFlexFactor(FlexGrow, 0) > 0;
     }
 
     private static void LayoutFlexItemAtTargetHeight(ILayoutEnvironment g, CssBox child, double targetOuterHeight)

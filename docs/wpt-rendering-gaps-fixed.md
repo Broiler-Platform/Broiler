@@ -535,6 +535,20 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   the `span { height: 100% }` this test measures — and poking `Size` alone leaves it
   reading the pre-flex value. That is the same reason the row path re-lays-out at the
   target *width* instead of resizing.
+- **A `height` declaration is not always the used main size, and the first cut assumed it was.**
+  When the container is itself a flex item of a *column* parent, its block axis is that parent's
+  main axis and §9.7 there resolves its size from its flex base size — `height` is only the base.
+  `css-flexbox/flex-minimum-height-flex-items-029` nests a `flex: 1 0 0px; height: 500px` column
+  container whose used height is 100px; filling 500px of it painted a green rectangle five times
+  the square the test asks for, and took the test from 100% to 94.9%. The pass now declines when
+  the container is a column parent's flex item **and** its own `flex-basis`/`flex-grow` let the
+  used size differ from the declaration — back to 100%, with nothing else in the suite moving.
+  `flex-shrink` is deliberately not part of that test: it defaults to `1`, so consulting it would
+  disable the pass for nearly every nested column container.
+- **Found by sweeping, not by reading.** The 5 013-test reftest suite over
+  css-flexbox/grid/align/position/sizing/transforms/display/overflow went **2615 → 2645** passing;
+  029 was the one entry in the newly-failing column that was a real defect rather than a test that
+  had been [passing by rendering nothing](#three-of-the-regressions-were-tests-that-had-been-passing-blank).
 - **Growth only, on purpose.** `flex-shrink` defaults to `1`, so implementing the negative
   half here would make *every* column container whose content overflows squash its items —
   and squash them further than §4.5 allows, because that clamp (an item's min-content size
@@ -545,6 +559,37 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 - **Exit gate:** `flex-grow` distributes a definite column container's free space, and
   the two residual assertions in the test are the orthogonal-writing-mode ones
   [tracked with the crossed-axes grid item](wpt-rendering-gaps-open.md#not-triaged-3).
+
+### Three of the regressions were tests that had been passing blank
+
+Sweeping the three fixes above over the 5 013-test reftest suite gave **2615 → 2645** passing
+(+30; 42 gained, 12 lost). Every one of the twelve was checked by hand. Only
+[one](#flex-grow-did-nothing-at-all-in-a-column-flex-container) was a real defect. The rest divide
+into two groups, and both are worth knowing before reading any future *newly failing* column as a
+regression.
+
+**Tests that had been passing because Broiler drew nothing.** Painting the boxes these fixes
+recovered is what made them fail — the [blank-on-blank
+trap](wpt-rendering-gaps.md#read-this-first--four-things-that-are-true-of-the-whole-set), sprung
+from the other side.
+
+| Test | Was | Now | What the render newly reveals |
+| --- | --- | --- | --- |
+| `css-position/sticky/position-sticky-flexbox` | 100% | 96.2% | The test lays a red `position: absolute` indicator under each sticky element and passes only when green covers red. That indicator is an abspos child of a **row flex container**, so it was never painted and the test passed for the absence of the red box. It paints now, and `position: sticky` is not offsetting against the scroller. |
+| `css-flexbox/gap-002-{ltr,rtl}` | 100% | 95.0% | The **test** now renders exactly what it asks for — grey boxes with green lines between them. It is the *reference* that is wrong, and for an unrelated reason: `margin-block-start` is ignored outright. `Broiler.CSS` expands the `margin-block`/`margin-inline` two-value shorthands but none of the four `-start`/`-end` longhands, and `CssUtils` has no case for them. Reproduced on a plain block, with no flex involved. |
+| `css-grid/abspos/orthogonal-positioned-grid-items-{007,013}` | 89.6%, 90.2% | 65.3%, 67.4% | Not in the newly-failing list — these stayed failing and dropped — but the same effect, and confirmed by reverting *only* the `placements` guard: the old render collapsed all four items into one narrow bar and scored well because a mostly-white canvas matches a mostly-white reference. The new render puts all four in the right columns at the right widths. The residual is the [crossed axes of an orthogonal grid item](wpt-rendering-gaps-open.md#a-definite-inline-size-does-not-drive-the-block-axis-through-an-aspect-ratio) in the block axis. |
+
+**Not yet attributed** — `css-flexbox/flex-aspect-ratio-img-column-012` (98.7%),
+`table-as-item-{flex-cross-size,stretch-cross-size-2}` (98.75%),
+`css-grid/grid-lanes/alignment/row-grid-lanes-alignment-positioned-items-{002,003,004}` (95–97%),
+`css-grid/subgrid/line-names-008` (97.8%) and `css-position/sticky/position-sticky-rtl` (98.7%).
+All eight are small drops on tests that now paint boxes they previously did not, so the same
+reading is likely; none has been confirmed by hand.
+
+**`margin-block-start` is the most tractable thing this surfaced** and is worth its own change: it
+would close the four `gap-002-*` tests, it is a `Broiler.CSS` submodule fix beside the existing
+shorthand expansion, and the writing-mode mapping wants doing properly rather than by copying the
+shorthands' horizontal-tb assumption.
 
 ### A replaced element's two axes were sized independently
 
