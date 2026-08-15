@@ -611,7 +611,7 @@ public sealed partial class DomBridge
 
         // getContext(contextType) — for <canvas> elements. Phase 3 P3.64: extracted into the co-located
         // CanvasBinding feature module (unblocked once Phase 6/P8.9 dissolved Broiler.HtmlBridge.Rendering).
-        Dom.Features.CanvasBinding.Install(obj, element);
+        Dom.Features.CanvasBinding.Install(this, obj, element);
 
         // <iframe> browsing-context accessors (contentDocument/contentWindow/getSVGDocument, src/srcdoc
         // read/write, sandbox reflection) — Phase 3 P3.55: extracted into the co-located IframeElementBinding

@@ -109,6 +109,51 @@ are versioned in lockstep during the preview.
   settable directly, as the other compiler switches are. A failure to write is swallowed — a
   diagnostic must never be able to break the execution it observes.
 
+- `Broiler.HtmlBridge` — the Canvas 2D context has pixels. It owns a
+  `Broiler.Graphics` `BBitmap` the size of the canvas and rasterises into it through
+  `BCanvas`, so `getImageData`, `putImageData`, `createImageData` and
+  `canvas.toDataURL` — all previously absent, so all previously a `TypeError` —
+  report what was actually drawn. `fillRect`, `clearRect`, `strokeRect`, the path
+  operations and `fillText` were empty method bodies before this: the context kept
+  the drawing state and painted nothing, a Phase 6 leftover from removing a command
+  recorder no renderer ever read.
+  - The pixel API was deliberately left *absent* rather than stubbed while that was
+    true, because zeroed pixels would have turned an honest `TypeError` — which
+    every feature detector reads as "no canvas readback" — into a false claim of
+    support. A real backing store is what retires that reasoning, and the same care
+    is why `toDataURL` of a type with no encoder falls back to `image/png` (as HTML
+    requires) rather than pretending: `image/webp` and `image/vnd.ms-photo` still
+    correctly report themselves unsupported.
+  - `getContext('2d')` returns the same context object every call, as the spec
+    requires. That was invisible while the context held nothing worth keeping and
+    decisive once it held a bitmap — every call was handing back a blank canvas.
+  - `canvas.width`/`canvas.height` are reflected, and assigning either resets the
+    bitmap to transparent black and the context to its default state — so
+    `canvas.width = canvas.width`, the idiomatic way to clear a canvas, clears it.
+  - `globalCompositeOperation` is a real accessor that applies the separable blend
+    modes through a `BCanvas` blend layer and ignores an operator it cannot
+    composite. It used to be nothing at all: the assignment merely created an own
+    property on an extensible object, so the value read back because it had been
+    stored, not because anything blended.
+  - `ctx.canvas` is the canvas element rather than a fresh empty object, and the
+    `HTMLCanvasElement` members are installed only on a `<canvas>` — `getContext`
+    was previously on every element and answered `null` from a tag check inside,
+    which made the call right and the name wrong.
+  - `CanvasRenderingContext2D` and `ImageData` join the DOM interface-constructor
+    globals. Neither is a node, so they answer `instanceof` from the members that
+    define the interface rather than from `nodeType`; `ImageData` is additionally
+    constructible, as HTML defines it.
+  - The bitmap is script-visible, not yet page-visible: nothing outside the binding
+    reads it, so a `<canvas>` still lays out as an empty replaced box and paints
+    nothing into the page. A page that draws a chart and shows it still renders
+    blank; one that reads its pixels back, or serialises them through `toDataURL`,
+    now gets the real image.
+  - Measured on html5test.com: 126/555 → 141/555, its 2D Graphics section 2/25 →
+    17/25, with no row regressing. Still absent, and still honestly absent:
+    `drawImage`, gradients and patterns, `clip`, `ellipse`, `setLineDash`, `Path2D`,
+    `toBlob`, and any transform beyond the identity. See
+    `docs/html5test-exceptions.md`.
+
 ### Changed
 
 - `Broiler.Browser.Core` and `Broiler.Writer` — the UI hosts no longer keep a
