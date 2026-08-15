@@ -26,6 +26,7 @@ measured 2026-08-13; CI is the golden-image score from the
 - [Grid](#grid)
 - [Sizing and layout](#sizing-and-layout)
 - [Images](#images)
+- [Transforms](#transforms)
 - [Masking](#masking)
 - [Dynamic stylesheets](#dynamic-stylesheets)
 - [Quirks](#quirks)
@@ -269,24 +270,10 @@ golden suite never looks at a passing test's own reference.
 
 ### Not triaged
 
-- `css-grid/abspos/grid-sizing-positioned-items-001`, CI 9.1%
-  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).13). Declares no
-  `rel=match`, so the pixel score can only be judged from a CI artifact — but its
-  `check-layout-th.js` assertions can be read locally and say the abspos grid child is
-  placed at the padding edge rather than at its grid area, and sized against the wrong
-  box:
-
-  ```
-  div.absolute  offset-x  expected   0  actual   15
-  div.absolute  offset-y  expected   0  actual   15
-  div.absolute  height    expected 1030 actual   30
-  div.absolute  offset-x  expected 115  actual   15
-  div.absolute  width     expected 915  actual 1030
-  ```
-
-  Every `offset-*` is the container's 15px padding, so **the grid area is not being
-  used as the containing block for an absolutely positioned grid child at all**
-  (CSS Grid §9). That is one cause for the whole test, not eleven separate ones.
+- `css-grid/abspos/grid-sizing-positioned-items-001` (CI 9.1%,
+  [#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).13) — **fixed**, see
+  [a grid with only out-of-flow children resolved no grid areas](wpt-rendering-gaps-fixed.md#a-grid-with-only-out-of-flow-children-resolved-no-grid-areas).
+  Its `check-layout-th.js` assertions read **128 / 128**, up from 39.
 
 ---
 
@@ -360,7 +347,14 @@ other direction. None is a sizing bug.
 ### Not triaged
 
 - `css-flexbox/percentage-heights-003`, CI 15.4%. A `check-layout-th.js` test with
-  no `rel=match`.
+  no `rel=match`. **7 of its 9 assertions now pass**, up from 4, since
+  [`flex-grow` started doing anything in a column container](wpt-rendering-gaps-fixed.md#flex-grow-did-nothing-at-all-in-a-column-flex-container).
+  The residual two are its orthogonal-writing-mode groups: a `vertical-rl` flex item
+  in a horizontal container, and the reverse. Both ask for a span of 100px and get
+  1008 — the viewport, not the item — so the item's main size is being read from the
+  wrong axis. **The same crossed-axes shape as
+  [the orthogonal grid item](#a-definite-inline-size-does-not-drive-the-block-axis-through-an-aspect-ratio),
+  and worth fixing with it rather than separately.**
 - `css-flexbox/flexbox-min-width-auto-002b` (98.5% against a 99% threshold), which
   fell out of the
   [abspos replaced fix](wpt-rendering-gaps-fixed.md#an-absolutely-positioned-img-rendered-nothing-at-all).
@@ -704,6 +698,30 @@ Worth separating from the rest, because the test itself may be at fault:
   engines failing by the same margin points at the test or its reference rather than
   at either engine; check it upstream before spending time on it.
 
+## Transforms
+
+### A perspective-transformed box is not rasterised in 3D
+
+- **Test:** `css-transforms/perspective-split-by-zero-w`, CI 24.9%
+  ([#1667](https://github.com/Broiler-Platform/Broiler/issues/1667).25). Broiler
+  reproduces its own reference here, so this reads like a reference disagreement and is
+  not one — the reference is *the test plus a red patch at `z-index: -1`*, drawn so that
+  anything the engine fails to paint shows through as red. Broiler paints the red patch
+  in full, which is the reference telling us the answer is wrong.
+- **What the test asks.** A 1140×990 box under `perspective: 500px` with
+  `transform-style: preserve-3d`, rotated 64° about Y and 90° about X so that part of it
+  crosses the `w = 0` plane. The parts with `w > 0` must still rasterise correctly.
+- **What we draw.** An axis-aligned tile block in the top-left corner — the box's
+  background at its untransformed geometry, clipped to the viewport. The 3D transform
+  chain reaches paint as something close to a 2D fallback, so nothing covers the patch.
+- **Owner:** `Broiler.Graphics`. This is not a transform-parsing or containing-block
+  gap; it needs perspective-correct rasterisation with clipping against the `w = 0`
+  plane, which is a rasteriser feature rather than a layout one.
+- **Exit gate:** the red patch is fully covered — i.e. the test matches its own
+  reference *and* both differ from a render with the transform removed.
+
+---
+
 ## Masking
 
 ### SVG `<clipPath>` referenced by `url()`
@@ -812,6 +830,22 @@ is worth more than the one test that names it.
 These fail for reasons that are not rendering gaps in the usual sense. They are
 listed so they are not mistaken for untriaged mismatches.
 
+**One class of them is no longer in this position.** A `check-layout-th.js` test states
+its expected geometry in `data-expected-*` / `data-offset-*` attributes, so it can be
+judged with no reference image at all — the pixel suite could only skip it, and this
+page kept saying such tests "can only be judged from a CI artifact". The runner now
+reports those assertions from a single render:
+
+```sh
+dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt/checkout \
+  --check-layout --render tests/wpt/checkout/css/css-grid/abspos/grid-sizing-positioned-items-001.html
+```
+
+It prints `check-layout: 128/128 passed (±1px)` and lists each failure as
+`element property: expected E, actual A`. Two of the entries on this page were triaged
+that way and closed. **Prefer it to reading a CI artifact** for anything carrying those
+attributes.
+
 ### Testharness tests, whose reference is a results table
 
 Closing one means passing its subtests, not making one fix.
@@ -911,6 +945,15 @@ is exactly one page area), and on both sides only the first block paints:
 
 Neither can change what CI reports for that test, which is scored unpaginated against
 [a blank Chromium capture](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact).
+
+**A second test belongs here rather than with the transforms it looks like.**
+`css-page/body-background-vrl-print` (CI 34.9%,
+[#1667](https://github.com/Broiler-Platform/Broiler/issues/1667).30) asks that the
+body's background fragment correctly across two 800×600 pages in `vertical-rl`. Rendered
+unpaginated — which is how CI scores it — Broiler puts both `.fullpager` blocks and the
+whole gradient on one canvas, so what the test is *about* is never exercised. It needs
+the same paged pipeline as the entry above, plus fragmentation of a propagated body
+background, and it cannot be judged from an unpaginated render at all.
 
 ### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium" — **fixed**
 

@@ -292,7 +292,16 @@ internal partial class CssBox
             });
         }
 
-        if (placements.Count == 0)
+        // A grid with no in-flow items has no tracks to size *from*, so the pass
+        // normally declines to the approximation. It must not when the grid carries
+        // absolutely-positioned children, though: their grid areas are their
+        // containing blocks (CSS Grid §9), and those areas come from the explicit
+        // template, which sizes perfectly well with nothing placed in it. Declining
+        // here left every abspos child of an item-less grid resolving against the
+        // container's padding box instead — the whole of
+        // css-grid/abspos/grid-sizing-positioned-items-001, whose eight grids hold
+        // nothing but abspos children.
+        if (placements.Count == 0 && absposItems == null)
             return false;
 
         int explicitRowStart;
@@ -525,7 +534,15 @@ internal partial class CssBox
             PlaceAbsposGridItems(absposItems, colStartEdge, colEndEdge, rowStartEdge, rowEndEdge,
                 colSizes.Length, rowSizes.Length, contentLeft, contentTop,
                 colSpecs.Count, rowSpecs.Count, explicitColStart, explicitRowStart,
-                colNames, rowNames, rtl);
+                colNames, rowNames, rtl,
+                // The block extent of the padding box an `auto` grid line resolves to.
+                // `gridHeight` above is the track sum, which is what this box is sized
+                // to only while its height is indefinite; a definite height is the
+                // container's used content height whether the tracks fill it or not,
+                // and is re-applied to the box after this pass returns. Reading
+                // ActualBottom here would take the stale, track-derived value.
+                contentTop + AbsposContainingBlockContentHeight(em, rowDefinite, definiteHeight, gridHeight)
+                    + ActualPaddingBottom);
 
         _gridTrackLayoutApplied = true;
         return true;
@@ -956,12 +973,12 @@ internal partial class CssBox
         int colCount, int rowCount, double contentLeft, double contentTop,
         int explicitCols, int explicitRows, int explicitColStart, int explicitRowStart,
         IReadOnlyDictionary<string, List<int>> colNames, IReadOnlyDictionary<string, List<int>> rowNames,
-        bool rtl)
+        bool rtl, double paddingBoxBottom)
     {
         double padLeft = Location.X + ActualBorderLeftWidth;
         double padRight = Location.X + Size.Width - ActualBorderRightWidth;
         double padTop = Location.Y + ActualBorderTopWidth;
-        double padBottom = ActualBottom - ActualBorderBottomWidth;
+        double padBottom = paddingBoxBottom;
 
         foreach (var item in items)
         {
@@ -979,7 +996,7 @@ internal partial class CssBox
             }
 
             var (top, bottom) = ResolveAbsposAxis(rowStartLine, rowEndLine, rowStartEdge, rowEndEdge, rowCount, contentTop, padTop, padBottom);
-            PlaceAbsposItemInArea(item, left, top, right - left, bottom - top);
+            PlaceAbsposItemInArea(item, left, top, right - left, bottom - top, rtl);
         }
     }
 
@@ -1071,9 +1088,14 @@ internal partial class CssBox
     /// <c>start</c>, not <c>stretch</c>, by default) unless both insets pin it.
     /// The area is recorded on the item so any later abspos re-resolution
     /// (<see cref="GetAbsoluteContainingBlockPaddingBox"/>) uses it too.
+    /// <para>
+    /// With both inline insets <c>auto</c> the used value is the static position
+    /// (CSS2.1 §10.3.7), which for a grid item is its area's <em>inline-start</em>
+    /// corner — the area's right edge when <paramref name="rtl"/>, not its left.
+    /// </para>
     /// </summary>
     private static void PlaceAbsposItemInArea(CssBox item,
-        double areaLeft, double areaTop, double areaWidth, double areaHeight)
+        double areaLeft, double areaTop, double areaWidth, double areaHeight, bool rtl)
     {
         item.GridAreaContainingBlock =
             new RectangleF((float)areaLeft, (float)areaTop, (float)areaWidth, (float)areaHeight);
@@ -1091,6 +1113,7 @@ internal partial class CssBox
 
         if (left.HasValue) x = areaLeft + left.Value + marginL;
         else if (right.HasValue) x = areaLeft + areaWidth - right.Value - marginR - width;
+        else if (rtl) x = areaLeft + areaWidth - marginR - width;
         else x = areaLeft + marginL;
 
         double marginT = item.ActualMarginTop, marginB = item.ActualMarginBottom;
@@ -2179,6 +2202,42 @@ internal partial class CssBox
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// The used content-box height an absolutely-positioned grid child's containing
+    /// block is measured from (CSS Grid §9: the padding box, for an <c>auto</c> line).
+    /// <para>
+    /// A definite height is the container's used content height whether or not the
+    /// tracks fill it, so the track sum is the answer only for an indefinite one.
+    /// <see cref="TryGetDefiniteContentHeight"/> deliberately declines a percentage
+    /// height — resolving one there would change which grids size their rows against a
+    /// definite basis, and with it <c>align-content</c> and every percentage track.
+    /// This reads no further than the abspos containing block, where the percentage is
+    /// simply the used height and nothing about track sizing depends on it.
+    /// </para>
+    /// </summary>
+    private double AbsposContainingBlockContentHeight(
+        double em, bool rowDefinite, double definiteHeight, double trackSum)
+    {
+        if (rowDefinite)
+            return definiteHeight;
+
+        if (string.IsNullOrEmpty(Height) || !Height.EndsWith('%'))
+            return trackSum;
+
+        double basis = PercentageHeightContainingBlockHeight();
+        if (basis <= 0)
+            return trackSum;
+
+        double h = CssLengthParser.ParseLength(Height, basis, em);
+        if (double.IsNaN(h) || double.IsInfinity(h) || h <= 0)
+            return trackSum;
+
+        if (UsesBorderBoxSizing)
+            h -= ActualPaddingTop + ActualPaddingBottom + ActualBorderTopWidth + ActualBorderBottomWidth;
+
+        return h > 0 ? h : trackSum;
     }
 
     /// <summary>

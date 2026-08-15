@@ -447,6 +447,105 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### A grid with only out-of-flow children resolved no grid areas
+
+**[Issue #1667](https://github.com/Broiler-Platform/Broiler/issues/1667).12.**
+
+- **Test:** `css-grid/abspos/grid-sizing-positioned-items-001`, CI 9.1%. It declares no
+  `rel=match`, so the pixel score can only be read off a CI artifact — but it is a
+  `check-layout-th.js` test, and those state their expected geometry in the markup.
+  Its assertions went **39 / 128 → 128 / 128**.
+- **The abspos pass was written and then never reached.** `PlaceAbsposGridItems` has
+  resolved a grid area per §9.2 since [#1624](https://github.com/Broiler-Platform/Broiler/issues/1624),
+  and the entry for this test read the symptom — every `offset-*` coming back as the
+  container's 15px padding — as that pass being absent. It is not: `TryApplyGridTrackLayout`
+  **declines the whole definite-track pass when no in-flow item is placed**
+  (`placements.Count == 0`), which is exactly the shape of this test. All eight of its
+  grids hold nothing but abspos children, so the pass returned before sizing a single
+  track and every child fell back to the container's padding box. A grid with no in-flow
+  items still has an explicit template to size, and §9 makes those tracks the containing
+  blocks; the guard now also asks whether anything is waiting on them.
+- **Two smaller defects were behind it**, invisible until the pass ran at all:
+  1. **The block extent was read from a box that was not finished.**
+     `PlaceAbsposGridItems` took the padding box's bottom from `ActualBottom`, which at
+     that point holds the *track sum* — the used height only while the container's own
+     height is indefinite. A definite height is re-applied after the pass returns, so an
+     `auto` grid line resolved to 230px on a grid that is 1030px tall. It now resolves
+     the container's used content height itself, including the percentage case, which
+     `TryGetDefiniteContentHeight` deliberately declines: widening *that* would change
+     which grids size their rows against a definite basis, and with them `align-content`
+     and every percentage track. The abspos containing block needs none of that.
+  2. **`rtl` mirrored the area and then placed the item at its left edge.** With both
+     inline insets `auto` the used value is the static position (CSS2.1 §10.3.7), which
+     is the area's *inline-start* corner — the right edge in `rtl`. Eight of the test's
+     offsets are that one rule, and the four `sizedToGridArea` rows hid it by filling
+     their area, where both edges coincide.
+- **Exit gate:** the test's 128 assertions pass. They do.
+
+### An out-of-flow child of a flex container was never laid out
+
+**[Issue #1667](https://github.com/Broiler-Platform/Broiler/issues/1667).22.**
+
+- **Test:** `css-transforms/dynamic-fixed-pos-cb-change`, CI 18.9%. It now renders
+  **byte-identical to the reference it declares**, and — the part that matters — both
+  sides render the content the test is about, where before both rendered a bare
+  background.
+- **This was a blank-on-blank pass in waiting**, the trap
+  [the whole set warns about](wpt-rendering-gaps.md#read-this-first--four-things-that-are-true-of-the-whole-set):
+  the test and its reference agreed with each other at ~100% while agreeing with the
+  golden at 18.9%, because Broiler drew nothing in either.
+- **Cause.** `PerformFlexRowLayout` replaces the ordinary block-flow child loop
+  wholesale, and that loop is the only thing that calls `PerformLayout` on a child. It
+  walks `Boxes` through `IsInFlowFlexItem`, which correctly excludes out-of-flow children
+  from flex layout (§4.1) — and nothing else ever laid them out. So an abspos or fixed
+  child of a **row** flex container was not merely mispositioned; it never reached the
+  canvas at all. `body { display: flex }` holding a fixed backdrop and an abspos panel
+  painted neither, and `body { display: flex }` is not an exotic shape.
+- **Only the row path.** A column flex container falls through to ordinary block/inline
+  flow over the same list, so its out-of-flow children were always laid out; the same
+  probe on `flex-direction: column` was correct before and after.
+- **The static position is the container's content-box start corner** (§4.1), seeded
+  before `PerformLayout` so an all-`auto` child lands there rather than at whatever
+  coordinates the last laid-out box left behind.
+- **Exit gate:** an abspos and a fixed child of a row flex container render exactly as
+  they do with the `display: flex` removed. They do, pixel for pixel.
+
+### `flex-grow` did nothing at all in a column flex container
+
+**[Issue #1667](https://github.com/Broiler-Platform/Broiler/issues/1667).20.**
+
+- **Test:** `css-flexbox/percentage-heights-003`, CI 15.4% — **4 / 9 assertions → 7 / 9**.
+- **A column flex container had no flex algorithm.** `PerformFlexRowLayout` is the only
+  one there is; a column container's children stack through ordinary block flow, which
+  never resolves flexible lengths. So `flex-grow` was inert along a column's main axis:
+  a lone `flex-grow: 1` item in a 100px-tall container stayed at its content height, and
+  a `height: 100%` child of it measured 0. Two constructed probes covering
+  `flex-grow`/`flex`/`flex-basis`, one item and two, went **1 / 6 → 6 / 6** and
+  **2 / 6 → 6 / 6**.
+- **Definite main size only, and the test is what pins the distinction.** §9.2 makes the
+  main size definite from a specified `height` — then clamped by `min-height`/`max-height`
+  — and *not* from a `min-height` alone. So this test's `height: 0; min-height: 100%`
+  containers flex their items to the clamped 100px, while its `min-height: 100%`-only
+  containers, whose main size stays content-based, correctly leave them at zero. Reusing
+  `TryGetDefiniteContentHeight` would have got this wrong in both directions: it drops a
+  zero result, and `height: 0` under a `min-height` is precisely the definite-but-clamped
+  case.
+- **Each grown item is laid out again at its target height** rather than resized in
+  place, because a percentage-height descendant resolves against the item's used height —
+  the `span { height: 100% }` this test measures — and poking `Size` alone leaves it
+  reading the pre-flex value. That is the same reason the row path re-lays-out at the
+  target *width* instead of resizing.
+- **Growth only, on purpose.** `flex-shrink` defaults to `1`, so implementing the negative
+  half here would make *every* column container whose content overflows squash its items —
+  and squash them further than §4.5 allows, because that clamp (an item's min-content size
+  as the floor for an `auto` `min-height`) does not exist yet. Not shrinking is the better
+  of the two wrong answers until it does; §4.5 is the prerequisite, not more of §9.7.
+- **Not attempted:** `column wrap` with items that overflow the main axis, which needs
+  real line breaking. Single-line is what the tests on this page exercise.
+- **Exit gate:** `flex-grow` distributes a definite column container's free space, and
+  the two residual assertions in the test are the orthogonal-writing-mode ones
+  [tracked with the crossed-axes grid item](wpt-rendering-gaps-open.md#not-triaged-3).
+
 ### A replaced element's two axes were sized independently
 
 - **Tests:** `css-sizing/replaced-max-size-saturation` (8.3% on CI),
