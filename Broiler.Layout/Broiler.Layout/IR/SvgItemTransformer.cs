@@ -87,6 +87,24 @@ internal static class SvgItemTransformer
                 };
             }
 
+            case ClipItem clip when transform.IsAxisAligned:
+            {
+                // A nested pattern inside this one clips its own tiling; that clip has to move with
+                // the tile. Under a rotation the mapped box is not a rectangle, so it is left alone
+                // rather than narrowed to the wrong one.
+                var mapped = transform.MapBounds(clip.ClipRect);
+                return new ClipItem
+                {
+                    Bounds = mapped,
+                    ClipRect = mapped,
+                    Polygon = clip.Polygon,
+                    CornerNw = clip.CornerNw, CornerNwY = clip.CornerNwY,
+                    CornerNe = clip.CornerNe, CornerNeY = clip.CornerNeY,
+                    CornerSe = clip.CornerSe, CornerSeY = clip.CornerSeY,
+                    CornerSw = clip.CornerSw, CornerSwY = clip.CornerSwY,
+                };
+            }
+
             case DrawSvgTextItem text:
             {
                 var origin = MapLocal(text.Bounds, text.X, text.Y, transform);

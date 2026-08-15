@@ -222,4 +222,19 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(40, clip.ClipRect.X, 3);
         Assert.Equal(60, clip.ClipRect.Y, 3);
     }
+
+    [Fact]
+    public void A_Use_Clones_A_Non_Viewport_Target_At_Its_Own_Offset()
+    {
+        // Anything but a <symbol>/<svg> is a translated deep clone: width/height do not apply, and
+        // a target that is itself rendered keeps painting where it stands as well.
+        var items = Render(
+            "<rect id='r' x='0' y='0' width='10' height='10' fill='red'/>"
+            + "<use x='40' y='60' xlink:href='#r'/>");
+
+        var painted = items.OfType<DrawSvgRectItem>().Where(r => r.Fill == BColor.Red).ToList();
+        Assert.Equal(2, painted.Count);
+        Assert.Contains(painted, r => Math.Abs(r.Bounds.X + r.X) < 0.001 && Math.Abs(r.Bounds.Y + r.Y) < 0.001);
+        Assert.Contains(painted, r => Math.Abs(r.Bounds.X + r.X - 40) < 0.001 && Math.Abs(r.Bounds.Y + r.Y - 60) < 0.001);
+    }
 }

@@ -258,29 +258,42 @@ internal static partial class SvgRenderer
         clipRect = elementTransform.MapBounds(clipRect);
         items.Add(new ClipItem { Bounds = clipRect, ClipRect = clipRect });
 
+        // The tile's content is the same markup at every position, so it is parsed and rendered
+        // once and each further tile is that render translated. Re-rendering per tile parses the
+        // markup up to MaxPatternTiles times for one fill, which a dense pattern over a large shape
+        // reaches easily.
         _patternDepth++;
+        List<DisplayItem> firstTile;
         try
         {
-            for (int row = firstRow; row < lastRow; row++)
-            {
-                for (int column = firstColumn; column < lastColumn; column++)
-                {
-                    var tilePage = new RectangleF(
-                        bounds.X + (tileX + column * tileW) * sx + tx,
-                        bounds.Y + (tileY + row * tileH) * sy + ty,
-                        tileW * sx,
-                        tileH * sy);
-
-                    var tileItems = RenderSvgContent(tileDocument, tilePage);
-                    items.AddRange(pageTransform.IsIdentity
-                        ? tileItems
-                        : SvgItemTransformer.Map(tileItems, pageTransform));
-                }
-            }
+            firstTile = RenderSvgContent(
+                tileDocument,
+                new RectangleF(
+                    bounds.X + (tileX + firstColumn * tileW) * sx + tx,
+                    bounds.Y + (tileY + firstRow * tileH) * sy + ty,
+                    tileW * sx,
+                    tileH * sy));
         }
         finally
         {
             _patternDepth--;
+        }
+
+        for (int row = firstRow; row < lastRow; row++)
+        {
+            for (int column = firstColumn; column < lastColumn; column++)
+            {
+                var placement = pageTransform.Concat(new SvgTransform(
+                    1, 0, 0, 1,
+                    (column - firstColumn) * tileW * sx,
+                    (row - firstRow) * tileH * sy));
+
+                // Identity holds only for the first cell of an untransformed tiling, where the
+                // render is already in place.
+                items.AddRange(placement.IsIdentity
+                    ? firstTile
+                    : SvgItemTransformer.Map(firstTile, placement));
+            }
         }
 
         items.Add(new RestoreItem { Bounds = clipRect });

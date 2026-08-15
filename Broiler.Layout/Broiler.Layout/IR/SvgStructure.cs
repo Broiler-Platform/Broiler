@@ -87,9 +87,24 @@ internal sealed partial class SvgStructure
     /// <summary>One element the scan reached, addressable by <c>id</c>.</summary>
     /// <param name="Name">Its tag name.</param>
     /// <param name="Attributes">Its own attributes.</param>
-    /// <param name="Content">Its content markup, empty when it is self-closing.</param>
+    /// <param name="Source">The whole markup the scan ran over.</param>
+    /// <param name="ContentStart">Where this element's content begins in <paramref name="Source"/>.</param>
+    /// <param name="ContentEnd">Where it ends; equal to the start when the element is self-closing.</param>
+    /// <remarks>
+    /// The content is held as a range rather than a substring so that scanning costs nothing per
+    /// element. Copying it eagerly is quadratic in the document — an element that contains a
+    /// thousand id-bearing descendants copies its own body once per descendant — and a large SVG
+    /// took gigabytes before this was a range.
+    /// </remarks>
     public readonly record struct Element(
-        string Name, IReadOnlyDictionary<string, string> Attributes, string Content);
+        string Name, IReadOnlyDictionary<string, string> Attributes,
+        string Source, int ContentStart, int ContentEnd)
+    {
+        /// <summary>The element's content markup, empty when it is self-closing.</summary>
+        public string Content => ContentEnd > ContentStart
+            ? Source[ContentStart..ContentEnd]
+            : string.Empty;
+    }
 
     private SvgStructure() { }
 
@@ -126,9 +141,18 @@ internal sealed partial class SvgStructure
     /// </remarks>
     public bool IsInert(int index)
     {
-        foreach (var (start, end) in _inertSpans)
+        // The spans are recorded in match order, so they are sorted and disjoint: a binary search
+        // keeps this off the quadratic path when a document carries many comments and many shapes.
+        int low = 0, high = _inertSpans.Count - 1;
+        while (low <= high)
         {
-            if (index >= start && index < end)
+            int mid = (low + high) / 2;
+            var (start, end) = _inertSpans[mid];
+            if (index < start)
+                high = mid - 1;
+            else if (index >= end)
+                low = mid + 1;
+            else
                 return true;
         }
 
@@ -193,8 +217,7 @@ internal sealed partial class SvgStructure
                 if (closed.Attributes.TryGetValue("id", out var closedId) && closedId.Length > 0)
                 {
                     structure._byId[closedId] = new Element(
-                        closed.Name, closed.Attributes,
-                        svgXml[closed.ContentStart..m.Index]);
+                        closed.Name, closed.Attributes, svgXml, closed.ContentStart, m.Index);
                 }
 
                 open.RemoveRange(last, open.Count - last);
@@ -223,7 +246,7 @@ internal sealed partial class SvgStructure
             if (m.Groups["empty"].Value.Length > 0)
             {
                 if (attributes.TryGetValue("id", out var emptyId) && emptyId.Length > 0)
-                    structure._byId[emptyId] = new Element(name, attributes, string.Empty);
+                    structure._byId[emptyId] = new Element(name, attributes, svgXml, 0, 0);
                 continue;
             }
 
