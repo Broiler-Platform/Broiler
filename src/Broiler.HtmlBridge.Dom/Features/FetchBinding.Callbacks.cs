@@ -148,8 +148,28 @@ internal sealed partial class FetchBinding
                     request.Content = CreateRequestContent(requestBody, requestHeaders);
                 foreach (var kv in requestHeaders)
                 {
-                    if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-                        request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+                    // Content-Type already travelled with the body, above.
+                    if (string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (request.Headers.TryAddWithoutValidation(kv.Key, kv.Value))
+                        continue;
+
+                    // What HttpRequestMessage.Headers refuses is a *content* header:
+                    // Content-Language, Content-Disposition, Content-Encoding and the rest belong to
+                    // the body in this API, not the request. TryAddWithoutValidation reports the
+                    // refusal by returning false, and this loop used to discard that without a word,
+                    // so a page that set one watched it vanish between fetch and the wire. Retrying
+                    // against the content is what actually sends them.
+                    //
+                    // Content-Length is the deliberate exception and stays dropped. The framework
+                    // derives it from the body it is about to write, and an author value *replaces*
+                    // that derived one rather than being rejected — a page claiming a length its body
+                    // does not have would leave the server waiting for bytes that never arrive, which
+                    // is a worse failure than the dropped header. Fetch forbids the header to authors
+                    // for the same reason.
+                    if (!string.Equals(kv.Key, "Content-Length", StringComparison.OrdinalIgnoreCase))
+                        request.Content?.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
                 }
 
                 var response = _resources.SendAsync(request).GetAwaiter().GetResult();

@@ -269,13 +269,21 @@ internal sealed class RecordingOrigin : IDisposable
         using (var buffer = new MemoryStream())
         {
             context.Request.InputStream.CopyTo(buffer);
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var name in context.Request.Headers.AllKeys)
+            {
+                if (name != null)
+                    headers[name] = context.Request.Headers[name] ?? string.Empty;
+            }
+
             // Decoded as UTF-8 rather than by the request's declared charset: what the assertions are
             // about is the bytes the binding produced, not the origin's interpretation of them.
             var received = new ReceivedRequest(
                 context.Request.HttpMethod,
                 context.Request.Url?.AbsolutePath ?? "/",
                 context.Request.ContentType,
-                Encoding.UTF8.GetString(buffer.ToArray()));
+                Encoding.UTF8.GetString(buffer.ToArray()),
+                headers);
             lock (_sync) _requests.Add(received);
         }
 
@@ -292,5 +300,14 @@ internal sealed class RecordingOrigin : IDisposable
     }
 }
 
-/// <summary>One request as the origin saw it.</summary>
-internal readonly record struct ReceivedRequest(string Method, string Path, string? ContentType, string Body);
+/// <summary>One request as the origin saw it. <paramref name="Headers"/> holds every header it carried.</summary>
+internal readonly record struct ReceivedRequest(
+    string Method,
+    string Path,
+    string? ContentType,
+    string Body,
+    Dictionary<string, string> Headers)
+{
+    /// <summary>The value the origin received for <paramref name="name"/>, or null if it never arrived.</summary>
+    public string? Header(string name) => Headers.TryGetValue(name, out var value) ? value : null;
+}
