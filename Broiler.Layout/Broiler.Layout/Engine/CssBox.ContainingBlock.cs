@@ -18,21 +18,32 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // CSS2.1 §10.1: The containing block for a box is the nearest
             // ancestor that is a block container.  Block containers include:
             //   - block-level boxes (display:block, flex, grid)
-            //   - inline-block boxes (display:inline-block)
+            //   - atomic inline-level boxes (inline-block, inline-table,
+            //     inline-flex, inline-grid)
             //   - list-item boxes
             //   - table cells (display:table-cell)
             //   - table boxes (display:table)
             //   - table captions (display:table-caption)
-            // Inline-block establishes a BFC (§9.4.1), so its block-level
-            // children must use it as their containing block.  A table caption
-            // is a block container that establishes an independent BFC
-            // (CSS2.1 §17.4), so its in-flow children resolve their width and
-            // position against the caption's content box, not a further-up
-            // ancestor — critical when the caption is sized/rotated by its own
-            // writing mode (its children must inherit its inline size, not the
-            // viewport's).
+            // An atomic inline-level box establishes an independent formatting
+            // context for its contents (§9.4.1 for inline-block; CSS Display 3
+            // §2.5 for the inline-* flex/grid/table forms), so its in-flow
+            // descendants resolve their sizes and positions against it and not
+            // against a further-up ancestor.  Listing only `inline-block` here
+            // left the other three transparent, and a percentage height inside
+            // one then resolved against whatever block ancestor lay beyond it:
+            // an `inline-grid` of a stated height holding a `height: 100%` item
+            // saw `<body>`'s auto height, so the percentage computed to auto —
+            // which an `aspect-ratio` on the item then turned into the *body's*
+            // width transferred through the ratio, escaping the grid entirely
+            // (WPT css-grid/alignment/grid-item-aspect-ratio-justify-self-001,
+            // where a 16×32 item rendered 24×2016).  A table caption is a
+            // block container that establishes an independent BFC (CSS2.1
+            // §17.4), so its in-flow children resolve their width and position
+            // against the caption's content box — critical when the caption is
+            // sized/rotated by its own writing mode (its children must inherit
+            // its inline size, not the viewport's).
             while (!box.IsBlock
-                   && box.Display != CssConstants.InlineBlock
+                   && !CssBoxHelper.IsAtomicInlineLevel(box.Display)
                    && box.Display != CssConstants.ListItem
                    && box.Display != CssConstants.Table
                    && box.Display != CssConstants.TableCell
@@ -529,7 +540,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// block's padding box (the viewport when that is the initial containing
     /// block) — an abspos box's containing block always has a definite height,
     /// unlike the flow containing block, whose height may be auto/indefinite.
-    /// Otherwise the flow containing block's used height is returned.
+    /// Otherwise the flow containing block's used <em>content</em> height is
+    /// returned: §10.5 resolves a percentage against the containing block's
+    /// content box, so the containing block's own padding and border are not part
+    /// of the basis in either branch below.
     /// </summary>
     private double PercentageHeightContainingBlockHeight()
     {
@@ -562,11 +576,26 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             double cssHeight = CssLengthParser.ParseLength(flowCb.Height, 0, flowCb.GetEmHeight());
 
+            // §10.5 resolves the percentage against the containing block's *content* box.
+            // Normalising the specified height to a border box instead added the containing
+            // block's own padding and border to every percentage inside it: a `height: 100%`
+            // child of a `height: 32px` box with a 2px border came out 36px, and 42px with
+            // 5px of padding. It went unnoticed because the two coincide whenever the
+            // containing block has neither, and because `box-sizing: border-box` — where the
+            // specified height already *is* the border box — takes the no-op path through
+            // both conversions.
             if (cssHeight > 0)
-                return flowCb.ResolveSpecifiedHeightToBorderBox(cssHeight);
+                return flowCb.ResolveSpecifiedHeightToContentBox(cssHeight);
         }
 
-        return flowCb?.Size.Height ?? 0;
+        // Size.Height is a border box, so the padding and border come off it to leave the
+        // content height, exactly as TryGetPercentageBlockSizeBasis does for the same box.
+        if (flowCb == null)
+            return 0;
+
+        return Math.Max(0, flowCb.Size.Height
+            - flowCb.ActualPaddingTop - flowCb.ActualPaddingBottom
+            - flowCb.ActualBorderTopWidth - flowCb.ActualBorderBottomWidth);
     }
 
     /// <summary>

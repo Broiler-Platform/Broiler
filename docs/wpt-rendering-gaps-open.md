@@ -201,53 +201,42 @@ golden suite never looks at a passing test's own reference.
   the check that subgrid stays a no-op while that is fixed, since the reference
   depends on it being one.
 
-### `aspect-ratio` on a grid item escapes an `inline-grid`
+### `justify-self` on a grid item is not honoured
 
 - **Test:** `css-grid/alignment/grid-item-aspect-ratio-justify-self-001`, CI 3.9%
-  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).11). Was listed
-  here as not triaged; it now has an isolated repro.
-- **What the test asks.** A grid item with `aspect-ratio: 1/2`, `height: 100%` of a
-  32px grid and a *non-stretching* `justify-self` must take its inline size from the
-  height through the ratio: **16×32**. With `justify-self: normal`/`stretch` it fills
-  the 24px area instead and is 24×48.
-- **What we produce: 1008×2016** — the item escapes the grid entirely and fills the
-  page. `check-layout-th.js` reports it directly, which is what makes this precise
-  rather than a pixel percentage:
-
-  ```
-  div.item  width   expected 16  actual 1008
-  div.item  height  expected 32  actual 2016
-  ```
-
-- **It is the `inline-grid`, not the ratio and not the alignment.** Bisected with a
-  four-case repro:
-
-  | Container | Item | Result |
-  | --- | --- | --- |
-  | `inline-grid` | `height: 100%` | **correct** |
-  | `inline-grid` | `height: 100%` + `aspect-ratio` | **escapes** — 24 wide, the page's height tall |
-  | `grid` (block-level) | `height: 100%` + `aspect-ratio` | correct |
-  | `block` | `height: 100%` + `aspect-ratio` | correct |
-  | `inline-block` | `height: 100%` + `aspect-ratio` | correct |
-
-  So neither `aspect-ratio` alone nor an item's percentage height in an `inline-grid`
-  alone is broken; only the pair. The percentage height stops resolving against the
-  grid area and resolves against the initial containing block, and the ratio then
-  carries that wrong height into the inline axis.
-- **Where to look — and one place it is *not*.** The obvious suspect,
-  `CssBox.Sizing.cs`'s `CanTransferAspectRatioToBlockHeight`, is **ruled out**: the
-  item's containing block is the `height: 32px` grid container, so
-  `HeightPercentageResolvesToAuto()` is false, and that guard returns false before the
-  width→height transfer is reached. The remaining candidate is the path an
-  *inline-level* container's contents take — `CssBox.ContainingBlock.cs` notes that an
-  atomic inline computes its height in `CssLayoutEngine`'s inline flow rather than in
-  `ResolveUsedBlockHeight`, and `inline-grid` is the only row of the table that goes
-  through it. **Confirm that with a debugger before changing anything**; this entry
-  records a bisect, not a root cause.
-- **Exit gate:** the four-case table above stays correct in every row, and the test's
-  22 assertions pass.
-- `justify-self`'s eleven values are a *second* requirement the test makes and are
-  not measured yet: nothing can be said about them until the item stays in its area.
+  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).11). Its own
+  `check-layout-th.js` assertions read **20 / 40**, up from 2 / 40 on
+  [two containing-block fixes](wpt-rendering-gaps-fixed.md#an-atomic-inline-level-box-was-not-a-containing-block-and-a-percentage-height-included-its-border).
+  The escape this entry used to describe — a 16×32 item rendering **24×2016**, with the
+  orthogonal group at 1008×1008 — is closed: **18 of the 20 height assertions pass**,
+  where none did. What is left is one rule.
+- **What the test asks.** Eleven grid items, each `aspect-ratio: 1/2` and `height: 100%`
+  of a 24×32 `inline-grid`, one per `justify-self` value. The nine *non-stretching*
+  values (`start`, `end`, `self-start`, `self-end`, `flex-start`, `flex-end`, `left`,
+  `right`, `center`) must leave the inline axis free, so it is derived from the definite
+  height through the ratio: **16×32**. Only `normal` and `stretch` fill the 24px area,
+  and there the definite *width* feeds the ratio back the other way: **24×48**. A second
+  group repeats the nine with the item in an orthogonal writing mode.
+- **The 20 failures are 18 of one kind and 2 of another.**
+  - **18 — every non-stretching row, in both groups — report `width 24`.** The item is
+    stretched to the full 24px inline size of its grid area whatever `justify-self` says,
+    so the axis is never left free for the ratio to size. `justify-self` is not honoured:
+    a non-`normal`/`stretch` value has to make a grid item's auto inline size
+    **shrink-to-fit its area rather than fill it** (CSS Grid §10.2, CSS Box Alignment
+    §6.2). That is the whole of this entry.
+  - **2 — the `normal` and `stretch` rows — report `height 32` where the test asks 48**,
+    with their widths correct at 24. **This one is not explained yet.** 32 is `height:
+    100%` of the 32px grid; 48 is the ratio applied to the stretched 24px width, so the
+    test asserts that the ratio displaces the percentage here. Whether that follows from
+    the row being indefinite at the time the item is sized, or is a second gap, needs
+    measuring against Chromium's box tree before anything is claimed — note the test's
+    own author dropped these two rows from the orthogonal group with a `TODO` saying
+    *"these ones behave differently in every browser"*.
+- **What is no longer in question:** `aspect-ratio` itself. It transfers correctly in
+  every case the four-container table exercises, which is what made the old reading of
+  this test — an `aspect-ratio` bug — wrong.
+- **Exit gate:** the test's 40 assertions pass, with the container table pinned by
+  `Broiler.Cli.Tests.AtomicInlineContainingBlockTests` staying correct in every row.
 
 ### Not triaged
 
