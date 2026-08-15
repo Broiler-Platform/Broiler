@@ -607,10 +607,13 @@ the two defects at the end of this entry.
 ### Gradient interpolation ignores three rules the colour functions made visible
 
 - **Tests:** `css-images/gradient/gradient-to-transparent`,
-  `gradient-{in,de}creasing-hue-lch` (all three were passing and now fail), and
-  `gradient-none-interpolation` (93.7% → 78.8%, failing throughout).
-- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs`).
-  **Submodule** — a fix ships as a patch.
+  `gradient-{in,de}creasing-hue-lch`, and the six canvas twins
+  `html/canvas/{element,offscreen}/fill-and-stroke-styles/2d.gradient.{color,hue}InterpolationMethod*`
+  — all nine were passing and now fail — plus `gradient-none-interpolation`
+  (93.7% → 78.8%, failing throughout). **These nine are the entire loss column of the
+  full-suite sweep** for this branch (18 235 → 18 343 passing, +117 / −9).
+- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs`,
+  and the canvas gradient path for the six). **Submodule** — a fix ships as a patch.
 - **All three are fake passes unmasked**, and none is a regression in the ordinary sense:
   they were agreeing with their references because *both sides* were dropping colour stops
   the parser could not read. Since

@@ -139,6 +139,14 @@ public static class CssColor4
         if (string.IsNullOrWhiteSpace(text))
             return false;
 
+        // A relative colour's origin and a color-mix()'s operands are themselves colours, so both
+        // recurse — and the input is arbitrary author CSS, which can nest them as deeply as it
+        // likes. A stack overflow cannot be caught in .NET and would take the process with it, so
+        // the depth is bounded here rather than trusted. Real content nests one or two deep; the
+        // limit only ever refuses a colour, which every caller already handles.
+        if (_depth >= MaxNestingDepth)
+            return false;
+
         var input = text.Trim();
         if (!TryReadFunctionName(input, 0, out var name, out var openParen) ||
             !TryFindMatchingParen(input, openParen, out var closeParen) ||
@@ -149,9 +157,30 @@ public static class CssColor4
 
         var body = input[(openParen + 1)..closeParen];
 
-        if (StartsWithKeyword(body, "from"))
-            return TryParseRelative(name, body, out rgba);
+        _depth++;
+        try
+        {
+            return StartsWithKeyword(body, "from")
+                ? TryParseRelative(name, body, out rgba)
+                : Dispatch(name, body, out rgba);
+        }
+        finally
+        {
+            _depth--;
+        }
+    }
 
+    /// <summary>How deeply a colour may nest another colour inside itself before this declines.</summary>
+    private const int MaxNestingDepth = 16;
+
+    /// <summary>Nesting depth of the conversion running on this thread; thread-static for the same
+    /// reason <see cref="_currentColor"/> is.</summary>
+    [ThreadStatic]
+    private static int _depth;
+
+    private static bool Dispatch(string name, string body, out (double R, double G, double B, double A) rgba)
+    {
+        rgba = default;
         return name switch
         {
             "hwb" => TryParseHwb(body, out rgba),
