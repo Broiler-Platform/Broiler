@@ -163,4 +163,68 @@ public sealed class SvgReplacedSizingTests
     {
         AssertSvgSize("width=\"auto\" viewBox=\"0 0 500 250\"", 400, 400, 200);
     }
+
+    /// <summary>
+    /// CSS 2.1 §10.5: a percentage height against a containing block whose block size is
+    /// indefinite computes to <c>auto</c>, so the viewBox ratio supplies the height —
+    /// <c>&lt;svg width="100%" height="100%"&gt;</c>, the shape every
+    /// <c>conformance-checkers/html-svg</c> page has, is a ratio-shaped box and not a
+    /// page-height-shaped one.
+    /// </summary>
+    /// <remarks>
+    /// It used to resolve against the containing block's <em>width</em> — the wrong axis outright.
+    /// A 400px-wide wrapper made the element 400px tall as well, and "xMidYMid meet" then centred
+    /// the drawing 100px down a box that should have been 200px tall (issue #1658).
+    /// </remarks>
+    [Theory]
+    [InlineData("0 0 500 250", 400, 400, 200)]
+    [InlineData("0 0 500 500", 400, 400, 400)]
+    public void PercentageHeight_AgainstAnIndefiniteContainingBlock_TransfersTheRatio(
+        string viewBox, int containerWidth, int expectedWidth, int expectedHeight)
+    {
+        AssertSvgSize(
+            $"width=\"100%\" height=\"100%\" viewBox=\"{viewBox}\"",
+            containerWidth, expectedWidth, expectedHeight);
+    }
+
+    /// <summary>
+    /// With a definite containing-block height the percentage does resolve — against that height,
+    /// and the ratio does not override it.
+    /// </summary>
+    [Theory]
+    [InlineData("100%", 300)]
+    [InlineData("50%", 150)]
+    public void PercentageHeight_AgainstADefiniteContainingBlock_ResolvesAgainstIt(
+        string height, int expectedHeight)
+    {
+        string html =
+            "<!DOCTYPE html><html><head><style>"
+            + ".wrap{width:400px;height:300px;position:relative}"
+            + "</style></head><body style=\"margin:0\"><div class=\"wrap\">"
+            + $"<svg width=\"100%\" height=\"{height}\" viewBox=\"0 0 500 250\" "
+            + "data-offset-x=\"0\" data-offset-y=\"0\" data-expected-width=\"400\" "
+            + $"data-expected-height=\"{expectedHeight}\"></svg>"
+            + "</div></body></html>";
+        AssertCheckLayout(html);
+    }
+
+    /// <summary>
+    /// The same rule for an atomic inline that is not an <c>&lt;svg&gt;</c>: an inline-block's
+    /// percentage height resolves against the containing block's block size, and against nothing
+    /// when there is none.
+    /// </summary>
+    [Fact]
+    public void InlineBlock_PercentageHeight_ResolvesAgainstTheBlockAxis()
+    {
+        string html =
+            "<!DOCTYPE html><html><head><style>"
+            + ".definite{width:400px;height:200px}"
+            + ".indefinite{width:400px}"
+            + "span{display:inline-block;width:10px;height:50%}"
+            + "</style></head><body style=\"margin:0\">"
+            + "<div class=\"definite\"><span data-expected-height=\"100\"></span></div>"
+            + "<div class=\"indefinite\"><span data-expected-height=\"0\"></span></div>"
+            + "</body></html>";
+        AssertCheckLayout(html);
+    }
 }

@@ -146,7 +146,8 @@ internal static partial class SvgRenderer
                 GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
                 GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
             var rectFill = ResolveFill(
-                items, bounds, patterns, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH);
+                items, bounds, patterns, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
+                elementTransform);
             var rectStroke = GetPaint(attrs, "stroke", BColor.Empty);
 
             // A colour-only filter chain over a solid fill is equivalent to recolouring the shape;

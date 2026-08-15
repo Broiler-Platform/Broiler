@@ -203,4 +203,23 @@ public sealed class SvgStructureAndPaintTests
     {
         Assert.Empty(Render("<use x='10' y='10' width='10' height='10' xlink:href='#missing'/>"));
     }
+
+    [Fact]
+    public void A_Pattern_Fill_Moves_With_The_Transform_On_The_Shape()
+    {
+        // The tiles are separate display items from the shape they fill, so the shape's transform
+        // has to reach them too — otherwise the fill paints where the shape would have been.
+        var items = Render(
+            "<defs><pattern id='p' x='0' y='0' width='10' height='10' patternUnits='userSpaceOnUse'>"
+            + "<rect width='10' height='10' fill='blue'/></pattern></defs>"
+            + "<g transform='translate(40 60)'><rect width='10' height='10' fill='url(#p)'/></g>");
+
+        var tile = Assert.Single(items.OfType<DrawSvgRectItem>().Where(r => r.Fill == BColor.Blue));
+        Assert.Equal(40, tile.Bounds.X + tile.X, 3);
+        Assert.Equal(60, tile.Bounds.Y + tile.Y, 3);
+
+        var clip = Assert.Single(items.OfType<ClipItem>());
+        Assert.Equal(40, clip.ClipRect.X, 3);
+        Assert.Equal(60, clip.ClipRect.Y, 3);
+    }
 }

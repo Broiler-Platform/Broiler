@@ -118,6 +118,10 @@ internal static partial class SvgRenderer
     /// </summary>
     /// <param name="objectBounds">The shape's bounding box in user units — the basis for
     /// <c>objectBoundingBox</c> units and the region the tiles are clipped to.</param>
+    /// <param name="elementTransform">The page-space transform the shape itself is drawn under. The
+    /// tiles are separate display items from the shape, so they need it applied too — otherwise a
+    /// pattern-filled shape inside a <c>&lt;g transform&gt;</c> paints its fill where the shape
+    /// would have been without the transform.</param>
     /// <returns>
     /// The colour the shape itself should be filled with: empty when the pattern was painted (the
     /// tiles are the fill), the declared fallback when the reference does not resolve to anything
@@ -126,14 +130,16 @@ internal static partial class SvgRenderer
     private static BColor ResolveFill(
         List<DisplayItem> items, RectangleF bounds, Dictionary<string, SvgPattern> patterns,
         Dictionary<string, string> attrs, RectangleF objectBounds,
-        float sx, float sy, float tx, float ty, float pctW, float pctH)
+        float sx, float sy, float tx, float ty, float pctW, float pctH,
+        SvgTransform elementTransform)
     {
         string paint = GetPresentationValue(attrs, "fill");
         if (!TryParsePaintReference(paint, out var id, out var fallback))
             return GetPaint(attrs, "fill", BColor.Black);
 
         if (patterns != null && patterns.TryGetValue(id, out var pattern)
-            && EmitPatternTiles(items, bounds, pattern, objectBounds, sx, sy, tx, ty, pctW, pctH))
+            && EmitPatternTiles(
+                items, bounds, pattern, objectBounds, sx, sy, tx, ty, pctW, pctH, elementTransform))
         {
             return BColor.Empty;
         }
@@ -166,7 +172,8 @@ internal static partial class SvgRenderer
     /// the fallback paint instead.</returns>
     private static bool EmitPatternTiles(
         List<DisplayItem> items, RectangleF bounds, SvgPattern pattern, RectangleF objectBounds,
-        float sx, float sy, float tx, float ty, float pctW, float pctH)
+        float sx, float sy, float tx, float ty, float pctW, float pctH,
+        SvgTransform elementTransform)
     {
         if (_patternDepth >= MaxPatternDepth
             || string.IsNullOrWhiteSpace(pattern.Content)
@@ -241,8 +248,14 @@ internal static partial class SvgRenderer
         // as a transform layer: the raster canvas cannot express a rotation or a skew, and a layer
         // it cannot take falls through to a compat backend that the image renderer stubs out — so a
         // rotated patternTransform drew nothing at all rather than drawing it rotated.
-        var pageTransform = transform.ToPageSpace(sx, sy, bounds.X + tx, bounds.Y + ty);
+        // The shape's own transform applies outside the pattern's, since the pattern is expressed
+        // in the shape's user space.
+        var pageTransform = elementTransform.Concat(
+            transform.ToPageSpace(sx, sy, bounds.X + tx, bounds.Y + ty));
 
+        // A rotated element clips to the mapped box rather than the mapped shape: ClipItem is a
+        // rectangle, so this is the tightest clip it can express.
+        clipRect = elementTransform.MapBounds(clipRect);
         items.Add(new ClipItem { Bounds = clipRect, ClipRect = clipRect });
 
         _patternDepth++;
