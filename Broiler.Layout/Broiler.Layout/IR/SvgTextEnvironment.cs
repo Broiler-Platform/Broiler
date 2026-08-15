@@ -18,8 +18,9 @@ namespace Broiler.Layout.IR;
 /// <para>
 /// Thread-static for the same reason <see cref="SvgFilterTable"/> and <see cref="SvgClipPathTable"/>
 /// are: concurrent renders on different threads must not share a document's state. Unset is a
-/// supported state — <see cref="SvgImageRaster"/> rasterises an SVG image without one — and resolves
-/// to no font, which is the pre-existing behaviour rather than a new failure.
+/// supported state that resolves to no font, which is the pre-existing behaviour rather than a new
+/// failure — and <see cref="SvgImageRaster"/> deliberately clears it, so an SVG rasterised as an
+/// image never depends on which thread decoded it (see the remarks there).
 /// </para>
 /// </remarks>
 public static class SvgTextEnvironment
