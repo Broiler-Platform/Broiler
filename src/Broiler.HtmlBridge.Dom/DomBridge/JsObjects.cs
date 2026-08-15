@@ -41,7 +41,14 @@ public sealed partial class DomBridge
         if (node is DomDocument documentNode && _jsObjects.TryGetDocument(documentNode, out var documentWrapper))
             return documentWrapper;
 
-        var obj = new JSObject();
+        // A <form> gets a wrapper that additionally resolves an unknown name to the control carrying
+        // it (HTMLFormElement's named getter). It is decided here rather than in the form binding
+        // because a wrapper's type is fixed when it is created, and every member installed below goes
+        // on this same object.
+        var obj = node is DomElement formElement &&
+                  string.Equals(formElement.TagName, "form", StringComparison.OrdinalIgnoreCase)
+            ? new Dom.Features.FormElementJSObject(formElement, this)
+            : new JSObject();
         _jsObjects.Set(node, obj);
 
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (DomText/DomComment) are not
