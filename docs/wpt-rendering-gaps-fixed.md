@@ -111,6 +111,42 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   needs the test's own reference to be judged rather than the render, which is a different
   check. A flag is still a triage queue rather than a verdict — just a much shorter one.
 
+### The reference score was measured and then thrown away
+
+- **Owner:** the WPT runner (`src/Broiler.Wpt`) and the shard merger
+  (`scripts/merge-wpt-shards.py`). Main repo.
+- **The bug.** `VerifyAgainstReferenceHtml` rendered the test's own `rel=match`
+  reference, compared Broiler's render to it, computed the percentage — and then
+  `return null`ed unless that percentage cleared the pass threshold. The one
+  measurement that separates a reference disagreement from an engine gap was
+  discarded in exactly the cases where it was needed, so a test at 94% against its own
+  reference and 0.8% against the committed golden was reported as though nothing at
+  all were known about it, indistinguishable from one that is wrong against both.
+- **The two need opposite work**, which is why the conflation mattered: the first says
+  the goldens disagree and "fixing" it would mean rendering *less* than the test asks
+  for; the second is a real gap.
+- **What landed.** The percentage is recorded on the result
+  (`WptTestResult.ReferenceMatchPercent`), serialised into the JSON report, carried
+  through the shard merge, printed beside the golden score in the run summary, and
+  written into the severity issue's per-problem detail. A gap of 25 points or more
+  between the two is called out in words. `SuspectReference` keeps its narrower
+  meaning — Broiler *reproduced* the declared reference — because the ranking uses it
+  to drop a test out of the candidate set, and whether these near-misses belong in
+  [won't fix](wpt-rendering-gaps-wont-fix.md) is a maintainer's call rather than the
+  report's.
+- **A margin, not a second threshold.** The claim it supports is comparative — far
+  closer to one reference than the other — so it needs no tuning against the run's own
+  gate.
+- **Measured** on the three `grid-lanes` tests the open entry named. The runner now
+  prints `0.8% … (rel=match 94.0%)` and `0.9% … (rel=match 94.8%)` for the two
+  reference disagreements, and `11.5% … (rel=match 10.4%)` for
+  `column-subgrid-auto-fill-008` — which is wrong against both and stays ranked as the
+  real gap it is. 36 existing merger tests unchanged, 3 added.
+- **What it does not do.** The inverse case — a test that passes the golden while
+  failing its own reference — is still unreported, because the check only runs on
+  golden failures. Widening it to passes would re-render a reference for every passing
+  reftest in the suite.
+
 ### The runner never performed WPT's `.sub` substitution
 
 - **Test:** `css/css-color-adjust/…/color-scheme-iframe-background-mismatch-opaque-cross-origin-002.sub`.
@@ -952,6 +988,72 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 - **Verified:** the four tests above, the probe cases behind them (a `userSpaceOnUse`
   pattern, a rotated `patternTransform` and a `url(#missing) lime` fallback all match
   Chromium pixel-for-pixel), and 839 `Broiler.Layout.Tests` unchanged.
+
+### `<path>` was never drawn, and three more gaps behind the same family
+
+- **Tests:** the six `conformance-checkers/html-svg` entries of
+  [#1661](https://github.com/Broiler-Platform/Broiler/issues/1661), and a great deal
+  of the rest of that family with them. Measured against locally generated Chromium
+  references over `conformance-checkers/html-svg`, `svg` and `css/filter-effects`
+  (1682 tests): **78 improve by more than a point, 4 worsen, mean +0.41**.
+
+  | Test | Was | Now |
+  | --- | --- | --- |
+  | `html-svg/color-prop-04-t-isvalid` | 32.1% | 79.3% |
+  | `html-svg/struct-group-02-b-isvalid` | 68.6% | 97.1% |
+  | `html-svg/render-elems-01-t-isvalid` | 68.2% | 96.4% |
+  | `html-svg/linking-a-07-t-isvalid` | 74.2% | 95.7% |
+  | `html-svg/filters-example-01-b-isvalid` | 56.1% | 86.8% |
+  | `html-svg/struct-image-02-b-isvalid` | 30.7% | 51.0% |
+
+- **Owner:** `Broiler.Layout` (`IR/SvgPathData.cs`, `IR/SvgPaintOrder.cs`,
+  `IR/SvgRenderer.Viewport.cs`, `IR/SvgRenderer*.cs`, `IR/SvgStructure.cs`). Main
+  repo, no patch.
+- **Five gaps, one family** — the same shape as the earlier `pservers-*` triage:
+
+  1. **`<path>` painted nothing at all**, which is the commonest shape in SVG. There
+     is no path display item, and the only pass over `<path>` harvested each one's
+     start point so a `<textPath>` could be positioned. Paths are now flattened to
+     straight-line subpaths and emitted through the **polygon and polyline items the
+     backend already fills and strokes** — so this needed no new backend primitive
+     and no submodule change, which is the whole reason it could land here.
+  2. **The shape passes painted out of document order.** One regex per shape type,
+     each sweeping the whole markup, emitted every rect, then every circle, then all
+     the text — so an element a later sibling had to cover was painted over it
+     instead. `color-prop-04-t`'s dropdown panel is opaque and sits after the
+     paragraph text in the markup; the text showed through it.
+  3. **A nested `<svg>` established no viewport.** Its children were drawn in the
+     *root's* coordinate system, so the six panels of `coords-viewattr-03-b` all
+     landed on the first one at the root's scale.
+  4. **A `clip-path` on a shape did nothing.** The existing collection publishes to
+     the table a CSS `clip-path` on an *HTML* element reads; the SVG attribute had no
+     path at all.
+  5. **A CSS system colour was not a colour.** `fill="Window"` matched no named
+     colour and fell through to the caller's default — black — so a page built out of
+     system colours painted as one black rectangle. `Broiler.CSS` already carries the
+     table; nothing consulted it from here.
+
+- **A path's subpaths fill as one ring, not one polygon each.** The rasterizer's fill
+  is an even-odd crossing test, so joining them with bridge edges that retrace — and
+  therefore cancel — gives an enclosed subpath the hole it should have. Filling each
+  separately painted over it, which is what turned the three overlapping rings of
+  `coords-viewattr-03-b` into a solid blob. Chaining them end to end instead would
+  leave a closing edge that retraces no bridge and toggles a spurious wedge.
+- **Drawing paths at all exposed `vector-effect: non-scaling-stroke`**, which was
+  unimplemented. `svg/painting/reftests/non-scaling-stroke-precision-loss` draws a
+  hairline under a view box 0.375 units tall over 344 pixels; scaling its width by
+  that 917× factor put a band across the whole canvas. A non-scaling stroke now takes
+  the viewport's scale rather than the view box's — *not* no scale at all, which
+  halved the stroke of a zoomed viewport.
+- **Two tests drop below the gate, and both are honest.**
+  `non-scaling-stroke-008` (99.7% → 99.0%) passed while its stroke was ten times too
+  wide and covered the canvas; `svg/types/scripted/SVGGraphicsElement.getBBox-10`
+  reports geometry the renderer does not compute. `masking-path-14-f` regressed on
+  the way and was closed by gap 4 above. `svg/interact/scripted/rect-hittest-002`
+  appears in the diff and is **not** caused by this: it scores 97.7% on an unmodified
+  build too — the flakiness
+  [the method notes warn about](wpt-rendering-gaps-open.md#one-test-is-flaky), caught
+  by re-running it against the unmodified build exactly as they say to.
 
 ### A media element with nothing to show painted a black box
 

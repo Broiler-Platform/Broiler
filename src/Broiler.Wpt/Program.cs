@@ -2076,6 +2076,10 @@ public class Program
                     // own rel=match reference but not the committed golden: the
                     // reference is the outlier, not the render.
                     ["suspectReference"] = r.SuspectReference,
+                    // The score against that same reference whether or not it cleared the gate,
+                    // so a test that is far closer to its own reference than to the golden can be
+                    // told apart from one that is wrong against both.
+                    ["referenceMatchPercent"] = r.ReferenceMatchPercent,
                 })
                 .ToList();
 
@@ -2608,7 +2612,15 @@ public class Program
             foreach (var failure in lowestMatchFailures)
             {
                 var relativePath = Path.GetRelativePath(wptPath, failure.TestPath).Replace('\\', '/');
-                Console.WriteLine($"  {failure.MatchPercent!.Value,5:F1}%  {relativePath}");
+
+                // The score against the test's own reference, when --verify-reference measured it:
+                // a test far closer to that than to the golden is a reference disagreement, and
+                // reading the two numbers side by side is what says so.
+                string against = failure.ReferenceMatchPercent is { } refPct
+                    ? $"  (rel=match {refPct,5:F1}%)"
+                    : string.Empty;
+
+                Console.WriteLine($"  {failure.MatchPercent!.Value,5:F1}%  {relativePath}{against}");
             }
         }
 

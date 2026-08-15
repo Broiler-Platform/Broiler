@@ -749,19 +749,34 @@ neither declares a `rel=match`, so the reftest suite cannot judge them, and the
 manifest is a merged file where a test that stops being exercised keeps its old
 entry. Confirm from a run artifact before treating either as closed.
 
-### Large documents — the `conformance-checkers` family is triaged; two remain
+### Large documents — the `conformance-checkers` family, round two
 
 The nine `conformance-checkers` entries in
 [#1658](https://github.com/Broiler-Platform/Broiler/issues/1658) were triaged on
-2026-08-15 and were **nine separate gaps, not one**. Seven are closed — see
+2026-08-15 and were **nine separate gaps, not one**. Seven closed then — see
 [SVG text, patterns, symbols and transforms](wpt-rendering-gaps-fixed.md#svg-text-pattern-fills-symbols-and-transforms-were-all-missing)
 and [a media element with nothing to show painted a black box](wpt-rendering-gaps-fixed.md#a-media-element-with-nothing-to-show-painted-a-black-box).
-The two that are not each need a subsystem rather than a fix:
+[#1661](https://github.com/Broiler-Platform/Broiler/issues/1661) then surfaced six
+more from the same family, of which four closed — see
+[`<path>` was never drawn](wpt-rendering-gaps-fixed.md#path-was-never-drawn-and-three-more-gaps-behind-the-same-family).
+**The pattern has held twice: a family that looks like one gap is a handful of
+unrelated ones, and only the residue needs a subsystem.**
 
-| Test | Was | Now | What is missing |
+Three remain, and each needs a subsystem rather than a fix:
+
+| Test | CI | Now | What is missing |
 | --- | --- | --- | --- |
-| `html-svg/types-dom-06-f-isvalid` | 16.4% | 22.5% | the **SVG DOM**: the page scripts `requiredFeatures`, an `SVGStringList` with `getItem`/`appendItem`/`insertItemBefore`, and paints red when any assertion fails |
-| `html-svg/styling-css-05-b-isvalid` | 11.3% | 12.6% | the **CSS cascade reaching SVG paint**. `:lang(en) { fill: green }` in a `<style>` inside the `<svg>` matches every element in an `<html lang=en>` document, and a stylesheet `fill` outranks the `fill="none"` presentation attribute — so the reference browser fills the whole test frame green. `SvgRenderer` reads paint from attributes and inline `style` only; it never sees the cascade, because it works from serialised markup rather than from the boxes the cascade was projected onto |
+| `html-svg/types-dom-06-f-isvalid` | 22.5% | 22.5% | the **SVG DOM**: the page scripts `requiredFeatures`, an `SVGStringList` with `getItem`/`appendItem`/`insertItemBefore`, and paints red when any assertion fails |
+| `html-svg/struct-dom-06-b-isvalid` | 16.5% | 16.5% | the **SVG DOM** again, from the other side: an `onload` on the root `<svg>` drives `setAttribute`, `removeChild`, `createElementNS` and `appendChild`, and the renderer works from serialised markup rather than from a live tree |
+| `html-svg/styling-css-05-b-isvalid` | 12.6% | 12.6% | the **CSS cascade reaching SVG paint**. `:lang(en) { fill: green }` in a `<style>` inside the `<svg>` matches every element in an `<html lang=en>` document, and a stylesheet `fill` outranks the `fill="none"` presentation attribute — so the reference browser fills the whole test frame green. `SvgRenderer` reads paint from attributes and inline `style` only; it never sees the cascade, because it works from serialised markup rather than from the boxes the cascade was projected onto |
+
+The three share one root: **`SvgRenderer` renders serialised markup, not the box tree
+the cascade and the DOM act on.** Two of the four just closed were fixable precisely
+because they were about geometry and paint the markup already states. These are not,
+and a fourth — `filters-blend-01-b` (31.1% → **34.6%**) — sits between the two groups:
+its `feFlood`+`feBlend` chain is analytically closed-form over a solid fill, the shape
+[`SvgColorFilter`](#) already models for `feColorMatrix` and `feComposite`, so it is
+reachable without the box tree.
 
 The other two in this group are unchanged and are not `conformance-checkers`:
 
@@ -812,19 +827,22 @@ is exactly one page area), and on both sides only the first block paints:
 Neither can change what CI reports for that test, which is scored unpaginated against
 [a blank Chromium capture](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact).
 
-### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium"
+### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium" — **fixed**
 
-`--verify-reference` sets `suspectReference` only when Broiler clears the same 99%
-gate against the test's own reference, so a test at 94–95% against its own reference
-and 0.8–8.0% against the golden is ranked as though nothing were known about it. Four
-entries fall through: two `grid-lanes` tests above, and
-[two in won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate).
+The reference score is now
+[recorded alongside the golden one](wpt-rendering-gaps-fixed.md#the-reference-score-was-measured-and-then-thrown-away)
+rather than discarded whenever it misses the gate, so the four entries that fell
+through — two `grid-lanes` tests above, and
+[two in won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate) —
+now carry both numbers in the run summary and in the severity issue's detail. The run
+prints `0.8% … (rel=match 94.0%)` for a reference disagreement and
+`11.5% … (rel=match 10.4%)` for the real gap beside it.
 
-**Recording the reference score alongside the golden one, rather than only using it as
-a pass/fail gate, would separate the two classes** without needing a second threshold
-to be tuned. The same change would surface
-[the inverse case](#two-tests-are-green-on-ci-and-wrong) — a test that passes the
-golden while failing its own reference — which nothing reports today.
+**What remains is the inverse case** — [a test that passes the
+golden while failing its own reference](#two-tests-are-green-on-ci-and-wrong) — which
+nothing reports, because the check runs only on golden *failures*. Widening it to
+passes would re-render a reference for every passing reftest in the suite, so it wants
+a cheaper trigger than "always".
 
 ---
 

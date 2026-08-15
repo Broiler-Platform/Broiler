@@ -310,6 +310,44 @@ def _problem_identity(result: dict) -> tuple[str, str, str | None]:
     return category, category, None
 
 
+def _reference_score_note(test: dict) -> str:
+    """
+    Describe how the test scored against the reference it declares itself, when the
+    runner measured it.
+
+    ``suspectReference`` is only set when Broiler *clears the pass threshold* against
+    that reference, so a test at 94% against its own reference and 0.8% against the
+    committed golden carried no signal at all and was ranked as though nothing were
+    known about it — indistinguishable from one that is wrong against both. The two
+    need opposite work: the first says the goldens disagree and "fixing" it would mean
+    rendering less than the test asks for, the second is a real engine gap. Printing the
+    second number says which one this is.
+    """
+    reference_percent = test.get("referenceMatchPercent")
+    if reference_percent is None:
+        return ""
+
+    match_percent = test["matchPercent"]
+    note = (
+        f" Against the reference the test itself declares via `rel=match` it scores"
+        f" {reference_percent:.1f}%"
+    )
+    if reference_percent - match_percent >= REFERENCE_DISAGREEMENT_MARGIN:
+        note += (
+            " — far closer than to the committed golden, so most of this gap is the two"
+            " references disagreeing rather than the feature under test"
+        )
+
+    return note + "."
+
+
+#: How far a test's score against its own ``rel=match`` reference must exceed its score
+#: against the committed golden before the gap is attributed to the references
+#: disagreeing rather than to the engine. Mirrors the runner's own margin; it is a
+#: comparative claim, so it needs no tuning against the run's pass threshold.
+REFERENCE_DISAGREEMENT_MARGIN = 25.0
+
+
 def _rank_biggest_problems(
     incomplete_shards: list[dict],
     exception_signatures: Counter[str],
@@ -419,6 +457,7 @@ def _rank_biggest_problems(
                 "detail": (
                     f"Rendered output matches the reference by only "
                     f"{test['matchPercent']:.1f}% ({label})."
+                    + _reference_score_note(test)
                 ),
             }
         )
@@ -630,6 +669,18 @@ def merge(
                         # render, so it is ranked separately (see _rank_biggest_problems).
                         "suspectReference": (
                             str(suspect_reference) if suspect_reference else None
+                        ),
+                        # The score against that same reference whether or not it
+                        # cleared the gate. A test far closer to its own reference than
+                        # to the golden is a reference disagreement too, and without
+                        # this number nothing in the report could say so.
+                        "referenceMatchPercent": (
+                            float(reference_percent)
+                            if isinstance(
+                                (reference_percent := entry.get("referenceMatchPercent")),
+                                (int, float),
+                            )
+                            else None
                         ),
                     }
                 )
