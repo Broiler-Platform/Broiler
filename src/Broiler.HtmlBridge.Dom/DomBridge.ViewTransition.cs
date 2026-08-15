@@ -835,6 +835,21 @@ public sealed partial class DomBridge
             // declarations (e.g. the pinned opacity); the captured content box inside it carries the
             // element's own paint (background, opacity, text) so an element's opacity composites over
             // the backdrop rather than over an opaque snapshot fill.
+            //
+            // Each snapshot box also resets `writing-mode`, and the reason is structural rather than
+            // cosmetic. css-view-transitions-1 gives the pseudo tree the *captured element's*
+            // writing mode — which BuildViewTransitionSnapshotContent already bakes onto the content
+            // box — not the originating root's; the pseudo boxes are real <div>s under <html>, so
+            // without a reset they inherit `:root { writing-mode: vertical-lr }` as well. That is
+            // not merely redundant: Broiler rotates a vertical subtree from its *rotation root*,
+            // defined as a vertical box whose parent is not vertical, so an inherited vertical mode
+            // all the way down means the content box is never a root, WillBeVerticalTransposed
+            // reports false, and ResolvePhysicalSize maps block-size onto physical height
+            // un-swapped. `.middle { block-size: 39800px }` then became a 39800px-tall band instead
+            // of a 39800px-wide one — the whole of the massive-element-*-partially-onscreen failure.
+            // An author `::view-transition-old(x) { writing-mode: … }` still wins: CreateStyledBox
+            // layers the author declarations on top of BaseStyle. It is deliberately not in
+            // PseudoBoxAuthorReset, which is skipped wholesale when the author paints a background.
             if (capture.HasOld)
             {
                 var scale = SnapshotScale(capture.OldWidth, groupW);
@@ -1028,6 +1043,7 @@ public sealed partial class DomBridge
         }
 
         var clone = CloneSnapshotContentForRender(content);
+
         if (scale is not 1 && capturedWidth > 0 && capturedHeight > 0)
         {
             // The snapshot must grow from its top-left corner, but the paint walker applies every
@@ -1159,6 +1175,21 @@ public sealed partial class DomBridge
     /// </summary>
     private static double FrozenGroupProgress(Dictionary<string, string> groupDeclarations)
     {
+        // A zero-duration animation is already *finished* by the time anything is screenshot, so the
+        // group is at its new geometry — progress 1, whatever the easing. `animation-duration: 0s`
+        // on a `::view-transition-group` is the standard WPT idiom for "show me the end state", and
+        // reading only the timing function left every one of those groups parked on the old
+        // geometry, mis-placing and mis-scaling both snapshots inside it.
+        //
+        // `animation-delay` is deliberately not folded in the same way: a positive delay means the
+        // animation has not started, which is the progress-0 behaviour root-to-shared-animation-start
+        // depends on.
+        if (groupDeclarations.TryGetValue("animation-duration", out var duration) &&
+            IsZeroDuration(FirstTopLevelValue(duration)))
+        {
+            return 1;
+        }
+
         if (!groupDeclarations.TryGetValue("animation-timing-function", out var raw) ||
             string.IsNullOrWhiteSpace(raw))
             return 0;
@@ -1189,6 +1220,24 @@ public sealed partial class DomBridge
             return 1d / (steps + 1);
 
         return 0;
+    }
+
+    /// <summary>Whether a <c>&lt;time&gt;</c> is zero, in either unit and in the unitless spelling a
+    /// bare <c>0</c> gives.</summary>
+    private static bool IsZeroDuration(string value)
+    {
+        var text = value.Trim();
+        if (text.Length == 0)
+            return false;
+
+        var number = text.EndsWith("ms", System.StringComparison.OrdinalIgnoreCase) ? text[..^2]
+            : text.EndsWith("s", System.StringComparison.OrdinalIgnoreCase) ? text[..^1]
+            : text;
+
+        return double.TryParse(
+                number.Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed) &&
+            parsed == 0;
     }
 
     /// <summary>The first entry of a comma-separated CSS value list, ignoring commas nested inside
@@ -1247,7 +1296,65 @@ public sealed partial class DomBridge
             return true;
 
         var rootName = ResolveRootViewTransitionName(UsedStyleForCapture(root));
-        return HasSnapshotAlteringEffect(LookupRootPseudo(pseudoRules, side, rootName));
+        if (HasSnapshotAlteringEffect(LookupRootPseudo(pseudoRules, side, rootName)))
+            return true;
+
+        // Third way, and the one the two clauses above miss: the *other* side's snapshot is the one
+        // the author has hidden. "Let the live page stand in" rests on the live page showing what
+        // the snapshot would — and the live page shows the NEW state, so it can only stand in for
+        // the old snapshot while the new snapshot is what is meant to be on screen. Hide the new
+        // side and the old snapshot is the only thing that can supply those pixels; leaving it
+        // content-less paints a flat viewport-sized rectangle of the captured root background
+        // instead, which is how `{new,old}-content-has-scrollbars` came to render a plain lightpink
+        // canvas where the reference has the page's checkerboard.
+        //
+        // This is not the `opacity` case the remarks above rule out. That one asks whether *this*
+        // snapshot's own compositing needs real pixels, and the answer is no. This asks whether the
+        // page underneath is still a truthful stand-in, and an author who has hidden the new
+        // snapshot has said it is not.
+        //
+        // Not for a page holding a nested browsing context, though. What a frame displays during a
+        // transition is resolved through the *live* element — TryGetFrameMarkupHeldByRootSnapshot
+        // replays FrameMarkupAtCapture onto it — and a clone carries a second copy of the frame
+        // that has had none of that applied, painted over the top. It shows whatever markup the
+        // frame's `srcdoc` last round-tripped rather than the state at capture time, which is
+        // exactly what SubDocumentViewTransitionTests pins. Reproducing a sub-document faithfully
+        // in a clone is the "close, not exact" problem that got the unconditional clone reverted,
+        // and it is a bigger question than this gate.
+        return !ContainsNestedBrowsingContext(root) &&
+            SuppressesSnapshotPaint(
+                LookupRootPseudo(pseudoRules, side == "old" ? "new" : "old", rootName));
+    }
+
+    /// <summary>Whether the document holds a frame whose content the root snapshot would have to
+    /// reproduce.</summary>
+    private static bool ContainsNestedBrowsingContext(DomElement root) =>
+        root.Descendants().OfType<DomElement>().Any(element =>
+            element.TagName.Equals("iframe", System.StringComparison.OrdinalIgnoreCase) ||
+            element.TagName.Equals("frame", System.StringComparison.OrdinalIgnoreCase) ||
+            element.TagName.Equals("object", System.StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Whether these declarations stop a snapshot painting at all — as opposed to merely
+    /// changing how it composites.</summary>
+    private static bool SuppressesSnapshotPaint(Dictionary<string, string> declarations)
+    {
+        if (declarations.TryGetValue("display", out var display) &&
+            display.Trim().Equals("none", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (declarations.TryGetValue("visibility", out var visibility) &&
+            visibility.Trim().Equals("hidden", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return declarations.TryGetValue("opacity", out var opacity) &&
+            double.TryParse(
+                opacity.Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed) &&
+            parsed == 0;
     }
 
     /// <summary>The declarations an author aimed at the root's <paramref name="kind"/> pseudo, taking
