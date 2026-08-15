@@ -799,6 +799,25 @@ internal partial class CssBox
             if (h > 0) newHeight = h;
         }
 
+        // CSS Sizing 4 §4: an item whose inline axis is not stretched has an *auto* inline
+        // size, so a preferred aspect ratio takes it from the block size the area just gave
+        // it. Ordinary boxes only ever transfer width→height, because their auto width fills
+        // the containing block and so is known first; a non-stretching justify-self is the
+        // case where that is not true and the transfer has to run the other way. Without it
+        // the item kept the width it had filled its containing block with and the ratio never
+        // applied at all — WPT css-grid/alignment/grid-item-aspect-ratio-justify-self-001 asks
+        // for 16×32 in a 24×32 area and got 24×32.
+        // Only an *auto* inline size is the ratio's to fill in. `widthFills` is already false
+        // for a stated `width: 20px` — that item does not fill its area either — so testing it
+        // alone would have let the ratio overwrite an author's width.
+        bool widthIsAuto = string.IsNullOrEmpty(item.Width) || item.Width == CssConstants.Auto;
+
+        if (!widthFills && widthIsAuto && replacedDefiniteH <= 0
+            && item.TryResolveAspectRatioInlineWidth(newHeight, out double ratioWidth))
+        {
+            newWidth = ratioWidth;
+        }
+
         // Alignment of a non-filling item within its area (start by default).
         if (!widthFills)
         {

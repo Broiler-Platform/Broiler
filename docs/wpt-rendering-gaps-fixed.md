@@ -715,6 +715,166 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   half holding the test at 2.26%. Re-measured 2026-08-13: it renders the reference
   exactly and is absent from the CI failure manifest.
 
+### An atomic inline-level box was not a containing block, and a percentage height included its border
+
+Two CSS2.1 defects in one file, found together on one grid test and each far wider than
+the test that exposed it.
+
+- **Test:** `css-grid/alignment/grid-item-aspect-ratio-justify-self-001`, CI 3.9%
+  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).11). Its
+  `check-layout-th.js` assertions go **2 / 40 → 20 / 40**: 18 of the 20 height assertions
+  pass, where none did. The 20 that remain are one unimplemented rule and stay open as
+  [`justify-self` on a grid item is not honoured](wpt-rendering-gaps-open.md#justify-self-on-a-grid-item-is-not-honoured).
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.ContainingBlock.cs`). Main repo, no patch.
+- **The entry this replaces had the right bisect and the wrong suspect, twice.** It ruled
+  out `CanTransferAspectRatioToBlockHeight` correctly, then reasoned that "the item's
+  containing block is the `height: 32px` grid container". It is not — it is `<body>`, and
+  the entry's own instruction to confirm that under a debugger before changing anything
+  is what turned a plausible story into the actual cause.
+
+**1. An atomic inline-level box was transparent to the containing-block walk.**
+
+- §10.1 puts a box's containing block at its nearest ancestor **block container**, and
+  `inline-block`, `inline-table`, `inline-flex` and `inline-grid` are all block
+  containers: inline-level on the outside, an independent formatting context on the
+  inside. The walk named only `inline-block`, so the other three were climbed straight
+  past and a descendant's containing block came back as whatever block ancestor lay
+  beyond them.
+- **Why it presented as an `aspect-ratio` bug.** The wrong containing block is `<body>`,
+  whose height is `auto`, so `height: 100%` computes to `auto` (§10.5). That is
+  ordinarily invisible in a grid — stretch alignment fills the area with the right size
+  anyway, which is why the item measures a correct 24×32 *without* the ratio. An
+  `aspect-ratio` is what turns that `auto` into a **transfer from the used width**, and
+  the used width came from the wrong containing block too: 1008 × 2 = **2016**, the
+  height this test rendered for a 32px item.
+- Neither condition alone reproduces, in any container. Measured on a 24×32 container
+  holding one `height: 100%` item, on a 1024px-wide page:
+
+  | Container | Item | Before | After |
+  | --- | --- | --- | --- |
+  | `inline-grid` | `height: 100%` | 24×32 | 24×32 |
+  | `inline-grid` | `height: 100%` + `aspect-ratio` | **24×2048** | **24×32** |
+  | `grid` | `height: 100%` + `aspect-ratio` | 24×32 | 24×32 |
+  | `block` | `height: 100%` + `aspect-ratio` | 24×32 | 24×32 |
+  | `inline-block` | `height: 100%` + `aspect-ratio` | 24×32 | 24×32 |
+
+**2. A percentage height resolved against the containing block's border box.**
+
+- `PercentageHeightContainingBlockHeight` normalised the containing block's specified
+  height **to a border box** before resolving the percentage against it. §10.5 resolves
+  against the **content** box, and the same file already carries
+  `ResolveSpecifiedHeightToContentBox`, documented for exactly this and used by the
+  sibling `min-`/`max-height` path (`TryGetPercentageBlockSizeBasis`). The two disagreed
+  with each other, and only one of them was right.
+- **Measured on a `height: 100%` child of a `height: 32px` box**, which is 32 in every
+  row a browser renders:
+
+  | Containing block | Before | After |
+  | --- | --- | --- |
+  | `height: 32px` | 32 | 32 |
+  | `+ border: 2px` | **36** | 32 |
+  | `+ padding: 5px` | **42** | 32 |
+  | `+ box-sizing: border-box`, with the 2px border | 28 | 28 |
+
+- **It hid behind two coincidences.** The border box and the content box are the same
+  height whenever the containing block has neither border nor padding — the common case —
+  and under `box-sizing: border-box` the specified height already *is* the border box, so
+  both conversions are no-ops and the answer came out right by not doing anything. The
+  same slip sat in the fallback that reads a settled `Size.Height`; it is stripped now,
+  the way the min/max path already stripped it.
+
+- **Sweep: 5 112 reftests over `css-grid`, `css-flexbox`, `css-sizing`, `css-tables`,
+  `css-display`, `css-inline`, `css-writing-modes` and `css-position`, before and after
+  on the same build — 2 397 → 2 395 passing, +7 and −9.** A net −2, and worth reading
+  rather than summing:
+  - **The 7 gains are real features on both sides**: five `css-grid/subgrid` tests
+    (`repeat-auto-fill-002/-003/-004` at 95.3% → 100.0%, 89.6% → 99.2%,
+    `placement-implicit-001` 97.9% → 100.0%, `orthogonal-writing-mode-005` 96.9% →
+    99.7%) and two `grid-lanes` gap tests at 96.5% → 100.0%.
+  - **All 9 losses are `grid-lanes/subgrid/grid-subgridded-to-grid-lanes`, and every one
+    of them is a fake pass unmasked on the *reference* side.** Those tests declare
+    `display: inline-grid-lanes`, which Broiler
+    [deliberately drops](wpt-rendering-gaps-open.md#grid-lanes-is-an-unshipped-draft-feature)
+    so the element keeps its default `block`; their references declare a real
+    `display: inline-grid`. Rendering both sides of `row-subgrid-grid-gap-013` on both
+    builds settles it: **the test render is byte-identical** (same MD5 before and after),
+    and only the reference moved — from an inner subgrid stretched across the full
+    1024px page to one honouring its `min-width: 30px`. The pair had been agreeing at
+    99.07% because the reference shared the bug; it is 74.02% now because it does not.
+    The eight others are the same shape, all previously sitting at 99.07–99.78%, just
+    over the gate.
+  - **Attributed, not assumed.** All 16 moved tests were re-run on a third build carrying
+    only the containing-block walk: every move reproduces there, so **the percentage-basis
+    fix moved no test in the 5 112**. It is spec-correct and inert on this corpus, and its
+    effect is on the layout assertions above, which the pixel suite never reaches — the
+    test declares no `rel=match`.
+- **Unit suites: `Broiler.Layout.Tests` 908 / 908, and `Broiler.Cli.Tests` holds its
+  baseline exactly** — 53 pre-existing failures before, the same 53 after, the failing set
+  identical name for name, plus the new tests passing. One intermediate run reported a 54th
+  (`ScriptCompileAheadOverlapTests.Every_Source_Is_Compiled_By_A_Worker_When_The_Budget_Is_On`);
+  it did not recur, it passes in isolation on both builds, and it is a worker-scheduling
+  budget assertion that touches no layout code — the machine was under memory pressure from
+  a concurrent sweep. Re-run before believing a diff, the way
+  [the flaky view-transition test](wpt-rendering-gaps-open.md#one-test-is-flaky) had to be.
+- **Tests:** `Broiler.Layout.Tests/AtomicInlineContainingBlockTests.cs` reads
+  `CssBox.ContainingBlock` directly — the four atomic inline displays, their four
+  block-level counterparts, and a plain `display: inline` control that must stay
+  transparent to the walk (three of the four atomic cases fail without the fix).
+  `Broiler.Cli.Tests/AtomicInlineContainingBlockTests.cs` drives the same claim through
+  real pages, as a parity assertion rather than absolute numbers: an atomic inline-level
+  container must size its descendants exactly as its block-level counterpart does. That
+  keeps it honest about the pairs whose shared behaviour is still wrong for other reasons
+  — a percentage height inside a `table` resolves no better than inside an
+  `inline-table`, and pinning today's number there would fail the day that separate gap
+  is closed.
+
+### A non-stretching grid item could not take its inline size from its `aspect-ratio`
+
+- **Test:** `css-grid/alignment/grid-item-aspect-ratio-justify-self-001`, whose assertions
+  go **20 / 40 → 29 / 40** on top of the containing-block fixes above. All nine
+  non-stretching rows of the first group now measure **16×32** exactly, where they measured
+  24×32. What remains is
+  [two other rules](wpt-rendering-gaps-open.md#a-definite-inline-size-does-not-drive-the-block-axis-through-an-aspect-ratio).
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Sizing.cs`, `Engine/CssBoxGrid.cs`). Main
+  repo, no patch.
+- **`justify-self` was implemented; the ratio could not run in the direction it needed.**
+  `PlaceItemInArea` already declines to stretch an item whose `justify-self` is positional
+  and aligns it in its area instead — the item simply *arrived* 24 wide, having filled its
+  containing block during ordinary layout, and nothing then re-derived it. Reading the
+  alignment code as missing would have been the wrong repair.
+- **Only one of the two transfer directions existed for a non-replaced box.**
+  `CanTransferAspectRatioToBlockHeight` takes an auto *height* from the used width, which is
+  the direction an ordinary in-flow box needs: its auto width fills the containing block, so
+  the width is known first. A grid item that is **not** stretched is the case where that is
+  untrue — its inline size is auto and its block size is the definite one the area gave it —
+  and the transfer has to run block→inline. Until now only a replaced box could do that
+  (`ResolveReplacedContentSize` fills in whichever axis is auto).
+  `TryResolveAspectRatioInlineWidth` is the new mirror of the existing helper, applying the
+  ratio in the box named by `box-sizing` and clamping the result to `min-`/`max-width`.
+- **The guard is the part worth keeping.** A first draft fired whenever the item did not
+  fill its area, which is also true of an item with a stated `width: 20px` — and it
+  overwrote that 20 with the ratio's 16. Only an *auto* inline size is the ratio's to fill
+  in. The test that caught it is in the landed set.
+- **Checked against Chromium on five shapes, not derived on paper.** All five widths agree:
+  16 for the plain border-box case, 20 for `box-sizing: content-box` with 2px of padding
+  (the ratio halves the *content* height, and the padding brings the border box back to 20),
+  20 under a `min-width` floor, 20 for a stated width, and 24 when stretched. The paper
+  arithmetic for the content-box row said 18 and was wrong; the engine and Chromium both
+  say 20 × 36. The three rows whose block axis Chromium drives back through the ratio are
+  recorded as the remaining gap rather than pinned at today's value.
+- **Sweep: the same 5 112 reftests, and it moves nothing at all** — 2 395 passing before and
+  after, `+0 / −0`, average match identical to three decimals. That is the expected result
+  rather than a disappointing one: the transfer fires only for a grid item that carries an
+  `aspect-ratio`, has an auto inline size *and* is not stretched, and no reftest in this
+  corpus combines the three. **The evidence for this change is the layout assertions and the
+  Chromium comparison, not the pixel suite** — the test it was written for declares no
+  `rel=match`, so the reftest runner never sees it. Worth stating plainly, because a `+0/−0`
+  sweep is only reassuring once you know it was capable of showing something.
+- **Tests:** `Broiler.Cli.Tests/GridItemAspectRatioInlineSizeTests.cs` — the nine
+  non-stretching `justify-self` values, the `normal`/`stretch` control that must still fill
+  its area (a fix that applied the ratio unconditionally would pass the first and fail the
+  second), the stated-width and `min-width` guards, and the `box-sizing` case.
+
 ---
 
 ## Paint and the renderer
