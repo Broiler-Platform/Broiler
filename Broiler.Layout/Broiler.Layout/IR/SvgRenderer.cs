@@ -582,14 +582,38 @@ internal static partial class SvgRenderer
             if (!flood.Success)
                 continue;
 
-            var floodAttrs = ParseAttributes(flood.Groups[1].Value);
-            var color = GetColor(floodAttrs, "flood-color", BColor.Black);
-            if (floodAttrs.TryGetValue("flood-opacity", out var opStr)
-                && float.TryParse(opStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var op))
-                color = BColor.FromArgb((int)(Math.Clamp(op, 0f, 1f) * color.A), color.R, color.G, color.B);
+            // "A flood filter" means the flood is the *whole* filter. A flood that another
+            // primitive then consumes describes a backdrop, not the result: registering
+            // filters-blend-01-b's five feFlood+feBlend chains here replaced each thin blended
+            // band with a solid flood-coloured rectangle 20% larger than the shape.
+            if (FilterPrimitiveRegex().Matches(body).Count > 1)
+                continue;
 
-            SvgFilterTable.AddFlood(id, color);
+            SvgFilterTable.AddFlood(id, ParseFloodColor(ParseAttributes(flood.Groups[1].Value)));
         }
+    }
+
+    /// <summary>
+    /// The colour an <c>&lt;feFlood&gt;</c> produces: its <c>flood-color</c> with
+    /// <c>flood-opacity</c> folded into the alpha channel.
+    /// </summary>
+    /// <remarks>
+    /// Takes the parsed attributes rather than the match, because the two regexes that find an
+    /// <c>&lt;feFlood&gt;</c> put them in different groups — <see cref="FeFloodRegex"/> in group 1
+    /// and <see cref="FilterPrimitiveRegex"/> in group 2, group 1 there being the element name.
+    /// </remarks>
+    private static BColor ParseFloodColor(Dictionary<string, string> floodAttrs)
+    {
+        var color = GetColor(floodAttrs, "flood-color", BColor.Black);
+
+        if (floodAttrs.TryGetValue("flood-opacity", out var opStr)
+            && float.TryParse(opStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var op))
+        {
+            color = BColor.FromArgb(
+                (int)(Math.Clamp(op, 0f, 1f) * color.A), color.R, color.G, color.B);
+        }
+
+        return color;
     }
 
     /// <summary>
@@ -639,10 +663,42 @@ internal static partial class SvgRenderer
         string? previousResult = null;
         bool first = true;
 
+        // The colours an feFlood in this filter produced, by its `result` name. A flood is a
+        // constant over the whole filter region, so a later primitive that consumes one is
+        // consuming a known colour rather than an image the model cannot represent.
+        Dictionary<string, BColor>? floods = null;
+
         foreach (Match pm in primitives)
         {
             var name = pm.Groups[1].Value;
             var attrs = ParseAttributes(pm.Groups[2].Value);
+
+            if (name.Equals("feFlood", StringComparison.OrdinalIgnoreCase))
+            {
+                // A flood ignores its `in` entirely, so it neither continues nor breaks the chain;
+                // it contributes a named constant for a later feBlend to use as its backdrop.
+                if (!attrs.TryGetValue("result", out var floodResult) || floodResult.Length == 0)
+                    return null;
+
+                floods ??= new Dictionary<string, BColor>(StringComparer.Ordinal);
+                floods[floodResult] = ParseFloodColor(attrs);
+                continue;
+            }
+
+            if (name.Equals("feBlend", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryResolveBlendBackdrop(attrs, floods, previousResult, first, out var backdrop))
+                    return null;
+
+                string mode = (attrs.GetValueOrDefault("mode") ?? "normal").Trim().ToLowerInvariant();
+                if (!SvgColorFilter.IsModelledBlendMode(mode))
+                    return null;
+
+                steps.Add(new SvgColorFilter.Step { BlendBackdrop = backdrop, BlendMode = mode });
+                attrs.TryGetValue("result", out previousResult);
+                first = false;
+                continue;
+            }
 
             // The chain must be straight: each primitive consumes the previous one's output (an
             // absent `in` means exactly that), and the first consumes the source graphic.
@@ -694,6 +750,41 @@ internal static partial class SvgRenderer
         }
 
         return new SvgColorFilter(steps);
+    }
+
+    /// <summary>
+    /// Resolves an <c>&lt;feBlend&gt;</c>'s two inputs to "the running colour, over this constant
+    /// backdrop".
+    /// </summary>
+    /// <remarks>
+    /// One input must name an <c>&lt;feFlood&gt;</c> declared earlier in the same filter — the only
+    /// second image a single-colour model can represent — and the other must be the running result.
+    /// Either order is accepted: the blend is not commutative, but <c>in</c> is always the source
+    /// and <c>in2</c> the backdrop, so the flood being named by <c>in</c> instead makes the flood
+    /// the source and the running colour the backdrop.
+    /// </remarks>
+    private static bool TryResolveBlendBackdrop(
+        Dictionary<string, string> attrs, Dictionary<string, BColor>? floods,
+        string? previousResult, bool first, out BColor backdrop)
+    {
+        backdrop = default;
+        if (floods == null)
+            return false;
+
+        string? input = attrs.GetValueOrDefault("in");
+        string? input2 = attrs.GetValueOrDefault("in2");
+
+        // in2 names the flood: the ordinary spelling, source over flood.
+        if (input2 != null && floods.TryGetValue(input2, out backdrop))
+            return ConsumesPreviousResult(attrs, "in", previousResult, first);
+
+        // in names the flood instead. The running colour is then the backdrop, which this model
+        // cannot express — it applies the blend to the running colour, not to the flood — so it is
+        // declined rather than rendered the wrong way round.
+        if (input != null && floods.ContainsKey(input))
+            return false;
+
+        return false;
     }
 
     /// <summary>

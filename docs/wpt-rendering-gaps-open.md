@@ -771,12 +771,15 @@ Three remain, and each needs a subsystem rather than a fix:
 | `html-svg/styling-css-05-b-isvalid` | 12.6% | 12.6% | the **CSS cascade reaching SVG paint**. `:lang(en) { fill: green }` in a `<style>` inside the `<svg>` matches every element in an `<html lang=en>` document, and a stylesheet `fill` outranks the `fill="none"` presentation attribute — so the reference browser fills the whole test frame green. `SvgRenderer` reads paint from attributes and inline `style` only; it never sees the cascade, because it works from serialised markup rather than from the boxes the cascade was projected onto |
 
 The three share one root: **`SvgRenderer` renders serialised markup, not the box tree
-the cascade and the DOM act on.** Two of the four just closed were fixable precisely
-because they were about geometry and paint the markup already states. These are not,
-and a fourth — `filters-blend-01-b` (31.1% → **34.6%**) — sits between the two groups:
-its `feFlood`+`feBlend` chain is analytically closed-form over a solid fill, the shape
-[`SvgColorFilter`](#) already models for `feColorMatrix` and `feComposite`, so it is
-reachable without the box tree.
+the cascade and the DOM act on.** The four that closed were fixable precisely because
+they were about geometry and paint the markup already states. These are not.
+
+`filters-blend-01-b` is the fourth of the six and is
+[closed as far as its filters go](wpt-rendering-gaps-fixed.md#an-feflood-feeding-another-primitive-flooded-the-shape)
+— 31.1% → **38.2%**. Its residual is the one thing the shape model states it does not
+cover: the element `opacity` on each band, which composites fill and stroke together
+as a group rather than recolouring the shape, and which
+[`AddShape` deliberately does not model](wpt-rendering-gaps-fixed.md#svg-text-pattern-fills-symbols-and-transforms-were-all-missing).
 
 The other two in this group are unchanged and are not `conformance-checkers`:
 

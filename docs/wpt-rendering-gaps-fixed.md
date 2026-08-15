@@ -1055,6 +1055,34 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   [the method notes warn about](wpt-rendering-gaps-open.md#one-test-is-flaky), caught
   by re-running it against the unmodified build exactly as they say to.
 
+### An `feFlood` feeding another primitive flooded the shape
+
+- **Tests:** the whole `css/filter-effects/tainting-*` family — **31 tests crossed the
+  99% gate**, from 98.4% to 99.2–100% — plus
+  `conformance-checkers/html-svg/filters-blend-01-b` 31.1% → **38.2%**.
+- **Owner:** `Broiler.Layout` (`IR/SvgRenderer.cs`, `IR/SvgColorFilter.cs`). Main repo.
+- **The bug.** `CollectFloodFilters` registered a filter as flood-only whenever its body
+  contained an `<feFlood>` *anywhere*, and a shape referencing a flood filter is replaced
+  by a solid rectangle of the flood colour over the filter region — 20% larger than the
+  shape on each axis. But a flood that another primitive then consumes describes a
+  **backdrop**, not the result. Every `tainting-*` test floods and then composites, and
+  each rendered as one solid flood-coloured rectangle. A flood is now taken as the whole
+  filter only when it is the only primitive in it.
+- **`feFlood` + `feBlend` is closed-form over a solid fill**, so it joins the two
+  primitives [`SvgColorFilter`](#svg-text-pattern-fills-symbols-and-transforms-were-all-missing)
+  already models: the backdrop is a single colour by construction, and the five separable
+  SVG 1.1 blend modes composite with it under the ordinary source-over rule. A flood is
+  not a chain step — it ignores its own `in` — so it contributes a named constant rather
+  than continuing the chain, and a blend whose backdrop is anything else declines and
+  leaves the shape unfiltered.
+- **What it does not do.** A blend that names the flood as `in` rather than `in2` is
+  declined rather than rendered the wrong way round: the running colour would then be the
+  backdrop, which a one-colour model cannot express. `filters-blend-01-b`'s residual is
+  the element `opacity` on each band, which is group compositing rather than recolouring
+  and is deliberately outside this model.
+- **Measured:** 0 tests lost across the 1682 in `conformance-checkers/html-svg`, `svg`
+  and `css/filter-effects`; 9 `SvgColorFilterTests` added.
+
 ### A media element with nothing to show painted a black box
 
 - **Tests:** `conformance-checkers/html/elements/{track,video}/src-isvalid` 14.4% →
