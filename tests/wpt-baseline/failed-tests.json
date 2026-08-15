@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7944,
+    "failed": 7433,
     "skipped": 0,
-    "total": 7944
+    "total": 7433
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5760,
+      "count": 5263,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 696,
+      "count": 692,
       "examples": [
         "css/css-align/blocks/align-content-block-007.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -39,7 +39,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 557,
+      "count": 583,
       "examples": [
         "css/css-backgrounds/background-size/background-size-cover-svg.html",
         "css/css-backgrounds/border-image-slice-fill-002.html",
@@ -51,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 478,
+      "count": 441,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-backgrounds/background-size-029.html",
@@ -63,7 +63,7 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 67,
+      "count": 65,
       "examples": [
         "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
         "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
@@ -75,7 +75,7 @@
       "label": "PixelMismatch / SubpixelAntiAliasing",
       "category": "PixelMismatch",
       "subCategory": "SubpixelAntiAliasing",
-      "count": 38,
+      "count": 40,
       "examples": [
         "css/css-anchor-position/anchor-center-safe-rtl.html",
         "svg/coordinate-systems/out-of-flow-svg-root.html",
@@ -86,7 +86,7 @@
   "topFailingDirectories": [
     [
       "css/CSS2",
-      801
+      800
     ],
     [
       "css/css-grid",
@@ -94,7 +94,7 @@
     ],
     [
       "conformance-checkers/html-svg",
-      514
+      505
     ],
     [
       "css/css-text",
@@ -113,26 +113,26 @@
       271
     ],
     [
-      "conformance-checkers/html",
-      247
+      "css/css-overflow",
+      199
     ],
     [
-      "html/semantics",
-      242
+      "html/canvas",
+      197
     ],
     [
       "css/css-transforms",
-      237
+      173
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      7529
+      7019
     ],
     [
       "Timeout",
-      67
+      65
     ]
   ],
   "droppedDeclarations": [],
@@ -211,18 +211,6 @@
       ]
     },
     {
-      "family": "css/css-transforms/matrix/svg-matrix-{N}.html",
-      "count": 40,
-      "categories": {
-        "PixelMismatch": 40
-      },
-      "examples": [
-        "css/css-transforms/matrix/svg-matrix-016.html",
-        "css/css-transforms/matrix/svg-matrix-034.html",
-        "css/css-transforms/matrix/svg-matrix-045.html"
-      ]
-    },
-    {
       "family": "html/dom/render-blocking/element-render-blocking-{N}.html",
       "count": 40,
       "categories": {
@@ -256,6 +244,18 @@
         "css/WOFF2/metadatadisplay-schema-description-001.xht",
         "css/WOFF2/metadatadisplay-schema-description-009.xht",
         "css/WOFF2/metadatadisplay-schema-description-012.xht"
+      ]
+    },
+    {
+      "family": "css/WOFF2/metadatadisplay-schema-copyright-{N}.xht",
+      "count": 30,
+      "categories": {
+        "PixelMismatch": 30
+      },
+      "examples": [
+        "css/WOFF2/metadatadisplay-schema-copyright-008.xht",
+        "css/WOFF2/metadatadisplay-schema-copyright-017.xht",
+        "css/WOFF2/metadatadisplay-schema-copyright-026.xht"
       ]
     }
   ],
@@ -320,11 +320,6 @@
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
-      "matchPercent": 1.271565755208337,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
       "relativeTestPath": "css/css-view-transitions/auto-name.html",
       "matchPercent": 1.271565755208337,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -337,21 +332,6 @@
     {
       "relativeTestPath": "css/filter-effects/svg-filter-primitive-units-user-space.html",
       "matchPercent": 8.01849365234375,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
-      "relativeTestPath": "svg/painting/reftests/mask-percentage.html",
-      "matchPercent": 21.81396484375,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/perspective-svg-001.html",
-      "matchPercent": 47.064208984375,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
-      "relativeTestPath": "resize-observer/devicepixel2.html",
-      "matchPercent": 50.0,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
@@ -368,6 +348,11 @@
       "relativeTestPath": "css/css-grid/subgrid/abs-pos-001.html",
       "matchPercent": 54.14924621582031,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.9%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-grid/subgrid/abs-pos-002.html",
+      "matchPercent": 54.62493896484375,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/filter-effects/backdrop-filter-clip-rect-zoom.html",
@@ -440,11 +425,6 @@
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (97.7%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
-      "relativeTestPath": "css/css-paint-api/one-custom-property-animation-half-opaque.https.html",
-      "matchPercent": 68.21085611979167,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
       "relativeTestPath": "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/line-names/column-line-names-008.html",
       "matchPercent": 68.30304463704427,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -453,11 +433,6 @@
       "relativeTestPath": "css/css-ruby/block-ruby-003.html",
       "matchPercent": 69.98392740885417,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (98.7%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
-      "relativeTestPath": "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing/column-subgrid-auto-fill-007.html",
-      "matchPercent": 72.65625,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/css-contain/contain-html-t-o-001.html",
@@ -470,9 +445,29 @@
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
-      "relativeTestPath": "css/css-backgrounds/background-attachment-fixed-inside-transform-1.html",
-      "matchPercent": 75.57627360026041,
+      "relativeTestPath": "css/css-inline/dominant-baseline/dominant-baseline-mixed-writing-modes-002.html",
+      "matchPercent": 75.5730946858724,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-inline/text-box-trim/text-box-trim-accumulation-002.html",
+      "matchPercent": 77.0416259765625,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-inline/text-box-trim/text-box-trim-accumulation-003.html",
+      "matchPercent": 77.0416259765625,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-view-transitions/massive-element-left-of-viewport-offscreen-new.html",
+      "matchPercent": 77.80558268229166,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (98.6%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-grid/grid-definition/grid-template-columns-fit-content-001.html",
+      "matchPercent": 78.75684102376303,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.1%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/css-view-transitions/massive-element-right-of-viewport-offscreen-new.html",
@@ -493,6 +488,11 @@
       "relativeTestPath": "css/css-overflow/scrollbar-gutter-003.html",
       "matchPercent": 79.0191650390625,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-gaps/grid/fragmentation/grid-gap-decorations-fragmentation-024.html",
+      "matchPercent": 80.49418131510416,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     }
   ],
   "results": [
@@ -1085,27 +1085,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html-its/externalresource/html/externalresource1html.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-its/externalresource/html/externalresource2html.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-its/externalresource/html/externalresource3html.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html-its/locqualityissue/html/locqualityissue4html.html",
       "passed": false,
       "skipped": false,
@@ -1397,7 +1376,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/animate-elem-37-t-isvalid.html",
@@ -1751,20 +1730,6 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/conform-viewers-03-f-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/coords-coord-01-t-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/coords-coord-02-t-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -2765,13 +2730,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html-svg/masking-path-13-f-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html-svg/masking-path-14-f-isvalid.html",
       "passed": false,
       "skipped": false,
@@ -3339,13 +3297,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html-svg/pservers-pattern-04-f-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html-svg/pservers-pattern-05-f-isvalid.html",
       "passed": false,
       "skipped": false,
@@ -3675,13 +3626,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html-svg/struct-defs-01-t-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html-svg/struct-dom-01-b-isvalid.html",
       "passed": false,
       "skipped": false,
@@ -3759,13 +3703,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html-svg/struct-dom-14-f-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html-svg/struct-dom-15-f-isvalid.html",
       "passed": false,
       "skipped": false,
@@ -3830,13 +3767,6 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/struct-frag-06-t-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/struct-group-01-t-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -3966,7 +3896,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/struct-image-17-b-isvalid.html",
@@ -4082,20 +4012,6 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/struct-use-11-f-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/struct-use-12-f-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/struct-use-13-f-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -4753,13 +4669,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html/elements/audio/src-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html/elements/embed/src/host-cr-novalid.html",
       "passed": false,
       "skipped": false,
@@ -4989,55 +4898,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/junk-video-before-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/junk-video-no-img-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/picture-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/track-srcset-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/video-source-sizes-srcset-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/video-source-srcset-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/picture/video-srcset-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html/elements/script/src-isvalid.html",
       "passed": false,
       "skipped": false,
@@ -5069,1431 +4929,10 @@
       "category": "Timeout"
     },
     {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src-whitespace-only-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/fragment-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/fragment-contains-hash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/fragment-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-double-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-double-percent-encoded-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-empty-userinfo-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-empty-with-userinfo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-hostname-in-brackets-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-invalid-unicode-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-invalid-unicode-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-square-brackets-port-contains-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-u0000-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/host-u0000-percent-encoded-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-bare-percent-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-contains-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-leading-backslash-at-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-leading-colon-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-leading-colon-chars-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-percent-encoded-malformed-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-relative-square-brackets-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/path-u0091-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-999999-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-leading-colon-bracket-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-leading-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-leading-dash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-multiple-letters-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-single-letter-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/port-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/query-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/query-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-data-contains-fragment-haswarn.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-data-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-file-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-file-single-slash-c-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-file-slash-slash-abc-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-file-triple-slash-c-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-ftp-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-ftp-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-http-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-http-no-slash-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-http-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-http-no-slash-square-bracket-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-http-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-https-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-https-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-trailing-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-trailing-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/scheme-trailing-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/userinfo-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/userinfo-password-bad-chars-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/userinfo-password-contains-pile-of-poo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/userinfo-username-contains-at-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/track/src/userinfo-username-contains-pile-of-poo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/model-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/model-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html/elements/video/poster-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "ScriptError"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster-whitespace-only-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/fragment-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/fragment-contains-hash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/fragment-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-double-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-double-percent-encoded-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-empty-userinfo-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-empty-with-userinfo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-hostname-in-brackets-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-invalid-unicode-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-invalid-unicode-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-square-brackets-port-contains-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-u0000-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/host-u0000-percent-encoded-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-bare-percent-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-contains-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-leading-backslash-at-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-leading-colon-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-leading-colon-chars-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-percent-encoded-malformed-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-relative-square-brackets-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/path-u0091-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-999999-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-leading-colon-bracket-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-leading-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-leading-dash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-multiple-letters-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-single-letter-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/port-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/query-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/query-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-data-contains-fragment-haswarn.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-data-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-file-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-file-single-slash-c-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-file-slash-slash-abc-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-file-triple-slash-c-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-ftp-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-ftp-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-http-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-http-no-slash-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-http-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-http-no-slash-square-bracket-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-http-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-https-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-https-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-trailing-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-trailing-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/scheme-trailing-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/userinfo-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/userinfo-password-bad-chars-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/userinfo-password-contains-pile-of-poo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/userinfo-username-contains-at-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/poster/userinfo-username-contains-pile-of-poo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/fragment-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/fragment-contains-hash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/fragment-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-double-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-double-percent-encoded-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-empty-userinfo-empty-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-empty-with-userinfo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-hostname-in-brackets-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-invalid-unicode-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-invalid-unicode-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-square-brackets-port-contains-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-u0000-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/host-u0000-percent-encoded-percent-encoded-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-bare-percent-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-contains-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-leading-backslash-at-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-leading-colon-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-leading-colon-chars-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-percent-encoded-malformed-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-relative-square-brackets-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/path-u0091-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-999999-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-leading-colon-bracket-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-leading-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-leading-dash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-multiple-letters-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-single-letter-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/port-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/query-leading-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/query-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-data-contains-fragment-haswarn.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-data-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-file-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-file-single-slash-c-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-file-slash-slash-abc-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-file-triple-slash-c-bar-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-ftp-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-ftp-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-http-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-http-no-slash-colon-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-http-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-http-no-slash-square-bracket-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-http-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-https-no-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-https-single-slash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-trailing-cr-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-trailing-newline-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-trailing-space-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/scheme-trailing-tab-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/userinfo-backslash-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/userinfo-password-bad-chars-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/userinfo-password-contains-pile-of-poo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/userinfo-username-contains-at-sign-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html/elements/video/src/userinfo-username-contains-pile-of-poo-novalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/index.html",
@@ -6514,13 +4953,6 @@
       "passed": false,
       "skipped": false,
       "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "content-dpr/content-dpr-various-elements.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "content-security-policy/README.html",
@@ -6545,13 +4977,6 @@
     },
     {
       "relativeTestPath": "content-security-policy/media-src/media-src-7_2_2.sub.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "content-security-policy/sandbox/autoplay-disabled-by-csp.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -9834,7 +8259,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/CSS2/normal-flow/replaced-min-max-001.xht",
@@ -16003,13 +14428,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-borders/corner-shape/corner-shape-video-border.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-borders/corner-shape/render-corner-shape.html",
       "passed": false,
       "skipped": false,
@@ -18269,13 +16687,6 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "css/css-contain/content-visibility/content-visibility-025.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
       "relativeTestPath": "css/css-contain/content-visibility/content-visibility-049.html",
       "passed": false,
       "skipped": false,
@@ -18788,13 +17199,6 @@
     },
     {
       "relativeTestPath": "css/css-counter-styles/upper-roman/css3-counter-styles-024.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-display/accessibility/display-contents-role-and-label.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -19539,7 +17943,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-flexbox/flex-lines/multi-line-wrap-reverse-column-reverse.html",
@@ -20652,7 +19056,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-flexbox/percentage-heights-003.html",
@@ -28664,13 +27068,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-masking/clip-path/clip-path-shape-svg-scaled-shape.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-masking/clip-path/clip-path-shape-svg-view-box-scaled-shape.html",
       "passed": false,
       "skipped": false,
@@ -28899,14 +27296,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-masking/mask-image/mask-mode-to-mask-type.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-masking/mask-image/mask-origin-3.html",
@@ -31512,13 +29909,6 @@
       "subCategory": "LayoutShift"
     },
     {
-      "relativeTestPath": "css/css-position/position-fixed-video-controls-print.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-position/position-sticky-dynamic-ancestor-001.html",
       "passed": false,
       "skipped": false,
@@ -31666,13 +30056,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-position/sticky/position-sticky-fixed-ancestor-iframe.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-position/sticky/position-sticky-fixed-ancestor.html",
       "passed": false,
       "skipped": false,
@@ -31804,13 +30187,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-pseudo/chrome-486467574.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-pseudo/events-on-after-before-marker.tentative.html",
@@ -32516,7 +30892,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -32537,7 +30913,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/snap-to-different-targets.html",
@@ -33240,20 +31616,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-sizing/aspect-ratio/replaced-element-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-sizing/aspect-ratio/replaced-element-026.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-sizing/aspect-ratio/replaced-element-028.html",
       "passed": false,
       "skipped": false,
@@ -33657,14 +32019,14 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-sizing/intrinsic-size-fallback-video.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-sizing/keyword-sizes-for-intrinsic-contributions-002.html",
@@ -38220,38 +36582,10 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-transforms/gradientTransform/svg-gradientTransform-combination-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/group/svg-transform-nested-023.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/group/svg-transform-nested-024.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/group/svg-transform-nested-025.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/group/svg-transform-nested-028.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -38307,200 +36641,60 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-012.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-013.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-015.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-016.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-018.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-019.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-020.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-021.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-022.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-023.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-030.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-031.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-034.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-035.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-036.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-037.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-038.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-039.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-040.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-041.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-042.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-043.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/matrix/svg-matrix-045.html",
@@ -38521,77 +36715,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-049.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-050.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-051.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-052.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-053.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-054.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-055.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-056.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/matrix/svg-matrix-057.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/patternTransform/svg-patternTransform-combination-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/perspective-split-by-zero-w.html",
@@ -38599,13 +36723,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/perspective-svg-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-transforms/perspective-transforms-equivalence.html",
@@ -38669,90 +36786,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-012.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-013.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-015.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-016.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/scale/svg-scale-017.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-3d-rotateY-stair-above-001.xht",
@@ -38951,83 +36984,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-list-separation/svg-transform-list-separations-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-transforms/transform-matrix-009.html",
       "passed": false,
       "skipped": false,
@@ -39054,27 +37010,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-length-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-length-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-length-in-001.html",
@@ -39116,105 +37051,105 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-002.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-004.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-005.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-006.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-007.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-008.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-009.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-010.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-011.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-012.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-013.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-014.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-015.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-016.html",
@@ -39228,21 +37163,21 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-018.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-019.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-020.html",
@@ -39438,91 +37373,84 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-002.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-004.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-005.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-006.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-007.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-008.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-009.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-010.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-011.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-012.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-percent-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-percent-010.html",
@@ -39581,25 +37509,11 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-transforms/translate/svg-translate-multiple-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/translate/svg-translate-multiple-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-transforms/translate/translate-and-transform-attribute-in-svg.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-transforms/translate/translate-and-transform-css-property-in-svg.html",
@@ -40337,13 +38251,6 @@
     },
     {
       "relativeTestPath": "css/css-variables/vars-font-shorthand-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -41215,7 +39122,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "SubpixelAntiAliasing"
     },
     {
       "relativeTestPath": "css/css-writing-modes/available-size-020.html",
@@ -43818,7 +41725,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/filter-effects/svg-filter-primitive-units-user-space.html",
@@ -43826,13 +41733,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/filter-effects/svg-mutation-filter-used-by-mask.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/mediaqueries/at-custom-media-basic.html",
@@ -44262,46 +42162,11 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/selectors/media/media-loading-state-timing.sub.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/selectors/media/media-loading-state.sub.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/selectors/media/media-playback-state-timing.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/selectors/media/media-playback-state.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/selectors/media/media-playing-paused-style-invalidation.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/selectors/media/sound-state.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/selectors/nth-child-of-classname.html",
@@ -44444,13 +42309,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "custom-elements/customized-built-in-constructor-exceptions.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "density-size-correction/density-corrected-image-svg-aspect-ratio-cross-origin.sub.html",
       "passed": false,
       "skipped": false,
@@ -44556,21 +42414,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "dom/nodes/insertion-removing-steps/Node-appendChild-script-and-source-from-fragment.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "editing/edit-context/edit-context-inheritability.tentative.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "element-timing/observe-video-poster.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -44782,489 +42626,6 @@
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-clear-encrypted-segmented.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-clear-encrypted.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-encrypted-clear-sources.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-encrypted-clear.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-events.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-multikey-missing-saio.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-multikey-missing-senc.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-multikey-sequential-readyState.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-multikey-sequential.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-multikey.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-multisession.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-setMediaKeys-after-src.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-setMediaKeys-after-update.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-setMediaKeys-immediately.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-setMediaKeys-onencrypted.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-two-videos.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary-waitingforkey.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-playback-temporary.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-reset-src-after-setmediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys-again-after-playback.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys-again-after-resetting-src.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys-at-same-time.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys-multiple-times-with-different-mediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys-multiple-times-with-the-same-mediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys-to-multiple-video-elements.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-setmediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-syntax-mediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-syntax-mediakeysession.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-syntax-mediakeysystemaccess.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-unique-origin.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/clearkey-mp4-waiting-for-a-key.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-keystatuses-multiple-sessions.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-onencrypted.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-destroy-persistent-license.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-persistent-license-events.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-persistent-license.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-retrieve-destroy-persistent-license.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-retrieve-persistent-license.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-clear-encrypted.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-encrypted-clear-sources.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-encrypted-clear.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-events.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-expired.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-multikey-sequential-readyState.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-multikey-sequential.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-multikey.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-multisession.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-playduration-keystatus.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-playduration.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-setMediaKeys-after-src.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-setMediaKeys-after-update.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-setMediaKeys-immediately.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-setMediaKeys-onencrypted.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-two-videos.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary-waitingforkey.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-playback-temporary.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-reset-src-after-setmediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys-again-after-playback.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys-again-after-resetting-src.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys-at-same-time.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys-multiple-times-with-different-mediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys-multiple-times-with-the-same-mediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys-to-multiple-video-elements.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-setmediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-syntax-mediakeys.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-syntax-mediakeysession.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-syntax-mediakeysystemaccess.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-unique-origin.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "encrypted-media/drm-mp4-waiting-for-a-key.https.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -48971,20 +46332,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/dom/documents/dom-tree-accessors/document.getElementsByName/document.getElementsByName-newelements-xhtml.xhtml",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/dom/documents/dom-tree-accessors/document.getElementsByName/document.getElementsByName-newelements.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/dom/elements/global-attributes/dir_auto-EN-L.html",
       "passed": false,
       "skipped": false,
@@ -49760,20 +47107,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "html/editing/dnd/microdata/001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "html/editing/dnd/microdata/003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "html/editing/dnd/overlay/heavy-styling-007.html",
@@ -50587,13 +47920,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/rendering/replaced-elements/attributes-for-embedded-content-and-images/video-intrinsic-width-height.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/rendering/replaced-elements/embedded-content/iframe-frameborder.html",
       "passed": false,
       "skipped": false,
@@ -50613,13 +47939,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "html/rendering/replaced-elements/embedded-content/video-stacking-hit-test.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "html/rendering/replaced-elements/images/space.html",
@@ -50696,7 +48015,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/disabled-elements/event-propagate-disabled-keyboard.tentative.html",
@@ -50717,308 +48036,203 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_canplay_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_canplaythrough.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_canplaythrough_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_loadeddata.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_loadeddata_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_loadedmetadata.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_loadedmetadata_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_loadstart.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_loadstart_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_order_canplay_canplaythrough.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_order_canplay_playing.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_order_durationchange_resize_loadedmetadata.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_order_loadedmetadata_loadeddata.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_order_loadstart_progress.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_pause.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_pause_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_play.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_play_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_playing.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_playing_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_progress.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_progress_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_timeupdate.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/event_timeupdate_noautoplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-in-sync-event.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-insert-source-in-div.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-insert-source-in-namespace.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-insert-source.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-pause-networkState.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-remove-from-document-networkState.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-set-src-in-namespace.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-invoke-set-src.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-resumes-onload.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/loading-the-media-resource/resource-selection-source-media-env-change.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/media_fragment_seek.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/mime-types/canPlayType.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/networkState_during_loadstart.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/networkState_during_progress.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/networkState_initial.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/offsets-into-the-media-resource/currentTime-move-within-document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/paused_false_during_play.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/paused_true_during_pause.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/played-loop.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/fragmented-mp4-end.html",
@@ -51028,434 +48242,42 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/loop-from-ended.tentative.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/pause-move-to-other-document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/pause-move-within-document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/pause-remove-from-document-different-load.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/pause-remove-from-document-networkState.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/playing-the-media-resource/pause-remove-from-document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/preload_reflects_none_autoplay.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/readyState_during_canplay.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/readyState_during_canplaythrough.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/readyState_during_loadeddata.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/readyState_during_loadedmetadata.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/readyState_during_playing.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/readyState_initial.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/src_object_blob.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/src-empty-string.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cue-mutable-fragment.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cue-mutable.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cue-negative-duration.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cue-negative-timestamp-events.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cue-negative-timestamp.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-add-new-track.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-cuechange-dynamically-created-track-element.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-cuechange.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-enter-exit.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-enter-seeking.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-missed-no-immediate-events.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-missed.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-pause-on-exit.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-seeking.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-cues-sorted-before-dispatch.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-default-attribute.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-default-load-timer-during-parser-block.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-delete-during-setup.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-disabled.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-element-src-aborted-load.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-element-src-change-error.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-element-src-change.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-id.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-large-timestamp.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-load-error-readyState.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-load-from-element-readyState.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-load-from-src-readyState.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-mode-disabled.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-mode-not-changed-by-new-track.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-mode-triggers-loading.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-mode.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-remove-active-cue.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-remove-by-setting-innerHTML.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-remove-insert-ready-state.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-remove-quickly.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-selection-metadata.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-text-track-cue-list.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-texttracks.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-align-positioning.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-align-text-line-position.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-bom.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-header-checks.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-header-comment.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-line-position.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-magic-header.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-newlines.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-no-timings.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -51469,34 +48291,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-timings-hour.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-timings-no-hours.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/track/track-element/track-webvtt-utf8.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/user-interface/muted.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/embedded-content/media-elements/video_loop_base.html",
       "passed": false,
       "skipped": false,
@@ -51504,28 +48298,7 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "html/semantics/embedded-content/media-elements/video_volume_check.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/embedded-content/the-embed-element/embed-hidden-attribute.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-embed-element/embed-ignored-in-media-element.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-embed-element/embed-represent-nothing-03.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -51664,13 +48437,6 @@
       "subCategory": "LayoutShift"
     },
     {
-      "relativeTestPath": "html/semantics/embedded-content/the-object-element/object-ignored-in-media-element.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/embedded-content/the-object-element/usemap-casing.html",
       "passed": false,
       "skipped": false,
@@ -51678,28 +48444,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/intrinsic_sizes.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "html/semantics/embedded-content/the-video-element/video-loading-lazy-window-onload.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video-poster-clone-template.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video-tabindex.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -51711,41 +48456,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video_content_image.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video_content_text.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video_dynamic_poster_absolute.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video_dynamic_poster_relative.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/semantics/embedded-content/the-video-element/video_initially_paused.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "html/semantics/forms/attributes-common-to-form-controls/dirname-only-if-applies.html",
@@ -52505,13 +49215,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "infrastructure/assumptions/allowed-to-play.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "input-events/input-events-get-target-ranges.html",
       "passed": false,
       "skipped": false,
@@ -52564,17 +49267,10 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "largest-contentful-paint/video-play-after-poster.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "largest-contentful-paint/video-poster.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -53378,49 +50074,7 @@
       "category": "ScriptError"
     },
     {
-      "relativeTestPath": "mediacapture-record/passthrough/MediaRecorder-passthrough.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "mediacapture-streams/BrowserCaptureMediaStreamTrack-restrictTo.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "mediacapture-streams/MediaStream-MediaElement-firstframe.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "mediacapture-streams/MediaStream-MediaElement-preload-none.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "mediacapture-streams/MediaStream-MediaElement-srcObject.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "mediacapture-streams/MediaStream-removetrack.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "mediacapture-streams/MediaStreamTrack-MediaElement-disabled-video-is-black.https.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -53532,13 +50186,6 @@
     },
     {
       "relativeTestPath": "page-visibility/test_child_document.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "paint-timing/fcp-only/fcp-video-frame.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -54329,20 +50976,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "quirks/percentage-height-quirk-excludes-flex-grid-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "quirks/percentage-height-quirk-excludes-flex-grid-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "quirks/tables-inherit-color-from-body-quirk-003.html",
       "passed": false,
       "skipped": false,
@@ -54385,13 +51018,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "resource-timing/initiator-type/audio.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "resource-timing/initiator-type/style.html",
       "passed": false,
       "skipped": false,
@@ -54404,13 +51030,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "resource-timing/internal-resources-not-counted.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "resource-timing/tentative/initiator-url/external-script-in-posted-task.html",
@@ -54442,27 +51061,6 @@
     },
     {
       "relativeTestPath": "resource-timing/test_resource_timing.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "screen-capture/getdisplaymedia-framerate.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "screen-capture/getdisplaymedia-settings.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "screen-capture/tentative/getdisplaymedia-captured-surface-resolution.https.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -54546,13 +51144,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "selection/selection-nested-video.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "serial/serialPort_readable-manual.https.html",
       "passed": false,
       "skipped": false,
@@ -54564,13 +51155,6 @@
       "passed": false,
       "skipped": false,
       "category": "ScriptError"
-    },
-    {
-      "relativeTestPath": "shadow-dom/declarative/declarative-shadow-dom-basic.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "shadow-dom/focus-navigation/focus-with-negative-index.html",
@@ -54713,13 +51297,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "soft-navigation-heuristics/detection/tentative/video-srcObject-change.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "soft-navigation-heuristics/smoke/tentative/video-src-change.html",
       "passed": false,
       "skipped": false,
@@ -54755,13 +51332,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "svg-aam/role/roles.tentative.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "svg/animations/additive-type-by-animation.html",
       "passed": false,
       "skipped": false,
@@ -54780,42 +51350,42 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-15-t-drt.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-16-t-drt.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-17-t-drt.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-18-t-drt.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-19-t-drt.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "svg/animations/correct-events-for-short-animations-with-syncbases.html",
@@ -54847,13 +51417,6 @@
     },
     {
       "relativeTestPath": "svg/animations/spaces-at-end-of-path-data.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "svg/coordinate-systems/abspos.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -54951,25 +51514,11 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "svg/interact/scripted/rect-hittest-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "svg/interact/scripted/text-hittest-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "svg/linking/reftests/href-pattern-element.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "svg/linking/reftests/media-fragment-spatial-percent-full.html",
@@ -55022,13 +51571,6 @@
     },
     {
       "relativeTestPath": "svg/render/reftests/blending-svg-foreign-object.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "svg/render/reftests/filter-effects-on-pattern.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -55697,13 +52239,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "video-rvfc/request-video-frame-callback-webrtc.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "visual-viewport/viewport-unscaled-scroll-iframe.html",
       "passed": false,
       "skipped": false,
@@ -55792,25 +52327,11 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "webrtc-encoded-transform/RTCRtpScriptTransform-bad-chunk.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "webrtc-encoded-transform/RTCRtpScriptTransform-encoded-transform.https.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-audio-transform.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "webrtc-encoded-transform/script-change-transform.https.html",
@@ -55821,55 +52342,6 @@
     },
     {
       "relativeTestPath": "webrtc-encoded-transform/script-late-transform.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-metadata-transform.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-transform-generateKeyFrame-simulcast.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-transform-generateKeyFrame.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-transform-sendKeyFrameRequest.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-transform.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/script-write-twice-transform.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc-encoded-transform/sframe-keys.https.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -55890,32 +52362,11 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "webrtc/legacy/simplecall_callbacks.optional.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "webrtc/receiver-track-live.https.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "webrtc/simplecall-no-ssrcs.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webrtc/simplecall.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "webtransport/bidirectional-cancel-crash.https.html",
@@ -55931,39 +52382,11 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "webvtt/api/VTTRegion/non-visible-cue-with-region.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "webvtt/rendering/cues-with-video/processing-model/audio_has_no_subtitles.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webvtt/rendering/cues-with-video/processing-model/embedded_style_media_queries.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webvtt/rendering/cues-with-video/processing-model/embedded_style_media_queries_resized.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "webvtt/rendering/cues-with-video/processing-model/navigate_cue_position.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "SubpixelAntiAliasing"
     },
     {
       "relativeTestPath": "workers/non-automated/navigator-onLine.html",
@@ -55983,7 +52406,8 @@
       "relativeTestPath": "xml/xslt/large-cdata.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     }
   ]
 }
