@@ -156,6 +156,17 @@ are versioned in lockstep during the preview.
 
 ### Changed
 
+- `Broiler.JS` (patch, pending upstream) — `new undefined()` and `new null()` report
+  `undefined is not a constructor` / `null is not a constructor` instead of
+  `cannot create instance of …`. No browser used the old wording and neither did
+  the rest of the engine — `JSFunction`, `JSSymbol`, `JSGenerator`, `JSReflect` and
+  `JSPromisePrototype` all already said "is not a constructor"; these two sites were
+  the only holdouts. It matters because the throw itself is usually *correct*: it is
+  what a feature probe such as html5test's
+  `new (window.RTCPeerConnection || …)(null)` gets from an engine without WebRTC, and
+  a wording no browser produces makes a right answer read as an engine fault.
+  `undefined is not a function` is deliberately unchanged — that one already matches.
+
 - `Broiler.Browser.Core` and `Broiler.Writer` — the UI hosts no longer keep a
   private clipboard string for when the shell wired no platform accessor. A
   fallback that only this process can see makes copy and paste appear to work

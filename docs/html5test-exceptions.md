@@ -58,6 +58,12 @@ defects — but it does mean none of them was an emergency.
 
 ---
 
+# Third report: `1986` alone
+
+The canvas fix below landed, and `3030`, `3055` and `3071` are gone from the report with it. What
+remains is the WebRTC probe, on its own — and it is the one of the four that was never a defect. Its
+message is now fixed too (see the section on it); the throw itself is correct and stays.
+
 # Second report: `1986`, `3030`, `3055`, `3071`
 
 Two of the first report's four are gone, which is the first thing worth reading off it: the
@@ -93,11 +99,32 @@ This is the expected outcome of a feature probe against an engine without the fe
 WebRTC disabled throws here too. Nothing to fix; implementing WebRTC is a feature project (an
 ICE/DTLS/SCTP stack), not a bug fix.
 
-One cosmetic observation, independent of html5test: Broiler words this `cannot create instance of
-undefined`, where the spec-conventional phrasing — and Broiler's own wording at its other construct
-sites — is `… is not a constructor`. Worth a sweep if error-message consistency is ever tidied; it
-lives in the `Broiler.JS` submodule (`JSUndefined.cs`, `JSNull.cs`), so it would go through the patch
-workflow.
+### The message was wrong even though the throw was right — **fixed**
+
+Broiler worded this `cannot create instance of undefined`. No browser does: V8, SpiderMonkey and JSC
+all say `undefined is not a constructor`, and so does the rest of this engine — `JSFunction`,
+`JSSymbol`, `JSGenerator`, `JSGeneratorFunctionV2`, `JSReflect` and `JSPromisePrototype` all raise
+`… is not a constructor`. `JSUndefined.CreateInstance` and its `JSNull` sibling were the only two
+sites left with a wording of their own.
+
+That is worth fixing precisely *because* the throw is correct. This trace is the engine giving the
+right answer to a feature probe, and a message no browser produces makes it read as an engine fault —
+which is exactly how it arrived here, twice. `InvokeFunction`'s `undefined is not a function` is
+deliberately untouched: that one already matches the browsers.
+
+Both sites live in the `Broiler.JS` submodule, whose remote is outside this session's GitHub scope, so
+the fix ships through the patch workflow rather than as a pointer bump — the commit
+*"Say "is not a constructor", as every other construct site does"*, exported under `patches/` with its
+tests (`ConstructNonConstructorMessageTests`). Nothing in the main repository asserts either message,
+so the engine behaves identically until a maintainer applies it; the cost of not applying it is a
+non-standard string in a stack trace.
+
+**This does not remove the exception, and nothing short of implementing WebRTC would.** The page
+evaluates `new (A || B || C || D)(null)` where all four are undefined; the only way not to throw is to
+define one of them, and defining one that cannot open a peer connection would be the false claim of
+support that the canvas section above spends its length avoiding. A browser with WebRTC disabled
+throws here too. The 45 points html5test allots to `Peer To Peer` require a working implementation, not
+a name.
 
 ## (2) `undefined is not a function` — `engine.js:3030`, `3055`, `3071` — **fixed**
 
@@ -359,6 +386,7 @@ Second round:
 | `src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs` | pass the bridge to `CanvasBinding.Install` |
 | `src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj` | reference `Broiler.Graphics` and `Broiler.Media.Image` |
 | `src/Broiler.Cli.Tests/CanvasPixelSurfaceTests.cs` | new — the pixel surface, and the html5test probes verbatim |
+| `patches/0007-not-a-constructor-message.patch` | `Broiler.JS` — `new undefined()` says "is not a constructor" |
 
 First round:
 

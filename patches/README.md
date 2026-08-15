@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Six patches are waiting on a maintainer.** See the index below.
+**Seven patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -52,6 +52,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0004` | `Broiler.JS` | Record where an error was raised, not where its factory was wired |
 | `0005` | `Broiler.DOM` | Parse a `<noscript>` body as raw text, as a scripting-enabled parser must |
 | `0006` | `Broiler.JS/Broiler.Regex` | Tell the end of a pattern apart from a NUL inside one |
+| `0007` | `Broiler.JS` | Say "is not a constructor", as every other construct site does |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -303,6 +304,38 @@ compiles through the .NET translator with or without the patch, so no pixel move
 either way. Its behaviour is unit-tested inside the patch (`NulCharacterTests`).
 
 **When it lands upstream:** bump both pointers and delete this patch.
+
+### `0007` — two construct sites had a wording of their own
+
+`new undefined()` said `cannot create instance of undefined`, and `new null()` the
+matching `... of null`. No browser words it that way — V8, SpiderMonkey and JSC all
+say `X is not a constructor` — and neither does the rest of this engine: `JSFunction`,
+`JSSymbol`, `JSGenerator`, `JSGeneratorFunctionV2`, `JSReflect` and
+`JSPromisePrototype` already raise `... is not a constructor`. These two were the only
+sites left disagreeing, so this is a consistency fix rather than a new opinion.
+
+**The throw it appears in is correct**, which is the part worth keeping straight.
+html5test.com probes for WebRTC with
+`new (window.RTCPeerConnection || window.msRTCPeerConnection || window.mozRTCPeerConnection || window.webkitRTCPeerConnection)(null)`.
+Against an engine with no WebRTC every alternative is `undefined`, so this throws, the
+page catches it, and the feature is correctly recorded as unsupported — a browser with
+WebRTC disabled does the same. Only the message was wrong, and a wording no browser
+produces reads as an engine fault in a trace where the right answer was in fact given.
+See `docs/html5test-exceptions.md`.
+
+**`InvokeFunction` is deliberately untouched.** `undefined is not a function` already
+matches the browsers; sweeping it along "for consistency" would have moved it away from
+the wording every engine agrees on.
+
+**Not listed for the pixel suites** — it changes an error message, nothing a page
+paints. `ConstructNonConstructorMessageTests` travels inside the patch and covers it,
+including that the call-path message did not move.
+
+**No main-repo fallback, and none is needed.** Nothing in this repository asserts either
+message, so the un-patched engine behaves exactly as before; the cost of not applying it
+is a non-standard string in a stack trace.
+
+**When it lands upstream:** bump the pointer and delete this patch.
 
 ## A stale entry in the apply script is not inert
 
