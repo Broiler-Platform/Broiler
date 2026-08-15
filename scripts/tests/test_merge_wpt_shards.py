@@ -917,6 +917,115 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertEqual([], merged["biggestProblems"])
             self.assertEqual(2, len(merged["referenceDisagreements"]))
 
+    def _scored_report(
+        self, root: Path, name: str, entries: list[tuple[str, float, float | None]]
+    ) -> None:
+        """Write a shard report whose lowestMatchTests carry a ``referenceMatchPercent``
+        — the score against the test's own rel=match reference, short of the gate."""
+        (root / name).write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "passed": 0,
+                        "failed": len(entries),
+                        "skipped": 0,
+                        "total": len(entries),
+                    },
+                    "shard": {"index": 0, "count": 1},
+                    "triage": {
+                        "lowestMatchTests": [
+                            {
+                                "testPath": path,
+                                "matchPercent": match,
+                                "category": "PixelMismatch",
+                                "subCategory": "LayoutShift",
+                                **(
+                                    {"referenceMatchPercent": reference}
+                                    if reference is not None
+                                    else {}
+                                ),
+                            }
+                            for path, match, reference in entries
+                        ]
+                    },
+                    "results": [
+                        self._failure(path, "PixelMismatch", "LayoutShift")
+                        for path, _, _ in entries
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_a_sub_threshold_reference_score_is_reported_beside_the_golden(self) -> None:
+        # The case the runner used to say nothing about: `suspectReference` is only set
+        # when Broiler *clears the gate* against the test's own reference, so a test at
+        # 94% against it and 0.8% against the golden was ranked as though nothing were
+        # known — indistinguishable from one that is wrong against both.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._scored_report(
+                shard_dir,
+                "shard-0.json",
+                [
+                    ("css/css-grid/column-subgrid-auto-fill-003.html", 0.8, 94.0),
+                    ("css/css-grid/column-subgrid-auto-fill-008.html", 11.5, 10.4),
+                ],
+            )
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=5, low_match_threshold=50.0
+            )
+            details = {
+                problem["relativeTestPath"]: problem["detail"]
+                for problem in merged["biggestProblems"]
+            }
+
+            # Far closer to its own reference than to the golden: the references
+            # disagree, and chasing it would mean rendering less than the test asks for.
+            disagreement = details["css/css-grid/column-subgrid-auto-fill-003.html"]
+            self.assertIn("94.0%", disagreement)
+            self.assertIn("references disagreeing", disagreement)
+
+            # Wrong against both, so the second number must not excuse it.
+            real_gap = details["css/css-grid/column-subgrid-auto-fill-008.html"]
+            self.assertIn("10.4%", real_gap)
+            self.assertNotIn("references disagreeing", real_gap)
+
+    def test_both_classes_stay_ranked_as_biggest_problems(self) -> None:
+        # Recording the second score annotates the ranking; it does not silently drop a
+        # test out of it. Only a reference Broiler actually reproduced does that, and
+        # whether these belong in won't-fix is a maintainer's call, not the report's.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._scored_report(
+                shard_dir, "shard-0.json", [("css/a/near.html", 0.8, 94.0)]
+            )
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=5, low_match_threshold=50.0
+            )
+
+            self.assertEqual(
+                ["css/a/near.html"],
+                [p["relativeTestPath"] for p in merged["biggestProblems"]],
+            )
+            self.assertEqual([], merged["referenceDisagreements"])
+
+    def test_a_report_without_reference_scores_reads_as_before(self) -> None:
+        # A run without --verify-reference carries no referenceMatchPercent key at all.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._scored_report(shard_dir, "shard-0.json", [("css/a/plain.html", 4.0, None)])
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=5, low_match_threshold=50.0
+            )
+            detail = merged["biggestProblems"][0]["detail"]
+
+            self.assertNotIn("rel=match", detail)
+            self.assertTrue(detail.endswith("(PixelMismatch / LayoutShift)."))
+
     def test_low_match_tests_without_verification_are_ranked_as_before(self) -> None:
         # Reports from a run without --verify-reference carry no suspectReference
         # key at all; ranking must be unchanged for them.

@@ -30,7 +30,7 @@ public sealed class SvgColorFilter
 
     internal SvgColorFilter(List<Step> steps) => _steps = steps;
 
-    /// <summary>One modelled primitive. Exactly one of the two forms is populated.</summary>
+    /// <summary>One modelled primitive. Exactly one of the three forms is populated.</summary>
     internal readonly struct Step
     {
         /// <summary>The 20 <c>feColorMatrix</c> values in row-major order, or <c>null</c> for a composite.</summary>
@@ -38,6 +38,16 @@ public sealed class SvgColorFilter
 
         /// <summary><c>feComposite operator="arithmetic"</c> coefficients k1..k4.</summary>
         public (float K1, float K2, float K3, float K4) Arithmetic { get; init; }
+
+        /// <summary>
+        /// An <c>&lt;feBlend&gt;</c> of the running colour over a constant backdrop — the colour an
+        /// <c>&lt;feFlood&gt;</c> earlier in the same filter produced. Null when this step is not a
+        /// blend.
+        /// </summary>
+        public BColor? BlendBackdrop { get; init; }
+
+        /// <summary>The <c>feBlend</c> mode, when <see cref="BlendBackdrop"/> is set.</summary>
+        public string? BlendMode { get; init; }
     }
 
     /// <summary>
@@ -59,6 +69,12 @@ public sealed class SvgColorFilter
                 float nb = m[10] * r + m[11] * g + m[12] * b + m[13] * a + m[14];
                 float na = m[15] * r + m[16] * g + m[17] * b + m[18] * a + m[19];
                 r = Clamp01(nr); g = Clamp01(ng); b = Clamp01(nb); a = Clamp01(na);
+                continue;
+            }
+
+            if (step.BlendBackdrop is { } backdrop)
+            {
+                (r, g, b, a) = Blend(r, g, b, a, backdrop, step.BlendMode);
                 continue;
             }
 
@@ -88,6 +104,61 @@ public sealed class SvgColorFilter
             (int)MathF.Round(g * 255f),
             (int)MathF.Round(b * 255f));
     }
+
+    /// <summary>
+    /// Filter Effects §feBlend: the source colour composited over a constant backdrop under one of
+    /// the separable blend modes, in non-premultiplied sRGB.
+    /// </summary>
+    /// <remarks>
+    /// The general primitive blends two images; this is the case where the backdrop is a single
+    /// colour, which is what an <c>&lt;feFlood&gt;</c> produces over the whole filter region — the
+    /// shape <c>conformance-checkers/html-svg/filters-blend-01-b</c> uses five times over. Only the
+    /// five separable modes SVG 1.1 defines are taken; anything else leaves the colour alone rather
+    /// than guessing.
+    /// <para>
+    /// The compositing is Porter-Duff source-over with the blended colour, per the Compositing and
+    /// Blending model: the blend function applies where both are opaque, and each input shows
+    /// through unblended where the other is transparent.
+    /// </para>
+    /// </remarks>
+    private static (float R, float G, float B, float A) Blend(
+        float r, float g, float b, float a, BColor backdrop, string? mode)
+    {
+        float br = backdrop.R / 255f, bg = backdrop.G / 255f, bb = backdrop.B / 255f;
+        float ba = backdrop.A / 255f;
+
+        float outA = a + ba * (1 - a);
+        if (outA <= 0f)
+            return (0f, 0f, 0f, 0f);
+
+        return (
+            Clamp01(Composite(r, br)), Clamp01(Composite(g, bg)), Clamp01(Composite(b, bb)),
+            Clamp01(outA));
+
+        float Composite(float source, float back)
+        {
+            float blended = BlendChannel(source, back, mode);
+
+            // Compositing and Blending §9: co = cs × αs × (1 − αb) + cb × αb × (1 − αs)
+            //                                  + B(cb, cs) × αs × αb, then un-premultiply.
+            float premultiplied =
+                source * a * (1 - ba) + back * ba * (1 - a) + blended * a * ba;
+            return premultiplied / outA;
+        }
+    }
+
+    private static float BlendChannel(float source, float backdrop, string? mode) => mode switch
+    {
+        "multiply" => source * backdrop,
+        "screen" => source + backdrop - source * backdrop,
+        "darken" => MathF.Min(source, backdrop),
+        "lighten" => MathF.Max(source, backdrop),
+        _ => source,
+    };
+
+    /// <summary>The <c>feBlend</c> modes this models — SVG 1.1's five separable ones.</summary>
+    internal static bool IsModelledBlendMode(string mode) =>
+        mode is "normal" or "multiply" or "screen" or "darken" or "lighten";
 
     private static float Clamp01(float v) => v < 0f ? 0f : v > 1f ? 1f : v;
 }

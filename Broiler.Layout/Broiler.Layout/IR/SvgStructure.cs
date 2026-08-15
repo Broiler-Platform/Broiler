@@ -84,6 +84,43 @@ internal sealed partial class SvgStructure
     /// </summary>
     private readonly List<(int Start, int End)> _inertSpans = [];
 
+    /// <summary>
+    /// The <c>&lt;svg&gt;</c> elements below the root, in document order, and the content spans they
+    /// own — see <see cref="NestedViewports"/>.
+    /// </summary>
+    private readonly List<NestedViewport> _nestedViewports = [];
+
+    /// <summary>
+    /// Every <c>&lt;svg&gt;</c> that is not the outermost one, each of which establishes a viewport
+    /// of its own (SVG 1.1 §7.2) rather than drawing its children in the enclosing user space.
+    /// </summary>
+    /// <remarks>
+    /// The renderer's shape passes sweep the whole markup, so before this the children of a nested
+    /// <c>&lt;svg x y width height viewBox&gt;</c> were drawn in the <em>root's</em> coordinate
+    /// system — every one of the six panels of
+    /// <c>conformance-checkers/html-svg/coords-viewattr-03-b</c> landed on top of the first, at the
+    /// root's scale. They are collected here so the renderer can render each one's content as its
+    /// own document and skip it in the outer passes.
+    /// </remarks>
+    public IReadOnlyList<NestedViewport> NestedViewports => _nestedViewports;
+
+    /// <summary>One nested <c>&lt;svg&gt;</c>: where it is, what it declares, and what it contains.</summary>
+    /// <param name="Index">Its start-tag offset, which orders it against its siblings.</param>
+    /// <param name="Attributes">Its own attributes — <c>x</c>/<c>y</c>/<c>width</c>/<c>height</c>,
+    /// <c>viewBox</c> and <c>preserveAspectRatio</c>.</param>
+    /// <param name="Inherited">The presentation attributes in force where it sits, which its
+    /// content must keep inheriting although it is rendered as a separate document.</param>
+    public readonly record struct NestedViewport(
+        int Index, IReadOnlyDictionary<string, string> Attributes,
+        IReadOnlyDictionary<string, string> Inherited,
+        string Source, int ContentStart, int ContentEnd)
+    {
+        /// <summary>The markup this viewport contains.</summary>
+        public string Content => ContentEnd > ContentStart
+            ? Source[ContentStart..ContentEnd]
+            : string.Empty;
+    }
+
     /// <summary>One element the scan reached, addressable by <c>id</c>.</summary>
     /// <param name="Name">Its tag name.</param>
     /// <param name="Attributes">Its own attributes.</param>
@@ -159,6 +196,26 @@ internal sealed partial class SvgStructure
         return false;
     }
 
+    /// <summary>
+    /// Whether <paramref name="index"/> falls inside a nested <c>&lt;svg&gt;</c>, whose content the
+    /// nested-viewport pass renders as its own document and the outer shape passes must therefore
+    /// leave alone.
+    /// </summary>
+    /// <remarks>
+    /// Scanned rather than binary-searched because these spans nest inside one another, so they are
+    /// not disjoint; a document has a handful of them at most.
+    /// </remarks>
+    public bool IsInNestedViewport(int index)
+    {
+        foreach (var viewport in _nestedViewports)
+        {
+            if (index > viewport.Index && index < viewport.ContentEnd)
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>Resolves an <c>id</c> to the element that declares it.</summary>
     public bool TryGetById(string id, out Element element)
     {
@@ -183,8 +240,10 @@ internal sealed partial class SvgStructure
         var structure = new SvgStructure();
         var open = new List<(string Name, IReadOnlyDictionary<string, string> Inherited,
             bool Suppresses, SvgTransform Transform, IReadOnlyDictionary<string, string> Attributes,
-            int ContentStart)>();
+            int ContentStart, int StartIndex, bool IsNestedViewport,
+            IReadOnlyDictionary<string, string> ParentInherited)>();
         int nonRenderingDepth = 0;
+        int svgDepth = 0;
 
         foreach (Match m in TagRegex().Matches(svgXml))
         {
@@ -210,6 +269,8 @@ internal sealed partial class SvgStructure
                 {
                     if (open[i].Suppresses)
                         nonRenderingDepth--;
+                    if (open[i].Name.Equals("svg", StringComparison.OrdinalIgnoreCase))
+                        svgDepth--;
                 }
 
                 // The element is complete, so its content span is known: record it under its id.
@@ -218,6 +279,16 @@ internal sealed partial class SvgStructure
                 {
                     structure._byId[closedId] = new Element(
                         closed.Name, closed.Attributes, svgXml, closed.ContentStart, m.Index);
+                }
+
+                // A nested <svg> that paints where it stands establishes its own viewport, so its
+                // content is rendered separately rather than by the outer passes. One inside <defs>
+                // is not recorded: it paints only through a <use>, which renders it itself.
+                if (closed.IsNestedViewport)
+                {
+                    structure._nestedViewports.Add(new NestedViewport(
+                        closed.StartIndex, closed.Attributes, closed.ParentInherited,
+                        svgXml, closed.ContentStart, m.Index));
                 }
 
                 open.RemoveRange(last, open.Count - last);
@@ -250,6 +321,11 @@ internal sealed partial class SvgStructure
                 continue;
             }
 
+            bool isSvg = name.Equals("svg", StringComparison.OrdinalIgnoreCase);
+            bool nestedViewport = isSvg && svgDepth > 0 && paints;
+            if (isSvg)
+                svgDepth++;
+
             // Track the suppression on the open element rather than re-deriving it at the end tag:
             // an element nested inside a container that does not paint suppresses its own children
             // too, and matching that against the container list alone would decrement fewer times
@@ -260,9 +336,12 @@ internal sealed partial class SvgStructure
 
             open.Add((
                 name, Extend(inherited, attributes), suppresses, transform,
-                attributes, m.Index + m.Length));
+                attributes, m.Index + m.Length, m.Index, nestedViewport, inherited));
         }
 
+        // Recorded as each end tag is met, so an outer viewport lands after the inner ones it
+        // contains; the renderer paints them in document order and needs them that way round.
+        structure._nestedViewports.Sort(static (a, b) => a.Index.CompareTo(b.Index));
         return structure;
     }
 

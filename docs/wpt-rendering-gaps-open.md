@@ -201,10 +201,74 @@ golden suite never looks at a passing test's own reference.
   the check that subgrid stays a no-op while that is fixed, since the reference
   depends on it being one.
 
+### `aspect-ratio` on a grid item escapes an `inline-grid`
+
+- **Test:** `css-grid/alignment/grid-item-aspect-ratio-justify-self-001`, CI 3.9%
+  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).11). Was listed
+  here as not triaged; it now has an isolated repro.
+- **What the test asks.** A grid item with `aspect-ratio: 1/2`, `height: 100%` of a
+  32px grid and a *non-stretching* `justify-self` must take its inline size from the
+  height through the ratio: **16×32**. With `justify-self: normal`/`stretch` it fills
+  the 24px area instead and is 24×48.
+- **What we produce: 1008×2016** — the item escapes the grid entirely and fills the
+  page. `check-layout-th.js` reports it directly, which is what makes this precise
+  rather than a pixel percentage:
+
+  ```
+  div.item  width   expected 16  actual 1008
+  div.item  height  expected 32  actual 2016
+  ```
+
+- **It is the `inline-grid`, not the ratio and not the alignment.** Bisected with a
+  four-case repro:
+
+  | Container | Item | Result |
+  | --- | --- | --- |
+  | `inline-grid` | `height: 100%` | **correct** |
+  | `inline-grid` | `height: 100%` + `aspect-ratio` | **escapes** — 24 wide, the page's height tall |
+  | `grid` (block-level) | `height: 100%` + `aspect-ratio` | correct |
+  | `block` | `height: 100%` + `aspect-ratio` | correct |
+  | `inline-block` | `height: 100%` + `aspect-ratio` | correct |
+
+  So neither `aspect-ratio` alone nor an item's percentage height in an `inline-grid`
+  alone is broken; only the pair. The percentage height stops resolving against the
+  grid area and resolves against the initial containing block, and the ratio then
+  carries that wrong height into the inline axis.
+- **Where to look — and one place it is *not*.** The obvious suspect,
+  `CssBox.Sizing.cs`'s `CanTransferAspectRatioToBlockHeight`, is **ruled out**: the
+  item's containing block is the `height: 32px` grid container, so
+  `HeightPercentageResolvesToAuto()` is false, and that guard returns false before the
+  width→height transfer is reached. The remaining candidate is the path an
+  *inline-level* container's contents take — `CssBox.ContainingBlock.cs` notes that an
+  atomic inline computes its height in `CssLayoutEngine`'s inline flow rather than in
+  `ResolveUsedBlockHeight`, and `inline-grid` is the only row of the table that goes
+  through it. **Confirm that with a debugger before changing anything**; this entry
+  records a bisect, not a root cause.
+- **Exit gate:** the four-case table above stays correct in every row, and the test's
+  22 assertions pass.
+- `justify-self`'s eleven values are a *second* requirement the test makes and are
+  not measured yet: nothing can be said about them until the item stays in its area.
+
 ### Not triaged
 
-- `css-grid/abspos/grid-sizing-positioned-items-001`, CI 9.1%. Declares no
-  `rel=match`, so it can only be judged from a CI artifact.
+- `css-grid/abspos/grid-sizing-positioned-items-001`, CI 9.1%
+  ([#1661](https://github.com/Broiler-Platform/Broiler/issues/1661).13). Declares no
+  `rel=match`, so the pixel score can only be judged from a CI artifact — but its
+  `check-layout-th.js` assertions can be read locally and say the abspos grid child is
+  placed at the padding edge rather than at its grid area, and sized against the wrong
+  box:
+
+  ```
+  div.absolute  offset-x  expected   0  actual   15
+  div.absolute  offset-y  expected   0  actual   15
+  div.absolute  height    expected 1030 actual   30
+  div.absolute  offset-x  expected 115  actual   15
+  div.absolute  width     expected 915  actual 1030
+  ```
+
+  Every `offset-*` is the container's 15px padding, so **the grid area is not being
+  used as the containing block for an absolutely positioned grid child at all**
+  (CSS Grid §9). That is one cause for the whole test, not eleven separate ones.
 
 ---
 
@@ -749,19 +813,37 @@ neither declares a `rel=match`, so the reftest suite cannot judge them, and the
 manifest is a merged file where a test that stops being exercised keeps its old
 entry. Confirm from a run artifact before treating either as closed.
 
-### Large documents — the `conformance-checkers` family is triaged; two remain
+### Large documents — the `conformance-checkers` family, round two
 
 The nine `conformance-checkers` entries in
 [#1658](https://github.com/Broiler-Platform/Broiler/issues/1658) were triaged on
-2026-08-15 and were **nine separate gaps, not one**. Seven are closed — see
+2026-08-15 and were **nine separate gaps, not one**. Seven closed then — see
 [SVG text, patterns, symbols and transforms](wpt-rendering-gaps-fixed.md#svg-text-pattern-fills-symbols-and-transforms-were-all-missing)
 and [a media element with nothing to show painted a black box](wpt-rendering-gaps-fixed.md#a-media-element-with-nothing-to-show-painted-a-black-box).
-The two that are not each need a subsystem rather than a fix:
+[#1661](https://github.com/Broiler-Platform/Broiler/issues/1661) then surfaced six
+more from the same family, of which four closed — see
+[`<path>` was never drawn](wpt-rendering-gaps-fixed.md#path-was-never-drawn-and-three-more-gaps-behind-the-same-family).
+**The pattern has held twice: a family that looks like one gap is a handful of
+unrelated ones, and only the residue needs a subsystem.**
 
-| Test | Was | Now | What is missing |
+Three remain, and each needs a subsystem rather than a fix:
+
+| Test | CI | Now | What is missing |
 | --- | --- | --- | --- |
-| `html-svg/types-dom-06-f-isvalid` | 16.4% | 22.5% | the **SVG DOM**: the page scripts `requiredFeatures`, an `SVGStringList` with `getItem`/`appendItem`/`insertItemBefore`, and paints red when any assertion fails |
-| `html-svg/styling-css-05-b-isvalid` | 11.3% | 12.6% | the **CSS cascade reaching SVG paint**. `:lang(en) { fill: green }` in a `<style>` inside the `<svg>` matches every element in an `<html lang=en>` document, and a stylesheet `fill` outranks the `fill="none"` presentation attribute — so the reference browser fills the whole test frame green. `SvgRenderer` reads paint from attributes and inline `style` only; it never sees the cascade, because it works from serialised markup rather than from the boxes the cascade was projected onto |
+| `html-svg/types-dom-06-f-isvalid` | 22.5% | 22.5% | the **SVG DOM**: the page scripts `requiredFeatures`, an `SVGStringList` with `getItem`/`appendItem`/`insertItemBefore`, and paints red when any assertion fails |
+| `html-svg/struct-dom-06-b-isvalid` | 16.5% | 16.5% | the **SVG DOM** again, from the other side: an `onload` on the root `<svg>` drives `setAttribute`, `removeChild`, `createElementNS` and `appendChild`, and the renderer works from serialised markup rather than from a live tree |
+| `html-svg/styling-css-05-b-isvalid` | 12.6% | 12.6% | the **CSS cascade reaching SVG paint**. `:lang(en) { fill: green }` in a `<style>` inside the `<svg>` matches every element in an `<html lang=en>` document, and a stylesheet `fill` outranks the `fill="none"` presentation attribute — so the reference browser fills the whole test frame green. `SvgRenderer` reads paint from attributes and inline `style` only; it never sees the cascade, because it works from serialised markup rather than from the boxes the cascade was projected onto |
+
+The three share one root: **`SvgRenderer` renders serialised markup, not the box tree
+the cascade and the DOM act on.** The four that closed were fixable precisely because
+they were about geometry and paint the markup already states. These are not.
+
+`filters-blend-01-b` is the fourth of the six and is
+[closed as far as its filters go](wpt-rendering-gaps-fixed.md#an-feflood-feeding-another-primitive-flooded-the-shape)
+— 31.1% → **38.2%**. Its residual is the one thing the shape model states it does not
+cover: the element `opacity` on each band, which composites fill and stroke together
+as a group rather than recolouring the shape, and which
+[`AddShape` deliberately does not model](wpt-rendering-gaps-fixed.md#svg-text-pattern-fills-symbols-and-transforms-were-all-missing).
 
 The other two in this group are unchanged and are not `conformance-checkers`:
 
@@ -812,19 +894,22 @@ is exactly one page area), and on both sides only the first block paints:
 Neither can change what CI reports for that test, which is scored unpaginated against
 [a blank Chromium capture](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact).
 
-### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium"
+### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium" — **fixed**
 
-`--verify-reference` sets `suspectReference` only when Broiler clears the same 99%
-gate against the test's own reference, so a test at 94–95% against its own reference
-and 0.8–8.0% against the golden is ranked as though nothing were known about it. Four
-entries fall through: two `grid-lanes` tests above, and
-[two in won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate).
+The reference score is now
+[recorded alongside the golden one](wpt-rendering-gaps-fixed.md#the-reference-score-was-measured-and-then-thrown-away)
+rather than discarded whenever it misses the gate, so the four entries that fell
+through — two `grid-lanes` tests above, and
+[two in won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate) —
+now carry both numbers in the run summary and in the severity issue's detail. The run
+prints `0.8% … (rel=match 94.0%)` for a reference disagreement and
+`11.5% … (rel=match 10.4%)` for the real gap beside it.
 
-**Recording the reference score alongside the golden one, rather than only using it as
-a pass/fail gate, would separate the two classes** without needing a second threshold
-to be tuned. The same change would surface
-[the inverse case](#two-tests-are-green-on-ci-and-wrong) — a test that passes the
-golden while failing its own reference — which nothing reports today.
+**What remains is the inverse case** — [a test that passes the
+golden while failing its own reference](#two-tests-are-green-on-ci-and-wrong) — which
+nothing reports, because the check runs only on golden *failures*. Widening it to
+passes would re-render a reference for every passing reftest in the suite, so it wants
+a cheaper trigger than "always".
 
 ---
 

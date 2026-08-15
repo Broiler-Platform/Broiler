@@ -221,4 +221,94 @@ public sealed class SvgColorFilterTests
 
         Assert.Equal(BColor.FromArgb(255, 0, 128, 0), fill);
     }
+
+    // ── feFlood as a backdrop, not as the result ──────────────────────────
+
+    /// <summary>
+    /// A flood that another primitive consumes describes a <em>backdrop</em>, not the filter's
+    /// result. Treating any filter containing an <c>feFlood</c> as flood-only replaced the shape
+    /// with a solid flood-coloured rectangle 20% larger than itself — which is what the whole
+    /// <c>css/filter-effects/tainting-*</c> family and
+    /// <c>conformance-checkers/html-svg/filters-blend-01-b</c> rendered as.
+    /// </summary>
+    [Fact]
+    public void AFloodFeedingAnotherPrimitive_DoesNotFloodTheShape()
+    {
+        var filter = @"<filter id=""f"">
+            <feFlood flood-color=""green"" result=""bg"" />
+            <feOffset in=""bg"" dx=""1"" />
+        </filter>";
+        var fill = RenderedRectFill(Doc(filter,
+            "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"red\" filter=\"url(#f)\"></rect>"));
+
+        // feOffset is not modelled, so the shape renders unfiltered — but it must not be flooded.
+        Assert.Equal(BColor.Red, fill);
+    }
+
+    [Theory]
+    // Opaque lime over opaque blue: each mode is its own channel function.
+    [InlineData("normal", 0, 0, 255)]
+    [InlineData("multiply", 0, 0, 0)]
+    [InlineData("screen", 0, 255, 255)]
+    [InlineData("darken", 0, 0, 0)]
+    [InlineData("lighten", 0, 255, 255)]
+    public void AFloodBlendedUnderTheSource_ProducesTheBlendedColour(
+        string mode, int r, int g, int b)
+    {
+        var filter = $@"<filter id=""f"" color-interpolation-filters=""sRGB"">
+            <feFlood flood-color=""#0f0"" result=""bg"" />
+            <feBlend in=""SourceGraphic"" in2=""bg"" mode=""{mode}"" />
+        </filter>";
+        var fill = RenderedRectFill(Doc(filter,
+            "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#00f\" filter=\"url(#f)\"></rect>"));
+
+        Assert.Equal(BColor.FromArgb(255, r, g, b), fill);
+    }
+
+    [Fact]
+    public void AFloodsOpacityReachesTheBlend()
+    {
+        // A half-transparent lime backdrop under opaque blue: source-over leaves the source, so the
+        // flood's alpha must not be dropped on the way in — it is what makes this differ from the
+        // opaque case for every non-normal mode.
+        var filter = @"<filter id=""f"" color-interpolation-filters=""sRGB"">
+            <feFlood flood-color=""#0f0"" flood-opacity=""0.5"" result=""bg"" />
+            <feBlend in=""SourceGraphic"" in2=""bg"" mode=""multiply"" />
+        </filter>";
+        var fill = RenderedRectFill(Doc(filter,
+            "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#00f\" filter=\"url(#f)\"></rect>"));
+
+        // αs = 1, so the result is fully opaque and is B(cb, cs) weighted by αb plus the source
+        // where the backdrop is transparent: blue × 0.5 in the blue channel.
+        Assert.Equal(255, fill.A);
+        Assert.Equal(0, fill.R);
+        Assert.Equal(0, fill.G);
+        Assert.InRange(fill.B, 126, 129);
+    }
+
+    [Fact]
+    public void AnUnmodelledBlendMode_LeavesTheShapeUnfiltered()
+    {
+        var filter = @"<filter id=""f"" color-interpolation-filters=""sRGB"">
+            <feFlood flood-color=""#0f0"" result=""bg"" />
+            <feBlend in=""SourceGraphic"" in2=""bg"" mode=""color-dodge"" />
+        </filter>";
+        var fill = RenderedRectFill(Doc(filter,
+            "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#00f\" filter=\"url(#f)\"></rect>"));
+
+        Assert.Equal(BColor.Blue, fill);
+    }
+
+    [Fact]
+    public void ABlendWhoseBackdropIsNotAFlood_LeavesTheShapeUnfiltered()
+    {
+        // in2 names something this model cannot reduce to one colour, so the whole chain declines.
+        var filter = @"<filter id=""f"" color-interpolation-filters=""sRGB"">
+            <feBlend in=""SourceGraphic"" in2=""BackgroundImage"" mode=""multiply"" />
+        </filter>";
+        var fill = RenderedRectFill(Doc(filter,
+            "<rect x=\"0\" y=\"0\" width=\"100\" height=\"100\" fill=\"#00f\" filter=\"url(#f)\"></rect>"));
+
+        Assert.Equal(BColor.Blue, fill);
+    }
 }

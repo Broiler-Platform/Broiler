@@ -189,6 +189,22 @@ internal sealed class WptTestResult
     public string? SuspectReference { get; init; }
 
     /// <summary>
+    /// How closely Broiler's render matched the test's own <c>rel="match"</c> reference
+    /// <em>HTML</em>, as a percentage, whenever <c>--verify-reference</c> ran that comparison —
+    /// whether or not it cleared the pass threshold. Null when the check did not run or the test
+    /// declares no reference.
+    /// </summary>
+    /// <remarks>
+    /// The score used to be computed and then discarded unless it passed the gate, so a test at 94%
+    /// against its own reference and 0.8% against the committed golden was reported as though
+    /// nothing at all were known about it — indistinguishable from one that is wrong against both.
+    /// Those are opposite triage outcomes: the first says the golden is the outlier and "fixing" it
+    /// would mean rendering *less* than the test asks for; the second is a real engine gap. Keeping
+    /// the number separates them without a second threshold to tune.
+    /// </remarks>
+    public double? ReferenceMatchPercent { get; init; }
+
+    /// <summary>
     /// <c>check-layout-th.js</c> geometry assertions whose computed value diverged
     /// from the test's <c>data-offset-*</c> / <c>data-expected-*</c> attribute, with
     /// the expected and actual values. Null/empty when the test carries no such
@@ -316,6 +332,9 @@ internal sealed class WptTestResult
 
         if (SuspectReference is not null)
             obj["suspectReference"] = SuspectReference;
+
+        if (ReferenceMatchPercent is not null)
+            obj["referenceMatchPercent"] = ReferenceMatchPercent;
 
         return obj;
     }
@@ -1601,9 +1620,22 @@ internal sealed partial class WptTestRunner
     /// render with no content against a golden that has some.
     /// </para>
     /// </remarks>
-    private string? VerifyAgainstReferenceHtml(
+    /// <summary>
+    /// Renders the test's own <c>rel="match"</c> reference and compares Broiler's render to it.
+    /// </summary>
+    /// <returns>
+    /// The match percentage against that reference, and the note to append to the failure message
+    /// when the comparison says something triage needs. Both are null when the check could not run.
+    /// </returns>
+    /// <remarks>
+    /// The percentage is returned whether or not it clears the pass threshold. Gating on the
+    /// threshold and returning nothing otherwise threw away the one measurement that tells a
+    /// reference disagreement apart from an engine gap — see
+    /// <see cref="WptTestResult.ReferenceMatchPercent"/>.
+    /// </remarks>
+    private (double? Percent, string? Note) VerifyAgainstReferenceHtml(
         string testPath, string html, string? wptRoot,
-        HTML.Image.BBitmap testRender, HTML.Image.BBitmap committedGolden)
+        HTML.Image.BBitmap testRender, HTML.Image.BBitmap committedGolden, double goldenPercent)
     {
         try
         {
@@ -1612,27 +1644,55 @@ internal sealed partial class WptTestRunner
             if (!TryResolveReferenceHref(ExtractMatchHref(html), testPath, wptRoot, out var refPath)
                 || !File.Exists(refPath))
             {
-                return null;
+                return (null, null);
             }
 
+            // A render that drew nothing agrees with any other blank render, so it cannot be used
+            // as evidence that the golden is the outlier.
             if (IsUniform(testRender) && !IsUniform(committedGolden))
-                return null;
+                return (null, null);
 
             using var refRender = RenderHtmlFileBitmap(refPath, wptRoot);
             using var diff = PixelDiffRunner.Compare(testRender, refRender, _pixelDiffConfig);
-            if (!diff.IsMatch)
-                return null;
-
             double pct = (1.0 - diff.DiffRatio) * 100;
-            return $"⚠ suspect reference: Broiler matches its rel=match reference HTML " +
-                   $"({pct:F1}%) but not the committed reference PNG — the committed reference " +
-                   "is likely stale/incorrect, not a Broiler bug";
+
+            if (diff.IsMatch)
+            {
+                return (pct,
+                    $"⚠ suspect reference: Broiler matches its rel=match reference HTML " +
+                    $"({pct:F1}%) but not the committed reference PNG — the committed reference " +
+                    "is likely stale/incorrect, not a Broiler bug");
+            }
+
+            // Short of the gate, but far closer to the test's own reference than to the golden:
+            // the two engines disagree about the reference, so most of the golden's mismatch is
+            // not something the engine is getting wrong about this test.
+            if (pct - goldenPercent >= ReferenceDisagreementMargin)
+            {
+                return (pct,
+                    $"ℹ reference disagreement: Broiler is {pct:F1}% against the test's own " +
+                    $"rel=match reference and {goldenPercent:F1}% against the committed PNG — " +
+                    "most of this gap is the two references disagreeing, not the test's own feature");
+            }
+
+            return (pct, null);
         }
         catch
         {
-            return null;
+            return (null, null);
         }
     }
+
+    /// <summary>
+    /// How far a test's score against its own reference must exceed its score against the committed
+    /// golden before the gap is attributed to the references disagreeing rather than to the engine.
+    /// </summary>
+    /// <remarks>
+    /// A margin rather than a second pass threshold, so it does not need tuning against the run's
+    /// own gate: the claim it supports is comparative ("far better against one than the other"),
+    /// not absolute. The cases it was sized for sit at 94% versus 0.8%.
+    /// </remarks>
+    private const double ReferenceDisagreementMargin = 25.0;
 
     /// <summary>
     /// Whether every pixel of <paramref name="bitmap"/> is the same colour — the signature of a
@@ -2029,11 +2089,18 @@ internal sealed partial class WptTestRunner
                 // and see whether Broiler's render actually matches it. If it does,
                 // the committed PNG — not Broiler — is the outlier (stale/incorrect
                 // reference), which we surface so triage doesn't chase a non-bug.
-                string? suspectReference = _verifyReferenceHtml
-                    ? VerifyAgainstReferenceHtml(testPath, html, wptRoot, rendered, reference)
-                    : null;
-                if (suspectReference != null)
-                    message = $"{message} [{suspectReference}]";
+                var (referencePercent, referenceNote) = _verifyReferenceHtml
+                    ? VerifyAgainstReferenceHtml(testPath, html, wptRoot, rendered, reference, matchPct)
+                    : (null, null);
+                if (referenceNote != null)
+                    message = $"{message} [{referenceNote}]";
+
+                // SuspectReference keeps its narrower meaning — Broiler *reproduced* the declared
+                // reference — because the ranking uses it to drop a test out of the candidates.
+                string? suspectReference =
+                    referenceNote != null && referencePercent is not null && referenceNote[0] == '⚠'
+                        ? referenceNote
+                        : null;
 
                 // Capture rendered / reference / diff PNGs for visual triage (#6).
                 var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
@@ -2048,6 +2115,7 @@ internal sealed partial class WptTestRunner
                     MismatchDiagnostics = diagnostics,
                     DisplacementProfile = displacementProfile,
                     SuspectReference = suspectReference,
+                    ReferenceMatchPercent = referencePercent,
                     LayoutAssertionFailures = layoutAssertionFailures,
                     RenderedImagePath = images.Rendered,
                     ReferenceImagePath = images.Reference,

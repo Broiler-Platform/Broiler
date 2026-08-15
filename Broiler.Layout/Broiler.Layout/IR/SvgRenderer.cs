@@ -33,8 +33,12 @@ internal static partial class SvgRenderer
         return items;
     }
 
-    private static void ParseElements(string svgXml, RectangleF bounds, List<DisplayItem> items, double effectiveZoom)
+    private static void ParseElements(string svgXml, RectangleF bounds, List<DisplayItem> output, double effectiveZoom)
     {
+        // Each element's items are collected against its start-tag offset and flushed in document
+        // order at the end, because the per-shape passes below each sweep the whole markup and would
+        // otherwise paint every rect before every circle before every text. See SvgPaintOrder.
+        var order = new SvgPaintOrder();
         // Parse the viewBox from the root <svg> element to compute the
         // coordinate transform.  When a viewBox is present, SVG coordinates
         // are in viewBox space and must be scaled/translated to CSS bounds.
@@ -44,6 +48,11 @@ internal static partial class SvgRenderer
         // 1:1 to CSS pixels, so they must scale by zoom like any other used length. A viewBox overrides
         // this below with a scale derived from the (already-zoomed) bounds, so it is not compounded.
         float sx = (float)effectiveZoom, sy = (float)effectiveZoom, tx = 0f, ty = 0f;
+        // How many device pixels one unit of the *viewport* coordinate system is — the basis a
+        // non-scaling stroke is drawn in (SVG 2 §14.2), which is the user-unit scale only when no
+        // view box remaps it. Derived below from the root's declared width against the box it was
+        // laid out into, so a CSS zoom or a width in other units is already folded in.
+        float viewportScale = (float)effectiveZoom;
         // The viewport a percentage length resolves against, in user units (SVG 1.1 §7.10). Zero until
         // a viewBox establishes one; the fallback below derives it from the bounds instead.
         float viewportW = 0f, viewportH = 0f;
@@ -52,6 +61,21 @@ internal static partial class SvgRenderer
         if (svgMatch.Success)
         {
             var svgAttrs = ParseAttributes(svgMatch.Groups[1].Value);
+
+            // A declared width names the viewport in its own units; the box it was laid out into is
+            // that viewport in device pixels, so their ratio is the viewport scale. A percentage or
+            // absent width leaves the zoom-derived seed, since neither states a unit count.
+            if (svgAttrs.TryGetValue("width", out var declaredWidth)
+                && !declaredWidth.Contains('%')
+                && float.TryParse(
+                    declaredWidth.Replace("px", string.Empty), NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out float widthUnits)
+                && widthUnits > 0
+                && bounds.Width > 0)
+            {
+                viewportScale = bounds.Width / widthUnits;
+            }
+
             if (svgAttrs.TryGetValue("viewBox", out var vb))
             {
                 var parts = vb.Split([' ', ',', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
@@ -99,6 +123,9 @@ internal static partial class SvgRenderer
         // rendered part: a <pattern> lives in <defs> precisely so it paints only through a reference.
         var patterns = CollectPatterns(svgXml);
 
+        // The <clipPath> rectangles a shape's own clip-path attribute may point at.
+        var clipRects = CollectClipRects(svgXml);
+
         foreach (Match m in ParseSvgRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
@@ -116,7 +143,10 @@ internal static partial class SvgRenderer
             if (!TryResolveElement(structure, m, out var attrs))
                 continue;
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
+                order.ClipLast(clip);
 
             // A rect referencing an feFlood filter is replaced by a solid fill of the flood colour
             // over the filter region — the default objectBoundingBox region is the shape's bounding
@@ -165,7 +195,7 @@ internal static partial class SvgRenderer
                 Height = GetLength(attrs, "height", pctH) * sy,
                 Fill = rectFill,
                 Stroke = rectStroke,
-                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
+                StrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale),
             });
         }
 
@@ -175,7 +205,10 @@ internal static partial class SvgRenderer
             if (!TryResolveElement(structure, m, out var attrs))
                 continue;
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
+                order.ClipLast(clip);
 
             float r = GetLength(attrs, "r", pctD);
             AddShape(items, bounds, attrs, elementTransform, new DrawSvgEllipseItem
@@ -187,7 +220,7 @@ internal static partial class SvgRenderer
                 Ry = r * sy,
                 Fill = ResolveFillWithoutPattern(attrs, BColor.Black),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
+                StrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale),
             });
         }
 
@@ -197,7 +230,10 @@ internal static partial class SvgRenderer
             if (!TryResolveElement(structure, m, out var attrs))
                 continue;
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
+                order.ClipLast(clip);
 
             AddShape(items, bounds, attrs, elementTransform, new DrawSvgEllipseItem
             {
@@ -208,7 +244,7 @@ internal static partial class SvgRenderer
                 Ry = GetLength(attrs, "ry", pctH) * sy,
                 Fill = ResolveFillWithoutPattern(attrs, BColor.Black),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
+                StrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale),
             });
         }
 
@@ -218,7 +254,10 @@ internal static partial class SvgRenderer
             if (!TryResolveElement(structure, m, out var attrs))
                 continue;
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
+                order.ClipLast(clip);
 
             AddShape(items, bounds, attrs, elementTransform, new DrawSvgLineItem
             {
@@ -228,7 +267,7 @@ internal static partial class SvgRenderer
                 X2 = GetLength(attrs, "x2", pctW) * sx + tx,
                 Y2 = GetLength(attrs, "y2", pctH) * sy + ty,
                 Stroke = GetPaint(attrs, "stroke", BColor.Black),
-                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
+                StrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale),
             });
         }
 
@@ -237,7 +276,10 @@ internal static partial class SvgRenderer
             if (!TryResolveElement(structure, m, out var attrs))
                 continue;
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
+                order.ClipLast(clip);
 
             AddShape(items, bounds, attrs, elementTransform, new DrawSvgPolygonItem
             {
@@ -245,7 +287,7 @@ internal static partial class SvgRenderer
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
                 Fill = ResolveFillWithoutPattern(attrs, BColor.Black),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
+                StrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale),
             });
         }
 
@@ -254,7 +296,10 @@ internal static partial class SvgRenderer
             if (!TryResolveElement(structure, m, out var attrs))
                 continue;
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
+                order.ClipLast(clip);
 
             AddShape(items, bounds, attrs, elementTransform, new DrawSvgPolylineItem
             {
@@ -262,8 +307,81 @@ internal static partial class SvgRenderer
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
                 Fill = ResolveFillWithoutPattern(attrs, BColor.Empty),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
-                StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
+                StrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale),
             });
+        }
+
+        // <path d="..." />
+        foreach (Match m in PathElementRegex().Matches(svgXml))
+        {
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var subPaths = SvgPathData.Flatten(attrs.GetValueOrDefault("d"));
+            if (subPaths.Count == 0)
+                continue;
+
+            var items = order.Open(m.Index);
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+            if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } pathClip)
+                order.ClipLast(pathClip);
+
+            var pathFill = ResolveFillWithoutPattern(attrs, BColor.Black);
+            var pathStroke = GetPaint(attrs, "stroke", BColor.Empty);
+            float pathStrokeWidth = StrokeWidthOf(attrs, pctD, sx, sy, viewportScale);
+
+            var mapped = new List<List<PointF>>(subPaths.Count);
+            foreach (var subPath in subPaths)
+            {
+                var points = new List<PointF>(subPath.Points.Count);
+                foreach (var point in subPath.Points)
+                    points.Add(new PointF(point.X * sx + tx, point.Y * sy + ty));
+                mapped.Add(points);
+            }
+
+            // The whole path fills as one shape, so its subpaths go into a single polygon rather
+            // than one each: the rasterizer's fill is an even-odd crossing test, which gives a
+            // subpath enclosed by another the hole SVG's fill rules ask for, where separate opaque
+            // polygons would paint over it. Filling each one alone turned the three overlapping
+            // rings of conformance-checkers/html-svg/coords-viewattr-03-b into a solid blob.
+            if (!pathFill.IsEmpty && pathFill.A > 0)
+            {
+                AddShape(items, bounds, attrs, elementTransform, new DrawSvgPolygonItem
+                {
+                    Bounds = bounds,
+                    Points = StitchSubPaths(mapped),
+                    Fill = pathFill,
+                    Stroke = BColor.Empty,
+                    StrokeWidth = 0,
+                });
+            }
+
+            if (pathStroke.IsEmpty || pathStroke.A == 0 || pathStrokeWidth <= 0)
+                continue;
+
+            // The stroke, by contrast, is per subpath: it follows each one's own outline, and only
+            // a subpath that Z closed is stroked all the way round — which is the difference
+            // between the polygon item and the polyline item.
+            for (int i = 0; i < mapped.Count; i++)
+            {
+                AddShape(items, bounds, attrs, elementTransform, subPaths[i].Closed
+                    ? new DrawSvgPolygonItem
+                    {
+                        Bounds = bounds,
+                        Points = mapped[i],
+                        Fill = BColor.Empty,
+                        Stroke = pathStroke,
+                        StrokeWidth = pathStrokeWidth,
+                    }
+                    : new DrawSvgPolylineItem
+                    {
+                        Bounds = bounds,
+                        Points = mapped[i],
+                        Fill = BColor.Empty,
+                        Stroke = pathStroke,
+                        StrokeWidth = pathStrokeWidth,
+                    });
+            }
         }
 
         // <text ...>content</text>
@@ -285,7 +403,7 @@ internal static partial class SvgRenderer
             float textPathSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy);
             var textPathFont = ResolveFont(attrs, textPathSize);
 
-            items.Add(new DrawSvgTextItem
+            order.Open(m.Index).Add(new DrawSvgTextItem
             {
                 Bounds = bounds,
                 X = start.X * sx + tx,
@@ -300,8 +418,11 @@ internal static partial class SvgRenderer
             });
         }
 
-        EmitTextElements(svgXml, bounds, items, structure, sx, sy, tx, ty, pctW, pctH, pctD);
-        EmitUseElements(svgXml, bounds, items, structure, sx, sy, tx, ty, pctW, pctH);
+        EmitTextElements(svgXml, bounds, order, structure, sx, sy, tx, ty, pctW, pctH, pctD);
+        EmitUseElements(svgXml, bounds, order, structure, sx, sy, tx, ty, pctW, pctH);
+        EmitNestedViewports(svgXml, bounds, order, structure, sx, sy, tx, ty, pctW, pctH);
+
+        order.Flush(output);
     }
 
     /// <summary>
@@ -461,14 +582,38 @@ internal static partial class SvgRenderer
             if (!flood.Success)
                 continue;
 
-            var floodAttrs = ParseAttributes(flood.Groups[1].Value);
-            var color = GetColor(floodAttrs, "flood-color", BColor.Black);
-            if (floodAttrs.TryGetValue("flood-opacity", out var opStr)
-                && float.TryParse(opStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var op))
-                color = BColor.FromArgb((int)(Math.Clamp(op, 0f, 1f) * color.A), color.R, color.G, color.B);
+            // "A flood filter" means the flood is the *whole* filter. A flood that another
+            // primitive then consumes describes a backdrop, not the result: registering
+            // filters-blend-01-b's five feFlood+feBlend chains here replaced each thin blended
+            // band with a solid flood-coloured rectangle 20% larger than the shape.
+            if (FilterPrimitiveRegex().Matches(body).Count > 1)
+                continue;
 
-            SvgFilterTable.AddFlood(id, color);
+            SvgFilterTable.AddFlood(id, ParseFloodColor(ParseAttributes(flood.Groups[1].Value)));
         }
+    }
+
+    /// <summary>
+    /// The colour an <c>&lt;feFlood&gt;</c> produces: its <c>flood-color</c> with
+    /// <c>flood-opacity</c> folded into the alpha channel.
+    /// </summary>
+    /// <remarks>
+    /// Takes the parsed attributes rather than the match, because the two regexes that find an
+    /// <c>&lt;feFlood&gt;</c> put them in different groups — <see cref="FeFloodRegex"/> in group 1
+    /// and <see cref="FilterPrimitiveRegex"/> in group 2, group 1 there being the element name.
+    /// </remarks>
+    private static BColor ParseFloodColor(Dictionary<string, string> floodAttrs)
+    {
+        var color = GetColor(floodAttrs, "flood-color", BColor.Black);
+
+        if (floodAttrs.TryGetValue("flood-opacity", out var opStr)
+            && float.TryParse(opStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var op))
+        {
+            color = BColor.FromArgb(
+                (int)(Math.Clamp(op, 0f, 1f) * color.A), color.R, color.G, color.B);
+        }
+
+        return color;
     }
 
     /// <summary>
@@ -518,10 +663,42 @@ internal static partial class SvgRenderer
         string? previousResult = null;
         bool first = true;
 
+        // The colours an feFlood in this filter produced, by its `result` name. A flood is a
+        // constant over the whole filter region, so a later primitive that consumes one is
+        // consuming a known colour rather than an image the model cannot represent.
+        Dictionary<string, BColor>? floods = null;
+
         foreach (Match pm in primitives)
         {
             var name = pm.Groups[1].Value;
             var attrs = ParseAttributes(pm.Groups[2].Value);
+
+            if (name.Equals("feFlood", StringComparison.OrdinalIgnoreCase))
+            {
+                // A flood ignores its `in` entirely, so it neither continues nor breaks the chain;
+                // it contributes a named constant for a later feBlend to use as its backdrop.
+                if (!attrs.TryGetValue("result", out var floodResult) || floodResult.Length == 0)
+                    return null;
+
+                floods ??= new Dictionary<string, BColor>(StringComparer.Ordinal);
+                floods[floodResult] = ParseFloodColor(attrs);
+                continue;
+            }
+
+            if (name.Equals("feBlend", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!TryResolveBlendBackdrop(attrs, floods, previousResult, first, out var backdrop))
+                    return null;
+
+                string mode = (attrs.GetValueOrDefault("mode") ?? "normal").Trim().ToLowerInvariant();
+                if (!SvgColorFilter.IsModelledBlendMode(mode))
+                    return null;
+
+                steps.Add(new SvgColorFilter.Step { BlendBackdrop = backdrop, BlendMode = mode });
+                attrs.TryGetValue("result", out previousResult);
+                first = false;
+                continue;
+            }
 
             // The chain must be straight: each primitive consumes the previous one's output (an
             // absent `in` means exactly that), and the first consumes the source graphic.
@@ -573,6 +750,41 @@ internal static partial class SvgRenderer
         }
 
         return new SvgColorFilter(steps);
+    }
+
+    /// <summary>
+    /// Resolves an <c>&lt;feBlend&gt;</c>'s two inputs to "the running colour, over this constant
+    /// backdrop".
+    /// </summary>
+    /// <remarks>
+    /// One input must name an <c>&lt;feFlood&gt;</c> declared earlier in the same filter — the only
+    /// second image a single-colour model can represent — and the other must be the running result.
+    /// Either order is accepted: the blend is not commutative, but <c>in</c> is always the source
+    /// and <c>in2</c> the backdrop, so the flood being named by <c>in</c> instead makes the flood
+    /// the source and the running colour the backdrop.
+    /// </remarks>
+    private static bool TryResolveBlendBackdrop(
+        Dictionary<string, string> attrs, Dictionary<string, BColor>? floods,
+        string? previousResult, bool first, out BColor backdrop)
+    {
+        backdrop = default;
+        if (floods == null)
+            return false;
+
+        string? input = attrs.GetValueOrDefault("in");
+        string? input2 = attrs.GetValueOrDefault("in2");
+
+        // in2 names the flood: the ordinary spelling, source over flood.
+        if (input2 != null && floods.TryGetValue(input2, out backdrop))
+            return ConsumesPreviousResult(attrs, "in", previousResult, first);
+
+        // in names the flood instead. The running colour is then the backdrop, which this model
+        // cannot express — it applies the blend to the running colour, not to the flood — so it is
+        // declined rather than rendered the wrong way round.
+        if (input != null && floods.ContainsKey(input))
+            return false;
+
+        return false;
     }
 
     /// <summary>
@@ -835,6 +1047,139 @@ internal static partial class SvgRenderer
             : defaultValue;
     }
 
+    /// <summary>
+    /// The rectangles the document's <c>&lt;clipPath&gt;</c> definitions clip to, by <c>id</c>, in
+    /// user units — the ones this renderer can express, which is a single <c>&lt;rect&gt;</c> child
+    /// in <c>userSpaceOnUse</c> units.
+    /// </summary>
+    /// <remarks>
+    /// Separate from <see cref="CollectClipPaths"/>, which publishes to the document-wide table a
+    /// CSS <c>clip-path</c> on an <em>HTML</em> element reads. This is the SVG side: a
+    /// <c>clip-path</c> attribute on a shape, which nothing honoured — so the black 200×200 rect of
+    /// <c>conformance-checkers/html-svg/masking-path-14-f</c> covered the panel it should have been
+    /// clipped to a corner of.
+    /// </remarks>
+    private static Dictionary<string, RectangleF> CollectClipRects(string svgXml)
+    {
+        if (string.IsNullOrEmpty(svgXml)
+            || svgXml.IndexOf("<clippath", StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return null;
+        }
+
+        Dictionary<string, RectangleF> rects = null;
+        foreach (Match cm in ClipPathBlockRegex().Matches(svgXml))
+        {
+            var clipAttrs = ParseAttributes(cm.Groups[1].Value);
+            if (!clipAttrs.TryGetValue("id", out var id) || string.IsNullOrEmpty(id))
+                continue;
+
+            // objectBoundingBox units would need each referencing shape's own box, which is not
+            // known here; those keep painting unclipped rather than being clipped to the wrong box.
+            if (clipAttrs.TryGetValue("clipPathUnits", out var units)
+                && units.Trim().Equals("objectBoundingBox", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var rectMatch = ParseRectRegex().Match(cm.Groups[2].Value);
+            if (!rectMatch.Success)
+                continue;
+
+            var shapeAttrs = ParseAttributes(rectMatch.Groups[1].Value);
+            float width = GetLength(shapeAttrs, "width", 0);
+            float height = GetLength(shapeAttrs, "height", 0);
+            if (width <= 0 || height <= 0)
+                continue;
+
+            rects ??= new Dictionary<string, RectangleF>(StringComparer.Ordinal);
+            rects[id] = new RectangleF(
+                GetLength(shapeAttrs, "x", 0), GetLength(shapeAttrs, "y", 0), width, height);
+        }
+
+        return rects;
+    }
+
+    /// <summary>
+    /// The page-space region an element's <c>clip-path="url(#id)"</c> narrows its drawing to, or
+    /// <see langword="null"/> when it carries none or the reference cannot be expressed as a rect.
+    /// </summary>
+    private static RectangleF? ClipRectFor(
+        Dictionary<string, string> attrs, Dictionary<string, RectangleF> clipRects,
+        RectangleF bounds, float sx, float sy, float tx, float ty, SvgTransform elementTransform)
+    {
+        if (clipRects == null)
+            return null;
+
+        string clipPath = GetPresentationValue(attrs, "clip-path");
+        if (string.IsNullOrWhiteSpace(clipPath)
+            || !TryParsePaintReference(clipPath, out var id, out _)
+            || !clipRects.TryGetValue(id, out var rect))
+        {
+            return null;
+        }
+
+        return elementTransform.MapBounds(new RectangleF(
+            bounds.X + rect.X * sx + tx, bounds.Y + rect.Y * sy + ty,
+            rect.Width * sx, rect.Height * sy));
+    }
+
+    /// <summary>
+    /// Joins a path's subpaths into the single closed ring the polygon item takes, so an even-odd
+    /// fill over it is the fill of the whole path.
+    /// </summary>
+    /// <remarks>
+    /// Each subpath is closed back to its own start and then followed by a return to the first
+    /// subpath's start. That makes every bridge edge between subpaths appear twice, once in each
+    /// direction, so its crossings cancel and it contributes nothing to the fill — the standard way
+    /// to express a multi-contour region as one ring. Chaining the subpaths end to end instead
+    /// would leave a closing edge that does not retrace any bridge, and it would toggle a spurious
+    /// wedge between them.
+    /// </remarks>
+    private static List<PointF> StitchSubPaths(List<List<PointF>> subPaths)
+    {
+        if (subPaths.Count == 1)
+            return subPaths[0];
+
+        var anchor = subPaths[0][0];
+        var stitched = new List<PointF>();
+
+        foreach (var subPath in subPaths)
+        {
+            stitched.AddRange(subPath);
+            stitched.Add(subPath[0]);
+            stitched.Add(anchor);
+        }
+
+        return stitched;
+    }
+
+    /// <summary>
+    /// A shape's stroke width in page pixels: the declared length taken through the user-unit scale,
+    /// unless <c>vector-effect: non-scaling-stroke</c> holds it at its declared width.
+    /// </summary>
+    /// <remarks>
+    /// SVG 2 §14.2 defines <c>non-scaling-stroke</c> as stroking in the viewport's coordinate system
+    /// rather than the element's, so the user-space scale must not be applied. It only became visible
+    /// once <c>&lt;path&gt;</c> painted at all: <c>svg/painting/reftests/non-scaling-stroke-precision-loss</c>
+    /// draws a hairline under a view box 0.375 units tall over 344 pixels, and scaling its width by
+    /// that 917× factor turns the hairline into a band across the whole canvas.
+    /// </remarks>
+    private static float StrokeWidthOf(
+        Dictionary<string, string> attrs, float pctD, float sx, float sy, float viewportScale)
+    {
+        float declared = GetLength(attrs, "stroke-width", pctD, 1);
+        string effect = GetPresentationValue(attrs, "vector-effect");
+        bool nonScaling = effect != null
+            && effect.Trim().Equals("non-scaling-stroke", StringComparison.OrdinalIgnoreCase);
+
+        // "Non-scaling" means the view box does not scale it, not that nothing does: the stroke is
+        // drawn in the viewport's coordinate system, so it still takes that viewport's own scale.
+        // Dropping it too left non-scaling-stroke-008's 25-unit stroke at half its width, because
+        // the zoom that doubles the viewport applies to the stroke as well.
+        return nonScaling ? declared * viewportScale : declared * Math.Max(sx, sy);
+    }
+
     private static BColor GetColor(Dictionary<string, string> attrs, string name, BColor defaultColor)
     {
         if (!attrs.TryGetValue(name, out var val))
@@ -892,7 +1237,18 @@ internal static partial class SvgRenderer
 
         // Handle named colors
         var named = BColor.FromName(val);
-        return named.IsEmpty ? defaultColor : named;
+        if (!named.IsEmpty)
+            return named;
+
+        // A CSS system color (CSS Color 4 §6) is a <color> keyword like every other, and SVG paint
+        // takes any <color>. The named-color table does not know them, so `fill="Window"` used to
+        // fall through to the caller's default — solid black — and a page built out of them painted
+        // as one black rectangle. Consulted after the named lookup so the two names CSS and X11
+        // share keep their named-color meaning.
+        if (Broiler.CSS.CssSystemColors.TryResolve(val, out var system))
+            return BColor.FromArgb(system.Alpha, system.Red, system.Green, system.Blue);
+
+        return defaultColor;
     }
 
     private static bool TryParseHexColor(string val, out BColor color)
@@ -925,6 +1281,14 @@ internal static partial class SvgRenderer
     
     [GeneratedRegex(@"<path\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParseSvgRegex();
+
+    /// <summary>
+    /// A <c>&lt;path&gt;</c> element. Quote-aware, unlike <see cref="ParseSvgRegex"/>, which stops
+    /// at the first <c>/</c> — and so misses any path whose <c>d</c> holds one, as an
+    /// <c>a</c> (arc) command written <c>a5,5 0 0 1 …</c> does not but a <c>url(…)</c> paint does.
+    /// </summary>
+    [GeneratedRegex(@"<path\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
+    private static partial Regex PathElementRegex();
 
     [GeneratedRegex(@"<rect\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParseRectRegex();
