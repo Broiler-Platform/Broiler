@@ -595,6 +595,13 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByTagName(this, element, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // getElementsByClassName on elements — the same descendant search by class. DOM §4.9 puts it on
+        // Element as well as Document, and only the document half was here; scoping a class lookup to a
+        // container is how pages narrow a search, so its absence threw rather than merely finding nothing.
+        obj.FastAddValue((KeyString)"getElementsByClassName",
+            new DomFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByClassName(this, element, in a), "getElementsByClassName", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // getContext(contextType) — for <canvas> elements. Phase 3 P3.64: extracted into the co-located
         // CanvasBinding feature module (unblocked once Phase 6/P8.9 dissolved Broiler.HtmlBridge.Rendering).
         Dom.Features.CanvasBinding.Install(obj, element);
