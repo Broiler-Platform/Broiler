@@ -110,6 +110,30 @@ internal sealed class FormBinding(IFormHost host)
     /// <summary>The <c>form.elements</c> collection object: a JS array-like with numeric indices and
     /// a <c>length</c>, overriding property lookup so a missing name resolves against the form's
     /// named controls (returning null when unmatched, per HTMLFormControlsCollection).</summary>
+    /// <summary>
+    /// The control of <paramref name="form"/> whose <c>name</c> is <paramref name="name"/>, or
+    /// <see langword="null"/> when none carries it.
+    /// </summary>
+    /// <remarks>
+    /// Shared by <c>form.elements</c>' named access and the form element's own named getter so the
+    /// two cannot answer differently. They differ only in what a miss means, which is the callers'
+    /// business: the collection reports <c>null</c>, the form leaves the property undefined.
+    /// </remarks>
+    internal static JSObject? FindNamedControl(DomElement form, string name, IFormHost host)
+    {
+        if (string.IsNullOrEmpty(name))
+            return null;
+
+        foreach (var ctrl in HtmlElementQueries.CollectFormControls(form))
+        {
+            if (ctrl.GetAttribute("name") is { } controlName &&
+                string.Equals(controlName, name, StringComparison.Ordinal))
+                return host.ToJSObject(ctrl);
+        }
+
+        return null;
+    }
+
     private sealed class FormElementsCollection(DomElement form, IFormHost host) : JSObject()
     {
         protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
@@ -119,20 +143,43 @@ internal sealed class FormBinding(IFormHost host)
             if (result != null && !result.IsUndefined)
                 return result;
 
-            // Dynamic named lookup in form controls
-            var prop = key.Value.ToString();
-            if (!string.IsNullOrEmpty(prop))
-            {
-                var controls = HtmlElementQueries.CollectFormControls(form);
-                foreach (var ctrl in controls)
-                {
-                    if (ctrl.GetAttribute("name") is { } name &&
-                        string.Equals(name, prop, StringComparison.Ordinal))
-                        return host.ToJSObject(ctrl);
-                }
-            }
-
-            return JSNull.Value; // HTMLFormControlsCollection returns null for missing names
+            return FindNamedControl(form, key.Value.ToString(), host) is { } named
+                ? named
+                : JSNull.Value; // HTMLFormControlsCollection returns null for missing names
         }
+    }
+}
+
+/// <summary>
+/// The JS wrapper for a <c>&lt;form&gt;</c>: an ordinary element object that additionally resolves an
+/// unknown property name to the control carrying that name — <c>HTMLFormElement</c>'s named getter
+/// (HTML §4.10.3).
+/// </summary>
+/// <remarks>
+/// <para>
+/// <c>form.elements</c> already offered named access, but the form itself did not, so <c>form.q</c>
+/// was <see langword="undefined"/>. That is the spelling pages actually use, and undefined does not
+/// announce itself: google.com's homepage hands the result straight to its search-box component —
+/// <c>var r=hp_SKb(),u=r.q</c> — which stores it and later reads <c>F.value</c>, throwing
+/// <c>Cannot get property value of undefined</c> from a component far from the lookup that failed.
+/// </para>
+/// <para>
+/// Named access is a fallback and not an override: WebIDL consults named properties only when the
+/// object and its prototype chain do not already answer, so <c>form.action</c> stays the action
+/// attribute even when a control is named <c>action</c>. A name nothing carries is left undefined
+/// rather than null, since an absent named property is an absent property.
+/// </para>
+/// </remarks>
+internal sealed class FormElementJSObject(DomElement form, IFormHost host) : JSObject()
+{
+    protected override JSValue GetValue(KeyString key, JSValue receiver, bool throwError = true)
+    {
+        var result = base.GetValue(key, receiver, false);
+        if (result != null && !result.IsUndefined)
+            return result;
+
+        return FormBinding.FindNamedControl(form, key.Value.ToString(), host) is { } named
+            ? named
+            : base.GetValue(key, receiver, throwError);
     }
 }

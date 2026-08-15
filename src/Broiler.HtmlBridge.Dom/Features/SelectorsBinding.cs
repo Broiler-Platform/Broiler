@@ -55,4 +55,19 @@ internal static class SelectorsBinding
         host.CollectElementsByTagName(element, tagSearch, results);
         return new JSArray(results);
     }
+
+    /// <summary>
+    /// <c>element.getElementsByClassName(names)</c> — DOM §4.9 defines it on <c>Element</c> as well as
+    /// on <c>Document</c>, and only the document half was registered. Missing on an element it did not
+    /// read as absent: calling it threw <c>TypeError: undefined is not a function</c>, which aborts the
+    /// whole script. google.com's One-Google-bar bundle scopes its lookups to a container that way —
+    /// <c>d.getElementsByClassName("gb_C")[0]||d</c> — so it died there.
+    /// </summary>
+    public static JSValue GetElementsByClassName(ISelectorsHost host, DomElement element, in Arguments a)
+    {
+        var classNames = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var results = new List<JSValue>();
+        host.CollectElementsByClassName(element, classNames, results);
+        return new JSArray(results);
+    }
 }

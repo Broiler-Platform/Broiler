@@ -43,10 +43,12 @@ public sealed partial class DomBridge
         document.FastAddProperty((KeyString)"title", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetTitle(this, in a), "get title"), new JSFunction((in a) => Dom.Features.DocumentStructureBinding.SetTitle(this, in a), "set title"), JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document element-query methods — getElementById/getElementsByTagName/getElementsByClassName/
-        // querySelector/querySelectorAll, co-located in the DocumentQueryBinding feature module (Phase 3).
+        // getElementsByName/querySelector/querySelectorAll, co-located in the DocumentQueryBinding
+        // feature module (Phase 3).
         document.FastAddValue((KeyString)"getElementById", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementById(this, in a), "getElementById", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"getElementsByTagName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByTagName(this, in a), "getElementsByTagName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"getElementsByClassName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByClassName(this, in a), "getElementsByClassName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        document.FastAddValue((KeyString)"getElementsByName", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.GetElementsByName(this, in a), "getElementsByName", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"querySelector", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelector(this, in a), "querySelector", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"querySelectorAll", new JSFunction((in a) => Dom.Features.DocumentQueryBinding.QuerySelectorAll(this, in a), "querySelectorAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         // document.elementFromPoint / elementsFromPoint (hit-testing), co-located in the HitTestBinding

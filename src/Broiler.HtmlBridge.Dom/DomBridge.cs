@@ -32,6 +32,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// </summary>
     public const int AsyncDrainIterationLimit = 1000;
 
+    /// <summary>
+    /// How far onto the virtual clock a drain follows scheduled work (ms from document start); see
+    /// <see cref="DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs"/>.
+    /// </summary>
+    public const double AsyncDrainVirtualTimeBudgetMs = DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs;
+
     // P2.6: sub-resource HTTP and the local base path now live in ResourceLoader, the single host
     // resource loader (was the static SharedHttpClient plus the _localBasePath field). Feature
     // callbacks ask the loader instead of reaching a static HttpClient.
@@ -708,6 +714,21 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             ThrowIfDisposed();
             return _eventLoop.HasPendingWork;
         }
+    }
+
+    /// <summary>
+    /// Whether queued timer/animation-frame work is due at or before <paramref name="virtualHorizonMs"/>
+    /// on the event loop's virtual clock, measured from document start.
+    /// </summary>
+    /// <remarks>
+    /// The question a drain actually needs. <see cref="HasPendingTimers"/> stays <c>true</c> forever on
+    /// any page holding a <c>setInterval</c>, because an interval always has a next tick, so a drain
+    /// waiting for it to go false cannot stop on an ordinary page.
+    /// </remarks>
+    public bool HasPendingTimersDueBy(double virtualHorizonMs)
+    {
+        ThrowIfDisposed();
+        return _eventLoop.HasWorkDueBy(virtualHorizonMs);
     }
 
     /// <summary>

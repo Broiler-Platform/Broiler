@@ -117,6 +117,18 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => GetElementsByTagName(docRoot, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // getElementsByClassName(names) / getElementsByName(name) — the two collection lookups a
+        // frame's document was missing while the main document had them. A script in a frame is a
+        // script like any other: absent, these read as undefined rather than as missing methods, so
+        // calling one threw and took the frame's whole <script> with it.
+        doc.FastAddValue((KeyString)"getElementsByClassName",
+            new DomFunction((in a) => GetElementsByClassName(docRoot, in a), "getElementsByClassName", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        doc.FastAddValue((KeyString)"getElementsByName",
+            new DomFunction((in a) => GetElementsByName(docRoot, in a), "getElementsByName", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // createElement(tag)
         doc.FastAddValue((KeyString)"createElement",
             new DomFunction((in a) => CreateElement(docRoot, in a), "createElement", 1),
@@ -366,6 +378,37 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         var tagName = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
         var results = new List<JSValue>();
         _host.CollectByTagName(docRoot, tagName, results);
+        return new JSArray(results);
+    }
+
+    /// <summary>
+    /// <c>getElementsByClassName</c> on a frame's document. It reuses
+    /// <see cref="ClassNameSet"/>, the rule the main document and the element-scoped search already
+    /// share, so all three surfaces answer a class query the same way.
+    /// </summary>
+    private JSValue GetElementsByClassName(DomNode docRoot, in Arguments a)
+    {
+        var wanted = ClassNameSet.Parse(a.Length > 0 ? a[0].ToString() : string.Empty);
+        var results = new List<JSValue>();
+        if (wanted.Length > 0)
+            _host.CollectMatching(docRoot, el => ClassNameSet.Matches(el, wanted), results);
+
+        return new JSArray(results);
+    }
+
+    /// <summary>
+    /// <c>getElementsByName</c> on a frame's document — the elements whose <c>name</c> attribute is
+    /// identical to the argument, matching the main document's implementation (HTML §3.1.5).
+    /// </summary>
+    private JSValue GetElementsByName(DomNode docRoot, in Arguments a)
+    {
+        var name = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var results = new List<JSValue>();
+        _host.CollectMatching(
+            docRoot,
+            el => DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal),
+            results);
+
         return new JSArray(results);
     }
 

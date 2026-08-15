@@ -4,9 +4,11 @@
 TYPE Broiler.HtmlBridge.DomBridge : Broiler.HtmlBridge.Dom.IDomBridgeRuntime, System.IDisposable
   ctor ()
   ctor (Broiler.HtmlBridge.DomBridgeSessionOptions)
+  field const System.Double AsyncDrainVirtualTimeBudgetMs
   field const System.Int32 AsyncDrainIterationLimit
   method Broiler.Dom.DomDocument GetRenderDocument()
   method System.Boolean FlushTimerStep()
+  method System.Boolean HasPendingTimersDueBy(System.Double)
   method System.Collections.Generic.IReadOnlyList<Broiler.HtmlBridge.DomBridge+CheckLayoutAssertion> EvaluateCheckLayoutAssertions()
   method System.String SerializeToHtml()
   method System.Void ApplyStyleContentSecurityPolicy(Broiler.HtmlBridge.Scripting.ContentSecurityPolicy)

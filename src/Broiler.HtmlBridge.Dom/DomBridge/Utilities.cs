@@ -442,6 +442,29 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// Descendants of <paramref name="root"/> carrying every class in <paramref name="classNames"/>,
+    /// in document order — the element half of <c>getElementsByClassName</c>.
+    /// </summary>
+    /// <remarks>
+    /// The argument is a set of class names, not a selector, so it cannot be routed through the
+    /// selector engine as <c>"." + classNames</c> — a class is a literal here and would need escaping
+    /// to survive as a selector. The set rule itself lives in
+    /// <see cref="Dom.Features.ClassNameSet"/>, shared with the document half of the same method.
+    /// </remarks>
+    private static void CollectDescendantsByClass(DomElement root, string classNames, List<JSValue> results, DomBridge bridge)
+    {
+        var wanted = Dom.Features.ClassNameSet.Parse(classNames);
+        if (wanted.Length == 0)
+            return;
+
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            if (Dom.Features.ClassNameSet.Matches(element, wanted))
+                results.Add(bridge.ToJSObject(element));
+        }
+    }
+
     // classList / DOMTokenList moved to the Phase 3 ClassListBinding feature module
     // (Broiler.HtmlBridge.Dom.Features).
     // style / CSSStyleDeclaration (element.style, rule.style, getComputedStyle result) moved to the

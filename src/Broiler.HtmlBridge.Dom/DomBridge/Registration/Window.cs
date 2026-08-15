@@ -34,6 +34,17 @@ public sealed partial class DomBridge
 
         window.FastAddValue((KeyString)"location", location, JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // document.location is the *same* Location as window.location (HTML §3.1.5: the getter
+        // returns this document's relevant global object's Location), so it is the one object
+        // registered on both rather than a copy — pages compare the two, and `document.location`
+        // is the spelling half of them reach for. Undefined here, it did not read as a missing
+        // property but threw "Cannot get property protocol of undefined" out of the first script
+        // to ask an origin of it, which aborts the whole <script>. That is the same One-Google-bar
+        // bundle `top` above died in — `dF=function(){var a=document.location;return
+        // a.protocol+"//"+a.host}` is how it builds its own origin — so it is the next thing that
+        // failed once `top` resolved.
+        document.FastAddValue((KeyString)"location", location, JSPropertyAttributes.EnumerableConfigurableValue);
+
         // window timers / animation frames — thin adapters over the P2.4 BrowserEventLoop, co-located
         // in the TimerBinding feature module (Phase 3).
         window.FastAddValue((KeyString)"setTimeout", new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);

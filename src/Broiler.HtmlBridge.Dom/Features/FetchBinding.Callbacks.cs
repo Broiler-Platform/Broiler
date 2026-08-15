@@ -1,4 +1,5 @@
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using Broiler.HtmlBridge.Core.Diagnostics;
 using Broiler.HtmlBridge.Internal.Scripting;
@@ -144,11 +145,31 @@ internal sealed partial class FetchBinding
             {
                 var request = new HttpRequestMessage(new HttpMethod(method), fetchUrl);
                 if (requestBody != null)
-                    request.Content = new StringContent(requestBody, Encoding.UTF8, requestHeaders.TryGetValue("Content-Type", out var ct) ? ct : "text/plain");
+                    request.Content = CreateRequestContent(requestBody, requestHeaders);
                 foreach (var kv in requestHeaders)
                 {
-                    if (!string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
-                        request.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
+                    // Content-Type already travelled with the body, above.
+                    if (string.Equals(kv.Key, "Content-Type", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (request.Headers.TryAddWithoutValidation(kv.Key, kv.Value))
+                        continue;
+
+                    // What HttpRequestMessage.Headers refuses is a *content* header:
+                    // Content-Language, Content-Disposition, Content-Encoding and the rest belong to
+                    // the body in this API, not the request. TryAddWithoutValidation reports the
+                    // refusal by returning false, and this loop used to discard that without a word,
+                    // so a page that set one watched it vanish between fetch and the wire. Retrying
+                    // against the content is what actually sends them.
+                    //
+                    // Content-Length is the deliberate exception and stays dropped. The framework
+                    // derives it from the body it is about to write, and an author value *replaces*
+                    // that derived one rather than being rejected — a page claiming a length its body
+                    // does not have would leave the server waiting for bytes that never arrive, which
+                    // is a worse failure than the dropped header. Fetch forbids the header to authors
+                    // for the same reason.
+                    if (!string.Equals(kv.Key, "Content-Length", StringComparison.OrdinalIgnoreCase))
+                        request.Content?.Headers.TryAddWithoutValidation(kv.Key, kv.Value);
                 }
 
                 var response = _resources.SendAsync(request).GetAwaiter().GetResult();
@@ -217,5 +238,51 @@ internal sealed partial class FetchBinding
 
         promise.FastAddValue((KeyString)"catch", new DomFunction(JsRegistrationCatch119, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         return promise;
+    }
+
+    /// <summary>
+    /// Builds the request body, carrying the author's <c>Content-Type</c> across as a header value
+    /// rather than as a bare media type.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What a page sets is a full header value, and pages routinely put parameters in it. The body
+    /// used to be built as <c>new StringContent(body, Encoding.UTF8, contentTypeHeader)</c>, whose
+    /// third parameter takes the media type <em>alone</em>: it validates through
+    /// <c>MediaTypeHeaderValue</c>, so a <c>;</c> anywhere in the value throws
+    /// <c>FormatException("The format of value '…' is invalid.")</c> — and an empty value throws
+    /// <c>ArgumentException</c>. That is caught below and turned into an error <c>Response</c>, so
+    /// the symptom is not a crash but a request that is never sent at all, for every POST whose
+    /// content type is spelled the ordinary way: google.com's start page posts
+    /// <c>application/x-www-form-urlencoded;charset=utf-8</c> (its XHR sets that through
+    /// <c>setRequestHeader</c>, which the polyfill hands to <c>fetch</c> as <c>opts.headers</c>), and
+    /// a <c>multipart/form-data; boundary=…</c> or <c>text/plain; charset=UTF-8</c> post failed the
+    /// same way.
+    /// </para>
+    /// <para>
+    /// Parsing into <see cref="HttpContentHeaders.ContentType"/> keeps those parameters. The bytes
+    /// stay UTF-8 regardless of the charset the author wrote, which is what Fetch §body extraction
+    /// says for a string body — the parameter travels in the header, it does not pick the encoding.
+    /// A value too malformed to parse is sent verbatim instead of costing the whole request, and
+    /// with no <c>Content-Type</c> at all the default stays the spec's <c>text/plain;charset=UTF-8</c>.
+    /// </para>
+    /// </remarks>
+    private static StringContent CreateRequestContent(string requestBody, Dictionary<string, string> requestHeaders)
+    {
+        var content = new StringContent(requestBody, Encoding.UTF8);
+        if (!requestHeaders.TryGetValue("Content-Type", out var contentType) || string.IsNullOrWhiteSpace(contentType))
+            return content;
+
+        if (MediaTypeHeaderValue.TryParse(contentType, out var parsed))
+        {
+            content.Headers.ContentType = parsed;
+        }
+        else
+        {
+            content.Headers.Remove("Content-Type");
+            content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+        }
+
+        return content;
     }
 }

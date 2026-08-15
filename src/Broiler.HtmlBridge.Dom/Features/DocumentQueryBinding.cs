@@ -41,14 +41,50 @@ internal static class DocumentQueryBinding
         return new JSArray(results);
     }
 
+    /// <summary>
+    /// <c>document.getElementsByClassName(names)</c>. The argument is an ordered set of class names
+    /// and an element must carry every one of them (DOM §4.5) — this read it as a single name, so a
+    /// multi-class query such as <c>getElementsByClassName("a b")</c> matched only an element whose
+    /// class attribute was that literal string, i.e. nothing. <see cref="ClassNameSet"/> holds the
+    /// rule so this and the element half of the same method cannot answer differently.
+    /// </summary>
     public static JSValue GetElementsByClassName(IDocumentQueryHost host, in Arguments a)
     {
-        var className = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var wanted = ClassNameSet.Parse(a.Length > 0 ? a[0].ToString() : string.Empty);
         var results = new List<JSValue>();
         foreach (var el in host.Elements)
         {
-            var classes = new HashSet<string>((el.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0), StringComparer.Ordinal);
-            if (classes.Contains(className))
+            if (ClassNameSet.Matches(el, wanted))
+                results.Add(host.ToJSObject(el));
+        }
+
+        return new JSArray(results);
+    }
+
+    /// <summary>
+    /// <c>document.getElementsByName(name)</c> — HTML §3.1.5: every element in the document whose
+    /// <c>name</c> <em>attribute</em> is identical to the argument, in tree order.
+    /// </summary>
+    /// <remarks>
+    /// It is not a synonym for the id lookup and not confined to form controls: any element carrying
+    /// the attribute qualifies, which is why it is an attribute read rather than a selector match.
+    /// The value is compared ordinally — HTML matches it exactly — while the attribute's own name is
+    /// matched case-insensitively, as attribute names are in an HTML document.
+    /// <para>
+    /// It was missing entirely, and on a document that reads as <see langword="undefined"/> rather
+    /// than as an absent method, so calling it threw <c>TypeError: undefined is not a function</c> and
+    /// took the whole script with it. google.com's homepage bundle finds its search form this way —
+    /// <c>for(var d=0;b=c[d++];)if(b=document.getElementsByName(b)[0])return b</c> over
+    /// <c>["f","gs"]</c> — after looking for a form by id first.
+    /// </para>
+    /// </remarks>
+    public static JSValue GetElementsByName(IDocumentQueryHost host, in Arguments a)
+    {
+        var name = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var results = new List<JSValue>();
+        foreach (var el in host.Elements)
+        {
+            if (DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal))
                 results.Add(host.ToJSObject(el));
         }
 

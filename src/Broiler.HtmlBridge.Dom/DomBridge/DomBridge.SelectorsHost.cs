@@ -16,6 +16,9 @@ public sealed partial class DomBridge : Dom.Features.ISelectorsHost
     void Dom.Features.ISelectorsHost.CollectElementsByTagName(DomElement element, string tagName, List<JSValue> results)
         => CollectDescendantsByTag(element, tagName, results, this);
 
+    void Dom.Features.ISelectorsHost.CollectElementsByClassName(DomElement element, string classNames, List<JSValue> results)
+        => CollectDescendantsByClass(element, classNames, results, this);
+
     JSObject Dom.Features.ISelectorsHost.ToJSObject(DomNode node) => ToJSObject(node);
 
     bool Dom.Features.ISelectorsHost.MatchesSelector(DomElement element, string selector, DomElement? scope)

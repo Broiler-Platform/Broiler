@@ -19,10 +19,12 @@ TYPE Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace+Phases
 TYPE Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace+Scope : System.IDisposable
   method System.Void Dispose()
 TYPE Broiler.HtmlBridge.Dom.DomBridgeRuntimeLimits
+  field const System.Double AsyncDrainVirtualTimeBudgetMs
   field const System.Int32 AsyncDrainIterationLimit
 TYPE Broiler.HtmlBridge.Dom.IDomBridgeRuntime
   method Broiler.Dom.DomDocument GetRenderDocument()
   method System.Boolean FlushTimerStep()
+  method System.Boolean HasPendingTimersDueBy(System.Double)
   method System.String SerializeToHtml()
   method System.Void Attach(Broiler.JavaScript.Engine.JSContext, System.String)
   method System.Void Attach(Broiler.JavaScript.Engine.JSContext, System.String, System.String)

@@ -41,7 +41,14 @@ public sealed partial class DomBridge
         if (node is DomDocument documentNode && _jsObjects.TryGetDocument(documentNode, out var documentWrapper))
             return documentWrapper;
 
-        var obj = new JSObject();
+        // A <form> gets a wrapper that additionally resolves an unknown name to the control carrying
+        // it (HTMLFormElement's named getter). It is decided here rather than in the form binding
+        // because a wrapper's type is fixed when it is created, and every member installed below goes
+        // on this same object.
+        var obj = node is DomElement formElement &&
+                  string.Equals(formElement.TagName, "form", StringComparison.OrdinalIgnoreCase)
+            ? new Dom.Features.FormElementJSObject(formElement, this)
+            : new JSObject();
         _jsObjects.Set(node, obj);
 
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (DomText/DomComment) are not
@@ -593,6 +600,13 @@ public sealed partial class DomBridge
         // getElementsByTagName on elements — searches descendants in tree order
         obj.FastAddValue((KeyString)"getElementsByTagName",
             new DomFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByTagName(this, element, in a), "getElementsByTagName", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getElementsByClassName on elements — the same descendant search by class. DOM §4.9 puts it on
+        // Element as well as Document, and only the document half was here; scoping a class lookup to a
+        // container is how pages narrow a search, so its absence threw rather than merely finding nothing.
+        obj.FastAddValue((KeyString)"getElementsByClassName",
+            new DomFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByClassName(this, element, in a), "getElementsByClassName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getContext(contextType) — for <canvas> elements. Phase 3 P3.64: extracted into the co-located
