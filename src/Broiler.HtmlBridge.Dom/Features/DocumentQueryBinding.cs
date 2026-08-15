@@ -41,14 +41,20 @@ internal static class DocumentQueryBinding
         return new JSArray(results);
     }
 
+    /// <summary>
+    /// <c>document.getElementsByClassName(names)</c>. The argument is an ordered set of class names
+    /// and an element must carry every one of them (DOM §4.5) — this read it as a single name, so a
+    /// multi-class query such as <c>getElementsByClassName("a b")</c> matched only an element whose
+    /// class attribute was that literal string, i.e. nothing. <see cref="ClassNameSet"/> holds the
+    /// rule so this and the element half of the same method cannot answer differently.
+    /// </summary>
     public static JSValue GetElementsByClassName(IDocumentQueryHost host, in Arguments a)
     {
-        var className = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var wanted = ClassNameSet.Parse(a.Length > 0 ? a[0].ToString() : string.Empty);
         var results = new List<JSValue>();
         foreach (var el in host.Elements)
         {
-            var classes = new HashSet<string>((el.ClassName ?? string.Empty).Split(' ').Where(s => s.Length > 0), StringComparer.Ordinal);
-            if (classes.Contains(className))
+            if (ClassNameSet.Matches(el, wanted))
                 results.Add(host.ToJSObject(el));
         }
 

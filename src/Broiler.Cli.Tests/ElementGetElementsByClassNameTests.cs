@@ -126,6 +126,66 @@ public sealed class ElementGetElementsByClassNameTests
         Assert.Equal("3", Eval(context, "String(document.getElementById('root').getElementsByClassName('gb_C').length)"));
     }
 
+    /// <summary>
+    /// The document half takes the same set of names. It used to read its argument as a single class,
+    /// so a multi-class query matched only an element whose class attribute was that literal string —
+    /// which is to say nothing.
+    /// </summary>
+    [Theory]
+    [InlineData("alpha", "multi")]
+    [InlineData("alpha beta", "multi")]
+    [InlineData("beta alpha", "multi")]
+    [InlineData("alpha  beta", "multi")]
+    [InlineData("alpha gamma", "")]
+    [InlineData("gb_C", "root,a,b,c,outside")]
+    [InlineData("other gb_C", "b")]
+    [InlineData("", "")]
+    public void DocumentGetElementsByClassName_RequiresEveryNameInTheSet(string query, string expectedIds)
+    {
+        var (context, bridge) = Attach();
+        using var _ = context;
+        using var __ = bridge;
+
+        var ids = Eval(context, $$"""
+            (function() {
+                var found = document.getElementsByClassName('{{query}}');
+                return Array.prototype.map.call(found, function(el) { return el.id; }).join(',');
+            })()
+            """);
+
+        Assert.Equal(expectedIds, ids);
+    }
+
+    /// <summary>
+    /// The two halves answer the same question the same way. Rooted at an ancestor of the whole
+    /// document, the element half must agree with the document half name for name — that agreement is
+    /// what the shared class-set rule exists to guarantee.
+    /// </summary>
+    [Theory]
+    [InlineData("gb_C")]
+    [InlineData("alpha beta")]
+    [InlineData("other")]
+    [InlineData("nomatch")]
+    public void BothHalvesAgreeWhenRootedAtTheDocumentElement(string query)
+    {
+        var (context, bridge) = Attach();
+        using var _ = context;
+        using var __ = bridge;
+
+        var ids = Eval(context, $$"""
+            (function() {
+                function idsOf(c) {
+                    return Array.prototype.map.call(c, function(el) { return el.id; }).join(',');
+                }
+                return idsOf(document.getElementsByClassName('{{query}}')) + '/' +
+                       idsOf(document.documentElement.getElementsByClassName('{{query}}'));
+            })()
+            """);
+
+        var halves = ids.Split('/');
+        Assert.Equal(halves[0], halves[1]);
+    }
+
     /// <summary>It is a function on every element wrapper, not only on the one the page happened to ask.</summary>
     [Fact]
     public void EveryElementCarriesTheMethod()
