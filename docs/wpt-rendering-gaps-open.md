@@ -749,16 +749,28 @@ neither declares a `rel=match`, so the reftest suite cannot judge them, and the
 manifest is a merged file where a test that stops being exercised keeps its old
 entry. Confirm from a run artifact before treating either as closed.
 
-### Large documents, not triaged
+### Large documents — the `conformance-checkers` family is triaged; two remain
 
-| Test | CI |
-| --- | --- |
-| `conformance-checkers/html-svg/*-isvalid` (5) | 11.1–19.3% |
-| `conformance-checkers/html/elements/{track,video}/src-isvalid` (2) | 14.4% |
-| `cssom-view/scrollIntoView-fixed` | 10.9% |
-| `scroll-animations/css/scroll-timeline-nearest-with-absolute-positioned-element` | 11.3% |
+The nine `conformance-checkers` entries in
+[#1658](https://github.com/Broiler-Platform/Broiler/issues/1658) were triaged on
+2026-08-15 and were **nine separate gaps, not one**. Seven are closed — see
+[SVG text, patterns, symbols and transforms](wpt-rendering-gaps-fixed.md#svg-text-pattern-fills-symbols-and-transforms-were-all-missing)
+and [a media element with nothing to show painted a black box](wpt-rendering-gaps-fixed.md#a-media-element-with-nothing-to-show-painted-a-black-box).
+The two that are not each need a subsystem rather than a fix:
 
-None declares a `rel=match`. `scrollIntoView-fixed` needs scripted scrolling.
+| Test | Was | Now | What is missing |
+| --- | --- | --- | --- |
+| `html-svg/types-dom-06-f-isvalid` | 16.4% | 22.5% | the **SVG DOM**: the page scripts `requiredFeatures`, an `SVGStringList` with `getItem`/`appendItem`/`insertItemBefore`, and paints red when any assertion fails |
+| `html-svg/styling-css-05-b-isvalid` | 11.3% | 12.6% | the **CSS cascade reaching SVG paint**. `:lang(en) { fill: green }` in a `<style>` inside the `<svg>` matches every element in an `<html lang=en>` document, and a stylesheet `fill` outranks the `fill="none"` presentation attribute — so the reference browser fills the whole test frame green. `SvgRenderer` reads paint from attributes and inline `style` only; it never sees the cascade, because it works from serialised markup rather than from the boxes the cascade was projected onto |
+
+The other two in this group are unchanged and are not `conformance-checkers`:
+
+| Test | CI | Note |
+| --- | --- | --- |
+| `cssom-view/scrollIntoView-fixed` | 10.9% | needs scripted scrolling |
+| `scroll-animations/css/scroll-timeline-nearest-with-absolute-positioned-element` | 11.3% | not triaged |
+
+None of the four declares a `rel=match`.
 
 ---
 
@@ -799,36 +811,6 @@ is exactly one page area), and on both sides only the first block paints:
 
 Neither can change what CI reports for that test, which is scored unpaginated against
 [a blank Chromium capture](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact).
-
-### `--verify-reference` clears a test that renders nothing
-
-**The most consequential defect on this page**, because it silently moves real gaps
-off the severity list.
-
-`WptTestRunner.VerifyAgainstReferenceHtml` clears a pixel-mismatch failure whenever
-Broiler reproduces the test's own `rel=match` reference. It does not check that
-anything was **drawn**. A test that renders a blank white canvas, whose reference
-also renders a blank white canvas, matches at 100% and is reported as a reference
-disagreement — the exact "passing by rendering nothing" trap this document set warns
-about, now built into the mechanism that decides what counts as a real bug.
-
-**Measured on the 2026-08-13 triage of the 28 unexamined flags: 17 of them are
-blank-on-blank.** Broiler paints a uniform white canvas for the test *and* for the
-reference, while Chromium paints substantial content in both. Every one is a real
-gap that had been moved out of the ranking.
-
-Two cheap checks would separate them, and either alone would have caught all 17:
-
-1. **Reject a clear when the render is uniform.** A test and reference that are both
-   a single colour across the whole canvas are not evidence of agreement. The runner
-   already computes a colour histogram for its `subCategory` classification.
-2. **Compare against the committed golden's content, not just its pixels.** A golden
-   with substantial content and a render with none is the signature; today that pair
-   scores 0.0% and is cleared anyway.
-
-Until one of them lands, **a `suspectReference` flag is a candidate for triage, not a
-verdict** — the tables in [won't fix](wpt-rendering-gaps-wont-fix.md#the-settled-set)
-are the flags that survived being checked by hand.
 
 ### The report cannot distinguish "wrong everywhere" from "wrong only against Chromium"
 

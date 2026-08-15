@@ -570,8 +570,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         get
         {
-            if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height))
+            // CSS 2.1 §10.5: a percentage height whose containing block has no definite block size
+            // *computes to* auto, so it qualifies for the transfer exactly as a written `auto` does.
+            // An outer `<svg width="100%" height="100%">` — every conformance-checkers/html-svg page
+            // — is that box, and without this arm it got no height at all once the percentage
+            // stopped being (wrongly) resolved against the containing block's width.
+            if (Height != CssConstants.Auto && !string.IsNullOrEmpty(Height)
+                && !HeightPercentageResolvesToAuto())
+            {
                 return false;
+            }
+
             if (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
                 return false;
             if (IsImage)
@@ -588,7 +597,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         borderBoxHeight = 0;
         if (!TryParseAspectRatio(AspectRatio, out double ratio) || !(ratio > 0))
-            return false;
+        {
+            // SVG 2 §8.2: an outer <svg>'s viewBox is its natural ratio. The style pass records it
+            // as an `aspect-ratio` only when the height is written `auto`, so a percentage height
+            // that computes to auto has to read it from the element itself.
+            if (!TryGetSvgViewBoxRatio(out ratio))
+                return false;
+        }
 
         double borderBoxWidth = Size.Width;
         if (!(borderBoxWidth > 0))
@@ -852,5 +867,34 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             if (!CssBoxHelper.EstablishesBfc(child))
                 FindMaxDescendantFloatBottom(child, ref maxBottom);
         }
+    }
+
+    /// <summary>
+    /// SVG 2 §8.2: the natural ratio (width ÷ height) an outer <c>&lt;svg&gt;</c>'s <c>viewBox</c>
+    /// establishes, for the paths that need it when the style pass did not record it as an
+    /// <c>aspect-ratio</c>. The attribute is four unitless numbers; anything else — a wrong count or
+    /// a non-positive extent — is no ratio at all, the same reading the style pass takes.
+    /// </summary>
+    private bool TryGetSvgViewBoxRatio(out double ratio)
+    {
+        ratio = 0;
+        if (HtmlTag == null || !HtmlTag.Name.Equals("svg", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var viewBox = HtmlTag.TryGetAttribute("viewBox");
+        if (string.IsNullOrWhiteSpace(viewBox))
+            return false;
+
+        var parts = viewBox.Split([' ', ',', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 4
+            || !double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double width)
+            || !double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double height)
+            || !(width > 0) || !(height > 0))
+        {
+            return false;
+        }
+
+        ratio = width / height;
+        return true;
     }
 }

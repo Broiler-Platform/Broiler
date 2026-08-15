@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Seven patches are waiting on a maintainer.** See the index below.
+**Eight patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -53,6 +53,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0005` | `Broiler.DOM` | Parse a `<noscript>` body as raw text, as a scripting-enabled parser must |
 | `0006` | `Broiler.JS/Broiler.Regex` | Tell the end of a pattern apart from a NUL inside one |
 | `0007` | `Broiler.JS` | Say "is not a constructor", as every other construct site does |
+| `0008` | `Broiler.HTML` | Paint a media element's box only when it shows controls |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -336,6 +337,39 @@ message, so the un-patched engine behaves exactly as before; the cost of not app
 is a non-standard string in a stack trace.
 
 **When it lands upstream:** bump the pointer and delete this patch.
+
+### `0008` — every `<video>` on a page was a solid black rectangle
+
+A `<video>` with no decodable media painted its whole box black, and an `<audio>`
+without `controls` laid out as a 300×32 black bar instead of not laying out at all.
+`conformance-checkers/html/elements/track/src-isvalid` is 250 `<video>` elements and
+`.../audio/src-isvalid` 250 `<audio>` ones; Chromium renders both as blank white pages
+and Broiler rendered walls of black, matching at **14.4 %** and **19.8 %**.
+
+HTML §4.8.9 is explicit that a video element with neither a poster frame nor video data
+"represents … nothing", and the HTML rendering section's UA stylesheet makes
+`audio:not([controls])` `display: none`. Checked against the reference browser directly:
+an empty `<video>`, a `<video src="missing.mp4">` and a `<video autoplay><source></video>`
+all paint transparent — the div behind each one shows through — and only `<video controls>`
+draws anything, the control scrim. An `<audio controls>` is a 300×**54** light bar, not 32.
+
+So the placeholder fill now follows `controls` rather than the element: a dark scrim under
+a video's controls, a light bar under an audio's, and nothing at all without them. The
+default audio height moves 32 → 54 to match. The three tests go to **100 %**.
+
+**Listed for the pixel suites** (`scripts/apply-pending-wpt-patches.sh`). It moves any page
+that merely contains a media element, and there is no main-repo half to fall back on: the
+fill is set during the style cascade, where nothing downstream can tell a UA-injected
+background from an author one.
+
+**The main-repo tests moved with it, but not to the patched behaviour.**
+`WptCompositingTests`'s three video cases asserted the black fill directly. They now assert
+the replaced box's *extent*, against an author background they set themselves — true with
+the patch and without it — because a fill the element is not supposed to draw is not
+something a test should pin. Transparency is pinned by the WPT tests above instead.
+
+**When it lands upstream:** bump the pointer, drop the entry from
+`scripts/apply-pending-wpt-patches.sh`, and delete this patch.
 
 ## A stale entry in the apply script is not inert
 

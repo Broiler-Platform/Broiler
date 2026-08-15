@@ -6,9 +6,12 @@
 > [How this was verified](wpt-rendering-gaps.md#how-the-2026-08-13-split-was-verified).
 
 Gaps that are closed. Each entry keeps the root cause, what landed, the evidence,
-and — where there was one — the wrong turn worth not repeating. **Nothing here is
-waiting on a patch:** the `patches/` directory was deleted on 2026-08-13 and every
-submodule fix named below is an ancestor of the pinned pointer.
+and — where there was one — the wrong turn worth not repeating. **One is waiting on a
+patch** — the media-element fix, whose `Broiler.HTML` remote is outside a
+this-repository session's push scope; it is listed in
+`scripts/apply-pending-wpt-patches.sh`, so the pixel suites run with it applied on top
+of the pinned pointer. Every other submodule fix named below is an ancestor of that
+pointer.
 
 Where a fix landed in a submodule it is identified by its **commit subject**, not
 by a patch number. Patch numbers named nothing durable — `patches/` was a backlog,
@@ -84,6 +87,29 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   mark any test as passing. It changes only which failures are called the run's
   *worst*, and only on evidence the runner produced itself. The reftest suite is
   unaffected — it renders both sides with Broiler, so it never sets the flag.
+
+### `--verify-reference` cleared a test that rendered nothing
+
+- **Owner:** the WPT runner (`src/Broiler.Wpt/WptTestRunner.cs`). Main repo.
+- **Reported as the most consequential defect in [not fixed](wpt-rendering-gaps-open.md)**,
+  because it moved real gaps off the severity ranking silently.
+- **What was wrong.** `VerifyAgainstReferenceHtml` cleared a pixel-mismatch failure
+  whenever Broiler reproduced the test's own `rel=match` reference, without ever asking
+  whether anything had been **drawn**. A test that paints a blank canvas and a reference
+  that paints a blank canvas match at 100%, so the exact "passing by rendering nothing"
+  trap this document set warns about was built into the mechanism that decided what
+  counted as a real bug. The 2026-08-13 triage measured **17 of 28** unexamined flags as
+  blank-on-blank.
+- **What landed.** A clear now additionally requires the render to have content, judged
+  against the committed golden: a uniform render is agreement only when the golden is
+  uniform too. That one condition is both checks the open entry proposed — it rejects a
+  uniform render, and it rejects a contentless render against a golden that has content —
+  and it costs one early-exiting scan of each bitmap on a path that already compares them
+  pixel by pixel.
+- **What it does not do.** A test that draws *something* wrong and reproduces a reference
+  that draws the same something wrong still clears; that is the `grid-lanes` shape, and it
+  needs the test's own reference to be judged rather than the render, which is a different
+  check. A flag is still a triage queue rather than a verdict — just a much shorter one.
 
 ### The runner never performed WPT's `.sub` substitution
 
@@ -857,6 +883,103 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   the whole subset is two lines — that test, and `fecolormatrix-display-p3` improving
   97.2% → 98.0% without crossing the threshold (its residual is the Display-P3 colour
   space, a separate gap). **Nothing else moved in either direction.**
+
+### SVG text, pattern fills, symbols and transforms were all missing
+
+- **Tests:** seven of the nine `conformance-checkers` entries in
+  [#1658](https://github.com/Broiler-Platform/Broiler/issues/1658). Measured against
+  locally generated Chromium references at the run's own 99% threshold:
+
+  | Test | Was | Now |
+  | --- | --- | --- |
+  | `html-svg/pservers-pattern-03-f-isvalid` | 21.9% | 94.2% |
+  | `html-svg/pservers-grad-03-b-isvalid` | 29.9% | 93.8% |
+  | `html-svg/pservers-pattern-02-f-isvalid` | 19.3% | 92.3% |
+  | `html-svg/struct-symbol-01-b-isvalid` | 30.6% | 81.4% |
+
+- **Owner:** `Broiler.Layout` (`IR/SvgRenderer*.cs`, `IR/SvgStructure.cs`,
+  `IR/SvgTransform.cs`, `IR/SvgItemTransformer.cs`, `IR/SvgTextEnvironment.cs`,
+  `Engine/CssLayoutEngine.cs`, `Engine/CssBox.Sizing.cs`). Main repo, no patch.
+- **Five separate gaps behind one family**, which is why the family had sat as *large
+  documents, not triaged*:
+
+  1. **Every SVG `<text>` painted nothing at all.**
+     `RGraphicsRasterBackend.RenderSvgText` returns early unless the item carries a
+     resolved font, and **nothing in the engine ever set one** — `DrawSvgTextItem`
+     was constructed with a family name and a size and no handle. The renderer builds
+     its items with no box to ask for a font, so the host's font services are now
+     published for the render pass the same way the SVG filter and clip-path tables
+     already are (`SvgTextEnvironment`, seeded by `FragmentTreeBuilder.Build`) — no
+     submodule change, because the item is built in the main repo.
+  2. **The per-shape regexes could not see the tree.** One regex per shape type over
+     the whole markup draws every `<rect>` wherever it sits, including the ones inside
+     `<defs>`, `<symbol>` and `<pattern>` that SVG renders only through a reference —
+     which is why `struct-symbol-01-b` painted a symbol's contents across the whole
+     canvas — and it cannot see that a `<g font-size="32">` sets the size for the text
+     inside it. `SvgStructure` scans the tags once with a stack and records, per
+     start-tag offset, whether the element paints, what it inherits, and the transform
+     it is under; the existing loops consult it by `Match.Index` and are otherwise
+     unchanged.
+  3. **`fill="url(#id)"` reached the colour parser**, matched no named colour, and fell
+     through to the caller's default — solid black, which is most of the canvas in every
+     `pservers-*` test. Patterns are now tiled as ordinary display items clipped to the
+     shape, with `patternUnits`, `patternContentUnits`, `viewBox`, `href` inheritance and
+     `patternTransform`; a reference that resolves to nothing paintable takes its declared
+     fallback paint (SVG 2 §13.2) instead of black.
+  4. **`<use>` drew nothing**, so a `<symbol>` had no way to reach the canvas at all.
+     It now renders its referent, establishing the `<symbol>` viewport, and
+     `preserveAspectRatio` is read rather than assumed to be `xMidYMid meet`.
+  5. **An atomic inline's percentage height resolved against the containing block's
+     *width*.** The wrong axis outright — and the reason
+     `<svg width="100%" height="100%">`, the shape every one of these pages has, came out
+     as tall as the page is wide and then let "xMidYMid meet" centre its drawing a couple
+     of hundred pixels down the box. It resolves against the block size now, or computes
+     to `auto` when there is none (CSS 2.1 §10.5), which lets the viewBox ratio give the
+     height the reference browser uses. The in-flow grid-item branch beside it had already
+     sidestepped that basis for its own case and named it as wrong.
+
+- **A transform is baked into the geometry, not pushed as a layer** — the wrong turn
+  worth not repeating. `TransformItem` exists and the backend takes it, but
+  `GraphicsAdapter.SaveTransformLayer` keeps only translations and uniform scales on the
+  raster canvas; anything else falls through to a compat backend that the image renderer
+  stubs out, and **the enclosed drawing disappears entirely**. A rotated
+  `patternTransform` written that way rendered a blank rectangle. Mapping the tiles'
+  own coordinates instead needs no layer, and a rotated rectangle is still exactly
+  expressible — as the polygon primitive the backend already draws
+  (`SvgItemTransformer`). The one shape it cannot carry under a rotation is an ellipse,
+  whose primitive has axis-aligned radii; those are left in place rather than drawn
+  somewhere wrong.
+- **Verified:** the four tests above, the probe cases behind them (a `userSpaceOnUse`
+  pattern, a rotated `patternTransform` and a `url(#missing) lime` fallback all match
+  Chromium pixel-for-pixel), and 839 `Broiler.Layout.Tests` unchanged.
+
+### A media element with nothing to show painted a black box
+
+- **Tests:** `conformance-checkers/html/elements/{track,video}/src-isvalid` 14.4% →
+  **100%**, and `.../audio/src-isvalid` 19.8% → **100%**.
+- **Owner:** `Broiler.HTML` (`Parse/DomParser.cs`). **Waiting on a patch** —
+  `patches/0008-media-element-painting.patch`, listed in
+  `scripts/apply-pending-wpt-patches.sh` so the pixel suites exercise it. Identify it by
+  its commit subject, *Paint a media element's box only when it shows controls*, not by
+  the number.
+- **What was wrong.** A `<video>` with no decodable media filled its whole box black, and
+  an `<audio>` without `controls` laid out as a 300×32 black bar instead of not laying out
+  at all. Each of those two test pages is 250 media elements; Chromium renders both as
+  blank white pages and Broiler rendered walls of black.
+- **What the reference browser actually does**, checked directly rather than assumed: an
+  empty `<video>`, a `<video src="missing.mp4">` and a `<video autoplay><source></video>`
+  all paint **transparent** — a div behind each one shows through — and only
+  `<video controls>` draws anything, the control scrim. HTML §4.8.9 says as much: with
+  neither poster frame nor video data the element "represents … nothing". The rendering
+  section's UA stylesheet makes `audio:not([controls])` `display: none`, and an
+  `<audio controls>` is 300×**54**, not 32.
+- **So the placeholder follows `controls`, not the element:** a dark scrim under a video's
+  controls, a light bar under an audio's, and nothing at all without them.
+- **The main-repo tests moved with it, but not to the patched behaviour.**
+  `WptCompositingTests`'s three video cases asserted the black fill directly; they now
+  assert the replaced box's *extent* against an author background they set themselves —
+  true with the patch and without it — because a fill the element is not supposed to draw
+  is not something a test should pin. Transparency is pinned by the WPT tests instead.
 
 ### Animated images always painted their first frame
 

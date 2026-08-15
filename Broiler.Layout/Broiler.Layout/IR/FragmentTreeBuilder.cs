@@ -23,6 +23,9 @@ internal static class FragmentTreeBuilder
         // `<clipPath>` lives in a different `<svg>` subtree than the referencing element.
         SvgFilterTable.Reset();
         SvgClipPathTable.Reset();
+        // Publish the host's font services for the pass: SvgRenderer has no box to ask for a font,
+        // and a DrawSvgTextItem without one is dropped by the raster backend (see SvgTextEnvironment).
+        SvgTextEnvironment.Reset(root.LayoutEnvironment);
         var tree = BuildFragment(root, parentHasTransform: false);
         CollectSvgDefinitions(tree);
         return tree;

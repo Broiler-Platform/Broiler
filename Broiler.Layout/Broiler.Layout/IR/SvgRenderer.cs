@@ -62,14 +62,13 @@ internal static partial class SvgRenderer
                     float.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float vbH) &&
                     vbW > 0 && vbH > 0)
                 {
-                    // "xMidYMid meet": scale uniformly to fit, centre
-                    float scaleX = bounds.Width / vbW;
-                    float scaleY = bounds.Height / vbH;
-                    float scale = Math.Min(scaleX, scaleY);
-                    sx = scale;
-                    sy = scale;
-                    tx = -vbX * scale + (bounds.Width - vbW * scale) / 2f;
-                    ty = -vbY * scale + (bounds.Height - vbH * scale) / 2f;
+                    // SVG 1.1 §7.8: preserveAspectRatio decides how the view box maps onto the
+                    // viewport. The default "xMidYMid meet" scales uniformly to fit and centres;
+                    // `none` stretches each axis independently, which is what a <symbol> used at a
+                    // different shape asks for, and `slice` fills instead of fitting.
+                    (sx, sy, tx, ty) = ResolveViewBoxMapping(
+                        svgAttrs.GetValueOrDefault("preserveAspectRatio"),
+                        bounds, vbX, vbY, vbW, vbH);
                     // A viewBox establishes the viewport for its children, so a percentage inside it
                     // resolves against the viewBox extent rather than against the CSS box.
                     viewportW = vbW;
@@ -91,6 +90,15 @@ internal static partial class SvgRenderer
         float pctW = viewportW, pctH = viewportH;
         float pctD = (float)(Math.Sqrt(viewportW * viewportW + viewportH * viewportH) / Math.Sqrt(2));
 
+        // The nesting the per-element regexes below cannot see: which elements are inside a
+        // <defs>/<symbol>/<pattern> (rendered only through a reference) or a comment, and which
+        // presentation attributes each inherits from its ancestors.
+        var structure = SvgStructure.Scan(svgXml);
+
+        // The paint servers a fill may point at. Collected from the whole markup, not just the
+        // rendered part: a <pattern> lives in <defs> precisely so it paints only through a reference.
+        var patterns = CollectPatterns(svgXml);
+
         foreach (Match m in ParseSvgRegex().Matches(svgXml))
         {
             var attrs = ParseAttributes(m.Groups[1].Value);
@@ -105,7 +113,10 @@ internal static partial class SvgRenderer
         // <rect ... /> or <rect ...></rect>
         foreach (Match m in ParseRectRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
 
             // A rect referencing an feFlood filter is replaced by a solid fill of the flood colour
             // over the filter region — the default objectBoundingBox region is the shape's bounding
@@ -115,7 +126,7 @@ internal static partial class SvgRenderer
                 float bx = GetLength(attrs, "x", pctW), by = GetLength(attrs, "y", pctH);
                 float bw = GetLength(attrs, "width", pctW), bh = GetLength(attrs, "height", pctH);
                 float fx = bx - 0.1f * bw, fy = by - 0.1f * bh, fw = 1.2f * bw, fh = 1.2f * bh;
-                AddShape(items, bounds, attrs, new DrawSvgRectItem
+                AddShape(items, bounds, attrs, elementTransform, new DrawSvgRectItem
                 {
                     Bounds = bounds,
                     X = fx * sx + tx,
@@ -129,7 +140,14 @@ internal static partial class SvgRenderer
                 continue;
             }
 
-            var rectFill = GetPaint(attrs, "fill", BColor.Black);
+            // A pattern fill paints as tiles behind the shape, so it is resolved before the rect
+            // item is added and leaves the rect's own fill empty; a stroke then draws over it.
+            var objectBounds = new RectangleF(
+                GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
+                GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
+            var rectFill = ResolveFill(
+                items, bounds, patterns, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
+                elementTransform);
             var rectStroke = GetPaint(attrs, "stroke", BColor.Empty);
 
             // A colour-only filter chain over a solid fill is equivalent to recolouring the shape;
@@ -138,7 +156,7 @@ internal static partial class SvgRenderer
             if (TryResolveColorFilter(attrs, rectFill, rectStroke, out var filteredFill))
                 rectFill = filteredFill;
 
-            AddShape(items, bounds, attrs, new DrawSvgRectItem
+            AddShape(items, bounds, attrs, elementTransform, new DrawSvgRectItem
             {
                 Bounds = bounds,
                 X = GetLength(attrs, "x", pctW) * sx + tx,
@@ -154,16 +172,20 @@ internal static partial class SvgRenderer
         // <circle ... />
         foreach (Match m in ParseCircleRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
             float r = GetLength(attrs, "r", pctD);
-            AddShape(items, bounds, attrs, new DrawSvgEllipseItem
+            AddShape(items, bounds, attrs, elementTransform, new DrawSvgEllipseItem
             {
                 Bounds = bounds,
                 Cx = GetLength(attrs, "cx", pctW) * sx + tx,
                 Cy = GetLength(attrs, "cy", pctH) * sy + ty,
                 Rx = r * sx,
                 Ry = r * sy,
-                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Fill = ResolveFillWithoutPattern(attrs, BColor.Black),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
@@ -172,15 +194,19 @@ internal static partial class SvgRenderer
         // <ellipse ... />
         foreach (Match m in ParseEllipseRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
-            AddShape(items, bounds, attrs, new DrawSvgEllipseItem
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
+            AddShape(items, bounds, attrs, elementTransform, new DrawSvgEllipseItem
             {
                 Bounds = bounds,
                 Cx = GetLength(attrs, "cx", pctW) * sx + tx,
                 Cy = GetLength(attrs, "cy", pctH) * sy + ty,
                 Rx = GetLength(attrs, "rx", pctW) * sx,
                 Ry = GetLength(attrs, "ry", pctH) * sy,
-                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Fill = ResolveFillWithoutPattern(attrs, BColor.Black),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
@@ -189,8 +215,12 @@ internal static partial class SvgRenderer
         // <line ... />
         foreach (Match m in ParseLineRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
-            AddShape(items, bounds, attrs, new DrawSvgLineItem
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
+            AddShape(items, bounds, attrs, elementTransform, new DrawSvgLineItem
             {
                 Bounds = bounds,
                 X1 = GetLength(attrs, "x1", pctW) * sx + tx,
@@ -204,12 +234,16 @@ internal static partial class SvgRenderer
 
         foreach (Match m in ParsePolygonRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
-            AddShape(items, bounds, attrs, new DrawSvgPolygonItem
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
+            AddShape(items, bounds, attrs, elementTransform, new DrawSvgPolygonItem
             {
                 Bounds = bounds,
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
-                Fill = GetPaint(attrs, "fill", BColor.Black),
+                Fill = ResolveFillWithoutPattern(attrs, BColor.Black),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
@@ -217,12 +251,16 @@ internal static partial class SvgRenderer
 
         foreach (Match m in ParsePolyLineRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
-            AddShape(items, bounds, attrs, new DrawSvgPolylineItem
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
+            AddShape(items, bounds, attrs, elementTransform, new DrawSvgPolylineItem
             {
                 Bounds = bounds,
                 Points = ParsePoints(attrs.GetValueOrDefault("points") ?? string.Empty, sx, sy, tx, ty),
-                Fill = GetPaint(attrs, "fill", BColor.Empty),
+                Fill = ResolveFillWithoutPattern(attrs, BColor.Empty),
                 Stroke = GetPaint(attrs, "stroke", BColor.Empty),
                 StrokeWidth = GetLength(attrs, "stroke-width", pctD, 1) * Math.Max(sx, sy),
             });
@@ -231,44 +269,80 @@ internal static partial class SvgRenderer
         // <text ...>content</text>
         foreach (Match m in ParseTextRegex().Matches(svgXml))
         {
-            var attrs = ParseAttributes(m.Groups[1].Value);
+            if (!TryResolveElement(structure, m, out var attrs))
+                continue;
+
+            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
             var textPathAttrs = ParseAttributes(m.Groups[2].Value);
-            
+
             if (!textPathAttrs.TryGetValue("href", out var href) || !href.StartsWith('#'))
                 continue;
-            
+
             if (!pathStartsById.TryGetValue(href[1..], out var start))
                 continue;
+
+            float textPathSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy);
+            var textPathFont = ResolveFont(attrs, textPathSize);
 
             items.Add(new DrawSvgTextItem
             {
                 Bounds = bounds,
                 X = start.X * sx + tx,
-                Y = start.Y * sy + ty,
-                FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
+                // The path's start point is on the baseline; the backend draws from the top of the
+                // ascent box (see EmitTextElements).
+                Y = start.Y * sy + ty - (float)AscentOf(textPathFont, textPathSize),
+                FontSize = textPathSize,
                 FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
-                Fill = GetPaint(attrs, "fill", BColor.Black),
-                Text = DrawSvgTextRegex().Replace(m.Groups[3].Value, string.Empty).Trim(),
+                FontHandle = textPathFont,
+                Fill = GetPaint(attrs, "fill", BColor.Black) is { IsEmpty: false } pathFill ? pathFill : BColor.Black,
+                Text = FlattenTextContent(m.Groups[3].Value),
             });
         }
 
-        foreach (Match m in ParseText2RegEx().Matches(svgXml))
-        {
-            if (ParseTextPathRegex().IsMatch(m.Groups[2].Value))
-                continue;
+        EmitTextElements(svgXml, bounds, items, structure, sx, sy, tx, ty, pctW, pctH, pctD);
+        EmitUseElements(svgXml, bounds, items, structure, sx, sy, tx, ty, pctW, pctH);
+    }
 
-            var attrs = ParseAttributes(m.Groups[1].Value);
-            items.Add(new DrawSvgTextItem
-            {
-                Bounds = bounds,
-                X = GetLength(attrs, "x", pctW) * sx + tx,
-                Y = GetLength(attrs, "y", pctH) * sy + ty,
-                FontSize = GetLength(attrs, "font-size", pctD, 16) * Math.Max(sx, sy),
-                FontFamily = attrs.GetValueOrDefault("font-family") ?? "Arial",
-                Fill = GetPaint(attrs, "fill", BColor.Black),
-                Text = m.Groups[2].Value.Trim(),
-            });
-        }
+    /// <summary>
+    /// SVG 1.1 §7.8: the scale and translation that map a view box onto the viewport under a
+    /// <c>preserveAspectRatio</c> value, as <c>(sx, sy, tx, ty)</c>.
+    /// </summary>
+    /// <remarks>
+    /// Only <c>none</c> and the alignment/<c>meet</c>/<c>slice</c> forms are read; a value this
+    /// cannot parse takes the initial <c>xMidYMid meet</c>, which is what the renderer applied
+    /// unconditionally before.
+    /// </remarks>
+    private static (float Sx, float Sy, float Tx, float Ty) ResolveViewBoxMapping(
+        string? preserveAspectRatio, RectangleF bounds, float vbX, float vbY, float vbW, float vbH)
+    {
+        var parts = (preserveAspectRatio ?? string.Empty)
+            .Split([' ', '\t', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
+
+        // "defer" is a legacy prefix that only applies to <image>, and is ignored here.
+        int first = parts.Length > 0 && parts[0].Equals("defer", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        string align = parts.Length > first ? parts[first] : "xMidYMid";
+        bool slice = parts.Length > first + 1
+            && parts[first + 1].Equals("slice", StringComparison.OrdinalIgnoreCase);
+
+        float scaleX = bounds.Width / vbW;
+        float scaleY = bounds.Height / vbH;
+
+        if (align.Equals("none", StringComparison.OrdinalIgnoreCase))
+            return (scaleX, scaleY, -vbX * scaleX, -vbY * scaleY);
+
+        float scale = slice ? Math.Max(scaleX, scaleY) : Math.Min(scaleX, scaleY);
+        float slackX = bounds.Width - vbW * scale;
+        float slackY = bounds.Height - vbH * scale;
+
+        float alignX = align.Contains("xMin", StringComparison.OrdinalIgnoreCase) ? 0f
+            : align.Contains("xMax", StringComparison.OrdinalIgnoreCase) ? slackX
+            : slackX / 2f;
+        float alignY = align.Contains("YMin", StringComparison.Ordinal) ? 0f
+            : align.Contains("YMax", StringComparison.Ordinal) ? slackY
+            : slackY / 2f;
+
+        return (scale, scale, -vbX * scale + alignX, -vbY * scale + alignY);
     }
 
     private static PointF? TryGetPathStart(string pathData)
@@ -688,6 +762,26 @@ internal static partial class SvgRenderer
     private static void AddShape(
         List<DisplayItem> items, RectangleF bounds, Dictionary<string, string> attrs, DisplayItem shape)
     {
+        AddShape(items, bounds, attrs, SvgTransform.Identity, shape);
+    }
+
+    /// <summary>
+    /// <see cref="AddShape(List{DisplayItem}, RectangleF, Dictionary{string, string}, DisplayItem)"/>
+    /// with the element's user-space <c>transform</c> baked into the shape's geometry.
+    /// </summary>
+    /// <remarks>
+    /// Baked rather than pushed as a transform layer for the reason
+    /// <see cref="SvgItemTransformer"/> records: the raster canvas takes only translations and
+    /// uniform scales, and a layer it cannot take routes the enclosed drawing to a compat backend
+    /// the image renderer stubs out, where it disappears.
+    /// </remarks>
+    private static void AddShape(
+        List<DisplayItem> items, RectangleF bounds, Dictionary<string, string> attrs,
+        SvgTransform pageTransform, DisplayItem shape)
+    {
+        if (!pageTransform.IsIdentity)
+            shape = SvgItemTransformer.MapItem(shape, pageTransform);
+
         string? mode = GetPresentationValue(attrs, "mix-blend-mode");
         bool blended = !string.IsNullOrWhiteSpace(mode)
             && !mode.Equals("normal", StringComparison.OrdinalIgnoreCase);
@@ -858,9 +952,6 @@ internal static partial class SvgRenderer
 
     [GeneratedRegex(@"M\s*(?<x>-?\d*\.?\d+)\s*,?\s*(?<y>-?\d*\.?\d+)", RegexOptions.IgnoreCase)]
     private static partial Regex ParsePathRegEx();
-
-    [GeneratedRegex(@"<text\s+([^>]*)>(.*?)</text>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
-    private static partial Regex ParseText2RegEx();
 
     [GeneratedRegex(@"<\s*textpath\b", RegexOptions.IgnoreCase)]
     private static partial Regex ParseTextPathRegex();

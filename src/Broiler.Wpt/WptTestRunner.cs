@@ -1585,7 +1585,25 @@ internal sealed partial class WptTestRunner
     /// Returns null when there is no rel=match reference, it cannot be resolved or
     /// rendered, or Broiler does not match it. Best-effort: never throws.
     /// </summary>
-    private string? VerifyAgainstReferenceHtml(string testPath, string html, string? wptRoot, HTML.Image.BBitmap testRender)
+    /// <remarks>
+    /// <para>
+    /// <b>Agreement is only evidence when something was drawn.</b> A test that renders a blank
+    /// canvas and a reference that renders a blank canvas match at 100%, so a gap that makes
+    /// Broiler paint nothing at all used to clear itself here and move off the severity ranking
+    /// entirely. The 2026-08-13 triage of the flags nobody had checked by hand found 17 of 28 were
+    /// exactly that: a uniform render on both sides while Chromium painted substantial content in
+    /// both (<c>docs/wpt-rendering-gaps-open.md</c>).
+    /// </para>
+    /// <para>
+    /// So a clear now needs the render to have content, judged against the committed golden: a
+    /// uniform render is only agreement when the golden is uniform too. Both of the checks that
+    /// document proposed are in that one condition — it rejects a uniform render, and it rejects a
+    /// render with no content against a golden that has some.
+    /// </para>
+    /// </remarks>
+    private string? VerifyAgainstReferenceHtml(
+        string testPath, string html, string? wptRoot,
+        HTML.Image.BBitmap testRender, HTML.Image.BBitmap committedGolden)
     {
         try
         {
@@ -1596,6 +1614,9 @@ internal sealed partial class WptTestRunner
             {
                 return null;
             }
+
+            if (IsUniform(testRender) && !IsUniform(committedGolden))
+                return null;
 
             using var refRender = RenderHtmlFileBitmap(refPath, wptRoot);
             using var diff = PixelDiffRunner.Compare(testRender, refRender, _pixelDiffConfig);
@@ -1611,6 +1632,29 @@ internal sealed partial class WptTestRunner
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Whether every pixel of <paramref name="bitmap"/> is the same colour — the signature of a
+    /// render that drew nothing, and the one thing a pixel comparison cannot tell apart from
+    /// agreement.
+    /// </summary>
+    internal static bool IsUniform(HTML.Image.BBitmap? bitmap)
+    {
+        if (bitmap is null || bitmap.Width == 0 || bitmap.Height == 0)
+            return true;
+
+        var first = bitmap.GetPixel(0, 0);
+        for (int y = 0; y < bitmap.Height; y++)
+        {
+            for (int x = 0; x < bitmap.Width; x++)
+            {
+                if (bitmap.GetPixel(x, y) != first)
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryExtractAttributeValue(Regex pattern, string tag, out string value)
@@ -1986,7 +2030,7 @@ internal sealed partial class WptTestRunner
                 // the committed PNG — not Broiler — is the outlier (stale/incorrect
                 // reference), which we surface so triage doesn't chase a non-bug.
                 string? suspectReference = _verifyReferenceHtml
-                    ? VerifyAgainstReferenceHtml(testPath, html, wptRoot, rendered)
+                    ? VerifyAgainstReferenceHtml(testPath, html, wptRoot, rendered, reference)
                     : null;
                 if (suspectReference != null)
                     message = $"{message} [{suspectReference}]";

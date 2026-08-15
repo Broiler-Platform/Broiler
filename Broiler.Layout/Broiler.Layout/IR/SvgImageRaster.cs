@@ -58,8 +58,31 @@ public static class SvgImageRaster
     /// The display list, empty when <paramref name="svgXml"/> is null, empty, or contains nothing this
     /// renderer draws. An empty list is not an error — it means the document painted nothing.
     /// </returns>
+    /// <remarks>
+    /// <b>An image raster resolves no fonts, deliberately.</b> <see cref="SvgTextEnvironment"/> is
+    /// published for a document's <em>paint</em> pass, and an image raster is not that pass — an
+    /// <c>&lt;img src&gt;</c> is decoded during layout, and <see cref="ImagePrefetch"/> may decode it
+    /// on a worker thread, where the thread-affine slot is deliberately empty. Reading whatever the
+    /// slot happens to hold would make an SVG image's text depend on which thread decoded it and on
+    /// what that pooled thread rendered last: <c>ImagePrefetchTests</c>'s "svg images" case compares
+    /// a serial decode against a concurrent one and catches exactly that. So the slot is cleared for
+    /// the duration, and an SVG image renders the same everywhere — which for text means not at all,
+    /// the behaviour it has always had. Inline <c>&lt;svg&gt;</c>, which does go through the paint
+    /// pass, is unaffected.
+    /// </remarks>
     public static DisplayList BuildDisplayList(string svgXml, RectangleF bounds, double effectiveZoom = 1.0)
-        => new() { Items = SvgRenderer.RenderSvgContent(svgXml, bounds, effectiveZoom) };
+    {
+        var published = SvgTextEnvironment.Current;
+        SvgTextEnvironment.Reset(null);
+        try
+        {
+            return new() { Items = SvgRenderer.RenderSvgContent(svgXml, bounds, effectiveZoom) };
+        }
+        finally
+        {
+            SvgTextEnvironment.Reset(published);
+        }
+    }
 
     /// <summary>
     /// Draws SVG source onto <paramref name="surface"/> through <paramref name="backend"/>.

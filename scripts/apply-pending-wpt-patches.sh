@@ -145,7 +145,18 @@ set -euo pipefail
 # NOT listed. It decides whether page script runs at all rather than what any of it paints, and
 # the pixel suites do not execute a module loader of the shape that trips it. Its behaviour is
 # unit-tested inside the patch itself (DirectEvalClosureScopeTests).
-PENDING_PATCHES=()
+#
+# The media-element patch (Broiler.HTML, "Paint a media element's box only when it shows controls")
+# IS listed, and for the plainest reason there is: without it every <video> on a page is a solid
+# black 300×150 rectangle and every <audio> a black bar, over whatever they sit on, where the
+# reference browser paints nothing at all. It is the whole of
+# conformance-checkers/html/elements/{video,track,audio}/src-isvalid — three tests that go from
+# 14–20 % to 100 % with it — and it moves any page that merely *contains* a media element. There
+# is no main-repo half to fall back on: the fill is set during the style cascade, where nothing
+# downstream can tell it from an author background.
+PENDING_PATCHES=(
+  "Broiler.HTML|patches/0008-media-element-painting.patch"
+)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
