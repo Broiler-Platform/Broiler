@@ -109,6 +109,11 @@ internal sealed class SubWindowBinding(
 
         subDocument.FastAddValue((KeyString)"defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // The frame's document shares its window's Location, as the main document shares the main
+        // window's. A framed page reads `document.location` for its origin exactly as a top-level
+        // one does, and undefined there throws rather than reading as absent.
+        subDocument.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
+
         // window.getComputedStyle — sub-window needs its own copy so that
         // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
         // the sub-document's <style> elements rather than the main document.
