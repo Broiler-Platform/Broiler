@@ -11,7 +11,13 @@ namespace Broiler.Cli.Tests;
 /// no renderer ever read. That unused command storage was removed and the context internalized into the
 /// Canvas binding, keeping only the script-observable state (current styles + the save/restore stack).
 /// These tests pin that observable behaviour: the context exists, style properties round-trip,
-/// save/restore is a real state stack, and the (now no-op) drawing methods stay callable without throwing.
+/// save/restore is a real state stack, and the drawing methods stay callable without throwing.
+///
+/// The drawing methods are no longer the empty bodies that internalization left behind — the context
+/// rasterises into a real bitmap now, and what it paints is covered by
+/// <see cref="CanvasPixelSurfaceTests"/>. These tests deliberately stay at the binding level: what they
+/// guard is that the JS surface is present and its state round-trips, which is what the P6.1 change put
+/// at risk and is orthogonal to any pixel landing anywhere.
 /// </summary>
 public sealed class CanvasContextBindingTests
 {
@@ -64,7 +70,8 @@ public sealed class CanvasContextBindingTests
     [Fact]
     public void Drawing_Methods_Are_Callable_And_Do_Not_Throw()
     {
-        // The drawing surface is a no-op on a headless canvas, but the JS API must stay callable.
+        // Every drawing entry point stays callable and total — a malformed or degenerate call must not
+        // throw out of the page's script, whatever it does or does not paint.
         Assert.Equal("ok", Eval(
             "(function(){var ctx=document.getElementById('c').getContext('2d');" +
             "ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(10,10);ctx.arc(5,5,3,0,6.28);ctx.closePath();" +

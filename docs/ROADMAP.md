@@ -1036,10 +1036,16 @@ are the contract.
 | Runtime and execution responsibilities in `Broiler.HtmlBridge.Core` | Runtime interfaces to `Broiler.HtmlBridge.Dom`; module execution plus execution DTOs/profiling to `Broiler.HtmlBridge.Scripting`; generic meta discovery to `Broiler.Dom.Html` | Host orchestration and public v2 forwarding facades until a major-version boundary |
 | Logging, URL/origin/CSP, and resource responsibilities in `Broiler.HtmlBridge.Core` | `RenderLogger` to `Broiler.Diagnostics`; injected web URL/origin/security/resource primitives to a small host-services component only after its dependency seam is proven | Security decisions, credentials/network policy, and browser API bindings |
 
-Canvas is deliberately not a current extraction candidate: its implementation is
-primarily JS-observable state and the draw calls are still no-ops. A future real
-display-list or raster contract belongs in `Broiler.Graphics`; moving the stub
-would only put bridge behavior in the wrong assembly.
+Canvas is deliberately not a current extraction candidate, though no longer for the
+reason first written here — the draw calls are no longer no-ops. The 2D context now
+owns a `Broiler.Graphics` `BBitmap` and rasterises into it through `BCanvas`, which
+is what makes `getImageData` and `toDataURL` report real pixels
+(`docs/html5test-exceptions.md`). The raster contract that was described as future
+work is therefore already `Broiler.Graphics`', and what remains in the bridge is
+argument conversion and the drawing state — bridge behavior, which is where it
+belongs. What would justify revisiting this is the paint path: nothing outside the
+binding reads the bitmap, so a `<canvas>` still paints nothing into the page, and
+connecting it means a display item in `Broiler.Layout` sourced from that bitmap.
 
 #### DOM component rehoming
 

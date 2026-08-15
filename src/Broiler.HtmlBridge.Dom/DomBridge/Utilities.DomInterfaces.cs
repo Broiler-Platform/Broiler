@@ -51,6 +51,30 @@ public sealed partial class DomBridge
             function Text() { throw new TypeError('Illegal constructor'); }
             function Comment() { throw new TypeError('Illegal constructor'); }
             function Attr() { throw new TypeError('Illegal constructor'); }
+            function CanvasRenderingContext2D() { throw new TypeError('Illegal constructor'); }
+
+            // ImageData, unlike the interfaces above, *is* constructible — HTML defines
+            // new ImageData(w, h) and new ImageData(data, w, h) — so it gets a real body rather
+            // than an illegal-constructor throw.
+            function ImageData(a, b, c) {
+                var data, width, height;
+                if (typeof a === 'object' && a !== null) {
+                    data = a;
+                    width = b >>> 0;
+                    height = arguments.length > 2 ? (c >>> 0) : (data.length / 4) / width;
+                    if (data.length !== width * height * 4)
+                        throw new TypeError(""ImageData: the source data length is not a multiple of the row length."");
+                } else {
+                    width = a >>> 0;
+                    height = b >>> 0;
+                    data = new Uint8ClampedArray(width * height * 4);
+                }
+                if (width === 0 || height === 0)
+                    throw new TypeError(""ImageData: the source dimensions are zero."");
+                this.width = width;
+                this.height = height;
+                this.data = data;
+            }
 
             (function () {
                 var HTML_NS = 'http://www.w3.org/1999/xhtml';
@@ -116,6 +140,27 @@ public sealed partial class DomBridge
                 define(Text, function (o) { return isNode(o) && (o.nodeType === 3 || o.nodeType === 4); });
                 define(Comment, function (o) { return isNode(o) && o.nodeType === 8; });
                 define(Attr, function (o) { return isNode(o) && o.nodeType === 2; });
+
+                // The canvas types are not nodes, so nodeType cannot discriminate them; they answer
+                // from the members that define the interface instead. A 2D context is the only
+                // object in the bridge carrying the drawing surface and the pixel readback together.
+                define(CanvasRenderingContext2D, function (o) {
+                    return !!o && typeof o === 'object'
+                        && typeof o.getImageData === 'function'
+                        && typeof o.fillRect === 'function'
+                        && typeof o.fillStyle === 'string';
+                });
+
+                // Accepts an ImageData this constructor produced and one getImageData returned,
+                // which are different objects: the readback is built in C# and does not run through
+                // the constructor, so a prototype walk would answer false for the commoner of the two.
+                define(ImageData, function (o) {
+                    return !!o && typeof o === 'object'
+                        && typeof o.width === 'number' && typeof o.height === 'number'
+                        && !!o.data && typeof o.data === 'object'
+                        && typeof o.data.length === 'number'
+                        && o.data.length === o.width * o.height * 4;
+                });
             })();
         ");
     }
