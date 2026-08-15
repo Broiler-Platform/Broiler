@@ -736,22 +736,26 @@ public class CaptureService
                     hadWork = true;
                 }
 
-                if (bridge.HasPendingTimers)
+                if (bridge.HasPendingTimersDueBy(DomBridge.AsyncDrainVirtualTimeBudgetMs))
                 {
                     bridge.FlushTimerStep();
                     hadWork = true;
                 }
 
                 if (!hadWork)
-                    return; // settled within the budget
+                    return; // settled — nothing left that this capture's window covers
             }
 
-            // Phase 8 item 3: the drain budget is exhausted while work is still queued (a runaway
-            // microtask/timer loop). Surface it explicitly instead of stopping silently.
+            // Phase 8 item 3: the iteration budget is exhausted while work is *still due now*. The
+            // virtual-time horizon above already retires the ordinary case — a page holding an
+            // interval, whose next tick is simply later — so reaching here means work that keeps
+            // regenerating at the current instant and never lets the clock move: a callback
+            // rescheduling itself with no delay, or a microtask queueing another. That is worth a
+            // warning; an interval is not, and used to get one.
             RenderLogger.LogWarning(LogCategory.JavaScript, "CaptureService.DrainAsyncWork",
-                $"Async work did not settle within {DomBridge.AsyncDrainIterationLimit} drain iterations; " +
-                $"stopping with pending microtasks={microTasks.Count}, pendingTimers={bridge.HasPendingTimers}. " +
-                "This usually indicates a runaway microtask/timer loop.");
+                $"Async work still due after {DomBridge.AsyncDrainIterationLimit} drain iterations; " +
+                $"stopping with pending microtasks={microTasks.Count}. " +
+                "A callback is rescheduling itself with no delay, so the virtual clock cannot advance.");
         }
 
         for (int si = 0; si < scripts.Count; si++)

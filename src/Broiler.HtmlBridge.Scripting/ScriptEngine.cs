@@ -428,25 +428,27 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
                 hadWork = true;
             }
 
-            if (bridge.HasPendingTimers)
+            if (bridge.HasPendingTimersDueBy(DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs))
             {
                 bridge.FlushTimerStep();
                 hadWork = true;
             }
 
             if (!hadWork)
-                return; // settled — the queues drained within the budget
+                return; // settled — nothing left that this capture's window covers
         }
 
-        // Phase 8 item 3: the iteration budget is exhausted while work is still queued (typically a
-        // runaway microtask/timer loop, e.g. a setTimeout/queueMicrotask that reschedules itself).
-        // Surface this explicitly instead of stopping silently: record it on the engine and log a
-        // warning with the pending counts so it is diagnosable rather than an invisible truncation.
+        // Phase 8 item 3: the iteration budget is exhausted while work is *still due now*. The
+        // virtual-time horizon above already retires the ordinary case — a page holding an interval,
+        // whose next tick is simply later — so reaching here means work that keeps regenerating at
+        // the current instant and never lets the clock move: a setTimeout or queueMicrotask that
+        // reschedules itself with no delay. Record it on the engine and log it, so the truncation is
+        // diagnosable rather than invisible.
         AsyncDrainLimitExhausted = true;
         RenderLogger.LogWarning(LogCategory.JavaScript, "ScriptEngine.DrainAsyncWork",
-            $"Async work did not settle within {DomBridgeRuntimeLimits.AsyncDrainIterationLimit} drain iterations; " +
-            $"stopping with pending microtasks={MicroTasks.Count}, pendingTimers={bridge.HasPendingTimers}. " +
-            "This usually indicates a runaway microtask/timer loop.");
+            $"Async work still due after {DomBridgeRuntimeLimits.AsyncDrainIterationLimit} drain iterations; " +
+            $"stopping with pending microtasks={MicroTasks.Count}. " +
+            "A callback is rescheduling itself with no delay, so the virtual clock cannot advance.");
     }
 
     /// <summary>

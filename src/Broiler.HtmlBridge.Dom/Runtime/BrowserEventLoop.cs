@@ -162,6 +162,43 @@ internal sealed class BrowserEventLoop
         !_timers.IsEmpty || !_rafCallbacks.IsEmpty || !_frameActions.IsEmpty;
 
     /// <summary>
+    /// Whether any queued work is due at or before <paramref name="horizonMs"/> on the virtual clock.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="HasPendingWork"/> cannot answer "is this page finished?", because an interval is
+    /// never finished: it reschedules to <c>Deadline + Period</c> after every tick, so a page holding
+    /// one keeps pending work forever by design. A drain that waits for the queue to empty therefore
+    /// cannot terminate on the ordinary case, and each step advances the virtual clock by a whole
+    /// period — so waiting it out does not merely spin, it simulates page time that a capture was
+    /// never meant to cover.
+    /// </para>
+    /// <para>
+    /// A horizon separates the two questions. Work scheduled beyond it is simply later, not stuck,
+    /// and a caller can stop without calling the page broken. Work still due at time zero after
+    /// repeated draining is the genuine runaway — a callback that reschedules itself with no delay —
+    /// and stays visible because it never moves the clock past the horizon.
+    /// </para>
+    /// <para>
+    /// Animation-frame callbacks and frame actions carry no deadline; they are due whenever they are
+    /// queued, so they count as due at any horizon.
+    /// </para>
+    /// </remarks>
+    public bool HasWorkDueBy(double horizonMs)
+    {
+        if (!_rafCallbacks.IsEmpty || !_frameActions.IsEmpty)
+            return true;
+
+        foreach (var kv in _timers.ToArray())
+        {
+            if (!_clearedTimerIds.ContainsKey(kv.Key) && kv.Value.Deadline <= horizonMs)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Runs pending work to a fixed point: repeatedly runs one batch (up to a safety cap) until no
     /// batch does anything, then clears the processed-timer-id set. <paramref name="taskCheckpoint"/>
     /// runs after each task (a spec-like microtask checkpoint). Used before DOM capture/serialisation.

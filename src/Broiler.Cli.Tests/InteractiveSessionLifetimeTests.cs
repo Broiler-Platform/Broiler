@@ -28,6 +28,7 @@ public class InteractiveSessionLifetimeTests
         public IReadOnlyList<DomElement> Elements { get; } = Array.Empty<DomElement>();
         public int CurrentScriptIndex { get; set; }
         public bool HasPendingTimers => false;
+        public bool HasPendingTimersDueBy(double virtualHorizonMs) => false;
 
         public void Attach(JSContext context, string html)
         {
