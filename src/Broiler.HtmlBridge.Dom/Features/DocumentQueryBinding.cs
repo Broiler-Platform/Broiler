@@ -61,6 +61,36 @@ internal static class DocumentQueryBinding
         return new JSArray(results);
     }
 
+    /// <summary>
+    /// <c>document.getElementsByName(name)</c> — HTML §3.1.5: every element in the document whose
+    /// <c>name</c> <em>attribute</em> is identical to the argument, in tree order.
+    /// </summary>
+    /// <remarks>
+    /// It is not a synonym for the id lookup and not confined to form controls: any element carrying
+    /// the attribute qualifies, which is why it is an attribute read rather than a selector match.
+    /// The value is compared ordinally — HTML matches it exactly — while the attribute's own name is
+    /// matched case-insensitively, as attribute names are in an HTML document.
+    /// <para>
+    /// It was missing entirely, and on a document that reads as <see langword="undefined"/> rather
+    /// than as an absent method, so calling it threw <c>TypeError: undefined is not a function</c> and
+    /// took the whole script with it. google.com's homepage bundle finds its search form this way —
+    /// <c>for(var d=0;b=c[d++];)if(b=document.getElementsByName(b)[0])return b</c> over
+    /// <c>["f","gs"]</c> — after looking for a form by id first.
+    /// </para>
+    /// </remarks>
+    public static JSValue GetElementsByName(IDocumentQueryHost host, in Arguments a)
+    {
+        var name = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var results = new List<JSValue>();
+        foreach (var el in host.Elements)
+        {
+            if (DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal))
+                results.Add(host.ToJSObject(el));
+        }
+
+        return new JSArray(results);
+    }
+
     public static JSValue QuerySelector(IDocumentQueryHost host, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
