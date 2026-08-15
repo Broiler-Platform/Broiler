@@ -23,7 +23,7 @@ internal static partial class SvgRenderer
 
     /// <summary>Draws every <c>&lt;use&gt;</c> that paints where it stands.</summary>
     private static void EmitUseElements(
-        string svgXml, RectangleF bounds, List<DisplayItem> items, SvgStructure structure,
+        string svgXml, RectangleF bounds, SvgPaintOrder order, SvgStructure structure,
         float sx, float sy, float tx, float ty, float pctW, float pctH)
     {
         if (_useDepth >= MaxUseDepth
@@ -54,6 +54,7 @@ internal static partial class SvgRenderer
                 target.Name.Equals("symbol", StringComparison.OrdinalIgnoreCase)
                 || target.Name.Equals("svg", StringComparison.OrdinalIgnoreCase);
 
+            var items = order.Open(m.Index);
             var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
             _useDepth++;
             try

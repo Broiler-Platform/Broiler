@@ -52,6 +52,15 @@ internal static partial class SvgRenderer
             return false;
         }
 
+        // Inside a nested <svg> the element belongs to that viewport's own coordinate system, and
+        // the nested-viewport pass renders it there. Drawing it here as well would put a second copy
+        // on the canvas at the outer scale.
+        if (structure.IsInNestedViewport(match.Index))
+        {
+            attrs = null;
+            return false;
+        }
+
         attrs = ParseAttributes(match.Groups[1].Value);
         if (inherited != null)
         {
@@ -81,7 +90,7 @@ internal static partial class SvgRenderer
     /// </para>
     /// </remarks>
     private static void EmitTextElements(
-        string svgXml, RectangleF bounds, List<DisplayItem> items, SvgStructure structure,
+        string svgXml, RectangleF bounds, SvgPaintOrder order, SvgStructure structure,
         float sx, float sy, float tx, float ty, float pctW, float pctH, float pctD)
     {
         foreach (Match m in TextElementRegex().Matches(svgXml))
@@ -96,6 +105,7 @@ internal static partial class SvgRenderer
             if (text.Length == 0)
                 continue;
 
+            var items = order.Open(m.Index);
             float scale = Math.Max(sx, sy);
             float fontSize = GetLength(attrs, "font-size", pctD, 16) * scale;
             var font = ResolveFont(attrs, fontSize);
