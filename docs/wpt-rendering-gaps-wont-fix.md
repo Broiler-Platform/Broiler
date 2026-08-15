@@ -311,7 +311,7 @@ upstream rather than fixing — see
 25 wrong out of 28 is not a tuning problem, it is a missing check:
 **`--verify-reference` never asks whether anything was drawn.** Blank-on-blank scores
 100% and clears. The defect and the two cheap fixes for it are recorded under
-[not fixed](wpt-rendering-gaps-open.md#--verify-reference-clears-a-test-that-renders-nothing).
+[fixed](wpt-rendering-gaps-fixed.md#--verify-reference-cleared-a-test-that-rendered-nothing).
 
 Until that lands, treat the *Not ranked* heading in a run as a **triage queue, not a
 verdict**. The [settled set](#the-settled-set) above is the part that has been checked

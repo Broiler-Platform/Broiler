@@ -6,14 +6,14 @@ documents, split by verdict:
 
 | Document | What is in it | Tests |
 | --- | --- | --- |
-| [**Not fixed**](wpt-rendering-gaps-open.md) | real gaps, each with an owner, evidence and an exit gate | 55 |
+| [**Not fixed**](wpt-rendering-gaps-open.md) | real gaps, each with an owner, evidence and an exit gate | 50 |
 | [**Won't fix**](wpt-rendering-gaps-wont-fix.md) | tests Broiler renders correctly and the golden image does not | 17 |
-| [**Fixed**](wpt-rendering-gaps-fixed.md) | closed gaps, with root cause, what landed, and the wrong turns | 43 |
+| [**Fixed**](wpt-rendering-gaps-fixed.md) | closed gaps, with root cause, what landed, and the wrong turns | 46 |
 
 Start with *not fixed*. Read *won't fix* before starting on any 0.0% — closing one of
 those means deleting working support. But do not read a run's *Not ranked* heading as
 that verdict: of the 28 such flags checked by hand on 2026-08-13, **25 were real gaps**
-being hidden by [a missing check in the runner](wpt-rendering-gaps-open.md#--verify-reference-clears-a-test-that-renders-nothing).
+being hidden by [a missing check in the runner](wpt-rendering-gaps-fixed.md#--verify-reference-cleared-a-test-that-rendered-nothing), since closed.
 
 ## Read this first — four things that are true of the whole set
 
@@ -28,25 +28,27 @@ being hidden by [a missing check in the runner](wpt-rendering-gaps-open.md#--ver
    nobody had checked by hand, **25 were wrong** — 17 of them because Broiler renders
    a *blank canvas* for the test and for its reference, and blank-on-blank matches at
    100%. `--verify-reference`
-   [never asks whether anything was drawn](wpt-rendering-gaps-open.md#--verify-reference-clears-a-test-that-renders-nothing).
+   [never asked whether anything was drawn](wpt-rendering-gaps-fixed.md#--verify-reference-cleared-a-test-that-rendered-nothing);
+   it does now, so that particular way of hiding a gap is closed.
    Passing a test's own reference is necessary evidence, not sufficient — the same
    way `css-grid/subgrid/orthogonal-writing-mode-006` passes its `rel=match` at 100%
    *because the test and its reference share the broken layout*
    ([details](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)). And the
    inverse exists too: two `css-view-transitions` tests
    [pass on CI and are demonstrably wrong](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
-3. **One patch is waiting, and a patch number identifies nothing.** The `patches/`
-   directory holds a single entry — [`0001`](../patches/README.md), the paint call
-   site for
-   [`object-fit` and `object-position`](wpt-rendering-gaps-fixed.md#object-fit-and-object-position-were-not-read-at-all).
-   Every *other* submodule fix in these documents is an ancestor of the pinned
-   pointer and live on CI, including the SVG-renderer unification that was `0001`
-   before this one (`Broiler.HTML` `c77f0f0`, pointer bumped). That is the whole
-   problem with numbering them: `patches/` is a backlog rather than an archive — a
-   file is deleted once its fix is upstream and numbering restarts from `0001` — so
-   the same number names different changes at different times, and a `patches/NNNN`
-   reference in an older commit or comment is almost always dangling. Fixes are
-   identified here by **commit subject**:
+3. **One rendering fix on these pages is waiting on a patch, and a patch number
+   identifies nothing.** That fix is
+   [the media-element one](wpt-rendering-gaps-fixed.md#a-media-element-with-nothing-to-show-painted-a-black-box)
+   — *Paint a media element's box only when it shows controls*, in `Broiler.HTML`,
+   listed in `scripts/apply-pending-wpt-patches.sh` so the pixel suites exercise it on
+   top of the pinned pointer. Every *other* submodule fix in these documents is an
+   ancestor of the pointer and live on CI outright, including the SVG-renderer
+   unification and the `object-fit` call site that each held `0001` before it. That is
+   the whole problem with numbering them: [`patches/`](../patches/README.md) is a
+   backlog rather than an archive — a file is deleted once its fix is upstream and
+   numbering restarts from `0001` — so the same number names different changes at
+   different times, and a `patches/NNNN` reference in an older commit or comment is
+   almost always dangling. Fixes are identified here by **commit subject**:
 
    ```sh
    git -C <Submodule> log --oneline --grep '<commit subject>'

@@ -19,10 +19,15 @@ namespace Broiler.Layout.IR;
 /// </para>
 /// <para>
 /// This scans the tags once with a stack and records, per start-tag offset, whether the element
-/// paints and what it inherits. The offsets are the ones <see cref="Regex"/> reports as
-/// <see cref="Capture.Index"/> for the same element, so the existing loops stay as they are and
-/// only consult this by index. Anything the scan does not reach — a commented-out element, markup
-/// inside <c>&lt;style&gt;</c> — is absent, and absent means "does not paint", which is the point.
+/// paints, what it inherits and the transform it is under. The offsets are the ones
+/// <see cref="Regex"/> reports as <see cref="Capture.Index"/> for the same element, so the existing
+/// loops stay as they are and only consult this by index.
+/// </para>
+/// <para>
+/// Two kinds of absence are told apart deliberately. Markup inside a comment or a CDATA section is
+/// recorded as an inert span (<see cref="IsInert"/>) and does not paint. An offset that is neither
+/// an element nor inert is markup the tag scan could not follow, and it keeps painting: a scanning
+/// gap must not silently erase a shape the renderer used to draw.
 /// </para>
 /// </remarks>
 internal sealed partial class SvgStructure
@@ -73,6 +78,12 @@ internal sealed partial class SvgStructure
     /// <summary><c>id</c> → the element that declares it, for <c>&lt;use href="#id"&gt;</c>.</summary>
     private readonly Dictionary<string, Element> _byId = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The spans of the comments and CDATA sections in the markup, so a shape regex that matches
+    /// inside one can be told apart from an element the scan simply could not follow.
+    /// </summary>
+    private readonly List<(int Start, int End)> _inertSpans = [];
+
     /// <summary>One element the scan reached, addressable by <c>id</c>.</summary>
     /// <param name="Name">Its tag name.</param>
     /// <param name="Attributes">Its own attributes.</param>
@@ -102,6 +113,27 @@ internal sealed partial class SvgStructure
     /// <summary>The attributes of the element starting at <paramref name="index"/>, painting or not.</summary>
     public bool TryGetAttributes(int index, out IReadOnlyDictionary<string, string> attributes)
         => _attributes.TryGetValue(index, out attributes!);
+
+    /// <summary>
+    /// Whether <paramref name="index"/> falls inside a comment or CDATA section — markup that looks
+    /// like an element to a regex and is text to a parser.
+    /// </summary>
+    /// <remarks>
+    /// Asked separately from <see cref="TryGetRendered"/> because the two absences mean opposite
+    /// things: an element the scan could not follow must keep painting (a scanning gap must not
+    /// erase a shape), while one inside a comment must not. Most of the SVG 1.1 suite carries a
+    /// commented-out <c>&lt;g id="draft-watermark"&gt;</c> with a red bar and a DRAFT label.
+    /// </remarks>
+    public bool IsInert(int index)
+    {
+        foreach (var (start, end) in _inertSpans)
+        {
+            if (index >= start && index < end)
+                return true;
+        }
+
+        return false;
+    }
 
     /// <summary>Resolves an <c>id</c> to the element that declares it.</summary>
     public bool TryGetById(string id, out Element element)
@@ -136,7 +168,10 @@ internal sealed partial class SvgStructure
             // markup inside it is text. Matching them here is what keeps a commented-out
             // <g id="draft-watermark"> — which most of the SVG 1.1 test suite carries — unpainted.
             if (!m.Groups["name"].Success)
+            {
+                structure._inertSpans.Add((m.Index, m.Index + m.Length));
                 continue;
+            }
 
             string name = m.Groups["name"].Value;
             bool isEnd = m.Groups["close"].Value.Length > 0;

@@ -36,16 +36,17 @@ internal static partial class SvgRenderer
     /// inheritable ones its ancestors declared filled in.
     /// </summary>
     /// <remarks>
-    /// An element the scan never reached — markup whose shape the tag regex could not follow —
-    /// is treated as painting with nothing inherited, which is what this renderer did before the
-    /// scan existed. Only an element the scan saw and classified is dropped, so a scanning gap
-    /// cannot silently erase a shape.
+    /// An element the scan never reached — markup whose shape the tag regex could not follow — is
+    /// treated as painting with nothing inherited, which is what this renderer did before the scan
+    /// existed, so a scanning gap cannot silently erase a shape. A match inside a comment or CDATA
+    /// section is the one absence that does mean "does not paint", and the scan records those spans
+    /// explicitly for exactly that reason.
     /// </remarks>
     private static bool TryResolveElement(
         SvgStructure structure, Match match, out Dictionary<string, string> attrs)
     {
         bool paints = structure.TryGetRendered(match.Index, out var inherited);
-        if (!paints && structure.TryGetAttributes(match.Index, out _))
+        if (!paints && (structure.TryGetAttributes(match.Index, out _) || structure.IsInert(match.Index)))
         {
             attrs = null;
             return false;
