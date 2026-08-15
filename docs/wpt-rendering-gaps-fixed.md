@@ -828,6 +828,45 @@ the test that exposed it.
   `inline-table`, and pinning today's number there would fail the day that separate gap
   is closed.
 
+### A non-stretching grid item could not take its inline size from its `aspect-ratio`
+
+- **Test:** `css-grid/alignment/grid-item-aspect-ratio-justify-self-001`, whose assertions
+  go **20 / 40 → 29 / 40** on top of the containing-block fixes above. All nine
+  non-stretching rows of the first group now measure **16×32** exactly, where they measured
+  24×32. What remains is
+  [two other rules](wpt-rendering-gaps-open.md#a-definite-inline-size-does-not-drive-the-block-axis-through-an-aspect-ratio).
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Sizing.cs`, `Engine/CssBoxGrid.cs`). Main
+  repo, no patch.
+- **`justify-self` was implemented; the ratio could not run in the direction it needed.**
+  `PlaceItemInArea` already declines to stretch an item whose `justify-self` is positional
+  and aligns it in its area instead — the item simply *arrived* 24 wide, having filled its
+  containing block during ordinary layout, and nothing then re-derived it. Reading the
+  alignment code as missing would have been the wrong repair.
+- **Only one of the two transfer directions existed for a non-replaced box.**
+  `CanTransferAspectRatioToBlockHeight` takes an auto *height* from the used width, which is
+  the direction an ordinary in-flow box needs: its auto width fills the containing block, so
+  the width is known first. A grid item that is **not** stretched is the case where that is
+  untrue — its inline size is auto and its block size is the definite one the area gave it —
+  and the transfer has to run block→inline. Until now only a replaced box could do that
+  (`ResolveReplacedContentSize` fills in whichever axis is auto).
+  `TryResolveAspectRatioInlineWidth` is the new mirror of the existing helper, applying the
+  ratio in the box named by `box-sizing` and clamping the result to `min-`/`max-width`.
+- **The guard is the part worth keeping.** A first draft fired whenever the item did not
+  fill its area, which is also true of an item with a stated `width: 20px` — and it
+  overwrote that 20 with the ratio's 16. Only an *auto* inline size is the ratio's to fill
+  in. The test that caught it is in the landed set.
+- **Checked against Chromium on five shapes, not derived on paper.** All five widths agree:
+  16 for the plain border-box case, 20 for `box-sizing: content-box` with 2px of padding
+  (the ratio halves the *content* height, and the padding brings the border box back to 20),
+  20 under a `min-width` floor, 20 for a stated width, and 24 when stretched. The paper
+  arithmetic for the content-box row said 18 and was wrong; the engine and Chromium both
+  say 20 × 36. The three rows whose block axis Chromium drives back through the ratio are
+  recorded as the remaining gap rather than pinned at today's value.
+- **Tests:** `Broiler.Cli.Tests/GridItemAspectRatioInlineSizeTests.cs` — the nine
+  non-stretching `justify-self` values, the `normal`/`stretch` control that must still fill
+  its area (a fix that applied the ratio unconditionally would pass the first and fail the
+  second), the stated-width and `min-width` guards, and the `box-sizing` case.
+
 ---
 
 ## Paint and the renderer

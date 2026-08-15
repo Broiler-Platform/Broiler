@@ -8,7 +8,7 @@ documents, split by verdict:
 | --- | --- | --- |
 | [**Not fixed**](wpt-rendering-gaps-open.md) | real gaps, each with an owner, evidence and an exit gate | 50 |
 | [**Won't fix**](wpt-rendering-gaps-wont-fix.md) | tests Broiler renders correctly and the golden image does not | 17 |
-| [**Fixed**](wpt-rendering-gaps-fixed.md) | closed gaps, with root cause, what landed, and the wrong turns | 47 |
+| [**Fixed**](wpt-rendering-gaps-fixed.md) | closed gaps, with root cause, what landed, and the wrong turns | 48 |
 
 Start with *not fixed*. Read *won't fix* before starting on any 0.0% — closing one of
 those means deleting working support. But do not read a run's *Not ranked* heading as

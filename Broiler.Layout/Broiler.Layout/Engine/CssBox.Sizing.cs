@@ -633,6 +633,58 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             && !double.IsNaN(borderBoxHeight) && !double.IsInfinity(borderBoxHeight);
     }
 
+    /// <summary>
+    /// CSS Sizing 4 §4 in the other direction: the used border-box <em>width</em> this box's
+    /// <c>auto</c> inline axis takes from a definite block size and its preferred aspect ratio.
+    /// </summary>
+    /// <remarks>
+    /// <para><see cref="TryResolveAspectRatioBlockHeight"/> is the width→height transfer, which
+    /// is the one an ordinary in-flow box needs: its auto inline size fills the containing
+    /// block, so the width is known first. This is the inverse, and it applies wherever the
+    /// inline axis is <em>not</em> filled and so has no size of its own — a grid item whose
+    /// <c>justify-self</c> is positional rather than stretching being the case it was written
+    /// for. Until now only a replaced box could transfer this way
+    /// (<see cref="ResolveReplacedContentSize"/>).</para>
+    /// <para><paramref name="borderBoxHeight"/> is the block size the caller has already
+    /// settled — for a grid item, the one its area gave it — because this transfer is only
+    /// unambiguous when the block axis does not itself depend on the width being derived.</para>
+    /// </remarks>
+    internal bool TryResolveAspectRatioInlineWidth(double borderBoxHeight, out double borderBoxWidth)
+    {
+        borderBoxWidth = 0;
+
+        if (!TryParseAspectRatio(AspectRatio, out double ratio) || !(ratio > 0))
+            return false;
+
+        if (!(borderBoxHeight > 0))
+            return false;
+
+        // The ratio relates the two sizes of the box named by box-sizing, so the transfer
+        // happens in that box and the result is mapped back to a border box — the mirror of
+        // TryResolveAspectRatioBlockHeight, and the reason a bordered `box-sizing: content-box`
+        // item cannot simply multiply.
+        double specifiedWidth;
+        if (UsesBorderBoxSizing)
+        {
+            specifiedWidth = borderBoxHeight * ratio;
+        }
+        else
+        {
+            double contentHeight = borderBoxHeight
+                - ActualPaddingTop - ActualPaddingBottom
+                - ActualBorderTopWidth - ActualBorderBottomWidth;
+            if (!(contentHeight > 0))
+                return false;
+            specifiedWidth = contentHeight * ratio;
+        }
+
+        // CSS2.1 §10.4: the derived size is still subject to min-/max-width.
+        borderBoxWidth = ResolveInlineSizeBounds().Clamp(ResolveSpecifiedWidthToBorderBox(specifiedWidth));
+
+        return borderBoxWidth > 0
+            && !double.IsNaN(borderBoxWidth) && !double.IsInfinity(borderBoxWidth);
+    }
+
     /// <summary>Parses an <c>aspect-ratio</c> value (<c>&lt;number&gt; [ /
     /// &lt;number&gt; ]?</c>, ignoring a leading/trailing <c>auto</c> keyword)
     /// into a width/height ratio. Returns <c>false</c> for <c>auto</c>/<c>none</c>
