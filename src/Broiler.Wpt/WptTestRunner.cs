@@ -2597,6 +2597,14 @@ internal sealed partial class WptTestRunner
     }
 
     /// <summary>
+    /// The <c>check-layout-th.js</c> assertions the most recent render evaluated, or an empty
+    /// list when the document declared none. A <c>check-layout</c> test states its expected
+    /// geometry in the markup, so this is the one signal about it that needs no reference image
+    /// — which is what <c>--render --check-layout</c> reports.
+    /// </summary>
+    internal IReadOnlyList<DomBridge.CheckLayoutAssertion> LastLayoutAssertions { get; private set; } = [];
+
+    /// <summary>
     /// Renders an HTML file through the full Broiler pipeline (script execution,
     /// anchor resolution, rendering) and returns the resulting bitmap.
     /// </summary>
@@ -2640,6 +2648,7 @@ internal sealed partial class WptTestRunner
             var executed = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
             html = executed.Html ?? html;
             renderDocument = executed.Document;
+            LastLayoutAssertions = executed.LayoutAssertions;
         }
 
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.PostProcess))

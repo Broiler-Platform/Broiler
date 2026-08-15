@@ -214,6 +214,42 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — an absolutely-positioned or fixed child of a **row** flex container
+  was never laid out, and so never painted. `PerformFlexRowLayout` replaces the ordinary
+  block-flow child loop wholesale, and that loop is the only thing that calls
+  `PerformLayout` on a child; the flex path walks the same list but skips out-of-flow
+  children, correctly excluding them from flex layout (CSS Flexbox §4.1) and then never
+  laying them out anywhere else. The visible effect was not a misplaced box but a missing
+  one: `body { display: flex }` holding a fixed backdrop and an absolutely-positioned
+  panel painted neither, which is a common enough shape that it made a WPT test and its
+  own reference agree with each other on a blank page. Out-of-flow children are now laid
+  out after the flex lines, from the container's content-box start corner as their static
+  position. Column containers were unaffected — they fall through to block flow, which
+  already laid them out.
+
+- `Broiler.Layout` — `flex-grow` did nothing at all along a column flex container's main
+  axis. A column container has no flex algorithm here; its children stack through ordinary
+  block flow, which never resolves flexible lengths, so a lone `flex-grow: 1` item in a
+  100px-tall container stayed at its content height and a `height: 100%` child of it
+  measured zero. The positive half of §9.7 now runs over that stack once the children are
+  laid out, when — and only when — the container's main size is definite (a specified
+  `height`, then clamped by `min-height`/`max-height`; a `min-height` alone leaves the main
+  size content-based, and items correctly do not flex). Each grown item is laid out again
+  at its target height rather than resized in place, so percentage-height descendants
+  resolve against the flexed size. Shrinking is deliberately not implemented yet: it would
+  need CSS Flexbox §4.5's automatic minimum size to avoid squashing content past its
+  min-content size.
+
+- `Broiler.Layout` — a CSS grid whose children are *all* absolutely positioned resolved no
+  grid areas for them. The definite-track pass declined outright when no in-flow item was
+  placed, so no track was sized and every abspos child fell back to the grid container's
+  padding box instead of the grid area CSS Grid §9 makes its containing block. Two smaller
+  defects sat behind it: the padding box's block extent was read from the container's
+  track-derived height rather than its used height, so an `auto` grid line resolved against
+  a box hundreds of pixels too short whenever the container had a definite height; and in
+  `rtl` the resolved area was mirrored correctly and the item then placed at its *left*
+  edge, where CSS2.1 §10.3.7's static position is the inline-start — the right — one.
+
 - `Broiler.HtmlBridge` — `window.top` did not exist, so the unqualified `top` a page
   writes raised `ReferenceError: top is not defined`. Because `window` *is* the global
   object here, an unregistered member is not an undefined property but a reference

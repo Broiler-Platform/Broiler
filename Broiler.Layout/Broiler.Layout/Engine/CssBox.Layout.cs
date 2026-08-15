@@ -1275,6 +1275,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // the block (cross) axis per align-items / align-self.
                 ApplyFlexGridCrossAxisAlignment();
                 ApplyFlexColumnInlineAxisAlignment(g);
+                ApplyFlexColumnMainAxisSizing(g);
             }
             else if (Boxes.Count > 0)
             {
@@ -1359,6 +1360,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
                 if (Display is "grid" or "inline-grid")
                     ApplyGridLayoutAfterInline();
+
+                // A column flex container's children stack through this block path, so the
+                // resolve-flexible-lengths step over them has to run here, once they are laid
+                // out and their content heights are known.
+                ApplyFlexColumnMainAxisSizing(g);
             }
         }
     }

@@ -108,6 +108,7 @@ public class Program
         int shardIndex = WptTestRunner.AllShards;
         bool nonJavaScriptOnly = false;
         bool referenceTestsOnly = false;
+        bool reportLayoutAssertions = false;
         bool verifyReference = false;
         bool workerMode = false;
         bool noWorkerIsolation = false;
@@ -225,6 +226,9 @@ public class Program
                 case "--verify-reference":
                     verifyReference = true;
                     break;
+                case "--check-layout":
+                    reportLayoutAssertions = true;
+                    break;
                 case "--wpt-dir":
                 case "--reference-dir":
                 case "--json-output":
@@ -269,7 +273,7 @@ public class Program
         // wpt-root-relative resource resolution, otherwise the file renders
         // standalone.  This deliberately bypasses test discovery.
         if (renderPath != null)
-            return RunRenderMode(renderPath, renderOutPath, wptPath);
+            return RunRenderMode(renderPath, renderOutPath, wptPath, reportLayoutAssertions);
 
         if (wptPath is null)
         {
@@ -3111,6 +3115,9 @@ public class Program
         Console.WriteLine("                             The fast 'reproduce against the live renderer' path; --wpt-dir is");
         Console.WriteLine("                             optional (supplies WPT fonts/resource resolution when given).");
         Console.WriteLine("  --render-out <PATH>        Output PNG path for --render (default: <FILE> with a .png extension)");
+        Console.WriteLine("  --check-layout             With --render, also report the check-layout-th.js assertions the");
+        Console.WriteLine("                             document declares. Judges a check-layout test with no reference");
+        Console.WriteLine("                             image at all, which the pixel suite can only skip.");
         Console.WriteLine("  --help                     Show this help message");
     }
 
@@ -3121,7 +3128,8 @@ public class Program
     /// <paramref name="wptPath"/> is supplied it loads the WPT fonts and resolves
     /// wpt-root-relative sub-resources; otherwise the file renders standalone.
     /// </summary>
-    private static int RunRenderMode(string renderPath, string? renderOutPath, string? wptPath)
+    private static int RunRenderMode(string renderPath, string? renderOutPath, string? wptPath,
+        bool reportLayoutAssertions)
     {
         if (!File.Exists(renderPath))
         {
@@ -3137,9 +3145,10 @@ public class Program
         // A --wpt-dir is optional in render mode; only use it when it exists.
         var wptRoot = wptPath != null && Directory.Exists(wptPath) ? wptPath : null;
 
+        var runner = new WptTestRunner();
+
         try
         {
-            var runner = new WptTestRunner();
             using var bitmap = runner.RenderHtmlFileBitmapPublic(renderPath, wptRoot);
             bitmap.Save(outPath);
         }
@@ -3150,6 +3159,39 @@ public class Program
         }
 
         Console.WriteLine($"Rendered {renderPath} -> {outPath}");
+
+        if (reportLayoutAssertions)
+            PrintRenderedLayoutAssertions(runner.LastLayoutAssertions);
+
         return 0;
+    }
+
+    /// <summary>
+    /// Reports the <c>check-layout-th.js</c> assertions a <c>--render</c> evaluated. A
+    /// <c>check-layout</c> test carries its own expected geometry in <c>data-expected-*</c>
+    /// attributes, so this judges it without a reference image — the class of test the pixel
+    /// suite can only skip, and which otherwise has to be read off a CI artifact.
+    /// </summary>
+    private static void PrintRenderedLayoutAssertions(
+        IReadOnlyList<Broiler.HtmlBridge.DomBridge.CheckLayoutAssertion> assertions)
+    {
+        if (assertions.Count == 0)
+        {
+            Console.WriteLine("check-layout: the document declared no assertions.");
+            return;
+        }
+
+        var failures = assertions
+            .Where(a => double.IsNaN(a.Actual) || Math.Abs(a.Expected - a.Actual) > 1.0)
+            .ToList();
+
+        Console.WriteLine($"check-layout: {assertions.Count - failures.Count}/{assertions.Count} passed (±1px).");
+
+        foreach (var f in failures)
+        {
+            var actual = double.IsNaN(f.Actual) ? "(no value)" : f.Actual.ToString("0.##", CultureInfo.InvariantCulture);
+            Console.WriteLine($"  {f.Element}  {f.Property}: expected " +
+                              $"{f.Expected.ToString("0.##", CultureInfo.InvariantCulture)}, actual {actual}");
+        }
     }
 }

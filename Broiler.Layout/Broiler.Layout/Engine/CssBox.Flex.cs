@@ -247,7 +247,61 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         ActualBottom = cursorY + ActualPaddingBottom + ActualBorderBottomWidth;
         ActualRight = Location.X + Size.Width;
+
+        LayoutOutOfFlowFlexChildren(g, contentLeft, contentTop);
     }
+
+    /// <summary>
+    /// CSS Flexbox §4.1: an absolutely-positioned child of a flex container takes no part in
+    /// flex layout, but it is still laid out — and painted — with the container's content-box
+    /// start corner as its static position.
+    /// </summary>
+    /// <remarks>
+    /// This path replaces the ordinary block-flow child loop wholesale, and that loop is what
+    /// calls <see cref="PerformLayout"/> on every child. Without this, an out-of-flow child of a
+    /// flex container was never laid out at all and so never reached the canvas: a
+    /// <c>body { display: flex }</c> holding a fixed backdrop and an abspos panel painted
+    /// neither (WPT css-transforms/dynamic-fixed-pos-cb-change, whose test *and* reference both
+    /// rendered a bare background).
+    /// </remarks>
+    private void LayoutOutOfFlowFlexChildren(ILayoutEnvironment g, double contentLeft, double contentTop)
+    {
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None
+                || child.Position is not (CssConstants.Absolute or CssConstants.Fixed))
+                continue;
+
+            child.Location = new PointF((float)contentLeft, (float)contentTop);
+            child.ActualBottom = contentTop;
+            child.PerformLayout(g);
+
+            // §4.1 again, for the axes no inset pinned: the static position is where the child
+            // would sit "as if it were the sole flex item", which is the container's content-box
+            // start corner. PerformLayout derives a *block container's* static position instead —
+            // the in-flow advance past the preceding sibling — so without this an all-`auto`
+            // child of a flex container holding one 10px-tall item landed 10px too low.
+            bool hasLeft = IsSpecifiedInset(child.Left), hasRight = IsSpecifiedInset(child.Right);
+            bool hasTop = IsSpecifiedInset(child.Top), hasBottom = IsSpecifiedInset(child.Bottom);
+
+            if (!hasLeft && !hasRight)
+            {
+                double dx = contentLeft + child.ActualMarginLeft - child.Location.X;
+                if (Math.Abs(dx) > 0.1)
+                    child.OffsetLeft(dx);
+            }
+
+            if (!hasTop && !hasBottom)
+            {
+                double dy = contentTop + child.ActualMarginTop - child.Location.Y;
+                if (Math.Abs(dy) > 0.1)
+                    child.OffsetTop(dy);
+            }
+        }
+    }
+
+    private static bool IsSpecifiedInset(string value) =>
+        !string.IsNullOrEmpty(value) && value != CssConstants.Auto;
 
     private static bool IsInFlowFlexItem(CssBox child) =>
         child.Display != CssConstants.None
@@ -380,6 +434,174 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.7: distributes a <c>column</c> flex container's positive free space along
+    /// its main (block) axis, per <c>flex-grow</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A column container has no flex algorithm of its own here — its children stack through
+    /// ordinary block flow — so until this ran, <c>flex-grow</c> did nothing at all in a column:
+    /// a lone <c>flex-grow: 1</c> item in a 100px-tall container stayed at its content height.
+    /// This is the resolve-flexible-lengths step over that stack, applied afterwards.
+    /// </para>
+    /// <para>
+    /// It runs only when the container's main size is <b>definite</b>, which per §9.2 means a
+    /// specified <c>height</c> (then clamped by <c>min-height</c>/<c>max-height</c>) — not a
+    /// <c>min-height</c> alone. The distinction is exactly what
+    /// css-flexbox/percentage-heights-003 pins: its <c>height: 0; min-height: 100%</c> containers
+    /// flex their items to the clamped 100px, and its <c>min-height: 100%</c>-only containers,
+    /// whose main size stays content-based, leave them at zero.
+    /// </para>
+    /// <para>
+    /// Each grown item is laid out again at its target height rather than resized in place,
+    /// because a percentage-height descendant resolves against the item's used height — the
+    /// <c>span { height: 100% }</c> the same test measures — and poking <c>Size</c> alone would
+    /// leave it reading the pre-flex one. Single-line only: <c>column wrap</c> with items that
+    /// overflow the main axis needs real line breaking, which this does not attempt.
+    /// </para>
+    /// </remarks>
+    private void ApplyFlexColumnMainAxisSizing(ILayoutEnvironment g)
+    {
+        if (!IsFlexContainer() || IsRowFlexContainer())
+            return;
+
+        if (TryGetDefiniteMainAxisContentHeight() is not { } mainSize)
+            return;
+
+        var items = new List<CssBox>();
+        double usedOuterHeight = 0;
+
+        foreach (var child in Boxes)
+        {
+            if (!IsInFlowFlexItem(child) || IsCollapsibleWhitespaceItem(child))
+                continue;
+
+            items.Add(child);
+            usedOuterHeight += GetFlexItemOuterHeight(child);
+        }
+
+        if (items.Count == 0)
+            return;
+
+        double rowGap = ResolveFlexGap(RowGap, mainSize);
+        double freeSpace = mainSize - usedOuterHeight - Math.Max(0, items.Count - 1) * rowGap;
+
+        // Growth only. Shrinking is the other half of §9.7 and is deliberately left out:
+        // `flex-shrink` defaults to 1, so implementing it here would make every column
+        // container whose content overflows squash its items — and squash them further than
+        // §4.5 allows, because that clamp (an item's min-content size as the floor for an
+        // `auto` `min-height`) does not exist yet. Not shrinking is the better of the two
+        // wrong answers until it does.
+        if (freeSpace <= 0.5)
+            return;
+
+        double growTotal = 0;
+
+        foreach (var child in items)
+            growTotal += ParseFlexFactor(child.FlexGrow, 0);
+
+        if (growTotal <= 0)
+            return;
+
+        double cursorY = ClientTop;
+        bool moved = false;
+
+        foreach (var child in items)
+        {
+            double outerHeight = GetFlexItemOuterHeight(child);
+            double factor = ParseFlexFactor(child.FlexGrow, 0);
+            double target = outerHeight + freeSpace * (factor / growTotal);
+
+            if (factor > 0 && Math.Abs(target - outerHeight) > 0.5)
+            {
+                LayoutFlexItemAtTargetHeight(g, child, Math.Max(0, target));
+                moved = true;
+            }
+
+            // Re-stack from the top even for an item that did not flex: an earlier sibling that
+            // did has moved everything after it.
+            double top = cursorY + child.ActualMarginTop;
+            double dy = top - child.Location.Y;
+
+            if (Math.Abs(dy) > 0.1)
+            {
+                child.OffsetTop(dy);
+                moved = true;
+            }
+
+            cursorY += GetFlexItemOuterHeight(child) + rowGap;
+        }
+
+        if (!moved)
+            return;
+
+        cursorY -= rowGap;   // the trailing gap the loop added after the last item
+        ActualBottom = Math.Max(ActualBottom, cursorY + ActualPaddingBottom + ActualBorderBottomWidth);
+    }
+
+    /// <summary>
+    /// The column flex container's definite main-axis content height — its specified
+    /// <c>height</c> clamped by <c>min-height</c>/<c>max-height</c> — or <c>null</c> when
+    /// <c>height</c> is <c>auto</c> and the main size is therefore content-based.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="TryGetDefiniteContentHeight"/> answers a narrower question and cannot be reused:
+    /// it drops a zero result, and <c>height: 0</c> under a <c>min-height</c> is precisely the
+    /// definite-but-clamped case this exists to catch.
+    /// </remarks>
+    private double? TryGetDefiniteMainAxisContentHeight()
+    {
+        if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
+            return null;
+
+        double basis = PercentageHeightContainingBlockHeight();
+        double em = GetEmHeight();
+
+        double ToContentHeight(double specified) =>
+            ResolveSpecifiedHeightToBorderBox(specified)
+            - ActualPaddingTop - ActualPaddingBottom
+            - ActualBorderTopWidth - ActualBorderBottomWidth;
+
+        double height = ToContentHeight(CssLengthParser.ParseLength(Height, basis, em));
+
+        if (double.IsNaN(height) || double.IsInfinity(height))
+            return null;
+
+        if (!string.IsNullOrEmpty(MinHeight) && MinHeight != CssConstants.Auto)
+        {
+            double min = ToContentHeight(CssLengthParser.ParseLength(MinHeight, basis, em));
+            if (!double.IsNaN(min) && !double.IsInfinity(min) && min > height)
+                height = min;
+        }
+
+        if (!string.IsNullOrEmpty(MaxHeight) && MaxHeight != CssConstants.Auto
+            && !MaxHeight.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            double max = ToContentHeight(CssLengthParser.ParseLength(MaxHeight, basis, em));
+            if (!double.IsNaN(max) && !double.IsInfinity(max) && max < height)
+                height = max;
+        }
+
+        return height > 0 ? height : null;
+    }
+
+    private static void LayoutFlexItemAtTargetHeight(ILayoutEnvironment g, CssBox child, double targetOuterHeight)
+    {
+        double targetBorderBoxHeight = Math.Max(0, targetOuterHeight - child.ActualMarginTop - child.ActualMarginBottom);
+        double cssHeight = child.UsesBorderBoxSizing
+            ? targetBorderBoxHeight
+            : targetBorderBoxHeight
+              - child.ActualPaddingTop - child.ActualPaddingBottom
+              - child.ActualBorderTopWidth - child.ActualBorderBottomWidth;
+
+        string savedHeight = child.Height;
+
+        child.Height = FormatCssPx(Math.Max(0, cssHeight));
+        child.PerformLayout(g);
+        child.Height = savedHeight;
     }
 
     private static void LayoutFlexItemAtTargetWidth(ILayoutEnvironment g, CssBox child, double targetOuterWidth)

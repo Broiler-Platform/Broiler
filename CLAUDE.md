@@ -166,6 +166,14 @@ something to attempt from inside the container.
   Pixel pass threshold defaults to 99% match (≤1% differing pixels) and is
   configurable: `--pass-threshold <percent>`, `BROILER_WPT_PASS_THRESHOLD`, or the
   `pass_threshold` input of the WPT Tests workflow.
+- **Judging a `check-layout` test needs no reference image.** A WPT test carrying
+  `data-expected-*` / `data-offset-*` states its own expected geometry, so
+  `--render --check-layout` reports it from one render:
+  `dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt/checkout --check-layout
+  --render <FILE>` prints `check-layout: N/M passed (±1px)` and lists each failure.
+  Use it instead of reading a CI artifact — the pixel suite can only *skip* these
+  tests, so a CI mismatch percentage says much less about them than their own
+  assertions do.
 - WPT **reftest** runner — a second, independent suite that uses no other engine:
   `./scripts/run-wpt-reftests.sh --wpt-dir tests/wpt/checkout [--subset <path>]`,
   or `dotnet run --project src/Broiler.Wpt -- --wpt-dir <dir> --reftests-only`.
