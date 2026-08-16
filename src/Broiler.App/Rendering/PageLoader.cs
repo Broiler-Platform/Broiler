@@ -6,13 +6,36 @@ namespace Broiler.App.Rendering;
 /// Fetches page content over HTTP(S) or from the local filesystem
 /// (<c>file://</c> URLs) using <see cref="HttpClient"/>.
 /// </summary>
-/// <remarks>
-/// Creates a new <see cref="PageLoader"/> using the provided
-/// <paramref name="httpClient"/>.  Callers should reuse a single
-/// <see cref="HttpClient"/> instance to avoid socket exhaustion.
-/// </remarks>
-public sealed class PageLoader(HttpClient httpClient) : IPageLoader
+public sealed class PageLoader : IPageLoader
 {
+    private readonly HttpClient httpClient;
+    private readonly bool ownsHttpClient;
+
+    /// <summary>
+    /// Creates a new <see cref="PageLoader"/> over <paramref name="httpClient"/>.
+    /// </summary>
+    /// <param name="httpClient">
+    /// The client page requests are issued on.  Callers should reuse a single long-lived
+    /// instance: it is the connection pool, so one per navigation both re-opens a
+    /// connection to a host already connected to and churns the pool.
+    /// </param>
+    /// <param name="ownsHttpClient">
+    /// Whether <see cref="Dispose"/> disposes <paramref name="httpClient"/>.  The default is
+    /// <see langword="false"/> — the client belongs to the caller and outlives the loader.
+    /// Disposing a shared client is not a leak-free tidy-up: it tears down the connection
+    /// pool, which closes pooled connections the pool's scavenger may have armed with a
+    /// pending zero-byte read-ahead, and that read then fails with
+    /// <see cref="System.Net.Sockets.SocketError.OperationAborted"/> — see
+    /// <c>docs/browser-connection-pool-aborts.md</c>.  Pass <see langword="true"/> only for a
+    /// client created solely for this loader.
+    /// </param>
+    public PageLoader(HttpClient httpClient, bool ownsHttpClient = false)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        this.httpClient = httpClient;
+        this.ownsHttpClient = ownsHttpClient;
+    }
+
     /// <inheritdoc />
     public async Task<(string NormalisedUrl, string Html)> FetchAsync(
         PageRequest request,
@@ -85,5 +108,10 @@ public sealed class PageLoader(HttpClient httpClient) : IPageLoader
     public Task<(string NormalisedUrl, string Html)> FetchAsync(string url, CancellationToken cancellationToken = default) =>
         FetchAsync(PageRequest.ForUrl(url), cancellationToken);
 
-    public void Dispose() => httpClient.Dispose();
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (ownsHttpClient)
+            httpClient.Dispose();
+    }
 }

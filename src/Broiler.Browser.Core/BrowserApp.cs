@@ -436,10 +436,41 @@ internal sealed class BrowserApp : IDisposable
         }
     }
 
+    // One connection pool for the whole browser session rather than one per navigation.
+    // An HttpClient *is* a connection pool, so a per-navigation client reconnects to a host
+    // the previous page already had a keep-alive connection to, and — because the pipeline's
+    // `using` disposed it at the end of the load — tore that pool down again immediately.
+    // Disposing a pool closes its pooled connections, and any connection the pool's scavenger
+    // has already armed with a zero-byte read-ahead fails that pending read with
+    // SocketError.OperationAborted, reported as `IOException: Unable to read data from the
+    // transport connection` (Windows spells 995 as "the I/O operation has been aborted because
+    // of either a thread exit or an application request"). A browser window is long-lived, so
+    // unlike the CLI's one-shot capture it stays alive to see it. See
+    // docs/browser-connection-pool-aborts.md.
+    //
+    // Never disposed: it is owned by the process, and outliving every navigation is the point.
+    private static readonly HttpClient PageHttpClient = CreatePageHttpClient();
+
+    private static HttpClient CreatePageHttpClient()
+    {
+        SocketsHttpHandler handler = new()
+        {
+            // A browser window can stay open for days; recycling a pooled connection
+            // periodically keeps it from pinning a DNS answer for that long.
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+
+            // A host that never completes the handshake otherwise holds the navigation for
+            // the whole request timeout with nothing to show for it.
+            ConnectTimeout = TimeSpan.FromSeconds(15),
+        };
+
+        return new HttpClient(handler);
+    }
+
     private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(PageRequest request, CancellationToken cancellationToken)
     {
         using var pipeline = new RenderingPipeline(
-            new PageLoader(new HttpClient()),
+            new PageLoader(PageHttpClient),
             new ScriptEngine());
 
         var (normalisedUrl, content) = await pipeline.LoadPageAsync(request, cancellationToken).ConfigureAwait(false);
