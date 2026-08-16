@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7308,
+    "failed": 7314,
     "skipped": 0,
-    "total": 7308
+    "total": 7314
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5200,
+      "count": 5228,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 678,
+      "count": 679,
       "examples": [
         "css/css-align/blocks/align-content-block-007.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -75,11 +75,9 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 24,
+      "count": 1,
       "examples": [
-        "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
-        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
-        "css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html"
+        "conformance-checkers/html/elements/img/src-isvalid.html"
       ]
     }
   ],
@@ -98,7 +96,7 @@
     ],
     [
       "css/css-text",
-      437
+      435
     ],
     [
       "css/WOFF2",
@@ -114,7 +112,7 @@
     ],
     [
       "css/css-overflow",
-      200
+      199
     ],
     [
       "html/canvas",
@@ -128,11 +126,11 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      6935
+      6964
     ],
     [
       "Timeout",
-      24
+      1
     ]
   ],
   "droppedDeclarations": [],
@@ -297,98 +295,19 @@
     }
   ],
   "timeoutLimit": 10,
-  "timeoutCount": 24,
+  "timeoutCount": 1,
   "timeouts": [
-    {
-      "relativeTestPath": "css/css-break/table/repeated-section/special-elements-crash.html",
-      "directory": "css/css-break/table/repeated-section",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-break/table/repeated-section/special-elements-crash.html",
-      "fileSizeBytes": 3411,
-      "severity": "high"
-    },
     {
       "relativeTestPath": "conformance-checkers/html/elements/img/src-isvalid.html",
       "directory": "conformance-checkers/html/elements/img",
       "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/conformance-checkers/html/elements/img/src-isvalid.html",
       "fileSizeBytes": 5940,
       "severity": "high"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/abspos/position-absolute-013.html",
-      "directory": "css/css-flexbox/abspos",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-flexbox/abspos/position-absolute-013.html",
-      "fileSizeBytes": 6229,
-      "severity": "high"
-    },
-    {
-      "relativeTestPath": "css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
-      "directory": "css/css-scroll-snap",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
-      "fileSizeBytes": 11896,
-      "severity": "medium"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/overflow-alignment-block-002.html",
-      "directory": "css/css-overflow",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-block-002.html",
-      "fileSizeBytes": 40172,
-      "severity": "low"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-wrap-overflow-002.html",
-      "directory": "css/css-overflow",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-row-wrap-overflow-002.html",
-      "fileSizeBytes": 40510,
-      "severity": "low"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-wrap-overflow-002.html",
-      "directory": "css/css-overflow",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-col-wrap-overflow-002.html",
-      "fileSizeBytes": 40516,
-      "severity": "low"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-002.html",
-      "directory": "css/css-overflow",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-row-reverse-overflow-002.html",
-      "fileSizeBytes": 40535,
-      "severity": "low"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html",
-      "directory": "css/css-overflow",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html",
-      "fileSizeBytes": 40541,
-      "severity": "low"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/overflow-alignment-block-001.html",
-      "directory": "css/css-overflow",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-block-001.html",
-      "fileSizeBytes": 40593,
-      "severity": "low"
     }
   ],
   "timeoutDirectories": [
     [
-      "css/css-overflow",
-      20
-    ],
-    [
       "conformance-checkers/html/elements/img",
-      1
-    ],
-    [
-      "css/css-flexbox/abspos",
-      1
-    ],
-    [
-      "css/css-scroll-snap",
-      1
-    ],
-    [
-      "css/css-break/table/repeated-section",
       1
     ]
   ],
@@ -450,7 +369,7 @@
       "detail": null
     },
     {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id.html",
+      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
       "matchPercent": 1.271565755208337,
       "referenceMatchPercent": 100.0,
       "cleared": true,
@@ -525,13 +444,6 @@
       "referenceMatchPercent": 99.9237060546875,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.9%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
-      "relativeTestPath": "css/css-grid/subgrid/abs-pos-002.html",
-      "matchPercent": 54.62493896484375,
-      "referenceMatchPercent": 100.0,
-      "cleared": true,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/filter-effects/backdrop-filter-clip-rect-zoom.html",
@@ -717,10 +629,17 @@
     },
     {
       "relativeTestPath": "svg/path/reftests/path-zoom.html",
-      "matchPercent": 79.36541239420572,
+      "matchPercent": 79.3755849202474,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-gaps/grid/fragmentation/grid-gap-decorations-fragmentation-024.html",
+      "matchPercent": 80.49418131510416,
+      "referenceMatchPercent": 99.0234375,
+      "cleared": true,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     }
   ],
   "results": [
@@ -1348,7 +1267,70 @@
       "subCategory": "MissingContent"
     },
     {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0034-isvalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0035-novalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0036-isvalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0037-novalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0038-isvalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0039-novalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0041-novalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
       "relativeTestPath": "conformance-checkers/html-rdfa/0099-isvalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0228-isvalid.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "conformance-checkers/html-rdfa/0229-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -15304,12 +15286,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-break/table/repeated-section/special-elements-crash.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "css/css-break/table/sections-and-captions-mixed-order.html",
       "passed": false,
       "skipped": false,
@@ -17336,7 +17312,8 @@
       "relativeTestPath": "css/css-flexbox/abspos/position-absolute-013.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-flexbox/abspos/position-absolute-014.html",
@@ -28382,121 +28359,141 @@
       "relativeTestPath": "css/css-overflow/overflow-alignment-block-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-block-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-reverse-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-reverse-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-reverse-overflow-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-wrap-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-wrap-overflow-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-wrap-overflow-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-reverse-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-reverse-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-wrap-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-wrap-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-wrap-overflow-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-wrap-overflow-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-grid-001.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-alignment-grid-002.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-overflow/overflow-auto-scrollbar-gutter-intrinsic-002.html",
@@ -28871,13 +28868,6 @@
     },
     {
       "relativeTestPath": "css/css-overflow/text-overflow-ellipsis-vertical-rtl-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/text-overflow-scroll-001.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -30111,7 +30101,8 @@
       "relativeTestPath": "css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/scroll-on-large-element-not-covering-snapport.html",
@@ -35118,13 +35109,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-text/text-transform/text-transform-upperlower-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-text/text-transform/text-transform-upperlower-007.html",
       "passed": false,
       "skipped": false,
@@ -35140,13 +35124,6 @@
     },
     {
       "relativeTestPath": "css/css-text/text-transform/text-transform-upperlower-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-text/text-transform/text-transform-upperlower-015.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -37722,7 +37699,7 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id.html",
+      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -38042,6 +38019,13 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
+    },
+    {
+      "relativeTestPath": "css/css-view-transitions/scoped/box-decoration-painting.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-view-transitions/scoped/centered-paint-offset.html",
@@ -50377,13 +50361,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "quirks/tables-inherit-color-from-body-quirk-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
       "relativeTestPath": "quirks/tables-inherit-color-from-body-quirk-004.html",
       "passed": false,
       "skipped": false,
@@ -50744,7 +50721,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-14-t-drt.html",
@@ -50793,7 +50770,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "svg/animations/non-additive-type-by-animation.html",
@@ -50811,6 +50788,13 @@
     },
     {
       "relativeTestPath": "svg/animations/smil-values-trailing-semicolon.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "svg/animations/spaces-at-end-of-path-data.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
