@@ -673,6 +673,40 @@ every one of those tests is one or the other:
   intrinsic size and ratio on the fragment, which `<img>` gets from the decoded image and
   this path does not have — and the `-svg-*o` tests match.
 
+### `sizes` parses, and the last of its two hundred spellings do not
+
+- **Tests:** `the-img-element/sizes/parse-a-sizes-attribute-{standards-mode,quirks-mode,display-none,width-1000px}`,
+  39.0% → **82.7%** on the [responsive-image work](wpt-rendering-gaps-fixed.md#an-img-loaded-nothing-at-all-when-its-source-came-from-srcset)
+  and the [frame-`src` fix](wpt-rendering-gaps-fixed.md#a-frame-src-with-a-query-or-a-fragment-resolved-to-nothing)
+  that let their `<iframe>` load at all. Still failing.
+- **Owner:** `Broiler.Layout` (`Engine/ResponsiveImageSourceSet.cs`), and one item in the CSS
+  engine.
+- **What these tests are.** Each is a page whose whole content is one `<iframe>` holding ~220
+  `<img>`s, every one of them a different spelling of `sizes` against the same two-candidate
+  `srcset`. The harness is stubbed in the pixel suite, so what is compared is the *images*: an
+  entry that resolves to a small source size selects a candidate at a huge density and renders
+  at ~0px, and one that falls through to the default `100vw` renders at ~320px. There is no
+  middle: every wrong answer is the full width of a 320px square.
+- **What is left, biggest first — and the biggest is not a `sizes` bug.**
+  1. **The two `<p>`s share a line.** Every square in the render is the right *size*; what is
+     wrong is where the second group starts. The reference lays the ~320px group out from the
+     left edge of its own `<p>`; here its first line begins ~290px in, as though the preceding
+     `<p>` — the one holding ~120 zero-sized images and the whitespace between them — had not
+     ended. Two blocks' inline content on one line is a block-boxing question, not a source
+     selection one, and it accounts for more of the residual than everything below it together.
+     Start by rendering `support/sizes-iframed.sub.html` cut down to the last two `<p>`s.
+  2. **`clamp()`** — a `<source-size-value>` per spec, but `CssLengthParser` evaluates only
+     `calc()`, `min()` and `max()`. Five entries. Fixing it in the CSS engine fixes it for
+     every property at once, which is the reason not to work around it here.
+  3. **Unknown feature names and values inside a condition** (`(unknown-mf-name)`,
+     `(min-width:unknown-mf-value)`, `(])`) evaluate to *unknown*, and `not unknown` is unknown
+     rather than true — a tri-state `MatchesMediaQuery` would answer these, and it already has
+     the `MediaMatch.Invalid` arm internally.
+  4. **Escapes outside a string** in the comma split (`sizes='\{,1px'`).
+- **Exit gate:** the four tests reach 99%. A cheaper intermediate signal, since these differ by
+  whole squares: the count of ~320px images in the render matches the reference's, and the
+  group starts at the left edge.
+
 ### Six that render content and are still wrong
 
 Broiler draws something, Chromium is self-consistent at 100% against its own

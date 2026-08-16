@@ -1636,6 +1636,123 @@ the test that exposed it.
   Both `cols` and `rows` framesets go from half-painted to both cells painting their own
   document. **No test in the current subset covers it** either way.
 
+### A frame `src` with a query or a fragment resolved to nothing
+
+- **Tests:** the four `the-img-element/sizes/parse-a-sizes-attribute-*` (39.0% each — see
+  [the responsive-image entry](#an-img-loaded-nothing-at-all-when-its-source-came-from-srcset)
+  for where they got to), and 68 other files in the checkout whose frame `src` carries a query.
+- **Owner:** `Broiler.Layout` (`FragmentTreeBuilder`). Main repo, no patch.
+- **The bug, and it is the other half of one already fixed here.** The
+  [root-relative branch](#a-root-relative-frame-src-resolved-against-the-wrong-directory)
+  strips the query and fragment before resolving, because only the path names a file and WPT
+  leans on that (`?pipe=`, `?doctype=`). The **document-relative** branch did not: it joined
+  the whole URL onto the containing directory, so `src="support/x.sub.html?doctype=…"` looked
+  for a file literally called `x.sub.html?doctype=…`, `File.Exists` failed, and the frame
+  painted empty with no error — indistinguishable from a missing file. The two branches
+  disagreed about the same URL depending only on whether it began with a slash.
+- **What landed.** One helper, `ResolveRelativeDocumentPath`, that both branches share: it
+  takes the URL's path component, percent-decodes it, and normalises the separators. A URL
+  with *only* a query or fragment addresses the containing document rather than a new one and
+  still resolves to nothing.
+- **How it was found.** Not from the test name. Bisecting
+  `parse-a-sizes-attribute-standards-mode` down to a two-line page —
+  `<iframe src="inner.html">` renders, `<iframe src="inner.html?x=1">` renders empty — took
+  the whole `.sub`/`sizes`/harness story out of it.
+- **Verified:** 10 focused cases in `RootRelativeFrameSrcTests` alongside the root-relative
+  ones they mirror, including the negative half (a bare `?a=1` or `#frag` is not a document).
+
+### An `<img>` loaded nothing at all when its source came from `srcset`
+
+- **Tests:** `the-img-element/sizes/implicit-sizes-ignores-width` 33.7% → **99.9%, passing**;
+  `the-img-element/current-pixel-density/basic` 43.9% → **97.9%**, with every image now
+  *exactly* the size the test states (256, 256, 160, 128, 0, 0, 256, 128, 512, 1, 0 px, read
+  off the render) — what is left is 4px of inter-image whitespace per gap, a font-metric
+  difference between this container and the reference browser and nothing to do with the
+  selection; and the four `sizes/parse-a-sizes-attribute-*` 39.0% → **82.7%** (they also
+  needed the frame-`src` fix above, which is what let their `<iframe>` load at all — see
+  [what is left](wpt-rendering-gaps-open.md#sizes-parses-and-the-last-of-its-two-hundred-spellings-do-not)).
+- **Owner:** `Broiler.Layout` (`Engine/ResponsiveImageSourceSet.cs`, `CssBoxImage`,
+  `CssLayoutEngine.MeasureImageSize`). Main repo, no patch.
+- **The bug.** The engine read `src` and nothing else. `srcset` appeared in exactly one file
+  in the tree — the preload scanner, which documents that it deliberately does *not* scan it —
+  so a responsive `<img srcset="a.png 2x">`, and every `<picture>`, had no source to load and
+  painted the missing-image border. `current-pixel-density/basic` renders fifteen images of
+  which fourteen carry only a `srcset`; it was a wall of 20×20 error boxes.
+- **The density is as much of the algorithm's output as the URL.** A `w` descriptor is not a
+  size — it says how many pixels the candidate has to spend on a slot whose CSS width comes
+  from `sizes` — so `<img srcset="x.png 100w" sizes="400px">` lays a 100-pixel bitmap out
+  400px wide. HTML §4.8.4.3 calls that divisor the image's *current pixel density*, and
+  dropping it would put a different image on the page, not a rounding difference.
+- **What landed.** HTML's "parse a srcset attribute", "parse a sizes attribute" and "select an
+  image source", including the `<picture>`/`<source>` walk with its `media` and `type` gates.
+  `CssRectImage.PixelDensity` carries the chosen density to `MeasureImageSize`, which divides
+  the decoded bitmap by it, and to the fragment builder, so `object-fit: none` draws at the
+  same natural size layout sized the box from. The density is 1 for every image that did not
+  come from a candidate list, which leaves all of this an identity for them.
+- **`sizes` needed a CSS component-value scanner, and there was no reusing one.** The spec
+  asks for the *last component value* of each comma-separated entry, which means telling a
+  dimension from an identifier, keeping a function with its arguments, closing an unterminated
+  block at the end of the input rather than discarding it (`sizes="calc(1px"` is the length
+  `1px`; `sizes="((),1px"` is one block and no length at all) and dropping comments **without**
+  leaving whitespace behind (`1/* */px` is a number and an identifier, not `1px`).
+  `CssSyntax.SplitTopLevel` splits on nesting but does not honour escapes, and nothing else in
+  the tree tokenises component values.
+- **A media condition is not a media query.** A media *type* — `all`, `print`,
+  `unknown-media-type` — makes a `sizes` entry a parse error rather than a query that happens
+  to match, so `sizes="all 100vw, 1px"` is 1px. Handing the text to
+  `CssStyleEngine.MatchesMediaQuery` unchecked gets every one of those backwards; the check
+  that what follows the leading `not`s opens with `(` is exactly that distinction.
+- **Known deviation.** `clamp()` is a `<source-size-value>` per spec, but
+  `CssLengthParser` evaluates only `calc()`, `min()` and `max()`, so a `sizes` entry written
+  with one is a parse error here. Teaching the length parser `clamp()` is a change to the CSS
+  engine that would fix it for every property at once; it is pinned as a deviation in
+  `ResponsiveImageSourceSetTests` so it moves when that lands.
+- **Verified:** 86 cases in `ResponsiveImageSourceSetTests`, with the expectations taken from
+  the two WPT tests rather than from a reading of the spec — including the one that reads like
+  a typo either way (`srcset="a.png,b.png 2x"` is *one* candidate whose URL contains a comma,
+  because only a trailing comma ends one).
+- **A crash found by writing it.** `sizes="0"` — a source size whose text ends at the number —
+  ran the scanner one character past the end of the string, and the exception aborted the
+  layout of the subtree around the image: a page with one such attribute rendered as a blank
+  area rather than as the same page with one image missing. Fixed, and the selection is now
+  wrapped so that no malformed attribute can do that again.
+
+### An inline replaced element was aligned by a font it does not draw
+
+- **Tests:** the half of `the-img-element/current-pixel-density/basic` that the source
+  selection above did not close — 70.2% → 97.9%, the images now standing on a shared
+  baseline as the reference has them rather than sharing a top edge.
+- **Owner:** `Broiler.Layout` (`CssLayoutEngine.ApplyVerticalAlignment`, `CssLineBox.SetBaseLine`).
+  Main repo, no patch.
+- **The bug.** CSS2.1 §10.8 gives two rules for where a box's baseline sits: an ordinary inline
+  box sits on its own text's baseline, one font ascent below its top, while an **atomic** inline —
+  an `inline-block` with no in-flow line boxes, and every inline **replaced** element — has its
+  baseline at its bottom margin edge. Only the `inline-block` half was implemented. An `<img>`
+  was therefore aligned by the ascent of a font it does not draw, a constant ~13px for the
+  default strut, so every image on a line was placed the same distance below the line's top
+  whatever its height — which reads as top-aligned. `SetBaseLine` then skipped image words
+  outright, so even that placement never moved them.
+- **The two halves already disagreed with each other.** `CreateLineBoxes` extends a line below
+  a tall image by the strut's descent *precisely because* the image's bottom is the baseline —
+  a comment there says so. The line's height assumed one rule and its contents were positioned
+  by the other.
+- **What landed.** `BaselineAscentOf` answers the §10.8 question once for both call sites, and
+  an image box is moved by `SetBaseLine` the way an `inline-block` is (paint reads an `<img>`'s
+  geometry off the box, and only its *source* rect off the word, so moving the word alone moved
+  nothing on screen). Re-running the alignment is idempotent: an atomic box that has been moved
+  reports the same baseline it was aligned to.
+- **Measured cost, on the image-heavy subsets, A/B on the same checkout and references** —
+  `html/rendering`, `html/rendering/replaced-elements`, `css/css-images`, `css/CSS2/normal-flow`,
+  `css/CSS2/floats`, `css/CSS2/visudet`, ~2 000 tests: **8 improved and 8 regressed**, all small,
+  and the pass count moved by one (1 055 → 1 054). **Every regression is a test that was already
+  failing, for a reason this does not touch.** The two largest:
+  `html/rendering/.../img-aspect-ratio` (98.1% → 96.9%) renders no images at all here — its
+  `img { width: 100%; max-width: 100px; height: auto }` leaves four error boxes running the
+  height of the viewport, and what moved was where those boxes sit; and
+  `CSS2/normal-flow/inlines-014`/`-015` (98.5% → 97.2%) put a 1×1 image in a
+  `font-size: 64px` table cell whose green box is already three line boxes tall against the
+  reference's one. The improvements are the `css-images/object-view-box-*` family.
+
 ### `Node.moveBefore` was missing — and it was only half the test
 
 - **Test:** `dom/nodes/moveBefore/preserve-render-blocking-style`. Ours white, Chromium

@@ -214,6 +214,38 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — an `<img>` whose source came from `srcset` loaded nothing at all.
+  The engine read the `src` attribute and nothing else, so a responsive image and every
+  `<picture>` had no source and painted the missing-image border. HTML §4.8.4.3's *select
+  an image source* now runs — "parse a srcset attribute", "parse a sizes attribute" and
+  the `<picture>`/`<source>` walk with its `media` and `type` gates — and the candidate's
+  pixel density is carried through to sizing, because it is as much of the algorithm's
+  output as the URL: a `w` descriptor is not a size but a divisor, so
+  `<img srcset="x.png 100w" sizes="400px">` lays a 100-pixel-wide bitmap out 400px wide,
+  and a `2x` candidate is laid out at half the pixels it decodes to. The density is 1 for
+  every image that did not come from a candidate list, which leaves the sizing path
+  unchanged for them. `clamp()` in a `sizes` entry is a known deviation: the CSS length
+  parser evaluates only `calc()`, `min()` and `max()`, so such an entry is treated as a
+  parse error until that gains one.
+
+- `Broiler.Layout` — an inline **replaced** element was aligned on its line by the ascent
+  of a font it does not draw. CSS 2.1 §10.8 puts an atomic inline's baseline at its bottom
+  margin edge, and only the `inline-block` half of that was implemented, so every image on
+  a line was placed the same ~13px below the line's top whatever its height — images of
+  two different heights came out sharing a top edge instead of a baseline. The line-box
+  *height* code had always assumed the other rule (it extends a line below a tall image by
+  the strut's descent precisely because the image's bottom is the baseline), so the two
+  halves disagreed with each other rather than only with the spec.
+
+- `Broiler.Layout` — an `<iframe>`/`<frame>` `src`, or an `<object data>`, that was
+  document-relative *and* carried a query or a fragment loaded nothing: the whole URL was
+  joined onto the containing directory, so the file it looked for was literally named
+  `page.html?a=1` and the frame painted empty with no error. The root-relative branch had
+  always stripped them — only the path names a file — and the two branches now share one
+  helper, so they cannot disagree about the same URL depending on whether it begins with a
+  slash. A `src` of only a query or a fragment addresses the containing document and
+  still resolves to nothing.
+
 - `Broiler.Layout` — an absolutely-positioned or fixed child of a **row** flex container
   was never laid out, and so never painted. `PerformFlexRowLayout` replaces the ordinary
   block-flow child loop wholesale, and that loop is the only thing that calls

@@ -89,6 +89,14 @@ internal static class CssLayoutEngine
         // rather than reading RImage members directly (see roadmap §4).
         ImageIntrinsics? image = imageWord.Image is { } handle ? g.GetImageIntrinsics(handle) : null;
 
+        // HTML §4.8.4.3: a `srcset` candidate states the density it is meant to be shown at, and the
+        // element's natural size is the decoded bitmap divided by it — a `2x` candidate is laid out
+        // at half the pixels it decodes to, and a `100w` candidate in a `sizes="400px"` slot at four
+        // times them. `PixelDensity` is 1 for every image that did not come from a candidate list,
+        // which leaves this arithmetic an identity for them. An infinite density (a candidate
+        // selected against a zero-width slot) gives the zero-sized image the spec asks for.
+        image = ApplyPixelDensity(image, imageWord.PixelDensity);
+
         double em = imageWord.OwnerBox.GetEmHeight();
 
         // A specified, non-percentage size counts as a "tag" size — but resolve it
@@ -131,7 +139,9 @@ internal static class CssLayoutEngine
             }
             else if (image != null)
             {
-                imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty ? image.Value.Width : imageWord.ImageRectangle.Width;
+                imageWord.Width = imageWord.ImageRectangle == RectangleF.Empty
+                    ? image.Value.Width
+                    : imageWord.ImageRectangle.Width / imageWord.PixelDensity;
 
                 // CSS2.1 §10.3.2: when width is auto the used value is the
                 // intrinsic width.  Do NOT clamp to the containing block —
@@ -150,7 +160,9 @@ internal static class CssLayoutEngine
         }
         else if (image != null)
         {
-            imageWord.Height = imageWord.ImageRectangle == RectangleF.Empty ? image.Value.Height : imageWord.ImageRectangle.Height;
+            imageWord.Height = imageWord.ImageRectangle == RectangleF.Empty
+                ? image.Value.Height
+                : imageWord.ImageRectangle.Height / imageWord.PixelDensity;
         }
         else
         {
@@ -200,6 +212,25 @@ internal static class CssLayoutEngine
         imageWord.Height = usedHeight;
 
         imageWord.Height += imageWord.OwnerBox.ActualBorderBottomWidth + imageWord.OwnerBox.ActualBorderTopWidth + imageWord.OwnerBox.ActualPaddingTop + imageWord.OwnerBox.ActualPaddingBottom;
+    }
+
+    /// <summary>
+    /// The decoded bitmap's dimensions divided by the density its <c>srcset</c> candidate was
+    /// selected at — HTML §4.8.4.3's <b>density-corrected natural width and height</b>. The aspect
+    /// ratio is a quotient of the two and so is untouched by a uniform scale, which is what keeps
+    /// this from disturbing the replaced-sizing path for the overwhelming majority of images, whose
+    /// density is exactly 1.
+    /// </summary>
+    private static ImageIntrinsics? ApplyPixelDensity(ImageIntrinsics? image, double density)
+    {
+        if (image is not { } intrinsics || density == 1.0 || double.IsNaN(density) || density <= 0)
+            return image;
+
+        return intrinsics with
+        {
+            Width = intrinsics.Width / density,
+            Height = intrinsics.Height / density,
+        };
     }
 
     public static void CreateLineBoxes(ILayoutEnvironment g, CssBox blockBox)
@@ -1942,6 +1973,38 @@ internal static class CssLayoutEngine
         return false;
     }
 
+    /// <summary>
+    /// How far below a box's top edge its baseline sits, for the purpose of aligning it on the line.
+    /// </summary>
+    /// <remarks>
+    /// CSS2.1 §10.8 gives two answers. An ordinary inline box sits on the baseline of its own text,
+    /// which is its font's ascent below its top. An <b>atomic</b> inline — an <c>inline-block</c>
+    /// with no in-flow line boxes, and every inline <b>replaced</b> element — has its baseline at its
+    /// bottom margin edge instead, so its whole height is ascent and it hangs above the line's
+    /// baseline rather than straddling it.
+    /// <para>
+    /// Only the <c>inline-block</c> half of that was implemented, so an <c>&lt;img&gt;</c> was aligned
+    /// by the ascent of a font it does not draw: every image on a line was placed the same ~13px
+    /// below the line top regardless of its height, which reads as top-aligned and is what a page
+    /// with images of two different heights on one line showed. The line-box <em>height</em> code has
+    /// always assumed the other rule — <see cref="CreateLineBoxes"/> extends a line below a tall
+    /// image by the strut's descent precisely because the image's bottom is the baseline — so the
+    /// two halves disagreed with each other, not merely with the spec.
+    /// </para>
+    /// </remarks>
+    private static double BaselineAscentOf(CssBox box, CssLineBox lineBox) =>
+        IsAtomicInline(box) && lineBox.Rectangles.TryGetValue(box, out RectangleF rect)
+            ? rect.Height
+            : box.ActualFont.Height * PtToCssPx * TypicalAscentRatio;
+
+    /// <summary>
+    /// Whether the box is an atomic inline-level box whose baseline is its bottom margin edge: an
+    /// <c>inline-block</c>, or an inline replaced element (an image — the only replaced content that
+    /// reaches a line box as a word of its own).
+    /// </summary>
+    private static bool IsAtomicInline(CssBox box) =>
+        box.Display == CssConstants.InlineBlock || box.IsImage;
+
     private static void ApplyVerticalAlignment(CssLineBox lineBox)
     {
         // CSS 2.1 §10.8: The baseline is where text sits, approximated as
@@ -1984,8 +2047,7 @@ internal static class CssLayoutEngine
         {
             if (box.Display != CssConstants.InlineBlock && !topBottomBoxes.Contains(box))
             {
-                double boxBaseline = lineBox.Rectangles[box].Top
-                    + box.ActualFont.Height * PtToCssPx * TypicalAscentRatio;
+                double boxBaseline = lineBox.Rectangles[box].Top + BaselineAscentOf(box, lineBox);
                 baseline = Math.Max(baseline, boxBaseline);
             }
         }
@@ -2002,15 +2064,12 @@ internal static class CssLayoutEngine
             // converted from baseline Y to word-top Y by subtracting
             // the box's ascent.
             //
-            // For inline-block boxes, CSS 2.1 §10.8.1: the baseline of
-            // an inline-block with no in-flow line boxes is the bottom
-            // margin edge.  SetBaseLine positions the box by its top, so
-            // we must subtract the box height to convert from the desired
-            // bottom-edge position to the top-edge position.
-            bool isInlineBlock = box.Display == CssConstants.InlineBlock;
-            double boxAscent = isInlineBlock
-                ? lineBox.Rectangles[box].Height
-                : box.ActualFont.Height * PtToCssPx * TypicalAscentRatio;
+            // For inline-block and inline replaced boxes, CSS 2.1 §10.8.1: the
+            // baseline of an inline-block with no in-flow line boxes, and of an
+            // inline replaced element, is the bottom margin edge.  SetBaseLine
+            // positions the box by its top, so we must subtract the box height to
+            // convert from the desired bottom-edge position to the top-edge position.
+            double boxAscent = BaselineAscentOf(box, lineBox);
 
             //Important notes on http://www.w3.org/TR/CSS21/tables.html#height-layout
             switch (box.VerticalAlign)
