@@ -1,0 +1,231 @@
+From eb1e5c6f944239ebdde85664499c2a87d566e06e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 16 Aug 2026 08:57:59 +0000
+Subject: [PATCH] Reject a `for` head that carries only one semicolon
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`for(;) {}` did not fail to compile — it ran forever.
+
+`for ( Init_opt ; Test_opt ; Update_opt )` has exactly two semicolons, and each
+clause is *omittable*, not *absent*. ExpressionSequence reports both the same
+way, as an AstEmptyExpression, so the for-head parser could not tell `for (;;)`
+from `for (;)`: it read the missing update clause as an omitted one and built
+the loop that spelling denotes — one with no test, which never terminates.
+
+Every malformed one-semicolon head was affected: `for(;)`, `for(a;)`, `for(;a)`,
+`for(var i=0;)`, `for(let i=0)`. Each parsed as a legal infinite loop instead of
+raising a SyntaxError.
+
+So ExpressionSequence now also reports the terminator it actually consumed —
+TokenTypes.Empty when it stopped without consuming one at all — and the C-style
+for head requires the test clause to end on `;` and the update clause on `)`.
+The terminator is the only signal that separates the two cases; the AST produced
+for every head that was already legal is unchanged.
+
+That distinction only holds if the parse reaches the terminator, and it did not
+when a line terminator came first. A `for` head's semicolons are never supplied
+by ASI, so a clause may be written on its own line — `for (i = 0\n; i < 5\n; i++)`
+— but ExpressionSequence stopped at the newline with the `;` still unread. The
+clause boundaries happened to come out right anyway while nothing checked them,
+so this surfaced only once the terminator was inspected. Line terminators are
+now skipped before the terminator check, and only for a clause that may be
+omitted — i.e. only in a `for` head, never where the LineTerminator break is
+what makes ASI work.
+
+This is what hung five WPT tests. html/webappapis/scripting/processing-model-2
+checks that a compile error fires window.onerror, and the script it compiles is
+literally `for(;) {}`. Rather than failing to compile, it spun until the runner
+gave up at its 30-second per-test timeout: compile-error, compile-error-*,
+addEventListener, body-onerror-compile-error. All five now finish in ~3 seconds.
+
+Also `throw` the exception ForStatement's final `else` branch builds. Written
+without it, a head no branch could parse fell through into the body parse with a
+null init/test/update instead of reporting the syntax error.
+---
+ .../ParserTests.cs                            | 37 +++++++++++++++++++
+ .../FastParser.ForStatement.cs                | 27 ++++++++++++--
+ .../FastParser.WhileStatement.cs              | 37 +++++++++++++++++++
+ 3 files changed, 98 insertions(+), 3 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs b/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs
+index 0d7dfdf7..24536c42 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs
+@@ -599,6 +599,13 @@ public class ParserTests
+     [InlineData("for(var i=0;;i++){}")]
+     [InlineData("for(;i<3;i++){}")]
+     [InlineData("for(var i=0;i<3;i++){}")]
++    // A line terminator inside the head is insignificant — the head's semicolons are never
++    // supplied by ASI — so a clause may sit on its own line, before its `;` as well as after.
++    [InlineData("for(var i=0\n;i<3\n;i++){}")]
++    [InlineData("for(i=0\n;i<3\n;i++){}")]
++    [InlineData("for(var i=0;\ni<3;\ni++){}")]
++    [InlineData("for(\n;\n;\n)break;")]
++    [InlineData("for(;\ni<3\n;){}")]
+     public void ParseProgram_ForHead_KeepsEveryClauseOptional(string source)
+     {
+         var stream = new FastTokenStream(new StringSpan(source));
+@@ -607,6 +614,36 @@ public class ParserTests
+         Assert.NotNull(parser.ParseProgram());
+     }
+ 
++    // …but optional is not the same as absent: `for ( Init_opt ; Test_opt ; Update_opt )` still
++    // requires BOTH semicolons. A head carrying only one used to parse as if the update clause
++    // had merely been omitted — so `for(;) {}` became `for(;;) {}`, an infinite loop, instead of
++    // the SyntaxError it is. That is not a quiet mis-parse: WPT's window.onerror compile-error
++    // tests (html/webappapis/scripting/processing-model-2) are literally `for(;) {}` and every
++    // one of them hung the WPT runner until its per-test timeout.
++    [Theory]
++    [InlineData("for(;){}")]
++    [InlineData("for (;) {}")]
++    [InlineData("for(a;){}")]
++    [InlineData("for(;a){}")]
++    [InlineData("for(a;b){}")]
++    [InlineData("for(i=0, j=1;){}")]
++    [InlineData("for(var i=0;){}")]
++    [InlineData("for(let i=0;){}")]
++    [InlineData("for(const i=0;){}")]
++    [InlineData("for(var i=0){}")]
++    [InlineData("for(let i=0){}")]
++    [InlineData("for(;;;){}")]
++    // Spreading the head over several lines does not conjure the missing `;` either.
++    [InlineData("for(\n;\n){}")]
++    [InlineData("for(\na\n;\nb\n){}")]
++    public void ParseProgram_ForHead_RequiresBothSemicolons(string source)
++    {
++        var stream = new FastTokenStream(new StringSpan(source));
++        var parser = new FastParser(stream);
++
++        Assert.Throws<FastParseException>(() => parser.ParseProgram());
++    }
++
+     [Fact]
+     public void ParseProgram_ReturnWithArgument_KeepsArgument()
+     {
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs
+index 9eee29e2..451af648 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs
+@@ -183,8 +183,21 @@ partial class FastParser
+ 
+                 stream.Expect(TokenTypes.BracketEnd);
+             }
+-            else if (ExpressionSequence(out test, TokenTypes.SemiColon, true))
++            else if (ExpressionSequence(out test, out var testTerminator, TokenTypes.SemiColon, true))
+             {
++                // `for ( Init_opt ; Test_opt ; Update_opt )` — the head has exactly two `;`,
++                // and each omitted clause is omitted, not absent. ExpressionSequence reports an
++                // omitted clause and a missing one alike as an AstEmptyExpression, so the
++                // terminator it actually consumed is the only thing that separates them: a head
++                // carrying a single `;` (`for (;)`, `for (a;)`, `for (;a)`) used to parse as
++                // though the update clause had simply been left out — i.e. as `for (;;)`, an
++                // infinite loop — instead of raising the SyntaxError it is. WPT's
++                // window.onerror compile-error tests (html/webappapis/scripting/processing-model-2)
++                // are literally `for(;) {}`, and every one of them hung the WPT runner until it
++                // hit the per-test timeout rather than failing to compile.
++                if (testTerminator != TokenTypes.SemiColon)
++                    throw stream.Unexpected();
++
+                 // A C-style for-head declaration (`for (const x = 0; …)`) is an
+                 // ordinary LexicalDeclaration/VariableDeclaration: a `const` binding
+                 // or a destructuring pattern must carry an initializer. (for-in/of
+@@ -200,13 +213,21 @@ partial class FastParser
+                 if (test.Type == FastNodeType.EmptyExpression)
+                     test = null;
+ 
+-                if (!ExpressionSequence(out update, TokenTypes.BracketEnd, true))
++                if (!ExpressionSequence(out update, out var updateTerminator, TokenTypes.BracketEnd, true))
++                    throw stream.Unexpected();
++
++                // The update clause closes the head, so it must end on the `)` — not on a third
++                // `;` (`for (;;;)`) and not by running out of tokens (`for (;;`).
++                if (updateTerminator != TokenTypes.BracketEnd)
+                     throw stream.Unexpected();
+ 
+                 if (update.Type == FastNodeType.EmptyExpression)
+                     update = null;
+             }
+-            else stream.Unexpected();
++            // `stream.Unexpected()` builds the exception, it does not raise it; leaving the
++            // `throw` off let a head no branch above could parse fall through into the body
++            // parse with a null init/test/update.
++            else throw stream.Unexpected();
+ 
+             // `for await` is only valid with a for-of head. A for-in head with `await` is
+             // rejected above; a C-style `for await (;;)` / `for await (init; test; update)`
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.WhileStatement.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.WhileStatement.cs
+index 4569429b..d0516002 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.WhileStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.WhileStatement.cs
+@@ -29,20 +29,44 @@ partial class FastParser
+     /// throwing a SyntaxError.
+     /// </returns>
+     bool ExpressionSequence(out AstExpression expressions, TokenTypes endWith = TokenTypes.BracketEnd, bool allowEmpty = false)
++        => ExpressionSequence(out expressions, out _, endWith, allowEmpty);
++
++    /// <param name="terminator">
++    /// The token the sequence was actually closed by — the <paramref name="endWith"/>, EOF or
++    /// <c>;</c> token that was consumed to end it — or <see cref="TokenTypes.Empty"/> when the
++    /// loop stopped without consuming any terminator at all (it ran into a <c>}</c>, a line
++    /// terminator, or a token it simply cannot continue past).
++    /// <para>
++    /// A <c>for</c> head needs this to tell an <em>omitted</em> clause from a <em>missing</em>
++    /// one: with <paramref name="allowEmpty"/> both produce an <see cref="AstEmptyExpression"/>
++    /// and are otherwise indistinguishable. See <c>ForStatement</c>.
++    /// </para>
++    /// </param>
++    bool ExpressionSequence(out AstExpression expressions, out TokenTypes terminator, TokenTypes endWith, bool allowEmpty)
+     {
+         var begin = stream.Current;
+         var nodes = new Sequence<AstExpression>();
+         // The loop clears `allowEmpty` after the first element (only the first may be
+         // omitted), so the caller's request is captured before it is consumed.
+         var emptyAllowed = allowEmpty;
++        terminator = TokenTypes.Empty;
+ 
+         do
+         {
+             if (allowEmpty && stream.Current.Type == TokenTypes.CurlyBracketEnd)
+                 break;
+ 
++            // Same reason as below: a wholly omitted clause may still be written across lines
++            // (`for (\n;\n;\n)`), so the newlines before its terminator are skipped first.
++            if (emptyAllowed)
++                stream.SkipNewLines();
++
++            var emptyCandidate = stream.Current.Type;
+             if (allowEmpty && stream.CheckAndConsumeAny(endWith, TokenTypes.EOF, TokenTypes.SemiColon))
++            {
++                terminator = emptyCandidate;
+                 break;
++            }
+ 
+             allowEmpty = false;
+ 
+@@ -52,8 +76,21 @@ partial class FastParser
+             if (stream.CheckAndConsume(TokenTypes.Comma))
+                 continue;
+ 
++            // Inside a `for` head — the only caller that permits an omitted clause — a line
++            // terminator is insignificant. The head's semicolons are never supplied by ASI, so
++            // a clause may be written on its own line, and `for (i = 0\n; i < 5\n; i++)` must
++            // reach the `;` that follows the newline rather than stopping at the newline with
++            // the `;` still unread. (Everywhere else the LineTerminator check below still ends
++            // the sequence, which is what makes ASI work for an ordinary statement.)
++            if (emptyAllowed)
++                stream.SkipNewLines();
++
++            var candidate = stream.Current.Type;
+             if (stream.CheckAndConsumeAny(endWith, TokenTypes.EOF, TokenTypes.SemiColon))
++            {
++                terminator = candidate;
+                 break;
++            }
+ 
+             if (stream.Current.Type == TokenTypes.CurlyBracketEnd)
+                 break;
+-- 
+2.43.0
+

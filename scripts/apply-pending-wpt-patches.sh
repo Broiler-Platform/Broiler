@@ -154,8 +154,18 @@ set -euo pipefail
 # 14–20 % to 100 % with it — and it moves any page that merely *contains* a media element. There
 # is no main-repo half to fall back on: the fill is set during the style cascade, where nothing
 # downstream can tell it from an author background.
+#
+# The one-semicolon `for` head patch (Broiler.JS, "Reject a `for` head that carries only one
+# semicolon") IS listed, because what it fixes is a *timeout*, and a timeout is the one failure
+# a pixel comparison cannot even reach: the run is aborted before anything is rendered. Without
+# it `for(;)` — a SyntaxError — parses as `for(;;)` and spins forever, so all five
+# html/webappapis/scripting/processing-model-2 compile-error tests burn the full 30-second
+# per-test budget and are reported as timeouts rather than run. With it they finish in ~3 s.
+# It is also the only entry here whose absence costs the run *wall-clock* as well as results:
+# 2.5 minutes of a shard's budget spent waiting on loops that cannot end.
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0008-media-element-painting.patch"
+  "Broiler.JS|patches/0009-reject-one-semicolon-for-head.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

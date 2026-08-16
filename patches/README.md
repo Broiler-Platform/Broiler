@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Eight patches are waiting on a maintainer.** See the index below.
+**Nine patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -54,6 +54,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0006` | `Broiler.JS/Broiler.Regex` | Tell the end of a pattern apart from a NUL inside one |
 | `0007` | `Broiler.JS` | Say "is not a constructor", as every other construct site does |
 | `0008` | `Broiler.HTML` | Paint a media element's box only when it shows controls |
+| `0009` | `Broiler.JS` | Reject a `for` head that carries only one semicolon |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -367,6 +368,71 @@ background from an author one.
 the replaced box's *extent*, against an author background they set themselves — true with
 the patch and without it — because a fill the element is not supposed to draw is not
 something a test should pin. Transparency is pinned by the WPT tests above instead.
+
+**When it lands upstream:** bump the pointer, drop the entry from
+`scripts/apply-pending-wpt-patches.sh`, and delete this patch.
+
+### `0009` — `for(;)` did not fail to compile, it ran forever
+
+`for ( Init_opt ; Test_opt ; Update_opt )` has exactly two semicolons, and each
+clause is *omittable*, not *absent*. `ExpressionSequence` reports both the same
+way — an `AstEmptyExpression` — so the for-head parser could not tell `for (;;)`
+from `for (;)`. It read the missing update clause as an omitted one and built the
+loop that spelling denotes: one with no test, which never terminates.
+
+So a **SyntaxError became an infinite loop**. Every malformed one-semicolon head
+was affected — `for(;)`, `for(a;)`, `for(;a)`, `for(var i=0;)`, `for(let i=0)` —
+each parsed as a legal `for(;;)` instead of being rejected.
+
+`ExpressionSequence` now also reports the terminator it actually consumed
+(`TokenTypes.Empty` when it stopped without consuming one), and the C-style head
+requires the test clause to end on `;` and the update clause on `)`. The
+terminator is the only thing that separates the two cases; the AST produced for
+every head that was already legal is unchanged, which is what the existing
+`ParseProgram_ForHead_KeepsEveryClauseOptional` theory pins and what the new
+`ParseProgram_ForHead_RequiresBothSemicolons` theory bounds from the other side.
+
+**The newline half is the part worth reading.** Inspecting the terminator only
+works if the parse *reaches* it, and it did not when a line terminator came
+first: `ExpressionSequence` stopped at the newline with the `;` still unread. A
+`for` head's semicolons are never supplied by ASI, so `for (i = 0\n; i < 5\n; i++)`
+is perfectly ordinary code — and it was parsing correctly before, because while
+nothing checked the terminator the clause boundaries happened to fall in the
+right places anyway. Adding the check is what turned a latent quirk into a
+rejection of valid input; the first version of this patch did exactly that, and
+six such forms only failed once they were run rather than merely parsed. Line
+terminators are now skipped before the terminator check, and *only* for a clause
+that may be omitted — that is, only in a `for` head, never where the
+`LineTerminator` break is what makes ASI work for an ordinary statement.
+
+Both halves are pinned by tests, and the valid ones assert the **iteration
+count**, not merely that the source parses: a head that parses into the wrong
+AST is precisely the failure this patch is about, and parse-success cannot see
+it.
+
+**Where it came from.** WPT's timed-out-tests issue for 2026-08-16, which ranks
+timeouts by source size on the reasoning that a sub-kilobyte document has too
+little in it to be *legitimately* slow. Five of the ten smallest were
+`html/webappapis/scripting/processing-model-2` — tests that check an uncaught
+compile error reaches `window.onerror`, and each of them raises it with a
+`<script>` whose entire content is `for(;) {}` (one via `support/syntax-error.js`,
+a file that contains nothing else). The engine compiled that script rather than
+rejecting it, and then ran it: each test burned the full 30-second per-test
+budget and was reported as a timeout. All five now finish in about three seconds.
+
+That ranking is worth taking seriously — it pointed straight at a parser
+conformance bug from nothing but a file-size sort.
+
+**Also in this patch:** `ForStatement`'s final `else` branch called
+`stream.Unexpected()` without `throw`. That method *builds* the exception, it
+does not raise it, so a head no branch could parse fell through into the body
+parse with a null init/test/update instead of reporting the syntax error.
+
+**Why it is listed for the pixel suite.** Unlike the other `Broiler.JS` entries
+here, what this one fixes is a *timeout*, and a timeout is the one failure a
+pixel comparison cannot reach — the run is aborted before anything is rendered.
+It also costs the run wall-clock: 2.5 minutes of a shard's budget spent waiting
+on loops that cannot end.
 
 **When it lands upstream:** bump the pointer, drop the entry from
 `scripts/apply-pending-wpt-patches.sh`, and delete this patch.
