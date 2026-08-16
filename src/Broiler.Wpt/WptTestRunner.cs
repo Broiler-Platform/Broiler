@@ -630,7 +630,27 @@ internal sealed partial class WptTestRunner
   // By unconditionally replacing rAF with a synchronous implementation,
   // callbacks execute immediately during Eval / FireWindowLoadEvent,
   // which avoids the FlushTimerStep persistence bug.
-  window.requestAnimationFrame = function(cb) { cb(0); return 0; };
+  // Bounded, because synchronous means a self-rescheduling rAF loop recurses natively
+  // through this stub rather than yielding to a queue: `function f(){ ...; rAF(f); }`
+  // becomes f -> stub -> f -> stub -> ... with no return until it converges. The real
+  // rAF this replaces is queue-based and capped (BrowserEventLoop.DrainAll runs at most
+  // maxIterations=1000); the stub threw that cap away with the queue. A loop whose exit
+  // condition this engine never satisfies then ran until the CLR stack gave out, and
+  // since every level re-read layout it cost two full document layouts per level:
+  // css-fonts/variations/font-opentype-collections.html spent 88s that way against the
+  // runner's 30s budget, and any test with the same shape would too.
+  // Dropping the callback once the budget is spent lets the page render the state it
+  // reached, so such a test reports an honest assertion failure in well under a second
+  // instead of a timeout. The limits are far above what a converging loop needs (real
+  // ones chain a handful of frames) and far below CLR stack exhaustion.
+  var __broilerRafDepth = 0, __broilerRafFrames = 0;
+  window.requestAnimationFrame = function(cb) {
+    if (__broilerRafDepth >= 64 || __broilerRafFrames >= 256) return 0;
+    __broilerRafDepth++; __broilerRafFrames++;
+    try { cb(0); } finally { __broilerRafDepth--; }
+    return 0;
+  };
+  // Still a no-op: this stub has already run the callback by the time anything could cancel it.
   window.cancelAnimationFrame = function(id) {};
   if (typeof takeScreenshot === 'undefined') {
     window.takeScreenshot = function() {
@@ -1934,7 +1954,14 @@ internal sealed partial class WptTestRunner
             {
                 var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
                 if (local != null)
+                {
                     args.Callback(local);
+                    return;
+                }
+
+                // Everything else that names a remote host is a fetch this run must not make.
+                if (IsOffCorpusNetworkImage(args.Src))
+                    args.Handled = true;
             };
         }
 
@@ -2558,6 +2585,51 @@ internal sealed partial class WptTestRunner
     /// (WPT resource-timing/tentative/initiator-url/static-resource, resource-timing/initiator-type/misc).
     /// </para>
     /// </summary>
+    /// <summary>
+    /// True when <paramref name="src"/> is an absolute http(s) URL on a host the corpus does not
+    /// serve — i.e. an image the engine would fetch off the real network.
+    /// </summary>
+    /// <remarks>
+    /// A conformance run must not touch the network, and one that does is not merely impure — it
+    /// is slow in a way no per-test budget survives. Image loading is synchronous here
+    /// (<c>HtmlRender</c> sets <c>AvoidAsyncImagesLoading</c>), so the fetch blocks the layout
+    /// thread, and <c>ImageDownloader</c>'s shared <c>HttpClient</c> sets no <c>Timeout</c> — so an
+    /// unroutable host stalls for .NET's 100-second default, more than three times the whole
+    /// per-test budget, and does it again on the next layout pass because failures are not cached.
+    /// <c>conformance-checkers/html/elements/img/src-isvalid.html</c> is 88 <c>&lt;img&gt;</c> with
+    /// 88 distinct sources, some of them deliberately exotic hosts — IP literals like
+    /// <c>http://192.0x00A80001</c> and documentation addresses like <c>http://[2001::1]</c> — that
+    /// black-hole on a CI runner with real internet. One is enough to time the test out. (It passes
+    /// here only because this container's proxy answers those instantly.)
+    /// <para>
+    /// Suppressing the load rather than redirecting it is what the corpus wants: the image does not
+    /// load, which is exactly what the test is checking the parser does with the URL.
+    /// <c>args.Callback</c> cannot express that — it throws on an empty path — so the load is
+    /// marked handled, which is the flag <c>ImageLoadHandler.LoadImage</c> gates the whole fetch on.
+    /// </para>
+    /// <para>
+    /// The complementary fix belongs in the engine, where <c>ImageDownloader</c>'s client should
+    /// carry a short timeout the way the stylesheet loader's already does (WPT #1147) — that one is
+    /// in the Broiler.HTML submodule and ships as a patch. This is the half that needs no patch and
+    /// is the more correct behaviour for a sandboxed runner regardless.
+    /// </para>
+    /// </remarks>
+    internal static bool IsOffCorpusNetworkImage(string? src)
+    {
+        if (string.IsNullOrWhiteSpace(src)
+            || !Uri.TryCreate(src, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return false;
+
+        foreach (var served in WptSubstitution.ServedHosts)
+        {
+            if (string.Equals(uri.Host, served, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
+    }
+
     internal static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
     {
         // A `.sub` template's URLs are absolute and on a WPT host (`http://www.web-platform.test:8000/…`)
@@ -2674,7 +2746,14 @@ internal sealed partial class WptTestRunner
             {
                 var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
                 if (local != null)
+                {
                     args.Callback(local);
+                    return;
+                }
+
+                // Everything else that names a remote host is a fetch this run must not make.
+                if (IsOffCorpusNetworkImage(args.Src))
+                    args.Handled = true;
             };
         }
 

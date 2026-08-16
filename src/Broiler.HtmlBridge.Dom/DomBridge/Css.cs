@@ -162,11 +162,8 @@ public sealed partial class DomBridge
     /// </summary>
     private void CollectStyleElementsInTree(DomElement root, List<DomElement> styleElements)
     {
-        foreach (var element in root.Descendants().OfType<DomElement>())
+        foreach (var element in CollectStyleSheetCandidatesInTree(root))
         {
-            if (!(string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element)))
-                continue;
-
             // A disabled sheet (CSSOM CSSStyleSheet.disabled, or a <link disabled> content
             // attribute) does not contribute to the cascade — CSSOM §2.3.
             if (IsStyleSheetDisabled(element))
@@ -174,6 +171,32 @@ public sealed partial class DomBridge
 
             styleElements.Add(element);
         }
+    }
+
+    /// <summary>
+    /// The tree walk behind <see cref="CollectStyleElementsInTree"/>, without the disabled filter:
+    /// every <c>&lt;style&gt;</c> and external-stylesheet <c>&lt;link&gt;</c> in the tree, in
+    /// document order.
+    /// </summary>
+    /// <remarks>
+    /// Split out so the walk can be cached per document root (see
+    /// <c>DomBridge.GetStyleSheetCandidates</c>) while the disabled filter stays live. The split is
+    /// exactly where the cache can be keyed on <see cref="DomDocument.Version"/>: what this returns
+    /// depends only on the tree and on element attributes, both of which bump that counter.
+    /// <c>disabled</c> does not — <see cref="IsStyleSheetDisabled"/> also honours the CSSOM
+    /// <c>CSSStyleSheet.disabled</c> override, which is set on bridge-side state and never touches
+    /// the DOM — so it must be re-evaluated on every call and cannot be baked into the cache.
+    /// </remarks>
+    private List<DomElement> CollectStyleSheetCandidatesInTree(DomElement root)
+    {
+        var candidates = new List<DomElement>();
+        foreach (var element in root.Descendants().OfType<DomElement>())
+        {
+            if (string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element))
+                candidates.Add(element);
+        }
+
+        return candidates;
     }
 
     /// <summary>
