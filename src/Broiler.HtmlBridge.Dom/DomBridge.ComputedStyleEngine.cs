@@ -70,8 +70,7 @@ public sealed partial class DomBridge
             return new ComputedStyleEngineScope(new CssStyleScopeBuilder(engine), engine);
         });
 
-        var styleElements = new List<DomElement>();
-        CollectStyleElementsInTree(docRoot, styleElements);
+        var styleElements = GetScopedStyleElements(docRoot, scope);
 
         // Hand the collected sheets to the canonical scope builder in document order; it
         // gates each on the element's `media` attribute against the viewport and re-syncs the
@@ -94,6 +93,57 @@ public sealed partial class DomBridge
 
         var (vpWidth, vpHeight) = GetViewportForDocRoot(docRoot);
         return scope.ScopeBuilder.Sync(sources, new CssEnvironment(vpWidth, vpHeight));
+    }
+
+    /// <summary>
+    /// The scope's contributing <c>&lt;style&gt;</c>/<c>&lt;link&gt;</c> elements, in document
+    /// order, reusing the cached tree walk when the document has not been mutated since.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="GetSyncedScopedEngine"/> runs once per element resolved, and the walk behind it
+    /// is over the whole tree — so the discovery cost was O(elements x nodes). On WPT's
+    /// legacy-multibyte <c>*_chars*.html</c> encoding tests, which are a single line of ~17 000
+    /// sibling <c>&lt;span&gt;</c>s and not one stylesheet, the anchor-registry pass walked ~34 000
+    /// nodes ~17 000 times — about 5.8x10^8 node visits, every one of them discarding an empty
+    /// result — and took ~7.5 minutes against the runner's 30-second per-test budget. That was 28
+    /// of the 65 timeouts in the 2026-08-16 WPT run, in five directories whose names all point at
+    /// text encoding; none of it was encoding code.
+    /// <para>
+    /// The cache holds only the walk. Sheet text is still read per call, so CSSOM edits and
+    /// external sheets that finish loading are picked up exactly as before, and the
+    /// <c>disabled</c> filter — which honours a CSSOM override the DOM never sees — is applied
+    /// here rather than baked in. <see cref="DomDocument.Version"/> covers the rest: it is bumped
+    /// by every mutation, so a tree edit or an attribute write invalidates this on the next call.
+    /// A scope whose root has no owner document (a severed sub-document root) simply walks every
+    /// time, as before.
+    /// </para>
+    /// </remarks>
+    private List<DomElement> GetScopedStyleElements(DomElement docRoot, ComputedStyleEngineScope scope)
+    {
+        if (docRoot.OwnerDocument is not { } document)
+            return FilterEnabled(CollectStyleSheetCandidatesInTree(docRoot));
+
+        var version = document.Version;
+        var snapshot = scope.StyleSheetCandidates;
+        if (snapshot is null || snapshot.Version != version)
+        {
+            snapshot = new StyleSheetCandidateSnapshot(version, CollectStyleSheetCandidatesInTree(docRoot));
+            scope.StyleSheetCandidates = snapshot;
+        }
+
+        return FilterEnabled(snapshot.Elements);
+
+        List<DomElement> FilterEnabled(List<DomElement> found)
+        {
+            var enabled = new List<DomElement>(found.Count);
+            foreach (var element in found)
+            {
+                if (!IsStyleSheetDisabled(element))
+                    enabled.Add(element);
+            }
+
+            return enabled;
+        }
     }
 
     /// <summary>
