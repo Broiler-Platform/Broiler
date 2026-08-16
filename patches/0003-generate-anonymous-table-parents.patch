@@ -1,0 +1,52 @@
+From 3905e7db6805ba1536501bb2a0c026db51164e48 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 16 Aug 2026 15:41:37 +0000
+Subject: [PATCH] parse: generate the anonymous table a misparented table box
+ needs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CSS2.1 §17.2.1 has two halves. CssLayoutEngineTable implements "generate
+missing children" — anonymous rows for stray cells in a table or a row group,
+anonymous cells for stray content in a row — but it only ever runs on a box
+that is already a table, so nothing implemented "generate missing parents": a
+table-row, row group or table-cell sitting directly inside a block or an
+inline. Such a box is neither IsBlock nor IsInline, so block layout walked
+straight past it and it was dropped — never laid out, never painted, and
+contributing no height.
+
+Call the new Broiler.Layout.Engine.AnonymousTableBoxes pass from the box
+fix-ups, before the inline/block corrections so the generated table takes part
+in them as the block-level box it is.
+
+WPT css/CSS2/tables/table-anonymous-objects-* is built almost entirely out of
+that pattern: its green "there should be no red" layer is spans carrying
+nothing but display:table-row-group, so the layer meant to cover the red one
+painted nothing at all. 103 of the family were failing.
+---
+ Source/Broiler.HTML.Orchestration/Parse/DomParser.cs | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index a58e6d7..cf4c054 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -125,6 +125,14 @@ internal sealed class DomParser
+             CorrectProgressBoxes(root, baseUrl);
+             CorrectSelectMultipleBoxes(root, baseUrl);
+ 
++            // CSS2.1 §17.2.1 'generate missing parents': a table-row / row group /
++            // table-cell sitting outside the table box it requires is neither block nor
++            // inline, so block layout walked past it and it was dropped. Wrap it in the
++            // anonymous table (and row) the spec calls for before the inline/block
++            // corrections below, so the generated table takes part in them as the
++            // block-level box it is.
++            Broiler.Layout.Engine.AnonymousTableBoxes.Generate(root, baseUrl);
++
+             bool followingBlock = true;
+             CorrectLineBreaksBlocks(root, ref followingBlock);
+             CorrectInlineBoxesParent(root, baseUrl);
+-- 
+2.43.0
+
