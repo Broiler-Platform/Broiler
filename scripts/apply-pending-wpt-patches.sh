@@ -167,8 +167,19 @@ set -euo pipefail
 # The patch matters for the real browser, where there is no such handler and an unreachable <img>
 # still stalls the render — so it is a correctness fix to land upstream, not something a WPT run
 # needs applied on top of the pointer.
+#
+# The anonymous-table-parent patch (Broiler.HTML, "parse: generate the anonymous table a
+# misparented table box needs") IS listed, and it is the plainest case for listing there is:
+# without it a `display: table-row` / `table-row-group` / `table-cell` box with no table around
+# it is neither IsBlock nor IsInline, so block layout walks past it and it paints *nothing*.
+# The pass it calls lives in the main repo (Broiler.Layout.Engine.AnonymousTableBoxes) and its
+# behaviour is unit-tested there (AnonymousTableBoxParentTests); this one line is what reaches
+# it from the box fix-ups, so without the patch applied the main-repo half never runs and every
+# css/CSS2/tables/table-anonymous-objects-* test still renders its bare red table with the green
+# layer missing.
 PENDING_PATCHES=(
   "Broiler.JS|patches/0001-reject-one-semicolon-for-head.patch"
+  "Broiler.HTML|patches/0003-generate-anonymous-table-parents.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

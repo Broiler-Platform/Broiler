@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**Three patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -48,6 +48,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Reject a `for` head that carries only one semicolon |
 | `0002` | `Broiler.HTML` | Cap the image fetch timeout, as the stylesheet fetch already is |
+| `0003` | `Broiler.HTML` | parse: generate the anonymous table a misparented table box needs |
 
 The eight patches that held `0001`–`0008` before these two are all upstream and all
 reachable through the pinned pointers, so their files are gone and the numbering has
@@ -165,6 +166,43 @@ still re-fetched on the next layout pass; with a 5-second cap that is now an
 annoyance rather than a lost test, but it is the other half of the defect.
 
 **When it lands upstream:** bump the pointer and delete this patch.
+
+### `0003` — a table box outside a table painted nothing at all
+
+CSS 2.1 §17.2.1 has two halves, and only one of them was implemented.
+`CssLayoutEngineTable` generates the missing **children** — an anonymous row for a
+stray cell in a table or a row group, an anonymous cell for stray content in a row.
+But it only ever runs on a box that *is* a table, so nothing generated the missing
+**parents**: a `table-row`, row group or `table-cell` sitting directly inside a block
+or an inline. Such a box is neither `IsBlock` nor `IsInline`, so block layout walked
+straight past it — it never laid out, never painted, and contributed no height.
+
+**Where it came from.** WPT's `css/CSS2/tables/table-anonymous-objects-*` family, 103
+of whose members were failing. Each is a "there should be no red" test that stacks a
+green layer over a red one; the green layer is built out of spans carrying nothing but
+`display: table-row-group`, so it painted nothing and the red layer underneath showed
+through in full. That is also why the family's failures were split between
+`MissingContent` and `ReferenceOverlayExposed` — the same absence, classified by which
+of the two layers the test happened to put on top.
+
+**Only the one-line call is in this patch.** The pass itself —
+`Broiler.Layout.Engine.AnonymousTableBoxes` — is a main-repo file, so the patch is the
+single line that reaches it from `DomParser`'s box fix-ups. It is placed before the
+inline/block corrections so the generated table takes part in them as the block-level
+box it is.
+
+**Measured** on the family's own `rel=match` references (font-neutral, unlike a golden
+comparison in a bare container): 46 → 48 passing, 60 tests improved against 7
+regressed. Four tests moved from passing to failing and are worth understanding rather
+than treating as a regression — in those the *red* layer is the one built from bare
+table boxes, so they had been passing because the content under test rendered nothing
+at all. Passing by omission; they now render and show the residual geometry gap.
+
+**Why it is listed in `scripts/apply-pending-wpt-patches.sh`.** Without this line the
+main-repo half never runs, so nothing about the fix reaches a WPT run.
+
+**When it lands upstream:** bump the pointer, drop the entry from
+`scripts/apply-pending-wpt-patches.sh`, and delete this patch.
 
 ## A stale entry in the apply script is not inert
 

@@ -505,6 +505,50 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### A table box outside a table painted nothing at all
+
+- **Tests:** the `css/CSS2/tables/table-anonymous-objects-*` family — **103 of its
+  members** were in the failure manifest for
+  [#1688](https://github.com/Broiler-Platform/Broiler/issues/1688), the single largest
+  numbered family in `css/CSS2`. On the family's own `rel=match` references: 46 → **48
+  passing**, 60 tests improved against 7 regressed.
+- **Owner:** `Broiler.Layout` for the pass, `Broiler.HTML` for the one line that calls
+  it (patch: *"parse: generate the anonymous table a misparented table box needs"*).
+- **CSS 2.1 §17.2.1 has two halves, and only one was implemented.**
+  `CssLayoutEngineTable` generates the missing *children* — an anonymous row for a
+  stray cell in a table or a row group, an anonymous cell for stray content in a row.
+  But it only ever runs on a box that already *is* a table, so nothing generated the
+  missing *parents*: a `table-row`, row group or `table-cell` sitting directly inside a
+  block or an inline. Such a box is neither `IsBlock` nor `IsInline`, so block layout
+  walked straight past it — it never laid out, never painted, and contributed no
+  height. `Broiler.Layout/Engine/AnonymousTableBoxes.cs` is the landed pass;
+  `AnonymousTableBoxParentTests` is the landed check.
+- **The classification split was one bug, not two.** The family's failures were
+  divided between `MissingContent` and `ReferenceOverlayExposed`, which reads like two
+  causes. It is one: every test in it stacks a green layer over a red one, and the
+  green layer is spans carrying nothing but `display: table-row-group`. Whichever layer
+  the test put on top decided which bucket the same absence landed in.
+- **Four tests moved from passing to failing, and that is the fix working.** In those
+  the *red* layer is the one built from bare table boxes, so they had been passing
+  because the content under test rendered nothing at all — passing by omission. They
+  now render, and show the residual geometry gap between a generated anonymous table
+  and the real `<table>` it is compared against.
+- **A flex or grid container is deliberately excluded.** CSS Display 3 §2.7 blockifies
+  those children, so a `display: table-cell` flex item computes to `block` and §17.2.1
+  has nothing to find a parent for. Wrapping one would insert an anonymous table
+  *between* the container and its item, so the item would stop being a flex/grid item
+  altogether — a worse answer than the blockification Broiler still owes, and one that
+  would land squarely in `css-grid` and `css-flexbox`, the two largest failing areas.
+  An out-of-flow or floated box is excluded for the same reason, and it splits a run
+  rather than joining one. (The exclusion is not hypothetical bookkeeping: an earlier
+  build without it changed how `display: table-cell` flex items sized.)
+- **A bare container cannot judge this family by pixels.** Broiler resolves no
+  `font-family` there — `monospace`, `serif` and a named family all render in one
+  sans face — so every golden comparison against Chromium sits at a ~96 % floor from
+  glyph shapes alone, well under the 99 % pass threshold, before any engine
+  difference is counted. The `rel=match` reftest suite renders both sides with
+  Broiler and is unaffected, which is why the numbers above are quoted from it.
+
 ### An out-of-flow first child propagated its top margin into its parent
 
 - **Tests:** `css/CSS2/margin-padding-clear/margin-006` … `-009`, failing → **passing**.
