@@ -72,6 +72,7 @@ capture.png
 
 # WPT testsuite results (generated at runtime)
 tests/wpt-results/
+tests/wpt-reftest-results/
 tests/wpt/checkout/
 
 # Octane benchmark suite (cloned at runtime); results are committed.
