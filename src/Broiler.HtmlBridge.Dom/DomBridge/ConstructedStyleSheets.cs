@@ -6,6 +6,7 @@ using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.Dom;
 using Broiler.CSS;
+using Broiler.HtmlBridge.Dom.Runtime;
 
 namespace Broiler.HtmlBridge;
 
@@ -46,7 +47,12 @@ public sealed partial class DomBridge
         _constructedSheetRules[sheet] = rules;
 
         List<CssRule> CurrentRules() => rules;
-        static void MarkRulesMutated() { }
+        // A constructed sheet has no owner element and so no StyleSheetRuntimeState to mark — there
+        // is nothing to reparse from, the list *is* the sheet. It still reaches the cascade through
+        // adoptedStyleSheets, so an insertRule/deleteRule on it is a layout change no DOM mutation
+        // records: move the epoch so a retained geometry snapshot is not answered from the pre-edit
+        // rules. See BridgeRuntimeStateEpoch.
+        static void MarkRulesMutated() => BridgeRuntimeStateEpoch.Bump();
 
         // ownerNode is null for a constructed sheet; href is null (no source URL).
         sheet.FastAddProperty((KeyString)"ownerNode", NullFunction("get ownerNode"),

@@ -30,7 +30,10 @@ public sealed partial class DomBridge
     /// </summary>
     private string? SerializeInlineStyleForEngine(DomElement element)
     {
-        var inline = InlineStyle(element);
+        // Read-only, and on the hot path: the cascade calls this once per element, including on the
+        // geometry queries that run against an already-built snapshot. InlineStyle's write-epoch bump
+        // would invalidate that snapshot on every read, so take the non-bumping accessor.
+        var inline = InlineStyleForRead(element);
         if (inline.Count == 0)
             return null;
         var sb = new System.Text.StringBuilder();

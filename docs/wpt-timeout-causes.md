@@ -40,9 +40,36 @@ Their regression guards are `MulticolCheckLayoutTimeoutTests` and
 | 1 | `conformance-checkers/…/img/src-isvalid` | Synchronous image fetch on the layout thread with no `HttpClient` timeout — .NET's 100 s default, per unroutable host, per layout pass. |
 | 1 | `css/css-break/…/special-elements-crash` | Not fragmentation. `elementFromPoint` built and tore down a full geometry snapshot per element visited. |
 | 1 | `css/css-fonts/variations/font-opentype-collections` | Not the TTC parser. The runner's synchronous `requestAnimationFrame` stub had no re-entrancy cap, so a non-converging rAF loop recursed to CLR stack exhaustion. |
+| 20 | `css/css-overflow` | Not overflow. A geometry snapshot was torn down at the end of every read pass, so a `scrollTop` write — which clamps against four extents — laid the whole document out four times. See below. |
 
-Guards: `StyleSheetDiscoveryCacheTests`, `HitTestAndRafBudgetTimeoutTests`, and
-the `for`-head theories inside the `Broiler.JS` patch.
+Guards: `StyleSheetDiscoveryCacheTests`, `HitTestAndRafBudgetTimeoutTests`,
+`ScrollWriteGeometryTimeoutTests`, `RetainedLayoutSnapshotTests`, and the
+`for`-head theories inside the `Broiler.JS` patch.
+
+### `css/css-overflow` — how the 20 were fixed
+
+The entry above was open for a run, with the cause established and the fix
+sized as "larger than the per-call-site wraps, wants its own issue" (#1682).
+It was: hoisting the redundant passes was measured as not sufficient, so the
+snapshot had to survive *across* queries.
+
+It now does. `DomBridge.AcquireSharedGeometrySnapshot` keeps the last snapshot
+with the key it was built under — `DomDocument.Version` for the DOM the
+projection is cloned from, a `BridgeRuntimeStateEpoch` counter for the
+bridge-side state that never reaches the DOM (inline style, form values, CSSOM
+edits), plus viewport and the two zoom channels — and reuses it while that key
+holds. `overflow-alignment-block-002.html` went from not finishing in ten
+minutes to ~6 s, and the whole `Broiler.Wpt.Tests` suite from 2m19s to 1m25s.
+
+Two details are worth carrying forward. The key is read **after** the build,
+because building a projection writes bridge runtime state of its own, so a key
+taken before it would never match again. And scroll offsets are deliberately
+**excluded** from the epoch — they live in the bridge's own table and are not
+part of the projected document the renderer is handed, so a scroll write cannot
+change box geometry. That exclusion is what makes the scroll loop one layout
+instead of 168; it is also the one assumption that would turn this cache into a
+staleness bug if it were wrong, which is why it is argued at the declaration and
+pinned by a test rather than left implicit.
 
 ## Not a defect
 
@@ -57,23 +84,6 @@ worth remembering before chasing it again.
 borderline result on a quiet machine before concluding anything.
 
 ## Open, with the cause established
-
-### `css/css-overflow` — 20 timeouts
-
-A genuine hang, and the largest remaining cluster. Each
-`overflow-alignment-*.html` is one ~1400-div table whose load handler writes
-`scrollTop`/`scrollLeft` on 84 elements — 168 scroll-offset writes. Every write
-goes `ElementGeometryBinding.SetScrollTop` →
-`DomBridge.SetElementScrollOffsetsWithBehavior` and costs **four** full document
-clones plus layouts, with an unbounded per-iteration retention on top that makes
-the whole thing superlinear.
-
-Hoisting the redundant passes is necessary but measured as **not sufficient**:
-the fixed overhead is ~6.4 s and each snapshot ~0.67 s cold, so even a 2× cut
-leaves ~63 s against a 30 s budget. This one needs the snapshot to survive
-*across* queries — invalidated on actual DOM/style mutation rather than torn down
-in every `WithLayoutGeometryCache` `finally` — which is a larger change than the
-per-call-site wraps above and wants its own issue.
 
 ### `css/css-variables/url-syntax-crash.html` — 1 timeout
 

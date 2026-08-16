@@ -52,7 +52,9 @@ public sealed partial class DomBridge
     /// </summary>
     internal Dictionary<string, string> EffectiveInlineStyle(DomElement element)
     {
-        var baseStyle = InlineStyle(element);
+        // Read-only (the result is a fresh dictionary), so take the non-bumping accessor — see
+        // SerializeInlineStyleForEngine for why a read must not invalidate the geometry snapshot.
+        var baseStyle = InlineStyleForRead(element);
         if (!_bakedStyleOverlays.TryGetValue(element, out var overlay) || overlay.Count == 0)
             return new Dictionary<string, string>(baseStyle, StringComparer.OrdinalIgnoreCase);
 
