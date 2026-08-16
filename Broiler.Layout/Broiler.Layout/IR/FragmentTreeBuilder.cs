@@ -126,8 +126,19 @@ internal static class FragmentTreeBuilder
             // must not be read as though it were.
             if (imgHandle != null && box.LayoutEnvironment?.GetImageIntrinsics(imgHandle) is { } intrinsics)
             {
+                // The natural size `object-fit: none` draws at is the *density-corrected* one
+                // (HTML §4.8.4.3) — the same size layout sized the box from — so a `2x` candidate
+                // is drawn at half its decoded pixels rather than overflowing the box it was
+                // deliberately sized to fit. The density is 1 for every image without a srcset.
+                double density = box is CssBoxImage { Words: [CssRectImage word, ..] } && word.PixelDensity > 0
+                    ? word.PixelDensity
+                    : 1.0;
+
                 if (intrinsics.HasIntrinsicSize)
-                    imgIntrinsicSize = new SizeF((float)intrinsics.Width, (float)intrinsics.Height);
+                {
+                    imgIntrinsicSize = new SizeF(
+                        (float)(intrinsics.Width / density), (float)(intrinsics.Height / density));
+                }
 
                 if (intrinsics.HasIntrinsicRatio)
                     imgIntrinsicRatio = (float)intrinsics.AspectRatio;
@@ -630,7 +641,19 @@ internal static class FragmentTreeBuilder
             if (string.IsNullOrEmpty(dir))
                 return (null, null);
 
-            string docPath = Path.GetFullPath(Path.Combine(dir, url));
+            // Only the *path* of the URL names a file. A document-relative src is as entitled to
+            // carry a query or a fragment as a root-relative one — `src="support/x.sub.html?a=b"`,
+            // `src="inner.html#frag"` — and joining the whole URL onto the directory produced a
+            // path with `?a=b` in the file name, which exists nowhere: the frame painted empty
+            // with no error, exactly as if the file were missing. The root-relative loader below
+            // has always stripped them (and percent-decoded what is left); this branch had not, so
+            // the two disagreed on the same URL depending only on whether it began with a slash.
+            // WPT's img-element `sizes` tests are the visible shape of it — each is a page whose
+            // whole content is one `<iframe src="support/sizes-iframed.sub.html?doctype=…">`.
+            if (ResolveRelativeDocumentPath(url) is not { Length: > 0 } relativePath)
+                return (null, null);
+
+            string docPath = Path.GetFullPath(Path.Combine(dir, relativePath));
             if (!File.Exists(docPath))
                 return (null, null);
 
@@ -653,6 +676,36 @@ internal static class FragmentTreeBuilder
         url.Length > 1 && url[0] == '/' && url[1] != '/';
 
     /// <summary>
+    /// The filesystem-relative path a document-relative URL names: its path component, percent
+    /// decoded and with the URL's <c>/</c> separators turned into the platform's. <c>null</c> when
+    /// the URL has no path at all (a bare <c>?query</c> or <c>#fragment</c>, which addresses the
+    /// containing document rather than a new one).
+    /// </summary>
+    /// <remarks>
+    /// The query and fragment address a server that is not there; the path alone names the file.
+    /// WPT leans on this — <c>?pipe=</c> and <c>?doctype=</c> decorate the URL of a resource that
+    /// is still just a file on disk. Shared with <see cref="LoadEmbeddedDocumentFromRoot"/> so the
+    /// document-relative and root-relative branches cannot drift apart again.
+    /// </remarks>
+    private static string ResolveRelativeDocumentPath(string url)
+    {
+        string path = url.Split('?', '#')[0];
+        if (path.Length == 0)
+            return null;
+
+        try
+        {
+            path = Uri.UnescapeDataString(path);
+        }
+        catch (UriFormatException)
+        {
+            // Malformed escape — fall back to the raw path rather than failing the resolve.
+        }
+
+        return path.Replace('/', Path.DirectorySeparatorChar);
+    }
+
+    /// <summary>
     /// Loads a root-relative sub-document from the host's document root
     /// (<see cref="Engine.DocumentRoot.Current"/>), or <c>(null, null)</c> when no root is set or
     /// the path names nothing under it — the empty frame this case has always painted.
@@ -664,18 +717,15 @@ internal static class FragmentTreeBuilder
 
         try
         {
-            // The query and fragment address a server that is not there; the path alone names the
-            // file. WPT leans on this — `?pipe=` decorates the URL of a resource that is still just
-            // a file on disk — and the runner's other root-relative loaders already strip it the
-            // same way (WptTestRunner.TryResolveWptRootRelativePath).
-            string path = url.Split('?', '#')[0];
-            if (path.Length <= 1)
+            // The path component alone names the file, the same way it does for a document-relative
+            // src — and the runner's other root-relative loaders strip it identically
+            // (WptTestRunner.TryResolveWptRootRelativePath). A root-relative URL is its leading
+            // slash plus something, so a one-character path is the document root itself.
+            if (ResolveRelativeDocumentPath(url) is not { Length: > 1 } path)
                 return (null, null);
 
-            path = Uri.UnescapeDataString(path);
-
             string docPath = Path.GetFullPath(
-                Path.Combine(root, path.TrimStart('/').Replace('/', Path.DirectorySeparatorChar)));
+                Path.Combine(root, path.TrimStart(Path.DirectorySeparatorChar, '/')));
 
             // A `..` segment must not walk out of the root: served over HTTP it could not, and the
             // frame would 404 rather than reach an unrelated file.

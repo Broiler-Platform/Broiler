@@ -176,6 +176,51 @@ public class RootRelativeFrameSrcTests : IDisposable
     }
 
     /// <summary>
+    /// The other half of the query/fragment rule: a <em>document-relative</em> <c>src</c> is as
+    /// entitled to carry one as a root-relative one, and only its path names a file.
+    /// </summary>
+    /// <remarks>
+    /// This branch used to join the whole URL onto the containing directory, so the file name it
+    /// looked for was <c>sibling.html?a=1</c> — a path that exists nowhere. The frame then painted
+    /// empty with no error, exactly as if the file were missing, and the two branches disagreed
+    /// about the same URL depending only on whether it began with a slash. WPT's img-element
+    /// <c>sizes</c> tests are the visible shape of it: each is a page whose whole content is one
+    /// <c>&lt;iframe src="support/sizes-iframed.sub.html?doctype=…"&gt;</c>.
+    /// </remarks>
+    [Theory]
+    [InlineData("sibling.html?doctype=doctype%20html&style=")]
+    [InlineData("sibling.html?pipe=trickle(d1)")]
+    [InlineData("sibling.html#fragment")]
+    [InlineData("sibling.html?a=1#b")]
+    [InlineData("./sibling.html?a=1")]
+    public void RelativeSrc_IgnoresTheQueryAndFragment(string src)
+    {
+        WriteResource(Path.Combine("pages", "sibling.html"), BlueDocument);
+        Assert.Equal(Blue, RenderFrameCentre(src, _root));
+    }
+
+    /// <summary>A percent-escaped document-relative path names the file it decodes to, too.</summary>
+    [Fact]
+    public void RelativeSrc_UnescapesThePath()
+    {
+        WriteResource(Path.Combine("pages", "a b.html"), BlueDocument);
+        Assert.Equal(Blue, RenderFrameCentre("a%20b.html", _root));
+    }
+
+    /// <summary>
+    /// A <c>src</c> of nothing but a query or a fragment addresses the containing document, not a
+    /// new one, so it must not resolve to the page's own directory.
+    /// </summary>
+    [Theory]
+    [InlineData("?a=1")]
+    [InlineData("#fragment")]
+    public void RelativeSrc_OfOnlyAQueryOrFragment_PaintsNothing(string src)
+    {
+        WriteResource(Path.Combine("pages", "sibling.html"), BlueDocument);
+        Assert.NotEqual(Blue, RenderFrameCentre(src, _root));
+    }
+
+    /// <summary>
     /// The lever restores what it found rather than leaving its own value behind, so a nested
     /// render (a frame inside a frame) cannot strand a root on the thread.
     /// </summary>

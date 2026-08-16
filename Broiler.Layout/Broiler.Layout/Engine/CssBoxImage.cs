@@ -82,7 +82,19 @@ internal sealed class CssBoxImage : CssBox
             return;
         }
 
-        var src = GetAttribute("src");
+        // HTML §4.8.4.3 "select an image source": a responsive <img> — one carrying a `srcset`, or
+        // one inside a <picture> — names its source through the candidate list, not through `src`.
+        // Reading `src` alone left such an element with nothing to load at all, so it painted the
+        // missing-image border instead of the image the page asked for.
+        var selection = ResponsiveImageSourceSet.Select(this);
+
+        // A `0x` descriptor parses (the spec rejects only a negative one) and names a density no
+        // image can be laid out at — dividing by it is an infinite natural size, not a very large
+        // one. It is stored as 1 so every consumer can divide by this unguarded; an *infinite*
+        // density is meaningful and kept, because it is a zero-sized image.
+        _imageWord.PixelDensity = selection is { Density: > 0 } chosen ? chosen.Density : 1.0;
+
+        var src = selection?.Url ?? GetAttribute("src");
         // <object data="..."> fallback: use 'data' attribute when 'src' is absent
         if (string.IsNullOrEmpty(src))
             src = GetAttribute("data");

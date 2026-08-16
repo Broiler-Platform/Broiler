@@ -139,6 +139,29 @@ internal sealed class CssLineBox
             return;
         }
 
+        // CSS2.1 §10.8: an inline replaced element is an atomic box too, and aligning it means
+        // moving the box — paint reads an <img>'s geometry off the box (FragmentTreeBuilder reads
+        // Location/ActualBottom and only the *source* rect off the word), so moving the word alone
+        // moved nothing on screen. Unlike an inline-block, whose flow position is already on the
+        // baseline when `vertical-align` is left at its initial value, an image is placed by the
+        // flow at the line's top and always needs this: a 30px and a 90px image on one line came
+        // out top-aligned rather than standing on a shared baseline. Re-running the alignment is
+        // idempotent, because an atomic box that has been moved reports the same baseline it was
+        // aligned to.
+        if (b.IsImage)
+        {
+            double shift = baseline - r.Top;
+            if (Math.Abs(shift) > 0.01)
+            {
+                Rectangles[b] = new RectangleF(r.X, (float)baseline, r.Width, r.Height);
+                b.Location = new PointF(b.Location.X, (float)baseline);
+                b.ActualBottom = baseline + r.Height;
+                foreach (var word in ws)
+                    word.Top += shift;
+            }
+            return;
+        }
+
         //Save top of words related to the top of rectangle
         double gap = 0f;
 
