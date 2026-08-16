@@ -166,6 +166,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             box.Rectangles[k] = RotateRect(box.Rectangles[k], rootX, rootY, blockExtent, mirror, blockOffset);
 
         // --- Line boxes owned by this box: words + per-box rectangles ---
+        //
+        // A run decomposed into per-glyph cells below replaces the original CssRect in the LINE's
+        // word list, but a word lives in two lists: CssLineBox.Words (what paint walks) and
+        // CssBox.Words (what OffsetTop/OffsetLeft walk). Leaving the box's copy behind desynchronises
+        // them, and every post-rotation pass that translates a subtree then moves the run nobody
+        // paints while the glyphs that are painted stay put. RunScrollSimulation is exactly such a
+        // pass and runs after this one (PerformLayout calls the rotation, then the scroll post-pass),
+        // so a scrolled vertical-writing-mode page painted its backgrounds at the scrolled offset and
+        // its text at the unscrolled one — visible on WPT massive-element-left-of-viewport-
+        // partially-onscreen-ref, whose green/blue bands scrolled while the Ahem glyphs stayed at the
+        // document origin. Substituting the glyphs into the owner box's list keeps the two views of
+        // the same run in agreement.
+        Dictionary<CssBox, Dictionary<CssRect, List<CssRect>>>? decomposedByOwner = null;
+
         foreach (var line in box.LineBoxes)
         {
             var rotatedWords = new List<CssRect>(line.Words.Count);
@@ -198,6 +212,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 if (text != null && text.Length > 1 && !word.IsLineBreak)
                 {
                     double advance = word.Width / text.Length;
+                    var glyphs = new List<CssRect>(text.Length);
 
                     for (int i = 0; i < text.Length; i++)
                     {
@@ -209,7 +224,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                             Height = word.Height,
                         };
 
+                        glyphs.Add(glyph);
                         rotatedWords.Add(glyph);
+                    }
+
+                    if (word.OwnerBox is { } owner)
+                    {
+                        decomposedByOwner ??= [];
+                        if (!decomposedByOwner.TryGetValue(owner, out var map))
+                            decomposedByOwner[owner] = map = [];
+                        map[word] = glyphs;
                     }
                 }
                 else
@@ -227,6 +251,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             foreach (var k in keys)
                 line.Rectangles[k] = RotateRect(line.Rectangles[k], rootX, rootY, blockExtent, mirror, blockOffset);
+        }
+
+        // Mirror the line-level substitution onto each owner box's own word list, in place, so the
+        // two stay the same run in the same order. A word not decomposed above (a single glyph, a
+        // line break) was rotated by mutation and is already shared by both lists.
+        if (decomposedByOwner is not null)
+        {
+            foreach (var (owner, map) in decomposedByOwner)
+            {
+                var rebuilt = new List<CssRect>(owner.Words.Count);
+
+                foreach (var existing in owner.Words)
+                {
+                    if (map.TryGetValue(existing, out var glyphs))
+                        rebuilt.AddRange(glyphs);
+                    else
+                        rebuilt.Add(existing);
+                }
+
+                owner.Words.Clear();
+                owner.Words.AddRange(rebuilt);
+            }
         }
 
         foreach (var child in box.Boxes)

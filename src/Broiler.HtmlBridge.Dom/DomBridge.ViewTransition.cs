@@ -534,6 +534,63 @@ public sealed partial class DomBridge
         return false;
     }
 
+    /// <summary>The writing modes whose block flow is horizontal, so a box in one is laid out in a
+    /// logical frame and rotated into physical space.</summary>
+    private static bool IsVerticalWritingMode(string? writingMode) =>
+        writingMode?.Trim().ToLowerInvariant() is "vertical-rl" or "vertical-lr" or "sideways-rl" or "sideways-lr";
+
+    /// <summary>
+    /// Whether the live layout transposes <paramref name="element"/> — i.e. whether it lies inside a
+    /// vertical <em>rotation root</em> (a vertical-writing-mode box whose parent is not vertical),
+    /// reached without first crossing an out-of-flow box, which establishes its own untransposed
+    /// rotation context.
+    /// <para>
+    /// This deliberately mirrors <c>CssBox.WillBeVerticalTransposed</c> over the DOM rather than
+    /// asking a spec question, because it decides how the <em>snapshot</em> is built and a snapshot's
+    /// only job is to reproduce what the live layout painted. The engine's vertical flow is a
+    /// prototype that does not rotate out-of-flow boxes, so a <c>position: fixed</c> vertical element
+    /// nested in a vertical root is laid out untransposed; a snapshot of it that <em>is</em> transposed
+    /// would disagree with the very page it was captured from. Both halves are exercised by the WPT
+    /// <c>massive-element-*</c> family, which splits exactly along this line: the in-flow variants
+    /// (<c>-partially-onscreen</c> with a scroll) need the transposition, and the <c>position: fixed</c>
+    /// ones (<c>-offscreen</c>, <c>right-and-left-</c>) need its absence.
+    /// </para>
+    /// </summary>
+    private bool CapturedElementIsVerticallyTransposed(DomElement element)
+    {
+        for (DomNode? node = element; node is not null; node = node.ParentNode)
+        {
+            if (node is not DomElement ctx)
+                continue;
+
+            var style = UsedStyleForCapture(ctx);
+            var parent = ParentElementForCapture(ctx);
+            bool parentVertical = parent is not null
+                && IsVerticalWritingMode(UsedStyleForCapture(parent).GetValueOrDefault("writing-mode"));
+
+            if (IsVerticalWritingMode(style.GetValueOrDefault("writing-mode")) && !parentVertical)
+                return true;
+
+            var position = style.GetValueOrDefault("position");
+            if (string.Equals(position, "absolute", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(position, "fixed", System.StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return false;
+    }
+
+    private static DomElement? ParentElementForCapture(DomElement element)
+    {
+        for (DomNode? node = element.ParentNode; node is not null; node = node.ParentNode)
+        {
+            if (node is DomElement parent)
+                return parent;
+        }
+
+        return null;
+    }
+
     /// <summary>
     /// Applies the author rules a running transition activates to the live DOM, so the "new" snapshot
     /// the pseudo tree captures reflects them. Two selector forms are handled (css-view-transitions-2):
@@ -807,8 +864,12 @@ public sealed partial class DomBridge
             // box, e.g. an absolutely-positioned child above the box (WPT
             // capture-with-offscreen-child-translated). Root and old-only/unknown captures keep the
             // clip (viewport / prior behaviour).
+            var capturedElement = capture.Name == rootName
+                ? DocumentElement
+                : elementByName.GetValueOrDefault(capture.Name);
+
             bool clipsContent = true;
-            if (capture.Name != rootName && elementByName.TryGetValue(capture.Name, out var capturedElement))
+            if (capture.Name != rootName && capturedElement is not null)
                 clipsContent = CapturedElementClipsContent(UsedStyleForCapture(capturedElement));
 
             var group = CreateStyledBox(BaseStyle(
@@ -836,26 +897,39 @@ public sealed partial class DomBridge
             // element's own paint (background, opacity, text) so an element's opacity composites over
             // the backdrop rather than over an opaque snapshot fill.
             //
-            // Each snapshot box also resets `writing-mode`, and the reason is structural rather than
-            // cosmetic. css-view-transitions-1 gives the pseudo tree the *captured element's*
-            // writing mode — which BuildViewTransitionSnapshotContent already bakes onto the content
-            // box — not the originating root's; the pseudo boxes are real <div>s under <html>, so
-            // without a reset they inherit `:root { writing-mode: vertical-lr }` as well. That is
-            // not merely redundant: Broiler rotates a vertical subtree from its *rotation root*,
-            // defined as a vertical box whose parent is not vertical, so an inherited vertical mode
-            // all the way down means the content box is never a root, WillBeVerticalTransposed
-            // reports false, and ResolvePhysicalSize maps block-size onto physical height
-            // un-swapped. `.middle { block-size: 39800px }` then became a 39800px-tall band instead
-            // of a 39800px-wide one — the whole of the massive-element-*-partially-onscreen failure.
+            // A snapshot box resets `writing-mode` when — and only when — the live layout transposes
+            // the element it captured, and the reason is structural rather than cosmetic.
+            // css-view-transitions-1 gives the pseudo tree the *captured element's* writing mode —
+            // which BuildViewTransitionSnapshotContent already bakes onto the content box — not the
+            // originating root's; the pseudo boxes are real <div>s under <html>, so without a reset
+            // they inherit `:root { writing-mode: vertical-lr }` as well. That is not merely
+            // redundant: Broiler rotates a vertical subtree from its *rotation root*, defined as a
+            // vertical box whose parent is not vertical, so an inherited vertical mode all the way
+            // down means the content box is never a root, WillBeVerticalTransposed reports false,
+            // and ResolvePhysicalSize maps block-size onto physical height un-swapped.
+            // `.middle { block-size: 39800px }` then became a 39800px-tall band instead of a
+            // 39800px-wide one — the whole of the massive-element-*-partially-onscreen failure.
+            //
+            // Resetting it *unconditionally* is the opposite error, and the same family catches it:
+            // the engine's vertical flow does not rotate out-of-flow boxes, so the `position: fixed`
+            // variants (-offscreen, right-and-left-) are laid out untransposed on the live page, and
+            // a transposed snapshot of them disagrees with the page it was captured from — measured
+            // as right-and-left-of-viewport-partially-onscreen falling from 100% to 2.9%. Mirroring
+            // the engine's own predicate keeps the snapshot honest in both directions.
+            //
             // An author `::view-transition-old(x) { writing-mode: … }` still wins: CreateStyledBox
             // layers the author declarations on top of BaseStyle. It is deliberately not in
             // PseudoBoxAuthorReset, which is skipped wholesale when the author paints a background.
+            var snapshotWritingMode = capturedElement is not null
+                && CapturedElementIsVerticallyTransposed(capturedElement)
+                    ? "horizontal-tb"
+                    : null;
+
             if (capture.HasOld)
             {
                 var scale = SnapshotScale(capture.OldWidth, groupW);
-                var oldBox = CreateStyledBox(BaseStyle(
-                    ("position", "absolute"), ("left", "0"), ("top", "0"),
-                    ("width", Px(capture.OldWidth * scale)), ("height", Px(capture.OldHeight * scale))),
+                var oldBox = CreateStyledBox(SnapshotBoxStyle(
+                    capture.OldWidth * scale, capture.OldHeight * scale, snapshotWritingMode),
                     LookupPseudo(pseudoRules, "old", capture));
                 AttachSnapshotPaint(
                     oldBox, capture.OldContent, capture.OldBackground,
@@ -866,9 +940,8 @@ public sealed partial class DomBridge
             if (capture.HasNew)
             {
                 var scale = SnapshotScale(capture.NewWidth, groupW);
-                var newBox = CreateStyledBox(BaseStyle(
-                    ("position", "absolute"), ("left", "0"), ("top", "0"),
-                    ("width", Px(capture.NewWidth * scale)), ("height", Px(capture.NewHeight * scale))),
+                var newBox = CreateStyledBox(SnapshotBoxStyle(
+                    capture.NewWidth * scale, capture.NewHeight * scale, snapshotWritingMode),
                     LookupPseudo(pseudoRules, "new", capture));
                 AttachSnapshotPaint(
                     newBox, capture.NewContent, capture.NewBackground,
@@ -914,6 +987,22 @@ public sealed partial class DomBridge
         }
 
         AppendBridgeChild(root, overlay);
+    }
+
+    /// <summary>The base style of a <c>::view-transition-old</c>/<c>-new</c> box: the captured rect's
+    /// size at the group's scale, plus the <c>writing-mode</c> reset when the captured element is one
+    /// the live layout transposes (<paramref name="writingMode"/> is null when it is not, leaving the
+    /// inherited mode alone).</summary>
+    private static Dictionary<string, string> SnapshotBoxStyle(double width, double height, string? writingMode)
+    {
+        var style = BaseStyle(
+            ("position", "absolute"), ("left", "0"), ("top", "0"),
+            ("width", Px(width)), ("height", Px(height)));
+
+        if (writingMode is not null)
+            style["writing-mode"] = writingMode;
+
+        return style;
     }
 
     private static Dictionary<string, string> BaseStyle(params (string Key, string Value)[] entries)
@@ -1044,23 +1133,48 @@ public sealed partial class DomBridge
 
         var clone = CloneSnapshotContentForRender(content);
 
-        if (scale is not 1 && capturedWidth > 0 && capturedHeight > 0)
+        if (capturedWidth > 0 && capturedHeight > 0)
         {
-            // The snapshot must grow from its top-left corner, but the paint walker applies every
-            // transform about the box's centre and does not read `transform-origin`. Composing a
-            // translate of half the growth ahead of the scale expresses a top-left-origin scale in
-            // terms of the centre-origin one it does implement: a point p maps to C + T·S·(p - C),
-            // so t = C(s - 1) puts the corner back at the origin. Without it the snapshot expands
-            // equally in all four directions and the group clips away everything above and left of
-            // its centre — which is exactly what this looked like: a 200x120 capture scaled 5.12x
-            // showed 612x368 of blue instead of filling the group.
-            var growthX = capturedWidth * (scale - 1) / 2;
-            var growthY = capturedHeight * (scale - 1) / 2;
             var style = InlineStyle(clone);
+
+            // Pin the content box to the captured pixel size instead of leaving it at the `100%`
+            // BuildViewTransitionSnapshotContent gives it. At a scale other than 1 that is what the
+            // summary above describes; at scale 1 the two are identical in a horizontal writing mode
+            // (100% of a box that is itself the captured size) — but NOT in a vertical one, and that
+            // is the reason this is unconditional.
+            //
+            // The content box carries the captured element's `writing-mode`, and the snapshot box
+            // above it resets to `horizontal-tb`, so the content box is a vertical *rotation root*:
+            // laid out in a logical frame whose frame-width is its inline size and frame-height its
+            // block size, then transposed into physical space. ResolvePhysicalSize feeds that frame
+            // from the swapped physical properties (frame-width ← CSS height, frame-height ← CSS
+            // width) precisely so an authored physical width/height survives the rotation. A
+            // percentage does not survive it: the swapped property still resolves against the
+            // containing block's same-named axis, so `height: 100%` became frame-width = the box's
+            // *width*, and the rotation handed back a content box 100x40000 where the capture was
+            // 40000x100. Measured on WPT massive-element-{left,right}-of-viewport-partially-onscreen,
+            // whose `:root { writing-mode: vertical-lr }` is the single line separating them from the
+            // -on-top-of-/below- variants that already passed: the 100px band rendered as a
+            // viewport-tall slab. A length resolves on the axis it is authored for, so it is the only
+            // form that crosses the rotation intact.
             style["width"] = Px(capturedWidth);
             style["height"] = Px(capturedHeight);
-            style["transform"] =
-                $"translate({Px(growthX)}, {Px(growthY)}) scale({scale.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)})";
+
+            if (scale is not 1)
+            {
+                // The snapshot must grow from its top-left corner, but the paint walker applies every
+                // transform about the box's centre and does not read `transform-origin`. Composing a
+                // translate of half the growth ahead of the scale expresses a top-left-origin scale in
+                // terms of the centre-origin one it does implement: a point p maps to C + T·S·(p - C),
+                // so t = C(s - 1) puts the corner back at the origin. Without it the snapshot expands
+                // equally in all four directions and the group clips away everything above and left of
+                // its centre — which is exactly what this looked like: a 200x120 capture scaled 5.12x
+                // showed 612x368 of blue instead of filling the group.
+                var growthX = capturedWidth * (scale - 1) / 2;
+                var growthY = capturedHeight * (scale - 1) / 2;
+                style["transform"] =
+                    $"translate({Px(growthX)}, {Px(growthY)}) scale({scale.ToString("0.#####", System.Globalization.CultureInfo.InvariantCulture)})";
+            }
         }
 
         AppendBridgeChild(box, clone);
