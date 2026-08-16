@@ -37,14 +37,52 @@ Their regression guards are `MulticolCheckLayoutTimeoutTests` and
 | 5 | `html/webappapis/scripting/processing-model-2` | `for(;)` parsed as `for(;;)` — a SyntaxError became an infinite loop. `Broiler.JS`, shipped as a patch. |
 | 28 | `encoding/legacy-mb-*` | Not encoding. Stylesheet discovery re-walked the whole tree once per element resolved. |
 | 3 | `conformance-checkers/…/table/integrity` | The tail of the same discovery quadratic. |
-| 1 | `conformance-checkers/…/img/src-isvalid` | Synchronous image fetch on the layout thread with no `HttpClient` timeout — .NET's 100 s default, per unroutable host, per layout pass. |
+| 1 | `conformance-checkers/…/img/src-isvalid` | Synchronous image fetch on the layout thread with no `HttpClient` timeout — .NET's 100 s default, per unroutable host, per layout pass. Took **two** attempts; see below. |
+| 1 | `css/CSS2/cascade-import/cascade-import-009` | Not the cascade. Three `<link>`s to a CGI that pauses by design, fetched once per pass — and a run has three fetchers, only one of which had a policy. See below. |
 | 1 | `css/css-break/…/special-elements-crash` | Not fragmentation. `elementFromPoint` built and tore down a full geometry snapshot per element visited. |
 | 1 | `css/css-fonts/variations/font-opentype-collections` | Not the TTC parser. The runner's synchronous `requestAnimationFrame` stub had no re-entrancy cap, so a non-converging rAF loop recursed to CLR stack exhaustion. |
 | 20 | `css/css-overflow` | Not overflow. A geometry snapshot was torn down at the end of every read pass, so a `scrollTop` write — which clamps against four extents — laid the whole document out four times. See below. |
 
 Guards: `StyleSheetDiscoveryCacheTests`, `HitTestAndRafBudgetTimeoutTests`,
-`ScrollWriteGeometryTimeoutTests`, `RetainedLayoutSnapshotTests`, and the
-`for`-head theories inside the `Broiler.JS` patch.
+`ScrollWriteGeometryTimeoutTests`, `RetainedLayoutSnapshotTests`,
+`WptResourceHandlersTests`, `OfflineSubresourcesTests`, and the `for`-head
+theories inside the `Broiler.JS` patch.
+
+### The two network timeouts — a policy on one of three fetchers
+
+Both are the same finding, and the first of them is worth reading as a
+**correction**: `src-isvalid` was fixed once, the fix was right, and the test
+timed out again in the next run.
+
+That fix marked an off-corpus `<img>` handled on the container the runner paints
+with, so the engine never reached the downloader. It was verified against all 88
+of the test's sources. What it missed is that **a run lays each document out more
+than once**:
+
+| pass | container / loader | had a policy? |
+| --- | --- | --- |
+| script bridge geometry (`DomBridge` → `HeadlessLayoutView`) | an `HtmlContainer` of its own | no |
+| bridge stylesheet loader, incl. the speculative preload scan | `ResourceLoader`, on a worker | no |
+| the render | the container the runner attaches handlers to | yes |
+
+So the guarded pass was the *last* one. The geometry pass fetched all 31
+off-corpus hosts of `src-isvalid` at the uncapped 100 s default, and finished the
+budget before the render it was feeding began. `cascade-import-009` is the same
+absence read through stylesheets: three `<link>`s to `software.hixie.ch`'s
+`delayed-file` CGI, which pauses 2, 5 and 8 s *by design*, fetched once per pass —
+about 24 s of a 30 s budget.
+
+The fix is one policy asked at every fetch rather than a handler on one
+container: `Broiler.Layout.Engine.OfflineSubresources` (a host-set predicate over
+the URL, unset and therefore inert for a renderer that has a network) consulted at
+the image load sites, and `ResourceLoader.NetworkFetchPolicy` on the bridge's own.
+`cascade-import-009` went 30.7 s → 2.3 s, which is this container's process
+start-up and nothing else.
+
+**What to take from it:** "the runner does not fetch X" is a claim about a
+*container*, and the runner has more than one. Before trusting one, check which
+pass you measured — a `Environment.StackTrace` at the fetch names the caller in
+one run and would have shown this immediately.
 
 ### `css/css-overflow` — how the 20 were fixed
 

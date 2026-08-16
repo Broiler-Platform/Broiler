@@ -77,8 +77,12 @@ internal sealed class CssBoxImage : CssBox
 
         if (Content != null && Content != CssConstants.Normal)
         {
-            LoadImageWithAnimationPolicy(
-                () => _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl));
+            // Declined by the host (see OfflineSubresources): not starting the load leaves this box
+            // in exactly the state a load the host marked handled leaves it in — the handler is
+            // built, nothing completes, and the image is the missing one it was always going to be.
+            if (!OfflineSubresources.Denies(Content))
+                LoadImageWithAnimationPolicy(
+                    () => _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl));
             return;
         }
 
@@ -98,8 +102,9 @@ internal sealed class CssBoxImage : CssBox
         // <object data="..."> fallback: use 'data' attribute when 'src' is absent
         if (string.IsNullOrEmpty(src))
             src = GetAttribute("data");
-        LoadImageWithAnimationPolicy(
-            () => _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
+        if (!OfflineSubresources.Denies(src))
+            LoadImageWithAnimationPolicy(
+                () => _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
     }
 
     /// <inheritdoc/>

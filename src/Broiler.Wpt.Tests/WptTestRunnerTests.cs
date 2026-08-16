@@ -11708,8 +11708,8 @@ div {{ width: 256px; height: 768px; }}
     [InlineData("http://192.0x00A80001")]
     [InlineData("http://[2001::1]")]
     [InlineData("http://[2001::1]:80/x.png")]
-    public void IsOffCorpusNetworkImage_FlagsRemoteHosts(string src) =>
-        Assert.True(WptTestRunner.IsOffCorpusNetworkImage(src), src);
+    public void IsOffCorpusNetworkResource_FlagsRemoteHosts(string src) =>
+        Assert.True(WptTestRunner.IsOffCorpusNetworkResource(src), src);
 
     [Theory]
     // Never suppress something the run can actually serve or that names no host at all: the
@@ -11721,17 +11721,17 @@ div {{ width: 256px; height: 768px; }}
     [InlineData("file:///tmp/x.png")]
     [InlineData("")]
     [InlineData(null)]
-    public void IsOffCorpusNetworkImage_LeavesLocalAndNonNetworkSourcesAlone(string? src) =>
-        Assert.False(WptTestRunner.IsOffCorpusNetworkImage(src), src ?? "(null)");
+    public void IsOffCorpusNetworkResource_LeavesLocalAndNonNetworkSourcesAlone(string? src) =>
+        Assert.False(WptTestRunner.IsOffCorpusNetworkResource(src), src ?? "(null)");
 
     [Fact]
-    public void IsOffCorpusNetworkImage_LeavesCorpusServedHostsAlone()
+    public void IsOffCorpusNetworkResource_LeavesCorpusServedHostsAlone()
     {
         // A `.sub` template's URLs are absolute on a WPT host once substituted, and WPT serves
         // every one of those from the same checkout — so they are files, not fetches.
         foreach (var host in WptSubstitution.ServedHosts.Take(8))
         {
-            Assert.False(WptTestRunner.IsOffCorpusNetworkImage($"http://{host}:8000/images/blue.png"),
+            Assert.False(WptTestRunner.IsOffCorpusNetworkResource($"http://{host}:8000/images/blue.png"),
                 $"corpus-served host {host} must not be treated as a network fetch");
         }
     }

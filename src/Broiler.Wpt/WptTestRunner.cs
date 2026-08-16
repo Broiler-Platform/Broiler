@@ -1943,26 +1943,8 @@ internal sealed partial class WptTestRunner
         EventHandler<HtmlImageLoadEventArgs> imageHandler = null;
         if (wptRoot != null)
         {
-            var capturedWptRoot = wptRoot;
-            stylesheetHandler = (_, args) =>
-            {
-                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
-                if (local != null)
-                    args.SetSrc = local;
-            };
-            imageHandler = (_, args) =>
-            {
-                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
-                if (local != null)
-                {
-                    args.Callback(local);
-                    return;
-                }
-
-                // Everything else that names a remote host is a fetch this run must not make.
-                if (IsOffCorpusNetworkImage(args.Src))
-                    args.Handled = true;
-            };
+            stylesheetHandler = WptResourceHandlers.Stylesheet(wptRoot);
+            imageHandler = WptResourceHandlers.Image(wptRoot);
         }
 
         // Render via Broiler HTML stack.
@@ -2569,6 +2551,48 @@ internal sealed partial class WptTestRunner
     }
 
     /// <summary>
+    /// True when <paramref name="src"/> is an absolute http(s) URL on a host the corpus does not
+    /// serve — i.e. a sub-resource the engine would fetch off the real network.
+    /// </summary>
+    /// <remarks>
+    /// A conformance run must not touch the network, and one that does is not merely impure — it
+    /// is slow in a way no per-test budget survives. Both loaders are synchronous on the layout
+    /// thread (<c>HtmlRender</c> sets <c>AvoidAsyncImagesLoading</c>), so a fetch blocks the render
+    /// for as long as the host takes to answer — and an unroutable one never does, so what it costs
+    /// is the client's whole timeout: five seconds for a <c>&lt;link&gt;</c>, and .NET's 100-second
+    /// default for an <c>&lt;img&gt;</c> until the engine-side cap lands. Neither is a render, and
+    /// neither is cached, so the next layout pass pays it again.
+    /// <para>
+    /// Both timed-out tests of the 2026-08-16 run are this and nothing else.
+    /// <c>css/CSS2/cascade-import/cascade-import-009.xht</c> links three stylesheets to a
+    /// <c>delayed-file</c> CGI on a personal server that pauses 2, 5 and 8 seconds by design;
+    /// <c>conformance-checkers/html/elements/img/src-isvalid.html</c> is 88 <c>&lt;img&gt;</c> with
+    /// 88 distinct sources, deliberately including IP literals (<c>http://192.0x00A80001</c>) and
+    /// documentation addresses (<c>http://[2001::1]</c>) that black-hole on a CI runner with real
+    /// internet. One of either is enough to lose the test.
+    /// </para>
+    /// <para>
+    /// Suppressing the load rather than redirecting it is what the corpus wants: the resource does
+    /// not load, which is exactly what these tests are checking the parser does with the URL.
+    /// </para>
+    /// </remarks>
+    internal static bool IsOffCorpusNetworkResource(string? src)
+    {
+        if (string.IsNullOrWhiteSpace(src)
+            || !Uri.TryCreate(src, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+            return false;
+
+        foreach (var served in WptSubstitution.ServedHosts)
+        {
+            if (string.Equals(uri.Host, served, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Maps a root-relative WPT URL (<c>/images/blue.png</c>, <c>/fonts/Ahem.ttf</c>) — or an
     /// absolute one on a host WPT serves from the same checkout
     /// (<c>http://www.web-platform.test:8000/images/blue.png</c>, which is what a substituted
@@ -2585,51 +2609,6 @@ internal sealed partial class WptTestRunner
     /// (WPT resource-timing/tentative/initiator-url/static-resource, resource-timing/initiator-type/misc).
     /// </para>
     /// </summary>
-    /// <summary>
-    /// True when <paramref name="src"/> is an absolute http(s) URL on a host the corpus does not
-    /// serve — i.e. an image the engine would fetch off the real network.
-    /// </summary>
-    /// <remarks>
-    /// A conformance run must not touch the network, and one that does is not merely impure — it
-    /// is slow in a way no per-test budget survives. Image loading is synchronous here
-    /// (<c>HtmlRender</c> sets <c>AvoidAsyncImagesLoading</c>), so the fetch blocks the layout
-    /// thread, and <c>ImageDownloader</c>'s shared <c>HttpClient</c> sets no <c>Timeout</c> — so an
-    /// unroutable host stalls for .NET's 100-second default, more than three times the whole
-    /// per-test budget, and does it again on the next layout pass because failures are not cached.
-    /// <c>conformance-checkers/html/elements/img/src-isvalid.html</c> is 88 <c>&lt;img&gt;</c> with
-    /// 88 distinct sources, some of them deliberately exotic hosts — IP literals like
-    /// <c>http://192.0x00A80001</c> and documentation addresses like <c>http://[2001::1]</c> — that
-    /// black-hole on a CI runner with real internet. One is enough to time the test out. (It passes
-    /// here only because this container's proxy answers those instantly.)
-    /// <para>
-    /// Suppressing the load rather than redirecting it is what the corpus wants: the image does not
-    /// load, which is exactly what the test is checking the parser does with the URL.
-    /// <c>args.Callback</c> cannot express that — it throws on an empty path — so the load is
-    /// marked handled, which is the flag <c>ImageLoadHandler.LoadImage</c> gates the whole fetch on.
-    /// </para>
-    /// <para>
-    /// The complementary fix belongs in the engine, where <c>ImageDownloader</c>'s client should
-    /// carry a short timeout the way the stylesheet loader's already does (WPT #1147) — that one is
-    /// in the Broiler.HTML submodule and ships as a patch. This is the half that needs no patch and
-    /// is the more correct behaviour for a sandboxed runner regardless.
-    /// </para>
-    /// </remarks>
-    internal static bool IsOffCorpusNetworkImage(string? src)
-    {
-        if (string.IsNullOrWhiteSpace(src)
-            || !Uri.TryCreate(src, UriKind.Absolute, out var uri)
-            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
-            return false;
-
-        foreach (var served in WptSubstitution.ServedHosts)
-        {
-            if (string.Equals(uri.Host, served, StringComparison.OrdinalIgnoreCase))
-                return false;
-        }
-
-        return true;
-    }
-
     internal static string? TryResolveWptRootRelativePath(string? src, string wptRoot)
     {
         // A `.sub` template's URLs are absolute and on a WPT host (`http://www.web-platform.test:8000/…`)
@@ -2735,26 +2714,8 @@ internal sealed partial class WptTestRunner
         EventHandler<HtmlImageLoadEventArgs>? imageHandler = null;
         if (wptRoot != null)
         {
-            var capturedWptRoot = wptRoot;
-            stylesheetHandler = (_, args) =>
-            {
-                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
-                if (local != null)
-                    args.SetSrc = local;
-            };
-            imageHandler = (_, args) =>
-            {
-                var local = TryResolveWptRootRelativePath(args.Src, capturedWptRoot);
-                if (local != null)
-                {
-                    args.Callback(local);
-                    return;
-                }
-
-                // Everything else that names a remote host is a fetch this run must not make.
-                if (IsOffCorpusNetworkImage(args.Src))
-                    args.Handled = true;
-            };
+            stylesheetHandler = WptResourceHandlers.Stylesheet(wptRoot);
+            imageHandler = WptResourceHandlers.Image(wptRoot);
         }
 
         using var presentation = ImageAnimationClock.Pin(presentationTime);
@@ -3179,6 +3140,12 @@ internal sealed partial class WptTestRunner
         string? wptRoot = null,
         bool batchStyleInvalidations = false)
     {
+        // This method is what drives the bridge's headless geometry pass, and that pass builds a
+        // container of its own — out of reach of the handlers the render is handed afterwards. Tell
+        // the policy which checkout to resolve against here, at the one boundary every caller of the
+        // geometry pass goes through (RunSingleTest, RenderHtmlFileBitmapCore, a worker process).
+        WptResourceHandlers.Root = wptRoot;
+
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
         var microTasks = new MicroTaskQueue();

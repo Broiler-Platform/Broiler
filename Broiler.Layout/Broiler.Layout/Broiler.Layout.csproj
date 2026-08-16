@@ -32,7 +32,8 @@
          item #12), the same way the tile-scaling mode sets TileParallelReplay's budget. -->
     <InternalsVisibleTo Include="Broiler.Render.Stage.Benchmarks" />
     <!-- The WPT runner sets NativeAnchorPlacement.Enabled around only the final
-         render during the Phase 5 native anchor-placement cutover (P5.8d.2b). -->
+         render during the Phase 5 native anchor-placement cutover (P5.8d.2b), and
+         installs OfflineSubresources.FetchPolicy for the whole run. -->
     <InternalsVisibleTo Include="Broiler.Wpt" />
     <!-- The headless layout view (the script bridge's ILayoutView) enables
          NativeAnchorPlacement around its geometry layout so the live read model
