@@ -195,9 +195,6 @@ set -euo pipefail
 # css/CSS2/tables/table-anonymous-objects-* test still renders its bare red table with the green
 # layer missing.
 PENDING_PATCHES=(
-  "Broiler.JS|patches/0001-reject-one-semicolon-for-head.patch"
-  "Broiler.HTML|patches/0003-generate-anonymous-table-parents.patch"
-  "Broiler.HTML|patches/0004-decline-off-corpus-stylesheet-fetch.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
