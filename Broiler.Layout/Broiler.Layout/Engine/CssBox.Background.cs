@@ -60,8 +60,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 deferred is null ? OnImageLoadComplete : deferred.OnCompleted);
 
             _backgroundImageLoadHandlers.Add(imageLoadHandler);
-            LoadImageWithAnimationPolicy(
-                () => imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
+
+            // Declined by the host (see OfflineSubresources): the layer paints nothing, which is
+            // where an unreachable background image ends up anyway — after the wait, not instead of
+            // it. The handler is still recorded so the layer indices stay aligned.
+            if (!OfflineSubresources.Denies(src))
+                LoadImageWithAnimationPolicy(
+                    () => imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
         }
     }
 

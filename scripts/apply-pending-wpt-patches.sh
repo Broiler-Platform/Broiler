@@ -158,15 +158,32 @@ set -euo pipefail
 # 2.5 minutes of a shard's budget spent waiting on loops that cannot end.
 #
 # 0002 (Broiler.HTML, cap the image fetch timeout) is deliberately NOT listed, even though it
-# fixes a timeout. Its main-repo half already covers the WPT run: WptTestRunner's image handler
-# marks an off-corpus http(s) <img> handled, so the runner never reaches the downloader and the
-# 100-second default it caps cannot be hit here. (Worth recording, because it is the obvious next
-# suspicion and it is wrong: the handler decides from Uri.TryCreate, and of the 88 sources in
-# conformance-checkers/html/elements/img/src-isvalid.html only two fail to parse — `http💩//:foo`
-# and `💩http://foo` — and neither names http(s), so nothing exotic in that file slips past it.)
-# The patch matters for the real browser, where there is no such handler and an unreachable <img>
-# still stalls the render — so it is a correctness fix to land upstream, not something a WPT run
-# needs applied on top of the pointer.
+# fixes a timeout — but the reason recorded here was wrong for one run, and the correction is worth
+# keeping. It said the main-repo half already covered the WPT run: WptTestRunner's image handler
+# marks an off-corpus http(s) <img> handled, so the runner never reaches the downloader. That is
+# true of the container the runner *paints* with, and only of it. A run lays each document out
+# twice — the script bridge lays it out headlessly to answer geometry reads, in a container of its
+# own that no handler was ever attached to — and that pass fetched all 31 off-corpus hosts of
+# conformance-checkers/html/elements/img/src-isvalid.html at the uncapped 100-second default. The
+# test timed out again on 2026-08-16 with the handler in place, which is what showed it.
+# Broiler.Layout's OfflineSubresources now declines those loads in the engine, for every container
+# rather than one, so the claim holds as stated: no <img> in a run reaches the downloader with an
+# off-corpus http(s) URL, and the default this patch caps cannot be hit here. The patch still
+# matters for the real browser, where no such policy is installed and an unreachable <img> stalls
+# the render — a correctness fix to land upstream, not something a WPT run needs on top of the
+# pointer.
+#
+# The off-corpus stylesheet patch (Broiler.HTML, "load: let the host decline a stylesheet fetch it
+# knows cannot succeed") IS listed, and it is the other half of the same finding. Images are
+# reachable from the main repo — the load starts in Broiler.Layout's CssBoxImage — but a <link> is
+# loaded from DomParser through StylesheetLoadHandler, both submodule files, so the geometry pass's
+# sheets cannot be declined without this one line. Without it a run still fetches every off-corpus
+# <link> once, at five seconds each: css/CSS2/cascade-import/cascade-import-009.xht (three <link>s
+# to a CGI that pauses 2, 5 and 8 seconds by design) renders in 14 s instead of 2 s. That is under
+# the 30-second budget — the main-repo half alone already stops it timing out — so this patch buys
+# the rest of the budget back rather than the test, and the main repo builds and runs correctly
+# whether or not it is applied: it names nothing new in the submodule, and the type the patch calls
+# is main-repo.
 #
 # The anonymous-table-parent patch (Broiler.HTML, "parse: generate the anonymous table a
 # misparented table box needs") IS listed, and it is the plainest case for listing there is:
@@ -180,6 +197,7 @@ set -euo pipefail
 PENDING_PATCHES=(
   "Broiler.JS|patches/0001-reject-one-semicolon-for-head.patch"
   "Broiler.HTML|patches/0003-generate-anonymous-table-parents.patch"
+  "Broiler.HTML|patches/0004-decline-off-corpus-stylesheet-fetch.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

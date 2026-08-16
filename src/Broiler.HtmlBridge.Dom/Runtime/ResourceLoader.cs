@@ -26,6 +26,25 @@ internal sealed class ResourceLoader
     private static readonly HttpClient SharedClient = new() { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
 
     /// <summary>
+    /// Host policy on which absolute URLs may be fetched over the network at all, or
+    /// <see langword="null"/> (the default) to permit every one — what a browser does. The engine
+    /// side of the same question is <c>Broiler.Layout.Engine.OfflineSubresources</c>; a host that
+    /// sets one normally sets both, since a document's sheets are requested from here and its
+    /// images from there.
+    /// </summary>
+    /// <remarks>
+    /// The timeout above bounds an unreachable host; it does not make one free. A host that knows
+    /// in advance that a URL cannot resolve to anything — the conformance runner, whose whole
+    /// corpus is a directory on disk — pays five seconds per such URL to be told what it already
+    /// knew, and pays it inside a per-test budget of thirty. Declining here reports the resource as
+    /// not loaded, which is where the fetch was going to end anyway.
+    /// </remarks>
+    internal static Func<string?, bool>? NetworkFetchPolicy;
+
+    private static bool MayFetchOverNetwork(string url) =>
+        NetworkFetchPolicy is null || NetworkFetchPolicy(url);
+
+    /// <summary>
     /// Optional local base directory for resolving relative sub-resource URLs to files. When set,
     /// relative URLs are checked against this directory before an HTTP fetch is attempted.
     /// </summary>
@@ -70,6 +89,14 @@ internal sealed class ResourceLoader
             if (uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
                 uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))
             {
+                // Declined by the host: reported as not loaded, and traced as such, so it is
+                // indistinguishable from the failed fetch it stands in for except in what it cost.
+                if (!MayFetchOverNetwork(url))
+                {
+                    attempt.Completed(null);
+                    return null;
+                }
+
                 var content = GetStringAsync(url).ConfigureAwait(false).GetAwaiter().GetResult();
                 attempt.Completed(content);
                 return content;
@@ -110,7 +137,11 @@ internal sealed class ResourceLoader
         if (urls.Count < minimumToOverlap)
             return;
 
-        Prefetcher().Prefetch(urls.Where(url => Uri.TryCreate(url, UriKind.Absolute, out _)));
+        // A URL the host will not let the consume path fetch must not be speculated on either: the
+        // prefetch is the same request, issued earlier and on a worker, so leaving it unfiltered
+        // would keep the whole cost the policy exists to remove — and pay it before the parse.
+        Prefetcher().Prefetch(urls.Where(url =>
+            Uri.TryCreate(url, UriKind.Absolute, out _) && MayFetchOverNetwork(url)));
     }
 
     /// <summary>

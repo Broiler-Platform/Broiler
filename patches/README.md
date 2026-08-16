@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Three patches are waiting on a maintainer.** See the index below.
+**Four patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -49,6 +49,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0001` | `Broiler.JS` | Reject a `for` head that carries only one semicolon |
 | `0002` | `Broiler.HTML` | Cap the image fetch timeout, as the stylesheet fetch already is |
 | `0003` | `Broiler.HTML` | parse: generate the anonymous table a misparented table box needs |
+| `0004` | `Broiler.HTML` | load: let the host decline a stylesheet fetch it knows cannot succeed |
 
 The eight patches that held `0001`–`0008` before these two are all upstream and all
 reachable through the pinned pointers, so their files are gone and the numbering has
@@ -153,13 +154,26 @@ renders in ~5 s in this container only because the agent proxy answers those
 instantly, which is precisely why the timeout looked unreproducible locally.
 
 **Why it is NOT listed in `scripts/apply-pending-wpt-patches.sh`.** The main-repo
-half already covers the WPT run: `WptTestRunner`'s image handler now marks an
-off-corpus http(s) `<img>` handled, so the runner never reaches the downloader
-and cannot hit the default this caps. A sandboxed conformance run should not
-touch the network at all, which is the more correct behaviour independently. The
-patch matters for the **real browser**, where there is no such handler and an
-unreachable `<img>` still stalls the render — so it is a correctness fix to land
-upstream, not something a WPT run needs applied on top of the pointer.
+half already covers the WPT run: no `<img>` in a run reaches the downloader with
+an off-corpus http(s) URL, so the default this caps cannot be hit here. A
+sandboxed conformance run should not touch the network at all, which is the more
+correct behaviour independently. The patch matters for the **real browser**,
+where no such policy is installed and an unreachable `<img>` still stalls the
+render — so it is a correctness fix to land upstream, not something a WPT run
+needs applied on top of the pointer.
+
+**That claim was wrong once, and the correction is worth more than the claim.**
+It used to rest on `WptTestRunner`'s image handler marking an off-corpus `<img>`
+handled — which is true of the container the runner *paints* with, and only of
+it. A run lays each document out **twice**: the script bridge lays it out
+headlessly to answer geometry reads, in a container of its own that no handler
+was ever attached to, and that pass fetched all 31 off-corpus hosts of
+`src-isvalid.html` at the uncapped 100-second default, before the guarded render
+had started. The test timed out again on 2026-08-16 with the handler in place,
+which is what showed it. `Broiler.Layout.Engine.OfflineSubresources` now declines
+the load in the engine, at `CssBoxImage`'s and `CssBox.Background`'s load sites,
+so the policy holds for every container rather than one — and the entry can stay
+off the list for the reason originally given.
 
 **Not fixed here:** the missing negative cache. A URL that already failed is
 still re-fetched on the next layout pass; with a 5-second cap that is now an
@@ -200,6 +214,45 @@ at all. Passing by omission; they now render and show the residual geometry gap.
 
 **Why it is listed in `scripts/apply-pending-wpt-patches.sh`.** Without this line the
 main-repo half never runs, so nothing about the fix reaches a WPT run.
+
+**When it lands upstream:** bump the pointer, drop the entry from
+`scripts/apply-pending-wpt-patches.sh`, and delete this patch.
+
+### `0004` — the run had three fetchers and a policy on one of them
+
+A timeout cap bounds an unreachable host; it does not make one free. The external
+stylesheet client is capped at five seconds, and
+`css/CSS2/cascade-import/cascade-import-009.xht` links three sheets to a `delayed-file`
+CGI on a personal server that pauses 2, 5 and 8 seconds by design — so the cap is what
+each of them costs, every time the document is laid out.
+
+**And a run lays each document out more than once.** The script bridge lays it out
+headlessly to answer the geometry reads scripts make (`DomBridge` → `HeadlessLayoutView`),
+the runner lays it out again to paint it, and the bridge fetches external sheets through
+a loader of its own besides — whose *speculative preload scan* puts them on the wire from
+a worker before the parse has even started. Only the paint container had the runner's
+handlers on it. So the same three unreachable sheets were fetched three times over, about
+twenty-four seconds of a thirty-second budget, and the test was reported as a timeout
+rather than run. The same absence is what kept
+`conformance-checkers/html/elements/img/src-isvalid.html` timing out after its own fix had
+landed — see `0002` above, which records the wrong reason it was thought to be covered.
+
+**Only the one-line consult is in this patch.** The policy —
+`Broiler.Layout.Engine.OfflineSubresources`, a host-set predicate over the URL, unset and
+therefore inert for a renderer that has a network — is a main-repo type, as are the image
+load sites (`CssBoxImage`, `CssBox.Background`) and the bridge's own loader. A `<link>` is
+the one sub-resource whose load starts in the submodule (`DomParser` →
+`StylesheetLoadHandler`), which is why this line exists at all.
+
+**Measured** on `cascade-import-009.xht`: 30.7 s → 14.4 s with the main-repo half alone,
+→ 2.3 s with this line as well (2.2 s is the process's own start-up, so that is the whole
+of it). The main-repo half is therefore what stops the timeout; this patch buys back the
+rest of the budget.
+
+**The main repo builds and runs correctly without it.** It names nothing new in
+`Broiler.HTML` — the dependency points the other way, at a main-repo type — so a workflow
+that builds `src/Broiler.Wpt` without applying patches (the WPT Reftests one does exactly
+that) compiles and behaves as it did, only slower on the documents this speeds up.
 
 **When it lands upstream:** bump the pointer, drop the entry from
 `scripts/apply-pending-wpt-patches.sh`, and delete this patch.
