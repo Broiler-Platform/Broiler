@@ -32,6 +32,21 @@ own ``wpt-results.json``. This script combines those shard reports to produce:
   out the ``--render`` command to reproduce a listed test, so every entry points
   at its cause. This is the "what hurt most this run" companion to the
   frequency-ranked ``--issue-md`` view.
+* ``--timeout-issue-md`` — a Markdown body for a *third* issue listing only the
+  tests the runner had to abort at the per-test timeout, ranked by the size of
+  the test's own source, **smallest first**. A timeout is not a mismatch you can
+  read a percentage off, so neither of the other two issues ranks it usefully:
+  the frequency view collapses every timeout into one ``Timeout`` row, and the
+  severity view ranks on pixel scores a timed-out test never produced. Source
+  size is the signal that separates them, and it separates them the counter-
+  intuitive way round: the *less* there is in a document, the less of it can be
+  legitimately slow, so the likelier its timeout is an engine hang — a layout
+  loop that never terminates, a parser that never advances — rather than a heavy
+  page that merely wants more than the budget. A 30s timeout on a 40 MB stress
+  test says the budget is tight; the same timeout on a 400-byte document says
+  something does not terminate, and that bug usually gates far more than the one
+  test. The issue also clusters the timeouts by directory, because a directory
+  full of them is one hang gating a feature area rather than N problems.
 
 When ``--merge-into`` names an existing manifest, the run's failures are folded
 into it *by scope* instead of replacing it: entries for tests this run actually
@@ -52,11 +67,11 @@ happened to.
 When ``--github-output`` is given (the ``$GITHUB_OUTPUT`` file), the script also
 writes ``failed_count``, ``total_count``, ``incomplete_shard_count``,
 ``create_issue``, ``biggest_problem_count``, ``create_biggest_issue``,
-``incomplete_shard_indexes``, ``incomplete_shard_matrix``,
-``has_incomplete_shards`` and ``retried_shard_count`` step outputs.
-``create_(biggest_)issue`` drive the two issues; the ``incomplete_shard_*``
-trio drives the retry pass, which re-dispatches exactly the shards flagged
-incomplete.
+``timeout_count``, ``create_timeout_issue``, ``incomplete_shard_indexes``,
+``incomplete_shard_matrix``, ``has_incomplete_shards`` and
+``retried_shard_count`` step outputs. ``create_(biggest_|timeout_)issue`` drive
+the three issues; the ``incomplete_shard_*`` trio drives the retry pass, which
+re-dispatches exactly the shards flagged incomplete.
 """
 
 from __future__ import annotations
@@ -93,6 +108,29 @@ DEFAULT_LOW_MATCH_THRESHOLD = 50.0
 # misses still surfaces its worst renders instead of an empty severity issue.
 LOW_MATCH_THRESHOLD_STEP = 10.0
 LOW_MATCH_THRESHOLD_CEILING = 100.0
+
+# The third, timeout-only issue lists at most this many timed-out tests, smallest
+# source first. Ten is enough to show the whole small-file head of the ranking —
+# past that the entries are large documents whose timeout says little.
+DEFAULT_TIMEOUT_LIMIT = 10
+
+#: Source-size bands used to label a timeout's severity, as
+#: ``(upper bound in bytes, label)`` ordered by ascending bound; anything above
+#: the last bound gets ``TIMEOUT_LARGE_LABEL``. The bounds are deliberately
+#: coarse — the ranking is the file size itself, and these only exist so a reader
+#: does not have to hold "is 3 KiB small for a WPT test?" in their head. For
+#: calibration: a WPT test that is nothing but a fragment of markup plus a
+#: stylesheet link lands around 0.5–2 KiB, and one carrying its own script
+#: harness around 4–8 KiB.
+TIMEOUT_SIZE_BANDS = (
+    (2 * 1024, "critical"),
+    (8 * 1024, "high"),
+    (32 * 1024, "medium"),
+)
+TIMEOUT_LARGE_LABEL = "low"
+#: Label for a timeout whose source size could not be read. It is not a severity
+#: — nothing is known — so it sorts last rather than anywhere on the scale.
+TIMEOUT_UNKNOWN_LABEL = "unranked"
 
 
 def _bucket_directory(relative_path: str) -> str:
@@ -659,12 +697,97 @@ def _rank_biggest_problems_escalating(
         threshold = min(threshold + LOW_MATCH_THRESHOLD_STEP, LOW_MATCH_THRESHOLD_CEILING)
 
 
+def _timeout_directory(relative_path: str) -> str:
+    """The directory a timed-out test lives in, mirroring the runner's own bucket
+    (``Program.GetBucketDirectory``): the test's parent directory, or ``.`` at the
+    root. Only used for reports predating ``triage.timeoutFailures``, which carry
+    the directory the runner computed."""
+    directory, _, _filename = relative_path.rpartition("/")
+    return directory or "."
+
+
+def _record_timeout(
+    store: dict[str, dict],
+    relative_path: str,
+    directory: str,
+    message: str | None,
+    size_bytes: int | None,
+) -> None:
+    """Remember one timed-out test, preferring the record that knows its size.
+
+    A test can be described twice — once by ``triage.timeoutFailures`` (with its
+    source size) and once by the bare ``results`` entry the fallback scan reads
+    (without one). Whichever arrives first, the sized record wins, so the ranking
+    never loses a measurement it was given.
+    """
+    existing = store.get(relative_path)
+    if existing is not None and (existing.get("fileSizeBytes") is not None or size_bytes is None):
+        return
+    store[relative_path] = {
+        "relativeTestPath": relative_path,
+        "directory": directory,
+        "message": message,
+        "fileSizeBytes": size_bytes,
+    }
+
+
+def _timeout_severity(size_bytes: int | None) -> str:
+    """Coarse severity label for a timeout, read off the test's source size."""
+    if size_bytes is None:
+        return TIMEOUT_UNKNOWN_LABEL
+    for upper_bound, label in TIMEOUT_SIZE_BANDS:
+        if size_bytes < upper_bound:
+            return label
+    return TIMEOUT_LARGE_LABEL
+
+
+def _format_file_size(size_bytes: int | None) -> str:
+    """Human-readable byte count, matching the runner's own formatting."""
+    if size_bytes is None:
+        return "size unknown"
+    if size_bytes >= 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MiB"
+    # Bytes, not "0.0 KiB", below a kilobyte: the head of this ranking is made of
+    # exactly those files, and rounding them all to the same 0.0 would hide the
+    # one distinction the report exists to draw.
+    if size_bytes >= 1024:
+        return f"{size_bytes / 1024:.1f} KiB"
+    return f"{size_bytes} B"
+
+
+def _rank_timeouts(timeout_tests: dict[str, dict], limit: int) -> list[dict]:
+    """The run's timed-out tests, smallest source first, bounded to ``limit``.
+
+    Ascending size is the whole ranking, and it is the point of this report: the
+    smaller the document, the less of it can be legitimately slow, so the likelier
+    its timeout is an engine hang than a heavy page (see the module docstring). A
+    test whose size could not be read sorts last — it carries no signal either way
+    and must not displace a measured small file.
+    """
+    ranked = sorted(
+        timeout_tests.values(),
+        key=lambda test: (
+            test["fileSizeBytes"] is None,
+            test["fileSizeBytes"] if test["fileSizeBytes"] is not None else 0,
+            test["relativeTestPath"],
+        ),
+    )
+    return [
+        {
+            **test,
+            "severity": _timeout_severity(test["fileSizeBytes"]),
+        }
+        for test in ranked[:limit]
+    ]
+
+
 def merge(
     shard_dir: Path,
     problem_limit: int = DEFAULT_PROBLEM_LIMIT,
     biggest_problem_limit: int = DEFAULT_BIGGEST_PROBLEM_LIMIT,
     low_match_threshold: float = DEFAULT_LOW_MATCH_THRESHOLD,
     expected_shard_indexes: set[int] | None = None,
+    timeout_limit: int = DEFAULT_TIMEOUT_LIMIT,
 ) -> dict:
     passed = failed = skipped = total = 0
     shard_count = 0
@@ -676,6 +799,7 @@ def merge(
     exception_signature_counter: Counter[str] = Counter()
     exception_examples: dict[str, list[str]] = {}
     low_match_tests: list[dict] = []
+    timeout_tests: dict[str, dict] = {}
     problem_groups: dict[str, dict] = {}
     family_groups: dict[str, dict] = {}
     reported_shard_indexes: set[int] = set()
@@ -768,6 +892,26 @@ def merge(
                     }
                 )
 
+            # Tests the runner aborted at the per-test timeout, each with the size
+            # of its own source — the signal the timeouts issue ranks on. The
+            # results loop below re-reads the same failures for reports that predate
+            # this triage entry, so the issue is complete either way; only the sizes
+            # (and therefore the ranking) need this.
+            for entry in triage.get("timeoutFailures", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                relative_path = entry.get("testPath") or entry.get("relativeTestPath")
+                if not relative_path:
+                    continue
+                size_bytes = entry.get("fileSizeBytes")
+                _record_timeout(
+                    timeout_tests,
+                    str(relative_path),
+                    str(entry.get("directory") or _timeout_directory(str(relative_path))),
+                    str(entry["message"]) if entry.get("message") else None,
+                    int(size_bytes) if isinstance(size_bytes, (int, float)) else None,
+                )
+
         for result in report.get("results", []):
             if not isinstance(result, dict):
                 continue
@@ -796,6 +940,21 @@ def merge(
             failures.append(failure)
             directory_counter[_bucket_directory(relative_path)] += 1
             category_counter[category] += 1
+
+            # Every timeout, counted here rather than from triage.timeoutFailures:
+            # this loop sees the authoritative per-test verdicts, so the timeouts
+            # issue reports the same number the category breakdown does even for a
+            # report that carries no timeout triage at all (an older shard, or one
+            # merged from a runner build predating it). _record_timeout keeps the
+            # sized triage record when there is one, so nothing is downgraded.
+            if category == "Timeout":
+                _record_timeout(
+                    timeout_tests,
+                    relative_path,
+                    _timeout_directory(relative_path),
+                    str(result["message"]) if result.get("message") else None,
+                    None,
+                )
 
             group = problem_groups.setdefault(
                 problem_key,
@@ -968,6 +1127,18 @@ def merge(
         "biggestProblemLimit": biggest_problem_limit,
         "lowMatchThreshold": effective_low_match_threshold,
         "biggestProblems": biggest_problems,
+        "timeoutLimit": timeout_limit,
+        # Every timeout the run saw, even when only `timeout_limit` of them are
+        # listed in the issue — the count is what says whether the listed head is
+        # the whole story.
+        "timeoutCount": len(timeout_tests),
+        "timeouts": _rank_timeouts(timeout_tests, timeout_limit),
+        # Counted from the same deduped set the ranking is drawn from, so the
+        # clusters always add up to `timeoutCount` rather than to whichever of the
+        # two sources happened to describe a given test.
+        "timeoutDirectories": Counter(
+            test["directory"] for test in timeout_tests.values()
+        ).most_common(problem_limit),
         "referenceDisagreements": _reference_disagreements(low_match_tests),
         "results": failures,
     }
@@ -1239,6 +1410,94 @@ def render_biggest_problems_markdown(merged: dict, run_url: str | None) -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_timeout_issue_markdown(merged: dict, run_url: str | None) -> str:
+    """Render the body of the third issue: only the tests that timed out, ranked
+    by their own source size, smallest first (see ``_rank_timeouts``)."""
+    timeouts = merged.get("timeouts") or []
+    total = merged.get("timeoutCount", len(timeouts))
+    limit = merged.get("timeoutLimit", DEFAULT_TIMEOUT_LIMIT)
+    lines = [
+        f"## WPT run — {total} timed-out test(s)",
+        "",
+        "_Only the tests the runner had to abort at the per-test timeout. They are"
+        " ranked by the size of the test's own source, **smallest first**: the less"
+        " there is in a document, the less of it can be legitimately slow, so the"
+        " likelier its timeout is an engine hang — a layout loop that never"
+        " terminates, a parser that never advances — than a heavy page that merely"
+        " wants more than the budget. A timeout on a multi-megabyte stress test says"
+        " the budget is tight; the same timeout on a sub-kilobyte document says"
+        " something does not terminate, and that bug usually gates far more than the"
+        " one test._",
+        "",
+        f"- Timed out: {total}",
+        f"- Listed below: {min(total, limit)}"
+        + (f" (of {total}; raise `timeout_problems_limit` for more)" if total > limit else ""),
+        "",
+        "### Timed-out tests, smallest source first",
+        "",
+    ]
+    if timeouts:
+        for index, timeout in enumerate(timeouts, start=1):
+            lines.append(
+                f"{index}. **{_format_file_size(timeout['fileSizeBytes'])}** —"
+                f" `{timeout['relativeTestPath']}` ({timeout['severity']})"
+            )
+            if timeout.get("message"):
+                lines.append(f"   - {timeout['message']}")
+    else:
+        lines.append("- None — no test hit the per-test timeout.")
+
+    # A directory with several timeouts is one hang gating a feature area rather
+    # than N independent problems, and it is the cheapest thing to act on: the
+    # subset command reruns exactly that slice.
+    directories = merged.get("timeoutDirectories") or []
+    if directories:
+        lines += [
+            "",
+            "### Timeout clusters",
+            "",
+            "_Directories with more than one timeout are usually a single hang gating a"
+            " whole feature area. Rerun one with the subset command beside it._",
+            "",
+        ]
+        for directory, count in directories:
+            lines.append(
+                f"- `{directory}` — {count} timeout(s) —"
+                f' `./scripts/run-wpt-tests.sh --subset "{directory}"`'
+            )
+
+    if timeouts:
+        first = timeouts[0]["relativeTestPath"]
+        lines += [
+            "",
+            "### Reproduce locally",
+            "",
+            "_Render the smallest timed-out test — the top of the ranking — against the"
+            " live engine. It hangs where the suite gave up, so a debugger attached here"
+            " lands directly in the non-terminating code._",
+            "",
+            "```sh",
+            "dotnet run --project src/Broiler.Wpt -- \\",
+            f"  --wpt-dir {WPT_CHECKOUT_DIR} --render {WPT_CHECKOUT_DIR}/{first}",
+            "```",
+            "",
+            "_Raise `--timeout` (or `BROILER_WPT_TIMEOUT_SECONDS`) to tell a genuine hang"
+            " apart from a test that is merely slower than the budget: a hang still does"
+            " not finish with the limit lifted._",
+        ]
+
+    lines += [
+        "",
+        "### CI metadata",
+        f"- Workflow run: {run_url}" if run_url else "- Workflow run: (unknown)",
+        "- Artifact: `wpt-merged`",
+        "",
+        "_Auto-generated by `.github/workflows/wpt-tests.yml`. See the companion"
+        " most-common-failures and biggest-problems issues for the rest of the run._",
+    ]
+    return "\n".join(lines) + "\n"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--shard-dir", required=True, type=Path, help="Directory containing per-shard JSON reports")
@@ -1256,6 +1515,11 @@ def main() -> int:
         help="Where to write the Markdown body for the second, biggest-problems issue",
     )
     parser.add_argument(
+        "--timeout-issue-md",
+        type=Path,
+        help="Where to write the Markdown body for the third, timeouts-only issue",
+    )
+    parser.add_argument(
         "--problem-limit",
         type=int,
         default=DEFAULT_PROBLEM_LIMIT,
@@ -1267,6 +1531,13 @@ def main() -> int:
         default=DEFAULT_BIGGEST_PROBLEM_LIMIT,
         help="Maximum biggest problems to report in the second issue "
         f"(default: {DEFAULT_BIGGEST_PROBLEM_LIMIT})",
+    )
+    parser.add_argument(
+        "--timeout-limit",
+        type=int,
+        default=DEFAULT_TIMEOUT_LIMIT,
+        help="Maximum timed-out tests to list in the third issue, smallest source "
+        f"first (default: {DEFAULT_TIMEOUT_LIMIT})",
     )
     parser.add_argument(
         "--low-match-threshold",
@@ -1290,6 +1561,8 @@ def main() -> int:
         parser.error("--problem-limit must be a positive integer")
     if args.biggest_problem_limit < 1:
         parser.error("--biggest-problem-limit must be a positive integer")
+    if args.timeout_limit < 1:
+        parser.error("--timeout-limit must be a positive integer")
     if not 0 <= args.low_match_threshold <= 100:
         parser.error("--low-match-threshold must be between 0 and 100")
 
@@ -1308,6 +1581,7 @@ def main() -> int:
         args.biggest_problem_limit,
         args.low_match_threshold,
         expected_shard_indexes=expected_shard_indexes,
+        timeout_limit=args.timeout_limit,
     )
 
     if args.merge_into:
@@ -1329,10 +1603,17 @@ def main() -> int:
             render_biggest_problems_markdown(merged, args.run_url), encoding="utf-8"
         )
 
+    if args.timeout_issue_md:
+        args.timeout_issue_md.parent.mkdir(parents=True, exist_ok=True)
+        args.timeout_issue_md.write_text(
+            render_timeout_issue_markdown(merged, args.run_url), encoding="utf-8"
+        )
+
     failed = merged["summary"]["failed"]
     total = merged["summary"]["total"]
     incomplete_shard_count = len(merged["incompleteShards"])
     biggest_problem_count = len(merged.get("biggestProblems") or [])
+    timeout_count = merged.get("timeoutCount", 0)
     print(f"Merged {merged['shardCount']} shard(s): {merged['summary']['passed']} passed, "
           f"{failed} failed, {merged['summary']['skipped']} skipped, {total} total.")
 
@@ -1352,6 +1633,8 @@ def main() -> int:
             handle.write(f"create_issue={'true' if failed > 0 or incomplete_shard_count > 0 else 'false'}\n")
             handle.write(f"biggest_problem_count={biggest_problem_count}\n")
             handle.write(f"create_biggest_issue={'true' if biggest_problem_count > 0 else 'false'}\n")
+            handle.write(f"timeout_count={timeout_count}\n")
+            handle.write(f"create_timeout_issue={'true' if timeout_count > 0 else 'false'}\n")
             handle.write(
                 "incomplete_shard_indexes="
                 + ",".join(str(index) for index in incomplete_indexes)

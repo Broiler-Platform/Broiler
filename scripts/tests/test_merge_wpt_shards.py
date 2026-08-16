@@ -1563,6 +1563,247 @@ class MergeWptShardsTests(unittest.TestCase):
                 [entry["relativeTestPath"] for entry in written["results"]],
             )
 
+    def _write_timeout_report(
+        self,
+        root: Path,
+        name: str,
+        shard_index: int,
+        timeouts: list[tuple[str, int | None]],
+        extra_results: list[dict] | None = None,
+    ) -> None:
+        """A shard report whose failures are timeouts, with the triage entry the
+        runner emits for each (test path + the size of its own source)."""
+        results = [self._failure(path, "Timeout") for path, _size in timeouts]
+        results += extra_results or []
+        (root / name).write_text(
+            json.dumps(
+                {
+                    "summary": {
+                        "passed": 1,
+                        "failed": len(results),
+                        "skipped": 0,
+                        "total": len(results) + 1,
+                    },
+                    "shard": {"index": shard_index, "count": 8},
+                    "triage": {
+                        "timeoutFailures": [
+                            {
+                                "testPath": path,
+                                "directory": path.rpartition("/")[0],
+                                "message": f"Test timed out after 30 second(s): {path}",
+                                "fileSizeBytes": size,
+                            }
+                            for path, size in timeouts
+                        ]
+                    },
+                    "results": results,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+    def test_timeouts_rank_smallest_source_first(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_timeout_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [
+                    ("css/css-tables/huge-generated-table.html", 4_000_000),
+                    ("css/css-grid/tiny-hang.html", 380),
+                ],
+            )
+            self._write_timeout_report(
+                shard_dir,
+                "shard-1.json",
+                1,
+                [("html/parser/medium.html", 6_000)],
+                extra_results=[self._failure("html/other/pixel.html", "PixelMismatch")],
+            )
+
+            merged = MODULE.merge(shard_dir)
+
+            self.assertEqual(3, merged["timeoutCount"])
+            # Ascending source size *is* the ranking: the 380-byte document that
+            # hung is the strongest hang signal in the run, the 4 MB one the weakest.
+            self.assertEqual(
+                [
+                    "css/css-grid/tiny-hang.html",
+                    "html/parser/medium.html",
+                    "css/css-tables/huge-generated-table.html",
+                ],
+                [timeout["relativeTestPath"] for timeout in merged["timeouts"]],
+            )
+            self.assertEqual(
+                ["critical", "high", "low"],
+                [timeout["severity"] for timeout in merged["timeouts"]],
+            )
+            # The pixel mismatch is a failure but not a timeout, so it appears in
+            # neither the count nor the ranking.
+            self.assertNotIn(
+                "html/other/pixel.html",
+                [timeout["relativeTestPath"] for timeout in merged["timeouts"]],
+            )
+
+    def test_timeouts_bounded_by_limit_and_clustered_by_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_timeout_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [
+                    ("css/css-grid/hang-1.html", 300),
+                    ("css/css-grid/hang-2.html", 400),
+                    ("css/css-grid/hang-3.html", 500),
+                    ("html/parser/hang.html", 900),
+                ],
+            )
+
+            merged = MODULE.merge(shard_dir, timeout_limit=2)
+
+            # The count reports every timeout; only `timeout_limit` are listed.
+            self.assertEqual(4, merged["timeoutCount"])
+            self.assertEqual(
+                ["css/css-grid/hang-1.html", "css/css-grid/hang-2.html"],
+                [timeout["relativeTestPath"] for timeout in merged["timeouts"]],
+            )
+            self.assertEqual(
+                [("css/css-grid", 3), ("html/parser", 1)],
+                merged["timeoutDirectories"],
+            )
+
+            markdown = MODULE.render_timeout_issue_markdown(merged, None)
+            self.assertIn("## WPT run — 4 timed-out test(s)", markdown)
+            self.assertIn("- Listed below: 2 (of 4; raise `timeout_problems_limit` for more)", markdown)
+            # Sub-kilobyte sources print as bytes: this is the head of the ranking,
+            # and rounding every entry in it to "0.0 KiB" would flatten the one
+            # distinction the report draws.
+            self.assertIn("**300 B** — `css/css-grid/hang-1.html` (critical)", markdown)
+            self.assertIn("### Timeout clusters", markdown)
+            self.assertIn(
+                '`css/css-grid` — 3 timeout(s) — `./scripts/run-wpt-tests.sh --subset "css/css-grid"`',
+                markdown,
+            )
+            # The reproduction points at the top of the ranking — the smallest file.
+            self.assertIn(
+                "--wpt-dir tests/wpt/checkout --render tests/wpt/checkout/css/css-grid/hang-1.html",
+                markdown,
+            )
+
+    def test_timeouts_without_triage_sizes_are_still_reported_last(self) -> None:
+        """A report predating ``triage.timeoutFailures`` (or one whose size could
+        not be stat'd) still contributes its timeouts — unranked, sorted after
+        every measured one, because nothing is known about how big it is."""
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._write_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [
+                    self._failure("css/legacy/no-triage.html", "Timeout"),
+                    self._failure("css/legacy/pixel.html", "PixelMismatch"),
+                ],
+            )
+            self._write_timeout_report(
+                shard_dir,
+                "shard-1.json",
+                1,
+                [("css/modern/sized.html", 12_000)],
+            )
+
+            merged = MODULE.merge(shard_dir)
+
+            self.assertEqual(2, merged["timeoutCount"])
+            self.assertEqual(
+                ["css/modern/sized.html", "css/legacy/no-triage.html"],
+                [timeout["relativeTestPath"] for timeout in merged["timeouts"]],
+            )
+            self.assertEqual(
+                ["medium", "unranked"],
+                [timeout["severity"] for timeout in merged["timeouts"]],
+            )
+            markdown = MODULE.render_timeout_issue_markdown(merged, None)
+            self.assertIn("**size unknown** — `css/legacy/no-triage.html` (unranked)", markdown)
+
+    def test_timeout_issue_written_and_gated_on_step_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp) / "shards"
+            shard_dir.mkdir()
+            self._write_timeout_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [("css/css-grid/tiny-hang.html", 380)],
+            )
+            timeout_md = Path(temp) / "timeout-issue.md"
+            github_output = Path(temp) / "github-output"
+            github_output.touch()
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    str(shard_dir),
+                    "--timeout-issue-md",
+                    str(timeout_md),
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = dict(
+                line.split("=", 1)
+                for line in github_output.read_text(encoding="utf-8").splitlines()
+                if "=" in line
+            )
+            self.assertEqual("1", outputs["timeout_count"])
+            self.assertEqual("true", outputs["create_timeout_issue"])
+            self.assertIn("`css/css-grid/tiny-hang.html`", timeout_md.read_text(encoding="utf-8"))
+
+    def test_timeout_issue_not_created_when_nothing_timed_out(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp) / "shards"
+            shard_dir.mkdir()
+            self._write_report(
+                shard_dir,
+                "shard-0.json",
+                0,
+                [self._failure("css/a/one.html", "PixelMismatch", "MissingContent")],
+            )
+            github_output = Path(temp) / "github-output"
+            github_output.touch()
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT_PATH),
+                    "--shard-dir",
+                    str(shard_dir),
+                    "--github-output",
+                    str(github_output),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            outputs = dict(
+                line.split("=", 1)
+                for line in github_output.read_text(encoding="utf-8").splitlines()
+                if "=" in line
+            )
+            self.assertEqual("0", outputs["timeout_count"])
+            self.assertEqual("false", outputs["create_timeout_issue"])
+
     @staticmethod
     def _failure(path: str, category: str, sub_category: str | None = None) -> dict:
         result = {

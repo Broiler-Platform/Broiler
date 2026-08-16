@@ -34,9 +34,10 @@ name: WPT Reftests
 #
 # The manually dispatched workflow can target every reftest, a subset, a single
 # shard, or only the previously-failed reftests. Every run merges the shard results
-# and, when failures exist, files the same two GitHub issues the golden-image suite
-# does (most common failure groups, and the run's biggest problems), titled so the
-# two suites' issues are never confused.
+# and, when failures exist, files the same three GitHub issues the golden-image suite
+# does (most common failure groups; the run's biggest problems; and the tests that hit
+# the per-test timeout, smallest source first), titled so the two suites' issues are
+# never confused.
 #
 # Any shard that aborts abnormally — evicted runner, hard crash, i.e. no conclusive
 # report — is rerun once at the end of the workflow by the `retry` job, before the
@@ -92,6 +93,12 @@ on:
         description: Maximum number of biggest problems to include in the second (severity-focused) GitHub issue.
         required: false
         default: '3'
+      timeout_problems_limit:
+        description: >
+          Maximum number of timed-out reftests to list in the third (timeouts-only)
+          GitHub issue, smallest source file first.
+        required: false
+        default: '10'
 
 permissions:
   contents: write   # persist-failed commits the failing-reftest manifest
@@ -110,6 +117,7 @@ env:
   FAILED_TESTS_FILE: tests/wpt-baseline/failed-reftests.json
   MOST_COMMON_PROBLEMS_LIMIT: ${{ github.event.inputs.most_common_problems_limit || '10' }}
   BIGGEST_PROBLEMS_LIMIT: ${{ github.event.inputs.biggest_problems_limit || '3' }}
+  TIMEOUT_PROBLEMS_LIMIT: ${{ github.event.inputs.timeout_problems_limit || '10' }}
 
 jobs:
   # ── Resolve the shard matrix and whether to run incrementally ────────────
@@ -342,8 +350,10 @@ jobs:
             --merged-json wpt-merged/wpt-results.json \
             --issue-md wpt-merged/issue.md \
             --biggest-issue-md wpt-merged/biggest-issue.md \
+            --timeout-issue-md wpt-merged/timeout-issue.md \
             --problem-limit "$MOST_COMMON_PROBLEMS_LIMIT" \
             --biggest-problem-limit "$BIGGEST_PROBLEMS_LIMIT" \
+            --timeout-limit "$TIMEOUT_PROBLEMS_LIMIT" \
             --expected-shards "${{ needs.plan.outputs.expected-shards }}" \
             --github-output "$GITHUB_OUTPUT"
 
@@ -410,6 +420,31 @@ jobs:
               body,
             });
             core.info(`Created biggest-problems issue #${issue.data.number}: ${issue.data.html_url}`);
+
+      # Timeouts on their own terms: neither issue above ranks them usefully (a
+      # timed-out reftest never produced the pixel score the severity view ranks
+      # on), so they get their own, ranked smallest source file first.
+      - name: Create GitHub issue for the timed-out reftests
+        if: steps.merge.outputs.create_timeout_issue == 'true'
+        uses: actions/github-script@v8
+        env:
+          TIMEOUT_COUNT: ${{ steps.merge.outputs.timeout_count }}
+        with:
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('wpt-merged/timeout-issue.md', 'utf8').trim();
+            const today = new Date().toISOString().slice(0, 10);
+            const count = Number(process.env.TIMEOUT_COUNT || 0);
+            const title = `WPT reftest run: ${count} timed-out reftest(s) (${today})`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            core.info(`Created timeouts issue #${issue.data.number}: ${issue.data.html_url}`);
 
   # ── Persist the failing-reftest manifest for incremental reruns ──────────
   persist-failed:

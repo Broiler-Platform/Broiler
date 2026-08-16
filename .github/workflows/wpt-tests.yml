@@ -11,10 +11,13 @@ name: WPT Tests
 #
 # The manually dispatched workflow can target the full suite, a subset, a
 # single shard, or only the previously-failed tests. Every run merges the shard
-# results and, when failures exist, files two GitHub issues: one ranking the
-# most common failure groups (by frequency) and a second, severity-focused issue
+# results and, when failures exist, files three GitHub issues: one ranking the
+# most common failure groups (by frequency); a second, severity-focused issue
 # listing the run's few biggest problems (crashes, low-percent matches, and
-# incomplete shards, ranked by blast radius).
+# incomplete shards, ranked by blast radius); and a third listing only the tests
+# that hit the per-test timeout, ranked by the size of the test's own source,
+# smallest first — a hang on a tiny document is an engine that does not
+# terminate, whereas one on a huge document may only mean the budget is tight.
 #
 # Reference generation (Chromium via Playwright) is expensive, so each shard
 # caches its reference slice. Bump CACHE_EPOCH to refresh WPT master + refs.
@@ -80,6 +83,12 @@ on:
         description: Maximum number of biggest problems to include in the second (severity-focused) GitHub issue.
         required: false
         default: '3'
+      timeout_problems_limit:
+        description: >
+          Maximum number of timed-out tests to list in the third (timeouts-only)
+          GitHub issue, smallest source file first.
+        required: false
+        default: '10'
 
 permissions:
   contents: write   # persist-failed commits the failing-test manifest
@@ -95,6 +104,7 @@ env:
   FAILED_TESTS_FILE: tests/wpt-baseline/failed-tests.json
   MOST_COMMON_PROBLEMS_LIMIT: ${{ github.event.inputs.most_common_problems_limit || '10' }}
   BIGGEST_PROBLEMS_LIMIT: ${{ github.event.inputs.biggest_problems_limit || '3' }}
+  TIMEOUT_PROBLEMS_LIMIT: ${{ github.event.inputs.timeout_problems_limit || '10' }}
 
 jobs:
   # ── Resolve the shard matrix and whether to run incrementally ────────────
@@ -332,8 +342,10 @@ jobs:
             --merged-json wpt-merged/wpt-results.json \
             --issue-md wpt-merged/issue.md \
             --biggest-issue-md wpt-merged/biggest-issue.md \
+            --timeout-issue-md wpt-merged/timeout-issue.md \
             --problem-limit "$MOST_COMMON_PROBLEMS_LIMIT" \
             --biggest-problem-limit "$BIGGEST_PROBLEMS_LIMIT" \
+            --timeout-limit "$TIMEOUT_PROBLEMS_LIMIT" \
             --expected-shards "${{ needs.plan.outputs.expected-shards }}" \
             --github-output "$GITHUB_OUTPUT"
 
@@ -397,6 +409,33 @@ jobs:
               body,
             });
             core.info(`Created biggest-problems issue #${issue.data.number}: ${issue.data.html_url}`);
+
+      # A timeout carries no match percentage, so the two issues above rank it
+      # poorly — the frequency view collapses every timeout into one `Timeout` row
+      # and the severity view ranks on pixel scores a timed-out test never
+      # produced. This third issue reports them on their own terms, smallest
+      # source file first.
+      - name: Create GitHub issue for the timed-out tests
+        if: steps.merge.outputs.create_timeout_issue == 'true'
+        uses: actions/github-script@v8
+        env:
+          TIMEOUT_COUNT: ${{ steps.merge.outputs.timeout_count }}
+        with:
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('wpt-merged/timeout-issue.md', 'utf8').trim();
+            const today = new Date().toISOString().slice(0, 10);
+            const count = Number(process.env.TIMEOUT_COUNT || 0);
+            const title = `WPT run: ${count} timed-out test(s) (${today})`;
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+            });
+            core.info(`Created timeouts issue #${issue.data.number}: ${issue.data.html_url}`);
 
   # ── Persist the failing-test manifest for incremental reruns ─────────────
   persist-failed:
