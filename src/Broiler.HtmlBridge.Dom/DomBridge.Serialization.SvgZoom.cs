@@ -20,8 +20,8 @@ public sealed partial class DomBridge
         var tag = element.TagName.ToLowerInvariant();
         var props = GetComputedProps(element);
 
-        ApplySvgPresentationAttribute(element, props, "fill");
-        ApplySvgPresentationAttribute(element, props, "stroke");
+        ApplySvgPresentationAttribute(element, props, "fill", cascadeWins: true);
+        ApplySvgPresentationAttribute(element, props, "stroke", cascadeWins: true);
         ApplySvgPresentationAttribute(element, props, "stroke-width", preferInlineStyle: true);
 
         if (tag is "text" or "textpath")
@@ -62,9 +62,24 @@ public sealed partial class DomBridge
         }
     }
 
-    private void ApplySvgPresentationAttribute(DomElement element, Dictionary<string, string> props, string propertyName, bool preferInlineStyle = false)
+    /// <param name="cascadeWins">
+    /// The cascaded value overwrites an existing presentation attribute rather than deferring to
+    /// it. SVG 1.1 §6.4 ranks a presentation attribute as an author-origin rule of specificity 0
+    /// inserted at the *start* of the author sheet, so any author rule outranks it — the deferral
+    /// has the priority backwards, and `:lang(en) { fill: green }` lost to a `fill="none"`
+    /// attribute (WPT conformance-checkers/html-svg/styling-css-05-b-isvalid).
+    /// <para>
+    /// Set only for <c>fill</c> and <c>stroke</c>. The font properties are inherited, so their
+    /// cascaded value on an SVG element is whatever the enclosing document sets: overwriting
+    /// there would clobber a <c>font-family="SVGFreeSansASCII"</c> attribute with the body font,
+    /// which is a regression rather than a cascade.
+    /// </para>
+    /// </param>
+    private void ApplySvgPresentationAttribute(
+        DomElement element, Dictionary<string, string> props, string propertyName,
+        bool preferInlineStyle = false, bool cascadeWins = false)
     {
-        if (HasAttr(element, propertyName))
+        if (!cascadeWins && HasAttr(element, propertyName))
             return;
 
         string? value = null;

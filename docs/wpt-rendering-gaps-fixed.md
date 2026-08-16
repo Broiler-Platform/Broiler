@@ -268,6 +268,64 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## CSS engine
 
+### Every CSS Color 4 colour function painted opaque black
+
+- **Tests:** `css-images/gradient/gradient-single-stop-none-interpolation`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).29) and the whole of
+  `css/css-color`, **182 → 273 of 307 passing**.
+- **Owner:** `Broiler.Layout` (`IR/CssColor4.cs`). Main repo, no patch.
+- **Root cause.** Only `rgb()`, `hsl()`, hex and the named colours parsed. `hwb()`,
+  `lab()`, `lch()`, `oklab()`, `oklch()`, `color()`, `color-mix()` and the relative colour
+  syntax all fell through to `Adapter.GetColor`, which folds an unrecognised value to
+  **opaque black** — the same failure mode as
+  [the system-colour keywords](#system-colour-keywords-did-not-resolve-at-all), and the
+  reason a page written in a modern colour space renders as black rectangles rather than
+  as nothing. A colour *stop* was dropped instead of blackened, so a single-stop gradient
+  lost its only stop and painted nothing at all.
+- **The gradient test was a blank-on-blank pass.** Its reference is written in the same
+  notation, so both sides rendered an empty page and agreed at 100% while painting none of
+  the five ramps the test is about. It renders them now and matches on their pixels. This
+  is the [false-negative trap](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)
+  a third time; the reftest flag cannot see it, because the flag only asks whether the two
+  sides agree.
+- **Why the fix is a normaliser and not a parser.** The canonical parser is
+  `Broiler.CSS.CssValueParser.TryParseColor`, and `Broiler.CSS` is deliberately a
+  dependency-free kernel — nothing there may reference `Broiler.Layout`, so a fix inside it
+  could only ship as a submodule patch and could reuse nothing. Every path that turns a CSS
+  colour into pixels passes through main-repo code first (`CssBox.GetActualColor`, the
+  `BackgroundImage`/`BoxShadow`/`TextShadow` getters, `SvgRenderer.ParseColorValue`), so
+  rewriting the value to `rgba(…)` there hands the existing parser something it already
+  reads. **No submodule change at all**, and the gradient stop list is covered by the same
+  pass as the flat colours.
+- **Four things inside it are worth naming.**
+  - **The modern `/ <alpha>` spelling was broken too.** The base parser rewrites the slash
+    to a comma and then splits on commas, so `rgb(0 128 128 / 50%)` became two tokens,
+    failed its arity check and painted black — while the legacy comma form worked. The
+    legacy form is deliberately still declined here, so the two parsers cannot disagree
+    about one value.
+  - **Out-of-gamut colours are gamut-mapped, not clipped** (§13.2). Clipping each channel
+    independently shifts hue as well as saturation: `oklch(0.8 0.4 0)` clips to a flat
+    `rgb(255, 0, 179)`. Reducing OKLCH chroma until the clip is within one just-noticeable
+    difference keeps the hue. Only out-of-gamut colours take that path.
+  - **A missing component is zero** (§4.4) — what the single-stop test asserts.
+  - **`currentcolor` is resolved by the caller, not guessed**, guarded against the
+    self-reference of `color: color-mix(in srgb, currentcolor, red)`.
+- **Three fake passes were unmasked**, each a separate gap now visible because the
+  *reference* side started rendering correctly. All three are in the paint walker's
+  gradient code (`Broiler.HTML`) and none is reachable from the value-normalising layer:
+  `gradient-to-transparent` (gradient interpolation is not premultiplied),
+  `gradient-{in,de}creasing-hue-lch` (the `increasing hue` / `decreasing hue` arc is
+  ignored), and `gradient-none-interpolation` (93.7% → 78.8%, still failing) which needs
+  §4.4's *carry-forward* rule — a missing component interpolated against a colour that has
+  it takes the neighbour's value rather than zero.
+- **`color-layers-no-blend-mode` drops 95.9% → 75.2%** without changing state:
+  `color-layers()` is CSS Color 6 and unimplemented, and its reference — a stack of
+  ordinary layers — is what got more correct.
+- **Exit gate — met.** `CssColor4Tests` pins the conversions against the numbers WPT's own
+  reftests state rather than against the implementation, including a round trip through
+  each predefined space, which is what keeps the inverse primary matrices in step with the
+  forward ones.
+
 ### System colour keywords did not resolve at all
 
 - **Test:** `forced-colors-mode/forced-colors-mode-20`. Ours 98% black; Chromium's
@@ -446,6 +504,25 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 ---
 
 ## Layout
+
+### An out-of-flow first child propagated its top margin into its parent
+
+- **Tests:** `css/CSS2/margin-padding-clear/margin-006` … `-009`, failing → **passing**.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Margins.cs`). Main repo.
+- **Root cause.** CSS2.1 §8.3.1 is explicit that margins of absolutely positioned boxes do
+  not collapse. `MarginTopCollapse`'s parent–child branch is reached by any box with no
+  previous *in-flow* sibling — `GetPreviousSibling` already skips out-of-flow ones — and
+  nothing there asked whether the box itself was in flow. Worse than a wrong margin: when
+  the child's margin exceeded the parent's, the branch mutated the **parent's** `Location`
+  to carry the excess up, so a page whose first child is a fixed backdrop or an absolutely
+  positioned panel laid *all* of its in-flow content at the wrong offset.
+- **Found while triaging `css-page/body-background-vrl-print`**
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).27), which it does not
+  close — that test needs
+  [block-axis pagination](wpt-rendering-gaps-open.md#pagination-runs-along-the-physical-y-axis-only),
+  and moves 34.8% → 37.2%. The margin bug is worth fixing on its own merit and was measured
+  on its own: `css/css-page`, `css/CSS2/margin-padding-clear`, `css/css-position` and
+  `css/css-anchor-position` together go **968 → 972 passing, +4 / −0**.
 
 ### A grid with only out-of-flow children resolved no grid areas
 
@@ -977,6 +1054,50 @@ the test that exposed it.
 ---
 
 ## Paint and the renderer
+
+### Six SVG shape elements were never drawn when an attribute held a slash
+
+- **Tests:** `conformance-checkers/html-svg/types-dom-06-f-isvalid`,
+  `struct-cond-01-t-isvalid`, `struct-cond-overview-04-f-isvalid`,
+  `struct-image-02-b-isvalid`, `svg/…/gradient-external-reference`. Partial improvements —
+  each has further gaps of its own.
+- **Owner:** `Broiler.Layout` (`IR/SvgRenderer.cs`). Main repo.
+- **Root cause.** `<rect>`, `<circle>`, `<line>`, `<ellipse>`, `<polygon>` and `<polyline>`
+  matched their attribute run with `[^/>]*`, which excludes `/`. Any element with a slash
+  anywhere in **any** attribute value therefore failed to match and was never drawn —
+  `requiredFeatures="http://www.w3.org/TR/SVG11/feature#Shape"`,
+  `fill="url(support/resources.svg#greenGradient)"`,
+  `filter="url(support/hueRotate.svg#MyFilter)"`. **Nothing reported it**, because an
+  element that does not match is not an error; it simply never reached the display list.
+- **The same defect was already found and fixed for `<path>`** — `PathElementRegex` is the
+  quote-aware form, added because an arc command can contain a slash — and the other six
+  were left behind. They now use that pattern. Worth knowing for the next regex added to
+  this file: the shape passes are one regex per element type swept over the whole markup,
+  so a pattern that silently fails to match costs a whole element class.
+
+### An SVG presentation attribute outranked the author stylesheet
+
+- **Test:** `conformance-checkers/html-svg/styling-css-05-b-isvalid`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).18), whose frame goes
+  from **1.1% green to 86.7%**.
+- **Owner:** `src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.SvgZoom.cs`. Main repo.
+- **Root cause.** `ApplySvgPresentationAttribute` is how a cascaded value reaches
+  `SvgRenderer` at all, and its first statement was `if (HasAttr(element, propertyName))
+  return;` — so the projection was skipped exactly when the element declared `fill` or
+  `stroke` itself. SVG 1.1 §6.4 ranks a presentation attribute as an author-origin rule of
+  **specificity 0 inserted at the start of the author sheet**, so any author rule outranks
+  it: the deferral had the priority backwards. The test is a document of
+  `<rect fill="none">` under `:lang(en) { fill: green }`.
+- **Scoped to `fill` and `stroke`, deliberately.** The font properties this helper also
+  projects are *inherited*, so their cascaded value on an SVG element is whatever the
+  enclosing document sets; overwriting there would clobber a
+  `font-family="SVGFreeSansASCII"` attribute with the body font. Measured rather than
+  assumed: a `<body style="font-family:Courier">` does reach such an element's computed
+  value.
+- **The conformance-checkers family declares no `rel=match` reference**, so the reftest
+  suite cannot score it at all — the number above is a direct read of the render against
+  what the test asks for. `svg`, `css/css-masking` and `conformance-checkers` together go
+  372 → 373 passing, +1 / −0.
 
 ### `clip-path` modelled only `inset()`
 
@@ -1767,6 +1888,58 @@ the test that exposed it.
 ---
 
 ## View transitions
+
+### The live page cannot stand in for the old root snapshot when the new one is hidden
+
+- **Tests:** `css-view-transitions/{new,old}-content-has-scrollbars`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).14 and .15) 11.1% →
+  **pass**, and `root-to-shared-animation-start` (.5) 1.5% → **pass**.
+- **Owner:** `src/Broiler.HtmlBridge.Dom/DomBridge.ViewTransition.cs`. Main repo, no patch.
+- **Root cause.** A root snapshot is normally left content-less, on the reasoning that the
+  live page underneath renders the same thing pixel-exactly where a DOM clone is only close
+  — cloning unconditionally was measured at +8/−7 and reverted, and
+  [that entry](wpt-rendering-gaps-open.md#the-root-capture-is-not-rasterised) still stands.
+  But the live page shows the **new** state, so it can only stand in while the *new*
+  snapshot is what is meant to be on screen. An author who writes
+  `::view-transition-new(root) { opacity: 0 }` has said it is not, and the old snapshot is
+  then the only thing that can supply those pixels. Leaving it content-less painted a flat
+  viewport-sized rectangle of the captured root background instead.
+- **This is not the `opacity` case the gate deliberately excludes**, and the distinction is
+  what keeps the −79 regression away. That rule asks whether *this* snapshot's own
+  compositing needs real pixels — it does not, since compositing against the backdrop is
+  what the live page already does. This asks whether the page underneath is still a
+  truthful stand-in at all.
+- **A page holding a nested browsing context is excluded.** What a frame displays during a
+  transition is resolved through the live element (`TryGetFrameMarkupHeldByRootSnapshot`
+  replays `FrameMarkupAtCapture` onto it), and a clone carries a second copy that has had
+  none of that applied, painted over the top — it shows whatever markup the frame's
+  `srcdoc` last round-tripped rather than the state at capture time.
+  `SubDocumentViewTransitionTests` pins that, and reproducing a sub-document faithfully in
+  a clone is the "close, not exact" problem that got the unconditional clone reverted.
+- **Neither test has anything to do with scrollbars.** Broiler paints none and does not
+  inset the viewport for one, and the two references are byte-identical to each other
+  despite one page having scrollbars and the other `overflow: hidden`. **The scrollbar
+  semantics they were written to verify are still untested here.**
+
+### A group whose animation lasted no time was left at the start of it
+
+- **Tests:** `3d-transform-outgoing`, `css-tags-shared-element`,
+  `new-content-{container,element}-writing-modes`, `new-content-is-empty-div` → **pass**;
+  `far-away-capture` 63.8% → 97.5%, `content-visibility-auto-shared-element` 86.8% → 92.2%.
+- **Owner:** same file. Main repo.
+- **Root cause.** `FrozenGroupProgress` decides where a `::view-transition-group` sits at
+  screenshot time and read only `animation-timing-function`. The WPT idiom
+  `::view-transition-group(x) { animation-duration: 0s }` — an animation already *finished*
+  two rAFs later, which is when these tests screenshot — came out as progress 0, so the
+  group stayed on the old geometry and every snapshot inside it was placed and scaled
+  against the wrong rect. A zero duration now reads as progress 1 whatever the easing.
+- **`animation-delay` is deliberately not folded in the same way**: a positive delay means
+  the animation has not started, which is the progress-0 behaviour
+  `root-to-shared-animation-start` depends on.
+- **The order of the two fixes matters.** The root-snapshot change alone regresses
+  `root-to-shared-animation-end` by 79 points, because the group it uncovers is one of the
+  zero-duration ones. With the duration fix in first that test *gains* 8, to 93.0%.
+- **Measured** over `css/css-view-transitions`: **157 → 165 of 307 passing, +8 / −0.**
 
 ### An explicit `view-transition-group` name matched a non-ancestor
 

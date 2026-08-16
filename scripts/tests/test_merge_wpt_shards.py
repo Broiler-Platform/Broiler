@@ -866,7 +866,8 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertEqual([0.0, 0.0], [entry["matchPercent"] for entry in disagreements])
 
             markdown = MODULE.render_biggest_problems_markdown(merged, None)
-            self.assertIn("Not ranked — reference disagreements", markdown)
+            self.assertIn("### Reference disagreements", markdown)
+            self.assertIn("excluded from the ranking above entirely", markdown)
             self.assertIn("css/mediaqueries/at-custom-media-basic.html", markdown)
             # The reproduce hint points at a real problem, not a cleared one.
             self.assertIn(
@@ -992,10 +993,30 @@ class MergeWptShardsTests(unittest.TestCase):
             self.assertIn("10.4%", real_gap)
             self.assertNotIn("references disagreeing", real_gap)
 
-    def test_both_classes_stay_ranked_as_biggest_problems(self) -> None:
-        # Recording the second score annotates the ranking; it does not silently drop a
-        # test out of it. Only a reference Broiler actually reproduced does that, and
-        # whether these belong in won't-fix is a maintainer's call, not the report's.
+    def test_a_golden_that_flatters_the_render_says_so(self) -> None:
+        # The mirror of a reference disagreement, and the class the old golden-only
+        # ranking buried: the committed golden agrees with a render the test's own
+        # reference says is almost entirely wrong. Ranking reads the smaller number and
+        # the note names the direction, so the two cannot be confused in the issue.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._scored_report(shard_dir, "shard-0.json", [("css/a/flattered.html", 40.0, 3.0)])
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=5, low_match_threshold=50.0
+            )
+            problem = merged["biggestProblems"][0]
+
+            self.assertEqual(3.0, problem["engineGapPercent"])
+            self.assertIn("golden is flattering this render", problem["detail"])
+            # Not a disagreement in the other direction, so it is not listed as one.
+            self.assertEqual([], merged["referenceDisagreements"])
+
+    def test_a_partial_disagreement_stays_ranked_and_is_listed(self) -> None:
+        # A partial disagreement is not cleared, so it keeps its place in the ranking —
+        # whether it belongs in won't-fix is a maintainer's call, not the report's. It is
+        # additionally listed under the reference-disagreement heading, which is what
+        # keeps its 0.8% golden score visible now that severity no longer reads it.
         with tempfile.TemporaryDirectory() as temp:
             shard_dir = Path(temp)
             self._scored_report(
@@ -1010,7 +1031,69 @@ class MergeWptShardsTests(unittest.TestCase):
                 ["css/a/near.html"],
                 [p["relativeTestPath"] for p in merged["biggestProblems"]],
             )
-            self.assertEqual([], merged["referenceDisagreements"])
+            self.assertEqual(
+                [("css/a/near.html", 0.8, 94.0, False)],
+                [
+                    (
+                        entry["relativeTestPath"],
+                        entry["matchPercent"],
+                        entry["referenceMatchPercent"],
+                        entry["cleared"],
+                    )
+                    for entry in merged["referenceDisagreements"]
+                ],
+            )
+
+            markdown = MODULE.render_biggest_problems_markdown(merged, None)
+            self.assertIn("0.8% golden", markdown)
+            self.assertIn("94.0% against its own reference", markdown)
+
+    def test_severity_is_ranked_on_the_tests_own_reference_not_the_golden(self) -> None:
+        # The 2026-08-15 severity issue (#1670) got both ends of its list wrong by
+        # ranking on the golden alone: `page-margin-002-print` — already settled as a
+        # reference disagreement in docs/wpt-rendering-gaps-wont-fix.md — was its single
+        # biggest problem at 0.0%, while `column-subgrid-auto-fill-008`, the worst real
+        # render in the run at 0.2% against its own reference, placed seventeenth.
+        with tempfile.TemporaryDirectory() as temp:
+            shard_dir = Path(temp)
+            self._scored_report(
+                shard_dir,
+                "shard-0.json",
+                [
+                    ("css/css-page/page-margin-002-print.html", 0.0, 89.2),
+                    ("css/css-grid/column-subgrid-auto-fill-008.html", 11.5, 0.2),
+                    ("css/css-view-transitions/new-content-has-scrollbars.html", 11.1, 11.1),
+                ],
+            )
+
+            merged = MODULE.merge(
+                shard_dir, biggest_problem_limit=2, low_match_threshold=50.0
+            )
+
+            # Two slots, and the golden-flattered test takes the first.
+            self.assertEqual(
+                [
+                    "css/css-grid/column-subgrid-auto-fill-008.html",
+                    "css/css-view-transitions/new-content-has-scrollbars.html",
+                ],
+                [p["relativeTestPath"] for p in merged["biggestProblems"]],
+            )
+            self.assertEqual(
+                [0.2, 11.1], [p["engineGapPercent"] for p in merged["biggestProblems"]]
+            )
+            # The headline number is the one the ranking used, and the golden it
+            # replaced is still stated in the body rather than dropped.
+            worst = merged["biggestProblems"][0]
+            self.assertEqual("0.2% match — css/css-grid/column-subgrid-auto-fill-008.html", worst["title"])
+            self.assertIn("committed golden by only 11.5%", worst["detail"])
+            self.assertIn("it scores 0.2%", worst["detail"])
+            self.assertIn("ranked on that score, not the golden's", worst["detail"])
+
+            # The demoted one is not lost: it is listed as a partial disagreement.
+            self.assertEqual(
+                ["css/css-page/page-margin-002-print.html"],
+                [e["relativeTestPath"] for e in merged["referenceDisagreements"]],
+            )
 
     def test_a_report_without_reference_scores_reads_as_before(self) -> None:
         # A run without --verify-reference carries no referenceMatchPercent key at all.

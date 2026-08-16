@@ -26,6 +26,7 @@ measured 2026-08-13; CI is the golden-image score from the
 - [Grid](#grid)
 - [Sizing and layout](#sizing-and-layout)
 - [Images](#images)
+- [Paged media](#paged-media)
 - [Transforms](#transforms)
 - [Masking](#masking)
 - [Dynamic stylesheets](#dynamic-stylesheets)
@@ -64,8 +65,13 @@ The largest remaining cluster, and it reduces to three causes.
 - **Read the fixed entry before attempting it.** Cloning the DOM unconditionally
   was implemented, measured at +8/−7 across 458 tests, and reverted; the reason is
   structural, not a missing detail.
-- **Exit gate:** a rasterised root snapshot composites at the group geometry so
-  `root-to-shared-animation-start` matches, with the other three staying passing.
+- **`root-to-shared-animation-start` now passes** on the narrower rule that
+  [a hidden new snapshot forces the old one to carry content](wpt-rendering-gaps-fixed.md#the-live-page-cannot-stand-in-for-the-old-root-snapshot-when-the-new-one-is-hidden),
+  which is not the rasterised snapshot this entry asks for — it is the same DOM clone,
+  reached by a gate that is right about one more case. The entry stands for the rest.
+- **Exit gate:** a rasterised root snapshot composites at the group geometry, with the
+  other three staying passing, and a page holding an `<iframe>` reproduces its frames —
+  the clone cannot, which is why the new gate excludes such pages.
 
 ### The snapshot clone lays its children out horizontally
 
@@ -78,15 +84,45 @@ The largest remaining cluster, and it reduces to three causes.
   so scrolling a vertical writing mode is right, and the gap is in the transition.
   [The old capture's containing block](wpt-rendering-gaps-fixed.md#the-old-capture-was-not-in-the-snapshot-containing-block)
   was the other half and is fixed; it closed the two *vertical*-scroll siblings.
-- **What remains.** Ours is green 85.1% — a green band ~651px tall where the
-  element is 100px tall — so `.middle`'s `block-size: 39800px` is resolving as a
-  height. It is **not** a lost `writing-mode` bake:
+- **What remains, traced rather than inferred.** Ours is a green band that fills the
+  viewport where the element is 100px tall, so `.middle`'s `block-size: 39800px` is
+  resolving as a height. It is **not** a lost `writing-mode` bake:
   `BuildViewTransitionSnapshotContent` carries `writing-mode: vertical-lr` onto the
-  content box correctly, so the miss is further in, in how the clone's box is
-  sized. These four are the horizontal-scroll members, where the block axis and the
-  scrolled axis are the same one.
+  content box correctly. The miss is two rules deep, and both were confirmed by probe:
+
+  1. **The pseudo-tree boxes are real `<div>`s under `<html>`, so they inherit
+     `:root { writing-mode: vertical-lr }` as well.** Broiler rotates a vertical subtree
+     from its *rotation root*, defined as a vertical box whose parent is not vertical
+     (`CssBox.cs` `isVerticalRoot`, `CssBox.WritingMode.cs` `WillBeVerticalTransposed`).
+     With every ancestor vertical the content box is never a root, so `ResolvePhysicalSize`
+     maps `block-size` onto physical height un-swapped. css-view-transitions-1 gives the
+     pseudo tree the *captured element's* writing mode, not the originating root's, so
+     resetting the snapshot boxes to `horizontal-tb` is both spec-correct and what makes
+     the content box a rotation root.
+  2. **And that is not sufficient**, which is the part worth recording. Once the content
+     box *is* a rotation root, its own `width: 100%` / `height: 100%` are read as the
+     frame's inline and block extents — but the percentage still resolves against the
+     containing block's **physical** width. A 40000×100 capture then lays out 40000 wide
+     and 40000 tall, and with `overflow: visible` on the group (a captured element that
+     establishes no clip) the whole viewport fills with the middle band.
+
+- **Two variants were measured and neither is a clean win**, which is why this stays open:
+
+  | change | `css/css-view-transitions` | the four subjects | cost |
+  | --- | --- | --- | --- |
+  | `writing-mode: horizontal-tb` on the snapshot boxes | 157 → 164 | 2.0/2.7% → 13.8% | `right-and-left-*-partially-onscreen` ×2, a byte-exact pass, breaks |
+  | the same **plus** the content box sized in px from the capture | 157 → 162 | two **pass**, two 98.5% | the four `*-offscreen-*` fall 98.65% → 91.26% |
+
+  `right-and-left-*-partially-onscreen` renders byte-identically to its reference today, so
+  it is a genuine pass and not an accidental one — checked against the pristine build.
+- **So the exit gate is a percentage basis, not a bake.** A rotation root's frame extent
+  must resolve a percentage against the containing block's *swapped* extent
+  (`CssBox.ContainingBlock.cs` already does the equivalent for out-of-flow descendants of a
+  transposed containing block). With that in place the writing-mode reset should close all
+  four without the px workaround; it is a change to the `BROILER_VERTICAL_FLOW` prototype's
+  percentage resolution and deserves its own sweep over `css-writing-modes` and `css-align`.
 - **Exit gate:** the four match; the family is 20 tests locally and the other 16
-  must not move.
+  must not move — in particular `right-and-left-*-partially-onscreen`, which passes now.
 
 ### A captured element still paints in place
 
@@ -122,10 +158,43 @@ The largest remaining cluster, and it reduces to three causes.
   into the parent, with a focused test pinning an iframe's old root snapshot
   against the parent's.
 
-### Scrollbars in a captured snapshot
+### Scrollbars in a captured snapshot — **fixed**, and never about scrollbars
 
-- **Tests:** `css-view-transitions/{new,old}-content-has-scrollbars`, CI 11.1% →
-  **11.1%** against their own references. Reproduces exactly; not triaged further.
+- **Tests:** `css-view-transitions/{new,old}-content-has-scrollbars`, 11.1% → **both
+  pass**. See
+  [the live page cannot stand in for a hidden snapshot](wpt-rendering-gaps-fixed.md#the-live-page-cannot-stand-in-for-the-old-root-snapshot-when-the-new-one-is-hidden).
+- **The name is misleading and the entry should not have kept it.** Broiler paints no
+  scrollbar and does not inset the viewport for one, and the two tests' references are
+  byte-identical to each other despite one page having scrollbars and the other
+  `overflow: hidden`. Both degenerated locally to one question — does the old root
+  snapshot carry content — and both hit 100% once it does. **The scrollbar semantics they
+  were written to verify are still untested here**; a future reader must not take these two
+  passing as evidence that scrollbars in a snapshot work.
+
+### `ViewTransition` is not an interface object, and has no `waitUntil`
+
+- **Test:** `css-view-transitions/view-transition-waituntil-animation-manipulation`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).4), 1.3% against its
+  own reference.
+- **Nothing view-transition-related runs in it at all**, which is the point of the entry —
+  the failure looks like a compositing bug and is not one. The test's second precondition
+  line is `failIfNot(ViewTransition.prototype.waitUntil, …)`, and there is no
+  `ViewTransition` global, so evaluating the *argument* throws before `failIfNot` is
+  entered. The whole inline script aborts, including the `onload` assignment at the bottom
+  of it, so `document.startViewTransition` is never called. The abort is silent: the
+  "Precondition Failed" text the test would otherwise paint is never reached either.
+- **Measured, not inferred.** A probe reports `typeof ViewTransition === "undefined"` while
+  `document.startViewTransition` is a function whose returned object has keys
+  `ready,finished,updateCallbackDone,types,skipTransition` and no `waitUntil`. The same
+  probe reports no `Animation` constructor and no `Element.prototype.animate`. A copy of
+  the test with only the `ViewTransition.prototype` precondition removed scores **98.7%**
+  against the real reference — so unblocking the script is nearly all of it.
+- **Two things, of different sizes.** Exposing a `ViewTransition` interface object with a
+  `waitUntil` on its prototype is small. Making `waitUntil` *mean* something — the test then
+  manipulates the pseudo-element animations through the Web Animations API — needs
+  `document.getAnimations()` over the pseudo tree, which does not exist.
+- **Exit gate:** the interface object exists, and a focused test pins that a page probing
+  `ViewTransition.prototype` no longer aborts.
 
 ### Two tests are green on CI and wrong
 
@@ -181,6 +250,44 @@ golden suite never looks at a passing test's own reference.
   [won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate). Chasing
   byte-compatibility on a dropped declaration is not the same as implementing
   subgrid.
+
+### A grid's intrinsic inline size counts only its explicit tracks
+
+- **Tests:** `css-grid/grid-lanes/subgrid/…/track-sizing/column-subgrid-auto-fill-008`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).17, **0.2%** against its
+  own reference — the worst real render in that run), and the plain-subgrid twins
+  `css-grid/subgrid/repeat-auto-fill-001` and `-008`.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxGrid.cs`, `TryComputeGridIntrinsicContentWidth`).
+  Main repo.
+- **Root cause, and it is on the *reference* side.** The shrink-to-fit inline size of a grid
+  container sums only the tracks listed in `grid-template-columns`. Implicit columns — from
+  auto-placement past the template, or from a `grid-column` reaching past it — contribute
+  nothing, and `grid-auto-columns` is never consulted on that path at all. With no template
+  the method bails outright and the caller falls back to measuring inline *content*, which
+  for a grid of empty divs is 0. The definite-width pass is correct and already does all of
+  this (`colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count)`,
+  `ParseSingleImplicitSpec(GridAutoColumns, em)`); the intrinsic path duplicates none of it.
+- **Measured by probe.** `display: inline-grid; grid-auto-columns: 15px` with one
+  auto-placed item paints nothing and reports content width 0 where 15px is required;
+  `grid-column: 3 / span 4` gives 0 where 90px is; the same grid at `width: 300px` places
+  the item at x 30..89, so only intrinsic sizing is wrong. The `-008` reference is 20 boxes
+  that should each be 92px wide and come out 2px — border only.
+- **The four edits are known** and are all inside that one method: drop the
+  `specs.Count == 0` half of the early-out; derive the column count from the same placement
+  the real pass runs; size a track beyond the template from `grid-auto-columns`, returning
+  false the moment that spec is intrinsic so today's content-based fallback is preserved for
+  the common `auto` case; and charge gaps for the full column count. That last guard is what
+  bounds the blast radius — only grids declaring a fixed-length `grid-auto-columns` change.
+- **It will not make `-008` pass**, and the entry should not pretend otherwise: the test and
+  its reference remain structurally different documents (see the `grid-lanes` entry above).
+  What it buys is that the reference stops being a lie, and that a real class of
+  shrink-to-fit grids — `inline-grid`, floats, `fit-content`, nested grid items — stops
+  collapsing to zero. **64 files under `tests/wpt/checkout/css` combine `grid-auto-columns`
+  with an intrinsically-sized container.**
+- **Exit gate:** the probes above report the required widths, and the full
+  `css/css-grid/grid-lanes` subset (850 tests, 193 passing) does not regress — a large
+  share of those passes are grids that agree with their reference *because both sides
+  collapse*.
 
 ### The flag can be a false negative
 
@@ -299,6 +406,25 @@ other direction. None is a sizing bug.
   genuine near-miss on a `display: block` canvas under `height: 100%`.
 - **Exit gate:** a 2D canvas context that paints, at which point the first two
   become ordinary comparisons.
+
+### A column flex container destroys an inline replaced item when it stretches it
+
+- **Test:** `css-flexbox/aspect-ratio-intrinsic-size-007`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).28), 35.4% against its
+  own reference, `MissingContent` over a 1008×10 strip.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Flex.cs`). Main repo.
+- **Root cause.** A column flex container whose only child is inline-level takes the
+  `ContainsInlinesOnly` branch: the line boxes are built first, and the cross-axis stretch
+  is then applied as a *post*-pass that re-lays the item out at a target width. That is
+  destructive for an inline replaced `<img>`, which never goes through
+  `ResolveBlockUsedWidth` on the inline path, so the re-layout does not resize it the way
+  the pass assumes.
+- **The fix is to make the stretch width definite *before* the inline formatting context
+  runs** rather than re-running layout after it: a pre-pass over the in-flow items that
+  resolve to `stretch`, have no specified width and no auto inline margin, and are
+  replaced.
+- **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
+  elsewhere.
 
 ### An inline-block's height ignores `line-height`
 
@@ -477,6 +603,37 @@ the two defects at the end of this entry.
 - **Exit gate:** the same SVG file renders identically whether it is inline markup or an
   external image, the eleven tests match, and a sweep over `css-masking`, `css-images`
   and `css-transforms` shows no regression.
+
+### Gradient interpolation ignores three rules the colour functions made visible
+
+- **Tests:** `css-images/gradient/gradient-to-transparent`,
+  `gradient-{in,de}creasing-hue-lch`, and the six canvas twins
+  `html/canvas/{element,offscreen}/fill-and-stroke-styles/2d.gradient.{color,hue}InterpolationMethod*`
+  — all nine were passing and now fail — plus `gradient-none-interpolation`
+  (93.7% → 78.8%, failing throughout). **These nine are the entire loss column of the
+  full-suite sweep** for this branch (18 235 → 18 343 passing, +117 / −9).
+- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Gradients.cs`,
+  and the canvas gradient path for the six). **Submodule** — a fix ships as a patch.
+- **All three are fake passes unmasked**, and none is a regression in the ordinary sense:
+  they were agreeing with their references because *both sides* were dropping colour stops
+  the parser could not read. Since
+  [the CSS Color 4 fix](wpt-rendering-gaps-fixed.md#every-css-color-4-colour-function-painted-opaque-black)
+  the reference side renders correctly and the ramp is compared for the first time.
+  1. **Interpolation is not premultiplied.** `linear-gradient(transparent, 75%, red)` and
+     `linear-gradient(rgba(255 0 0 / 0), 75%, red)` must look identical (CSS Color 4 §12.3
+     premultiplies before interpolating); they do not.
+  2. **The hue arc is ignored.** `increasing hue` / `decreasing hue` on an `lch`
+     interpolation take the same path as `shorter`.
+  3. **A missing component is not carried forward.** §4.4 splits a stop with a `none`
+     component into two and takes each neighbour's value; Broiler's normaliser resolves it
+     to zero, which is correct for a colour rendered on its own (and is what
+     `gradient-single-stop-none-interpolation` asserts) and wrong between two stops.
+- **Rule 3 is the one with a choice in it.** Resolving `none` to zero is what makes the
+  single-stop test render at all; declining the conversion instead was measured and is
+  *worse* — it takes `gradient-none-interpolation` to 68.2% and loses the single-stop pass.
+  Carry-forward has to be implemented, not worked around.
+- **Exit gate:** the three tests pass, and `gradient-single-stop-none-interpolation` and the
+  four `gradient-powerless-hue-*` stay passing.
 
 ### Other image formats and inline-SVG edge cases
 
@@ -698,7 +855,80 @@ Worth separating from the rest, because the test itself may be at fault:
   engines failing by the same margin points at the test or its reference rather than
   at either engine; check it upstream before spending time on it.
 
+## Paged media
+
+### Pagination runs along the physical Y axis only
+
+- **Tests:** `css-page/body-background-{vrl,vlr,srl,slr}-print` —
+  [#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).27 is the `vrl` one,
+  34.8% against its own reference (37.2% since
+  [the out-of-flow margin fix](wpt-rendering-gaps-fixed.md#an-out-of-flow-first-child-propagated-its-top-margin-into-its-parent)).
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Fragmentation.cs`) *and* the runner
+  (`src/Broiler.Wpt/WptDocumentRenderer.cs`). Main repo, both halves.
+- **Root cause.** The fragmentation model is hardcoded to the physical Y axis. It works
+  exclusively in `environment.PageSize.Height`, `Location.Y`, `ActualBottom` and
+  `OffsetTop` — there is no block-axis abstraction anywhere in it — and the runner's paged
+  path mirrors that assumption, allocating a tall layout surface and cutting page *k* as
+  the horizontal band `[k·H, (k+1)·H)`. In `vertical-rl` the block progression is
+  horizontal, so content past the first page area overflows the surface's **width** and is
+  clipped away instead of continuing on page 2, and the page count comes out wrong too.
+- **There is no small fix**, and that is the useful part of the entry. It needs (a) a
+  block-axis abstraction in `CssBox.Fragmentation.cs` so the forced-break and
+  monolithic-fit passes read the page area's *block* extent and offset, and (b) a runner
+  that allocates the layout surface along the document's block axis and slices accordingly.
+  Do not attempt it at the unpaginated layer.
+- **`page-margin-002-print` is a different thing entirely** and is already settled in
+  [won't fix](wpt-rendering-gaps-wont-fix.md#page-margin-002-print-is-a-screenshot-artifact):
+  its residual 10.8% is the `@page` margin ring, which has no effect outside paged media,
+  and it declares **no** page margin boxes at all — `WptPageMarginBoxes` is not on its code
+  path. "page-margin" in the name means the page's margin, not a margin box.
+- **Exit gate:** the four `body-background-*-print` tests match, and a horizontal-writing-mode
+  paged test does not move.
+
 ## Transforms
+
+### Nothing with a rotation or a skew in it paints at all
+
+- **Tests:** `css-transforms/animation/transform-interpolation-005`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).23) and every test whose
+  transform is not axis-aligned.
+- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Image/BCanvas.cs`,
+  `Adapters/GraphicsAdapter.cs`). **Submodule** — a fix ships as a patch.
+- **Root cause.** `BCanvas.TrySaveTransform` returns false when the affine's `b` or `c` is
+  non-zero, i.e. for any rotation or skew — including every `matrix()` with non-zero b/c.
+  `GraphicsAdapter` then routes the layer to `_canvasCompat`, whose only implementation in
+  the tree is `StubCanvasCompat`, **every method of which is a no-op**, and
+  `CanUseRaster` sends every enclosed draw there too. So the content does not paint
+  mis-rotated; it does not paint.
+- **What it needs:** `BCanvas` keeps `_translation`, `_scaleX`, `_scaleY` and maps points
+  per axis. That has to become a real 2×3 matrix, composed in
+  `TrySaveTransform`/`Translate`/`Scale` and applied at the ~12 mapping call sites; a
+  rect-shaped primitive under a rotation has to go out as the polygon primitive the backend
+  already draws, and `PushClip` has to become the polygon clip that already exists.
+- **`perspective-split-by-zero-w`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).22) is a tier beyond
+  that** and belongs with
+  [the 3D entry below](#a-perspective-transformed-box-is-not-rasterised-in-3d): there is no
+  `w` to split against because there is no 3D pipeline at all —
+  `ParseCssTransformMatrix` reduces the whole list to a 2D affine and silently drops
+  `rotateX`, `rotateY`, off-Z `rotate3d` and genuinely-3D `matrix3d`.
+
+### Transform interpolation has no matrix fallback
+
+- **Tests:** `css-transforms/animation/transform-interpolation-005` and its siblings.
+- **Owner:** `src/Broiler.HtmlBridge.Dom/DomBridge/WebAnimations.cs`. **Main repo** — this
+  half needs no patch, though it moves no pixels until the rasteriser above can draw a
+  rotation.
+- **Root cause.** `TryInterpolateTransform` requires equal list length, identical function
+  names and identical argument counts, then lerps each numeric token. A mismatched pair
+  gets no decompose/recompose fallback at all — the spec requires converting both sides to
+  a matrix and interpolating that — so the animation freezes at `from` until progress
+  reaches 1. `IdentityTransform` also picks the wrong identity for several functions: it
+  chooses `1` for anything starting with `scale`, `0deg` for `rotate`/`skew` and `0`
+  otherwise, so the identity of `matrix()` is wrong.
+- **Exit gate:** a CSS Transforms 2 decompose/recompose pair (quaternion SLERP for the 3D
+  rotation), a corrected per-function identity, and matched `matrix()`/`matrix3d()` pairs
+  routed through it.
 
 ### A perspective-transformed box is not rasterised in 3D
 
@@ -736,6 +966,39 @@ Worth separating from the rest, because the test itself may be at fault:
   staying passing.
 
 ---
+
+### The filter region is hardcoded, so `filterUnits` and `primitiveUnits` do nothing
+
+- **Tests:** `filter-effects/svg-filter-filter-units-user-space`
+  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).11 — 95.3% against its
+  own reference, so most of its CI gap is
+  [a reference disagreement](wpt-rendering-gaps-wont-fix.md#the-settled-set), but the
+  residual is real), plus `svg-feflood-001`, `feflood-with-filter-reference`,
+  `filter-region-html-content-viewport.tentative`, `empty-element-with-filter-002`/`-004`
+  and the three `visibility-hidden-element-with-filter-*`.
+- **Root cause.** The `feFlood` path hardcodes the *default* objectBoundingBox filter
+  region: `SvgRenderer` literally computes `fx = bx − 0.1·bw, fy = by − 0.1·bh,
+  fw = 1.2·bw, fh = 1.2·bh` from the shape's own bounding box and floods that. The
+  attributes are not mis-resolved — they are never captured. `SvgFilterTable.FloodFilter`
+  is a `record struct FloodFilter(BColor Color)`, so `filterUnits`, `primitiveUnits` and
+  the x/y/width/height of both the `<filter>` and the primitive are discarded at collection
+  time even though the parsed attribute dictionaries are in scope there.
+- **Where the halves land, and why the split is worth taking.** The region *type* and its
+  resolver belong in `Broiler.Layout` — widen `FloodFilter` to carry the raw geometry
+  strings and add `Resolve(objectBoundingBox, viewportW, viewportH)`. The CSS
+  `filter: url(#id)` path for HTML elements has the identical defect in
+  `PaintWalker.Stacking.cs`, which emits the element's border box verbatim; with the
+  resolver in the main repo **that submodule patch is two lines**. This is the shape
+  `CLAUDE.md` recommends and the reason to do it in that order.
+- **Two adjacent defects on the same path, both `Broiler.HTML`, both small.** The HTML
+  flood rect is emitted *before* the element's transform layer and then returns early, so a
+  transform never applies to it — the in-code comment justifies this by pointing at
+  `svg-filter-primitive-units-user-space`, where the correct local region happens to land on
+  the border-box origin after the translate, so two errors cancel. And
+  `visibility: hidden` takes an early return above the flood branch entirely, where an
+  `feFlood` ignores its input and must still paint.
+- **Exit gate:** `filterUnits`/`primitiveUnits` resolve on both paths, and the flood is
+  emitted inside the transform layer.
 
 ## Dynamic stylesheets
 

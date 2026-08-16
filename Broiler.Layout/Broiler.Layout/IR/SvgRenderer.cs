@@ -1248,6 +1248,19 @@ internal static partial class SvgRenderer
         if (Broiler.CSS.CssSystemColors.TryResolve(val, out var system))
             return BColor.FromArgb(system.Alpha, system.Red, system.Green, system.Blue);
 
+        // SVG paint takes any CSS <color>, which since Color 4 includes oklch()/lab()/color()/…
+        // None of the branches above reads one, and the fall-through below is the caller's default
+        // — solid black for a fill — so an SVG styled in a modern colour space painted black rather
+        // than the colour it names.
+        if (CssColor4.TryParse(val, out var color4))
+        {
+            return BColor.FromArgb(
+                (int)Math.Round(Math.Clamp(color4.A, 0, 1) * 255),
+                (int)Math.Round(Math.Clamp(color4.R, 0, 255)),
+                (int)Math.Round(Math.Clamp(color4.G, 0, 255)),
+                (int)Math.Round(Math.Clamp(color4.B, 0, 255)));
+        }
+
         return defaultColor;
     }
 
@@ -1290,22 +1303,30 @@ internal static partial class SvgRenderer
     [GeneratedRegex(@"<path\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex PathElementRegex();
 
-    [GeneratedRegex(@"<rect\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    /// <summary>
+    /// The shape elements, matched quote-aware for the same reason <see cref="PathElementRegex"/>
+    /// is: <c>[^/&gt;]*</c> excludes <c>/</c>, so an element with a slash anywhere in <em>any</em>
+    /// attribute value never matched and was never drawn — <c>requiredFeatures="http://…"</c>,
+    /// <c>fill="url(support/resources.svg#g)"</c>, <c>filter="url(support/hueRotate.svg#f)"</c>.
+    /// Nothing reported it, because an element that does not match is not an error. The six were
+    /// left behind when <c>&lt;path&gt;</c> was fixed.
+    /// </summary>
+    [GeneratedRegex(@"<rect\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParseRectRegex();
 
-    [GeneratedRegex(@"<circle\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<circle\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParseCircleRegex();
 
-    [GeneratedRegex(@"<line\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<line\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParseLineRegex();
 
-    [GeneratedRegex(@"<ellipse\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<ellipse\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParseEllipseRegex();
 
-    [GeneratedRegex(@"<polygon\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<polygon\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParsePolygonRegex();
 
-    [GeneratedRegex(@"<polyline\s+([^/>]*)/?>", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"<polyline\b((?:[^>""']|""[^""]*""|'[^']*')*?)/?>", RegexOptions.IgnoreCase)]
     private static partial Regex ParsePolyLineRegex();
 
     [GeneratedRegex(@"<text\s+([^>]*)>\s*<textpath\s+([^>]*)>(.*?)</textpath>\s*</text>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]

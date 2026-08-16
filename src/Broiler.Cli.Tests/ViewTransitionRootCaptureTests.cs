@@ -105,7 +105,8 @@ public class ViewTransitionRootCaptureTests
     // The gate matters as much as the capture: cloning the root unconditionally was measured at
     // +8/-7 passing and reverted (see the class remarks), because a transparent snapshot over the
     // live page is pixel-exact where a clone is only close. With no author background on
-    // ::view-transition the snapshot must stay content-less and let the page through.
+    // ::view-transition, and both snapshots left visible, the snapshot must stay content-less and
+    // let the page through.
     [Fact]
     public void Transparent_Overlay_Leaves_The_Root_Snapshot_Content_Less()
     {
@@ -116,7 +117,7 @@ public class ViewTransitionRootCaptureTests
   body { background: white; margin: 0; }
   #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
   html::view-transition-old(root) { animation: unset; opacity: 1; }
-  html::view-transition-new(root) { animation: unset; opacity: 0; }
+  html::view-transition-new(root) { animation: unset; opacity: 1; }
 </style>
 <div id="box"></div>
 </html>
@@ -161,6 +162,11 @@ public class ViewTransitionRootCaptureTests
     // opacity only composites the snapshot against what is behind it, which is exactly what the live
     // page already does. root-to-shared-animation-end pins `::view-transition-old(*) { opacity: 1 }`
     // and cost 79 pixel points the one time this was treated as needing content.
+    // <para>
+    // A *partial* opacity on this side, with the other side left visible, is the case that isolates
+    // it. A flat `opacity: 0` on the other side is a different question entirely — that hides the
+    // other snapshot, and the pair of tests at the end of this file covers it.
+    // </para>
     [Fact]
     public void Opacity_Alone_Leaves_The_Snapshot_Content_Less()
     {
@@ -170,8 +176,8 @@ public class ViewTransitionRootCaptureTests
 <style>
   body { background: white; margin: 0; }
   #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
-  html::view-transition-old(root) { animation: unset; opacity: 1; }
-  html::view-transition-new(root) { animation: unset; opacity: 0; }
+  html::view-transition-old(root) { animation: unset; opacity: 0.5; }
+  html::view-transition-new(root) { animation: unset; opacity: 1; }
 </style>
 <div id="box"></div>
 </html>
@@ -234,5 +240,67 @@ public class ViewTransitionRootCaptureTests
 
         AssertPixel(bitmap, 20, 20, 255, 0, 0, "the visible group's snapshot");
         AssertPixel(bitmap, 150, 150, 255, 192, 203, "the backdrop");
+    }
+
+    // The live page can only stand in for the *old* root snapshot while the *new* one is what is
+    // meant to be on screen — the page shows the new state. An author who hides the new snapshot
+    // has said otherwise, and then the old snapshot is the only thing that can supply those pixels.
+    // Leaving it content-less painted a flat viewport-sized rectangle of the captured root
+    // background instead, which is how WPT {new,old}-content-has-scrollbars rendered a plain
+    // lightpink canvas where their references show the page.
+    [Fact]
+    public void Hiding_The_New_Root_Snapshot_Makes_The_Old_One_Reproduce_The_Page()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  html { background: lightpink; }
+  body { margin: 0; }
+  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
+  html::view-transition-old(root) { animation: unset; opacity: 1; }
+  html::view-transition-new(root) { animation: unset; opacity: 0; }
+</style>
+<div id="box"></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.startViewTransition(() => {" +
+            "  document.getElementById('box').remove(); });");
+
+        // The captured box, not the flat root background that replaced it — and not the live page
+        // either, which no longer has a box at all.
+        AssertPixel(bitmap, 50, 50, 0, 0, 255, "the captured box under a hidden new snapshot");
+    }
+
+    // The negative half: with the new snapshot left visible, the gate must not fire and the old
+    // snapshot must stay content-less. This is the exact path the reverted unconditional clone
+    // broke, so it is the regression this pair exists to pin.
+    // <para>
+    // The root background is left transparent here, unlike its positive twin, because a
+    // content-less snapshot does not merely let the page through — AttachSnapshotPaint fills it
+    // with the captured root background, opaquely. With `html { background: lightpink }` this
+    // renders flat pink whether the gate fires or not, and would assert nothing.
+    // </para>
+    [Fact]
+    public void A_Visible_New_Root_Snapshot_Leaves_The_Old_One_Content_Less()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html class="reftest-wait">
+<style>
+  body { background: white; margin: 0; }
+  #box { position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; background: blue; }
+  html::view-transition-old(root) { animation: unset; opacity: 1; }
+  html::view-transition-new(root) { animation: unset; opacity: 1; }
+</style>
+<div id="box"></div>
+</html>
+""";
+        using var bitmap = Render(html,
+            "document.startViewTransition(() => {" +
+            "  document.getElementById('box').style.background = 'red'; });");
+
+        AssertPixel(bitmap, 50, 50, 255, 0, 0, "the live page through the empty snapshot");
     }
 }
