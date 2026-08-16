@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7319,
+    "failed": 7308,
     "skipped": 0,
-    "total": 7319
+    "total": 7308
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5167,
+      "count": 5200,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 680,
+      "count": 678,
       "examples": [
         "css/css-align/blocks/align-content-block-007.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -51,23 +51,11 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 402,
+      "count": 401,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-backgrounds/background-size-029.html",
         "css/css-backgrounds/border-image-width-should-extend-to-padding.html"
-      ]
-    },
-    {
-      "key": "Timeout",
-      "label": "Timeout",
-      "category": "Timeout",
-      "subCategory": null,
-      "count": 65,
-      "examples": [
-        "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
-        "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
-        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html"
       ]
     },
     {
@@ -80,6 +68,18 @@
         "css/css-anchor-position/anchor-center-safe-rtl.html",
         "css/css-images/gradient/css-color-4-colors-default-to-oklab-gradient.html",
         "svg/coordinate-systems/out-of-flow-svg-root.html"
+      ]
+    },
+    {
+      "key": "Timeout",
+      "label": "Timeout",
+      "category": "Timeout",
+      "subCategory": null,
+      "count": 24,
+      "examples": [
+        "css/css-overflow/overflow-alignment-flex-col-wrap-002.html",
+        "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-001.html",
+        "css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html"
       ]
     }
   ],
@@ -128,11 +128,11 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      6905
+      6935
     ],
     [
       "Timeout",
-      65
+      24
     ]
   ],
   "droppedDeclarations": [],
@@ -297,64 +297,8 @@
     }
   ],
   "timeoutLimit": 10,
-  "timeoutCount": 65,
+  "timeoutCount": 24,
   "timeouts": [
-    {
-      "relativeTestPath": "css/filter-effects/crashtests/filter-primitive-crash.html",
-      "directory": "css/filter-effects/crashtests",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/filter-effects/crashtests/filter-primitive-crash.html",
-      "fileSizeBytes": 391,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "css/css-variables/url-syntax-crash.html",
-      "directory": "css/css-variables",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-variables/url-syntax-crash.html",
-      "fileSizeBytes": 428,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/compile-error-in-body-onerror.html",
-      "directory": "html/webappapis/scripting/processing-model-2",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/html/webappapis/scripting/processing-model-2/compile-error-in-body-onerror.html",
-      "fileSizeBytes": 661,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/addEventListener.html",
-      "directory": "html/webappapis/scripting/processing-model-2",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/html/webappapis/scripting/processing-model-2/addEventListener.html",
-      "fileSizeBytes": 696,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/body-onerror-compile-error.html",
-      "directory": "html/webappapis/scripting/processing-model-2",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/html/webappapis/scripting/processing-model-2/body-onerror-compile-error.html",
-      "fileSizeBytes": 976,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/compile-error.html",
-      "directory": "html/webappapis/scripting/processing-model-2",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/html/webappapis/scripting/processing-model-2/compile-error.html",
-      "fileSizeBytes": 984,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/compile-error-same-origin.html",
-      "directory": "html/webappapis/scripting/processing-model-2",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/html/webappapis/scripting/processing-model-2/compile-error-same-origin.html",
-      "fileSizeBytes": 1059,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "css/css-fonts/variations/font-opentype-collections.html",
-      "directory": "css/css-fonts/variations",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-fonts/variations/font-opentype-collections.html",
-      "fileSizeBytes": 1282,
-      "severity": "critical"
-    },
     {
       "relativeTestPath": "css/css-break/table/repeated-section/special-elements-crash.html",
       "directory": "css/css-break/table/repeated-section",
@@ -368,6 +312,62 @@
       "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/conformance-checkers/html/elements/img/src-isvalid.html",
       "fileSizeBytes": 5940,
       "severity": "high"
+    },
+    {
+      "relativeTestPath": "css/css-flexbox/abspos/position-absolute-013.html",
+      "directory": "css/css-flexbox/abspos",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-flexbox/abspos/position-absolute-013.html",
+      "fileSizeBytes": 6229,
+      "severity": "high"
+    },
+    {
+      "relativeTestPath": "css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
+      "directory": "css/css-scroll-snap",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-scroll-snap/scroll-margin-overflow-ancestor.html",
+      "fileSizeBytes": 11896,
+      "severity": "medium"
+    },
+    {
+      "relativeTestPath": "css/css-overflow/overflow-alignment-block-002.html",
+      "directory": "css/css-overflow",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-block-002.html",
+      "fileSizeBytes": 40172,
+      "severity": "low"
+    },
+    {
+      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-wrap-overflow-002.html",
+      "directory": "css/css-overflow",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-row-wrap-overflow-002.html",
+      "fileSizeBytes": 40510,
+      "severity": "low"
+    },
+    {
+      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-wrap-overflow-002.html",
+      "directory": "css/css-overflow",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-col-wrap-overflow-002.html",
+      "fileSizeBytes": 40516,
+      "severity": "low"
+    },
+    {
+      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-row-reverse-overflow-002.html",
+      "directory": "css/css-overflow",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-row-reverse-overflow-002.html",
+      "fileSizeBytes": 40535,
+      "severity": "low"
+    },
+    {
+      "relativeTestPath": "css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html",
+      "directory": "css/css-overflow",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-flex-col-reverse-overflow-002.html",
+      "fileSizeBytes": 40541,
+      "severity": "low"
+    },
+    {
+      "relativeTestPath": "css/css-overflow/overflow-alignment-block-001.html",
+      "directory": "css/css-overflow",
+      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/css/css-overflow/overflow-alignment-block-001.html",
+      "fileSizeBytes": 40593,
+      "severity": "low"
     }
   ],
   "timeoutDirectories": [
@@ -376,39 +376,19 @@
       20
     ],
     [
-      "encoding/legacy-mb-korean/euc-kr",
-      10
-    ],
-    [
-      "encoding/legacy-mb-japanese/shift_jis",
-      8
-    ],
-    [
-      "html/webappapis/scripting/processing-model-2",
-      5
-    ],
-    [
-      "encoding/legacy-mb-tchinese/big5",
-      5
-    ],
-    [
-      "conformance-checkers/html/elements/table/integrity",
-      3
-    ],
-    [
-      "encoding/legacy-mb-japanese/euc-jp",
-      3
-    ],
-    [
-      "encoding/legacy-mb-japanese/iso-2022-jp",
-      2
-    ],
-    [
       "conformance-checkers/html/elements/img",
       1
     ],
     [
-      "css/WOFF2",
+      "css/css-flexbox/abspos",
+      1
+    ],
+    [
+      "css/css-scroll-snap",
+      1
+    ],
+    [
+      "css/css-break/table/repeated-section",
       1
     ]
   ],
@@ -468,13 +448,6 @@
       "referenceMatchPercent": 94.95328267415366,
       "cleared": false,
       "detail": null
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
-      "matchPercent": 1.271565755208337,
-      "referenceMatchPercent": 100.0,
-      "cleared": true,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/css-view-transitions/auto-name-from-id.html",
@@ -552,6 +525,13 @@
       "referenceMatchPercent": 99.9237060546875,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.9%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-grid/subgrid/abs-pos-002.html",
+      "matchPercent": 54.62493896484375,
+      "referenceMatchPercent": 100.0,
+      "cleared": true,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/filter-effects/backdrop-filter-clip-rect-zoom.html",
@@ -737,7 +717,7 @@
     },
     {
       "relativeTestPath": "svg/path/reftests/path-zoom.html",
-      "matchPercent": 79.3908437093099,
+      "matchPercent": 79.36541239420572,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -5134,19 +5114,22 @@
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Alexis_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Feodor_I_of_Russia-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/table/integrity/Naser_al-Din_Shah_Qajar-novalid.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/video/poster-isvalid.html",
@@ -5167,12 +5150,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/xhtml/elements/table/204-isvalid.xhtml",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
     },
     {
       "relativeTestPath": "content-security-policy/README.html",
@@ -12839,7 +12816,8 @@
       "relativeTestPath": "css/WOFF2/testcaseindex.xht",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/WOFF2/valid-001.xht",
@@ -19578,12 +19556,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-fonts/variations/font-opentype-collections.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
     },
     {
       "relativeTestPath": "css/css-fonts/variations/variable-avar2-rvrn-mismatch.html",
@@ -30342,7 +30314,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -37701,12 +37673,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-variables/url-syntax-crash.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "css/css-variables/variable-css-wide-keywords-after-substitution.html",
       "passed": false,
       "skipped": false,
@@ -37750,13 +37716,6 @@
     },
     {
       "relativeTestPath": "css/css-variables/vars-font-shorthand-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -40948,12 +40907,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/filter-effects/crashtests/filter-primitive-crash.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "css/filter-effects/css-backdrop-filter-transform-clip.html",
       "passed": false,
       "skipped": false,
@@ -41888,31 +41841,36 @@
       "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-cseucpkdfmtjapanese.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars-x-euc-jp.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/euc-jp/eucjp_chars.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/iso-2022-jp/iso2022jp_chars-csiso2022jp.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/iso-2022-jp/iso2022jp_chars.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis-decode-ms932.html",
@@ -41930,49 +41888,57 @@
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-csshiftjis.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms932.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-ms_kanji.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-shift-jis.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-sjis.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-windows-31j.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars-x-sjis.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-japanese/shift_jis/sjis_chars.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr-decode-csksc56011987.html",
@@ -41990,61 +41956,71 @@
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-cseuckr.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-csksc56011987.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-iso-ir-149.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-korean.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ks_c_5601-1987.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ks_c_5601-1989.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ksc5601.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-ksc_5601.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars-windows-949.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-korean/euc-kr/euckr_chars.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5-decode-big5-hkscs.html",
@@ -42062,31 +42038,36 @@
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-big5-hkscs.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-cn-big5.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-csbig5.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars-x-x-big5.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars.html",
       "passed": false,
       "skipped": false,
-      "category": "Timeout"
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "encoding/legacy-mb-tchinese/big5/big5_chars_extra.html",
@@ -48628,36 +48609,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/addEventListener.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/body-onerror-compile-error.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/compile-error-in-body-onerror.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/compile-error-same-origin.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "html/webappapis/scripting/processing-model-2/compile-error.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "infrastructure/assumptions/ahem.html",
       "passed": false,
       "skipped": false,
@@ -50793,7 +50744,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-14-t-drt.html",
@@ -50842,7 +50793,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/non-additive-type-by-animation.html",
@@ -50860,13 +50811,6 @@
     },
     {
       "relativeTestPath": "svg/animations/smil-values-trailing-semicolon.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "svg/animations/spaces-at-end-of-path-data.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
