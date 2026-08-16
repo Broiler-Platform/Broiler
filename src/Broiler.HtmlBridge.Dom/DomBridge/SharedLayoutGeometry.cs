@@ -1,6 +1,7 @@
 using Broiler.Layout;
 using System.Drawing;
 using Broiler.Dom;
+using Broiler.HtmlBridge.Dom.Runtime;
 
 namespace Broiler.HtmlBridge;
 
@@ -45,6 +46,7 @@ public sealed partial class DomBridge
         _layoutView?.Dispose();
         _layoutView = null;
         _sharedGeometrySnapshot = null;
+        DropRetainedGeometrySnapshot();
     }
 
     // The geometry snapshot for the current WithLayoutGeometryCache read pass. Built
@@ -82,7 +84,7 @@ public sealed partial class DomBridge
                 _layoutGeometryPassActive = true;
             try
             {
-                snapshot = _sharedGeometrySnapshot ??= BuildSharedGeometrySnapshot();
+                snapshot = _sharedGeometrySnapshot ??= AcquireSharedGeometrySnapshot();
             }
             finally
             {
@@ -96,6 +98,89 @@ public sealed partial class DomBridge
 
     private static readonly IReadOnlyDictionary<DomElement, BoxGeometry> EmptySharedGeometry =
         new Dictionary<DomElement, BoxGeometry>();
+
+    /// <summary>
+    /// Everything a shared geometry snapshot is a function of, so that two queries carrying the same
+    /// key are guaranteed to lay out to the same boxes.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DomDocument.Version"/> covers the DOM the projection is cloned from — every tree
+    /// edit, attribute write, text change and adoption bumps it.
+    /// <see cref="BridgeRuntimeStateEpoch"/> covers the bridge-side state
+    /// <c>CopyBridgeRuntimeStateTo</c> carries into that clone — inline style (which never reaches
+    /// the <c>style=</c> attribute at script time), form-control values, CSSOM sheet edits, shadow,
+    /// dialog/popover and animation state. The remaining fields are the layout inputs the projection
+    /// does not carry: the viewport the renderer is handed, and the two zoom channels
+    /// <see cref="BuildSharedGeometrySnapshot"/> sets around it.
+    /// </remarks>
+    private readonly record struct LayoutSnapshotKey(
+        ulong DocumentVersion,
+        long BridgeStateEpoch,
+        float ViewportWidth,
+        float ViewportHeight,
+        bool NativeZoom,
+        double VisualViewportScale);
+
+    private LayoutSnapshotKey CurrentLayoutSnapshotKey() => new(
+        _document.Version,
+        BridgeRuntimeStateEpoch.Current,
+        _viewportWidth,
+        _viewportHeight,
+        Broiler.Layout.Engine.NativeZoom.Enabled,
+        NativeVisualViewport && HasActiveVisualViewport() ? GetVisualViewportScale() : 0.0);
+
+    // The most recently built snapshot and the key it was built under, held as one immutable pair so
+    // that publishing it is a single reference write. Frame actions can run a geometry query on a
+    // ThreadPool thread, and a snapshot paired with another build's key is precisely a stale read —
+    // the failure this whole cache has to be incapable of. See AcquireSharedGeometrySnapshot.
+    private sealed record RetainedGeometry(
+        LayoutSnapshotKey Key,
+        IReadOnlyDictionary<DomElement, BoxGeometry> Snapshot);
+
+    private RetainedGeometry? _retainedGeometry;
+
+    private void DropRetainedGeometrySnapshot() => _retainedGeometry = null;
+
+    /// <summary>
+    /// The snapshot for this read pass: the retained one when nothing it depends on has changed since
+    /// it was built, otherwise a fresh layout.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A snapshot costs one whole-document layout, and the per-pass scoping alone bounds that to one
+    /// per <em>query</em> — which is one per <c>offsetWidth</c> read and, because clamping a scroll
+    /// offset reads four extents, four per <c>scrollTop</c> write. A script that walks a collection
+    /// therefore paid a full layout per element per property. WPT's twenty
+    /// <c>css/css-overflow/overflow-alignment-*</c> tests do exactly that — 84 scrollers x 2 axes,
+    /// against a 1 617-element document that lays out in ~0.9s — and all twenty were reported as
+    /// timeouts (issue #1682) rather than as the pixel results they actually are.
+    /// </para>
+    /// <para>
+    /// Retaining the snapshot across passes turns that into one layout for the whole loop. It is sound
+    /// exactly while <see cref="LayoutSnapshotKey"/> is unchanged, which is the point of taking the key
+    /// from the same inputs the projection is built out of rather than from a "has script run" heuristic.
+    /// The key is read <em>after</em> the build, not before: preparing a projection writes bridge runtime
+    /// state of its own (<c>CopyBridgeRuntimeStateTo</c> copies every element's state onto its clone, and
+    /// the anchor/animation resolvers bake into the overlay), so a key taken before the build would never
+    /// match again and the cache would never hit.
+    /// </para>
+    /// <para>
+    /// Conservative in both directions that matter: a read path that has not been routed through
+    /// <c>InlineStyleForRead</c> merely bumps the epoch and costs a rebuild, and any state the key does
+    /// not model is state the projection does not carry. A stale snapshot needs a layout input to change
+    /// with no key field moving — which is why scroll offsets, the one input deliberately excluded, are
+    /// argued for at <see cref="RuntimeValue{T}"/> rather than assumed.
+    /// </para>
+    /// </remarks>
+    private IReadOnlyDictionary<DomElement, BoxGeometry> AcquireSharedGeometrySnapshot()
+    {
+        if (_retainedGeometry is { } retained && retained.Key == CurrentLayoutSnapshotKey())
+            return retained.Snapshot;
+
+        var snapshot = BuildSharedGeometrySnapshot();
+        _retainedGeometry = new RetainedGeometry(CurrentLayoutSnapshotKey(), snapshot);
+        return snapshot;
+    }
 
     private IReadOnlyDictionary<DomElement, BoxGeometry> BuildSharedGeometrySnapshot()
     {

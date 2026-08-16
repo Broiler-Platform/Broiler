@@ -141,19 +141,12 @@ set -euo pipefail
 # The program-numbering and program-dump patches that held 0001 before this one both landed
 # upstream, so their files are gone with them.
 #
-# 0001 (Broiler.JS, keep a direct eval's scope alive for the closures it creates) is deliberately
-# NOT listed. It decides whether page script runs at all rather than what any of it paints, and
-# the pixel suites do not execute a module loader of the shape that trips it. Its behaviour is
-# unit-tested inside the patch itself (DirectEvalClosureScopeTests).
-#
-# The media-element patch (Broiler.HTML, "Paint a media element's box only when it shows controls")
-# IS listed, and for the plainest reason there is: without it every <video> on a page is a solid
-# black 300×150 rectangle and every <audio> a black bar, over whatever they sit on, where the
-# reference browser paints nothing at all. It is the whole of
-# conformance-checkers/html/elements/{video,track,audio}/src-isvalid — three tests that go from
-# 14–20 % to 100 % with it — and it moves any page that merely *contains* a media element. There
-# is no main-repo half to fall back on: the fill is set during the style cascade, where nothing
-# downstream can tell it from an author background.
+# The eight patches that held 0001–0008 before the two below are all upstream and all reachable
+# through the pinned pointers, so their files are deleted and the numbering has restarted. Two of
+# them mattered here. The direct-eval one (Broiler.JS 60c9182a) was never listed — it decides
+# whether page script runs at all rather than what any of it paints. The media-element one
+# (Broiler.HTML a9be60a) WAS listed and is now the pointer itself, so its entry is removed rather
+# than left to skip forever: an entry whose idempotence guard can only ever skip is noise.
 #
 # The one-semicolon `for` head patch (Broiler.JS, "Reject a `for` head that carries only one
 # semicolon") IS listed, because what it fixes is a *timeout*, and a timeout is the one failure
@@ -163,16 +156,19 @@ set -euo pipefail
 # per-test budget and are reported as timeouts rather than run. With it they finish in ~3 s.
 # It is also the only entry here whose absence costs the run *wall-clock* as well as results:
 # 2.5 minutes of a shard's budget spent waiting on loops that cannot end.
-# 0010 (Broiler.HTML, cap the image fetch timeout) is deliberately NOT listed, even though it
+#
+# 0002 (Broiler.HTML, cap the image fetch timeout) is deliberately NOT listed, even though it
 # fixes a timeout. Its main-repo half already covers the WPT run: WptTestRunner's image handler
-# now marks an off-corpus http(s) <img> handled, so the runner never reaches the downloader and
-# the 100-second default it caps cannot be hit here regardless. The patch matters for the real
-# browser, where there is no such handler and an unreachable <img> still stalls the render — so it
-# is a correctness fix to land upstream, not something a WPT run needs applied on top of the
-# pointer. Listing it would only add a patch application that changes no result.
+# marks an off-corpus http(s) <img> handled, so the runner never reaches the downloader and the
+# 100-second default it caps cannot be hit here. (Worth recording, because it is the obvious next
+# suspicion and it is wrong: the handler decides from Uri.TryCreate, and of the 88 sources in
+# conformance-checkers/html/elements/img/src-isvalid.html only two fail to parse — `http💩//:foo`
+# and `💩http://foo` — and neither names http(s), so nothing exotic in that file slips past it.)
+# The patch matters for the real browser, where there is no such handler and an unreachable <img>
+# still stalls the render — so it is a correctness fix to land upstream, not something a WPT run
+# needs applied on top of the pointer.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0008-media-element-painting.patch"
-  "Broiler.JS|patches/0009-reject-one-semicolon-for-head.patch"
+  "Broiler.JS|patches/0001-reject-one-semicolon-for-head.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

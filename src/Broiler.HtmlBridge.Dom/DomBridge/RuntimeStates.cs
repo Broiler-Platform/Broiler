@@ -93,8 +93,10 @@ internal sealed class FormControlRuntimeState
 
 internal sealed class ScrollRuntimeState
 {
-    public RuntimeValue<double> Left { get; } = new();
-    public RuntimeValue<double> Top { get; } = new();
+    // affectsLayout: false — a scroll offset never reaches the renderer, so writing one leaves a
+    // retained geometry snapshot valid. See the RuntimeValue<T> parameter docs below.
+    public RuntimeValue<double> Left { get; } = new(affectsLayout: false);
+    public RuntimeValue<double> Top { get; } = new(affectsLayout: false);
 
     public void CopyTo(ScrollRuntimeState target)
     {
@@ -163,7 +165,11 @@ internal sealed class StyleSheetRuntimeState
     /// <c>getComputedStyle</c> engine sheet (Phase 6 store unification). <c>null</c>
     /// until first materialized from <see cref="RulesSourceText"/>.
     /// </summary>
-    public List<CssRule>? Rules { get; set; }
+    public List<CssRule>? Rules
+    {
+        get;
+        set { field = value; BridgeRuntimeStateEpoch.Bump(); }
+    }
 
     /// <summary>
     /// The source text <see cref="Rules"/> was last parsed from. When the element's
@@ -179,7 +185,17 @@ internal sealed class StyleSheetRuntimeState
     /// author source (byte-identical to pre-Phase-6); once <c>true</c>, the renderer
     /// text is serialized from the model so the mutation is observed downstream.
     /// </summary>
-    public bool RulesMutated { get; set; }
+    /// <remarks>
+    /// The setter is also the CSSOM's mutation signal: <c>DomBridge.MarkRulesMutated</c> sets it from
+    /// <c>insertRule</c>/<c>deleteRule</c>, which change the rule <em>list's contents</em> and so move
+    /// the cascade without touching the DOM at all. <see cref="BridgeRuntimeStateEpoch"/> has to see
+    /// that, or a retained geometry snapshot would answer from the pre-edit stylesheet.
+    /// </remarks>
+    public bool RulesMutated
+    {
+        get;
+        set { field = value; BridgeRuntimeStateEpoch.Bump(); }
+    }
 
     /// <summary>
     /// The script-set CSSOM <c>disabled</c> flag (<c>CSSStyleSheet.disabled</c>), or
@@ -189,7 +205,13 @@ internal sealed class StyleSheetRuntimeState
     /// for a <c>&lt;link&gt;</c>, appears in <c>document.styleSheets</c> — CSSOM §2.3 /
     /// HTML §4.2.4 (<c>&lt;link disabled&gt;</c>).
     /// </summary>
-    public bool? DisabledOverride { get; set; }
+    public bool? DisabledOverride
+    {
+        get;
+        // Disabling a sheet removes its rules from the cascade — a layout input, and one no DOM
+        // mutation records, so the epoch must move with it.
+        set { field = value; BridgeRuntimeStateEpoch.Bump(); }
+    }
 
     /// <summary>
     /// The <c>href</c> this <c>&lt;link rel="stylesheet"&gt;</c> last dispatched its
@@ -229,7 +251,40 @@ internal sealed class AnimationRuntimeState
     public void CopyTo(AnimationRuntimeState target) => CurrentTimeMilliseconds.CopyTo(target.CurrentTimeMilliseconds);
 }
 
-internal sealed class RuntimeValue<T>
+/// <summary>
+/// Monotonic counter over every write to layout-affecting bridge runtime state — the state that
+/// <c>DomBridge.CopyBridgeRuntimeStateTo</c> carries into a render projection and that therefore
+/// decides what the shared geometry snapshot lays out. It is the non-DOM half of the snapshot's
+/// cache key (<c>DomDocument.Version</c> is the DOM half); see
+/// <c>DomBridge.CurrentLayoutSnapshotKey</c>.
+/// </summary>
+/// <remarks>
+/// Process-wide rather than per-bridge because <see cref="RuntimeValue{T}"/> holds no back-reference
+/// to the bridge that owns it. A second document in the same process therefore invalidates this one's
+/// snapshot too — conservative, never wrong: a spurious bump only costs a rebuild.
+/// </remarks>
+internal static class BridgeRuntimeStateEpoch
+{
+    private static long _value;
+
+    public static long Current => Interlocked.Read(ref _value);
+
+    public static void Bump() => Interlocked.Increment(ref _value);
+}
+
+/// <param name="affectsLayout">
+/// Whether writes to this slot can change what the renderer lays out, and so must invalidate a
+/// retained geometry snapshot. True for every slot except scroll offsets: the bridge keeps those in
+/// its own <c>_scrollRuntimeStates</c> table, which is not part of the projected
+/// <see cref="DomDocument"/> handed to <c>ILayoutView.GetGeometry</c> — no attribute, inline-style
+/// declaration or serialized text carries them — so the renderer never sees a scroll offset and its
+/// box geometry cannot depend on one. (The reader that does consult scroll state, the bridge-side
+/// anchor resolver, is off the snapshot path since the Phase-5 endgame moved anchor placement into
+/// the engine's native pass; see <c>ComputeUnzoomedLayoutRect</c>.) Excluding them is what lets a
+/// loop of <c>scrollTop</c>/<c>scrollLeft</c> writes reuse one layout instead of forcing one per
+/// write — the shape behind WPT issue #1682's twenty <c>css/css-overflow</c> timeouts.
+/// </param>
+internal sealed class RuntimeValue<T>(bool affectsLayout = true)
 {
     public bool IsSet { get; private set; }
 
@@ -239,6 +294,8 @@ internal sealed class RuntimeValue<T>
     {
         Value = value is null ? default : (T)value;
         IsSet = true;
+        if (affectsLayout)
+            BridgeRuntimeStateEpoch.Bump();
     }
 
     public bool TryGet(out object? value)
@@ -252,6 +309,8 @@ internal sealed class RuntimeValue<T>
         var wasSet = IsSet;
         Value = default;
         IsSet = false;
+        if (affectsLayout && wasSet)
+            BridgeRuntimeStateEpoch.Bump();
         return wasSet;
     }
 

@@ -43,8 +43,10 @@ public sealed partial class DomBridge
             // that an enclosing foreach was still enumerating (InvalidOperationException).
             // Building once here also bounds it to one layout per pass. Built
             // unconditionally so a stale snapshot left by a non-pass shared query (e.g. the
-            // anchor resolver) is overwritten fresh for this pass.
-            _sharedGeometrySnapshot = BuildSharedGeometrySnapshot();
+            // anchor resolver) is overwritten fresh for this pass — "fresh" meaning re-acquired
+            // under the current LayoutSnapshotKey, which reuses the retained layout when no
+            // layout input has moved since it was taken (AcquireSharedGeometrySnapshot).
+            _sharedGeometrySnapshot = AcquireSharedGeometrySnapshot();
         }
 
         try

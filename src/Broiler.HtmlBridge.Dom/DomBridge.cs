@@ -469,6 +469,26 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     internal Dictionary<string, string> InlineStyle(DomElement element)
     {
+        // Handing out the mutable dictionary is the only inline-style write seam there is, so it is
+        // also where a retained geometry snapshot has to be given up: an inline declaration never
+        // reaches the DOM `style=` attribute at script time (it is synced only when a projection is
+        // built), so DomDocument.Version cannot see the change. Counting the handout rather than the
+        // write is deliberately conservative — a caller that only reads costs a rebuild, a caller
+        // that writes can never go unnoticed. Read-only consumers on the geometry path call
+        // InlineStyleForRead instead; see CurrentLayoutSnapshotKey.
+        BridgeRuntimeStateEpoch.Bump();
+        return InlineStyleForRead(element);
+    }
+
+    /// <summary>
+    /// <see cref="InlineStyle"/> without the write-epoch bump, for callers that only read the
+    /// dictionary. Reserved for the hot read paths a geometry query runs *after* the snapshot was
+    /// built (the cascade's inline-style source and <c>EffectiveInlineStyle</c>): counting those as
+    /// writes would invalidate the snapshot on every read and defeat the cache. Never hand the
+    /// result to code that mutates it.
+    /// </summary>
+    internal Dictionary<string, string> InlineStyleForRead(DomElement element)
+    {
         var state = InlineStyleStateFor(element);
         if (!state.StyleSeeded)
         {
