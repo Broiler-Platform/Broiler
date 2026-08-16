@@ -246,7 +246,7 @@ reference-disagreement list rather than from its severity ranking.
 | `css-grid/abspos/grid-sizing-positioned-items-001` | **not fixed** | fails | n/a | #1624.13 |
 | `css-grid/grid-lanes/…/column-subgrid-orthogonal-writing-mode-004` | **not fixed** | fails | 94.8% | #1624.3 |
 | `css-grid/grid-lanes/…/track-sizing/column-subgrid-auto-fill-003` | **not fixed** | fails | 94.0% | #1538.12 |
-| `css-grid/grid-lanes/…/track-sizing/column-subgrid-auto-fill-008` | **not fixed** | fails | 10.4% | #1624.22 |
+| `css-grid/grid-lanes/…/track-sizing/column-subgrid-auto-fill-008` | **not fixed** [^itr] | fails | 16.8% | #1624.22 |
 | `css-grid/subgrid/orthogonal-writing-mode-006` | **not fixed** [^fn] | fails (flagged) | 100.0% | #1562.18 |
 | `css-masking/clip-path/clip-path-element-userSpaceOnUse-004` | **not fixed** | fails | 82.6% | #1538.27 |
 | `css-transforms/animation/transform-interpolation-002` | **not fixed** | fails | n/a | #1491.13 |
@@ -365,6 +365,12 @@ reference-disagreement list rather than from its severity ranking.
     [Details](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
 [^new]: Fixed on 2026-08-13, after the #1624 run produced the manifest, so CI has not
     yet re-scored it.
+[^itr]: Part-fixed on 2026-08-16 and re-measured then, not on 2026-08-13 like the rest
+    of this column: the container now reaches its own width, taking the test from 0.2%
+    (as [#1685](https://github.com/Broiler-Platform/Broiler/issues/1685) reported it) to
+    16.8% against its own reference.
+    [Details](wpt-rendering-gaps-fixed.md#a-grids-intrinsic-inline-size-counted-only-its-explicit-tracks).
+    What remains is that the test and its reference are structurally different documents.
 [^chg]: Recorded as open or part-fixed before this review; verified fixed on
     2026-08-13.
 [^print]: The `vb` gap is fixed and the golden comparison passes. Its own reference

@@ -232,7 +232,10 @@ golden suite never looks at a passing test's own reference.
 - **Tests:** `css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/…` —
   `column-subgrid-auto-fill-003` (CI 0.8%, `rel=match` **94.0%**),
   `column-subgrid-orthogonal-writing-mode-004` (0.9%, **94.8%**),
-  `column-subgrid-auto-fill-008` (11.5%, **10.4%**).
+  `column-subgrid-auto-fill-008` (11.5%, **10.4%** as measured here; 0.2% in the
+  [#1685](https://github.com/Broiler-Platform/Broiler/issues/1685) run, and **16.8%**
+  since
+  [the intrinsic inline size started counting implicit tracks](wpt-rendering-gaps-fixed.md#a-grids-intrinsic-inline-size-counted-only-its-explicit-tracks)).
 - Built on `display: inline grid-lanes` — CSS Grid Level 3 — combined with
   `grid-template-columns: subgrid` and `repeat(auto-fill, [line-names])`. Broiler
   **deliberately** treats `grid-lanes` as an invalid display value so the
@@ -244,50 +247,15 @@ golden suite never looks at a passing test's own reference.
   *unfeatured fallback* lays out. The first two sit at 94–95% against their own
   reference and 0.8–0.9% against Chromium's golden — the signature of a reference
   disagreement, which they do not get flagged as only because they miss the 99%
-  gate. `-008` is different: 10.4% against its own reference is a real track-sizing
-  gap.
+  gate. `-008` is different: its score against its own reference is a real track-sizing
+  gap. Part of it was the container never reaching its own width, which is
+  [fixed](wpt-rendering-gaps-fixed.md#a-grids-intrinsic-inline-size-counted-only-its-explicit-tracks);
+  what is left is that the test and its reference are structurally different documents,
+  so the boxes now have the right size and the wrong contents.
 - **Worth a maintainer's call** on whether the first two belong in
   [won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate). Chasing
   byte-compatibility on a dropped declaration is not the same as implementing
   subgrid.
-
-### A grid's intrinsic inline size counts only its explicit tracks
-
-- **Tests:** `css-grid/grid-lanes/subgrid/…/track-sizing/column-subgrid-auto-fill-008`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).17, **0.2%** against its
-  own reference — the worst real render in that run), and the plain-subgrid twins
-  `css-grid/subgrid/repeat-auto-fill-001` and `-008`.
-- **Owner:** `Broiler.Layout` (`Engine/CssBoxGrid.cs`, `TryComputeGridIntrinsicContentWidth`).
-  Main repo.
-- **Root cause, and it is on the *reference* side.** The shrink-to-fit inline size of a grid
-  container sums only the tracks listed in `grid-template-columns`. Implicit columns — from
-  auto-placement past the template, or from a `grid-column` reaching past it — contribute
-  nothing, and `grid-auto-columns` is never consulted on that path at all. With no template
-  the method bails outright and the caller falls back to measuring inline *content*, which
-  for a grid of empty divs is 0. The definite-width pass is correct and already does all of
-  this (`colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count)`,
-  `ParseSingleImplicitSpec(GridAutoColumns, em)`); the intrinsic path duplicates none of it.
-- **Measured by probe.** `display: inline-grid; grid-auto-columns: 15px` with one
-  auto-placed item paints nothing and reports content width 0 where 15px is required;
-  `grid-column: 3 / span 4` gives 0 where 90px is; the same grid at `width: 300px` places
-  the item at x 30..89, so only intrinsic sizing is wrong. The `-008` reference is 20 boxes
-  that should each be 92px wide and come out 2px — border only.
-- **The four edits are known** and are all inside that one method: drop the
-  `specs.Count == 0` half of the early-out; derive the column count from the same placement
-  the real pass runs; size a track beyond the template from `grid-auto-columns`, returning
-  false the moment that spec is intrinsic so today's content-based fallback is preserved for
-  the common `auto` case; and charge gaps for the full column count. That last guard is what
-  bounds the blast radius — only grids declaring a fixed-length `grid-auto-columns` change.
-- **It will not make `-008` pass**, and the entry should not pretend otherwise: the test and
-  its reference remain structurally different documents (see the `grid-lanes` entry above).
-  What it buys is that the reference stops being a lie, and that a real class of
-  shrink-to-fit grids — `inline-grid`, floats, `fit-content`, nested grid items — stops
-  collapsing to zero. **64 files under `tests/wpt/checkout/css` combine `grid-auto-columns`
-  with an intrinsically-sized container.**
-- **Exit gate:** the probes above report the required widths, and the full
-  `css/css-grid/grid-lanes` subset (850 tests, 193 passing) does not regress — a large
-  share of those passes are grids that agree with their reference *because both sides
-  collapse*.
 
 ### The flag can be a false negative
 

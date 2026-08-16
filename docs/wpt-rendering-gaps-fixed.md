@@ -1051,6 +1051,77 @@ the test that exposed it.
   its area (a fix that applied the ratio unconditionally would pass the first and fail the
   second), the stated-width and `min-width` guards, and the `box-sizing` case.
 
+### A grid's intrinsic inline size counted only its explicit tracks
+
+**[Issue #1685](https://github.com/Broiler-Platform/Broiler/issues/1685).1** — the worst
+real render in that run.
+
+- **Test:** `css-grid/grid-lanes/subgrid/…/track-sizing/column-subgrid-auto-fill-008`,
+  **0.2% → 16.8%** against the reference it declares itself. It does not pass and the
+  entry does not pretend it will: the test and its reference are structurally different
+  documents, so what this buys is that the container reaches its real size and the
+  reference
+  [stops being a lie](wpt-rendering-gaps-open.md#grid-lanes-is-an-unshipped-draft-feature).
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxGrid.cs`,
+  `TryComputeGridIntrinsicContentWidth`). Main repo, no patch.
+- **Root cause.** The shrink-to-fit inline size of a grid container summed only the tracks
+  listed in `grid-template-columns`. Implicit columns — from auto-placement past the
+  template, or from a `grid-column` reaching past it — contributed nothing, and
+  `grid-auto-columns` was never consulted on that path at all. With no template the method
+  bailed on `specs.Count == 0` and the caller fell back to measuring inline *content*,
+  which for a grid of empty divs is 0. The definite-width pass had always done all of this
+  correctly; the intrinsic path duplicated none of it.
+- **What landed**, all in that one method and a new helper beside it: a `none`/empty
+  template is now zero explicit tracks rather than a reason to decline; the column count
+  comes from `TryCountGridIntrinsicColumns`, which runs the *same* auto-placement over the
+  same item set the definite-width pass does; a track outside
+  `[explicitColStart, explicitColStart + specs.Count)` is sized from
+  `ParseSingleImplicitSpec(GridAutoColumns, …)`; and gaps are charged across the full
+  column count instead of the template's.
+- **The guard is what bounds it.** `grid-auto-columns` defaults to `auto`, which is
+  intrinsic — so the moment a needed implicit track is not a fixed length the method
+  declines and the caller keeps the content-based fallback it had before. Only a grid that
+  *declares* a fixed `grid-auto-columns` changes. The count helper declines on the same
+  shapes the real pass does (a leading implicit track alongside an auto-placed item, an
+  implausible placement) and on one more of its own: a row template whose explicit track
+  count it cannot resolve, since column-flow placement wraps into a new column when the
+  rows run out and phase 2 can push a row-flow item past the last template column.
+- **Measured by probe, before and after.** Six shapes, run through
+  `--render --check-layout`: **1/6 → 6/6**. The five that were failing reported 0 where
+  15px, 90px, 53px and 30px were required, and 40 where 70px was — exactly the collapse
+  the open entry predicted.
+- **Sweep: the whole `css/css-grid` reftest corpus, 1 216 tests, and 11 of them move at
+  all** — 404 → **400** passing, average match 90.863% → 90.816%. The `grid-lanes` subset
+  that was the stated exit gate is **152 → 152** with its average up, and the rest of
+  `css-grid` outside `subgrid/` is **221 → 221**. Every one of the four losses is in
+  `css-grid/subgrid/repeat-auto-fill-*`.
+- **Those four were false passes, and it is worth knowing how that was established rather
+  than asserted.** `repeat-auto-fill-002` matched its reference at 100.0% before. Rendering
+  the two documents separately shows why: **both were a row of 2px-wide border slivers with
+  no grey `.subgrid` background and no items at all** — two blank pages agreeing, the same
+  automatic pass
+  [`orthogonal-writing-mode-006`](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)
+  is the cautionary case for. Both documents declare the same outer
+  `inline-grid { grid-auto-columns: 15px }` holding a `grid-column: 3 / span 4` child, so
+  both now render at the 92px the open entry named, and the residual mismatch is the
+  nested-subgrid item placement the test and its reference disagree about — a pre-existing
+  gap that was simply invisible while there was nothing to see. **A score that falls
+  because two pages stopped being blank is not a regression**, but it is a real loss of
+  four reftest passes and is recorded as one rather than argued away.
+- **Nothing outside `css-grid` moves at all.** The method returns before doing anything
+  unless the box is `display: grid`/`inline-grid`, so a document with no grid in it cannot
+  reach the change — which makes the sweep bounded rather than merely sampled. Every
+  directory under `tests/wpt/checkout/css` holding a file that mentions `display: grid`,
+  `grid-template` or `grid-auto-columns` outside `css/css-grid` (82 leaf directories, 952
+  such files) was run as one subset: **9 910 reftests, 6 195 → 6 195 passing, +0 / −0**,
+  with exactly one score moving at all and that one upwards
+  (`css-ruby/ruby-overhang-spaces-vertical-003`, 99.1% → 100.0%, passing on both sides).
+- **Tests:** `Broiler.Cli.Tests/GridIntrinsicWidthTests.cs` — the implicit-column widths,
+  gaps across the full count, the float path, the column-flow count that depends on the row
+  template, and two guards that a naive version fails: an implicit `auto` column must
+  decline rather than invent a width, and an item that fits inside the template must not
+  reach `grid-auto-columns` at all.
+
 ---
 
 ## Paint and the renderer
