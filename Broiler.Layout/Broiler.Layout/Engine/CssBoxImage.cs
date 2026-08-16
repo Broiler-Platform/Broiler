@@ -77,8 +77,7 @@ internal sealed class CssBoxImage : CssBox
 
         if (Content != null && Content != CssConstants.Normal)
         {
-            LoadImageWithAnimationPolicy(
-                () => _imageLoadHandler.LoadImage(Content, HtmlTag?.Attributes, BaseUrl));
+            StartContentImageLoad(Content);
             return;
         }
 
@@ -98,6 +97,38 @@ internal sealed class CssBoxImage : CssBox
         // <object data="..."> fallback: use 'data' attribute when 'src' is absent
         if (string.IsNullOrEmpty(src))
             src = GetAttribute("data");
+        StartContentImageLoad(src);
+    }
+
+    /// <summary>
+    /// Starts this box's replaced-content load for <paramref name="src"/>, unless the render is
+    /// pinned to a local document root that cannot reach it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The loader is still created and still claimed (the caller assigned <c>_imageLoadHandler</c>
+    /// before calling), so a skipped source is a source that finished without an image — the box
+    /// paints its missing-image state — rather than one that stays pending and is retried on the
+    /// next pass. That is the same end state a host reaches by marking the load handled, which is
+    /// how the WPT runner already suppresses these on the container it owns.
+    /// </para>
+    /// <para>
+    /// <b>Why the check lives here and not in the host's load handler.</b> The handler is attached
+    /// per container, and a render is not one container: the script bridge lays the document out
+    /// through a headless view of its own to answer element-geometry queries, and that container is
+    /// built by the bridge, so a host has nowhere to attach anything to it. Every such container
+    /// funnels through this method, and <see cref="DocumentRoot"/> is thread-scoped rather than
+    /// per-container, so stating the rule once here covers the containers a host cannot see —
+    /// which is where <c>conformance-checkers/html/elements/img/src-isvalid.html</c> spent its
+    /// 30-second budget: 88 <c>&lt;img&gt;</c>, 34 of them on hosts that black-hole, loaded in full
+    /// by the geometry pass before the gated render container ever ran.
+    /// </para>
+    /// </remarks>
+    private void StartContentImageLoad(string? src)
+    {
+        if (DocumentRoot.IsUnreachableAbsoluteUrl(src))
+            return;
+
         LoadImageWithAnimationPolicy(
             () => _imageLoadHandler.LoadImage(src, HtmlTag?.Attributes, BaseUrl));
     }

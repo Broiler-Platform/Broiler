@@ -116,6 +116,69 @@ internal static class DocumentRoot
         return uri.PathAndQuery + uri.Fragment;
     }
 
+    /// <summary>
+    /// True when <paramref name="url"/> is an absolute <c>http</c>/<c>https</c> URL this render
+    /// cannot reach: the host has declared its content local by pinning
+    /// <see cref="LocalOriginHosts"/>, and the URL names none of them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The complement of <see cref="TryStripLocalOrigin(string?)"/>, and deliberately the same host
+    /// rule read the other way round: a URL on a pinned host is a file in <see cref="Current"/>, so
+    /// a URL on any other host is a round trip to a network this render has already said it does
+    /// not have. Sub-documents got that guarantee when <see cref="Current"/> was introduced; every
+    /// other sub-resource kind still resolved past it, and an image is the one that pays for it in
+    /// wall-clock — the load is synchronous on the layout thread, so an unroutable host stalls the
+    /// whole render until the HTTP client's timeout, not merely renders without the image.
+    /// </para>
+    /// <para>
+    /// <b>Inert unless a host pins the list.</b> <see cref="LocalOriginHosts"/> is null by default,
+    /// so a real browser render — which has a network and means to use it — takes the early return
+    /// and loads the image exactly as before. Only a host that has declared "my content is this
+    /// directory, served as these hosts" gets the restriction, which is the same condition under
+    /// which resolving a root-relative sub-document against <see cref="Current"/> is correct.
+    /// </para>
+    /// <para>
+    /// Non-http schemes are not this method's business and answer <see langword="false"/>: a
+    /// <c>file:</c>, <c>data:</c> or relative URL is resolved against the document's base URL by
+    /// the loader, and reaches no network for it to forbid.
+    /// </para>
+    /// </remarks>
+    public static bool IsUnreachableAbsoluteUrl(string? url)
+    {
+        if (LocalOriginHosts is not { Length: > 0 } hosts || string.IsNullOrEmpty(url))
+            return false;
+
+        if (!System.Uri.TryCreate(url, System.UriKind.Absolute, out var uri))
+            return false;
+
+        if (!uri.Scheme.Equals("http", System.StringComparison.OrdinalIgnoreCase)
+            && !uri.Scheme.Equals("https", System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Exact host matching, for the reason LocalOriginHosts documents: a suffix rule would serve
+        // content to the hosts a corpus mints precisely to be unresolvable.
+        //
+        // Both spellings are compared, because Uri does not normalise between them: `Host` keeps a
+        // non-ASCII label as the page wrote it (`élève.web-platform.test`) and only `IdnHost` gives
+        // the A-label (`xn--lve-6lad.web-platform.test`). A host list is written one way or the
+        // other, and getting this wrong is a false *unreachable* — the one direction that costs a
+        // load the corpus could have served.
+        foreach (var candidate in hosts)
+        {
+            if (string.IsNullOrEmpty(candidate))
+                continue;
+
+            if (uri.Host.Equals(candidate, System.StringComparison.OrdinalIgnoreCase)
+                || uri.IdnHost.Equals(candidate, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private sealed class Scope(string? previous, string[]? previousHosts) : System.IDisposable
     {
         private bool _disposed;

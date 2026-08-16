@@ -1902,6 +1902,13 @@ internal sealed partial class WptTestRunner
         Broiler.Dom.DomDocument? renderDocument = null;
         try
         {
+            // The bridge answers element-geometry queries by laying the document out through a
+            // headless container it builds itself, so the image and stylesheet handlers installed
+            // on the render container below do not exist for that pass — it resolves every source
+            // itself. Pin the document root here as well as around the render, so an <img> on a
+            // host the corpus does not serve is skipped there too instead of being fetched off the
+            // real network. See CssBoxImage.StartContentImageLoad.
+            using var scriptDocumentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot, WptSubstitution.ServedHosts);
             var executed = ExecuteScriptsWithDom(
                 html,
                 new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
@@ -2717,6 +2724,9 @@ internal sealed partial class WptTestRunner
         Broiler.Dom.DomDocument? renderDocument;
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Scripts))
         {
+            // Same reasoning as the suite path: the bridge's geometry pass lays out through its own
+            // container, which no handler installed below can reach. See CssBoxImage.StartContentImageLoad.
+            using var scriptDocumentRoot = Broiler.Layout.Engine.DocumentRoot.Pin(wptRoot, WptSubstitution.ServedHosts);
             var executed = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
             html = executed.Html ?? html;
             renderDocument = executed.Document;

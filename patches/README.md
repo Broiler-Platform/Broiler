@@ -152,13 +152,31 @@ renders in ~5 s in this container only because the agent proxy answers those
 instantly, which is precisely why the timeout looked unreproducible locally.
 
 **Why it is NOT listed in `scripts/apply-pending-wpt-patches.sh`.** The main-repo
-half already covers the WPT run: `WptTestRunner`'s image handler now marks an
-off-corpus http(s) `<img>` handled, so the runner never reaches the downloader
-and cannot hit the default this caps. A sandboxed conformance run should not
-touch the network at all, which is the more correct behaviour independently. The
-patch matters for the **real browser**, where there is no such handler and an
-unreachable `<img>` still stalls the render — so it is a correctness fix to land
-upstream, not something a WPT run needs applied on top of the pointer.
+half covers the WPT run — but **not** for the reason first recorded here, and the
+wrong reason is worth keeping visible because it is what let the bug survive a
+fix aimed straight at it. The claim was that `WptTestRunner`'s image handler
+marks an off-corpus http(s) `<img>` handled, so the runner never reaches the
+downloader. That handler is attached **per container**, and a WPT render is not
+one container: the script bridge lays the document out through a
+`HeadlessLayoutView` of its own to answer element-geometry queries, and the
+runner has nowhere to attach anything to it. So this test kept timing out after
+the handler landed — the geometry pass fetched all 34 off-corpus sources in full
+before the gated render container ever ran. The gate now lives at the layout
+layer instead (`DocumentRoot.IsUnreachableAbsoluteUrl`, consulted by
+`CssBoxImage.StartContentImageLoad`), where every container funnels through it,
+so the run reaches the downloader for no http(s) source at all. The patch still
+matters for the **real browser**, which pins no document root and so is
+deliberately unaffected by that gate: there, an unreachable `<img>` still stalls
+the render on the 100-second default. It is a correctness fix to land upstream,
+not something a WPT run needs applied on top of the pointer.
+
+**Also not fixed here, and not by the main-repo gate either:** `SetImageFromPath`
+sends *any* absolute non-`file:` URI to the downloader, so a `mailto:`,
+`javascript:`, `ftps:`, `madeupscheme:` or non-image `data:` source is handed to
+an `HttpClient` that answers `NotSupportedException`. That is fast — it costs no
+wall-clock and loses no test — but it is the wrong shape: only `http`/`https`
+should reach a network client at all. 14 of this test's 88 sources take that
+path.
 
 **Not fixed here:** the missing negative cache. A URL that already failed is
 still re-fetched on the next layout pass; with a 5-second cap that is now an

@@ -158,15 +158,20 @@ set -euo pipefail
 # 2.5 minutes of a shard's budget spent waiting on loops that cannot end.
 #
 # 0002 (Broiler.HTML, cap the image fetch timeout) is deliberately NOT listed, even though it
-# fixes a timeout. Its main-repo half already covers the WPT run: WptTestRunner's image handler
-# marks an off-corpus http(s) <img> handled, so the runner never reaches the downloader and the
-# 100-second default it caps cannot be hit here. (Worth recording, because it is the obvious next
-# suspicion and it is wrong: the handler decides from Uri.TryCreate, and of the 88 sources in
-# conformance-checkers/html/elements/img/src-isvalid.html only two fail to parse — `http💩//:foo`
-# and `💩http://foo` — and neither names http(s), so nothing exotic in that file slips past it.)
-# The patch matters for the real browser, where there is no such handler and an unreachable <img>
-# still stalls the render — so it is a correctness fix to land upstream, not something a WPT run
-# needs applied on top of the pointer.
+# fixes a timeout — but the reason recorded here before was wrong, and the correction is the
+# useful part. The claim was that WptTestRunner's image handler marks an off-corpus http(s) <img>
+# handled, so the runner never reaches the downloader. It does mark it — on the container the
+# runner builds. A WPT render is not one container: the script bridge lays the document out
+# through its own HeadlessLayoutView to answer element-geometry queries, and that container is the
+# bridge's, so the runner cannot attach a handler to it. That pass ran first and fetched every
+# off-corpus source for real, which is why src-isvalid.html still timed out after the handler
+# landed. The gate is now stated at the layout layer instead — DocumentRoot.IsUnreachableAbsoluteUrl,
+# consulted by CssBoxImage.StartContentImageLoad, with the root carried onto the prefetch workers by
+# ImagePrefetch.RunAll — so it holds for every container, and the run reaches the downloader for no
+# http(s) source at all. The patch still matters for the real browser, which pins no document root
+# and is deliberately outside that gate: there an unreachable <img> still stalls on the 100-second
+# default. So it stays a correctness fix to land upstream, not something a WPT run needs applied on
+# top of the pointer.
 PENDING_PATCHES=(
   "Broiler.JS|patches/0001-reject-one-semicolon-for-head.patch"
 )

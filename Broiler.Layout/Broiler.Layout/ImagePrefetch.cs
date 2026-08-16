@@ -209,6 +209,15 @@ public static class ImagePrefetch
         // it would read whatever the last document on that pooled thread left behind.
         var quirksMode = DocumentModeContext.CurrentQuirksMode;
 
+        // The document root is thread-scoped for the same reason and has to cross the same way. It
+        // is not a rendering lever like the ones above — it is what tells a load that this render's
+        // content is a local directory and that a host outside it is unreachable — so a worker that
+        // does not have it does not merely lay the image out differently, it fetches it for real.
+        // That is a network round trip per off-corpus <img>, on the layout thread, against hosts a
+        // corpus picks precisely because they do not answer.
+        var documentRoot = Engine.DocumentRoot.Current;
+        var localOriginHosts = Engine.DocumentRoot.LocalOriginHosts;
+
         if (CollectDiagnostics)
         {
             Interlocked.Increment(ref _documentsWalked);
@@ -226,6 +235,7 @@ public static class ImagePrefetch
                 AmbientRenderState.EnforceOnThisThread = true;
                 try
                 {
+                    using var documentRootScope = Engine.DocumentRoot.Pin(documentRoot, localOriginHosts);
                     loads[i]();
                 }
                 finally
