@@ -4913,6 +4913,12 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             File.WriteAllText(timeoutPath, "<html><body>Timeout</body></html>");
         }
 
+        // One deliberately larger source, so the report's ordering has something to
+        // order: timeouts are ranked by source size ascending (a hang on a small
+        // document is the stronger signal), not alphabetically.
+        var largestTimeoutPath = timeoutPaths[0];
+        File.WriteAllText(largestTimeoutPath, $"<html><body>{new string('x', 4096)}</body></html>");
+
         Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) => new WptTestResult
         {
             TestPath = testPath,
@@ -4947,6 +4953,18 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains(timeoutFailures, failure => failure.GetProperty("testPath").GetString() == "css/css-grid/parsing/grid-template-columns-crash.html");
         Assert.Contains(timeoutFailures, failure => failure.GetProperty("testPath").GetString() == "css/css-tables/html5-table-formatting-3.html");
 
+        // Each timeout carries the size of the test's own source — the signal
+        // scripts/merge-wpt-shards.py ranks the timeouts issue on.
+        Assert.All(timeoutFailures, failure => Assert.True(failure.GetProperty("fileSizeBytes").GetInt64() > 0));
+        // …and the list is already ranked by it, smallest first, so the largest
+        // source sorts last however early its path sorts alphabetically.
+        Assert.Equal(
+            "css/css-grid/parsing/grid-template-columns-crash.html",
+            timeoutFailures[^1].GetProperty("testPath").GetString());
+        Assert.Equal(
+            timeoutFailures.Select(failure => failure.GetProperty("fileSizeBytes").GetInt64()).Order(),
+            timeoutFailures.Select(failure => failure.GetProperty("fileSizeBytes").GetInt64()));
+
         var timeoutSubsetCommands = triage.GetProperty("timeoutSubsetCommands")
             .EnumerateArray()
             .Select(entry => new
@@ -4968,14 +4986,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         var markdown = File.ReadAllText(markdownPath);
         Assert.Contains("## Timeout failures", markdown);
         Assert.Contains($"- Render backend: {BGraphicsBackend.CurrentLabel}", markdown);
-        Assert.Contains("`css/css-grid/parsing/grid-template-columns-crash.html`", markdown);
-        Assert.Contains("`css/css-tables/html5-table-formatting-3.html`", markdown);
+        Assert.Contains("`css/css-grid/parsing/grid-template-columns-crash.html` — 4.0 KiB", markdown);
+        Assert.Contains("`css/css-tables/html5-table-formatting-3.html` — 33 B", markdown);
         Assert.Contains("### Suggested timeout subset commands", markdown);
         Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-overflow/scroll-markers\"", markdown);
         Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-tables/height-distribution\"", markdown);
 
         var output = consoleOutput.ToString();
-        Assert.Contains("Timeout failures:", output);
+        Assert.Contains("Timeout failures (smallest source first — the likeliest engine hangs):", output);
         Assert.Contains("css/css-grid/parsing/grid-template-columns-crash.html", output);
         Assert.Contains("css/css-tables/html5-table-formatting-3.html", output);
         Assert.Contains("Timeout subset commands:", output);

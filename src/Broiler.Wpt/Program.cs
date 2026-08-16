@@ -2705,7 +2705,7 @@ public class Program
     {
         var timeoutSummary = GetTimeoutSummary(failures, wptPath);
 
-        Console.WriteLine("Timeout failures:");
+        Console.WriteLine("Timeout failures (smallest source first — the likeliest engine hangs):");
         if (timeoutSummary.Failures.Count == 0)
         {
             Console.WriteLine("  (none)");
@@ -2714,7 +2714,7 @@ public class Program
         {
             foreach (var failure in timeoutSummary.Failures)
             {
-                Console.WriteLine($"  • {failure.RelativePath}");
+                Console.WriteLine($"  • {FormatFileSize(failure.FileSizeBytes),12}  {failure.RelativePath}");
                 if (!string.IsNullOrWhiteSpace(failure.Message))
                     Console.WriteLine($"    {failure.Message}");
             }
@@ -2756,10 +2756,59 @@ public class Program
             .Select(result =>
             {
                 var relativePath = Path.GetRelativePath(wptPath, result.TestPath).Replace('\\', '/');
-                return new TimeoutFailure(relativePath, GetBucketDirectory(result.TestPath, wptPath), result.Message);
+                return new TimeoutFailure(
+                    relativePath,
+                    GetBucketDirectory(result.TestPath, wptPath),
+                    result.Message,
+                    TryGetFileSizeBytes(result.TestPath));
             })
-            .OrderBy(result => result.RelativePath, StringComparer.Ordinal)
+            // Smallest source first — that ordering *is* the triage ranking. See
+            // TimeoutFailure for why a small file makes a timeout more serious, not
+            // less. A size that could not be read sorts last: nothing is known about
+            // it, so it must not outrank a measured tiny file.
+            .OrderBy(failure => failure.FileSizeBytes ?? long.MaxValue)
+            .ThenBy(failure => failure.RelativePath, StringComparer.Ordinal)
             .ToList();
+
+    /// <summary>
+    /// Size of a test's source on disk in bytes, or null when it cannot be read
+    /// (deleted between the run and the report, or unreadable). Never throws: a
+    /// missing size only costs the entry its ranking, and losing the whole report
+    /// over one stat call would be a far worse trade.
+    /// </summary>
+    private static long? TryGetFileSizeBytes(string testPath)
+    {
+        try
+        {
+            var info = new FileInfo(testPath);
+            return info.Exists ? info.Length : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Human-readable byte count for the timeout report (<c>1.4 KiB</c>). Mirrors
+    /// <c>scripts/merge-wpt-shards.py</c>'s formatting so a per-shard line and the
+    /// merged issue print the same test the same way.
+    /// </summary>
+    private static string FormatFileSize(long? bytes) =>
+        bytes switch
+        {
+            null => "size unknown",
+            >= 1024 * 1024 => $"{bytes.Value / (1024.0 * 1024.0):0.0} MiB",
+            >= 1024 => $"{bytes.Value / 1024.0:0.0} KiB",
+            // Bytes rather than "0.0 KiB" below a kilobyte: the head of this
+            // ranking is made of exactly those files, and rounding them all to the
+            // same 0.0 would hide the one distinction the ordering exists to draw.
+            _ => $"{bytes.Value} B",
+        };
 
     private static TimeoutSummary GetTimeoutSummary(IEnumerable<WptTestResult> failures, string wptPath)
     {
@@ -2984,16 +3033,34 @@ public class Program
         };
     }
 
+    /// <summary>
+    /// One test the runner had to abort at the per-test timeout.
+    /// </summary>
+    /// <param name="FileSizeBytes">
+    /// Size of the test's own source on disk, null when it could not be read. This
+    /// is what ranks the timeout report, and it ranks it <em>ascending</em>: the
+    /// smaller the document that hung, the less there is in it to be legitimately
+    /// slow, so the likelier the timeout is an engine hang — an unterminated layout
+    /// loop, a parser that never advances, a promise that never settles — rather
+    /// than a genuinely heavy page that merely wants more than the budget. A 30s
+    /// timeout on a 40 MB generated stress test says the budget is tight; the same
+    /// timeout on a 400-byte document says something in the engine does not
+    /// terminate, and that one usually gates many more tests than itself.
+    /// </param>
     private sealed record TimeoutFailure(
         string RelativePath,
         string Directory,
-        string? Message)
+        string? Message,
+        long? FileSizeBytes = null)
     {
         public Dictionary<string, object?> ToJsonObject() => new()
         {
             ["testPath"] = RelativePath,
             ["directory"] = Directory,
             ["message"] = Message,
+            // Consumed by scripts/merge-wpt-shards.py, which ranks the merged
+            // timeouts issue on it exactly as this file ranks the per-shard list.
+            ["fileSizeBytes"] = FileSizeBytes,
         };
     }
 
@@ -3015,9 +3082,14 @@ public class Program
         }
         else
         {
+            writer.WriteLine(
+                "_Smallest source first: the less there is in a document, the less of it can be" +
+                " legitimately slow, so the likelier its timeout is an engine hang rather than a" +
+                " heavy page._");
+            writer.WriteLine();
             foreach (var failure in timeoutFailures)
             {
-                writer.WriteLine($"- `{failure.RelativePath}`");
+                writer.WriteLine($"- `{failure.RelativePath}` — {FormatFileSize(failure.FileSizeBytes)}");
                 if (!string.IsNullOrWhiteSpace(failure.Message))
                     writer.WriteLine($"  - {failure.Message}");
             }
