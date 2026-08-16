@@ -48,9 +48,31 @@ public sealed partial class DomBridge
         if (viewportWidth <= 0 || viewportHeight <= 0 || x < 0 || y < 0 || x >= viewportWidth || y >= viewportHeight)
             return [];
 
-        var hits = new List<DomElement>();
-        CollectHitTestMatches(documentElement, x, y, hits);
-        return hits;
+        // One geometry pass for the whole walk, not one per element. CollectHitTestMatches asks
+        // every element in the tree for its border box, and each of those reads went through
+        // WithLayoutGeometryCache with no pass open — so each one built a full shared-geometry
+        // snapshot (a deep document clone, a full cascade and a full layout) and tore it down
+        // again, and each teardown also dropped the computed-props memo that the very next
+        // element's ancestor walk needed. One elementFromPoint therefore cost O(elements)
+        // document layouts instead of one.
+        //
+        // This is the third instance of the same bug class — WPT #1113 (the check-layout
+        // evaluator) and #1115 (the live geometry getters) were the first two, guarded by
+        // MulticolCheckLayoutTimeoutTests and LiveGeometryQueryTimeoutTests. Hit testing was the
+        // remaining tree-walking geometry consumer that never opened a pass of its own.
+        //
+        // Sound for the same reason those are: elementFromPoint/elementsFromPoint is a single
+        // synchronous DOM query, so no script runs and layout cannot change while the walk is in
+        // flight — exactly the static-snapshot precondition WithLayoutGeometryCache documents.
+        // Nested calls already share the outermost pass, so every inner read now reuses this one
+        // snapshot. Wrapping the private method covers both public entries (ISubDocumentHost and
+        // IHitTestHost), which delegate here.
+        return WithLayoutGeometryCache<IReadOnlyList<DomElement>>(() =>
+        {
+            var hits = new List<DomElement>();
+            CollectHitTestMatches(documentElement, x, y, hits);
+            return hits;
+        });
     }
 
     private void CollectHitTestMatches(DomElement element, double x, double y, List<DomElement> hits)

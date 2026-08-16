@@ -630,7 +630,27 @@ internal sealed partial class WptTestRunner
   // By unconditionally replacing rAF with a synchronous implementation,
   // callbacks execute immediately during Eval / FireWindowLoadEvent,
   // which avoids the FlushTimerStep persistence bug.
-  window.requestAnimationFrame = function(cb) { cb(0); return 0; };
+  // Bounded, because synchronous means a self-rescheduling rAF loop recurses natively
+  // through this stub rather than yielding to a queue: `function f(){ ...; rAF(f); }`
+  // becomes f -> stub -> f -> stub -> ... with no return until it converges. The real
+  // rAF this replaces is queue-based and capped (BrowserEventLoop.DrainAll runs at most
+  // maxIterations=1000); the stub threw that cap away with the queue. A loop whose exit
+  // condition this engine never satisfies then ran until the CLR stack gave out, and
+  // since every level re-read layout it cost two full document layouts per level:
+  // css-fonts/variations/font-opentype-collections.html spent 88s that way against the
+  // runner's 30s budget, and any test with the same shape would too.
+  // Dropping the callback once the budget is spent lets the page render the state it
+  // reached, so such a test reports an honest assertion failure in well under a second
+  // instead of a timeout. The limits are far above what a converging loop needs (real
+  // ones chain a handful of frames) and far below CLR stack exhaustion.
+  var __broilerRafDepth = 0, __broilerRafFrames = 0;
+  window.requestAnimationFrame = function(cb) {
+    if (__broilerRafDepth >= 64 || __broilerRafFrames >= 256) return 0;
+    __broilerRafDepth++; __broilerRafFrames++;
+    try { cb(0); } finally { __broilerRafDepth--; }
+    return 0;
+  };
+  // Still a no-op: this stub has already run the callback by the time anything could cancel it.
   window.cancelAnimationFrame = function(id) {};
   if (typeof takeScreenshot === 'undefined') {
     window.takeScreenshot = function() {
