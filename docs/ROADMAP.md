@@ -117,7 +117,11 @@ historical test artifacts is tracked in
   [WPT rendering gaps](wpt-rendering-gaps.md) — start with
   [not fixed](wpt-rendering-gaps-open.md), and read
   [won't fix](wpt-rendering-gaps-wont-fix.md) before taking on any 0.0%, since a
-  third of that tail is tests Broiler already renders correctly.
+  third of that tail is tests Broiler already renders correctly. Timeouts are
+  tracked separately in [WPT timeout causes](wpt-timeout-causes.md), because the
+  pixel reports cannot see them — a timed-out run is abandoned before it renders
+  — and because they are overwhelmingly one shape: something redone once per
+  element whose cost is the whole document.
 - Prototype per-component stress attribution with a small Broiler.JS slice before
   investing in full coverage-guided selection.
 
