@@ -163,6 +163,13 @@ set -euo pipefail
 # per-test budget and are reported as timeouts rather than run. With it they finish in ~3 s.
 # It is also the only entry here whose absence costs the run *wall-clock* as well as results:
 # 2.5 minutes of a shard's budget spent waiting on loops that cannot end.
+# 0010 (Broiler.HTML, cap the image fetch timeout) is deliberately NOT listed, even though it
+# fixes a timeout. Its main-repo half already covers the WPT run: WptTestRunner's image handler
+# now marks an off-corpus http(s) <img> handled, so the runner never reaches the downloader and
+# the 100-second default it caps cannot be hit here regardless. The patch matters for the real
+# browser, where there is no such handler and an unreachable <img> still stalls the render — so it
+# is a correctness fix to land upstream, not something a WPT run needs applied on top of the
+# pointer. Listing it would only add a patch application that changes no result.
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0008-media-element-painting.patch"
   "Broiler.JS|patches/0009-reject-one-semicolon-for-head.patch"

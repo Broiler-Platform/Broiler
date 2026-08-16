@@ -11697,6 +11697,45 @@ div {{ width: 256px; height: 768px; }}
         Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png#frag", _tempDir));
     }
 
+    [Theory]
+    // Absolute http(s) on a host the corpus does not serve — a real network fetch, and the reason
+    // conformance-checkers/html/elements/img/src-isvalid.html timed out: image loading is
+    // synchronous on the render thread and ImageDownloader's HttpClient took .NET's 100-second
+    // default, so one unroutable host burned three times the whole per-test budget. These exotic
+    // spellings are exactly what that test carries.
+    [InlineData("http://example.com/x.png")]
+    [InlineData("https://example.com/x.png")]
+    [InlineData("http://192.0x00A80001")]
+    [InlineData("http://[2001::1]")]
+    [InlineData("http://[2001::1]:80/x.png")]
+    public void IsOffCorpusNetworkImage_FlagsRemoteHosts(string src) =>
+        Assert.True(WptTestRunner.IsOffCorpusNetworkImage(src), src);
+
+    [Theory]
+    // Never suppress something the run can actually serve or that names no host at all: the
+    // corpus's own hosts resolve to files under the checkout, and relative/data/file URLs never
+    // reach the network in the first place.
+    [InlineData("/images/blue.png")]
+    [InlineData("support/pattern.png")]
+    [InlineData("data:image/gif;base64,R0lGODlhAQABAAAAACw=")]
+    [InlineData("file:///tmp/x.png")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void IsOffCorpusNetworkImage_LeavesLocalAndNonNetworkSourcesAlone(string? src) =>
+        Assert.False(WptTestRunner.IsOffCorpusNetworkImage(src), src ?? "(null)");
+
+    [Fact]
+    public void IsOffCorpusNetworkImage_LeavesCorpusServedHostsAlone()
+    {
+        // A `.sub` template's URLs are absolute on a WPT host once substituted, and WPT serves
+        // every one of those from the same checkout — so they are files, not fetches.
+        foreach (var host in WptSubstitution.ServedHosts.Take(8))
+        {
+            Assert.False(WptTestRunner.IsOffCorpusNetworkImage($"http://{host}:8000/images/blue.png"),
+                $"corpus-served host {host} must not be treated as a network fetch");
+        }
+    }
+
     [Fact]
     public void TryResolveWptRootRelativePath_Is_Absolute_Even_From_A_Relative_Root()
     {

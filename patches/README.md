@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Nine patches are waiting on a maintainer.** See the index below.
+**Ten patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -55,6 +55,7 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
 | `0007` | `Broiler.JS` | Say "is not a constructor", as every other construct site does |
 | `0008` | `Broiler.HTML` | Paint a media element's box only when it shows controls |
 | `0009` | `Broiler.JS` | Reject a `for` head that carries only one semicolon |
+| `0010` | `Broiler.HTML` | Cap the image fetch timeout, as the stylesheet fetch already is |
 
 ### `0001` — a closure a direct eval created lost the eval site's bindings
 
@@ -436,6 +437,44 @@ on loops that cannot end.
 
 **When it lands upstream:** bump the pointer, drop the entry from
 `scripts/apply-pending-wpt-patches.sh`, and delete this patch.
+
+### `0010` — an unreachable `<img>` blocked the render for 100 seconds
+
+Image loading on the render path is synchronous: `HtmlRender` sets
+`AvoidAsyncImagesLoading`, so `DownloadImageFromUrl` runs inline on the layout
+thread and blocks in `SharedHttpClient.Send`. That client set no `Timeout`, so it
+took .NET's **100-second default** — more than three times any per-test budget —
+and the only `CancellationTokenSource` bounding it is cancelled on `Dispose`.
+
+Worse, it paid that twice: a failed URL is not remembered. `_imageDownloadCallbacks`
+is an *in-flight* map whose entry is removed the moment a download completes, so
+it coalesces concurrent requests only, and the next layout pass re-fetches.
+
+`StylesheetLoadHandler` already fixed exactly this for `<link>` (WPT #1147);
+images were simply missed at the time. Same cap, same reasoning, and the comment
+now says so in both places.
+
+**Where it came from.** `conformance-checkers/html/elements/img/src-isvalid.html`
+— 88 `<img>` with 88 distinct sources, deliberately including IP literals and
+documentation addresses (`http://192.0x00A80001`, `http://[2001::1]`) that
+black-hole on a CI runner with real internet. One is enough to lose the test. It
+renders in ~5 s in this container only because the agent proxy answers those
+instantly, which is precisely why the timeout looked unreproducible locally.
+
+**Why it is NOT listed in `scripts/apply-pending-wpt-patches.sh`.** The main-repo
+half already covers the WPT run: `WptTestRunner`'s image handler now marks an
+off-corpus http(s) `<img>` handled, so the runner never reaches the downloader
+and cannot hit the default this caps. A sandboxed conformance run should not
+touch the network at all, which is the more correct behaviour independently. The
+patch matters for the **real browser**, where there is no such handler and an
+unreachable `<img>` still stalls the render — so it is a correctness fix to land
+upstream, not something a WPT run needs applied on top of the pointer.
+
+**Not fixed here:** the missing negative cache. A URL that already failed is
+still re-fetched on the next layout pass; with a 5-second cap that is now an
+annoyance rather than a lost test, but it is the other half of the defect.
+
+**When it lands upstream:** bump the pointer and delete this patch.
 
 ## A stale entry in the apply script is not inert
 
