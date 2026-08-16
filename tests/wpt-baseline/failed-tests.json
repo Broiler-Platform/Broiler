@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7314,
+    "failed": 7310,
     "skipped": 0,
-    "total": 7314
+    "total": 7310
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5228,
+      "count": 5230,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 679,
+      "count": 676,
       "examples": [
         "css/css-align/blocks/align-content-block-007.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -39,7 +39,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 612,
+      "count": 613,
       "examples": [
         "css/css-backgrounds/background-size/background-size-cover-svg.html",
         "css/css-backgrounds/border-image-slice-fill-002.html",
@@ -51,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 401,
+      "count": 397,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-backgrounds/background-size-029.html",
@@ -126,7 +126,7 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      6964
+      6960
     ],
     [
       "Timeout",
@@ -285,13 +285,13 @@
     {
       "kind": "LowMatch",
       "tier": 2,
-      "severity": 98.00465901692709,
+      "severity": 97.18971252441406,
       "impact": 1,
-      "matchPercent": 1.995340983072913,
-      "engineGapPercent": 1.995340983072913,
-      "relativeTestPath": "css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-new.html",
-      "title": "2.0% match \u2014 css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-new.html",
-      "detail": "Rendered output matches the committed golden by only 2.0% (PixelMismatch / LayoutShift). Against the reference the test itself declares via `rel=match` it scores 2.0%. Severity above is ranked on that score, not the golden's."
+      "matchPercent": 2.8102874755859375,
+      "engineGapPercent": 2.8102874755859375,
+      "relativeTestPath": "css/css-view-transitions/navigation/root-element-transition-iframe-with-startVT-on-main.html",
+      "title": "2.8% match \u2014 css/css-view-transitions/navigation/root-element-transition-iframe-with-startVT-on-main.html",
+      "detail": "Rendered output matches the committed golden by only 2.8% (PixelMismatch / MissingContent). Against the reference the test itself declares via `rel=match` it scores 2.8%. Severity above is ranked on that score, not the golden's."
     }
   ],
   "timeoutLimit": 10,
@@ -384,7 +384,7 @@
     },
     {
       "relativeTestPath": "css/css-grid/subgrid/orthogonal-writing-mode-006.html",
-      "matchPercent": 5.5531819661458375,
+      "matchPercent": 5.764007568359375,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -421,6 +421,13 @@
       "relativeTestPath": "css/css-position/backdrop-inherit-rendered.html",
       "matchPercent": 41.852315266927086,
       "referenceMatchPercent": 83.48388671875,
+      "cleared": false,
+      "detail": null
+    },
+    {
+      "relativeTestPath": "css/css-masking/clip-path/clip-path-element-userSpaceOnUse-004.html",
+      "matchPercent": 46.27876281738281,
+      "referenceMatchPercent": 83.33333333333334,
       "cleared": false,
       "detail": null
     },
@@ -524,7 +531,7 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/baseline/column-grid-lanes-item-baseline-005.html",
-      "matchPercent": 65.44787089029948,
+      "matchPercent": 65.5255635579427,
       "referenceMatchPercent": 99.53231811523438,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.5%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -21443,7 +21450,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-grid/alignment/grid-self-alignment-positioned-items-with-margin-border-padding-009.html",
@@ -30305,7 +30312,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -37811,20 +37818,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-new.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/massive-element-left-of-viewport-partially-onscreen-old.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
       "relativeTestPath": "css/css-view-transitions/massive-element-on-top-of-viewport-offscreen-new.html",
       "passed": false,
       "skipped": false,
@@ -37865,20 +37858,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-new.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/massive-element-right-of-viewport-partially-onscreen-old.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-view-transitions/names-are-tree-scoped.html",
@@ -48534,7 +48513,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "html/syntax/charset/with-inheritance.html",
@@ -50721,7 +50700,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-14-t-drt.html",
@@ -50770,7 +50749,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/non-additive-type-by-animation.html",
