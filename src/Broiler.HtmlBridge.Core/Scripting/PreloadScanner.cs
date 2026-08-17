@@ -256,7 +256,12 @@ public static class PreloadScanner
         switch (tag.Name)
         {
             case "script":
-                return Candidate(PreloadKind.Script, Attribute(tag, "src"));
+                // A `<script>` whose type is neither a JavaScript MIME essence nor `module` is a
+                // data block, and the load path never fetches its src. Speculating on it would be a
+                // round trip the document does not make.
+                return ScriptMimeType.IsExecutable(Attribute(tag, "type"))
+                    ? Candidate(PreloadKind.Script, Attribute(tag, "src"))
+                    : null;
 
             case "link":
                 return LinkCandidate(tag);

@@ -300,35 +300,11 @@ internal sealed class ScriptInsertionRunner
     /// script) and the types pages use to park data in a <c>&lt;script&gt;</c> the browser must never
     /// execute — <c>text/template</c>, <c>application/json</c>, <c>application/ld+json</c>.
     /// </summary>
-    private static bool IsClassicScriptType(string? type)
-    {
-        if (string.IsNullOrWhiteSpace(type))
-            return true;
-
-        // "text/javascript; charset=utf-8" — the essence is the part before the parameters.
-        var essence = type.Split(';')[0].Trim();
-        return JavaScriptMimeTypes.Contains(essence);
-    }
-
-    /// <summary>The HTML spec's JavaScript MIME type essences (the legacy aliases included: pages in
-    /// the wild still ship <c>text/jscript</c> and the versioned <c>text/javascript1.x</c>).</summary>
-    private static readonly HashSet<string> JavaScriptMimeTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "application/ecmascript",
-        "application/javascript",
-        "application/x-ecmascript",
-        "application/x-javascript",
-        "text/ecmascript",
-        "text/javascript",
-        "text/javascript1.0",
-        "text/javascript1.1",
-        "text/javascript1.2",
-        "text/javascript1.3",
-        "text/javascript1.4",
-        "text/javascript1.5",
-        "text/jscript",
-        "text/livescript",
-        "text/x-ecmascript",
-        "text/x-javascript",
-    };
+    /// <remarks>
+    /// The rule itself lives in <see cref="ScriptMimeType"/>, shared with the page-load extraction
+    /// path. It was defined here first and only here, which is how that path came to execute every
+    /// data block in a document while this one — dynamically inserted scripts — correctly skipped
+    /// them.
+    /// </remarks>
+    private static bool IsClassicScriptType(string? type) => ScriptMimeType.IsClassicScript(type);
 }
