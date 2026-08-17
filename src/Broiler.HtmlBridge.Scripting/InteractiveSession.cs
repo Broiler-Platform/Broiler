@@ -33,6 +33,23 @@ public sealed class InteractiveSession : IDisposable
     public bool HasPendingWork => !_disposed && _bridge.HasPendingTimers;
 
     /// <summary>
+    /// Whether queued work is due within the load window — the same bounded question the
+    /// non-interactive drains ask (<c>ScriptEngine.DrainAsyncWork</c>,
+    /// <c>CaptureService.DrainAsyncWork</c>), against the same
+    /// <see cref="DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs"/> horizon.
+    /// </summary>
+    /// <remarks>
+    /// This is the predicate a render pump must drive itself on. <see cref="HasPendingWork"/>
+    /// answers "are any callbacks queued at all", which on a page holding a <c>setInterval</c> —
+    /// google.com among them — is <c>true</c> forever by design: an interval always has a next
+    /// tick. A pump that steps while that is true never stops, and since each step runs a callback
+    /// batch and re-serialises the document, it does so at whatever a batch happens to cost.
+    /// Work scheduled past the horizon is later, not stuck, and the page is loaded without it.
+    /// </remarks>
+    public bool HasWorkDueInLoadWindow =>
+        !_disposed && _bridge.HasPendingTimersDueBy(DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs);
+
+    /// <summary>
     /// Executes one batch of pending timer and animation-frame callbacks,
     /// drains micro-tasks, and returns the serialised DOM HTML reflecting
     /// the current state.  Returns <c>null</c> if no callbacks were
@@ -46,6 +63,52 @@ public sealed class InteractiveSession : IDisposable
             return null;
 
         _microTasks.Drain();
+        return _bridge.SerializeToHtml();
+    }
+
+    /// <summary>
+    /// Runs the load window to a fixed point and returns the resulting document, leaving only
+    /// work that is genuinely later — the settled page a caller can render once.
+    /// </summary>
+    /// <remarks>
+    /// The same loop as <c>ScriptEngine.DrainAsyncWork</c> and <c>CaptureService.DrainAsyncWork</c>:
+    /// microtasks first, then one timer batch, bounded by
+    /// <see cref="DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs"/> on the virtual clock and
+    /// <see cref="DomBridgeRuntimeLimits.AsyncDrainIterationLimit"/> on the iteration count — the
+    /// backstop for work that regenerates at the current instant and never lets the clock move.
+    /// <para>
+    /// It exists so a host can settle a page off the thread it paints on.
+    /// <see cref="ScriptEngine.ExecuteInteractive"/> drains only microtasks, so every timer a page
+    /// schedules during load is left for the caller to step; a host stepping them from its UI
+    /// thread pays each callback batch there, and one batch of a heavy page is measured in seconds.
+    /// </para>
+    /// </remarks>
+    public string SettleLoadWindow(CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        for (var iteration = 0; iteration < DomBridgeRuntimeLimits.AsyncDrainIterationLimit; iteration++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var hadWork = false;
+
+            if (_microTasks.Count > 0)
+            {
+                _microTasks.Drain();
+                hadWork = true;
+            }
+
+            if (_bridge.HasPendingTimersDueBy(DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs))
+            {
+                _bridge.FlushTimerStep();
+                hadWork = true;
+            }
+
+            if (!hadWork)
+                break;
+        }
+
         return _bridge.SerializeToHtml();
     }
 

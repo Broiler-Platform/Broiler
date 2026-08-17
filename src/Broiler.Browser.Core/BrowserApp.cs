@@ -485,11 +485,20 @@ internal sealed class BrowserApp : IDisposable
 
             if (session is not null)
             {
-                string initial = session.CurrentHtml();
+                // Settle the load window here, on the load worker. ExecuteScriptsInteractive drains
+                // only microtasks, so without this every timer the page scheduled during load is
+                // left for the viewport to step from the UI thread — inside the WndProc, one
+                // callback batch per animation tick, and a batch of a page like google.com is
+                // measured in seconds. That is the freeze; the CLI never had it because its drain
+                // runs bounded and off any message pump. See docs/browser-load-window-pump.md.
+                string initial = session.SettleLoadWindow(cancellationToken);
                 if (!string.IsNullOrWhiteSpace(initial))
                     html = PrepareForBrowsing(initial);
 
-                if (!session.HasPendingWork)
+                // Same bounded question the viewport pumps on: a page whose only remaining work is
+                // an interval's later ticks is finished loading, and carrying its session forward
+                // would hand the viewport a live JS context it is never going to step.
+                if (!session.HasWorkDueInLoadWindow)
                 {
                     session.Dispose();
                     session = null;
@@ -1038,6 +1047,7 @@ internal sealed class BrowserApp : IDisposable
         private HtmlContainer _container = CreateContentContainer(WelcomePage, string.Empty);
         private HtmlGraphicsRenderList? _renderList;
         private InteractiveSession? _interactiveSession;
+        private string? _lastAppliedHtml;
         private bool _layoutDirty = true;
         private bool _renderDirty = true;
         private bool _suppressNavigation;
@@ -1087,7 +1097,13 @@ internal sealed class BrowserApp : IDisposable
 
         public string BaseUrl { get; private set; } = string.Empty;
 
-        public bool HasPendingWork => _interactiveSession?.HasPendingWork == true;
+        // The load window, not "are any timers queued at all" — see
+        // InteractiveSession.HasWorkDueInLoadWindow. This drives the busy state, the 16 ms
+        // animation tick and StopSession, and on a page holding an interval the unbounded
+        // question never goes false: the browser would step JS and re-lay out the document on
+        // the UI thread for as long as the window stayed open, which is what made google.com
+        // hang while the CLI (which asks the bounded question) rendered it.
+        public bool HasPendingWork => _interactiveSession?.HasWorkDueInLoadWindow == true;
 
         public void ReplacePage(HtmlContainer container, InteractiveSession? interactiveSession, string baseUrl)
         {
@@ -1104,6 +1120,7 @@ internal sealed class BrowserApp : IDisposable
             _container = container;
             _container.LinkClicked += OnLinkClicked;
             _interactiveSession = interactiveSession;
+            _lastAppliedHtml = null;
             BaseUrl = baseUrl ?? string.Empty;
             _scrollY = 0;
             _viewportZoom = 1f;
@@ -1112,12 +1129,18 @@ internal sealed class BrowserApp : IDisposable
 
         public bool StepAnimation()
         {
-            if (_interactiveSession is null || !_interactiveSession.HasPendingWork)
+            if (_interactiveSession is null || !_interactiveSession.HasWorkDueInLoadWindow)
                 return false;
 
             string? html = _interactiveSession.Step();
-            if (!string.IsNullOrWhiteSpace(html))
+
+            // Re-parsing costs a full parse and layout of the document, so it is worth paying only
+            // when the step actually changed it. A callback batch that touched no DOM — a timer
+            // that only reads, schedules, or measures — still returns the serialised document, and
+            // google.com runs many of those.
+            if (!string.IsNullOrWhiteSpace(html) && !string.Equals(html, _lastAppliedHtml, StringComparison.Ordinal))
             {
+                _lastAppliedHtml = html;
                 _suppressNavigation = true;
                 try
                 {
@@ -1131,7 +1154,7 @@ internal sealed class BrowserApp : IDisposable
                 MarkLayoutDirty();
             }
 
-            if (!_interactiveSession.HasPendingWork)
+            if (!_interactiveSession.HasWorkDueInLoadWindow)
                 StopSession();
 
             return html is not null;
