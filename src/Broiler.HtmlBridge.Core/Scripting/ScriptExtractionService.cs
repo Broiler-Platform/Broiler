@@ -40,8 +40,21 @@ public static partial class ScriptExtractionService
     private static string? GetNonce(IReadOnlyDictionary<string, string> attrs) =>
         attrs.TryGetValue("nonce", out var nonce) ? nonce : null;
 
+    private static string? GetType(IReadOnlyDictionary<string, string> attrs) =>
+        attrs.TryGetValue("type", out var type) ? type : null;
+
     private static bool IsModule(IReadOnlyDictionary<string, string> attrs) =>
-        attrs.TryGetValue("type", out var type) && string.Equals(type, "module", StringComparison.OrdinalIgnoreCase);
+        ScriptMimeType.IsModule(GetType(attrs));
+
+    /// <summary>
+    /// Whether this <c>&lt;script&gt;</c> is executed at all. A type that is neither a JavaScript
+    /// MIME essence nor <c>module</c> marks a data block — JSON-LD, framework state, speculation
+    /// rules, an import map, a client-side template — which a browser never executes. Extraction
+    /// used to look only for <c>type="module"</c>, so every one of those was collected and handed
+    /// to the engine, where it failed to compile.
+    /// </summary>
+    private static bool IsExecutable(IReadOnlyDictionary<string, string> attrs) =>
+        ScriptMimeType.IsExecutable(GetType(attrs));
 
     /// <summary>The <c>src</c> value when present and non-empty (an empty <c>src</c> is treated as no src).</summary>
     private static string? GetSrc(IReadOnlyDictionary<string, string> attrs) =>
@@ -88,6 +101,10 @@ public static partial class ScriptExtractionService
         foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
         {
             var nonce = GetNonce(tag.Attributes);
+
+            // Skip data blocks: a type that is neither JavaScript nor `module` is not a script.
+            if (!IsExecutable(tag.Attributes))
+                continue;
 
             // Skip module scripts — they are extracted separately
             if (IsModule(tag.Attributes))
@@ -142,6 +159,13 @@ public static partial class ScriptExtractionService
         var documentOrder = 0;
         foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
         {
+            // A data block (JSON-LD, framework state, speculation rules, an import map, a
+            // client-side template) is not a script: it is skipped entirely — no descriptor, no
+            // module-map entry, no execution bucket — rather than compiled and reported as a
+            // syntax error in content that was never JavaScript.
+            if (!IsExecutable(tag.Attributes))
+                continue;
+
             var nonce = GetNonce(tag.Attributes);
             var isModule = IsModule(tag.Attributes);
             var isDefer = tag.Attributes.ContainsKey("defer");
@@ -385,6 +409,12 @@ public static partial class ScriptExtractionService
 
         foreach (var tag in HtmlScriptScanner.EnumerateScripts(html))
         {
+            // Prefetching what the document will fetch means what it will fetch *as a script*: a
+            // data block's src is never requested by the walk below, so requesting it here would
+            // be a round trip the page never makes.
+            if (!IsExecutable(tag.Attributes))
+                continue;
+
             var src = GetSrc(tag.Attributes);
             if (src is null || src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
                 continue;

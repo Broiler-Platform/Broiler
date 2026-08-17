@@ -1,0 +1,204 @@
+From ef07380bbae92b1e6e9347ae7c0dd21ebd0aa99c Mon Sep 17 00:00:00 2001
+From: Claude <enrico.bartky@gmail.com>
+Date: Mon, 17 Aug 2026 10:14:09 +0000
+Subject: [PATCH] Name the character a token cannot start with
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The scanner reported an untokenisable character by naming `Token` — the token
+most recently produced — which says nothing about it: the character has not
+been tokenised, and that is the whole problem. On the FIRST character of a
+source no token has been produced at all, so the report read
+
+    Unexpected token Empty:  at 1, 1
+
+with neither a token nor a character in it. That is the case that matters. A
+source whose very first character cannot start a token is usually not
+JavaScript, and which non-JavaScript it is, is exactly what the reader needs:
+a data block handed to the engine by mistake (a `text/template` opening with a
+bullet), a response body that was never decompressed (a control character), or
+text decoded with the wrong encoding (U+FFFD). The message now names the
+character, and says which of those it looks like:
+
+    Unexpected character '•' (U+2022) at 1, 1
+    Unexpected character U+001F (a control character) at 1, 1
+    Unexpected character U+FFFD (the replacement character — the source is not
+      valid text in the encoding it was decoded with) at 1, 1
+
+An astral character is a surrogate pair, so it is named by the code point the
+pair forms rather than by half of one; an unpaired surrogate is called that.
+End of input is reported as end of input instead of as U+FFFF.
+
+Only the fall-through at the end of _ReadToken changes — the site that reaches
+a character no case handles. Every other caller of Unexpected() is reporting a
+token that does exist, where naming it is right.
+---
+ .../ParserTests.cs                            | 87 +++++++++++++++++++
+ .../Broiler.JavaScript.Parser/FastScanner.cs  | 47 +++++++++-
+ 2 files changed, 133 insertions(+), 1 deletion(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs b/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs
+index 240c74ef..c77a98f0 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser.Tests/ParserTests.cs
+@@ -955,4 +955,91 @@ public class ParserTests
+         Assert.Contains("Unexpected token Negate: ! at 1, 1", error.Message);
+         Assert.Contains("SemiColon at 1, 2", error.Message);
+     }
++
++    /// <summary>
++    /// A character no token can start with is reported by naming the character. The scanner used to
++    /// report <c>Token</c> instead — the token most recently produced — which says nothing, since the
++    /// offending character has not been tokenised and that is the whole problem. On the FIRST
++    /// character of a source no token has been produced at all, so the report read "Unexpected token
++    /// Empty:  at 1, 1": neither a token nor a character in it. That is the case that matters,
++    /// because a source whose very first character is untokenisable is usually not JavaScript.
++    /// </summary>
++    [Theory]
++    [InlineData("\u2022var a=1;", "'\u2022' (U+2022)")]
++    [InlineData("\u2013var a=1;", "'\u2013' (U+2013)")]
++    [InlineData("\u20ACvar a=1;", "'\u20AC' (U+20AC)")]
++    [InlineData("var a = \u2022;", "'\u2022' (U+2022)")]
++    public void ParseProgram_UntokenisableCharacter_NamesTheCharacter(string source, string expected)
++    {
++        // The scanner reads the first two tokens in its constructor, so a bad FIRST character is
++        // reported from `new FastTokenStream(...)` rather than from ParseProgram — which is why the
++        // stack of such a failure shows only FastScanner._ReadToken.
++        var error = Assert.ThrowsAny<FastParseException>(
++            () => new FastParser(new FastTokenStream(new StringSpan(source))).ParseProgram());
++
++        Assert.Contains("Unexpected character", error.Message);
++        Assert.Contains(expected, error.Message);
++    }
++
++    /// <summary>
++    /// A control character has no glyph to print, so it is named by code point and called what it is.
++    /// This is the shape a response body that was never decompressed arrives in.
++    /// </summary>
++    [Theory]
++    [InlineData("\u001fvar a=1;", "U+001F (a control character)")]
++    [InlineData("\u0000var a=1;", "U+0000 (a control character)")]
++    [InlineData("\u007fvar a=1;", "U+007F (a control character)")]
++    public void ParseProgram_ControlCharacter_IsNamedByCodePoint(string source, string expected)
++    {
++        var error = Assert.ThrowsAny<FastParseException>(
++            () => new FastParser(new FastTokenStream(new StringSpan(source))).ParseProgram());
++
++        Assert.Contains(expected, error.Message);
++    }
++
++    /// <summary>
++    /// U+FFFD is what a decoder substitutes for bytes it could not decode, so it is the signature of
++    /// a body that arrived in another encoding — said outright, because "invalid character" would
++    /// send the reader looking for a typo instead of at the transport.
++    /// </summary>
++    [Fact]
++    public void ParseProgram_ReplacementCharacter_SaysTheSourceWasMisdecoded()
++    {
++        var error = Assert.ThrowsAny<FastParseException>(
++            () => new FastParser(new FastTokenStream(new StringSpan("\ufffdvar a=1;"))).ParseProgram());
++
++        Assert.Contains("U+FFFD", error.Message);
++        Assert.Contains("not valid text in the encoding it was decoded with", error.Message);
++    }
++
++    /// <summary>
++    /// An astral character is a surrogate PAIR; naming half of one prints a broken glyph and the
++    /// wrong code point.
++    /// </summary>
++    [Fact]
++    public void ParseProgram_AstralCharacter_IsNamedByItsCodePoint()
++    {
++        var error = Assert.ThrowsAny<FastParseException>(
++            () => new FastParser(new FastTokenStream(new StringSpan("\ud83d\ude00var a=1;"))).ParseProgram());
++
++        Assert.Contains("U+1F600", error.Message);
++    }
++
++    /// <summary>
++    /// The characters that legitimately start a token are unaffected — `$` and `_` are
++    /// IdentifierStart, and the whole ASCII operator set still scans.
++    /// </summary>
++    [Theory]
++    [InlineData("var $ = 1, _ = 2, $_a = 3;")]
++    [InlineData("var a = b % c ^ d | e & f ~ 0;")]
++    [InlineData("var \u00e9 = 1, \u4e2d = 2;")]
++    [InlineData("var a = '\u2022 \u2013 \u20AC';")]
++    [InlineData("// \u2022 \u2013\nvar a = 1;")]
++    public void ParseProgram_LegitimateCharacters_StillScan(string source)
++    {
++        var stream = new FastTokenStream(new StringSpan(source));
++        var parser = new FastParser(stream);
++
++        Assert.NotNull(parser.ParseProgram());
++    }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastScanner.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastScanner.cs
+index 5deb7133..07324cfa 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastScanner.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastScanner.cs
+@@ -61,6 +61,49 @@ public class FastScanner
+         return new FastParseException(c, $"Unexpected token {c.Type}: {c.Span} at {Location}");
+     }
+ 
++    /// <summary>
++    /// Reports a character that cannot begin any token, naming the character itself.
++    /// </summary>
++    /// <remarks>
++    /// <see cref="Unexpected"/> reports <see cref="Token"/> — the token most recently produced —
++    /// which says nothing here: the offending character has not been tokenised, and that is the
++    /// whole problem. Worse, on the FIRST character of a source no token has been produced at all,
++    /// so the report read "Unexpected token Empty:  at 1, 1" — a message with neither a token nor a
++    /// character in it. That is the case that matters, because a source whose very first character
++    /// is untokenisable is usually not JavaScript: a data block handed to the engine by mistake, a
++    /// response body that was never decompressed, or text decoded with the wrong encoding. Naming
++    /// the character says which.
++    /// </remarks>
++    private Exception UnexpectedCharacter(char c)
++    {
++        var token = Token;
++
++        if (c == char.MaxValue && position >= Text.Length)
++            return new FastParseException(token, $"Unexpected end of input at {Location}");
++
++        // An astral character (emoji, and anything else outside the BMP) is a surrogate PAIR, and
++        // printing half of one prints a broken glyph. Report the code point it forms.
++        if (char.IsHighSurrogate(c) && char.IsLowSurrogate(Peek(1)))
++        {
++            var pair = char.ConvertToUtf32(c, Peek(1));
++            return new FastParseException(token,
++                $"Unexpected character '{char.ConvertFromUtf32(pair)}' (U+{pair:X4}) at {Location}");
++        }
++
++        // U+FFFD is what a decoder substitutes for bytes it could not decode, so it is the
++        // signature of a body that arrived compressed or in another encoding — worth saying
++        // outright, since "invalid character" would send the reader looking for a typo.
++        var description = c == '�'
++            ? "U+FFFD (the replacement character — the source is not valid text in the encoding it was decoded with)"
++            : char.IsControl(c)
++                ? $"U+{(int)c:X4} (a control character)"
++                : char.IsSurrogate(c)
++                    ? $"U+{(int)c:X4} (an unpaired surrogate)"
++                    : $"'{c}' (U+{(int)c:X4})";
++
++        return new FastParseException(token, $"Unexpected character {description} at {Location}");
++    }
++
+     public FastScanner(FastPool pool, in StringSpan text, FastKeywordMap keywords = null)
+     {
+         this.pool = pool;
+@@ -601,7 +644,9 @@ public class FastScanner
+                 return state.Commit(TokenTypes.Assign);
+         }
+ 
+-        throw Unexpected();
++        // `first` is the character the switch could not start a token with; nothing has been
++        // consumed for it, so Location points at it.
++        throw UnexpectedCharacter(first);
+     }
+ 
+     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+-- 
+2.43.0
+

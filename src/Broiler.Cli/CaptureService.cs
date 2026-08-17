@@ -226,6 +226,15 @@ public class CaptureService
         @"\stype\s*=\s*(?:""\s*module\s*""|'\s*module\s*'|module(?:\s|$))",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Captures the value of a script tag's <c>type</c> attribute, so a data block — JSON-LD,
+    /// framework state, speculation rules, an import map, a client-side template — can be told
+    /// from a script and skipped rather than compiled. See <see cref="ScriptMimeType"/>.
+    /// </summary>
+    private static readonly Regex TypeAttrPattern = new(
+        @"\stype\s*=\s*(?:""(?<type>[^""]*)""|'(?<type>[^']*)'|(?<type>[^\s>]+))",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex StylePattern = new(
         @"<style[^>]*>(?<content>[\s\S]*?)</style>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -595,6 +604,15 @@ public class CaptureService
                 continue;
 
             var attrs = match.Groups["attrs"].Value;
+
+            // A `<script>` whose type is neither a JavaScript MIME essence nor `module` is a data
+            // block the browser never executes. Compiling one produced a syntax error about
+            // content that was never JavaScript — a `text/template` opening with a bullet reported
+            // as "Unexpected token Empty:  at 1, 1".
+            var typeMatch = TypeAttrPattern.Match(attrs);
+            if (!ScriptMimeType.IsExecutable(typeMatch.Success ? typeMatch.Groups["type"].Value : null))
+                continue;
+
             var isDefer = DeferAttrPattern.IsMatch(attrs);
             var isModule = TypeModuleAttrPattern.IsMatch(attrs);
             var nonce = ContentSecurityPolicy.ExtractNonceFromAttributes(attrs);
