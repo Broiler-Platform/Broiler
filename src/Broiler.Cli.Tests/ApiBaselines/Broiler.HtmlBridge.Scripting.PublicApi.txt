@@ -25,9 +25,11 @@ TYPE Broiler.HtmlBridge.InteractiveSession : System.IDisposable
   method Broiler.Dom.DomDocument StepDocument()
   method System.String Complete()
   method System.String CurrentHtml()
+  method System.String SettleLoadWindow(System.Threading.CancellationToken)
   method System.String Step()
   method System.Void Dispose()
   property System.Boolean HasPendingWork { get; }
+  property System.Boolean HasWorkDueInLoadWindow { get; }
 TYPE Broiler.HtmlBridge.ScriptEngine : Broiler.HtmlBridge.IInteractiveScriptEngine, Broiler.HtmlBridge.IScriptEngine, Broiler.HtmlBridge.IScriptEventLoop, Broiler.HtmlBridge.IScriptExecutor, Broiler.HtmlBridge.IScriptProfiling, Broiler.HtmlBridge.ITypedScriptEngine
   ctor ()
   ctor (Broiler.HtmlBridge.Dom.IDomBridgeRuntimeFactory)
