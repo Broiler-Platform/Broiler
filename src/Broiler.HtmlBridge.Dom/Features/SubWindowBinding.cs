@@ -39,6 +39,74 @@ internal sealed class SubWindowBinding(
     private readonly EventTargetRegistry _eventTargets = eventTargets;
     private readonly MessagingBinding _messaging = messaging;
 
+    /// <summary>
+    /// The globals published on a sub-window: the event constructors it has always mirrored, plus the
+    /// standard JavaScript ones.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A sub-window used to carry <c>document</c>, <c>location</c> and the event constructors and
+    /// nothing else, so <c>iframe.contentWindow.String</c> — and <c>Object</c>, <c>Array</c>,
+    /// <c>Function</c>, <c>JSON</c>, <c>Math</c>, every one of them — read as <c>undefined</c>. In a
+    /// browser a nested browsing context is a full global object, and script reaches for exactly
+    /// these: taking a reference to a built-in from a fresh frame, rather than from the current
+    /// global, is the standard way to get one that page script has not patched. Google Search's
+    /// anti-abuse bundle does it on the first run of its interpreter — <c>contentWindow.String</c>,
+    /// then <c>.prototype</c> — and reading <c>prototype</c> off <c>undefined</c> threw, which
+    /// derailed the interpreter into decoding its own bytecode wrongly for the rest of the page.
+    /// </para>
+    /// <para>
+    /// These are the PARENT realm's objects, not a realm of the frame's own: <c>contentWindow.String
+    /// === String</c> here, where a browser gives two distinct functions. Broiler runs every document
+    /// in one JavaScript context, so a per-frame realm is not something this binding can conjure —
+    /// and identity is the lesser problem. Code that harvests a built-in gets a working built-in;
+    /// only code that compares the two for identity can tell, and it gets a defensible answer either
+    /// way, where <c>undefined</c> was defensible to nobody.
+    /// </para>
+    /// <para>
+    /// Names the context does not define are skipped, so this list may name more than Broiler has.
+    /// </para>
+    /// </remarks>
+    private static readonly string[] MirroredGlobals =
+    [
+        // Event constructors — mirrored since P3.17.
+        "Event", "CustomEvent", "MouseEvent", "FocusEvent", "KeyboardEvent",
+        "WheelEvent", "UIEvent", "MessageChannel",
+
+        // Fundamental objects and their namespaces.
+        "Object", "Function", "Boolean", "Symbol", "Math", "JSON", "Reflect",
+
+        // Numbers, text and time.
+        "Number", "BigInt", "String", "Date", "RegExp",
+
+        // Collections.
+        "Array", "Map", "Set", "WeakMap", "WeakSet", "WeakRef",
+
+        // Errors.
+        "Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError",
+        "EvalError", "URIError", "AggregateError",
+
+        // Binary data.
+        "ArrayBuffer", "SharedArrayBuffer", "DataView", "Int8Array", "Uint8Array",
+        "Uint8ClampedArray", "Int16Array", "Uint16Array", "Int32Array", "Uint32Array",
+        "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array",
+
+        // Control flow and metaprogramming.
+        "Promise", "Proxy", "Intl",
+
+        // Global functions and value properties.
+        "eval", "parseInt", "parseFloat", "isNaN", "isFinite",
+        "encodeURI", "encodeURIComponent", "decodeURI", "decodeURIComponent",
+        "NaN", "Infinity", "undefined",
+
+        // Web globals a frame's script reaches for as readily as the language ones.
+        "console", "navigator", "fetch", "XMLHttpRequest", "URL", "URLSearchParams",
+        "TextEncoder", "TextDecoder", "Blob", "AbortController", "Headers",
+        "setTimeout", "clearTimeout", "setInterval", "clearInterval",
+        "requestAnimationFrame", "cancelAnimationFrame", "queueMicrotask",
+        "atob", "btoa", "structuredClone", "performance", "crypto",
+    ];
+
     /// <summary>Gets or builds the sub-window JS object for a nested-browsing-context container.</summary>
     public JSObject GetOrCreate(DomElement containerElement)
     {
@@ -89,11 +157,9 @@ internal sealed class SubWindowBinding(
         subWindow.FastAddValue((KeyString)"self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
         subWindow.FastAddValue((KeyString)"window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        foreach (var ctorName in new[]
-                 {
-                     "Event", "CustomEvent", "MouseEvent", "FocusEvent", "KeyboardEvent",
-                     "WheelEvent", "UIEvent", "MessageChannel",
-                 })
+        subWindow.FastAddValue((KeyString)"globalThis", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+
+        foreach (var ctorName in MirroredGlobals)
         {
             if (_host.GetGlobal(ctorName) is { } ctor)
                 subWindow.FastAddValue((KeyString)ctorName, ctor, JSPropertyAttributes.EnumerableConfigurableValue);
