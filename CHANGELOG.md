@@ -228,7 +228,13 @@ are versioned in lockstep during the preview.
   same object are fixed with them — `location` stringified to `[object Object]` rather than to
   its href (`"" + location`, `` `${location}` ``, `String(location)` all wrong), and `port` was
   undefined for every URL rather than empty on a scheme's default port and the number
-  otherwise. A frame's Location gets all of it too, being built separately.
+  otherwise. `location.href = url` is the same operation under a different spelling (HTML
+  §7.10.5 — the setter performs *location-object navigate*) and the one pages reach for most;
+  it was a plain data property, so the write stuck and nothing else happened: the page believed
+  it had left, the capture never knew it had been asked, and the URL then disagreed with the
+  document still in hand. It is an accessor now, answering the document's own URL and routing
+  the write where `assign()` goes. A frame's Location gets all of it too, being built
+  separately.
 
 - `Broiler.JS` (`8564eee2`) — a closure that a directly-evalled function created was
   handed none of the eval's bindings, so one level of nesting decided whether a name

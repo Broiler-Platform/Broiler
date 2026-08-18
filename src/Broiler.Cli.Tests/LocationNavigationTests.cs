@@ -87,6 +87,57 @@ public sealed class LocationNavigationTests
     }
 
     /// <summary>
+    /// `location.href = url` is `assign(url)` with different spelling (HTML §7.10.5 — the setter
+    /// performs "location-object navigate"), and it is the spelling pages reach for most. It was a
+    /// plain data property, so the write stuck and nothing else happened: the page believed it had
+    /// left, the capture never knew it had been asked, and the URL then disagreed with the document
+    /// still in hand.
+    /// </summary>
+    [Fact]
+    public void AssigningHref_DoesNotThrow_AndLeavesTheUrlAlone()
+    {
+        var (context, bridge) = Attach();
+        using var _ = context;
+        using var __ = bridge;
+
+        var thrown = Record.Exception(() => context.Eval("location.href = 'https://example.com/next';"));
+
+        Assert.Null(thrown);
+        Assert.Equal(PageUrl, context.Eval("String(location.href)").ToString());
+        Assert.Equal("/search", context.Eval("String(location.pathname)").ToString());
+    }
+
+    /// <summary>Through the document's spelling of the same object, and in a frame.</summary>
+    [Fact]
+    public void AssigningHref_BehavesTheSameThroughDocumentLocation()
+    {
+        var (context, bridge) = Attach();
+        using var _ = context;
+        using var __ = bridge;
+
+        var thrown = Record.Exception(() => context.Eval("document.location.href = '/relative-next';"));
+
+        Assert.Null(thrown);
+        Assert.Equal(PageUrl, context.Eval("String(document.location.href)").ToString());
+    }
+
+    /// <summary>
+    /// A `location.href` read is still a plain string read — the accessor must not change what the
+    /// property answers, only what writing to it does.
+    /// </summary>
+    [Fact]
+    public void ReadingHref_IsUnchanged()
+    {
+        var (context, bridge) = Attach();
+        using var _ = context;
+        using var __ = bridge;
+
+        Assert.Equal(PageUrl, context.Eval("String(location.href)").ToString());
+        Assert.Equal("string", context.Eval("String(typeof location.href)").ToString());
+        Assert.Equal("true", context.Eval("String('href' in location)").ToString());
+    }
+
+    /// <summary>
     /// Location stringifies to its href. `[object Object]` is what pages got from `"" + location`,
     /// and it is wrong everywhere it appears — in a URL they build, in a log line, in a comparison.
     /// </summary>
@@ -160,6 +211,7 @@ public sealed class LocationNavigationTests
             globalThis.__kinds = [typeof w.location.assign, typeof w.location.replace,
                                   typeof w.location.reload, typeof w.location.toString].join(',');
             w.location.replace('/inner-next');
+            w.location.href = '/inner-href';
             globalThis.__href = String(w.location.href);
             """));
 

@@ -44,7 +44,6 @@ internal static class LocationBinding
     internal static JSObject Build(string href)
     {
         var location = new JSObject();
-        location.FastAddValue((KeyString)"href", new JSString(href), JSPropertyAttributes.EnumerableConfigurableValue);
 
         if (Uri.TryCreate(href, UriKind.Absolute, out var uri))
         {
@@ -66,16 +65,28 @@ internal static class LocationBinding
             Add(location, "hash", string.Empty);
         }
 
-        AddNavigationMethods(location, href);
+        AddNavigationSurface(location, href);
         return location;
     }
 
     /// <summary>
-    /// Adds <c>assign</c>, <c>replace</c>, <c>reload</c> and <c>toString</c> to a Location whose
-    /// components a caller has already defined itself.
+    /// Adds <c>href</c>, <c>assign</c>, <c>replace</c>, <c>reload</c> and <c>toString</c> to a
+    /// Location whose remaining components a caller has already defined itself.
     /// </summary>
-    internal static void AddNavigationMethods(JSObject location, string href)
+    internal static void AddNavigationSurface(JSObject location, string href)
     {
+        // `href` is the fourth way to ask for a navigation and the one pages reach for most —
+        // `location.href = url` is assign(url) with different spelling (HTML §7.10.5: the setter
+        // performs "location-object navigate"). It was a plain data property, so the write stuck
+        // and nothing else happened: the page believed it had left, the capture did not know it
+        // had been asked, and the URL then disagreed with the document still in hand. As an
+        // accessor it answers the document's own URL and routes the write where assign() goes.
+        location.FastAddProperty(
+            (KeyString)"href",
+            new DomFunction((in _) => new JSString(href), "get href"),
+            new DomFunction((in a) => Navigate(href, "href", in a), "set href"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         location.FastAddValue(
             (KeyString)"assign",
             new DomFunction((in a) => Navigate(href, "assign", in a), "assign", 1),
@@ -112,7 +123,10 @@ internal static class LocationBinding
             target = resolved.ToString();
         }
 
-        RenderLogger.LogDebug(LogCategory.JavaScript, LogContext, $"location.{method}({target}) requested; the capture renders the document it was given and does not navigate");
+        // Named as the page spelled it — `location.href = x` and `location.assign(x)` are the same
+        // operation, and which one a page used is the first thing a reader wants back.
+        var request = method == "href" ? $"location.href = {target}" : $"location.{method}({target})";
+        RenderLogger.LogDebug(LogCategory.JavaScript, LogContext, $"{request} requested; the capture renders the document it was given and does not navigate");
         return JSUndefined.Value;
     }
 

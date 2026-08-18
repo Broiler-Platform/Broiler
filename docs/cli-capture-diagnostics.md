@@ -181,14 +181,21 @@ never arrived is recorded as an attempt with an `Error` and no archived file.
 
 ### A page that asked to leave
 
-`location.assign()`, `location.replace()` and `location.reload()` are recorded
-into `diagnostics.json` at `Debug` — not as failures, because nothing failed —
-under the context `DomBridge.location`:
+`location.assign()`, `location.replace()`, `location.reload()` and
+`location.href = …` are recorded into `diagnostics.json` at `Debug` — not as
+failures, because nothing failed — under the context `DomBridge.location`:
 
 ```
 Debug | DomBridge.location | location.replace(https://…/sorry/index) requested;
        the capture renders the document it was given and does not navigate
+Debug | DomBridge.location | location.href = https://…/next requested;
+       the capture renders the document it was given and does not navigate
 ```
+
+The target is resolved against the document, so the line names the URL the page
+meant rather than the relative fragment it wrote, and the spelling is kept
+(`href =` against `assign(…)`) because which one a page used is the first thing
+a reader wants back.
 
 A capture renders the one document it was given; `--follow-first-link` is the
 only way it goes elsewhere. So a page whose last act is to navigate away renders
