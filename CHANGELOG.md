@@ -214,6 +214,22 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.JS` (patch `0002`) — a closure that a directly-evalled function created was
+  handed none of the eval's bindings, so one level of nesting decided whether a name
+  resolved: `f = eval("0,function(){ return function(){ return b; }; }")` gave `f()`
+  the caller's `b` and `f()()` a `ReferenceError`. The eval's overlay is withdrawn when
+  it returns, and the snapshot the *outer* function carries was not consulted when the
+  inner one was built — although it is the only trace of that scope left. Google Search's
+  bot-detection VM is exactly that shape, evaluating its opcode handlers with
+  `function(X){return eval(X)}(src)` and building a closure inside them on nearly every
+  step, so the challenge died on a `g is not defined` and the page rendered as the
+  interstitial. Two neighbours dropped the same scope and are fixed with it: a function
+  invoked from a builtin's callback (`Array.prototype.map`, `Set`/`Map.prototype.forEach`,
+  a JSON reviver or replacer) had neither its eval bindings nor its captured `with` chain
+  re-established, so the same closure worked when JavaScript called it and threw when a
+  builtin did; and `typeof` answered `"undefined"` for a name the very next read produced
+  a value for, because its non-throwing resolver never consulted the capture.
+
 - `Broiler.Layout` — an `<img>` whose source came from `srcset` loaded nothing at all.
   The engine read the `src` attribute and nothing else, so a responsive image and every
   `<picture>` had no source and painted the missing-image border. HTML §4.8.4.3's *select
