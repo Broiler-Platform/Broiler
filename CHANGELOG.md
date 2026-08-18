@@ -214,7 +214,7 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
-- `Broiler.JS` (patch `0002`) — a closure that a directly-evalled function created was
+- `Broiler.JS` (`8564eee2`) — a closure that a directly-evalled function created was
   handed none of the eval's bindings, so one level of nesting decided whether a name
   resolved: `f = eval("0,function(){ return function(){ return b; }; }")` gave `f()`
   the caller's `b` and `f()()` a `ReferenceError`. The eval's overlay is withdrawn when

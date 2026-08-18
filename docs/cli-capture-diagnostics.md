@@ -88,6 +88,46 @@ error channel can fail throughout and log nothing here. When a bundle shows few
 failures and a document the scripts barely changed, that pattern, not success,
 is the first thing to suspect.
 
+#### Reading a `BROILER_LOG_THROWS` log: most of it is the page
+
+The counterpart to the table above is `BROILER_LOG_THROWS=1`, which makes a
+**Debug** build write every `JSException.Throw` to stderr — caught or not, with
+the .NET stack of the throw site. It is the only way to see the caught ones, and
+the first thing to know about it is that on a heavily-scripted page **almost
+everything in it is the page throwing on purpose**.
+
+Google Search is the worked example. Its bot-detection VM signals "this register
+is not set" by throwing a three-element array — `throw [lQ, 30, V]`, which the
+log renders as `[object Object],30,440` — and catches it one frame up in its own
+dispatch loop. It is control flow, not failure. On one saved results page:
+
+| Engine | Throws | Of which `[lQ,30,N]` |
+| --- | --- | --- |
+| Chromium 1194 (CDP, pause-on-all-exceptions) | 165 | 153 |
+| Broiler | 20 | 19 |
+
+So a log full of `[object Object],30,N` says nothing on its own, and neither does
+its *absence* of engine errors — a `ReferenceError` raised through
+`JSEngine.NewReferenceError` is thrown by its caller and never passes through
+`JSException.Throw`, so it does not appear here at all. Read the log for what is
+**not** page-shaped:
+
+```sh
+BROILER_LOG_THROWS=1 dotnet run --project src/Broiler.Cli -c Debug -- \
+  --capture-image <URL> --output out.png 2> throws.txt
+
+grep -a '^\[JSException.Throw\]' throws.txt | sort | uniq -c | sort -rn | head -20
+```
+
+and then compare the **count** against a real browser on the same bytes rather
+than judging it alone — the same page under Playwright's Chromium, with
+`Debugger.setPauseOnExceptions: 'all'` and a `Debugger.resume` per pause, gives
+the baseline. An order-of-magnitude gap is the finding; the shape of any one
+entry usually is not. The same page replayed from `resources/` is what makes the
+comparison controlled: the challenge a live capture is served differs per
+request, and its throw count varies by three orders of magnitude between them
+for reasons that have nothing to do with the engine.
+
 **Unhandled promise rejections** need the patch under `patches/` that adds
 `JSPromiseRejectionTracker` to `Broiler.JS`; the engine has no notion of them
 otherwise. Without it the reporting compiles out and a rejected promise nobody

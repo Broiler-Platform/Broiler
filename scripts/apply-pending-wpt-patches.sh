@@ -195,20 +195,13 @@ set -euo pipefail
 # css/CSS2/tables/table-anonymous-objects-* test still renders its bare red table with the green
 # layer missing.
 #
-# 0002 (Broiler.JS, "Carry a direct eval's bindings into the closures its functions create") IS
-# listed, and the suite it is listed for is the real-world render one rather than WPT — the same
-# script runs both. Its fix decides whether google.com's bot-detection VM completes: the VM
-# evaluates its opcode handlers with `function(X){return eval(X)}(src)` and builds a closure inside
-# them on nearly every step, and without the patch the first such closure throws "g is not defined"
-# and the challenge never finishes. What renders then is the interstitial rather than the page, so
-# the difference is a whole screenshot. The engine's own suites pin the semantics
-# (DirectEvalClosureScopeTests, CapturedScopeCallbackTests); only a real page can say the VM got
-# through. Its predecessor — the direct-eval capture itself, Broiler.JS 60c9182a — was deliberately
-# NOT listed on the ground that it decides whether page script runs rather than what it paints;
-# that reasoning holds for the golden-image suite and not for the real-world one, which is the
-# difference here.
+# 0002 (Broiler.JS, "Carry a direct eval's bindings into the closures its functions create")
+# landed upstream as Broiler.JS 8564eee2 and the pinned pointer is that commit, so it reaches CI
+# through the pointer and its entry is removed rather than left to skip forever. It was listed for
+# the real-world render suite rather than for WPT — the same script runs both — because without it
+# google.com's bot-detection VM throws "g is not defined" out of the first closure one of its
+# evalled opcode handlers builds, and what renders is the interstitial rather than the page.
 PENDING_PATCHES=(
-  "Broiler.JS|patches/0002-carry-eval-bindings-into-nested-closures.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

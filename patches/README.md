@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**One patch is waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -48,12 +48,17 @@ patch ("Parse the minified JavaScript real sites serve") is `Broiler.JS`
 `e680338f` and the pinned pointer is `2bab1567`, so it reaches CI through the
 pointer and its file is deleted — this directory is a backlog, not an archive.
 
+The patch that held `0002` — "Carry a direct eval's bindings into the closures its
+functions create" — landed upstream as `Broiler.JS` `8564eee2`, and the pinned
+pointer is that commit, so it reaches CI through the pointer and its file is
+deleted along with its entry in `scripts/apply-pending-wpt-patches.sh`. `0001`
+keeps its number: the numbering restarts only when the directory empties.
+
 ## The index
 
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Name the character a token cannot start with |
-| `0002` | `Broiler.JS` | Carry a direct eval's bindings into the closures its functions create |
 
 ### `0001` — the report that named neither a token nor a character
 
@@ -105,53 +110,3 @@ every `<script>` in a document whatever its `type`, so JSON-LD, framework state,
 speculation rules, import maps and client-side templates were all compiled as
 JavaScript. This patch is what makes the *next* report of this shape legible; it
 is not what stops it happening.
-
-### `0002` — one level of nesting decided whether a name resolved
-
-A function a direct eval produced keeps the eval site's bindings: it carries a
-snapshot of the overlay, taken while the eval was still running. A function
-*that* function creates when it later runs was handed nothing, because by then
-the eval had returned and there was no overlay left to snapshot:
-
-```js
-f = eval("0,function(){ return function(){ return b; }; }");
-f()      // fine
-f()()    // ReferenceError: b is not defined
-```
-
-google.com's bot-detection VM is that shape. It evaluates its own opcode
-handlers with `function(X){return eval(X)}(src)` and builds a closure inside
-them on nearly every step, so the first such closure threw **`g is not
-defined`** and the challenge never finished — one nesting level past the
-`b is not defined` the capture already fixed (`Broiler.JS` 60c9182a).
-
-The scope the *running* function carries is the lexical environment of
-everything it creates, and it is the only trace of the eval left once the eval
-has returned, so `JSContext.CaptureDirectEvalBindings` folds it in — outermost,
-so an inner scope's binding of the same name still wins.
-
-Two more places dropped the same scope, both reproduced from the same payload:
-
-* `JSFunction.InvokeCallback` — a native callback site is a `[[Call]]` like any
-  other, but it re-established none of the scopes a function closed over. A
-  closure resolved its free names when JavaScript called it and threw the moment
-  it was handed to `Array.prototype.map`, `Set`/`Map.prototype.forEach`, a JSON
-  reviver or replacer; a function created inside `with (o)` lost `o` the same
-  way. It now enters the same four scopes `InvokeFunction` does, and only when
-  the function actually carries some, so an ordinary callback costs what it did.
-* `JSContext.ResolveIdentifierOrUndefined` — `typeof` resolves through its own
-  non-throwing path, which never consulted the capture: it answered `"undefined"`
-  for a name the very next read produced a value for. It consults it now,
-  skipping a *deleted* binding, which is the one case where the two must
-  genuinely differ.
-
-**Why it is listed in `scripts/apply-pending-wpt-patches.sh`.** That script also
-runs for the real-world render suite, and google.com is where this moves pixels:
-without the patch the challenge never completes and what renders is the
-interstitial rather than the page. The semantics are pinned by unit tests in the
-submodule (`DirectEvalClosureScopeTests`, `CapturedScopeCallbackTests`); only a
-real page can say the VM got through.
-
-**There is no main-repo fallback.** The defect is entirely inside the JavaScript
-engine's scope resolution — there is no layer above it where the same fix could
-be written — so until this patch is applied the engine behaves as it did.
