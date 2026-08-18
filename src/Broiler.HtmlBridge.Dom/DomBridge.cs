@@ -189,6 +189,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     private string _pageProtocol = string.Empty;
     private string _pageHost = string.Empty;
     private string _pageHostName = string.Empty;
+    private string _pagePort = string.Empty;
     private string _pagePathName = "/";
     private string _pageSearch = string.Empty;
     private string _pageHash = string.Empty;
@@ -618,6 +619,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
             _pageProtocol = uri.Scheme + ":";
             _pageHost = Origin.HostOf(uri);
             _pageHostName = uri.Host;
+            // Empty for a URL on its scheme's default port — that default is exactly what `host`
+            // leaves out, so `location.port === ""` is how a page asks whether one was given.
+            _pagePort = uri.IsDefaultPort ? string.Empty : uri.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
             _pagePathName = uri.AbsolutePath;
             _pageSearch = uri.Query;
             _pageHash = uri.Fragment;

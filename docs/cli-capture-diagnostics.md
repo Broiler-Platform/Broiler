@@ -179,6 +179,24 @@ never arrived is recorded as an attempt with an `Error` and no archived file.
   grouping.
 - **Resources that failed to load**, and the **slowest resources**.
 
+### A page that asked to leave
+
+`location.assign()`, `location.replace()` and `location.reload()` are recorded
+into `diagnostics.json` at `Debug` — not as failures, because nothing failed —
+under the context `DomBridge.location`:
+
+```
+Debug | DomBridge.location | location.replace(https://…/sorry/index) requested;
+       the capture renders the document it was given and does not navigate
+```
+
+A capture renders the one document it was given; `--follow-first-link` is the
+only way it goes elsewhere. So a page whose last act is to navigate away renders
+as whatever it had built by then, and *that* is what the screenshot shows. The
+line is the difference between reading it as the page and reading it as a page
+that left — worth looking for whenever a render stops somewhere that looks
+deliberate.
+
 ## Where the recording happens
 
 The fetches are spread across three assemblies, and none of them may reference

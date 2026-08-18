@@ -214,6 +214,22 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HtmlBridge.Dom` — `location.replace(url)` was `TypeError: undefined is not a
+  function`. The bridge defined the Location's URL components and none of its methods, so
+  `assign`, `replace` and `reload` were all missing — and a missing method is not something a
+  page feature-detects around: the TypeError is raised at the call and unwinds the rest of the
+  calling function. Google Search reaches it on the branch its bot-detection bootstrap takes
+  when `window.prs` is absent and the `SG_SS` cookie is already set. The three methods exist
+  now and **do not navigate**: a capture renders the document it was given, and
+  `--follow-first-link` is the explicit opt-in for going elsewhere, so each records the request
+  into the diagnostics bundle and returns — which is what a browser that blocks a navigation
+  does, and unlike a throw it leaves the calling script running. The URL is deliberately left
+  alone with it: the document did not change, so neither did its URL. Two neighbours in the
+  same object are fixed with them — `location` stringified to `[object Object]` rather than to
+  its href (`"" + location`, `` `${location}` ``, `String(location)` all wrong), and `port` was
+  undefined for every URL rather than empty on a scheme's default port and the number
+  otherwise. A frame's Location gets all of it too, being built separately.
+
 - `Broiler.JS` (`8564eee2`) — a closure that a directly-evalled function created was
   handed none of the eval's bindings, so one level of nesting decided whether a name
   resolved: `f = eval("0,function(){ return function(){ return b; }; }")` gave `f()`

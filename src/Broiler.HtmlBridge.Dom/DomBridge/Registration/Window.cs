@@ -21,16 +21,22 @@ public sealed partial class DomBridge
         // window.matchMedia(query) — evaluates basic media queries
         window.FastAddValue((KeyString)"matchMedia", new DomFunction((in a) => Dom.Features.MatchMediaBinding.MatchMedia(this, in a), "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.location (read-only)
+        // window.location — the URL components, and the navigation methods that go with them.
+        // The components alone made `location.replace(url)` a TypeError ("undefined is not a
+        // function") which aborts the rest of the calling function, so they are built together:
+        // see LocationBinding for what assign/replace/reload do in a capture, and why they do
+        // not navigate.
         var location = new JSObject();
         location.FastAddValue((KeyString)"href", new JSString(_pageUrl), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"protocol", new JSString(_pageProtocol), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"host", new JSString(_pageHost), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"hostname", new JSString(_pageHostName), JSPropertyAttributes.EnumerableConfigurableValue);
+        location.FastAddValue((KeyString)"port", new JSString(_pagePort), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"pathname", new JSString(_pagePathName), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"search", new JSString(_pageSearch), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"hash", new JSString(_pageHash), JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue((KeyString)"origin", new JSString(_pageOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
+        Dom.Features.LocationBinding.AddNavigationMethods(location, _pageUrl);
 
         window.FastAddValue((KeyString)"location", location, JSPropertyAttributes.EnumerableConfigurableValue);
 
