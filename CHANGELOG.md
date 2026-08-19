@@ -214,6 +214,18 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.JS` (patch `0002`) — `String(Math.pow(2, -25))` answered
+  `2.980232238769531e-8`, which reads back as a *different* double, so a page that
+  round-tripped a value through a string got a different value back than it put in.
+  `Number::toString` owes the shortest string that reads back as the same Number, and
+  .NET's `"R"` specifier — documented as unreliable — drops the seventeenth
+  significant digit for this value. The short form is now verified by parsing and
+  widened to 17 digits only where it fails, so everything that already round-tripped
+  keeps its shortest form (`String(0.1)` is still `"0.1"`). Found by differentially
+  fuzzing the engine against V8, along with `"abc".lastIndexOf("")` answering 2
+  instead of 3 — the position clamps into `[0, length]`, not `[0, length - 1]`, and a
+  negative position answered "not found" for the empty string, which is always found.
+
 - `Broiler.HtmlBridge.Dom` — `location.replace(url)` was `TypeError: undefined is not a
   function`. The bridge defined the Location's URL components and none of its methods, so
   `assign`, `replace` and `reload` were all missing — and a missing method is not something a

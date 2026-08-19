@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**One patch is waiting on a maintainer.** See the index below.
+**Two patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -59,6 +59,7 @@ keeps its number: the numbering restarts only when the directory empties.
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Name the character a token cannot start with |
+| `0002` | `Broiler.JS` | Render a number as the number it was asked about, and find the empty string at the end |
 
 ### `0001` — the report that named neither a token nor a character
 
@@ -110,3 +111,42 @@ every `<script>` in a document whatever its `type`, so JSON-LD, framework state,
 speculation rules, import maps and client-side templates were all compiled as
 JavaScript. This patch is what makes the *next* report of this shape legible; it
 is not what stops it happening.
+
+### `0002` — two answers that were wrong for ordinary input
+
+Both were found by differentially fuzzing the engine against V8 (node stands in for
+it — same language semantics, no browser needed) while chasing a Google Search
+failure. Neither is what that investigation was looking for, and both are real.
+
+**`String(Math.pow(2, -25))` named a number that is not the one it was asked
+about.** `Number::toString` is defined to produce the shortest string that reads
+back as the same Number. .NET's `"R"` specifier is documented as unreliable and, for
+this value, drops the seventeenth significant digit:
+
+```
+"R"   → 2.980232238769531E-08   → parses back as 0x1.fffffffffffffp-26   ✗
+"G17" → 2.9802322387695312E-08  → parses back as 0x1.0p-25               ✓
+```
+
+So a page round-tripping a value through a string — a hash, a serialized payload, a
+cache key — got a different value back than it put in. The short form is now
+verified by parsing and widened to 17 digits only where it fails, so every value
+that already round-tripped keeps its shortest form (`String(0.1)` is still `"0.1"`,
+not `"0.10000000000000001"`). One value in 900 tested doubles was affected, and one
+is enough: the failure is silent and the corrupted value travels.
+
+**`"abc".lastIndexOf("")` answered 2, and `"abc".lastIndexOf("", -1)` answered
+-1.** The position clamps into `[0, length]`, not `[0, length - 1]`. The difference
+is visible only for the empty search string, which is found *at* every position
+including one past the end — so the first should be 3, and the second should be 0
+rather than "not found" for a string that is always found. The conversion to .NET's
+`LastIndexOf`, which takes the index a match must END at rather than the one it may
+start at, is now done once and explicitly instead of by two stacked clamps.
+
+34 tests pin both, including what must not move.
+
+**Why it is not listed in `scripts/apply-pending-wpt-patches.sh`.** Neither answer
+can move a rendered pixel on a WPT test or a real-world capture: no page in either
+suite round-trips a 17-digit double through a string or searches for the empty
+string at a negative position. They are engine conformance, and the engine's own
+tests cover them.
