@@ -202,5 +202,16 @@ public sealed partial class DomBridge
 
         // document.inputEncoding — alias for characterSet
         document.FastAddProperty((KeyString)"inputEncoding", new JSFunction((in _) => new JSString("UTF-8"), "get inputEncoding"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.hidden / document.visibilityState (Page Visibility, HTML §6.6). A capture
+        // renders one document in one viewport and never backgrounds it, so the answer is always
+        // "visible" — but it has to be *an* answer. Absent, `document.hidden` reads `undefined`,
+        // and the idiom scripts spell it with is a loose comparison: Google Search's bot-check VM
+        // gates its "may I yield to the event loop?" predicate on `document.hidden == 0`, which is
+        // true for `false` and false for `undefined`. A missing property does not read as
+        // "not hidden"; it reads as a third state no page has a branch for. See
+        // docs/google-search-post-consent-challenge.md.
+        document.FastAddProperty((KeyString)"hidden", new JSFunction((in _) => JavaScript.BuiltIns.Boolean.JSBoolean.False, "get hidden"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        document.FastAddProperty((KeyString)"visibilityState", new JSFunction((in _) => new JSString("visible"), "get visibilityState"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 }

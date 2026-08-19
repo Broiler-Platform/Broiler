@@ -252,6 +252,40 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("GT0:true", result);
     }
 
+    // ---------------------------------------------------------------
+    //  Page Visibility — document.hidden / document.visibilityState
+    // ---------------------------------------------------------------
+
+    /// <summary>
+    /// A capture's document is never backgrounded, so <c>document.hidden</c> is <c>false</c> —
+    /// but it has to be present. Scripts read it with a loose comparison, and `undefined` is not
+    /// the same answer as `false`: Google Search's bot-check VM gates its "may I yield?" predicate
+    /// on <c>document.hidden == 0</c>, which an absent property turns permanently false. See
+    /// docs/google-search-post-consent-challenge.md.
+    /// </summary>
+    [Fact]
+    public void Document_Hidden_Is_False_And_Compares_Loosely_To_Zero()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent =
+                'TYPE:' + typeof document.hidden +
+                ',VALUE:' + document.hidden +
+                ',EQ0:' + (document.hidden == 0);
+        ");
+        Assert.Contains("TYPE:boolean", result);
+        Assert.Contains("VALUE:false", result);
+        Assert.Contains("EQ0:true", result);
+    }
+
+    [Fact]
+    public void Document_VisibilityState_Is_Visible()
+    {
+        var result = ExecJs(@"
+            document.getElementById('result').textContent = 'STATE:' + document.visibilityState;
+        ");
+        Assert.Contains("STATE:visible", result);
+    }
+
     [Fact]
     public void Performance_GetEntriesByType_Returns_Array()
     {
