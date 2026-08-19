@@ -1,6 +1,6 @@
-From c91e47c164de84f051b7f54f7aae93f38e703208 Mon Sep 17 00:00:00 2001
+From 07c5aa4920f1ec3780f2dcc3b18c9bf374ef7267 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 19 Aug 2026 22:21:27 +0000
+Date: Wed, 19 Aug 2026 23:27:51 +0000
 Subject: [PATCH 2/4] Filter a bitmap when it is drawn at a size other than its
  own
 MIME-Version: 1.0

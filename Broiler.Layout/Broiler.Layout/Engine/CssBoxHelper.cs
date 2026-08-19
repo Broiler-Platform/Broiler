@@ -585,6 +585,11 @@ internal static class CssBoxHelper
                 || child.Display == CssConstants.InlineBlock)
                 continue;
 
+            // CSS2.1 §9.2.4 again: a box that is not generated cannot be the last in-flow child
+            // whose bottom margin propagates out of its parent.
+            if (child.Display == CssConstants.None)
+                continue;
+
             lastInFlow = child;
         }
 
@@ -812,6 +817,14 @@ internal static class CssBoxHelper
             if (child.Float != CssConstants.None
                 || child.Position == CssConstants.Absolute
                 || child.Position == CssConstants.Fixed)
+                continue;
+
+            // CSS2.1 §9.2.4: a display:none element generates no box, so it has no margins to
+            // collapse through. Collecting them anyway hands a hidden element's margin to the
+            // next visible sibling: www.mediawiki.org's empty .vector-column-start holds two
+            // display:none pinned containers with `margin-bottom: 32px`, and that 32px was
+            // separating the site notice from the article.
+            if (child.Display == CssConstants.None)
                 continue;
 
             maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginTop, 0));

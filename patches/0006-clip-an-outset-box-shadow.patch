@@ -1,6 +1,6 @@
-From fa6653584cfc76b760343f00c93e3f54cf9cd86f Mon Sep 17 00:00:00 2001
+From 7e2d9f35b48d8f2b862c75bb2f322ffb0d478b83 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 19 Aug 2026 22:21:27 +0000
+Date: Wed, 19 Aug 2026 23:27:52 +0000
 Subject: [PATCH 4/4] Clip an outset box-shadow out of its own border box
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

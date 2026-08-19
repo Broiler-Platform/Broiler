@@ -73,7 +73,7 @@ reaches the canvas rather than how fast it gets there.
 | `0002` | `Broiler.CSS` | Match :link on an actual link, and :visited on nothing |
 | `0003` | `Broiler.HTML` | Draw the face the style asked for, not the first one loaded |
 | `0004` | `Broiler.HTML` | Filter a bitmap when it is drawn at a size other than its own |
-| `0005` | `Broiler.HTML` | Make a flex or grid container's children items before the box fix-ups run |
+| `0005` | `Broiler.HTML` | Itemise a flex or grid container's children, and keep a split box's element |
 | `0006` | `Broiler.HTML` | Clip an outset box-shadow out of its own border box |
 
 ### `0001` — a breakpoint written as arithmetic
@@ -108,7 +108,7 @@ is exact at 1:1 and wrong at any other scale. The thumbnail beside the article's
 lead paragraph is a 330px JPEG drawn at 320px: 33% of its pixels matched the
 reference within tolerance before the patch, 81% after.
 
-### `0005` — a flex item that floats
+### `0005` — a flex item that floats, and an element that vanished
 
 CSS Flexbox §3 says `float` has no effect on a flex item, and CSS Display 3 §2.7
 blockifies one. The pass that does both ran *after* the box fix-ups, too late for
@@ -116,6 +116,16 @@ a replaced item — `CorrectImgBoxes` had already wrapped a block image in an
 anonymous block, so the float was cleared on the wrapper while the image inside
 kept floating. Vector's logo is exactly that shape (a `display: flex` link with a
 floated icon and a floated wordmark) and laid out as an empty box.
+
+The same patch carries two more corrections to the box fix-ups. A `display: none`
+child no longer makes its parent "block inside inline" (CSS2.1 §9.2.4 — it
+generates no box). And an inline box broken around a block keeps its element: the
+break replaces the box with copies of itself on either side of the block, and
+when the block was its only content neither copy was made and the element was
+left with no box at all. WPT
+`css-backgrounds/background-color-body-propagation-003` is that shape, and it
+passed before only because the `display: none` miss made the split pick `<head>`
+instead of `<body>`.
 
 ### `0006` — a card that is all shadow
 

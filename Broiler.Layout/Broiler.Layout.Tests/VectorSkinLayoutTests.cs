@@ -153,6 +153,83 @@ public sealed class VectorSkinLayoutTests
         Assert.Equal(container.ClientTop + 1 + 10, inner.Location.Y, 3);
     }
 
+    /// <summary>
+    /// CSS2.1 §9.2.4: a <c>display: none</c> element generates no box, so it has no margins to
+    /// collapse through and none to hand on. They were collected anyway, and a hidden element's
+    /// margin then separated the two visible siblings around it. MediaWiki's empty
+    /// <c>.vector-column-start</c> holds two <c>display: none</c> pinned containers with
+    /// <c>margin-bottom: 32px</c>, and that 32px was pushing the whole article down.
+    /// </summary>
+    [Fact]
+    public void A_Hidden_Childs_Margin_Does_Not_Collapse_Through_Its_Empty_Parent()
+    {
+        var (root, container) = PageWithContainer(containerMarginTop: null);
+
+        var first = Block(container);
+        first.Height = "20px";
+
+        // An empty box whose only child is hidden: nothing of it reaches the flow.
+        var empty = Block(container);
+        var hidden = Block(empty);
+        hidden.Display = CssConstants.None;
+        hidden.MarginBottom = "32px";
+
+        var following = Block(container);
+        following.Height = "40px";
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(first.Location.Y + 20, following.Location.Y, 3);
+    }
+
+    /// <summary>The control: the same margin on a <em>visible</em> empty box does collapse
+    /// through it and does separate the siblings.</summary>
+    [Fact]
+    public void A_Visible_Empty_Boxs_Margin_Still_Collapses_Through()
+    {
+        var (root, container) = PageWithContainer(containerMarginTop: null);
+
+        var first = Block(container);
+        first.Height = "20px";
+
+        var empty = Block(container);
+        var inner = Block(empty);
+        inner.MarginBottom = "32px";
+
+        var following = Block(container);
+        following.Height = "40px";
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(first.Location.Y + 20 + 32, following.Location.Y, 3);
+    }
+
+    /// <summary>
+    /// A collapse-through hands the next sibling the margin standing above the empty box, less
+    /// what was already spent placing it. "Less" must not go below zero: margin that is not there
+    /// cannot be cancelled, and subtracting it unclamped yields a *negative* margin that lifts the
+    /// box above its own parent's content edge. MediaWiki's site notice was drawn 18px above the
+    /// box that owns it for exactly this reason.
+    /// </summary>
+    [Fact]
+    public void A_Collapse_Through_Never_Yields_A_Negative_Margin()
+    {
+        var (root, container) = PageWithContainer(containerMarginTop: "24px");
+
+        // First in-flow child, empty, carrying a margin much smaller than the 24px already
+        // standing above it.
+        var empty = Block(container);
+        var inner = Block(empty);
+        inner.MarginTop = "6px";
+
+        var following = Block(container);
+        following.Height = "40px";
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(container.ClientTop, following.Location.Y, 3);
+    }
+
     // ─────────── CSS Sizing 3 §5: an inline child's margins are on the line ───────────
 
     /// <summary>

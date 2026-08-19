@@ -1,6 +1,6 @@
-From c1bffe113d6e544f99322e3f9021d3ab9f51eea9 Mon Sep 17 00:00:00 2001
+From a3d56a3f0f49f54cf801864c0c7b26a809390ce8 Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 19 Aug 2026 22:21:47 +0000
+Date: Wed, 19 Aug 2026 23:28:04 +0000
 Subject: [PATCH 2/2] Match :link on an actual link, and :visited on nothing
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8

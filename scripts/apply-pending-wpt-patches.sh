@@ -216,10 +216,14 @@ set -euo pipefail
 #     italic` draw as regular text, so every glyph of every emphasised run differs.
 #   * 0004 (Broiler.HTML, filter a scaled bitmap) — point sampling at a non-integer scale is
 #     visibly unlike a browser's output, which is exactly what a pixel comparison measures.
-#   * 0005 (Broiler.HTML, itemise flex/grid children first) — a floated flex item is otherwise
-#     taken out of flow and its container sizes as though it were not there; the pass it calls is
-#     main-repo (Broiler.Layout.Engine.FlexGridItemBlockification, unit-tested in
-#     VectorSkinLayoutTests) and this is what reaches it at the right point in the box fix-ups.
+#   * 0005 (Broiler.HTML, itemise flex/grid children and keep a split box's element) — a floated
+#     flex item is otherwise taken out of flow and its container sizes as though it were not there;
+#     the pass it calls is main-repo (Broiler.Layout.Engine.FlexGridItemBlockification, unit-tested
+#     in VectorSkinLayoutTests) and this is what reaches it at the right point in the box fix-ups.
+#     The same patch keeps an inline box's element alive when a block-inside-inline split consumes
+#     all of its content, which is what WPT
+#     css-backgrounds/background-color-body-propagation-003 needs: without it a <body> broken that
+#     way has no box for its background to propagate from and the page renders white.
 #   * 0006 (Broiler.HTML, clip an outset box-shadow) — an unclipped outer shadow fills the element
 #     it is cast by, so a card with a shadow paints as a solid block of shadow colour.
 
@@ -228,7 +232,7 @@ PENDING_PATCHES=(
   "Broiler.CSS|patches/0002-match-link-and-visited-apart.patch"
   "Broiler.HTML|patches/0003-draw-the-face-the-style-asked-for.patch"
   "Broiler.HTML|patches/0004-filter-a-scaled-bitmap.patch"
-  "Broiler.HTML|patches/0005-itemise-flex-and-grid-children-first.patch"
+  "Broiler.HTML|patches/0005-itemise-flex-and-grid-children-and-keep-a-split-element.patch"
   "Broiler.HTML|patches/0006-clip-an-outset-box-shadow.patch"
 )
 

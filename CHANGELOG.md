@@ -214,9 +214,9 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
-- `https://www.mediawiki.org/` now renders roughly like the same page in the reference browser:
-  38.9 % of pixels matched a Chromium capture of identical bytes at 1024×768 before this work,
-  76.5 % after. Everything behind that is a general engine defect that the Vector 2022 skin
+- `https://www.mediawiki.org/` now renders like the same page in the reference browser: 38.9 % of
+  pixels matched a Chromium capture of identical bytes at 1024×768 before this work, 82.7 % after,
+  and the page is vertically aligned with the reference to the pixel. Everything behind that is a general engine defect that the Vector 2022 skin
   happened to expose; the full account, including what the remaining error is made of and what
   in it is not worth chasing, is in
   [`docs/mediawiki-vector-rendering.md`](docs/mediawiki-vector-rendering.md).

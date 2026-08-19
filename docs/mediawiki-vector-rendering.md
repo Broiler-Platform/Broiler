@@ -2,8 +2,9 @@
 
 `https://www.mediawiki.org/` loads and paints, but it did not look like the same page in the
 reference browser. Measured against a Chromium capture of the identical bytes at a 1024×768
-viewport, **38.9 %** of pixels matched; the fixes below take that to **76.5 %**. The 80 % the work
-was aimed at is not reached, and [what is left](#what-is-left) says why and what it would take.
+viewport, **38.9 %** of pixels matched; the fixes below take that to **82.7 %**. The page is now
+vertically aligned with the reference to the pixel — the best whole-page shift is zero — and
+[what is left](#what-is-left) is what remains once that is true.
 
 Everything here is a general engine defect. The Vector 2022 skin is a useful witness because it
 stacks ordinary constructs — a flex header, `calc()` breakpoints, a floated `display: table`
@@ -31,7 +32,8 @@ python scripts/run-real-world-render-tests.py --sites mediawiki
 **The per-fix deltas are not additive, and are not quoted as such.** Several of the defects
 compensated for each other — a header 16px too short sat above a site notice 17px too tall, so
 fixing either one alone moved the whole page *further* from the reference before the other was
-fixed. The honest summary is the endpoints: 38.9 % → 76.5 %.
+fixed. Three of the margin-collapse fixes below each scored *worse* than the state before them,
+and only the third made the page align. The honest summary is the endpoints: 38.9 % → 82.7 %.
 
 ## What was wrong
 
@@ -73,6 +75,19 @@ fixed. The honest summary is the endpoints: 38.9 % → 76.5 %.
   down by it. The same record is what makes the collapse transitive, so a wrapper `<div>` between a
   margin and its grandparent no longer turns the margin into a gap.
 * **A parent shifted by that collapse left its own content behind,** because only its origin moved.
+* **A collapse-through could produce a *negative* margin.** The next sibling subtracts the margin
+  already spent placing the empty box; subtracting more than the collapse would have added lifts
+  the box above its own parent's content edge. The site notice was drawn 18px above the box that
+  owns it.
+* **A `display: none` child's margins were collected and handed on.** CSS2.1 §9.2.4: it generates
+  no box, so it has none to give. Vector's empty `.vector-column-start` holds two `display: none`
+  pinned containers with `margin-bottom: 32px`, and that 32px was separating the site notice from
+  the article — the single largest remaining offset, and the last one fixed.
+* **An inline box broken around a block lost its element.** The break replaces the inline box with
+  copies of itself on either side of the block; when the block was its only content, neither copy
+  is made and the element was left with no box at all. A `<body>` broken that way is the canvas
+  background's only source, so a page whose background lives on the body rendered white
+  (`Broiler.HTML`, patch `0005`).
 * **An inline child's horizontal margins were left out of max-content width.** Vector wraps every
   thumbnail in a `display: table` figure whose image carries `margin: 3px`, so the figure measured
   6px under, and `max-width` then scaled the photo down to fit a box that should have fitted it
@@ -115,48 +130,41 @@ rest of what the skin needs turned up in order:
 
 ## What is left
 
-At 76.5 % the remaining error is concentrated, and most of it is two things.
+17.3 % of pixels still differ, and the page is no longer misaligned — shifting Broiler's render up
+or down only makes the match worse, so what is left is content rather than position.
 
-**The article's photograph, ~8 points.** It is 2px too high and the rest is resampling: even
-perfectly aligned, Broiler's bilinear downscale of a 330px JPEG to 320px agrees with Chromium's on
-about 80 % of pixels, and a busy photograph has no flat regions to forgive the other 20 %. The 2px
-is worth chasing (see below); the resampling difference is a legitimate difference between two
-correct implementations and is not worth chasing at all.
+**The photograph, 3.5 points.** It is aligned and correctly sized; the difference is resampling.
+The thumbnail is a 330px JPEG drawn at 320px, and Broiler's bilinear downscale agrees with
+Chromium's on about 80 % of pixels — a busy photograph has no flat regions to forgive the rest.
+This is two correct implementations disagreeing and is not worth chasing.
 
-**A 2px vertical offset over the whole article body.** Shifting Broiler's render of everything below
-`#bodyContent` down by 2px scores **81.2 %** — so this single offset is the difference between the
-result here and the target. It was not found: the boxes above it (`#siteNotice`, `.vector-page-titlebar`,
-`.vector-page-toolbar`) are individually mispositioned by 9–17px in ways that partly cancel, and
-`getBoundingClientRect` in Broiler disagrees with where those boxes actually paint, so the usual
-probe is unreliable exactly where the answer is. Two smaller findings sit inside that knot and are
-worth writing down:
+**The header, about 3 points.** It is still nearly empty: the sun logo and the "MediaWiki" wordmark
+are SVGs that need `fill="url(#id)"` paint servers and `fill` inheritance, neither implemented, and
+five more header icons are drawn with `mask-image`, which is not implemented at all. The header is
+mostly white in both engines, which is why an entirely missing logo costs so little.
 
-* **`#siteNotice` paints its content outside its own border box** — the box is at y=89..147 and the
-  notice text at y=76..147. Something moves the box after its subtree has been positioned. It is
-  not the margin-collapse propagation (that now moves the subtree with it) and it does not
-  reproduce statically, which points at the relayout pass that runs after the skin's JavaScript
-  mutates the DOM.
-* **The first baseline sits about half a leading too high.** CSS2.1 §10.8 splits a strut's leading
-  evenly above and below its content area; Broiler counts only the ascent from the top of the line
-  box. At `line-height: 1.6` on a 16px font that is ~3px, and it grows with the line-height — a
-  `line-height: 2.5` block draws its text flush with the top of the line box where the reference
-  centres it in it. Adding the half-leading to the strut baseline alone does *not* fix it (tried:
-  the page moved 0.07 points the wrong way), so the ascent Broiler uses — a flat 0.8 × font height
-  rather than the face's own `hhea`/`OS/2` metrics — is part of the same answer.
+**Text, spread through the rest.** Every line of text sits about 3px high inside its own block:
+CSS2.1 §10.8 splits a strut's leading evenly above and below its content area, and Broiler counts
+only the ascent from the top of the line box — and it uses a flat 0.8 × font height for that ascent
+rather than the face's own `hhea`/`OS/2` metrics. Adding the half-leading to the strut baseline
+alone does not fix it (tried: the page moved 0.07 points the wrong way), so the two have to be done
+together. At `line-height: 1.6` on a 16px font the error is ~3px and it grows with the line-height:
+a `line-height: 2.5` block draws its text flush with the top of the line box where the reference
+centres it.
 
-Confirmed and not yet fixed, each smaller than the two above:
+Smaller, confirmed, and not fixed:
 
-* SVG `fill="url(#id)"` paint servers (the sun logo is a gradient) and SVG `fill` inheritance (the
-  wordmark) — the header's two logos do not paint.
-* `mask-image` is unimplemented, so five header icons paint as solid squares.
 * `[<a>dismiss</a>]` breaks between the bracket and the link. CSS Text §5.1 puts a break
-  opportunity only where the text allows one, and an inline box boundary is not one, so the
-  three-character run wraps to three lines and its float is 45px tall instead of 15px.
+  opportunity only where the text allows one, and an inline box boundary is not one, so a
+  nine-character run wraps to three lines and its float is 45px tall instead of 15px.
 * Grid named areas, and `margin: 0 auto` with `max-width`.
+* `getComputedStyle().display` answers `inline` for every element. It does not affect the render —
+  the box tree is right — but it made every DOM-side probe during this work untrustworthy, which
+  cost more time than any single defect here.
 
 Refuted by adversarial verification, and listed so nobody chases them again: `place-*` shorthands,
 two-value `overflow`, flex auto widths, CSSOM `styleSheets`, `clamp()`, `srcset`, `line-height:
-normal`, `calc()` in `font-size`, and `getComputedStyle().display`.
+normal`, and `calc()` in `font-size`.
 
 ## Where the fixes live
 

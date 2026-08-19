@@ -1,6 +1,6 @@
-From d5c7e5d585cc3ce8a2c9f48b46284b31c737905b Mon Sep 17 00:00:00 2001
+From d52a2a33cc33c66c4d7922f8bf650567a9fb9bcf Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
-Date: Wed, 19 Aug 2026 22:21:06 +0000
+Date: Wed, 19 Aug 2026 23:27:51 +0000
 Subject: [PATCH 1/4] Draw the face the style asked for, not the first one
  loaded
 MIME-Version: 1.0
@@ -11,7 +11,7 @@ A CSS family names a set of files — DejaVuSans.ttf, DejaVuSans-Bold.ttf,
 DejaVuSans-Oblique.ttf — and the resolver cached whichever one it loaded first
 under the bare family name. In practice that was the regular face, so every
 later request for the same family got it back: `font-weight: bold` and
-`font-style: italic` drew as regular text on every page that did not ship its
+`font-style: italic` drew as regular text on every page that does not ship its
 own @font-face.
 
 Key the installed-face cache by family *and* style, and let the family index
