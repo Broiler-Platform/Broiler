@@ -124,25 +124,11 @@ internal sealed class SubWindowBinding(
             new DomFunction((in _) => _host.GetOrCreateSubDocument(containerElement), "get document"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // The frame's Location is built the same way the top-level one is — components and the
+        // navigation methods together, because a framed page calls location.replace() as readily
+        // as a top-level one and a missing method is a TypeError that takes its caller with it.
         var locationHref = GetSubWindowLocationHref(containerElement);
-        var iframeLocation = new JSObject();
-        iframeLocation.FastAddValue((KeyString)"href",
-            new JSString(locationHref), JSPropertyAttributes.EnumerableConfigurableValue);
-        if (Uri.TryCreate(locationHref, UriKind.Absolute, out var locationUri))
-        {
-            iframeLocation.FastAddValue((KeyString)"protocol", new JSString(locationUri.Scheme + ":"), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"host", new JSString(Scripting.Origin.HostOf(locationUri)), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hostname", new JSString(locationUri.Host), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"pathname", new JSString(locationUri.AbsolutePath), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"search", new JSString(locationUri.Query), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hash", new JSString(locationUri.Fragment), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"origin", new JSString(Scripting.Origin.Of(locationUri)), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
-        else
-        {
-            iframeLocation.FastAddValue((KeyString)"search", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-            iframeLocation.FastAddValue((KeyString)"hash", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-        }
+        var iframeLocation = LocationBinding.Build(locationHref);
         subWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
 
         subWindow.FastAddProperty((KeyString)"scrollX", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
