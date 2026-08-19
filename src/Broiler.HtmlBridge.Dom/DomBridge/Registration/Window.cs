@@ -149,7 +149,9 @@ public sealed partial class DomBridge
     {
         // TODO-G3: navigator object with sendBeacon, userAgent, language, etc.
         var navigatorObj = new JSObject();
-        navigatorObj.FastAddValue((KeyString)"userAgent", new JSString("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Broiler/1.0"), JSPropertyAttributes.EnumerableConfigurableValue);
+        // The same string the network sees, rather than a second copy of it: a page that compares
+        // what it was told with what its own fetches report is entitled to one answer.
+        navigatorObj.FastAddValue((KeyString)"userAgent", new JSString(Layout.Net.BroilerUserAgent.Value), JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"language", new JSString("en-US"), JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"languages", new JSArray([new JSString("en-US"), new JSString("en")]), JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"cookieEnabled", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);

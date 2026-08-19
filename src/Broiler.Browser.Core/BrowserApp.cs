@@ -8,6 +8,7 @@ using Broiler.HtmlBridge;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
 using Broiler.Input.Touch;
+using Broiler.Layout.Net;
 using Broiler.UI;
 using Broiler.UI.Button.Standard;
 using Broiler.UI.Dialog;
@@ -451,7 +452,7 @@ internal sealed class BrowserApp : IDisposable
     // Never disposed: it is owned by the process, and outliving every navigation is the point.
     private static readonly HttpClient PageHttpClient = CreatePageHttpClient();
 
-    private static HttpClient CreatePageHttpClient()
+    internal static HttpClient CreatePageHttpClient()
     {
         SocketsHttpHandler handler = new()
         {
@@ -464,7 +465,10 @@ internal sealed class BrowserApp : IDisposable
             ConnectTimeout = TimeSpan.FromSeconds(15),
         };
 
-        return new HttpClient(handler);
+        // Without this the client sends no User-Agent at all, and a server whose policy rejects an
+        // unidentified request answers the navigation itself — mediawiki.org replies 403 Forbidden
+        // before the first byte of the page. See Broiler.Layout.Net.BroilerUserAgent.
+        return BroilerUserAgent.Apply(new HttpClient(handler));
     }
 
     private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(PageRequest request, CancellationToken cancellationToken)

@@ -1,0 +1,81 @@
+From 9434fde1ffcaf1f04a178c911c52e2542adc32a2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 14:37:52 +0000
+Subject: [PATCH] Say who is asking
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+HttpClient sends no User-Agent unless one is configured, and a request that
+carries none is not a request every server will answer: Wikimedia's User-Agent
+policy replies 403 Forbidden before anything else about the request matters. So
+each loader here refused its resource on www.mediawiki.org — the <link>
+stylesheets, the <img> photographs on upload.wikimedia.org, and any web font the
+page asked for — for want of one header, and the page rendered unstyled and
+pictureless even once the document itself had loaded.
+
+Identify all three clients with the engine's own token. It lives in the main
+repository as Broiler.Layout.Net.BroilerUserAgent — already referenced from here
+for OfflineSubresources — so that these loaders and the document, script and
+fetch/XHR loaders outside the submodule cannot drift apart, and so that what a
+server is told matches what navigator.userAgent tells the page.
+---
+ Source/Broiler.HTML.Core/Handlers/ImageDownloader.cs        | 6 +++++-
+ .../Handlers/StylesheetLoadHandler.cs                       | 6 +++++-
+ Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs       | 4 +++-
+ 3 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Core/Handlers/ImageDownloader.cs b/Source/Broiler.HTML.Core/Handlers/ImageDownloader.cs
+index 120ea07..c240255 100644
+--- a/Source/Broiler.HTML.Core/Handlers/ImageDownloader.cs
++++ b/Source/Broiler.HTML.Core/Handlers/ImageDownloader.cs
+@@ -23,8 +23,12 @@ internal sealed class ImageDownloader : IDisposable
+     // conformance-checkers/html/elements/img/src-isvalid.html, whose 88 <img> include IP literals
+     // and documentation addresses (http://192.0x00A80001, http://[2001::1]) that black-hole on a
+     // CI runner with real internet.
++    //
++    // Identified, too: HttpClient sends no User-Agent unless given one, and a host that refuses an
++    // unidentified request refuses the image rather than serving a different one — every
++    // upload.wikimedia.org image on a mediawiki.org page came back 403 Forbidden.
+     private static readonly HttpClient SharedHttpClient =
+-        new() { Timeout = TimeSpan.FromSeconds(5) };
++        Broiler.Layout.Net.BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(5) });
+     private readonly Dictionary<string, List<DownloadFileAsyncCallback>> _imageDownloadCallbacks = [];
+     private readonly CancellationTokenSource _cts = new();
+ 
+diff --git a/Source/Broiler.HTML.Orchestration/Handlers/StylesheetLoadHandler.cs b/Source/Broiler.HTML.Orchestration/Handlers/StylesheetLoadHandler.cs
+index 175fc6e..eae9278 100644
+--- a/Source/Broiler.HTML.Orchestration/Handlers/StylesheetLoadHandler.cs
++++ b/Source/Broiler.HTML.Orchestration/Handlers/StylesheetLoadHandler.cs
+@@ -173,8 +173,12 @@ internal sealed class StylesheetLoadHandler : IStylesheetLoader
+     // any per-test budget — a hang, not a render.  Cap it short so an
+     // unreachable sheet fails fast and the page renders without it (WPT #1147
+     // Timeout cluster, e.g. CSS2/cascade-import-* linking delayed-file CGI URLs).
++    //
++    // Identified, too: HttpClient sends no User-Agent unless given one, and a host that refuses an
++    // unidentified request refuses the sheet rather than serving a different one — the load.php
++    // stylesheets of a mediawiki.org page came back 403 Forbidden, so the page rendered unstyled.
+     private static readonly HttpClient SharedHttpClient =
+-        new() { Timeout = TimeSpan.FromSeconds(5) };
++        Broiler.Layout.Net.BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(5) });
+ 
+     private string LoadStylesheetFromUri(Uri uri)
+     {
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index cc65aba..e77f809 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -601,7 +601,9 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+         string tempPath = null;
+         try
+         {
+-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
++            // Identified: a host that refuses an unidentified request refuses the font file too.
++            using var client = Broiler.Layout.Net.BroilerUserAgent.Apply(
++                new HttpClient { Timeout = TimeSpan.FromSeconds(10) });
+             byte[] bytes = client.GetByteArrayAsync(fontUri).GetAwaiter().GetResult();
+             if (bytes == null || bytes.Length == 0)
+                 return;
+-- 
+2.43.0
+

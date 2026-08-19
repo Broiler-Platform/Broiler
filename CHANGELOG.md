@@ -214,6 +214,38 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Broiler now says who is asking. `HttpClient` sends **no** `User-Agent` unless one is
+  configured, and a request carrying none is not one every server will answer: Wikimedia's
+  User-Agent policy replies `403 Forbidden` before content negotiation, before the redirect,
+  before the page is even looked up. So `https://www.mediawiki.org/wiki/MediaWiki` failed
+  instantly in both the CLI and the browser window — "Capture failed: Response status code
+  does not indicate success: 403 (Forbidden)" — with nothing about the page involved. Any
+  non-empty token is accepted there; what the policy will not have is silence. Full account in
+  [`docs/mediawiki-user-agent-403.md`](docs/mediawiki-user-agent-403.md).
+  - **It was every loader, not one.** Each of Broiler's loaders builds its own `HttpClient`, so
+    each was independently unidentified, and a header set only where the failure was reported
+    buys a page that loads and then fails again per resource. With just the document fixed, a
+    `--diagnostic-dir` capture of that page still lost
+    `load.php?modules=startup` — the bootstrap that pulls in every other module on the page — to
+    the same `403`. The header now comes from one constant,
+    `Broiler.Layout.Net.BroilerUserAgent`, applied at the document (`Broiler.Cli`), navigation
+    (`Broiler.Browser.Core`), external-script (`Broiler.HtmlBridge.Core`), and
+    stylesheet/sub-resource/`fetch()`/XHR (`Broiler.HtmlBridge.Dom`) loaders alike, plus the
+    engine-baseline tool. A capture of the page goes from an instant failure to 13 resources and
+    0 failures.
+  - `Broiler.Layout` is the home because it is the one assembly every loader already reaches —
+    including the `<link>`, `<img>` and web-font loaders inside the `Broiler.HTML` submodule,
+    which reference it for `OfflineSubresources`. Their identical one-line fix ships as
+    `patches/0002-say-who-is-asking.patch`; until it is applied and the pointer bumped, a build
+    against the pinned pointer still renders that page unstyled and pictureless, because
+    `HtmlRender` fetches a page's sheets through the submodule's loader rather than the bridge's.
+  - `navigator.userAgent` reads the same constant instead of a second literal of the same string,
+    so a page comparing what it was told with what its own `fetch()` reports gets one answer. The
+    value it reports is unchanged.
+  - Not only mediawiki.org: `tests/real-world-sites/sites.json` already tracked
+    `https://en.wikipedia.org/wiki/Web_browser`, which refused an unidentified request for the
+    same reason.
+
 - `Broiler.HtmlBridge.Dom` — `document.currentScript` was not bound, so it read `undefined`
   and the idiomatic dereference threw. Google's tag-manager loader, served on
   `about.google` — where `google.com`'s "About" link leads — opens with
