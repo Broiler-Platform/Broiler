@@ -214,6 +214,47 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `https://www.mediawiki.org/` now renders roughly like the same page in the reference browser:
+  38.9 % of pixels matched a Chromium capture of identical bytes at 1024×768 before this work,
+  76.5 % after. Everything behind that is a general engine defect that the Vector 2022 skin
+  happened to expose; the full account, including what the remaining error is made of and what
+  in it is not worth chasing, is in
+  [`docs/mediawiki-vector-rendering.md`](docs/mediawiki-vector-rendering.md).
+  - **Style.** A media feature value may be a math function (Media Queries 4 §2.4.1), and
+    `calc(1120px - 1px)` did not parse — so 25 of the page's 76 `@media` blocks were malformed
+    and their rules never cascaded, including the entire narrow-viewport branch that applies at
+    1024px. `calc()` also gained the product tier it never had. The `list-style` shorthand is
+    expanded (the longhands already worked), `:visited` no longer matches every `<a href>`, and a
+    `display: none` child no longer makes its parent look like an inline container.
+  - **Layout.** `float` and `clear` have no effect on a flex or grid item (CSS Flexbox §3), and a
+    floated one was being taken out of flow — Vector's logo is a `display: flex` link whose icon
+    and wordmark are both floated, so it laid out as nothing. Line boxes now avoid floats on both
+    sides (CSS2.1 §9.5). A floated `display: table`/`flex`/`grid` box keeps its own width instead
+    of the block algorithm's. `max-width: calc(100% - …)` against an indefinite basis is ignored
+    rather than collapsing to zero (CSS Sizing 3 §5.1). A collapsed top margin is spent once —
+    an empty box handing its margins to the next sibling had them applied twice — and the record
+    that makes that work also makes the collapse transitive through a wrapper. An inline child's
+    horizontal margins count toward max-content width, and an inline replaced element's vertical
+    margins are part of its line (CSS2.1 §10.8.1); together those are why a thumbnail was scaled
+    down to fit a figure 6px too narrow for it. A `vertical-align: middle` image no longer drives
+    the line's baseline down by its own height.
+  - **Text and images.** Generic font families resolve against the machine's installed fonts
+    instead of one bundled face; `font-weight: bold` and `font-style: italic` now draw in the
+    bold and italic faces rather than the regular one; `font-size` in `rem`/`em` is no longer 4/3
+    too large; a bitmap drawn at a size other than its own is filtered instead of point-sampled;
+    and an outset `box-shadow` is clipped out of its own border box (CSS Backgrounds 3 §7.1)
+    rather than filling the element it is cast by.
+  - **Scripting.** A `<script src>` whose URL carries `&amp;` is now entity-decoded, which is
+    what MediaWiki's whole ResourceLoader bootstrap hung on — without it none of the skin's
+    JavaScript ran at all. `document.readyState` and `readystatechange`, the `history` object,
+    `PerformanceObserver`, `requestIdleCallback`, and `MediaQueryList`'s event listeners were
+    each missing and each threw out of a module the skin loads.
+  - Six of the fixes are in the `Broiler.CSS` and `Broiler.HTML` submodules, which this session
+    could not push to, so they are patch files under [`patches/`](patches/README.md) and are
+    listed in `scripts/apply-pending-wpt-patches.sh` for the pixel suites.
+  - `mediawiki` joins the real-world render corpus, so the figure is reproducible with
+    `python scripts/run-real-world-render-tests.py --sites mediawiki`.
+
 - Broiler now says who is asking. `HttpClient` sends **no** `User-Agent` unless one is
   configured, and a request carrying none is not one every server will answer: Wikimedia's
   User-Agent policy replies `403 Forbidden` before content negotiation, before the redirect,

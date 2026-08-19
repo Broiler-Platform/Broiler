@@ -1,0 +1,138 @@
+From d5c7e5d585cc3ce8a2c9f48b46284b31c737905b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 22:21:06 +0000
+Subject: [PATCH 1/4] Draw the face the style asked for, not the first one
+ loaded
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A CSS family names a set of files — DejaVuSans.ttf, DejaVuSans-Bold.ttf,
+DejaVuSans-Oblique.ttf — and the resolver cached whichever one it loaded first
+under the bare family name. In practice that was the regular face, so every
+later request for the same family got it back: `font-weight: bold` and
+`font-style: italic` drew as regular text on every page that did not ship its
+own @font-face.
+
+Key the installed-face cache by family *and* style, and let the family index
+answer for a generic family (serif, sans-serif, monospace and the rest) so a
+document's font-family means something instead of every family drawing in the
+one bundled fallback.
+
+Found on https://www.mediawiki.org/, where the article headings, the bolded
+lead-ins in the site notice and the emphasised links in the two main-page cards
+all rendered at regular weight.
+---
+ .../Text/TrueTypeText.cs                      | 53 +++++++++++++++++++
+ .../Adapters/BroilerFontRegistry.cs           | 13 ++++-
+ 2 files changed, 65 insertions(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Image.Compat/Text/TrueTypeText.cs b/Source/Broiler.HTML.Image.Compat/Text/TrueTypeText.cs
+index 1e860fc..65b73fa 100644
+--- a/Source/Broiler.HTML.Image.Compat/Text/TrueTypeText.cs
++++ b/Source/Broiler.HTML.Image.Compat/Text/TrueTypeText.cs
+@@ -23,6 +23,15 @@ internal sealed class TrueTypeTypefaceResolver : IFontTypefaceResolver
+     private readonly object _sync = new();
+     private readonly Dictionary<string, TrueTypeFont> _byFamily = new(StringComparer.OrdinalIgnoreCase);
+ 
++    /// <summary>
++    /// Faces found on the machine, keyed by family <em>and</em> style. A family names a whole
++    /// set of files — DejaVuSans.ttf, DejaVuSans-Bold.ttf, DejaVuSans-Oblique.ttf — so caching
++    /// one of them under the bare family name answers every later request with whichever style
++    /// happened to be asked for first. In practice that was the regular face, and
++    /// <c>font-weight: bold</c> and <c>font-style: italic</c> drew as regular text everywhere.
++    /// </summary>
++    private readonly Dictionary<(string Family, bool Bold, bool Italic), TrueTypeFont> _installed = new();
++
+     private TrueTypeFont _fallback;
+     private bool _fallbackLoaded;
+ 
+@@ -110,6 +119,14 @@ internal sealed class TrueTypeTypefaceResolver : IFontTypefaceResolver
+                 if (_byFamily.TryGetValue(family, out var font))
+                     return font;
+             }
++
++            // Not registered by the page or the host, but the machine may still have it. The
++            // index (Broiler.Layout.Text.SystemFontIndex) maps a CSS family — including a
++            // generic such as `serif` — onto an installed file; loading it here is what makes a
++            // document's font-family mean anything at all, rather than every family drawing in
++            // the single bundled fallback face.
++            if (TryLoadInstalledFace(family, style) is { } installed)
++                return installed;
+         }
+ 
+         // Unregistered/default family: fall back to the bundled font so that
+@@ -117,6 +134,42 @@ internal sealed class TrueTypeTypefaceResolver : IFontTypefaceResolver
+         // MissingTypeface only if the bundled font is unavailable.
+         return (object)GetFallbackFont() ?? MissingTypeface.Instance;
+     }
++
++    /// <summary>
++    /// Loads the installed face for <paramref name="family"/> in the style that was asked for,
++    /// once, so the miss above happens at most once per family and style. A family the machine
++    /// does not have, or a file with no outlines this backend can rasterise, caches nothing and
++    /// lets the bundled fallback answer.
++    /// </summary>
++    private TrueTypeFont TryLoadInstalledFace(string family, BGraphicsFontStyle style)
++    {
++        bool bold = (style & BGraphicsFontStyle.Bold) != 0;
++        bool italic = (style & BGraphicsFontStyle.Italic) != 0;
++        var key = (Family: family, Bold: bold, Italic: italic);
++
++        lock (_sync)
++        {
++            if (_installed.TryGetValue(key, out var cached))
++                return cached;
++        }
++
++        if (!Broiler.Layout.Text.SystemFontIndex.TryResolve(family, bold, italic, out var path))
++            return null;
++
++        var font = TrueTypeFont.LoadFromFile(path);
++        if (font == null || !font.HasOutlines)
++            return null;
++
++        lock (_sync)
++        {
++            if (_installed.TryGetValue(key, out var raced))
++                return raced;
++
++            _installed[key] = font;
++        }
++
++        return font;
++    }
+ }
+ 
+ /// <summary>Sentinel returned when a requested font family is not registered.</summary>
+diff --git a/Source/Broiler.HTML.Image/Adapters/BroilerFontRegistry.cs b/Source/Broiler.HTML.Image/Adapters/BroilerFontRegistry.cs
+index 98bebe6..ec3b511 100644
+--- a/Source/Broiler.HTML.Image/Adapters/BroilerFontRegistry.cs
++++ b/Source/Broiler.HTML.Image/Adapters/BroilerFontRegistry.cs
+@@ -19,10 +19,21 @@ internal static class BroilerFontRegistry
+ 
+     public static IReadOnlyCollection<string> GetSystemFontFamilies()
+     {
++        // The installed families, which this registry could not name for itself: reading a font
++        // file's `name` table is what tells you the family CSS asks for it by, and that index
++        // lives in Broiler.Layout (Broiler.Layout.Text.SystemFontIndex). Without them the
++        // adapter advertised no family at all, so every font-family — including `serif` and
++        // `monospace` — resolved to the one fallback face the text backend carries.
++        var families = new HashSet<string>(
++            Broiler.Layout.Text.SystemFontIndex.Families,
++            StringComparer.OrdinalIgnoreCase);
++
+         lock (Sync)
+         {
+-            return [.. LoadedFamilies];
++            families.UnionWith(LoadedFamilies);
+         }
++
++        return [.. families];
+     }
+ 
+     public static void RegisterFontFile(string path, string? alias)
+-- 
+2.43.0
+
+

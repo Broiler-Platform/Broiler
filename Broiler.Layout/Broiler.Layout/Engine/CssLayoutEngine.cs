@@ -247,7 +247,17 @@ internal static class CssLayoutEngine
         //Get the start x and y of the blockBox
         double startx = blockBox.Location.X + blockBox.ActualPaddingLeft - 0 + blockBox.ActualBorderLeftWidth;
         double starty = blockBox.Location.Y + blockBox.ActualPaddingTop - 0 + blockBox.ActualBorderTopWidth;
-        double curx = startx + blockBox.ActualTextIndent;
+
+        // CSS2.1 §9.5: the floats this block's lines have to share their width with. Collected
+        // once per pass because every line consults them and the geometry does not change while
+        // the block flows.
+        blockBox.LineFloatBands = LineFloatBands.For(blockBox);
+
+        double firstLineHeight = blockBox.ActualLineHeight > 0
+            ? blockBox.ActualLineHeight
+            : blockBox.ActualFont.Height * PtToCssPx;
+
+        double curx = BandLeftAt(blockBox, starty, firstLineHeight, startx) + blockBox.ActualTextIndent;
         double cury = starty;
 
         //Reminds the maximum bottom reached
@@ -380,10 +390,11 @@ internal static class CssLayoutEngine
                         : blockBox.ActualFont.Height * PtToCssPx;
 
                     maxBottom = Math.Max(maxBottom,
-                        word.Bottom + lineStrut * (1.0 - TypicalAscentRatio));
+                        word.Bottom + ImageWordMarginBottom(word)
+                        + lineStrut * (1.0 - TypicalAscentRatio));
                 }
 
-                minTop = Math.Min(minTop, word.Top);
+                minTop = Math.Min(minTop, word.Top - (word.IsImage ? ImageWordMarginTop(word) : 0));
             }
 
             if (blockBox.ActualLineHeight > 0)
@@ -715,6 +726,69 @@ internal static class CssLayoutEngine
         }
     }
 
+    /// <summary>
+    /// The left edge available to a line of <paramref name="blockbox"/> at <paramref name="top"/>,
+    /// which is <paramref name="contentLeft"/> unless a left float in the block formatting context
+    /// reaches that line (CSS2.1 §9.5).
+    /// </summary>
+    private static double BandLeftAt(CssBox blockbox, double top, double lineHeight, double contentLeft) =>
+        blockbox.LineFloatBands is { IsEmpty: false } bands
+            ? bands.LeftAt(top, lineHeight, contentLeft)
+            : contentLeft;
+
+    /// <summary>
+    /// The right edge available to a line of <paramref name="blockbox"/> at <paramref name="top"/>.
+    /// </summary>
+    /// <remarks>
+    /// A block still being measured at an unrestricted width (the shrink-to-fit sentinel that
+    /// <see cref="CreateLineBoxes"/> narrows afterwards) has no meaningful right edge to subtract a
+    /// float from, so it keeps the sentinel and wraps only where its content says.
+    /// </remarks>
+    private static double BandRightAt(CssBox blockbox, double top, double lineHeight, double contentRight) =>
+        contentRight < 90999 && blockbox.LineFloatBands is { IsEmpty: false } bands
+            ? bands.RightAt(top, lineHeight, contentRight)
+            : contentRight;
+
+    /// <summary>
+    /// CSS2.1 §9.5: moves a line down past the floats beside it when <paramref name="needed"/>
+    /// does not fit in the band there, and returns the y it settles at. Each step drops to the
+    /// bottom of the shallowest float still in the way, so the walk is bounded by the float count.
+    /// </summary>
+    private static double DropLineBelowNarrowBands(
+        CssBox blockbox,
+        double top,
+        double lineHeight,
+        double contentLeft,
+        double contentRight,
+        double needed)
+    {
+        if (needed <= 0 || contentRight >= 90999 || blockbox.LineFloatBands is not { IsEmpty: false } bands)
+            return top;
+
+        // The word may be wider than the block itself, in which case no drop can help and the
+        // line overflows where it is — the same answer the un-floated path gives.
+        if (needed > contentRight - contentLeft)
+            return top;
+
+        for (int step = 0; step < 64; step++)
+        {
+            double left = bands.LeftAt(top, lineHeight, contentLeft);
+            double right = bands.RightAt(top, lineHeight, contentRight);
+
+            if (right - left >= needed)
+                return top;
+
+            double next = bands.NextBandBottom(top, lineHeight);
+
+            if (double.IsNaN(next) || next <= top)
+                return top;
+
+            top = next;
+        }
+
+        return top;
+    }
+
     private static void FlowBox(ILayoutEnvironment g, CssBox blockbox, CssBox box, double limitRight, double linespacing, double startx, ref CssLineBox line, ref double curx, ref double cury, ref double maxRight, ref double maxbottom)
     {
         var startX = curx;
@@ -804,6 +878,17 @@ internal static class CssLayoutEngine
                     // container's strut so that baseline alignment pushes the
                     // image down when the font is larger than the image.
                     double strutHeight = 0;
+
+                    // CSS2.1 §10.8.1: it is the *margin* box of an inline replaced element that
+                    // sits on the baseline, so its vertical margins take part in the line the
+                    // same way its horizontal ones take part in the advance. They were dropped —
+                    // the image was placed at the line's top and the line closed at the image's
+                    // own bottom — so a thumbnail with `margin: 3px` (MediaWiki puts that on
+                    // every one) sat 3px too high in a wrapper 6px too short.
+                    double imageMarginTop = word.IsImage ? ImageWordMarginTop(word) : 0;
+                    double imageMarginBottom = word.IsImage ? ImageWordMarginBottom(word) : 0;
+                    double imageMarginBoxHeight = word.Height + imageMarginTop + imageMarginBottom;
+
                     if (word.IsImage)
                     {
                         strutHeight = blockbox.ActualLineHeight;
@@ -826,19 +911,27 @@ internal static class CssLayoutEngine
                     // ReportExistanceOf below, so Words.Count == 0 means this
                     // word is the first on the current line.
                     bool lineHasContent = line.Words.Count > 0;
-                    if ((b.WhiteSpace != CssConstants.NoWrap && b.WhiteSpace != CssConstants.Pre && curx + word.Width + rightspacing > limitRight
+                    double lineRight = BandRightAt(blockbox, cury, boxLineHeight, limitRight);
+                    if ((b.WhiteSpace != CssConstants.NoWrap && b.WhiteSpace != CssConstants.Pre && curx + word.Width + rightspacing > lineRight
                          && (b.WhiteSpace != CssConstants.PreWrap || !word.IsSpaces)
                          && (b.WhiteSpace != CssConstants.PreLine || !word.IsSpaces)
                          && lineHasContent) || word.IsLineBreak || wrapNoWrapBox)
                     {
                         wrapNoWrapBox = false;
-                        curx = startx;
+                        cury = maxbottom + linespacing;
+
+                        // CSS2.1 §9.5: the new line sits between the floats that reach it, and is
+                        // pushed below them when what has to go on it does not fit even in the
+                        // empty band. Both edges move, so the left one is re-read after the drop.
+                        cury = DropLineBelowNarrowBands(
+                            blockbox, cury, boxLineHeight, startx, limitRight,
+                            word.Width + rightspacing);
+
+                        curx = BandLeftAt(blockbox, cury, boxLineHeight, startx);
 
                         // handle if line is wrapped for the first text element where parent has left margin\padding
                         if (b == box.Boxes[0] && !word.IsLineBreak && (word == b.Words[0] || (box.ParentBox != null && box.ParentBox.IsBlock)))
                             curx += box.ActualMarginLeft + box.ActualBorderLeftWidth + box.ActualPaddingLeft;
-
-                        cury = maxbottom + linespacing;
 
                         line = new CssLineBox(blockbox);
 
@@ -854,15 +947,15 @@ internal static class CssLayoutEngine
                     // baseline-aligned by default — the bottom of the replaced
                     // element sits on the baseline.  The baseline position
                     // within the strut is at the font's ascent from the top.
-                    if (word.IsImage && strutHeight > word.Height)
+                    if (word.IsImage && strutHeight > imageMarginBoxHeight)
                     {
                         double fontHeight = blockbox.ActualFont.Height * PtToCssPx;
                         double baseline = fontHeight * TypicalAscentRatio;
-                        word.Top = Math.Max(cury, cury + baseline - word.Height);
+                        word.Top = Math.Max(cury, cury + baseline - imageMarginBoxHeight) + imageMarginTop;
                     }
                     else
                     {
-                        word.Top = cury;
+                        word.Top = cury + imageMarginTop;
                     }
 
                     if (!box.IsFixed)
@@ -891,7 +984,8 @@ internal static class CssLayoutEngine
                             ? blockbox.ActualLineHeight
                             : blockbox.ActualFont.Height * PtToCssPx;
                         maxbottom = Math.Max(maxbottom,
-                            word.Bottom + lineStrut * (1.0 - TypicalAscentRatio));
+                            word.Bottom + imageMarginBottom
+                            + lineStrut * (1.0 - TypicalAscentRatio));
                     }
 
                     if (b.Position == CssConstants.Absolute)
@@ -1910,10 +2004,31 @@ internal static class CssLayoutEngine
     private static double InlineWordLineBoxBottom(CssRect word)
     {
         double ownerLineHeight = word.OwnerBox?.ActualLineHeight ?? 0;
-        if (word.IsImage || ownerLineHeight <= 0)
+        if (word.IsImage)
+            return word.Bottom + ImageWordMarginBottom(word);
+
+        if (ownerLineHeight <= 0)
             return word.Bottom;
 
         return Math.Min(word.Bottom, word.Top + ownerLineHeight);
+    }
+
+    /// <summary>
+    /// The block-start margin of an inline replaced element, which CSS2.1 §10.8.1 makes part of
+    /// the margin box the line aligns. A percentage resolves against the containing block's
+    /// <em>width</em> (CSS2.1 §8.3), which <c>ActualMarginTop</c> already does.
+    /// </summary>
+    private static double ImageWordMarginTop(CssRect word)
+    {
+        double margin = word.OwnerBox?.ActualMarginTop ?? 0;
+        return double.IsNaN(margin) ? 0 : margin;
+    }
+
+    /// <summary>The block-end margin counterpart of <see cref="ImageWordMarginTop"/>.</summary>
+    private static double ImageWordMarginBottom(CssRect word)
+    {
+        double margin = word.OwnerBox?.ActualMarginBottom ?? 0;
+        return double.IsNaN(margin) ? 0 : margin;
     }
 
     /// <summary>
@@ -2005,6 +2120,19 @@ internal static class CssLayoutEngine
     private static bool IsAtomicInline(CssBox box) =>
         box.Display == CssConstants.InlineBlock || box.IsImage;
 
+    /// <summary>
+    /// Whether a <c>vertical-align</c> value positions the box against the <em>parent's font
+    /// metrics</em> rather than against the line's baseline — <c>middle</c>, <c>text-top</c> and
+    /// <c>text-bottom</c> (CSS2.1 §10.8.1). <c>top</c>/<c>bottom</c> align against the line box
+    /// itself and are handled by their own second pass; every other value, including
+    /// <c>sub</c>/<c>super</c> and a length, is an offset <em>from</em> the baseline and so does
+    /// help establish it.
+    /// </summary>
+    private static bool IsAlignedToParentFontMetrics(string verticalAlign) =>
+        verticalAlign == CssConstants.Middle
+        || verticalAlign == CssConstants.TextTop
+        || verticalAlign == CssConstants.TextBottom;
+
     private static void ApplyVerticalAlignment(CssLineBox lineBox)
     {
         // CSS 2.1 §10.8: The baseline is where text sits, approximated as
@@ -2042,10 +2170,23 @@ internal static class CssLayoutEngine
             ? lineTop + parentFontHeight * TypicalAscentRatio
             : float.MinValue;
 
-        // Non-inline-block boxes also contribute to the baseline.
+        // Non-inline-block boxes also contribute to the baseline — but only the ones that are
+        // aligned *to* it. CSS2.1 §10.8.1: a box aligned `middle`, `text-top` or `text-bottom` is
+        // positioned from the parent's font metrics, not from the line's baseline, so where its
+        // own baseline would fall says nothing about where the line's is. Letting it push the
+        // baseline down is self-defeating: the box is then placed relative to the baseline it just
+        // moved, so it drives itself away from where it belongs. An `<img>` is the visible case,
+        // because its baseline is its bottom edge — a `vertical-align: middle` image in a short
+        // line put the baseline a whole image-height down and then centred the image on *that*,
+        // leaving half an image of blank space above it. That is the band above the MediaWiki
+        // thumbnail: the skin sets `line-height: 0` on the figure and `vertical-align: middle` on
+        // the image, so the strut contributed nothing and the image's own bottom became the
+        // baseline.
         foreach (var box in lineBox.Rectangles.Keys)
         {
-            if (box.Display != CssConstants.InlineBlock && !topBottomBoxes.Contains(box))
+            if (box.Display != CssConstants.InlineBlock
+                && !topBottomBoxes.Contains(box)
+                && !IsAlignedToParentFontMetrics(box.VerticalAlign))
             {
                 double boxBaseline = lineBox.Rectangles[box].Top + BaselineAscentOf(box, lineBox);
                 baseline = Math.Max(baseline, boxBaseline);

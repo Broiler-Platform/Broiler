@@ -839,7 +839,7 @@ internal static partial class CssUtils
                 cssBox.FontWeight = value;
                 break;
             case "list-style":
-                cssBox.ListStyle = value;
+                ApplyListStyleShorthand(cssBox, value);
                 break;
             case "list-style-position":
                 cssBox.ListStylePosition = value;
@@ -1253,6 +1253,120 @@ internal static partial class CssUtils
             SetLogicalBorderComponent(cssBox, inlineAxis, startSide: true, "color", color);
             SetLogicalBorderComponent(cssBox, inlineAxis, startSide: false, "color", color);
         }
+    }
+
+    /// <summary>
+    /// CSS Lists 3 §5: <c>list-style</c> is a shorthand for <c>list-style-position</c>,
+    /// <c>list-style-image</c> and <c>list-style-type</c>, in any order, and omitted
+    /// components reset to their initial values. Only the whole value was being kept, so
+    /// nothing read it and the longhands stayed at their defaults — <c>list-style: none</c>
+    /// left the marker at <c>disc</c> and drew a bullet on every navigation item and menu
+    /// entry an author had asked to go unmarked.
+    /// </summary>
+    /// <remarks>
+    /// The one <c>none</c> ambiguity CSS calls out: it may set either the type or the image,
+    /// so a lone <c>none</c> sets both, and <c>list-style: none disc</c> leaves the type as
+    /// <c>disc</c> with only the image suppressed.
+    /// </remarks>
+    private static void ApplyListStyleShorthand(CssBox cssBox, string value)
+    {
+        cssBox.ListStyle = value;
+
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        // Shorthand application resets omitted longhands back to their initial values.
+        string type = CssConstants.Disc;
+        string position = "outside";
+        string image = CssConstants.None;
+        bool sawType = false, sawImage = false, sawNone = false;
+
+        foreach (var token in SplitListStyleComponents(value))
+        {
+            var lower = token.ToLowerInvariant();
+
+            if (lower is "inside" or "outside")
+            {
+                position = lower;
+            }
+            else if (lower == CssConstants.None)
+            {
+                sawNone = true;
+            }
+            else if (lower.StartsWith("url(", StringComparison.Ordinal)
+                || lower.StartsWith("linear-gradient(", StringComparison.Ordinal)
+                || lower.StartsWith("radial-gradient(", StringComparison.Ordinal)
+                || lower.StartsWith("image-set(", StringComparison.Ordinal))
+            {
+                image = token;
+                sawImage = true;
+            }
+            else if (lower is "inherit" or "initial" or "unset" or "revert" or "revert-layer")
+            {
+                // A CSS-wide keyword is the whole value; hand it to each longhand as-is.
+                cssBox.ListStyleType = token;
+                cssBox.ListStylePosition = token;
+                cssBox.ListStyleImage = token;
+                return;
+            }
+            else
+            {
+                type = token;
+                sawType = true;
+            }
+        }
+
+        // `none` names whichever of type/image the rest of the value left unstated; when it
+        // states neither, it states both.
+        if (sawNone)
+        {
+            if (!sawType)
+                type = CssConstants.None;
+            if (!sawImage)
+                image = CssConstants.None;
+        }
+
+        cssBox.ListStyleType = type;
+        cssBox.ListStylePosition = position;
+        cssBox.ListStyleImage = image;
+    }
+
+    /// <summary>
+    /// Splits a <c>list-style</c> value on top-level whitespace, keeping a functional
+    /// component such as <c>url(a b.png)</c> or <c>image-set(...)</c> in one piece.
+    /// </summary>
+    private static List<string> SplitListStyleComponents(string value)
+    {
+        var components = new List<string>(3);
+        int depth = 0, start = -1;
+
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+
+            if (c == '(')
+                depth++;
+            else if (c == ')' && depth > 0)
+                depth--;
+
+            if (depth == 0 && char.IsWhiteSpace(c))
+            {
+                if (start >= 0)
+                {
+                    components.Add(value[start..i]);
+                    start = -1;
+                }
+            }
+            else if (start < 0)
+            {
+                start = i;
+            }
+        }
+
+        if (start >= 0)
+            components.Add(value[start..]);
+
+        return components;
     }
 
     private static void ApplyTextDecorationShorthand(CssBox cssBox, string value)

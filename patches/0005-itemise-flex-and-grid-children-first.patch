@@ -1,0 +1,77 @@
+From 6bc99170c2f468f45d83bd8bde297d44ba9255a2 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 22:21:27 +0000
+Subject: [PATCH 3/4] Make a flex or grid container's children items before the
+ box fix-ups run
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CSS Display 3 §2.7 blockifies a flex/grid item and CSS Flexbox §3 says `float`
+has no effect on one. The pass that does both ran after the box fix-ups, which
+is too late for a replaced item: CorrectImgBoxes had already wrapped a
+`display: block` image in an anonymous block and turned the image itself inline,
+so the pass cleared the float on the wrapper while the image inside kept
+floating — the wrapper held nothing in flow and the container sized as if the
+image were not there.
+
+Running it first lets each fix-up see the display the item ends up with: an
+<img> item blockified to `block` is wrapped by CorrectImgBoxes as any other
+block image is, and the inline/block corrections still see a blockified item as
+the block-level box it has become.
+
+Also skip `display: none` children when deciding whether a box contains inlines
+only; a box that generates nothing cannot make its parent an inline container.
+
+On https://www.mediawiki.org/ this is the Vector 2022 logo: `display: flex` with
+a floated sun icon and a floated wordmark, which laid out as an empty 0-height
+box and left the site header 16px shorter than it should be.
+---
+ .../Parse/DomParser.cs                        | 23 +++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index cf4c054..c30d896 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -115,6 +115,17 @@ internal sealed class DomParser
+ 
+         using (Broiler.Layout.Diagnostics.RenderStageTrace.Measure(Broiler.Layout.Diagnostics.RenderStageTrace.SubStages.BoxFixups))
+         {
++            // CSS Display 3 §2.7 'blockification' and CSS Flexbox §3: a flex/grid container's
++            // in-flow children are items, an item's display is blockified, and `float` has no
++            // effect on one. Without it an inline-level item never reaches the block layout path
++            // at all and lays out as nothing — which is every <a> and <span> in a flex toolbar —
++            // and a floated one is taken out of flow, so the container sizes as if it were not
++            // there. Runs ahead of the box fix-ups below so each of them sees the display the
++            // item ends up with: an <img> item blockified to `block` is wrapped by
++            // CorrectImgBoxes, and a blockified item takes part in the inline/block corrections
++            // as the block-level box it has become.
++            Broiler.Layout.Engine.FlexGridItemBlockification.Generate(root);
++
+             CorrectTextBoxes(root);
+             CorrectImgBoxes(root, baseUrl);
+             CorrectObjectBoxes(root);
+@@ -1951,6 +1962,18 @@ internal sealed class DomParser
+             if (childBox.Position is CssConstants.Absolute or CssConstants.Fixed)
+                 continue;
+ 
++            // CSS2.1 §9.2.4: a display:none element generates no box at all, so it can no
++            // more make its parent "block inside inline" than an absent element could. It was
++            // counted as block-level here (only the inline-* displays answer IsInline), which
++            // is the one place this predicate disagreed with LayoutBoxUtils.ContainsInlinesOnly
++            // and ContainsVariantBoxes, both of which already skip it. The split it triggered
++            // then dissolved the hidden subtree into the surrounding flow and made it visible:
++            // on www.mediawiki.org the skin's no-JS search form and its collapsed "Appearance"
++            // menu, each display:none beside inline content, were laid out full-size at the top
++            // of the page and pushed the whole article down.
++            if (childBox.Display == CssConstants.None)
++                continue;
++
+             if (!childBox.IsInline)
+                 return false;
+ 
+-- 
+2.43.0
+
+

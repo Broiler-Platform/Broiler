@@ -201,7 +201,35 @@ set -euo pipefail
 # the real-world render suite rather than for WPT — the same script runs both — because without it
 # google.com's bot-detection VM throws "g is not defined" out of the first closure one of its
 # evalled opcode handlers builds, and what renders is the interstitial rather than the page.
+# The six patches below are the MediaWiki/Vector 2022 rendering item, and every one of them is
+# listed for the same reason: each decides what reaches the canvas, not merely how fast it gets
+# there, and the main-repo half of each is already unit-tested where a unit test can reach it.
+#
+#   * 0001 (Broiler.CSS, math functions where a length is expected) — a media feature value that
+#     will not parse makes the whole @media block malformed, so its rules never cascade. On the
+#     narrow-viewport branch of a skin that writes every breakpoint as `calc(1120px - 1px)` that
+#     is a whole stylesheet not applying. The grammar is pinned by Broiler.CSS's own tests in the
+#     patch; only a pixel run can say the rules reached the render.
+#   * 0002 (Broiler.CSS, :link and :visited apart) — `:visited` matching every link repaints every
+#     link on a page in the visited colour.
+#   * 0003 (Broiler.HTML, a face per style) — without it `font-weight: bold` and `font-style:
+#     italic` draw as regular text, so every glyph of every emphasised run differs.
+#   * 0004 (Broiler.HTML, filter a scaled bitmap) — point sampling at a non-integer scale is
+#     visibly unlike a browser's output, which is exactly what a pixel comparison measures.
+#   * 0005 (Broiler.HTML, itemise flex/grid children first) — a floated flex item is otherwise
+#     taken out of flow and its container sizes as though it were not there; the pass it calls is
+#     main-repo (Broiler.Layout.Engine.FlexGridItemBlockification, unit-tested in
+#     VectorSkinLayoutTests) and this is what reaches it at the right point in the box fix-ups.
+#   * 0006 (Broiler.HTML, clip an outset box-shadow) — an unclipped outer shadow fills the element
+#     it is cast by, so a card with a shadow paints as a solid block of shadow colour.
+
 PENDING_PATCHES=(
+  "Broiler.CSS|patches/0001-evaluate-a-math-function-where-a-length-is-expected.patch"
+  "Broiler.CSS|patches/0002-match-link-and-visited-apart.patch"
+  "Broiler.HTML|patches/0003-draw-the-face-the-style-asked-for.patch"
+  "Broiler.HTML|patches/0004-filter-a-scaled-bitmap.patch"
+  "Broiler.HTML|patches/0005-itemise-flex-and-grid-children-first.patch"
+  "Broiler.HTML|patches/0006-clip-an-outset-box-shadow.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

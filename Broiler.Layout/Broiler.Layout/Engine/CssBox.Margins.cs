@@ -185,9 +185,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 double propagation = ActualMarginTop - parentEffective;
 
-                _parentBox.Location = new PointF(
-                    _parentBox.Location.X,
-                    _parentBox.Location.Y + (float)propagation);
+                // Move what is already inside the parent with it. Only the parent's own origin
+                // used to move, and anything positioned before this box got there — a preceding
+                // float, or a whole subtree on a second layout pass — stayed where the old origin
+                // had put it, so the box's content rendered outside its own border box.
+                // www.mediawiki.org's site notice did exactly that: its border box moved down by
+                // the margin its first block child propagated, and the notice text stayed above it.
+                _parentBox.OffsetTop(propagation);
                 _parentBox.CollapsedMarginTop = ActualMarginTop;
 
                 value = 0;
@@ -196,6 +200,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             {
                 value = Math.Max(0, ActualMarginTop - parentEffective);
             }
+
+            // Record the margin already spent above this box's top edge — the collapsed set's,
+            // not merely this box's own, since the set is what positioned the parent. An
+            // empty-collapsible box hands its margins on to the next sibling (the prevSibling
+            // branch above), and that sibling has to subtract what was already spent or it is
+            // applied twice. www.mediawiki.org opens its article body with exactly that box —
+            // an empty <p> holding only a <style> and two abspos spans, `margin: 0.5em 0 1em` —
+            // and its 1em collapse-through was landing on top of the 1em already applied,
+            // pushing the whole article down.
+            CollapsedMarginTop = Math.Max(parentEffective, ActualMarginTop) - value;
         }
         else
         {

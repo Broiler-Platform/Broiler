@@ -355,6 +355,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     internal CssLineBox LastHostingLineBox { get; set; }
 
+    /// <summary>
+    /// The floats that shorten this block's line boxes, recorded by
+    /// <see cref="CssLayoutEngine.CreateLineBoxes"/> for the pass it is running so that every
+    /// line it flows can consult the same geometry. Null on a box that has not flowed lines.
+    /// </summary>
+    internal LineFloatBands LineFloatBands { get; set; }
+
     internal Uri BaseUrl { get; set; }
 
     public void PerformLayout(ILayoutEnvironment g)

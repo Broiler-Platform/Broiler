@@ -1,0 +1,53 @@
+From c1bffe113d6e544f99322e3f9021d3ab9f51eea9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 22:21:47 +0000
+Subject: [PATCH 2/2] Match :link on an actual link, and :visited on nothing
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Selectors 4 §7.1 splits the two: `:link` matches a hyperlink that has not been
+visited, `:visited` one that has. Both were matching the same predicate, so
+`:visited` matched every `<a href>` in the document and a page that styles
+visited links a different colour drew all of its links in it.
+
+An engine with no history has visited nothing, so `:visited` matches nothing —
+which is also the privacy-preserving answer, and the one every engine gives for
+a link it has no record of. `:link` and `:any-link` keep the element test they
+had (an `<a>` or `<area>` carrying `href`).
+
+On https://www.mediawiki.org/ this turned every link on the page purple.
+---
+ Broiler.CSS.Dom/CssSelectorMatcher.cs | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/Broiler.CSS.Dom/CssSelectorMatcher.cs b/Broiler.CSS.Dom/CssSelectorMatcher.cs
+index 012a1a6..55d3ca0 100644
+--- a/Broiler.CSS.Dom/CssSelectorMatcher.cs
++++ b/Broiler.CSS.Dom/CssSelectorMatcher.cs
+@@ -191,7 +191,21 @@ public sealed partial class CssSelectorMatcher(ICssSelectorStateProvider? stateP
+                 "invalid" => IsConstraintValidationCandidate(element) && HasConstraintViolation(element),
+                 "required" => SupportsRequiredState(element) && IsRequiredControl(element),
+                 "optional" => SupportsRequiredState(element) && !IsRequiredControl(element),
+-                "link" or "visited" => IsNamed(element, "a") && element.HasAttribute("href"),
++                "link" => IsNamed(element, "a", "area") && element.HasAttribute("href"),
++                // Selectors 4 §7.1 pairs :link and :visited, but they are not synonyms —
++                // :visited matches a link this user has been to. A static render has no
++                // history to consult, and :visited is the one selector a page must never be
++                // able to read history through, so the honest and the safe answer are the
++                // same one: it never matches. Treating it as :link applied every visited
++                // style to every link, which is not a subtle shading difference — the rule
++                // comes later in the sheet and wins the cascade, so on www.mediawiki.org
++                // every link in the article rendered in the visited purple (#6a60b0) where a
++                // browser shows the unvisited blue (#36c).
++                "visited" => false,
++                // :any-link is the union of the two, and unlike :visited it is knowable: it
++                // is any element that IS a hyperlink. It used to fall through to the lenient
++                // default below and match every element, not just links.
++                "any-link" => IsNamed(element, "a", "area") && element.HasAttribute("href"),
+                 // Interactive/user-state pseudo-classes never match in a static
+                 // render (nothing is focused, hovered, active, or targeted), so a UA
+                 // rule like `:focus { outline: thin dotted invert }` must not apply
+-- 
+2.43.0
+
