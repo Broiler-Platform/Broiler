@@ -40,7 +40,11 @@ internal static partial class Program
         "bridge.mutation",
     };
 
-    private static readonly HttpClient HttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+    // Identified like the engine's own loaders — this one fetches test262 sources and dependency
+    // metadata from hosts (github.com among them) that are entitled to refuse a request carrying no
+    // User-Agent at all, which is what HttpClient sends by default.
+    private static readonly HttpClient HttpClient =
+        Broiler.Layout.Net.BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
 
     public static async Task<int> Main(string[] args)
     {

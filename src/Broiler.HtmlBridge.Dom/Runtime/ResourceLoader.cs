@@ -1,5 +1,6 @@
 using System.Net.Http;
 using Broiler.HtmlBridge.Core.Diagnostics;
+using Broiler.Layout.Net;
 
 namespace Broiler.HtmlBridge.Dom.Runtime;
 
@@ -23,7 +24,13 @@ internal sealed class ResourceLoader
     // environment external hosts are unreachable, so a short timeout fails fast (several sequential
     // unreachable fetches still stay well under the per-test budget) instead of hanging the shard.
     private const int TimeoutSeconds = 5;
-    private static readonly HttpClient SharedClient = new() { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
+
+    // Identified, because an unidentified request is one some servers refuse outright rather than
+    // serve differently: Wikimedia answers a request with no User-Agent 403 Forbidden, so every
+    // stylesheet, script, fetch() and XHR a mediawiki.org page asked for here failed even once the
+    // document itself had loaded. See Broiler.Layout.Net.BroilerUserAgent.
+    private static readonly HttpClient SharedClient =
+        BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) });
 
     /// <summary>
     /// Host policy on which absolute URLs may be fetched over the network at all, or

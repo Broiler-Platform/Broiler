@@ -35,7 +35,16 @@ public static partial class ScriptExtractionService
     /// <see cref="HttpClient"/> instances to benefit from connection pooling
     /// and avoid socket exhaustion.
     /// </summary>
-    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+    /// <remarks>
+    /// Identified, like every other loader: <see cref="HttpClient"/> sends no <c>User-Agent</c> of its
+    /// own, and a host whose policy rejects an unidentified request rejects the script rather than
+    /// serving a plainer one. mediawiki.org's <c>load.php?modules=startup</c> — the bootstrap that
+    /// loads every other module on the page — answered <c>403 Forbidden</c> for exactly that reason,
+    /// after the document and its stylesheets had already been fixed.
+    /// See <see cref="Broiler.Layout.Net.BroilerUserAgent"/>.
+    /// </remarks>
+    private static readonly HttpClient SharedHttpClient =
+        Layout.Net.BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
 
     private static string? GetNonce(IReadOnlyDictionary<string, string> attrs) =>
         attrs.TryGetValue("nonce", out var nonce) ? nonce : null;

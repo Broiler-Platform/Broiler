@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge.Core.Diagnostics;
+using Broiler.Layout.Net;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.Storage;
@@ -256,10 +257,7 @@ public class CaptureService
             throw new IOException($"Cannot create output directory: {ex.Message}", ex);
         }
 
-        using var httpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
-        };
+        using var httpClient = CreateHttpClient(options.TimeoutSeconds);
 
         var html = await FetchDocumentAsync(httpClient, new Uri(options.Url));
 
@@ -286,6 +284,22 @@ public class CaptureService
             await File.WriteAllTextAsync(options.OutputPath, html);
         }
     }
+
+    /// <summary>
+    /// The client both capture entry points fetch the document (and any followed link) on.
+    /// </summary>
+    /// <remarks>
+    /// It carries a <c>User-Agent</c>, which <see cref="HttpClient"/> otherwise omits entirely. A
+    /// server is free to refuse an unidentified request outright rather than serve it differently,
+    /// and Wikimedia's User-Agent policy does exactly that: <c>https://www.mediawiki.org/wiki/MediaWiki</c>
+    /// answered every capture <c>403 Forbidden</c> — before a redirect, before any content
+    /// negotiation — for want of this one header. See <see cref="BroilerUserAgent"/>.
+    /// </remarks>
+    private static HttpClient CreateHttpClient(int timeoutSeconds) =>
+        BroilerUserAgent.Apply(new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(timeoutSeconds),
+        });
 
     /// <summary>
     /// Fetches the top-level document, recording it when a diagnostic run is listening. The page
@@ -350,10 +364,7 @@ public class CaptureService
 
         string html;
         var uri = new Uri(options.Url);
-        using var httpClient = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds),
-        };
+        using var httpClient = CreateHttpClient(options.TimeoutSeconds);
 
         if (uri.IsFile)
         {
