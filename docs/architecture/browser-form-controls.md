@@ -141,6 +141,17 @@ in whichever encoding `enctype` asks for:
 
 A GET ignores `enctype` entirely — it has no body to encode.
 
+That media type is also the one the request goes out under, and it must be the **only**
+`Content-Type` on it. `StringContent`'s constructor already sets one
+(`text/plain; charset=utf-8` for the UTF-8 overload) and `TryAddWithoutValidation`
+*appends* to a header rather than replacing it, so `PageLoader` used to post the
+two-valued `text/plain; charset=utf-8, application/x-www-form-urlencoded`. A server
+reading the first value sees `text/plain`, never decodes the body, and rejects the
+submission — google's cookie-consent dialog answered `POST https://consent.google.de/save`
+with `400 Bad Request`, stranding a search behind the consent page. `PageLoader.WithContentType`
+clears the default before setting the media type; the bytes stay UTF-8 either way, so
+dropping the constructor's `charset` changes nothing on the wire.
+
 One definition of "successful control" feeds all three: `BuildEntryList` is the single
 walk of the form, and the encoders are pure functions over its output, so they cannot
 disagree about which controls submit.
