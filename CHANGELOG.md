@@ -232,13 +232,17 @@ are versioned in lockstep during the preview.
     (`Broiler.Browser.Core`), external-script (`Broiler.HtmlBridge.Core`), and
     stylesheet/sub-resource/`fetch()`/XHR (`Broiler.HtmlBridge.Dom`) loaders alike, plus the
     engine-baseline tool. A capture of the page goes from an instant failure to 13 resources and
-    0 failures.
+    0 failures — a figure that covers the document, scripts and sheets and is silent about the
+    images, since `ResourceTraceKind` has no `Image` member.
   - `Broiler.Layout` is the home because it is the one assembly every loader already reaches —
     including the `<link>`, `<img>` and web-font loaders inside the `Broiler.HTML` submodule,
-    which reference it for `OfflineSubresources`. Their identical one-line fix ships as
-    `patches/0002-say-who-is-asking.patch`; until it is applied and the pointer bumped, a build
-    against the pinned pointer still renders that page unstyled and pictureless, because
-    `HtmlRender` fetches a page's sheets through the submodule's loader rather than the bridge's.
+    which reference it for `OfflineSubresources`, so their share of the fix is one line each
+    (`Broiler.HTML`, "Say who is asking"; the submodule pointer is bumped to it). Both halves are
+    needed for the *render*: `HtmlRender` fetches a page's sheets through the submodule's loader
+    rather than the bridge's, so the main-repository half on its own stops the reported `403` and
+    still draws the page as bare document flow. Established by A/B — reverting only the image
+    loader turns a Wikimedia photograph into blank space, reverting only the sheet loader turns
+    the skin off.
   - `navigator.userAgent` reads the same constant instead of a second literal of the same string,
     so a page comparing what it was told with what its own `fetch()` reports gets one answer. The
     value it reports is unchanged.

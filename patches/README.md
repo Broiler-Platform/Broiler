@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**One patch is waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -61,42 +61,27 @@ git -C Broiler.JS merge-base --is-ancestor 95aaa3ef HEAD
 git -C Broiler.JS merge-base --is-ancestor e75de4ae HEAD
 ```
 
+A third has left since, and it is worth recording *why* it was ever written: "Say
+who is asking" — the `User-Agent` the `<link>`, `<img>` and web-font loaders did
+not send, which is half of why `www.mediawiki.org` rendered as bare document flow
+— was captured here only because the push to `Broiler.HTML` answered **403**. The
+repository was then added to the session's own source set, which is what that 403
+actually asks for, the push went through, and the fix is upstream as
+`Broiler.HTML` `dc197ed` with the pointer bumped to it. So the file went the way
+this section describes, and the lesson is the one at the top of the workflow:
+**try the push first, and treat a scope 403 as a scope question rather than a
+verdict.** Checked the way this file says to check:
+
+```sh
+git -C Broiler.HTML log --oneline --grep 'Say who is asking'
+git -C Broiler.HTML merge-base --is-ancestor dc197ed HEAD
+```
+
 ## The index
 
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.JS` | Collect a JavaScript stack once, render it as often as asked |
-| `0002` | `Broiler.HTML` | Say who is asking |
-
-### `0002` — the sheets, pictures and fonts a server will not serve an anonymous client
-
-`HttpClient` sends no `User-Agent` unless one is configured, and Wikimedia's User-Agent policy
-answers a request that carries none with `403 Forbidden` before anything else about it matters. Each
-of the three loaders in this submodule builds its own client, so each refused its resource on
-`https://www.mediawiki.org/wiki/MediaWiki`: the `<link>` stylesheets, the `<img>` photographs on
-`upload.wikimedia.org`, and any web font the page asked for. The patch gives all three the engine's
-own token, `Broiler.Layout.Net.BroilerUserAgent` — a main-repository type this submodule already
-references for `OfflineSubresources` — so it is one line per loader and adds no dependency.
-
-**What is live without it, and what is not.** The reported failure — the instant `403` on the
-document itself — is fixed in the main repository and needs nothing from here, as are the external
-scripts, `fetch()` and XHR. What still fails against the pinned pointer is the *render*:
-`HtmlRender` fetches a page's stylesheets through this submodule's `StylesheetLoadHandler` rather
-than through the bridge's `ResourceLoader`, so a capture of that page comes back as bare document
-flow instead of the Vector skin, with the photographs missing. Applying this patch is the whole
-difference. The account is in `docs/mediawiki-user-agent-403.md`.
-
-**Why it is not listed in `scripts/apply-pending-wpt-patches.sh`.** It can only change a resource
-fetched over the network, and the WPT corpus is a directory on disk — the runner installs
-`OfflineSubresources.FetchPolicy` and declines off-corpus URLs before a request is made. No WPT
-pixel can move, so there is nothing for that script to exercise. The suite it *would* show up in is
-`tests/real-world-sites`, which is observational and not part of the WPT gate.
-
-**Why the main repository has no equivalent fallback.** The capture path renders through the static
-`HtmlRender.RenderToFile*` helpers, which construct their own container: there is no host-side
-`StylesheetLoad` handler to answer from, and the alternative — inlining every external sheet into
-the document before handing it over — would mean re-implementing this submodule's relative-URL
-rebasing in the caller, which is a larger change than the patch and a worse one.
 
 ### `0001` — one throw, five frames
 

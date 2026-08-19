@@ -67,7 +67,8 @@ construction site, rather than a header set where the bug was noticed:
 
 `Broiler.Layout` is the home because it is the one assembly all of them already reach — including
 the three inside the `Broiler.HTML` submodule, which reference it for `OfflineSubresources`. That
-keeps the submodule side of the fix to one line per loader.
+keeps the submodule side of the fix to one line per loader; it is upstream as `Broiler.HTML`
+`dc197ed`, "Say who is asking", and the pointer is bumped to it.
 
 ### The same string script is told
 
@@ -75,17 +76,42 @@ keeps the submodule side of the fix to one line per loader.
 a literal of its own. It now reads the constant, so a page that compares what it was told with what
 its own `fetch()` reports gets one answer. The value is unchanged; only the number of copies is.
 
-## What the header does not fix
+## Half of it is the difference between a styled page and a bare one
 
-The three submodule loaders are delivered as a patch under `patches/` (the submodule remote is
-outside this session's push scope — see `patches/README.md`), so until a maintainer applies it and
-bumps the pointer, a build against the pinned pointer still fetches `<link>` sheets, images and web
-fonts unidentified. Concretely, on `mediawiki.org` that is the difference between a styled render
-and a bare document flow — `HtmlRender` fetches the page's stylesheets through the submodule's
-`StylesheetLoadHandler`, not through the bridge's `ResourceLoader`.
+It is worth being precise about which loader does what, because the main-repository half alone looks
+like a complete fix from the outside and is not. `HtmlRender` fetches a page's `<link>` stylesheets
+through the submodule's `StylesheetLoadHandler`, **not** through the bridge's `ResourceLoader`, so
+with only the main repository fixed the capture reports "0 failures" and renders the page as
+black-on-white document flow — no Vector skin, no cards, no pictures. Both halves are needed for the
+render; only the main-repository half is needed for the reported `403` to stop.
 
-The document, the external scripts, `fetch()` and XHR are all in the main repository and are fixed
-without the patch, which is what makes the reported failure go away.
+That was checked by A/B, not inferred: reverting only `ImageDownloader.cs` and rebuilding turns a
+page holding one `upload.wikimedia.org` photograph from the photograph into blank space, and
+reverting `StylesheetLoadHandler.cs` turns the skin off. Both halves are pinned now, so a build of
+this tree renders the page styled.
+
+## What the capture's "0 failures" does and does not count
+
+`--diagnostic-dir` reports resources through `ResourceTraceKind`, whose members are `Document`,
+`Script`, `ExecutedScript`, `Stylesheet`, `Fetch` and sub-document — **there is no `Image`**. The
+final capture's `resources/index.json` holds 13 rows and not one of them is a picture, so "13
+resources, 0 failures" is evidence about the document, the scripts and the sheets and is silent
+about the images, however many the page has. The image half of this fix is established by the render
+A/B above instead.
+
+## Two things this made visible without causing
+
+Both were there before and are only reachable now that the requests get past the `403`:
+
+- **The startup module is fetched twice.** `<script src>` is taken verbatim from the attribute, so
+  the entity-encoded `load.php?lang=en&amp;modules=startup&amp;…` is requested as written, answered
+  with a small MediaWiki error, and then requested again correctly. One wasted round trip per such
+  URL.
+- **Nothing asks for compression.** No loader sets `AutomaticDecompression`, and none sends
+  `Accept-Encoding`, so the page's module bundle arrives at roughly 8× its gzipped size. That is a
+  handler-level setting (`SocketsHttpHandler.AutomaticDecompression`), not something a `User-Agent`
+  helper over `HttpClient` can carry, so it is left for its own change — but it interacts with
+  `ResourceLoader`'s 5-second timeout and is worth doing.
 
 ## It was not only mediawiki.org
 
