@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 
 namespace Broiler.App.Rendering;
@@ -91,17 +92,50 @@ public sealed class PageLoader : IPageLoader
 
         // A multipart body carries file bytes verbatim, so it must not be re-encoded
         // as text. Its media type already includes the boundary parameter, which
-        // StringContent's constructor would reject, so it is set on the header.
+        // StringContent's constructor would reject anyway.
         if (request.BinaryBody is { } bytes)
-        {
-            ByteArrayContent content = new(bytes);
-            content.Headers.TryAddWithoutValidation("Content-Type", mediaType);
-            return content;
-        }
+            return WithContentType(new ByteArrayContent(bytes), mediaType);
 
-        StringContent text = new(request.Body ?? string.Empty, Encoding.UTF8);
-        text.Headers.TryAddWithoutValidation("Content-Type", mediaType);
-        return text;
+        return WithContentType(new StringContent(request.Body ?? string.Empty, Encoding.UTF8), mediaType);
+    }
+
+    /// <summary>
+    /// Makes <paramref name="mediaType"/> the <em>only</em> <c>Content-Type</c> on
+    /// <paramref name="content"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="StringContent"/>'s constructor already sets one — <c>text/plain; charset=utf-8</c>
+    /// for the <see cref="Encoding.UTF8"/> overload — and <c>TryAddWithoutValidation</c>
+    /// <em>appends</em> to a header rather than replacing it. A urlencoded form therefore went out
+    /// as the two-valued
+    /// <c>Content-Type: text/plain; charset=utf-8, application/x-www-form-urlencoded</c>,
+    /// and a server reading the first value sees <c>text/plain</c>, never decodes the body, and
+    /// rejects the submission: google's cookie-consent dialog answered
+    /// <c>POST https://consent.google.de/save</c> with <c>400 Bad Request</c>, which stranded a
+    /// search behind the consent page. Removing the default first leaves the media type the form
+    /// actually chose.
+    /// </para>
+    /// <para>
+    /// The bytes stay UTF-8 whatever the media type says, so dropping the constructor's
+    /// <c>charset=utf-8</c> does not change what is on the wire — and a bare
+    /// <c>application/x-www-form-urlencoded</c> is what browsers send for a urlencoded form.
+    /// Parsing into <see cref="System.Net.Http.Headers.HttpContentHeaders.ContentType"/> keeps
+    /// parameters such as multipart's <c>boundary</c>; a value too malformed to parse is sent
+    /// verbatim rather than costing the whole request.
+    /// </para>
+    /// </remarks>
+    private static T WithContentType<T>(T content, string mediaType)
+        where T : HttpContent
+    {
+        content.Headers.Remove("Content-Type");
+
+        if (MediaTypeHeaderValue.TryParse(mediaType, out var parsed))
+            content.Headers.ContentType = parsed;
+        else
+            content.Headers.TryAddWithoutValidation("Content-Type", mediaType);
+
+        return content;
     }
 
     /// <inheritdoc />
