@@ -1,7 +1,12 @@
 # html5test.com — the rendering exceptions
 
-Rendering <https://html5test.com/> has been reported twice, each time as four distinct JavaScript
-exceptions. This is what each one actually is, what was fixed, and what was deliberately left alone.
+Rendering <https://html5test.com/> has been reported four times: twice as four distinct JavaScript
+exceptions, then twice as a single one. This is what each one actually is, what was fixed, and what
+was deliberately left alone.
+
+**The remaining exception is not a defect and will not be fixed.** It is html5test's WebRTC probe
+deliberately provoking a throw to detect that the feature is absent, and the page catches it itself.
+If you are here because that trace was reported again, read "Fourth report" below and stop.
 
 Source of the page under test: <https://github.com/WebPlatformTest/HTML5test>.
 
@@ -33,7 +38,8 @@ trace.
 Every reported site sits inside html5test's own `try { … } catch (e) { }`. That is not incidental —
 `Runner.initialize` wraps the whole testsuite loop in a single `try { … } catch (e) { error(e) }`
 (`engine.js:4423-4519`), so had the first exception escaped, the run would have stopped there and the
-others could never have been reported. Four reports is itself the proof that all four were caught.
+others could never have been observed. A report listing four distinct sites is itself the proof that
+the first three were caught.
 
 They are feature-detection probes: html5test deliberately provokes a throw and reads the failure as
 "unsupported".
@@ -42,19 +48,86 @@ They are feature-detection probes: html5test deliberately provokes a throw and r
 place a JS error is ever logged is the host `catch` around `context.Eval(script, label)` —
 `src/Broiler.Cli/CaptureService.cs` and the equivalents in
 `src/Broiler.HtmlBridge.Scripting/ScriptEngine.cs` — that is, the *unwind* boundary, reached only when
-an exception escapes an entire script. There is no throw-time hook anywhere: `Broiler.JS` never
-reports, it only *constructs* a `JSException` carrying an origin frame. A caught exception therefore
-produces no `javascript-errors.log` entry at all, and a `--diagnostic-dir` capture of this page reports
+an exception escapes an entire script. A caught exception therefore produces no
+`javascript-errors.log` entry at all, and a `--diagnostic-dir` capture of this page reports
 **0 JavaScript failures** both before and after every fix below.
 
-The reported traces interleave C# frames (`JSUndefined.cs:62`) with JS frames and name Windows paths
-(`D:\Broiler\…`), which is what a **first-chance** observer sees: every `JSException` at the moment it
-is constructed, caught or not. That is a strictly noisier view than the capture diagnostics, and
-reading it as a list of page failures overstates what happened — none of these stopped html5test, and
-one of them (WebRTC) is the correct answer.
+### The one throw-time hook does not cover this throw
+
+There is a first-chance hook, but only one, and it is Debug-only, opt-in and **partial**:
+`JSException.LogThrows` (`Broiler.JS/…/Broiler.JavaScript.Runtime/JSException.cs`), enabled with
+`BROILER_LOG_THROWS=1`, whose own summary says it dumps *"every JavaScript throw"*. It does not. It is
+read at exactly three sites — `JSException.Throw`, and the `undefined`/`null` property-read indexers in
+`JSUndefined`/`JSNull` — and the engine's other throw sites raise a `NewTypeError(…)` object directly
+rather than routing through `JSException.Throw`, so the hook never sees them.
+
+Measured on a page that provokes six throws and catches each one, with `BROILER_LOG_THROWS=1` against a
+Debug `Broiler.Cli`:
+
+| throw | logged |
+| --- | --- |
+| `undefined.foo` | yes — `[JSUndefined] Cannot get property foo of undefined` |
+| `null.foo` | yes — `[JSNull] Cannot get property foo of null` |
+| `throw new Error('explicit')` | yes — `[JSException.Throw] Error: explicit` |
+| `new undefined()` | **no** |
+| `undefined()` | **no** |
+| `JSON.parse('{')` | **no** |
+
+`new undefined()` — the first of those three misses — is this document's subject, and a full
+`BROILER_LOG_THROWS=1` capture of html5test.com prints **nothing at all**: the one event a reader
+would want to see is an event the hook does not report. Note what that empty output does and does not
+establish — it proves no *hook-covered* throw occurred, not that the page throws only once. The
+uncovered kinds are invisible either way, which is the point.
+
+So the hook cannot reproduce a report like the ones below, and nothing else in this repository can
+either — the observer that produces them is external to it. That is a gap in the engine's diagnostics
+rather than a defect on the page, and it is why the same trace keeps arriving: there is no way for a
+reader here to see the caught throws and confirm for themselves that the list is expected. Closing it
+means routing the direct `NewTypeError(…)` throw sites through `JSException.Throw`, or reading
+`LogThrows` at them; it is a `Broiler.JS` change, so it ships through the patch workflow.
+
+The reported traces interleave C# frames (`JSUndefined.cs:62`, `:68` after the message fix) with JS
+frames and name Windows paths (`D:\Broiler\…`), which is what a **first-chance** observer sees: every
+`JSException` at the moment it is constructed, caught or not. That is a strictly noisier view than the
+capture diagnostics, and reading it as a list of page failures overstates what happened — none of
+these stopped html5test, and one of them (WebRTC) is the correct answer.
 
 That does not make them uninteresting — they are real capability gaps, and several were outright
 defects — but it does mean none of them was an emergency.
+
+---
+
+# Fourth report: `1986` alone, again — nothing to fix
+
+Same single site as the third report, and the same answer: `engine.js:1986` is html5test's
+`rtc.datachannel` probe, `new (window.RTCPeerConnection || … )(null)` with all four names undefined.
+The page catches it two lines later and scores the row `No`, which is correct for an engine with no
+WebRTC. Verified end to end rather than inferred:
+
+- **The site is unchanged.** Fetched live, `engine.js:1986` is still that `new` expression, inside the
+  `try` opened at 1985 and closed by the empty `catch (e) { }` at 1989-1990.
+- **Every frame in the trace resolves**, against the scripts a `--diagnostic-dir` capture archived:
+  `inline-5:8` is `wait()` polling for `WhichBrowser`, `:25` is the `start()` call in the
+  `waitForWhichBrowser` callback, `:46` is `new Test(…)`; `inline-1:4423` is `Runner`, `:4512` the
+  `testsuite[s](this.list)` dispatch.
+- **Reproduced standalone.** A two-line page evaluating
+  `new (window.RTCPeerConnection || window.msRTCPeerConnection)(null)` inside a `try` catches
+  `TypeError: undefined is not a constructor` — the reported message, character for character.
+- **The page completes.** A live capture scores **143 / 555**, renders its results table, and reports
+  **0 JavaScript failures**. `Peer To Peer` is 0/45, as it has been throughout.
+
+**The trace differs from the third report's in two details, and both are the engine improving.** The
+message is now `undefined is not a constructor` rather than `cannot create instance of undefined`, and
+the C# frame is `JSUndefined.cs:68` rather than `:62` — that is the message fix having landed upstream
+(see the section on it below). A report that quotes the new wording is evidence the fix is in the
+build that produced it.
+
+Nothing here is actionable. The only change that would remove this exception is a WebRTC
+implementation; see "This does not remove the exception" below for why a stub is worse than the throw.
+The one thing this round did surface is a diagnostics gap, in "The one throw-time hook does not cover
+this throw" above: `BROILER_LOG_THROWS=1` misses precisely this throw, so a maintainer cannot
+reproduce the reporter's view locally. Closing that is what would stop a fifth report, and it belongs
+in `Broiler.JS` rather than on this page.
 
 ---
 
@@ -113,11 +186,22 @@ which is exactly how it arrived here, twice. `InvokeFunction`'s `undefined is no
 deliberately untouched: that one already matches the browsers.
 
 Both sites live in the `Broiler.JS` submodule, whose remote is outside this session's GitHub scope, so
-the fix ships through the patch workflow rather than as a pointer bump — the commit
-*"Say "is not a constructor", as every other construct site does"*, exported under `patches/` with its
-tests (`ConstructNonConstructorMessageTests`). Nothing in the main repository asserts either message,
-so the engine behaves identically until a maintainer applies it; the cost of not applying it is a
-non-standard string in a stack trace.
+the fix shipped through the patch workflow rather than as a pointer bump — the commit
+*"Say "is not a constructor", as every other construct site does"*, with its tests
+(`ConstructNonConstructorMessageTests`).
+
+**That is now upstream and pinned**, so it reaches CI through the pointer and its patch file is gone
+from `patches/` (a backlog, not an archive). Check it the way the patch index says to, by subject
+rather than by patch number:
+
+```sh
+git -C Broiler.JS log --oneline --grep 'Say "is not a constructor"'   # -> 8059835a
+git -C Broiler.JS merge-base --is-ancestor 8059835a HEAD && echo live
+```
+
+The fourth report is the same fact observed from outside: it quotes `undefined is not a constructor`
+and `JSUndefined.cs:68`, the post-fix wording and line, where the earlier reports quoted
+`cannot create instance of undefined` and `:62`.
 
 **This does not remove the exception, and nothing short of implementing WebRTC would.** The page
 evaluates `new (A || B || C || D)(null)` where all four are undefined; the only way not to throw is to
@@ -386,7 +470,7 @@ Second round:
 | `src/Broiler.HtmlBridge.Dom/DomBridge/JsObjects.cs` | pass the bridge to `CanvasBinding.Install` |
 | `src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj` | reference `Broiler.Graphics` and `Broiler.Media.Image` |
 | `src/Broiler.Cli.Tests/CanvasPixelSurfaceTests.cs` | new — the pixel surface, and the html5test probes verbatim |
-| `patches/0007-not-a-constructor-message.patch` | `Broiler.JS` — `new undefined()` says "is not a constructor" |
+| `Broiler.JS` — *"Say "is not a constructor", as every other construct site does"* | `new undefined()` gets the message every browser gives; shipped as a patch, since landed upstream and pinned |
 
 First round:
 
