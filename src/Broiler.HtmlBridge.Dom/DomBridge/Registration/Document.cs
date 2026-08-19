@@ -142,6 +142,11 @@ public sealed partial class DomBridge
         // document.scripts — collection of all <script> elements, in tree order.
         document.FastAddProperty((KeyString)"scripts", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetScripts(this, in a), "get scripts"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // document.currentScript — the <script> element being executed, null when none is. The
+        // element the bridge already tracks for document.write's insertion point, read from the
+        // property a loader script uses to find its own <src>.
+        document.FastAddProperty((KeyString)"currentScript", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetCurrentScript(this, in a), "get currentScript"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document.styleSheets — collection of stylesheet objects for main document
         document.FastAddProperty((KeyString)"styleSheets", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetStyleSheets(this, in a), "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 

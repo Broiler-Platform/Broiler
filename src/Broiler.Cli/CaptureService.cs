@@ -174,14 +174,6 @@ public class CaptureOptions
 /// </summary>
 public class CaptureService
 {
-    private static readonly Regex ScriptPattern = new(
-        @"<script(?![^>]*\ssrc\s*=)[^>]*>(?<content>[\s\S]*?)</script>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex DataScriptPattern = new(
-        @"<script[^>]*\ssrc\s*=\s*[""']?(?<uri>data:[^""'\s>]+)[""']?[^>]*>\s*</script>",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
     /// <summary>
     /// Matches all &lt;script&gt; tags (both inline and with src attributes)
     /// in document order. The tag attributes and body content are captured
@@ -499,9 +491,26 @@ public class CaptureService
     {
         var scripts = new List<string>();
         var noscriptSpans = NoscriptSpans(html);
-        foreach (Match match in ScriptPattern.Matches(html))
+        foreach (Match match in AnyScriptPattern.Matches(html))
         {
             if (IsInsideNoscript(noscriptSpans, match.Index))
+                continue;
+
+            var attrs = match.Groups["attrs"].Value;
+
+            // This path evaluates only what the element itself carries, so a script with a `src`
+            // has nothing here to run.
+            if (AnySrcAttrPattern.IsMatch(attrs))
+                continue;
+
+            // A `<script>` whose type is neither a JavaScript MIME essence nor `module` is a data
+            // block the browser never executes — the DOM path below has skipped those since
+            // ScriptMimeType was introduced, and this one had not, so a capture written as HTML
+            // reported a compile error for content that was never JavaScript. The first
+            // `<script>` on `about.google` is a JSON-LD block, and it failed as
+            // "Unexpected token Colon: : at 1, 12".
+            var typeMatch = TypeAttrPattern.Match(attrs);
+            if (!ScriptMimeType.IsExecutable(typeMatch.Success ? typeMatch.Groups["type"].Value : null))
                 continue;
 
             var content = match.Groups["content"].Value.Trim();
@@ -735,12 +744,14 @@ public class CaptureService
             bridge.SetLocalBasePath(localResourceBasePath);
 
         // Execute regular and async scripts in document order.
-        // Track the corresponding <script> DOM element index so that
-        // document.write() can insert content at the correct position.
-        var scriptElements = bridge.Elements
-            .Select((el, idx) => (el, idx))
-            .Where(t => string.Equals(t.el.TagName, "script", StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        // Track the corresponding <script> DOM element index so that document.currentScript names
+        // the running script and document.write() inserts at its position. Only the elements each
+        // bucket actually runs are counted: pairing the buckets against every <script> in the tree
+        // attributed the n-th executed script to the n-th element, which on any document carrying a
+        // data block before a script — a JSON-LD block, an import map — is a different element
+        // (ScriptElementMap).
+        var scriptElements = ScriptElementMap.Classic(bridge.Elements);
+        var deferredScriptElements = ScriptElementMap.Deferred(bridge.Elements);
 
         static void DrainAsyncWork(DomBridge bridge, MicroTaskQueue microTasks)
         {
@@ -778,8 +789,7 @@ public class CaptureService
 
         for (int si = 0; si < scripts.Count; si++)
         {
-            if (si < scriptElements.Count)
-                bridge.CurrentScriptIndex = scriptElements[si].idx;
+            bridge.CurrentScriptIndex = si < scriptElements.Count ? scriptElements[si] : -1;
             var label = ScriptLabel.Inline(si);
             try
             {
@@ -802,6 +812,10 @@ public class CaptureService
         // Execute deferred scripts after all regular scripts (simulates end-of-parsing)
         for (var di = 0; di < deferredScripts.Count; di++)
         {
+            // A deferred script is as much the running script as a non-deferred one; this bucket
+            // never set the index, so document.currentScript was null and document.write appended
+            // to <body> for the whole of it.
+            bridge.CurrentScriptIndex = di < deferredScriptElements.Count ? deferredScriptElements[di] : -1;
             var label = ScriptLabel.Deferred(di);
             try
             {
@@ -813,6 +827,7 @@ public class CaptureService
                 RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom", $"Script {label} failed: {ex.Message}", ex);
             }
         }
+        bridge.CurrentScriptIndex = -1;
 
         // Execute ES modules (deferred by definition) last, through the engine module machinery on the
         // BridgeModuleContext the DOM is attached to. Only when the engine binds imports (see the context

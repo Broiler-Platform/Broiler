@@ -25,5 +25,13 @@ internal interface IDocumentCollectionHost
     /// </summary>
     void CollectByTagName(DomNode root, string tag, List<JSValue> results);
 
+    /// <summary>
+    /// Index into <see cref="Elements"/> of the <c>&lt;script&gt;</c> element whose program the host
+    /// is evaluating right now, or a negative value when no script is running. The same insertion
+    /// point <see cref="IDocumentWriteHost"/> exposes, needed here for
+    /// <c>document.currentScript</c>.
+    /// </summary>
+    int CurrentScriptIndex { get; }
+
     JSObject BuildStyleSheetObject(DomElement styleElement);
 }

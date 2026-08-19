@@ -21,6 +21,8 @@ public sealed partial class DomBridge : Dom.Features.IDocumentCollectionHost
     void Dom.Features.IDocumentCollectionHost.CollectByTagName(DomNode root, string tag, List<JSValue> results)
         => CollectByTagName(root, tag, results);
 
+    int Dom.Features.IDocumentCollectionHost.CurrentScriptIndex => CurrentScriptIndex;
+
     JSObject Dom.Features.IDocumentCollectionHost.BuildStyleSheetObject(DomElement styleElement)
         => BuildStyleSheetObject(styleElement);
 }
