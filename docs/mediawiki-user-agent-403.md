@@ -70,6 +70,13 @@ the three inside the `Broiler.HTML` submodule, which reference it for `OfflineSu
 keeps the submodule side of the fix to one line per loader; it is upstream as `Broiler.HTML`
 `dc197ed`, "Say who is asking", and the pointer is bumped to it.
 
+That is every client the engine builds. One more exists and is deliberately left alone:
+`BroilerJS.Network.Names.InstallNetworkServices` in `Broiler.JS` installs a `fetch` over an
+`HttpClient` of its own, and **nothing calls it** — Broiler's `fetch` is the bridge's
+`FetchBinding`, which goes through `ResourceLoader` above. Identifying it would mean a
+`Broiler.JS → Broiler.Layout` reference, pointing the wrong way down the stack, to fix a code path
+no page can reach.
+
 ### The same string script is told
 
 `navigator.userAgent` already reported `Mozilla/5.0 (Windows NT 10.0; Win64; x64) Broiler/1.0` from
