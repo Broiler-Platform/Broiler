@@ -223,19 +223,18 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         Action<IDomBridgeRuntime> finalDrain,
         string logSource)
     {
-        // Track the corresponding <script> DOM element index so that
-        // document.write() can insert content at the correct position.
-        var scriptElements = new List<int>();
-        for (int idx = 0; idx < bridge.Elements.Count; idx++)
-        {
-            if (string.Equals(bridge.Elements[idx].TagName, "script", StringComparison.OrdinalIgnoreCase))
-                scriptElements.Add(idx);
-        }
+        // Track the corresponding <script> DOM element index so that document.currentScript names
+        // the running script and document.write() inserts at its position. Only the elements each
+        // bucket actually runs are counted: pairing the buckets against every <script> in the tree
+        // attributed the n-th executed script to the n-th element, which on any document carrying a
+        // data block before a script — a JSON-LD block, an import map — is a different element
+        // (ScriptElementMap).
+        var scriptElements = ScriptElementMap.Classic(bridge.Elements);
+        var deferredScriptElements = ScriptElementMap.Deferred(bridge.Elements);
 
         for (var i = 0; i < scripts.Count; i++)
         {
-            if (i < scriptElements.Count)
-                bridge.CurrentScriptIndex = scriptElements[i];
+            bridge.CurrentScriptIndex = i < scriptElements.Count ? scriptElements[i] : -1;
             var label = ScriptLabel.Inline(i);
             try
             {
@@ -253,6 +252,10 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
         // Execute deferred scripts after all regular scripts (end-of-parsing for <script defer>).
         for (var i = 0; i < deferredScripts.Count; i++)
         {
+            // A deferred script is as much the running script as a non-deferred one; this bucket
+            // never set the index, so document.currentScript was null and document.write appended
+            // to <body> for the whole of it.
+            bridge.CurrentScriptIndex = i < deferredScriptElements.Count ? deferredScriptElements[i] : -1;
             var label = ScriptLabel.Deferred(i);
             try
             {
@@ -265,6 +268,8 @@ public sealed partial class ScriptEngine : ITypedScriptEngine
                 RenderLogger.LogError(LogCategory.JavaScript, logSource, $"Script {label} failed: {ex.Message}", ex);
             }
         }
+
+        bridge.CurrentScriptIndex = -1;
 
         // Engine-driven ES modules (Phase 7 item 6): modules are deferred, so run the authorised roots
         // after the classic deferred scripts. Each root executes on the same realm the DOM is attached to,

@@ -2,12 +2,15 @@ using Broiler.Dom;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Array;
+using Broiler.JavaScript.BuiltIns.Null;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
 /// <summary>
 /// The <c>document</c> live-collection accessors — <c>document.forms</c>, <c>document.images</c>,
-/// <c>document.links</c>, <c>document.scripts</c>, <c>document.styleSheets</c> — co-located as an HtmlBridge feature module
+/// <c>document.links</c>, <c>document.scripts</c>, <c>document.styleSheets</c> — plus
+/// <c>document.currentScript</c>, which names one element out of the same set, co-located as an
+/// HtmlBridge feature module
 /// (Phase 3). Each scans the document for the relevant elements and returns a JS array of their
 /// wrappers (<c>forms</c> additionally exposes named access by the form's <c>name</c> attribute;
 /// <c>styleSheets</c> returns stylesheet objects rather than element wrappers). The document root,
@@ -81,6 +84,36 @@ internal static class DocumentCollectionBinding
         var results = new List<JSValue>();
         host.CollectByTagName(host.DocumentElement, "script", results);
         return new JSArray(results);
+    }
+
+    /// <summary>
+    /// <c>document.currentScript</c> — the <c>&lt;script&gt;</c> element whose classic script is
+    /// executing, and <c>null</c> whenever none is (between scripts, inside a callback, in a
+    /// module).
+    /// </summary>
+    /// <remarks>
+    /// The property was absent, so reading it yielded <c>undefined</c> rather than <c>null</c>, and
+    /// the difference is not cosmetic: <c>null</c> is a value a script can go on to test, while the
+    /// idiomatic use is to dereference it immediately. Google's own tag-manager loader — served on
+    /// <c>about.google</c>, which is where <c>google.com</c>'s "About" link leads — opens with
+    /// <code>new URL(document.currentScript.src).searchParams</code>
+    /// on its 14th line, so the missing property was a <c>TypeError</c> ("Cannot get property src of
+    /// undefined") four lines into the page's first script. The next two lines are that script's
+    /// <c>const id</c> and <c>const cookieCategory</c>, so aborting there also left the cookie bar's callback
+    /// reading <c>id</c> in its temporal dead zone, and the page's analytics never initialised.
+    /// <c>document.scripts[document.scripts.length - 1]</c>, the fallback the same idiom usually
+    /// carries, does not help a script that spells the access without one.
+    /// </remarks>
+    public static JSValue GetCurrentScript(IDocumentCollectionHost host, in Arguments a)
+    {
+        var index = host.CurrentScriptIndex;
+        if (index < 0 || index >= host.Elements.Count)
+            return JSNull.Value;
+
+        var element = host.Elements[index];
+        return string.Equals(element.TagName, "script", StringComparison.OrdinalIgnoreCase)
+            ? host.ToJSObject(element)
+            : JSNull.Value;
     }
 
     public static JSValue GetStyleSheets(IDocumentCollectionHost host, in Arguments a)

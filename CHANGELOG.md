@@ -214,7 +214,46 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
-- `Broiler.JS` (patch `0002`) — `String(Math.pow(2, -25))` answered
+- `Broiler.HtmlBridge.Dom` — `document.currentScript` was not bound, so it read `undefined`
+  and the idiomatic dereference threw. Google's tag-manager loader, served on
+  `about.google` — where `google.com`'s "About" link leads — opens with
+  `new URL(document.currentScript.src).searchParams` on its 14th line, so the missing
+  property was `TypeError: Cannot get property src of undefined` four lines into the page's
+  first script. The next two lines are that script's `const id` and `const cookieCategory`, so
+  aborting there also left the cookie bar's callback reading `id` in its temporal dead zone
+  and the page's analytics never initialised: one missing property, two reported failures.
+  A capture of that page went from 18 JavaScript failures to 3.
+  - **Which element it names is half the fix.** The bridge tracked the running script as an
+    index into the document's `<script>` elements — for `document.write`'s insertion point —
+    by pairing the *n*-th executed script with the *n*-th element. Those two lists only
+    coincide when the document has no data block, no module and no `defer`, so on a page
+    whose first `<script>` is a JSON-LD block (which is most of them) the first script that
+    ran was attributed to the JSON-LD, whose `src` is absent. `ScriptElementMap` counts only
+    the elements each bucket runs, classifying exactly as the extractors do.
+  - The deferred bucket never set the index at all, so through every `<script defer>` on a
+    page `currentScript` was `null` and `document.write` appended to `<body>` instead of
+    writing at the script's position. Both hosts now set it across that bucket too.
+
+- `Broiler.JS` — reading an exception's stack changed it. `JSException.JSStackTrace` both
+  renders the JavaScript frames and *collects* them into the exception's own list, which is
+  what keeps them printable once the context that threw is gone — so it has to collect once
+  and render thereafter, and it did neither. An exception whose stack a host renders for
+  several sinks reported the whole stack once per sink, and since a frame is walked at its
+  *current* position, only the first copy carried the line it threw at: a function that
+  failed at line 3 and rethrew from its `catch` came back as one line-3 frame followed by
+  four line-4 ones, naming the handler as if it were a call site. It arrived in the
+  `about.google` report above as five identical `at native in inline-0:line 14` lines over a
+  JavaScript-side `stack` that correctly showed the one frame there was — the two halves of
+  one report disagreeing is the tell. Waiting on a maintainer under `patches/`; find it by
+  its commit subject, "Collect a JavaScript stack once, render it as often as asked".
+
+- `Broiler.Cli` — a capture written as HTML (`--url`) compiled the document's data blocks as
+  JavaScript, reporting a syntax error for content that was never JavaScript. The DOM path
+  (`--capture-image`) has skipped them since `ScriptMimeType` was introduced and this one had
+  not, so the same page produced a different failure through each mode: `about.google`'s
+  JSON-LD block failed as `Unexpected token Colon: : at 1, 12`.
+
+- `Broiler.JS` — `String(Math.pow(2, -25))` answered
   `2.980232238769531e-8`, which reads back as a *different* double, so a page that
   round-tripped a value through a string got a different value back than it put in.
   `Number::toString` owes the shortest string that reads back as the same Number, and

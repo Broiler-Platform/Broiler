@@ -1,0 +1,254 @@
+From 72bdf007222757b711d43525cffb3196dbd30a7b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 19 Aug 2026 10:45:07 +0000
+Subject: [PATCH] Collect a JavaScript stack once, render it as often as asked
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`JSException.JSStackTrace` both renders the JavaScript frames and collects
+them: the walker appends each frame to the exception's own trace list as it
+prints it, and that list is what keeps the frames printable by
+`Exception.StackTrace` after the context that threw is gone. So the read has to
+collect once and render thereafter. It did neither — every read walked the live
+frames again and appended them again, so an exception whose stack a host
+renders for several sinks reported the whole stack once per sink.
+
+The repeats are worse than redundant. A frame is walked at its *current*
+position, so only the first copy carries the line it threw at; each later copy
+carries wherever that frame had unwound to. A function that failed at line 3
+and rethrew from its `catch` at line 4 came back as one line-3 frame followed
+by four line-4 frames, naming the handler as if it were a call site.
+
+It reached a report as a page's first script failing on its 14th line, over
+five identical
+
+    at native in inline-0:line 14
+
+lines — the shape of a five-deep recursion that never happened — above a
+JavaScript-side `stack` that correctly showed the one frame there was. The two
+halves of one report disagreeing is the tell: `stack` is a string captured
+once, while the CLR-side rendering re-read a list that had been growing on
+every read.
+
+A read now renders the frames it captured when they were live, which is also
+the better answer for a later read: that is the stack as it stood at the throw,
+while the live stack has been unwinding since. The capture flag is only set
+when frames were actually collected, so an exception constructed with no
+JavaScript context current on the thread stays free to collect them on a read
+that has one, exactly as before.
+
+Five tests cover it: the frame counts under zero, one and four further renders,
+that every frame reports its throw site rather than the handler it unwound to,
+and that the two halves of one report agree.
+---
+ .../ExceptionStackTraceReadTests.cs           | 122 ++++++++++++++++++
+ .../Broiler.JavaScript.Runtime/JSException.cs |  42 ++++++
+ 2 files changed, 164 insertions(+)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/ExceptionStackTraceReadTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ExceptionStackTraceReadTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ExceptionStackTraceReadTests.cs
+new file mode 100644
+index 00000000..c2fd04be
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ExceptionStackTraceReadTests.cs
+@@ -0,0 +1,122 @@
++using Broiler.JavaScript.BuiltIns.Error;
++using Broiler.JavaScript.BuiltIns.Function;
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.Integration.Tests;
++
++// Reading a JSException's stack must not change it.
++//
++// JSException.JSStackTrace both renders the JavaScript frames and collects them: the walker appends
++// each frame to the exception's own trace list as it prints it, which is what keeps them printable
++// by Exception.StackTrace once the context that threw is gone. So it has to collect once and render
++// thereafter — and it did not. Every read walked the live frames again and appended them again, so
++// an exception whose stack a host renders for more than one sink reported the whole stack once per
++// render, and each repeat carried the position the frame had reached by then rather than the
++// position it threw at.
++//
++// It reached a report as a page's first script failing on its 14th line, over five identical
++//
++//     at native in inline-0:line 14
++//
++// lines — the shape of a five-deep recursion that never happened — above a JavaScript-side `stack`
++// that correctly showed the one frame there was. That the two halves of one report disagreed is the
++// tell: `stack` is a string captured once, while the CLR-side rendering re-read a list that had
++// been growing on every read.
++public class ExceptionStackTraceReadTests
++{
++    /// <summary>
++    /// The reported shape: a property read on <c>undefined</c> inside a function, whose stack a host
++    /// renders <paramref name="reads"/> further times while the frames are still live.
++    /// </summary>
++    private static string TraceAfterReads(int reads)
++    {
++        using var context = new JSContext();
++
++        // Stands in for a host rendering the stack of an error it has been handed — a log sink, an
++        // error event, a console. Called from the `catch` so the frames are still on the stack,
++        // which is the only point at which the walker has anything to collect.
++        context["renderStack"] = new JSFunction((in Arguments a) =>
++        {
++            if (a[0] is JSError error)
++                _ = error.Exception.JSStackTrace;
++            return JSUndefined.Value;
++        }, "renderStack");
++
++        var source = """
++            var missing;
++            function readSrc() {
++                try { return missing.src; }
++                catch (e) { RENDERS throw e; }
++            }
++            readSrc();
++            """.Replace("RENDERS", string.Concat(Enumerable.Repeat("renderStack(e); ", reads)));
++
++        try
++        {
++            context.Eval(source, "inline-0");
++        }
++        catch (JSException ex)
++        {
++            return ex.StackTrace ?? string.Empty;
++        }
++
++        throw new Xunit.Sdk.XunitException("the script was expected to throw");
++    }
++
++    /// <summary>
++    /// The two JavaScript frames are reported twice — once each — however many times the stack was
++    /// rendered. Four further renders used to report ten frames: the two real ones, then the same
++    /// two again per render.
++    /// </summary>
++    [Theory]
++    [InlineData(0)]
++    [InlineData(1)]
++    [InlineData(4)]
++    public void RenderingTheStackDoesNotDuplicateItsFrames(int reads)
++    {
++        var trace = TraceAfterReads(reads);
++
++        Assert.Equal(2, CountOf(trace, " in inline-0:line "));
++        Assert.Equal(1, CountOf(trace, "at readSrc in inline-0:line 3"));
++        Assert.Equal(1, CountOf(trace, "at native in inline-0:line 6"));
++    }
++
++    /// <summary>
++    /// Every frame reports where it threw, not where it had unwound to by the time something asked.
++    /// The repeats carried <c>readSrc</c> at line 4 — the <c>catch</c> — which is a position it
++    /// reached only after the throw, and which named the handler as if it were a call site.
++    /// </summary>
++    [Fact]
++    public void TheFramesReportTheThrowSiteAndNotTheHandler()
++    {
++        var trace = TraceAfterReads(reads: 4);
++
++        Assert.Contains("at readSrc in inline-0:line 3", trace, StringComparison.Ordinal);
++        Assert.DoesNotContain("at readSrc in inline-0:line 4", trace, StringComparison.Ordinal);
++    }
++
++    /// <summary>
++    /// And the CLR-side rendering agrees with the JavaScript-side <c>stack</c> string appended below
++    /// it, which is captured once at construction — the two halves of one report saying the same
++    /// thing is what was lost.
++    /// </summary>
++    [Fact]
++    public void TheTwoHalvesOfOneReportAgree()
++    {
++        var trace = TraceAfterReads(reads: 4);
++
++        Assert.Equal(
++            CountOf(trace, ":inline-0:"),          // the JavaScript-side `stack`, indented
++            CountOf(trace, " in inline-0:line ")); // the frames rendered above it
++    }
++
++    private static int CountOf(string haystack, string needle)
++    {
++        var count = 0;
++        for (var i = haystack.IndexOf(needle, StringComparison.Ordinal); i >= 0;
++             i = haystack.IndexOf(needle, i + needle.Length, StringComparison.Ordinal))
++            count++;
++        return count;
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs
+index 1383a6df..0357e8a7 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSException.cs
+@@ -79,6 +79,13 @@ public class JSException : Exception
+ 
+     private readonly List<(StringSpan target, string file, int line, int column)> trace = [];
+ 
++    /// <summary>
++    /// Whether the JavaScript frames have already been folded into <see cref="trace"/>, so that
++    /// reading <see cref="JSStackTrace"/> again renders them instead of collecting them a second
++    /// time.
++    /// </summary>
++    private bool javaScriptFramesCaptured;
++
+     public JSException(JSValue message, [CallerMemberName] string function = null, [CallerFilePath] string filePath = null, [CallerLineNumber] int line = 0) : base()
+     {
+         if (function != null)
+@@ -108,6 +115,27 @@ public class JSException : Exception
+             (this, prototype);
+     }
+ 
++    /// <summary>
++    /// The thrown value's message over the frames it was raised through: the throw site the
++    /// constructor recorded, then the JavaScript frames that were live at the throw.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// Reading this is what <em>collects</em> the JavaScript frames — the walker appends them to
++    /// <see cref="trace"/> as it renders them, which is what keeps them printable by
++    /// <see cref="StackTrace"/> after the context that threw is gone. So the read has to be
++    /// collected from once and rendered from thereafter, and it was not: every read walked the live
++    /// frames again and appended them again, so an exception whose stack a host renders for several
++    /// sinks reported the same frame once per sink. A page's first script failing on line 14 came
++    /// back as five identical <c>at native in inline-0:line 14</c> lines above a JavaScript-side
++    /// <c>stack</c> that correctly showed one — the shape of a recursion that never happened, and
++    /// the reason the two halves of the same report disagreed.
++    /// </para>
++    /// <para>
++    /// The captured frames are also the better answer for a later read: they are the stack as it
++    /// stood at the throw, while the live stack has been unwinding since.
++    /// </para>
++    /// </remarks>
+     public JSValue JSStackTrace
+     {
+         get
+@@ -115,13 +143,27 @@ public class JSException : Exception
+             var sb = new StringBuilder();
+             sb.AppendLine(Message);
+ 
++            if (javaScriptFramesCaptured)
++            {
++                // Already collected: render what was captured at the throw.
++                foreach (var (target, file, line, column) in trace)
++                    sb.AppendLine($"    at {target}:{file}:{line},{column}");
++
++                return JSValue.CreateString(sb.ToString());
++            }
++
+             if (trace.Count > 0)
+             {
+                 var f = trace[0];
+                 sb.AppendLine($"    at {f.target}:{f.file}:{f.line},{f.column}");
+             }
+ 
++            var beforeWalk = trace.Count;
+             AppendStackTraceHelper?.Invoke(sb, trace);
++            // Only once frames were actually collected. An exception constructed with no JavaScript
++            // context current on this thread collects none, and must stay free to collect them on a
++            // read that does have one, exactly as before.
++            javaScriptFramesCaptured = trace.Count > beforeWalk;
+ 
+             return JSValue.CreateString(sb.ToString());
+         }
+-- 
+2.43.0
+

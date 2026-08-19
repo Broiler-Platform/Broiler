@@ -194,6 +194,9 @@ TYPE Broiler.HtmlBridge.Scripting.ScriptDescriptor : System.IEquatable<Broiler.H
   property System.String Content { get; set; }
   property System.String Nonce { get; set; }
   property System.String Url { get; set; }
+TYPE Broiler.HtmlBridge.Scripting.ScriptElementMap
+  method System.Collections.Generic.IReadOnlyList<System.Int32> Classic(System.Collections.Generic.IReadOnlyList<Broiler.Dom.DomElement>)
+  method System.Collections.Generic.IReadOnlyList<System.Int32> Deferred(System.Collections.Generic.IReadOnlyList<Broiler.Dom.DomElement>)
 TYPE Broiler.HtmlBridge.Scripting.ScriptError
   ctor ()
   property System.Int32 ScriptIndex { get; set; }
