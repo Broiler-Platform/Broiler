@@ -927,7 +927,7 @@ internal abstract partial class CssBoxProperties
                 CssConstants.Smaller => parentSize - 2,
                 CssConstants.Larger => parentSize + 2,
                 _ when IsMathFontSize(FontSize) => parentSize,
-                _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+                _ => ResolveFontSizeLengthToPoints(FontSize, parentSize),
             };
 
             return fsize <= 0 ? 0.001 : fsize;
@@ -952,6 +952,35 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     private static bool IsMathFontSize(string fontSize) =>
         fontSize.Equals("math", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A <c>font-size</c> length as a point count, resolved against a parent size also given in
+    /// points.
+    /// </summary>
+    /// <remarks>
+    /// The layout font is built at a point size, so this resolution has to end in points; it gets
+    /// there by resolving the length in CSS pixels — the unit every entry in the parser's unit
+    /// table is expressed in — and converting once at the end.
+    /// <para>
+    /// Asking the parser for points instead only ever worked for <c>px</c>, the single unit whose
+    /// table entry consults that flag. Every other absolute unit came back in pixels and was then
+    /// read as points, so it landed <c>96/72</c> too large: <c>1rem</c> drew at 21.3px rather than
+    /// 16, and with it every <c>rem</c>-sized element on a page that sizes its type that way — on
+    /// <c>www.mediawiki.org</c>, which sizes all of it that way, every line of the article broke a
+    /// third of the way early. <c>em</c>, <c>%</c> and the other font-relative units were right
+    /// only because their basis was passed in already-resolved, and they stay right here: the
+    /// basis is converted with them.
+    /// </para>
+    /// </remarks>
+    private static double ResolveFontSizeLengthToPoints(string fontSize, double parentSizePoints)
+    {
+        double parentSizePx = parentSizePoints * CssMetrics.PtToPx;
+
+        double px = CssLengthParser.ParseLength(
+            fontSize, parentSizePx, parentSizePx, null, fontAdjust: false, returnPoints: false);
+
+        return px * CssMetrics.PxToPt;
+    }
 
     // CSS Anchor Positioning: the cascaded values are surfaced on the box so the
     // layout engine's anchor-placement post-pass can read them (HtmlBridge
@@ -2235,7 +2264,7 @@ internal abstract partial class CssBoxProperties
                     CssConstants.Smaller => parentSize - 2,
                     CssConstants.Larger => parentSize + 2,
                     _ when IsMathFontSize(FontSize) => parentSize,
-                    _ => CssLengthParser.ParseLength(FontSize, parentSize, parentSize, null, true, true),
+                    _ => ResolveFontSizeLengthToPoints(FontSize, parentSize),
                 };
             }
 

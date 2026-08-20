@@ -23,6 +23,42 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     /// <summary>
+    /// Backs <c>document.readyState</c> (HTML §3.1.7). It starts at <c>loading</c> and is advanced
+    /// by the load sequence below; a script that runs before that sequence — every script in the
+    /// document — therefore sees the same value a browser would show it.
+    /// </summary>
+    private string _documentReadyState = "loading";
+
+    /// <summary>
+    /// Moves <c>document.readyState</c> on and fires <c>readystatechange</c> at the document, which
+    /// is the event pages pair with the property (HTML §3.1.7: the state is set, then the event is
+    /// fired at the document).
+    /// </summary>
+    private void SetDocumentReadyState(string state)
+    {
+        if (string.Equals(_documentReadyState, state, StringComparison.Ordinal))
+            return;
+
+        _documentReadyState = state;
+
+        if (_jsContext == null || _document == null)
+            return;
+
+        try
+        {
+            var evt = new JSObject();
+            evt.FastAddValue((KeyString)"type", new JSString("readystatechange"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            DispatchEventOnElement(_document, evt);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.SetDocumentReadyState",
+                $"Error firing readystatechange listeners: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// Fires the <c>load</c> event on the <c>&lt;body&gt;</c> element, which
     /// triggers the inline <c>onload</c> attribute handler as well as any
     /// <c>addEventListener('load', …)</c> listeners registered on the body.
@@ -43,6 +79,11 @@ public sealed partial class DomBridge
         // array here would replace that accessor with a snapshot frozen at load time.
         BuildWindowFramesArray();
 
+        // Parsing is over by the time this runs — every synchronous script has executed — so the
+        // document is "interactive" before DOMContentLoaded is dispatched, and "complete" once the
+        // sub-resources are accounted for and `load` is about to fire.
+        SetDocumentReadyState("interactive");
+
         FireDomContentLoadedEvent();
 
         var htmlEl = Elements.FirstOrDefault(e =>
@@ -54,6 +95,8 @@ public sealed partial class DomBridge
             FireDescendantStylesheetLinkLoads(htmlEl);
             FireDescendantOnloads(htmlEl);
         }
+
+        SetDocumentReadyState("complete");
 
         // 1. Fire window.onload if it was set by script.
         //    In browsers, setting `window.onload = fn` registers a handler

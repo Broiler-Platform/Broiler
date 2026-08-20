@@ -195,6 +195,18 @@ internal static class CssBoxHelper
     internal static bool IsAtomicInlineLevel(string display) =>
         display is "inline-block" or "inline-table" or "inline-flex" or "inline-grid";
 
+    /// <summary>
+    /// Whether <paramref name="box"/> begins a fresh max-content line rather than continuing the
+    /// running one: block-level boxes do, inline-level content — real inline boxes, the atomic
+    /// inline-level displays, floats, and anything under <c>white-space: nowrap</c> — does not.
+    /// </summary>
+    private static bool StartsNewMaxContentLine(CssBox box) =>
+        box.Display != CssConstants.Inline
+        && box.Display != CssConstants.TableCell
+        && !IsAtomicInlineLevel(box.Display)
+        && box.WhiteSpace != CssConstants.NoWrap
+        && box.Float == CssConstants.None;
+
     public static void GetMinMaxSumWords(CssBox box, ref double min, ref double maxSum, ref double paddingSum, ref double marginSum, CssBox suppressExplicitWidthFor = null)
     {
         LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicVisits);
@@ -216,9 +228,7 @@ internal static class CssBoxHelper
         // of their *sum* (e.g. two 40px inline-blocks → max-content 40, not 80),
         // under-sizing every shrink-to-fit and collapsing max-content/fit-content
         // grid tracks that hold them.
-        if (box.Display != CssConstants.Inline && box.Display != CssConstants.TableCell
-            && !IsAtomicInlineLevel(box.Display)
-            && box.WhiteSpace != CssConstants.NoWrap && box.Float == CssConstants.None)
+        if (StartsNewMaxContentLine(box))
         {
             oldSum = maxSum;
             maxSum = marginSum;
@@ -349,7 +359,18 @@ internal static class CssBoxHelper
 
                 marginSum += childBox.ActualMarginLeft + childBox.ActualMarginRight;
 
-                //maxSum += childBox.ActualMarginLeft + childBox.ActualMarginRight;
+                // CSS Sizing 3 §5: an inline-level child sits on the running line, so its own
+                // horizontal margins advance that line and belong in the sum. Only the
+                // block-level case was covered — a block child restarts its line at marginSum,
+                // which carries them — so the margins of an inline box, and of an inline
+                // *replaced* box in particular, contributed nothing. A shrink-to-fit container
+                // around one then came out exactly those margins too narrow: MediaWiki wraps
+                // every thumbnail in a `display: table` figure whose image carries `margin: 3px`,
+                // so the figure measured 6px under, and `max-width` scaled the photo down to fit
+                // a box that should have fitted it exactly.
+                if (!StartsNewMaxContentLine(childBox) && childBox.Display != CssConstants.None)
+                    maxSum += childBox.ActualMarginLeft + childBox.ActualMarginRight;
+
                 GetMinMaxSumWords(childBox, ref min, ref maxSum, ref paddingSum, ref marginSum);
 
                 marginSum -= childBox.ActualMarginLeft + childBox.ActualMarginRight;
@@ -562,6 +583,11 @@ internal static class CssBoxHelper
 
             if (child.Display == CssConstants.Inline
                 || child.Display == CssConstants.InlineBlock)
+                continue;
+
+            // CSS2.1 §9.2.4 again: a box that is not generated cannot be the last in-flow child
+            // whose bottom margin propagates out of its parent.
+            if (child.Display == CssConstants.None)
                 continue;
 
             lastInFlow = child;
@@ -791,6 +817,14 @@ internal static class CssBoxHelper
             if (child.Float != CssConstants.None
                 || child.Position == CssConstants.Absolute
                 || child.Position == CssConstants.Fixed)
+                continue;
+
+            // CSS2.1 §9.2.4: a display:none element generates no box, so it has no margins to
+            // collapse through. Collecting them anyway hands a hidden element's margin to the
+            // next visible sibling: www.mediawiki.org's empty .vector-column-start holds two
+            // display:none pinned containers with `margin-bottom: 32px`, and that 32px was
+            // separating the site notice from the article.
+            if (child.Display == CssConstants.None)
                 continue;
 
             maxPos = Math.Max(maxPos, Math.Max(child.ActualMarginTop, 0));

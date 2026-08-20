@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**Six patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -47,91 +47,89 @@ once more. Both patches it held are upstream and the pinned pointer contains
 them, so each reached CI through the pointer and neither file was doing anything
 but inviting a re-apply:
 
-* `0001`, "Name the character a token cannot start with" — `Broiler.JS`
-  `95aaa3ef`.
-* `0002`, "Render a number as the number it was asked about, and find the empty
-  string at the end" — `Broiler.JS` `e75de4ae`, which is the pinned pointer
-  itself.
+* "Collect a JavaScript stack once, render it as often as asked" — `Broiler.JS`
+  `6fb71d2f`.
+* "Say who is asking" — `Broiler.HTML` `dc197ed`.
 
 Both were checked the way this file says to check, and both answered "live on
 CI":
 
 ```sh
-git -C Broiler.JS merge-base --is-ancestor 95aaa3ef HEAD
-git -C Broiler.JS merge-base --is-ancestor e75de4ae HEAD
+git -C Broiler.JS   merge-base --is-ancestor 6fb71d2f HEAD
+git -C Broiler.HTML merge-base --is-ancestor dc197ed  HEAD
 ```
 
 ## The index
 
+The six below are one item: making `https://www.mediawiki.org/` render as the
+reference browser renders it. Each is a general engine fix that the Vector 2022
+skin happened to expose; none of them is specific to that site. Every one is
+listed in `scripts/apply-pending-wpt-patches.sh`, because each decides what
+reaches the canvas rather than how fast it gets there.
+
 | # | submodule | subject |
 | --- | --- | --- |
-| `0001` | `Broiler.JS` | Collect a JavaScript stack once, render it as often as asked |
-| `0002` | `Broiler.HTML` | Say who is asking |
+| `0001` | `Broiler.CSS` | Evaluate a math function wherever a length is expected |
+| `0002` | `Broiler.CSS` | Match :link on an actual link, and :visited on nothing |
+| `0003` | `Broiler.HTML` | Draw the face the style asked for, not the first one loaded |
+| `0004` | `Broiler.HTML` | Filter a bitmap when it is drawn at a size other than its own |
+| `0005` | `Broiler.HTML` | Itemise a flex or grid container's children, and keep a split box's element |
+| `0006` | `Broiler.HTML` | Clip an outset box-shadow out of its own border box |
 
-### `0002` — the sheets, pictures and fonts a server will not serve an anonymous client
+### `0001` — a breakpoint written as arithmetic
 
-`HttpClient` sends no `User-Agent` unless one is configured, and Wikimedia's User-Agent policy
-answers a request that carries none with `403 Forbidden` before anything else about it matters. Each
-of the three loaders in this submodule builds its own client, so each refused its resource on
-`https://www.mediawiki.org/wiki/MediaWiki`: the `<link>` stylesheets, the `<img>` photographs on
-`upload.wikimedia.org`, and any web font the page asked for. The patch gives all three the engine's
-own token, `Broiler.Layout.Net.BroilerUserAgent` — a main-repository type this submodule already
-references for `OfflineSubresources` — so it is one line per loader and adds no dependency.
+`calc()` had no product tier, so `calc(0.85 * 59.25rem)` was invalid outright.
+Worse, `CssLengthParser.ParseToPixels` — the entry point a *media feature value*
+goes through — unwrapped a single-value `calc()` and then parsed one length
+token, so `calc(1120px - 1px)` came out `NaN` and the whole media query was
+malformed. Media Queries 4 §2.4.1 accepts a math function there, and Vector 2022
+writes every breakpoint that way: 25 of the 76 `@media` blocks on the page are
+`(max-width: calc(1120px - 1px))` and relatives, including the entire
+narrow-viewport branch that applies at a 1024px viewport. All of them were being
+dropped, which is why the page rendered as though it were 1200px wide.
 
-**What is live without it, and what is not.** The reported failure — the instant `403` on the
-document itself — is fixed in the main repository and needs nothing from here, as are the external
-scripts, `fetch()` and XHR. What still fails against the pinned pointer is the *render*:
-`HtmlRender` fetches a page's stylesheets through this submodule's `StylesheetLoadHandler` rather
-than through the bridge's `ResourceLoader`, so a capture of that page comes back as bare document
-flow instead of the Vector skin, with the photographs missing. Applying this patch is the whole
-difference. The account is in `docs/mediawiki-user-agent-403.md`.
+### `0002` — every link the visited colour
 
-**Why it is not listed in `scripts/apply-pending-wpt-patches.sh`.** It can only change a resource
-fetched over the network, and the WPT corpus is a directory on disk — the runner installs
-`OfflineSubresources.FetchPolicy` and declines off-corpus URLs before a request is made. No WPT
-pixel can move, so there is nothing for that script to exercise. The suite it *would* show up in is
-`tests/real-world-sites`, which is observational and not part of the WPT gate.
+`:link` and `:visited` shared one predicate, so `:visited` matched every
+`<a href>`. An engine with no history has visited nothing; `:visited` now matches
+nothing, which is both the correct answer and the privacy-preserving one.
 
-**Why the main repository has no equivalent fallback.** The capture path renders through the static
-`HtmlRender.RenderToFile*` helpers, which construct their own container: there is no host-side
-`StylesheetLoad` handler to answer from, and the alternative — inlining every external sheet into
-the document before handing it over — would mean re-implementing this submodule's relative-URL
-rebasing in the caller, which is a larger change than the patch and a worse one.
+### `0003` — bold that is not bold
 
-### `0001` — one throw, five frames
+The installed-face cache was keyed by family alone, so the first face loaded for
+a family answered every later request for it. In practice that was the regular
+face, and `font-weight: bold` and `font-style: italic` drew as regular text on
+any page that does not ship its own `@font-face`.
 
-`JSException.JSStackTrace` both renders an exception's JavaScript frames and
-*collects* them: the walker appends each frame to the exception's own trace list
-as it prints it, and that list is what keeps the frames printable by
-`Exception.StackTrace` once the context that threw is gone. So the read has to
-collect once and render thereafter, and it did neither — every read walked the
-live frames and appended them again. An exception whose stack a host renders for
-several sinks reported the whole stack once per sink.
+### `0004` — a photograph point-sampled
 
-The repeats are worse than redundant, because a frame is walked at its *current*
-position: only the first copy carries the line it threw at, and each later copy
-carries wherever that frame had unwound to by then. A function that failed at
-line 3 and rethrew from its `catch` at line 4 came back as one line-3 frame
-followed by four line-4 frames, naming the handler as if it were a call site.
+`BCanvas.DrawBitmap` point-sampled the source for every destination pixel, which
+is exact at 1:1 and wrong at any other scale. The thumbnail beside the article's
+lead paragraph is a 330px JPEG drawn at 320px: 33% of its pixels matched the
+reference within tolerance before the patch, 81% after.
 
-It arrived in a report of `https://www.google.com/intl/de/about.html` as five
-identical
+### `0005` — a flex item that floats, and an element that vanished
 
-```
-at native in inline-0:line 14
-```
+CSS Flexbox §3 says `float` has no effect on a flex item, and CSS Display 3 §2.7
+blockifies one. The pass that does both ran *after* the box fix-ups, too late for
+a replaced item — `CorrectImgBoxes` had already wrapped a block image in an
+anonymous block, so the float was cleared on the wrapper while the image inside
+kept floating. Vector's logo is exactly that shape (a `display: flex` link with a
+floated icon and a floated wordmark) and laid out as an empty box.
 
-lines — the shape of a five-deep recursion that never happened — above a
-JavaScript-side `stack` that correctly showed the one frame there was. The two
-halves of one report disagreeing is the tell: `stack` is a string captured once,
-while the CLR-side rendering re-read a list that had been growing on every read.
+The same patch carries two more corrections to the box fix-ups. A `display: none`
+child no longer makes its parent "block inside inline" (CSS2.1 §9.2.4 — it
+generates no box). And an inline box broken around a block keeps its element: the
+break replaces the box with copies of itself on either side of the block, and
+when the block was its only content neither copy was made and the element was
+left with no box at all. WPT
+`css-backgrounds/background-color-body-propagation-003` is that shape, and it
+passed before only because the `display: none` miss made the split pick `<head>`
+instead of `<body>`.
 
-**Why it is not listed in `scripts/apply-pending-wpt-patches.sh`.** It changes
-how an exception's frames are rendered and nothing about what any program
-computes. No pixel can move.
+### `0006` — a card that is all shadow
 
-**It is the smaller half of the report it came from.** What actually failed on
-that page — `document.currentScript` being unbound, so Google's tag-manager
-loader threw on `new URL(document.currentScript.src)` — is in the main repo and
-is already applied here. This patch is what makes the *next* report of that
-shape legible; it is not what stops it happening.
+CSS Backgrounds 3 §7.1: an outer shadow is not painted inside the border box of
+the element casting it. The fill covered the whole shadow rectangle, so every
+main-page card and the tab bar — all of which carry
+`box-shadow: 0 2px 2px rgba(0,0,0,0.2)` — painted as solid grey rectangles.

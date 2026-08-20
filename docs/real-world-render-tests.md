@@ -116,6 +116,12 @@ its format documented by `sites.schema.json`. Keep it limited to public,
 unauthenticated pages: CI must never send repository credentials or signed-in
 browser state to these origins.
 
+A site's own investigation, where it has one, is worth reading before
+interpreting its numbers — what a low score is *made of* is rarely what the
+score says. `mediawiki` has one:
+[MediaWiki and the Vector 2022 skin](mediawiki-vector-rendering.md), which also
+records what its remaining error is and what is not worth chasing in it.
+
 ## CI behavior
 
 [`real-world-render-tests.yml`](../.github/workflows/real-world-render-tests.yml)

@@ -162,8 +162,24 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         if (IsBlock || isOutOfFlow || IsBlockifiedFloatedReplaced || Display == CssConstants.ListItem || Display == CssConstants.Table || Display == CssConstants.InlineTable || Display == CssConstants.TableCell || Display == CssConstants.TableCaption)
         {
-            // Because their width and height are set by CssTable
-            if (Display != CssConstants.TableCell && Display != CssConstants.Table)
+            // Because their width and height are set by CssTable.
+            //
+            // Except when the table is out of flow: CSS2.1 §10.3.5/§10.3.7 shrink-to-fit
+            // a floated or absolutely positioned table just like any other such box, and
+            // ComputeStaticAndFloatPosition below needs that width *before* it places the
+            // box — a right float is positioned at (container right − width). Skipping the
+            // resolution left Size.Width at zero there, so a `float: right` table was
+            // placed hard against the right edge and then grew off the viewport: the
+            // MediaWiki thumbnail (`figure[typeof~='mw:File/Thumb']`, which the skin makes
+            // `display: table; float: right`) vanished entirely, taking its reserved space
+            // with it so the article text reflowed across the full column. The table
+            // algorithm still sizes the columns afterwards, exactly as it already does for
+            // `display: inline-table`, which reaches this branch and has always been right.
+            bool widthComesFromTableAlgorithm = Display == CssConstants.Table
+                && Float == CssConstants.None
+                && !isOutOfFlow;
+
+            if (Display != CssConstants.TableCell && !widthComesFromTableAlgorithm)
             {
                 ResolveBlockUsedWidth(g);
             }
@@ -173,8 +189,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 ComputeStaticAndFloatPosition();
             }
 
+            double widthAtPlacement = Size.Width;
+
             PreResolveDefiniteHeightForDescendants();
             LayoutBlockChildren(g);
+
+            RealignRightFloatAfterContentSizing(widthAtPlacement);
         }
         else
         {
@@ -656,6 +676,45 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // For explicit widths, margins affect position only (CSS1 box model).
             Size = new SizeF((float)(width - ActualMarginLeft - ActualMarginRight), Size.Height);
         }
+    }
+
+    /// <summary>
+    /// Keeps a right float's <em>right</em> edge where placement put it when laying out its
+    /// contents changed its width (CSS2.1 §9.5.1 rule 3: the right outer edge is what a right
+    /// float aligns).
+    /// </summary>
+    /// <remarks>
+    /// A right float is positioned as <c>container right − width</c>, so its left edge is derived
+    /// and its width has to be known first. For a table that width is only provisional at
+    /// placement time: the shrink-to-fit measurement estimates it from the box's content, and the
+    /// table algorithm then sizes the columns and settles on the real one. The difference is pure
+    /// displacement — the MediaWiki thumbnail measured 502px wide, was placed at
+    /// <c>1001 − 502</c>, and then became the 328px it really is, leaving it 174px to the left of
+    /// the margin it was supposed to sit against.
+    /// <para>
+    /// Shifting is the whole correction: the contents were laid out relative to this box, so
+    /// moving box and subtree together by the same delta leaves them consistent, and nothing that
+    /// has already consulted this float can be disturbed by it — a float's own placement only ever
+    /// reads floats <em>earlier</em> in the formatting context.
+    /// </para>
+    /// </remarks>
+    private void RealignRightFloatAfterContentSizing(double widthAtPlacement)
+    {
+        if (Float != CssConstants.Right || ContainingBlock == null)
+            return;
+
+        double delta = widthAtPlacement - Size.Width;
+
+        if (Math.Abs(delta) <= 0.1)
+            return;
+
+        // Only reclaim space the box gave back. A box that grew past its placement would have to
+        // re-run collision resolution against the floats beside it, which is placement's job and
+        // not a shift's.
+        if (delta < 0)
+            return;
+
+        OffsetLeft(delta);
     }
 
     /// <summary>
@@ -1226,11 +1285,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // CSS2.1 §9.5: Floated children were skipped by
                 // CreateLineBoxes (they are out-of-flow).  Lay them out
                 // now so they are positioned and painted.
+                bool laidOutOwnFloat = false;
+
                 foreach (var childBox in Boxes)
                 {
                     if (childBox.Float != CssConstants.None)
                     {
                         childBox.PerformLayout(g);
+                        laidOutOwnFloat |= childBox.Display != CssConstants.None
+                            && childBox.Size is { Width: > 0, Height: > 0 };
 
                         // CSS2.1 §13.3.1: When page-break-inside:avoid is
                         // set on a float's containing block, move the float
@@ -1239,6 +1302,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                         if (PageBreakInside == CssConstants.Avoid)
                             childBox.BreakPage();
                     }
+                }
+
+                // A float's own vertical position is decided by the content before it, so it can
+                // only be placed after that content has flowed — which leaves the lines that
+                // should have been shortened beside it already flowed at full width. Re-flow them
+                // now that the geometry exists; the float's position does not depend on the
+                // narrower lines (its top is where the flow had already reached), so one extra
+                // pass settles it rather than oscillating. Blocks with no float of their own —
+                // nearly all of them — never pay for this.
+                if (laidOutOwnFloat)
+                {
+                    ActualBottom = Location.Y;
+                    CssLayoutEngine.CreateLineBoxes(g, this);
                 }
 
                 // CSS2.1 §9.4.3: a relatively positioned inline-level box is offset

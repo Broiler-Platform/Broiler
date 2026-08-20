@@ -87,8 +87,24 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         double cbWidth = ContainingBlock?.Size.Width ?? 0;
         double em = GetEmHeight();
 
+        // CSS Sizing 3 §5.1: an inline-axis percentage resolves against a containing block width
+        // that is not known yet whenever this box is being measured to *decide* that width — a
+        // shrink-to-fit float, an inline-block, a table cell. Such a percentage takes the
+        // property's initial value (0 for min-width, none for max-width) rather than resolving
+        // against nothing, which is the rule the block axis already follows below.
+        //
+        // Resolving it anyway is not merely imprecise, it inverts the result: the basis is zero,
+        // so `max-width: calc(100% - 8px)` parses to a *negative* length that clamps to zero and
+        // the box disappears. That is the MediaWiki thumbnail — the skin caps the photograph at
+        // `calc(100% - (2 * 3px) - (2 * 1px))` inside a `float: right` figure, so the image came
+        // out zero pixels wide, the figure shrank to its caption, and the article reflowed
+        // around a thumbnail that was not there. A plain `max-width: 100%` reached zero the same
+        // way but clamped to the same zero the box already had, which is why only the calc()
+        // form was visible.
+        bool inlineBasisIsDefinite = cbWidth > 0;
+
         double min = 0;
-        if (IsSizeConstraintLength(MinWidth))
+        if (IsSizeConstraintLength(MinWidth) && (inlineBasisIsDefinite || !MinWidth.Contains('%')))
         {
             double v = CssLengthParser.ParseLength(MinWidth, cbWidth, em);
             if (v > 0 && !double.IsNaN(v))
@@ -96,7 +112,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         double max = double.PositiveInfinity;
-        if (IsSizeConstraintLength(MaxWidth))
+        if (IsSizeConstraintLength(MaxWidth) && (inlineBasisIsDefinite || !MaxWidth.Contains('%')))
         {
             double v = CssLengthParser.ParseLength(MaxWidth, cbWidth, em);
             if (v >= 0 && !double.IsNaN(v))

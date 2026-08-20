@@ -156,6 +156,8 @@ public sealed partial class DomBridge
         using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegWindowObjects))
         {
             RegisterPerformanceObject(context, window);
+            RegisterHistoryObject(context, window);
+            RegisterObservationStubs(context, window);
             RegisterNavigatorObject(context, window);
             RegisterViewportObjects(context, window);
         }

@@ -205,6 +205,23 @@ public class CaptureService
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>
+    /// An attribute value read straight out of the source text, decoded the way the tokenizer
+    /// would have decoded it (WHATWG §13.2.5, the attribute-value character-reference states).
+    /// </summary>
+    /// <remarks>
+    /// This loop matches attributes with a regex over the raw markup, which skips the tokenizer
+    /// and therefore its decoding step — so a <c>src</c> was requested exactly as spelled. An
+    /// ampersand in a query string is spelled <c>&amp;amp;</c> in conforming HTML, so the request
+    /// went out with the entity intact and the server answered about a query it did not have:
+    /// <c>www.mediawiki.org</c>'s ResourceLoader bootstrap
+    /// (<c>load.php?lang=en&amp;amp;modules=startup&amp;amp;…</c>) came back 404, the script was
+    /// dropped for want of content, and with it every module the page loads through
+    /// <c>mw.loader</c> — the whole skin's JavaScript, from one unresolved entity.
+    /// </remarks>
+    private static string DecodeAttributeValue(string value) =>
+        value.IndexOf('&') < 0 ? value : System.Net.WebUtility.HtmlDecode(value);
+
+    /// <summary>
     /// Matches the <c>defer</c> attribute on a script tag (standalone or with a value).
     /// </summary>
     private static readonly Regex DeferAttrPattern = new(
@@ -655,7 +672,7 @@ public class CaptureService
                 var anySrcMatch = AnySrcAttrPattern.Match(attrs);
                 if (anySrcMatch.Success)
                 {
-                    var srcUri = anySrcMatch.Groups["uri"].Value;
+                    var srcUri = DecodeAttributeValue(anySrcMatch.Groups["uri"].Value);
                     if (csp != null && !csp.AllowsExternalScript(srcUri, url, nonce))
                         continue;
 

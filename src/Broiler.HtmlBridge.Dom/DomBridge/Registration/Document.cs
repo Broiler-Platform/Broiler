@@ -36,6 +36,24 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"webkitExitFullscreen",
             new JSFunction((in _) => _dialogs.ExitFullscreen(), "webkitExitFullscreen", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // HTML §3.1.7 document.readyState: "loading" while parsing, "interactive" once parsing is
+        // done, "complete" once the load event is about to fire. It is read, not just written to:
+        // the standard way a script decides whether the DOM is ready is
+        //
+        //     if (document.readyState === 'interactive' || document.readyState === 'complete') go();
+        //     else document.addEventListener('DOMContentLoaded', go);
+        //
+        // and `undefined` fails that test, so such a script takes the listener branch — after
+        // DOMContentLoaded has already fired, which means `go` is never called at all. That is not
+        // a degraded rendering but a missing one: it is how MediaWiki's Vector skin starts, so on
+        // www.mediawiki.org none of the skin's JavaScript ran, and the appearance panel it moves
+        // into the header stayed in the page column, displacing the whole article.
+        document.FastAddProperty(
+            (KeyString)"readyState",
+            new JSFunction((in _) => new JSString(_documentReadyState), "get readyState"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // document structural accessors — body/head/title, co-located in the DocumentStructureBinding
         // feature module (Phase 3).
         document.FastAddProperty((KeyString)"body", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetBody(this, in a), "get body"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

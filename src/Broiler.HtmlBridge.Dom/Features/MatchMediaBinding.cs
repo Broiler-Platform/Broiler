@@ -3,6 +3,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.String;
 
 namespace Broiler.HtmlBridge.Dom.Features;
@@ -35,6 +36,27 @@ internal static class MatchMediaBinding
         // addListener / removeListener stubs (the legacy MediaQueryList API) — no-ops.
         result.FastAddValue((KeyString)"addListener", NoOp("addListener"), JSPropertyAttributes.EnumerableConfigurableValue);
         result.FastAddValue((KeyString)"removeListener", NoOp("removeListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // CSSOM View §4.2 made MediaQueryList an EventTarget, and that is the pair current code
+        // registers with — the two above are the deprecated spelling kept for old callers. Having
+        // only the old pair is not a smaller surface but a broken one: `mql.addEventListener` is
+        // then undefined, and calling it throws "undefined is not a function" *inside* whatever
+        // was setting up a responsive behaviour, abandoning the rest of that setup. On
+        // www.mediawiki.org that is Vector's pinnable-element code, which registers for viewport
+        // changes before it decides whether the appearance panel belongs in the header or in the
+        // page column — so the panel stayed in the column and pushed the article down.
+        //
+        // A capture renders one frame at a fixed viewport, so no `change` event can ever fire and
+        // the listener is genuinely never called; what matters is that registering one is not an
+        // error. `dispatchEvent` reports false — nothing was dispatched — for the same reason.
+        result.FastAddValue((KeyString)"addEventListener", NoOp("addEventListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue((KeyString)"removeEventListener", NoOp("removeEventListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue(
+            (KeyString)"dispatchEvent",
+            new JSFunction((in _) => JSBoolean.False, "dispatchEvent", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue((KeyString)"onchange", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+
         return result;
     }
 

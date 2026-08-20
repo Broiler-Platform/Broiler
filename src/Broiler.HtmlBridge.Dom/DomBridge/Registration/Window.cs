@@ -1,4 +1,5 @@
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
@@ -143,6 +144,106 @@ public sealed partial class DomBridge
 
         window.FastAddValue((KeyString)"performance", performanceObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["performance"] = performanceObj;
+    }
+
+    /// <summary>
+    /// <c>window.history</c> (HTML §7.2.3). A capture never leaves the page it was given, so the
+    /// session is one entry long and the traversal methods do nothing; what matters is that the
+    /// object and its members <em>exist</em>.
+    /// </summary>
+    /// <remarks>
+    /// Absent, it did not read as a missing feature — reading through it threw "Cannot get
+    /// property replaceState of undefined", which aborts the function that asked and, with it,
+    /// whatever that function was in the middle of setting up. It is boilerplate in every router
+    /// and analytics bundle, so the abort lands early: on <c>www.mediawiki.org</c> it took out
+    /// <c>skins.vector.js</c>, and the skin then never applied the preferences that decide which
+    /// of its two appearance panels is shown — leaving both in the page and the article a
+    /// panel's height too far down.
+    /// </remarks>
+    private void RegisterHistoryObject(JSContext context, JSObject window)
+    {
+        var history = new JSObject();
+
+        history.FastAddValue((KeyString)"length", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        history.FastAddValue((KeyString)"state", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        history.FastAddValue((KeyString)"scrollRestoration", new JSString("auto"), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // pushState/replaceState record the state the page hands them, because a page that writes
+        // one commonly reads it straight back; neither changes the document's URL, which a capture
+        // has no way to honour.
+        history.FastAddValue((KeyString)"pushState", new DomFunction((in a) => StoreHistoryState(history, in a), "pushState", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        history.FastAddValue((KeyString)"replaceState", new DomFunction((in a) => StoreHistoryState(history, in a), "replaceState", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        history.FastAddValue((KeyString)"back", UndefinedFunction("back", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        history.FastAddValue((KeyString)"forward", UndefinedFunction("forward", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        history.FastAddValue((KeyString)"go", UndefinedFunction("go", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        window.FastAddValue((KeyString)"history", history, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["history"] = history;
+    }
+
+    private static JSValue StoreHistoryState(JSObject history, in Arguments arguments)
+    {
+        history.FastAddValue(
+            (KeyString)"state",
+            arguments.Length > 0 ? arguments[0] : JSNull.Value,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// <c>PerformanceObserver</c> (Performance Timeline §2) and <c>requestIdleCallback</c>
+    /// (Background Tasks §2), as the shapes a page needs them to have rather than as working
+    /// instrumentation: a headless capture produces no performance entries to deliver, and its
+    /// event loop has no idle period to wait for.
+    /// </summary>
+    /// <remarks>
+    /// A missing constructor is worse than an inert one here. Telemetry bundles construct one at
+    /// module scope, so <c>new PerformanceObserver(…)</c> threw a ReferenceError that rejected the
+    /// promise the module was resolving, and every module waiting on that one stayed unresolved —
+    /// which is how a page can lose behaviour that has nothing to do with performance timing.
+    /// <c>requestIdleCallback</c> runs its callback on a timer instead of dropping it, because
+    /// what pages defer to idle is often the work that produces visible content.
+    /// </remarks>
+    private void RegisterObservationStubs(JSContext context, JSObject window)
+    {
+        if (window[(KeyString)"PerformanceObserver"] is not JSUndefined)
+            return;
+
+        var observerPrototype = new JSObject();
+        observerPrototype.FastAddValue((KeyString)"observe", UndefinedFunction("observe", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        observerPrototype.FastAddValue((KeyString)"disconnect", UndefinedFunction("disconnect", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        observerPrototype.FastAddValue((KeyString)"takeRecords", new DomFunction((in _) => new JSArray(), "takeRecords", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        var performanceObserver = new JSFunction((in _) =>
+        {
+            var instance = new JSObject();
+            instance.FastAddValue((KeyString)"observe", UndefinedFunction("observe", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            instance.FastAddValue((KeyString)"disconnect", UndefinedFunction("disconnect", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            instance.FastAddValue((KeyString)"takeRecords", new DomFunction((in _) => new JSArray(), "takeRecords", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            return instance;
+        }, "PerformanceObserver", 1);
+
+        performanceObserver.FastAddValue((KeyString)"prototype", observerPrototype, JSPropertyAttributes.ConfigurableValue);
+
+        // Feature detection reads this before observing, and an observer that claims to support
+        // nothing is the honest answer for a capture that reports no entries.
+        performanceObserver.FastAddValue((KeyString)"supportedEntryTypes", new JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        window.FastAddValue((KeyString)"PerformanceObserver", performanceObserver, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["PerformanceObserver"] = performanceObserver;
+
+        if (window[(KeyString)"requestIdleCallback"] is JSUndefined)
+        {
+            var requestIdle = new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "requestIdleCallback", 1);
+            window.FastAddValue((KeyString)"requestIdleCallback", requestIdle, JSPropertyAttributes.EnumerableConfigurableValue);
+            context["requestIdleCallback"] = requestIdle;
+
+            var cancelIdle = new DomFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "cancelIdleCallback", 1);
+            window.FastAddValue((KeyString)"cancelIdleCallback", cancelIdle, JSPropertyAttributes.EnumerableConfigurableValue);
+            context["cancelIdleCallback"] = cancelIdle;
+        }
     }
 
     private void RegisterNavigatorObject(JSContext context, JSObject window)

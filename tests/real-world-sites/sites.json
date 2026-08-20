@@ -120,6 +120,21 @@
         "semantic-html",
         "responsive"
       ]
+    },
+    {
+      "id": "mediawiki",
+      "name": "MediaWiki.org",
+      "url": "https://www.mediawiki.org/",
+      "category": "dynamic",
+      "description": "Vector 2022 skin: a flex/grid header and toolbar, a ResourceLoader bootstrap that rewrites the page from JavaScript, calc() breakpoints, and a floated thumbnail beside the article text.",
+      "settleMilliseconds": 4000,
+      "tags": [
+        "wiki",
+        "flexbox",
+        "javascript",
+        "dynamic-content",
+        "media-queries"
+      ]
     }
   ]
 }
