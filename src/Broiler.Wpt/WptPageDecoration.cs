@@ -55,19 +55,46 @@ internal sealed record WptPageDecoration(string BackgroundCss, string BoxCss, bo
     /// <c>null</c> when they declare none — which is every document that does not style the sheet,
     /// and the reason this costs nothing for the rest of the suite.
     /// </summary>
-    internal static WptPageDecoration? Resolve(string html)
+    /// <param name="html">The document's markup.</param>
+    /// <param name="page">
+    /// The page box as the document declares it — the surface a paged render would use, which is
+    /// what a flow-relative padding's percentage resolves against even when the render is
+    /// unpaginated onto the runner's viewport.
+    /// </param>
+    internal static WptPageDecoration? Resolve(string html, WptPageBox page)
     {
         // Later declarations win, and a shorthand must not be reordered behind the longhand that
         // follows it, so the cascade is kept as a name-keyed list in source order.
         var background = new List<CssDeclaration>();
         var box = new List<CssDeclaration>();
         bool paints = false, insets = false;
+        var axes = WptPageAxes.Resolve(html);
 
         foreach (var (declarations, _) in WptPageBox.EnumerateUnconditionalPageBlocks(html))
         {
+            double fontSize = WptPageBox.FontSizeOf(declarations.Declarations.ToList());
+
             foreach (var declaration in declarations.Declarations)
             {
                 var name = declaration.Name.Trim().ToLowerInvariant();
+
+                // Flow-relative padding names a physical side through the page's own axes and takes
+                // its percentage against the page box, neither of which the probe below can work out
+                // for itself — its writing mode is the initial one, and its containing block is the
+                // probe surface rather than the page. So it is rewritten here into the physical
+                // longhand it means, in the place it was written so the cascade is unchanged.
+                //
+                // A value this cannot resolve to a length falls through to the general box branch
+                // below and reaches the probe as written, which is what it did before any of this:
+                // the rewrite is an improvement on that path, not a gate in front of it.
+                if (TryLogicalPadding(name, out bool inline, out bool start)
+                    && Physical(declaration, axes.Side(inline, start), page, fontSize) is { } physical)
+                {
+                    Replace(box, physical.Name, physical);
+                    paints = true;
+                    insets = true;
+                    continue;
+                }
 
                 // `visibility` applies to the page context and to nothing else in the document
                 // (css-page-3 §5.1), so it goes on both boxes: a hidden page keeps the space its
@@ -107,6 +134,57 @@ internal sealed record WptPageDecoration(string BackgroundCss, string BoxCss, bo
             into.Add(declaration);
         }
     }
+
+    /// <summary>
+    /// Whether <paramref name="name"/> is one of the four flow-relative padding longhands, and which
+    /// axis and end it names.
+    /// </summary>
+    private static bool TryLogicalPadding(string name, out bool inline, out bool start)
+    {
+        foreach (var (longhand, isInline, isStart) in WptPageAxes.LogicalLonghands("padding"))
+        {
+            if (!name.Equals(longhand, StringComparison.Ordinal))
+                continue;
+
+            (inline, start) = (isInline, isStart);
+            return true;
+        }
+
+        (inline, start) = (false, false);
+        return false;
+    }
+
+    /// <summary>
+    /// <paramref name="declaration"/> rewritten as the physical longhand for <paramref name="side"/>,
+    /// with its length resolved against <paramref name="page"/>, or <c>null</c> when the value is not
+    /// a length this can resolve.
+    /// </summary>
+    /// <remarks>
+    /// The percentage basis is the page box dimension the side runs along, not the box's inline size:
+    /// <c>page-box-008-print</c> and <c>-009-print</c> both state a 16/32/48/80 ring from 2/8/6/20 %
+    /// on a 400×800 page, which only comes out that way per-axis.
+    /// </remarks>
+    private static CssDeclaration? Physical(
+        CssDeclaration declaration, WptPageSide side, WptPageBox page, double fontSize)
+    {
+        double basis = side is WptPageSide.Top or WptPageSide.Bottom
+            ? page.BoxSize.Height
+            : page.BoxSize.Width;
+
+        if (WptPageBox.TryLength(declaration.Value.Text.Trim(), basis, fontSize) is not { } pixels)
+            return null;
+
+        return new CssDeclaration(
+            "padding-" + PhysicalName(side), new CssValue(Px(pixels)), declaration.Important);
+    }
+
+    private static string PhysicalName(WptPageSide side) => side switch
+    {
+        WptPageSide.Top => "top",
+        WptPageSide.Right => "right",
+        WptPageSide.Bottom => "bottom",
+        _ => "left",
+    };
 
     /// <summary>
     /// Renders the sheet's backdrop: the page background over the whole page box, and the page's

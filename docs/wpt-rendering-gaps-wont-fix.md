@@ -232,6 +232,49 @@ sides only the first block paints. **It cannot change what CI reports for this
 test in any case** — CI scores it unpaginated against Chromium's blank
 `vertical-rl` viewport capture.
 
+## The inverse case: a reftest reference no shipping engine matches
+
+Everything above is *golden fails, reftest passes*. The reftest suite produces the
+mirror image of it, and the
+[#1726 run](https://github.com/Broiler-Platform/Broiler/issues/1726) ranked one at
+the very top of its severity list, so it is worth writing down before someone
+spends a day on it.
+
+### `CSS2/box-display/root-box-003` — Chromium renders it blank too
+
+The test styles the root element `display: none; background: green` and its
+reference paints the canvas green through `body`; the title promises "a big green
+expanse". Broiler renders a blank white page and scores **0.0%**, which put it
+first in that run's thirty.
+
+Rendered in the Chromium that generates this project's references (2026-08-20,
+`file://`, 800×600): the **test comes out blank white** and the **reference comes
+out solid green**. Chromium fails this reftest against its own reference, and
+Broiler renders exactly what Chromium renders.
+
+So this 0.0% is not an engine gap in the sense the rest of the *not fixed* list
+uses. Making it pass means propagating a `display: none` root element's background
+to the canvas — behaviour the reference browser does not implement — and the
+golden-image suite scores against that browser's screenshot, so closing it here
+would open it there. It needs the same maintainer's call as
+[`grid-lanes`](wpt-rendering-gaps-open.md#grid-lanes-is-an-unshipped-draft-feature):
+which suite governs, not a patch.
+
+**The general lesson, and it applies to every 0.0% in a reftest report.** The
+reftest suite removes Chromium from the *comparison*, which is what makes it
+independent — but it does not make the test's own reference authoritative. Before
+treating a low reftest score as a gap, open the test **and** the file its
+`<link rel="match">` names in the pinned Chromium (`tests/wpt/node_modules`, launched
+with `executablePath: '/opt/pw-browsers/chromium'` — the bundled build the pinned
+Playwright wants is not the one installed) and screenshot both at the runner's
+viewport. If the reference browser does not reproduce its own reference, the test is
+not measuring Broiler.
+
+`css-page/root-element-display-none-print` is the neighbouring case that is
+**not** this: it matches a deliberately blank reference, and Broiler passes it. A
+`display: none` root generating no page is settled; a `display: none` root
+propagating its background to the canvas is not.
+
 ## Two fall through the 99% gate
 
 `--verify-reference` only sets `suspectReference` when Broiler *reproduces* the

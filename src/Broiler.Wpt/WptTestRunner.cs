@@ -2793,13 +2793,19 @@ internal sealed partial class WptTestRunner
             // nothing else — and for both sides of one, since PrintMedia is set from the test path
             // for the whole reftest. A document with no page background, border or padding resolves
             // to null here and renders exactly as it always has.
-            var decoration = PrintMedia ? WptPageDecoration.Resolve(html) : null;
+            //
+            // The page box comes first because the decoration needs it: it is the surface a paged
+            // render lays out on, and it is the basis a `@page` percentage resolves against — in the
+            // unpaginated render below too, whose sheet is the runner's viewport instead.
+            var declaredPage = PrintMedia
+                ? WptPageBox.Resolve(html, new System.Drawing.SizeF(_width, _height))
+                : default;
+            var decoration = PrintMedia ? WptPageDecoration.Resolve(html, declaredPage) : null;
 
             if (PagedRender)
             {
-                var page = WptPageBox.Resolve(html, new System.Drawing.SizeF(_width, _height));
                 return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderPaged(
-                    renderDocument, html, page,
+                    renderDocument, html, declaredPage,
                     backgroundColor: BColor.White,
                     stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl,
                     decoration: decoration));
@@ -2810,8 +2816,7 @@ internal sealed partial class WptTestRunner
                 // Unpaginated, so the surface stays the runner's viewport and only the `@page`'s
                 // margins are taken from the rule: taking its `size` too would resize one side of a
                 // comparison whose reference states no size of its own.
-                var sheet = WptPageBox.Resolve(html, new System.Drawing.SizeF(_width, _height))
-                    with { BoxSize = new System.Drawing.SizeF(_width, _height) };
+                var sheet = declaredPage with { BoxSize = new System.Drawing.SizeF(_width, _height) };
                 return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderDecorated(
                     renderDocument, html, sheet, decoration,
                     backgroundColor: BColor.White,

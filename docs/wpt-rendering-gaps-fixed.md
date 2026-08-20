@@ -262,6 +262,57 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   preserved rather than cleared. 204 `manual/`-segment entries are still in that
   file for this reason. They are historical, not current.
 
+### The page box dropped its flow-relative margins and padding
+
+- **Tests:** `css-page/page-box-008-print` (`rel=match` 4.0% → **6.7%**) and
+  `page-box-009-print` (67.0% → **79.8%**), measured 2026-08-20 against the
+  [#1726 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1726),
+  where the first was the run's 16th-biggest problem.
+- **Owner:** the WPT runner (`src/Broiler.Wpt/WptPageBox.cs`,
+  `WptPageDecoration.cs`, and the new `WptPageAxes.cs`). Main repo.
+- **The bug.** CSS Paged Media 3 §3.2 lets the page box carry the flow-relative
+  margin and padding properties, and neither half of the runner's `@page` model
+  understood them. `WptPageBox.Resolve` switched on the four *physical* margin
+  longhands only, so `margin-inline-start` and its siblings fell through the switch
+  and left the margin at zero. The padding reached the decoration probe, but that
+  probe is a bare `<div>`: its writing mode is the initial one, so
+  `padding-block-start` resolved to `padding-top` no matter what the page said, and
+  its containing block is the probe surface, so a percentage resolved against that
+  rather than against the page box.
+- **Where the writing mode comes from, and why it needs saying.** The two tests
+  disagree on purpose. `page-box-008-print` puts `writing-mode: vertical-rl` on the
+  root element and leaves the `@page` silent; `page-box-009-print` puts it on the
+  `@page` rule and leaves the root horizontal. Both expect the same 16/32/48/80
+  ring, so the page's own declaration wins where it makes one and the root
+  element's applies otherwise.
+- **And the percentage basis is per-axis, not the inline size.** Both references
+  spell the expected ring out as `border-width: 16px 32px 48px 80px` on a 400×800
+  page declared as 2%/8%/6%/20% — which only comes out that way if each percentage
+  is taken against the page-box dimension its *physical* side runs along. That is
+  the convention the physical margin longhands in `WptPageBox` already used; the
+  `margin` shorthand beside them still resolves all four against the width.
+- **What landed:** `WptPageAxes` resolves the page's writing mode and direction and
+  maps a flow-relative side to a physical one; `WptPageBox.Resolve` reads the four
+  flow-relative margin longhands through it; and `WptPageDecoration.Resolve` now
+  takes the declared page box and rewrites a flow-relative padding into the
+  physical longhand it means, **in the place it was written**, so the cascade
+  between the two spellings is unchanged.
+- **The wrong turn, and it cost a measurable regression.** The padding was first
+  resolved at probe-build time against the `WptPageBox` the renderer is handed —
+  which, on the unpaginated path, has had its `BoxSize` replaced by the runner's
+  viewport. Percentages then resolved against 1024×768 instead of the declared
+  400×800 and `page-box-009-print` fell from 81.4% to 64.4%. The basis has to be
+  the page box **as declared**, which is why `WptTestRunner` now resolves it once,
+  before the sheet is overridden, and passes it to both readers.
+- **Verified:** nine focused tests across `WptPageBoxTests` and
+  `PagePaintRenderTests` pin the mapping in both writing modes, `direction: rtl`,
+  the initial axes, the source-order cascade against the physical longhands, and
+  the page-box percentage basis. Suite-wide, `css/css-page` moved 87.86% → 87.93%
+  average with the passing count unchanged at 140/223, and `css/css-break` did not
+  move at all — no test regressed. The golden-image score for all three affected
+  tests is byte-identical before and after (98.4%, 98.4%, 98.9% against a locally
+  generated Chromium reference), so the change is free on that side.
+
 ---
 
 ## CSS engine
