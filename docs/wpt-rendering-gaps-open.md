@@ -983,17 +983,23 @@ Worth separating from the rest, because the test itself may be at fault:
   there. The declared page box is not a sheet-size change at all: it is pagination.
 - **So the work is to make the paged path good enough to become the default**,
   and the gap is now measured rather than guessed. `BROILER_WPT_PAGED_PRINT=1`
-  scores `css/css-page` **128 of 224** against the unpaginated 142 — it was 125
-  when this entry was first written, and
-  [the empty-root fix](wpt-rendering-gaps-fixed.md#a-paged-render-stamped-a-page-for-a-document-that-generates-none),
-  named pages and the paged formatting context have since closed three of it.
+  scores `css/css-page` **132 of 224** against the unpaginated 142 — it was 125
+  when this entry was first written, and named pages, the paged formatting context,
+  [the empty-root fix](wpt-rendering-gaps-fixed.md#a-paged-render-stamped-a-page-for-a-document-that-generates-none)
+  and [page one's own box](wpt-rendering-gaps-fixed.md#every-page-of-a-paged-render-was-printed-on-the-same-page-box)
+  have closed seven of it since.
   Paged **wins 8** tests the unpaginated path fails — `basic-pagination-003`/`-004`,
-  five `margin-boxes/content-*`, `page-margin-004` — and **loses 22**, which sort
+  five `margin-boxes/content-*`, `page-margin-004` — and **loses 18**, which sort
   into three groups:
-  - **13 are `SizeMismatch` at 0.0 %**: the two sides render a different number of
-    pages. Seven of those need a **per-page box** the model cannot carry —
-    `page-rule-specificity-001`–`-003` (`@page :first { size: portrait }`),
-    `page-name-003`, `page-name-img-003`/`-004`, `page-name-unnamed-trailing-001`.
+  - **`SizeMismatch` at 0.0 %** was the largest group, and page one's own box plus
+    `reftest-pages` has since closed `page-rule-specificity-001`–`-003`. **Four
+    remain, and they are the harder half:** `page-name-003`,
+    `page-name-img-003`/`-004` and `page-name-unnamed-trailing-001` put *different*
+    named pages on different pages of one flow, so the flow has to divide against
+    more than one page area. That is per-page **layout**, not a per-page box —
+    `RenderPaged` lays the whole flow out once against a single page area and cuts
+    bands out of it, which is exactly what cannot express them. Page one is the one
+    page whose box may differ without that, because nothing before it has to fit.
   - **`page-background-002` is the page *count* itself**, and it is the cleanest
     one to start on: test and reference are the same three-page document except
     that the reference draws its image as `position: absolute; top: 0`, and the

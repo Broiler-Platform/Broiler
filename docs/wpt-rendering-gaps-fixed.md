@@ -343,6 +343,48 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   does not move, and a fail-list diff shows exactly one test changed state and none
   regressed. The golden-image score is unchanged (99.0%, passing either way).
 
+### Every page of a paged render was printed on the same page box
+
+- **Tests:** `css-page/page-rule-specificity-001-print`, `-002`, `-003` and
+  `page-size-006-print` — all four **0.0% or near-miss → pass** under
+  `BROILER_WPT_PAGED_PRINT=1`. The first three were `SizeMismatch` at 0.0%, the
+  largest single group of that lever's remaining losses.
+- **Owner:** the WPT runner (`WptDocumentRenderer.RenderPaged`, `WptPageBox`, and
+  the new `WptReftestPages`). Main repo.
+- **Two things were missing, and the first is not a page box at all.** A print
+  reftest often needs a page it does not want to compare — one that exists only to
+  push the interesting content onto the page after it —
+  and says so with `<meta name="reftest-pages">`. `page-orientation-on-landscape-001-print`
+  spells it out in the markup it renders: *"Page 1. Not compared. Just bumps testing
+  to page 2."* Its reference is a one-page document, so emitting both of the test's
+  pages compares two pages against one and fails on the size before a pixel is
+  looked at. **No page box can fix that**, which is why the three specificity tests
+  were unreachable however their geometry was resolved.
+- **The second is the page box.** `@page :first` describes exactly one page, and
+  every page of a paged render was printed on the same box, so a document whose
+  first page differs could not be drawn — including
+  `page-rule-specificity-print-portrait-ref`, which states its whole geometry as
+  one page sized by `@page :first { size: portrait }` alone.
+- **What landed:** `WptReftestPages` reads the declaration (single pages, lists and
+  `2-4` ranges), and `RenderPaged` emits only the pages it names, each carrying the
+  box it is actually printed on — page one taking `@page :first` layered over the
+  unconditional rule and the used named one. The sheet is as wide as the widest
+  emitted page and as tall as they add up to.
+- **The limit, stated rather than hidden.** The *flow* is still laid out against one
+  page area, so only page one's box may differ. That is sound for these four
+  because each forces its own break, so where the content divides does not depend
+  on the size of the page it lands on. A document whose flow has to divide against
+  two different page areas needs per-page *layout*, which this is not —
+  the four remaining `page-name-*` `SizeMismatch` failures are that case and are
+  still [open](wpt-rendering-gaps-open.md#a--print-document-renders-on-the-viewport-not-on-the-page-it-declares).
+- **Verified:** 19 focused tests across `WptReftestPagesTests` and `WptPageBoxTests`
+  cover the meta's spellings, ranges, sorting and the declarations that name nothing
+  usable, plus `:first` layering over the unconditional rule and the other
+  pseudo-classes staying unread. The paged run goes 128 → **132** of 224 with the
+  average 73.69% → **76.45%**, `css/css-break` does not move, four tests change
+  state and none is lost. The default unpaginated run is byte-identical
+  test-for-test.
+
 ### A paged render stamped a page for a document that generates none
 
 - **Test:** `css-page/root-element-display-none-print` — under

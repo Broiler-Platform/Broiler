@@ -214,6 +214,24 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` — a paged render prints each page on the box it is actually
+  printed on, and emits only the pages the comparison asks for. Two things were
+  missing and the first is not a page box at all: a print reftest often needs a
+  page it does not want to compare, and says so with
+  `<meta name="reftest-pages">` — `page-orientation-on-landscape-001-print`
+  spells it out in the markup it renders ("Page 1. Not compared. Just bumps
+  testing to page 2."), and its reference is a one-page document, so emitting
+  both of the test's pages compares two pages against one and fails on the size
+  alone. `WptReftestPages` reads the declaration (single pages, lists, `2-4`
+  ranges) and `RenderPaged` emits only what it names. The second is `@page
+  :first`, which describes exactly one page and could not be drawn while every
+  page shared a box. The flow is still laid out against a single page area, so
+  only page one's box may differ — sound for these tests because each forces its
+  own break. Under `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 128 → 132 of
+  224, average 73.69% → 76.45%, four tests changing state and none lost;
+  `css/css-break` does not move and the default unpaginated run is
+  byte-identical.
+
 - `Broiler.Wpt` — a paged render no longer stamps a page for a document that
   generates none. A root element with no box generates no page, so the sheet
   keeps none of its own paint; `RenderDecorated` has gated that on

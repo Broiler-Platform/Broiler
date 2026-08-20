@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using Broiler.CSS;
 using Broiler.Dom;
 using Broiler.Graphics;
@@ -208,6 +210,25 @@ internal static class WptDocumentRenderer
     }
 
     /// <summary>
+    /// The pages of a <paramref name="pages"/>-page render that take part in the comparison: the
+    /// ones <c>&lt;meta name="reftest-pages"&gt;</c> names, or all of them when it names none.
+    /// </summary>
+    /// <remarks>
+    /// A page the document asks for that the render does not have is dropped rather than blanked,
+    /// and a declaration that leaves nothing at all falls back to every page — a comparison against
+    /// an empty image says less than one against the wrong number of pages.
+    /// </remarks>
+    private static IReadOnlyList<int> ComparedPages(string html, int pages)
+    {
+        var requested = WptReftestPages.Parse(html);
+        if (requested is null)
+            return Enumerable.Range(1, pages).ToArray();
+
+        var kept = requested.Where(page => page <= pages).ToArray();
+        return kept.Length == 0 ? Enumerable.Range(1, pages).ToArray() : kept;
+    }
+
+    /// <summary>
     /// Whether a laid-out document puts anything on a page: some box below the fragment tree's root
     /// that is neither <c>display: none</c> nor collapsed to nothing.
     /// </summary>
@@ -338,7 +359,8 @@ internal static class WptDocumentRenderer
         EventHandler<HtmlStylesheetLoadEventArgs>? stylesheetLoad,
         EventHandler<HtmlImageLoadEventArgs>? imageLoad,
         string? baseUrl,
-        WptPageDecoration? decoration = null)
+        WptPageDecoration? decoration = null,
+        WptPageBox? firstPage = null)
     {
         // The page's own paint, and the border and padding it insets the page area by. Every page
         // of the flow gets the same sheet, so this is resolved once and stamped per page below.
@@ -416,7 +438,32 @@ internal static class WptDocumentRenderer
             return blank;
         }
 
-        var output = new BBitmap(boxWidth, boxHeight * pages);
+        // Which of those pages the comparison actually wants. A test that only needs a page to
+        // exist so the next one is reachable says so, and its reference is then a shorter document;
+        // emitting the pages it excluded compares two documents of different lengths.
+        var compared = ComparedPages(html, pages);
+
+        // Page one may have a box of its own — `@page :first` describes it and nothing else — so
+        // each emitted page carries the box it is actually printed on. The sheet is as wide as the
+        // widest of them and as tall as they add up to. Nothing but page one can differ, which is
+        // why the flow above is still laid out against one page area: `page-rule-specificity-001`
+        // through `-003` each force the break themselves, so where the content divides does not
+        // depend on the size of the page it lands on. A document whose *flow* has to divide against
+        // two different page areas is the per-page layout this does not do.
+        var sheets = compared
+            .Select(number => number == 1 && firstPage is { } first ? first : page)
+            .ToArray();
+
+        var slotTop = new int[sheets.Length];
+        int sheetWidth = 1, sheetHeight = 0;
+        for (int slot = 0; slot < sheets.Length; slot++)
+        {
+            slotTop[slot] = sheetHeight;
+            sheetWidth = Math.Max(sheetWidth, (int)Math.Round(sheets[slot].BoxSize.Width));
+            sheetHeight += Math.Max(1, (int)Math.Round(sheets[slot].BoxSize.Height));
+        }
+
+        var output = new BBitmap(sheetWidth, Math.Max(1, sheetHeight));
         output.Clear(backgroundColor);
 
         // The sheet's own paint under everything, then the margin ring, then the flow's band over
@@ -425,14 +472,24 @@ internal static class WptDocumentRenderer
         // the page area's edge, and the flow is the one the rest of the render is measured against.
         if (backdrop is not null)
         {
-            for (int p = 0; p < pages; p++)
-                BlitOnto(output, backdrop, 0, p * boxHeight);
+            for (int slot = 0; slot < sheets.Length; slot++)
+                BlitOnto(output, backdrop, 0, slotTop[slot]);
         }
 
-        PaintMarginBoxes(output, html, page, pages, boxWidth, boxHeight, stylesheetLoad, imageLoad, baseUrl);
+        PaintMarginBoxes(
+            output, html, page, compared.Count, boxWidth, boxHeight, stylesheetLoad, imageLoad, baseUrl);
 
-        for (int p = 0; p < pages; p++)
-            BlitBand(output, surface, p * areaHeight, areaX, p * boxHeight + areaY, areaWidth, areaHeight);
+        for (int slot = 0; slot < sheets.Length; slot++)
+        {
+            // `compared` is one-based, the way the markup writes it.
+            int sourcePage = compared[slot] - 1;
+            var sheet = sheets[slot];
+            BlitBand(
+                output, surface, sourcePage * areaHeight,
+                (int)Math.Round(sheet.MarginLeft + insets.Item1),
+                slotTop[slot] + (int)Math.Round(sheet.MarginTop + insets.Item2),
+                areaWidth, areaHeight);
+        }
 
         return output;
     }

@@ -77,7 +77,7 @@ internal readonly record struct WptPageBox(
     /// matters is that both sides resolve them identically, which is why this reads the document
     /// rather than taking them from the runner.
     /// </remarks>
-    internal static WptPageBox Resolve(string html, SizeF defaultBoxSize)
+    internal static WptPageBox Resolve(string html, SizeF defaultBoxSize, bool firstPage = false)
     {
         var box = new WptPageBox(defaultBoxSize, 0, 0, 0, 0);
         double? areaWidth = null, areaHeight = null;
@@ -89,7 +89,7 @@ internal readonly record struct WptPageBox(
         // here and settled after the loop.
         var auto = new AutoMargins();
 
-        foreach (var (declarations, _) in EnumerateAppliedPageBlocks(html))
+        foreach (var (declarations, _) in EnumerateAppliedPageBlocks(html, firstPage))
         {
             double fontSize = FontSizeOf(declarations.Declarations.ToList());
 
@@ -196,7 +196,7 @@ internal readonly record struct WptPageBox(
     /// </para>
     /// </remarks>
     internal static IEnumerable<(CssDeclarationBlock Declarations, string BlockText)>
-        EnumerateAppliedPageBlocks(string html)
+        EnumerateAppliedPageBlocks(string html, bool firstPage = false)
     {
         var used = SoleUsedPageName(html);
 
@@ -206,12 +206,23 @@ internal readonly record struct WptPageBox(
                 yield return block;
         }
 
-        if (used is null)
+        if (used is not null)
+        {
+            foreach (var (selector, block) in EnumeratePageBlocks(html))
+            {
+                if (selector.Equals(used, StringComparison.OrdinalIgnoreCase))
+                    yield return block;
+            }
+        }
+
+        if (!firstPage)
             yield break;
 
-        foreach (var (selector, block) in EnumeratePageBlocks(html))
+        // `:first` last, because it is the most specific of the three and describes exactly one
+        // page. Only a paged render asks for it, and only for page one — see WptDocumentRenderer.
+        foreach (var (selector, block) in EnumeratePageBlocks(html, pseudoClasses: true))
         {
-            if (selector.Equals(used, StringComparison.OrdinalIgnoreCase))
+            if (selector.Equals(":first", StringComparison.OrdinalIgnoreCase))
                 yield return block;
         }
     }
@@ -221,7 +232,7 @@ internal readonly record struct WptPageBox(
     /// and its block. A selector carrying a pseudo-class is skipped outright.
     /// </summary>
     private static IEnumerable<(string Selector, (CssDeclarationBlock Declarations, string BlockText) Block)>
-        EnumeratePageBlocks(string html)
+        EnumeratePageBlocks(string html, bool pseudoClasses = false)
     {
         foreach (var source in EnumerateStyleSources(html))
         {
@@ -245,7 +256,7 @@ internal readonly record struct WptPageBox(
                     continue;
 
                 var selector = ((split < 0 ? string.Empty : name[split..]) + " " + atRule.Prelude).Trim();
-                if (selector.Contains(':'))
+                if (selector.Contains(':') && !pseudoClasses)
                     continue;
 
                 yield return (selector, (declarations, atRule.BlockText ?? string.Empty));

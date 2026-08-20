@@ -2804,11 +2804,15 @@ internal sealed partial class WptTestRunner
 
             if (PagedRender)
             {
+                // Page one's own box, for the `@page :first` that describes it.
+                var firstPage = WptPageBox.Resolve(
+                    html, new System.Drawing.SizeF(_width, _height), firstPage: true);
+
                 return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderPaged(
                     renderDocument, html, declaredPage,
                     backgroundColor: BColor.White,
                     stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl,
-                    decoration: decoration));
+                    decoration: decoration, firstPage: firstPage));
             }
 
             if (decoration is not null)

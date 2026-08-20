@@ -128,6 +128,54 @@ public sealed class WptPageBoxTests
         Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox).BoxSize);
     }
 
+    // ---- page one's own box ----------------------------------------------
+
+    // ...except when the caller is asking for page one specifically, which only a paged render
+    // does. `:first` describes exactly one page, so a surface that prints that page can carry it.
+    // page-rule-specificity-print-portrait-ref states its whole geometry that way: one page, sized
+    // by `@page :first { size: portrait }` alone.
+    [Fact]
+    public void First_Page_Reads_The_First_Page_Rule()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page :first { size: 400px; }"
+            + "</style></head><body></body></html>";
+
+        Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox).BoxSize);
+        Assert.Equal(
+            new SizeF(400, 400),
+            WptPageBox.Resolve(html, DefaultBox, firstPage: true).BoxSize);
+    }
+
+    // `:first` is the most specific of the three, so it layers over the unconditional rule and over
+    // the used named one — page-rule-specificity-002-print states `@page :first { size: portrait }`
+    // beside `@page { size: landscape }` and expects the first page portrait.
+    [Fact]
+    public void The_First_Page_Rule_Layers_Over_The_Unconditional_One()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 5in 3in; margin: 10px; } @page :first { size: 3in 5in; }"
+            + "</style></head><body></body></html>";
+
+        var box = WptPageBox.Resolve(html, DefaultBox, firstPage: true);
+
+        Assert.Equal(new SizeF(288, 480), box.BoxSize);
+        Assert.Equal(10, box.MarginTop, 3);   // still the unconditional rule's
+    }
+
+    // The other pseudo-classes describe pages this model still cannot single out, so `:first` does
+    // not open the door to them.
+    [Theory]
+    [InlineData("@page :left { size: 400px; }")]
+    [InlineData("@page :right { size: 400px; }")]
+    [InlineData("@page :blank { size: 400px; }")]
+    public void Only_First_Is_Read_For_Page_One(string rule)
+    {
+        var html = $"<!DOCTYPE html><html><head><style>{rule}</style></head><body></body></html>";
+
+        Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox, firstPage: true).BoxSize);
+    }
+
     // ---- the named page the document actually uses ----
 
     // The runner renders one sheet and that sheet is page one, so it takes the box of the page the
