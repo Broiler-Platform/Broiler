@@ -214,6 +214,23 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.HTML` (**pending patch**, `patches/0003`) — a block-level image keeps
+  its page name. `CorrectImgBoxes` implements a block-level replaced element by
+  wrapping the image in an anonymous block and demoting the image itself to
+  `display: inline`, so it paints as an inline replaced word inside a block
+  wrapper; the geometry is right, but the wrapper is now the block-level box the
+  element generates and CSS Paged Media 3 §3.4 hangs a page name on a
+  block-level box and nothing else. The name stayed behind on the demoted
+  inline, so `<img style="display:block; page:b">` read as staying on its
+  ancestor's page and a following `div { page: b }` forced a break that should
+  not be there. `css-page/page-name-img-001` and `-002` are the control — there
+  the image really is inline and its name really must be ignored — and all four
+  now pass at 100%. Only paged rendering reads a page name, so the default
+  unpaginated render is unchanged test-for-test across `css/css-page`,
+  `css/css-break`, `css/css-backgrounds` and `css/css-values`; under
+  `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 132 → 134 of 224, average
+  76.45% → 77.36%, none lost.
+
 - `Broiler.Wpt` — a paged render prints each page on the box it is actually
   printed on, and emits only the pages the comparison asks for. Two things were
   missing and the first is not a page box at all: a print reftest often needs a

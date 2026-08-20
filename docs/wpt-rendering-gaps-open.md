@@ -998,8 +998,14 @@ Worth separating from the rest, because the test itself may be at fault:
     its reference on 2026-08-20, which is what the rest of this bullet records.
     Each is a *page count* disagreement with its own cause:
 
-    - **`page-name-img-003` and `-004` are an image-box bug in `Broiler.Layout`,
-      not a paged-media one.** Each renders two pages where its reference renders
+    - **`page-name-img-003` and `-004` — found, and fixed as `patches/0003`.**
+      The staleness was `Broiler.HTML`'s, not `Broiler.Layout`'s: `CorrectImgBoxes`
+      wraps a block-level image in an anonymous block and demotes the image to
+      `display: inline`, which is how a block-level replaced element is laid out
+      here, and the page name stayed behind on the demoted inline instead of
+      moving to the wrapper that now *is* the block-level box. See
+      [the fixed entry](wpt-rendering-gaps-fixed.md#a-display-block-image-lost-its-page-name).
+      The original symptom, kept because the reasoning is the reusable part: Each renders two pages where its reference renders
       one. `TakesAPageName` asks `CssBox.Display` whether a box is block-level,
       because an *inline* image must ignore its own `page` name — that is what
       `page-name-img-001`/`-002` state, and they pass. `-003`/`-004` are their

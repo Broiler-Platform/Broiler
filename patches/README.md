@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Two patches are waiting on a maintainer.** See the index below.
+**Three patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -52,6 +52,7 @@ again with the one below.
 | --- | --- | --- |
 | `0001` | `Broiler.CSS` | Resolve the absolute length units in ParseToPixels |
 | `0002` | `Broiler.CSS` | Give a media query a paged formatting context |
+| `0003` | `Broiler.HTML` | Carry a block image's page name onto the box that replaces it |
 
 ### `0001` — `border: 72pt solid red` painted a thin black line
 
@@ -132,3 +133,37 @@ Measured on top of `0001`: `css/css-page` goes 142 → **143** of 224 reftests w
 the average 88.37% → **88.83%**, `css/css-break` does not move, and a fail-list
 diff shows exactly one test changing state — `media-queries-001-print`, 0.0% →
 100% — with none lost.
+
+### `0003` — a `display: block` image lost its page name
+
+`CorrectImgBoxes` implements a block-level replaced element the way this engine
+lays one out: it wraps the image in an **anonymous block** and demotes the image
+itself to `display: inline`, so the image paints as an inline replaced word
+inside a block wrapper. The geometry that comes out is correct — an
+`<img style="display:block">` followed by text puts the text on the next line —
+but the wrapper is now the block-level box the element generates, and one thing
+was not travelling with it.
+
+CSS Paged Media 3 §3.4 hangs a page name on a block-level box **and nothing
+else**, which is exactly what lets an *inline* image's own `page` be ignored.
+Leaving the name behind on the demoted inline therefore reads
+`<img style="display:block; page:b">` as staying on its ancestor's page: the name
+is dropped, and a following `div { page: b }` forces a break that should not be
+there.
+
+`css-page/page-name-img-003` and `-004` are that failure, each rendering two
+pages where its reference renders one. **`-001` and `-002` are the control** —
+there the image really is inline, its name really must be ignored, and they pass
+both before and after. That pair is why the demoted `Display` could not simply be
+read around downstream: it said `inline` for *both* spellings, so nothing after
+`CorrectImgBoxes` could tell a block image from an inline one. All four now pass
+at 100%, which is the coverage this patch carries — `Broiler.HTML.Orchestration`
+has no unit-test project of its own.
+
+**Only paged rendering sees it.** The page name is not read outside paged media,
+so the default unpaginated render is unchanged — verified test-for-test across
+`css/css-page`, `css/css-break`, `css/css-backgrounds` and `css/css-values`.
+Under `BROILER_WPT_PAGED_PRINT=1`, `css/css-page` goes 132 → **134** of 224 with
+the average 76.45% → **77.36%**, `css/css-break` unmoved, none lost. There is no
+main-repo half and nothing in this repository references anything new, so the
+build is unaffected while the patch waits.

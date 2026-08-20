@@ -343,6 +343,39 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   does not move, and a fail-list diff shows exactly one test changed state and none
   regressed. The golden-image score is unchanged (99.0%, passing either way).
 
+### A `display: block` image lost its page name
+
+- **Tests:** `css-page/page-name-img-003` and `-004` — both **0.0% → pass at
+  100%** under `BROILER_WPT_PAGED_PRINT=1`.
+- **Owner:** `Broiler.HTML` (`DomParser.CorrectImgBoxes`) — **a pending submodule
+  patch**, `patches/0003`, because the push to `Broiler-Platform/Broiler.HTML`
+  answers 403. Nothing in this repository references anything new, so the build is
+  unaffected while it waits, and the WPT shard actions apply it for a run.
+- **It was diagnosed in the wrong component first.** The symptom is that
+  `CssBox.Display` reads `inline` for an `<img>` whose author style says
+  `display: block`, so `TakesAPageName` drops the image's `page` name. The cascade
+  sets it correctly and layout honours it, which made it look like staleness in
+  `Broiler.Layout`. Instrumenting the property setter named the writer outright:
+  `DomParser.CorrectImgBoxes`.
+- **And it is not a bug there either.** That method implements a block-level
+  replaced element the way this engine lays one out — it wraps the image in an
+  **anonymous block** and demotes the image to `display: inline`, so the image
+  paints as an inline replaced word inside a block wrapper. The geometry is right.
+  What was missing is that the wrapper is now the block-level box the element
+  generates, and CSS Paged Media 3 §3.4 hangs a page name on a block-level box and
+  nothing else — so the name has to travel with it.
+- **`-001` and `-002` are the control, and they are why this could not be worked
+  around downstream.** There the image really is inline and its name really must be
+  ignored. The demoted `Display` said `inline` for *both* spellings, so nothing
+  after `CorrectImgBoxes` could tell them apart; the fix has to be at the point the
+  block-level-ness is moved. All four now pass at 100%.
+- **Verified:** the paged run goes 132 → **134** of 224 with the average 76.45% →
+  **77.36%**, `css/css-break` does not move, and the default unpaginated render is
+  unchanged test-for-test across `css/css-page`, `css/css-break`,
+  `css/css-backgrounds` and `css/css-values` — a page name is not read outside
+  paged media. `Broiler.HTML.Orchestration` has no unit-test project, so the
+  four-test discrimination is the coverage the patch carries.
+
 ### Every page of a paged render was printed on the same page box
 
 - **Tests:** `css-page/page-rule-specificity-001-print`, `-002`, `-003` and

@@ -247,9 +247,16 @@ set -euo pipefail
 # different files and apply in either order. The main-repo call sites are already in, behind a
 # `BROILER_CSS_PAGED_MEDIA` probe that defines itself only once this patch puts CssPagedMedia.cs
 # on disk, so applying this here is what switches them on for a run.
+# 0003 carries a block-level image's page name onto the anonymous block that replaces it.
+# CorrectImgBoxes demotes the image to `display: inline` inside a wrapper, which is how a
+# block-level replaced element is laid out here, but a page name hangs on a block-level box and so
+# was being dropped — `page-name-img-003`/`-004` broke a page their references do not. It only
+# moves pixels under BROILER_WPT_PAGED_PRINT=1, where the page name is read at all; the default
+# unpaginated render is unchanged.
 PENDING_PATCHES=(
   "Broiler.CSS|patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch"
   "Broiler.CSS|patches/0002-give-a-media-query-a-paged-formatting-context.patch"
+  "Broiler.HTML|patches/0003-carry-a-block-images-page-name-onto-the-box-that-replaces-it.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

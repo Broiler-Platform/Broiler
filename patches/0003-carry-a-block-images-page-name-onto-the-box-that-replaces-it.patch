@@ -1,0 +1,60 @@
+From 25150bfe5c20087be174450b0086fd408cfe802e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 20 Aug 2026 20:10:53 +0000
+Subject: [PATCH] Carry a block image's page name onto the box that replaces it
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CorrectImgBoxes implements a block-level replaced element by wrapping the image
+in an anonymous block and demoting the image itself to `display: inline`, so it
+paints as an inline replaced word inside a block wrapper. The layout that comes
+out is right — an `<img style="display:block">` followed by text puts the text on
+the next line — but the wrapper is now the block-level box the element
+generates, and one thing did not travel with it.
+
+CSS Paged Media 3 §3.4 hangs a page name on a block-level box and nothing else,
+which is what lets an inline image's own `page` be ignored. Leaving the name
+behind on the demoted inline therefore reads an
+`<img style="display:block; page:b">` as staying on its ancestor's page: the
+name is dropped, and a following `div { page: b }` forces a break that should
+not be there.
+
+css-page/page-name-img-003 and -004 are exactly that, each rendering two pages
+where its reference renders one. Their twins -001 and -002 are the control: the
+image really is inline there, its name really must be ignored, and they pass
+before and after. All four now pass at 100%, which is the discrimination the
+demoted `Display` had made impossible — it read `inline` for both spellings, so
+nothing downstream could tell them apart.
+
+Under BROILER_WPT_PAGED_PRINT=1 css/css-page goes 132 -> 134 of 224 with the
+average 76.45% -> 77.36%, css/css-break does not move, and the default
+unpaginated render is unchanged across css-page, css-break, css-backgrounds and
+css-values — the page name has no effect outside paged media.
+---
+ Source/Broiler.HTML.Orchestration/Parse/DomParser.cs | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index c14c98b..a6fa1f2 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -944,6 +944,15 @@ internal sealed class DomParser
+                 childBox.ParentBox = block;
+                 childBox.Display = CssConstants.Inline;
+ 
++                // The wrapper is now the block-level box the element generates, so what `page`
++                // names travels with it. CSS Paged Media 3 §3.4 hangs a page name on a block-level
++                // box and nothing else, and the image is about to stop being one — leaving the name
++                // behind on the demoted inline means an `<img style="display:block; page:b">` is
++                // read as staying on its ancestor's page. `css-page/page-name-img-003` and `-004`
++                // are exactly that, against `-001` and `-002` where the image really is inline and
++                // its name really must be ignored.
++                block.Page = childBox.Page;
++
+                 // CSS2.1 §10.3.4: a block-level replaced element resolves its
+                 // horizontal margins with the non-replaced-block rules, so
+                 // `margin-left/right:auto` can center it or push it to one side.
+-- 
+2.43.0
+
