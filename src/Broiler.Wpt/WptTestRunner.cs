@@ -593,6 +593,109 @@ internal sealed partial class WptTestRunner
 ";
 
     /// <summary>
+    /// The runner's <c>test_driver</c> implementation — the parts of the testdriver API that
+    /// can mean something without a WebDriver session behind them.
+    /// <para>
+    /// Injected twice, and the second time is the point. It rides along with
+    /// <see cref="BrowserApiStubs"/> so a test that never pulls in testdriver.js still gets a
+    /// <c>test_driver</c>, and it is re-injected immediately after the real
+    /// <c>/resources/testdriver.js</c> whenever a test does load it (see
+    /// <see cref="IsTestDriverScript"/>). Without that second injection the real file — which the
+    /// runner serves verbatim out of the checkout, and which loads *after* the stubs — replaced
+    /// every method here with one that funnels through <c>test_driver_internal</c>. WPT's in-tree
+    /// <c>testdriver-vendor.js</c> is an empty file, so nothing implements that side and the
+    /// promises never settle.
+    /// </para>
+    /// <para>
+    /// Each method therefore assigns unconditionally rather than filling a gap: the definition it
+    /// overwrites is the real testdriver's, and in this environment that one cannot work.
+    /// </para>
+    /// </summary>
+    private const string TestDriverStubs = @"
+(function() {
+  var test_driver = window.test_driver || {};
+  window.test_driver = test_driver;
+  // testdriver `bless(name, action)`: in wptrunner this grants transient user activation and then
+  // runs the action, so a test can call an API that requires a user gesture — requestFullscreen()
+  // in fullscreen/rendering, showPicker() in the customizable-select tests. There is no user here
+  // and nothing checks activation, so the activation half is a no-op and the action is what
+  // matters: without it the callback never runs and the test renders its un-activated state.
+  // Returns a promise resolving to the action's result, which is what callers await.
+  //
+  // The real testdriver.js instead appends a `This test requires user interaction. Please click
+  // here to allow <intent>.` button to the document and awaits a click on it delivered through
+  // WebDriver — so leaving it in place both stranded the action *and* painted that button into
+  // the reftest screenshot.
+  test_driver.bless = function(name, action) {
+    try {
+      return Promise.resolve(typeof action === 'function' ? action() : undefined);
+    } catch (e) {
+      return Promise.reject(e);
+    }
+  };
+  function Actions() {
+    this._pointers = Object.create(null);
+  }
+
+  Actions.prototype.addPointer = function(name, type) {
+    this._pointers[String(name || 'pointer')] = {
+      type: String(type || 'mouse'),
+      moves: []
+    };
+    return this;
+  };
+
+  Actions.prototype.pointerMove = function(x, y, options) {
+    var sourceName = options && options.sourceName
+      ? String(options.sourceName)
+      : Object.keys(this._pointers)[0] || 'pointer';
+    if (!this._pointers[sourceName]) {
+      this.addPointer(sourceName, 'mouse');
+    }
+
+    this._pointers[sourceName].moves.push({
+      x: Number(x) || 0,
+      y: Number(y) || 0
+    });
+    return this;
+  };
+
+  Actions.prototype.pointerDown = function() { return this; };
+  Actions.prototype.pointerUp = function() { return this; };
+  Actions.prototype.pause = function() { return this; };
+  Actions.prototype.keyDown = function() { return this; };
+  Actions.prototype.keyUp = function() { return this; };
+  Actions.prototype.scroll = function() { return this; };
+  Actions.prototype.send = function() {
+    var touchPointers = Object.keys(this._pointers)
+      .map((name) => this._pointers[name])
+      .filter((pointer) => pointer.type === 'touch' && pointer.moves.length > 0);
+
+    if (touchPointers.length >= 2 &&
+        window.visualViewport &&
+        typeof visualViewport.scale !== 'undefined') {
+      var first = touchPointers[0];
+      var second = touchPointers[1];
+      var firstStart = first.moves[0];
+      var secondStart = second.moves[0];
+      var firstEnd = first.moves[first.moves.length - 1];
+      var secondEnd = second.moves[second.moves.length - 1];
+      var startDistance = Math.hypot(firstStart.x - secondStart.x, firstStart.y - secondStart.y);
+      var endDistance = Math.hypot(firstEnd.x - secondEnd.x, firstEnd.y - secondEnd.y);
+
+      if (endDistance > startDistance + 1) {
+        visualViewport.scale = Math.max(Number(visualViewport.scale) || 1, 2);
+      }
+    }
+
+    return Promise.resolve();
+  };
+
+  test_driver.Actions = Actions;
+})();
+";
+
+    /// <summary>
     /// Minimal stubs for browser APIs that the DomBridge JavaScript context
     /// does not natively provide.  These are injected unconditionally before
     /// any test scripts execute so that common Web APIs (such as
@@ -600,7 +703,14 @@ internal sealed partial class WptTestRunner
     /// is not referenced.  WPT tests that use <c>requestAnimationFrame</c>
     /// inside <c>window.onload</c> handlers depend on this.
     /// </summary>
-    private const string BrowserApiStubs = @"
+    private const string BrowserApiStubs = BrowserApiStubsCore + TestDriverStubs;
+
+    /// <summary>
+    /// Everything in <see cref="BrowserApiStubs"/> except the testdriver half, which is a separate
+    /// source only because the runner also injects it a second time (see
+    /// <see cref="TestDriverStubs"/>). Nothing should reference this directly.
+    /// </summary>
+    private const string BrowserApiStubsCore = @"
 (function() {
   var __broilerCustomElementRegistry = Object.create(null);
   var __broilerCurrentCustomElementName = null;
@@ -666,84 +776,6 @@ internal sealed partial class WptTestRunner
   }
   __broilerEnsureAnimate(document.documentElement);
   __broilerEnsureAnimate(document.body);
-  var test_driver = window.test_driver || {};
-  window.test_driver = test_driver;
-  // testdriver `bless(name, action)`: in wptrunner this grants transient user activation and then
-  // runs the action, so a test can call an API that requires a user gesture — requestFullscreen()
-  // in fullscreen/rendering, showPicker() in the customizable-select tests. There is no user here
-  // and nothing checks activation, so the activation half is a no-op and the action is what
-  // matters: without it the callback never runs and the test renders its un-activated state.
-  // Returns a promise resolving to the action's result, which is what callers await.
-  if (typeof test_driver.bless === 'undefined') {
-    test_driver.bless = function(name, action) {
-      try {
-        return Promise.resolve(typeof action === 'function' ? action() : undefined);
-      } catch (e) {
-        return Promise.reject(e);
-      }
-    };
-  }
-  if (typeof test_driver.Actions === 'undefined') {
-    function Actions() {
-      this._pointers = Object.create(null);
-    }
-
-    Actions.prototype.addPointer = function(name, type) {
-      this._pointers[String(name || 'pointer')] = {
-        type: String(type || 'mouse'),
-        moves: []
-      };
-      return this;
-    };
-
-    Actions.prototype.pointerMove = function(x, y, options) {
-      var sourceName = options && options.sourceName
-        ? String(options.sourceName)
-        : Object.keys(this._pointers)[0] || 'pointer';
-      if (!this._pointers[sourceName]) {
-        this.addPointer(sourceName, 'mouse');
-      }
-
-      this._pointers[sourceName].moves.push({
-        x: Number(x) || 0,
-        y: Number(y) || 0
-      });
-      return this;
-    };
-
-    Actions.prototype.pointerDown = function() { return this; };
-    Actions.prototype.pointerUp = function() { return this; };
-    Actions.prototype.pause = function() { return this; };
-    Actions.prototype.keyDown = function() { return this; };
-    Actions.prototype.keyUp = function() { return this; };
-    Actions.prototype.scroll = function() { return this; };
-    Actions.prototype.send = function() {
-      var touchPointers = Object.keys(this._pointers)
-        .map((name) => this._pointers[name])
-        .filter((pointer) => pointer.type === 'touch' && pointer.moves.length > 0);
-
-      if (touchPointers.length >= 2 &&
-          window.visualViewport &&
-          typeof visualViewport.scale !== 'undefined') {
-        var first = touchPointers[0];
-        var second = touchPointers[1];
-        var firstStart = first.moves[0];
-        var secondStart = second.moves[0];
-        var firstEnd = first.moves[first.moves.length - 1];
-        var secondEnd = second.moves[second.moves.length - 1];
-        var startDistance = Math.hypot(firstStart.x - secondStart.x, firstStart.y - secondStart.y);
-        var endDistance = Math.hypot(firstEnd.x - secondEnd.x, firstEnd.y - secondEnd.y);
-
-        if (endDistance > startDistance + 1) {
-          visualViewport.scale = Math.max(Number(visualViewport.scale) || 1, 2);
-        }
-      }
-
-      return Promise.resolve();
-    };
-
-    test_driver.Actions = Actions;
-  }
   // The bridge now defines HTMLElement (see DomBridge RegisterDomInterfaceConstructors), so an
   // `is it missing?` guard would skip this shim and leave `class X extends HTMLElement` building
   // plain objects instead of elements. Probe the capability this shim actually needs — that
@@ -3207,6 +3239,16 @@ internal sealed partial class WptTestRunner
                 if (localScript != null && File.Exists(localScript))
                 {
                     var scriptContent = File.ReadAllText(localScript);
+
+                    // testdriver.js is served verbatim — it carries API surface the runner does
+                    // not shim — but it also overwrites the methods the runner *does* implement
+                    // with WebDriver-backed ones that cannot settle here. Re-install the runner's
+                    // versions on the same script, so they win regardless of where in the document
+                    // the include sits. Appending rather than inserting a list entry keeps the
+                    // page-script indices (and so the phase-trace labels) matching the document.
+                    if (IsTestDriverScript(src))
+                        scriptContent += Environment.NewLine + TestDriverStubs;
+
                     if (isDefer)
                         deferredScripts.Add(scriptContent);
                     else
@@ -3557,6 +3599,17 @@ internal sealed partial class WptTestRunner
             catch { return tag; }
         });
     }
+
+    /// <summary>
+    /// Whether an external script <c>src</c> names one of WPT's testdriver sources:
+    /// <c>/resources/testdriver.js</c>, the vendor hook <c>testdriver-vendor.js</c> that is meant
+    /// to implement it, or <c>testdriver-actions.js</c>, which supplies
+    /// <c>test_driver.Actions</c> on its own. Each is re-topped with
+    /// <see cref="TestDriverStubs"/> — matching the whole family rather than testdriver.js alone
+    /// is what makes the runner's methods survive whichever of them a test includes last.
+    /// </summary>
+    private static bool IsTestDriverScript(string src) =>
+        src.Contains("testdriver", StringComparison.OrdinalIgnoreCase);
 
     private static string? ResolveExternalScriptPath(string src, string? testDir, string? wptRoot)
     {

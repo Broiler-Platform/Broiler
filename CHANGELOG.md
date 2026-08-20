@@ -214,6 +214,22 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- WPT tests that need a user gesture run again. A test asks for one through
+  `test_driver.bless(intent, action)`, which the conformance runner shims — there is no user in a
+  headless run and nothing checks activation, so the shim just runs the action. But the shim went in
+  *ahead* of the page's scripts and installed itself only if the name was free, and
+  `/resources/testdriver.js` — inlined from the checkout like any other external script — then
+  assigned `window.test_driver` wholesale. Upstream's `bless` appends a "This test requires user
+  interaction" button and waits for a WebDriver click routed through `test_driver_internal`, whose
+  in-tree implementation file is empty, so the promise never settled: **the action never ran, and the
+  button was rendered into the screenshot.** The shim is now its own injected source, assigns
+  unconditionally, and is appended to every `testdriver*.js` the runner inlines, so it wins whatever
+  the page loads and in whichever order. The reftest suite goes **880 → 910 of 1258** across the
+  directories holding a reftest that loads testdriver.js in a partial checkout, nothing regressed —
+  `fullscreen/rendering` from 3/6 to 6/6, the rest customizable-`select`, `interestfor` and
+  `css/css-shadow/part`. See
+  [`docs/wpt-reftests.md`](docs/wpt-reftests.md#testdriverjs-overwrote-the-shim-that-drives-it).
+
 - `https://www.mediawiki.org/` now renders like the same page in the reference browser: 38.9 % of
   pixels matched a Chromium capture of identical bytes at 1024×768 before this work, 82.7 % after,
   and the page is vertically aligned with the reference to the pixel. Everything behind that is a general engine defect that the Vector 2022 skin
