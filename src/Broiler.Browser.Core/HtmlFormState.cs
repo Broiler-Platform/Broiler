@@ -309,7 +309,7 @@ internal sealed class HtmlFormState
     {
         try
         {
-            return new HtmlDocumentParser().ParseDocument(html).Document.DocumentElement;
+            return HtmlDocumentParser.ParseDocument(html).Document.DocumentElement;
         }
         catch (Exception)
         {

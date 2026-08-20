@@ -21,7 +21,7 @@ public sealed partial class DomBridge
     /// </summary>
     internal static (DomElement DocumentElement, DomDocumentType? DocumentType, List<DomNode> AllElements, string Title) BuildDocumentTree(string html)
     {
-        var parsed = new HtmlDocumentParser().ParseDocument(html);
+        var parsed = HtmlDocumentParser.ParseDocument(html);
         var root = parsed.Document.DocumentElement ??
             throw new InvalidOperationException("The shared HTML parser did not produce a document element.");
 
@@ -37,7 +37,7 @@ public sealed partial class DomBridge
     /// </summary>
     private (DomDocumentFragment Fragment, List<DomNode> AllElements) BuildFragmentTree(string html, string contextTagName)
     {
-        var parsed = new HtmlDocumentParser().ParseFragment(html, contextTagName);
+        var parsed = HtmlDocumentParser.ParseFragment(html, contextTagName);
         var fragment = CreateBridgeDocumentFragment();
         var allElements = new List<DomNode>();
 

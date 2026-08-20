@@ -531,7 +531,7 @@ internal sealed class HtmlFormControlHost
 
         try
         {
-            return new HtmlDocumentParser().ParseDocument(html).Document.DocumentElement;
+            return HtmlDocumentParser.ParseDocument(html).Document.DocumentElement;
         }
         catch (Exception)
         {
