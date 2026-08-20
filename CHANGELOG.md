@@ -214,6 +214,28 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` / `Broiler.Layout` — a paged render prints each page on the box
+  the *name that page carries* resolves to, instead of guessing one name for the
+  whole document. The guess arrived with the earlier named-page fix and is right
+  for the unpaginated path, which renders a single sheet; a paged render knows its
+  pages one at a time and should never have taken it. `page-name-unnamed-trailing-001`
+  uses exactly one name — `landscape`, on its middle page — so the guess put that
+  page's `margin: 20px` on all of them, giving a 260px page area and a fourth page
+  where its reference (two names, so no guess applied) had 300px and three.
+  `ComputedStyle` now carries `page` into the fragment IR, because a laid-out
+  fragment does not otherwise remember it, and `RenderPaged` reads the name off
+  the first fragment to start on each page — CSS Paged Media 3 §5.3 makes that
+  box's used name the page's name, and a later box on the same page cannot rename
+  it. When every page names the same rule the flow is laid out once more against
+  that rule's area (`page-name-table-001` is a single page on
+  `@page square { size: 5in }` and needs it); a document with mixed names still
+  divides its flow against the unconditional area, so only the boxes differ.
+  `page-size-010-print` gains: under `BROILER_WPT_PAGED_PRINT=1` `css/css-page`
+  goes 135 → 136 of 224, average 77.53% → 78.27%, `css/css-break` unchanged at 90,
+  none lost, default unpaginated unchanged. The test this was opened for goes from
+  `SizeMismatch` at 0.0% to 96.4% `MissingContent` and still fails — the residual
+  is per-page *layout*, which this is not.
+
 - `Broiler.Layout` — a page-name change breaks inside an out-of-flow subtree.
   `CarriesThePageFlow` walked the whole ancestor chain and answered no for
   anything inside a `position: absolute` or `fixed` box, conflating two rules: an

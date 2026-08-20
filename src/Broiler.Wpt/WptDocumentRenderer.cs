@@ -210,6 +210,76 @@ internal static class WptDocumentRenderer
     }
 
     /// <summary>
+    /// The one page name every page of a render carries, or <c>null</c> when they do not all carry
+    /// the same one — including when any of them carries none.
+    /// </summary>
+    private static string? SoleName(string?[] names)
+    {
+        if (names.Length == 0 || names[0] is not { } first)
+            return null;
+
+        foreach (var name in names)
+        {
+            if (!string.Equals(name, first, StringComparison.OrdinalIgnoreCase))
+                return null;
+        }
+
+        return first;
+    }
+
+    /// <summary>
+    /// The page name the content of each page carries, indexed by page, or <c>null</c> for a page
+    /// whose content names none.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A page takes its <c>@page</c> rule from the content on it, so the name has to be read back
+    /// off the laid-out flow rather than from the document as a whole — the same document can put
+    /// one page on <c>@page b</c> and leave its neighbours on the unconditional rule, which is what
+    /// <c>page-name-unnamed-trailing-001</c> is built from.
+    /// </para>
+    /// <para>
+    /// The <em>first</em> fragment to start on a page names it. CSS Paged Media 3 §5.3 says a page's
+    /// name is the used name of the first box on it, and a later box on the same page cannot rename
+    /// it — if it named a different page it would have forced a break and started one of its own.
+    /// The name resolves up the tree, so it is carried down as the walk descends rather than looked
+    /// up again per fragment.
+    /// </para>
+    /// </remarks>
+    private static string?[] PageNames(Fragment? tree, int areaHeight, int pages)
+    {
+        var names = new string?[Math.Max(1, pages)];
+        if (tree is null || areaHeight <= 0)
+            return names;
+
+        foreach (var child in tree.Children)
+            Visit(child, null);
+
+        return names;
+
+        void Visit(Fragment fragment, string? inherited)
+        {
+            var name = Named(fragment.Style.Page) ?? inherited;
+
+            int page = (int)(fragment.Bounds.Top / areaHeight);
+            if (page >= 0 && page < names.Length && names[page] is null)
+                names[page] = name;
+
+            foreach (var child in fragment.Children)
+                Visit(child, name);
+        }
+
+        static string? Named(string? page)
+        {
+            var value = page?.Trim();
+            return string.IsNullOrEmpty(value)
+                || value.Equals("auto", StringComparison.OrdinalIgnoreCase)
+                ? null
+                : value;
+        }
+    }
+
+    /// <summary>
     /// The pages of a <paramref name="pages"/>-page render that take part in the comparison: the
     /// ones <c>&lt;meta name="reftest-pages"&gt;</c> names, or all of them when it names none.
     /// </summary>
@@ -360,7 +430,8 @@ internal static class WptDocumentRenderer
         EventHandler<HtmlImageLoadEventArgs>? imageLoad,
         string? baseUrl,
         WptPageDecoration? decoration = null,
-        WptPageBox? firstPage = null)
+        Func<string?, bool, WptPageBox>? resolvePage = null,
+        bool renamed = false)
     {
         // The page's own paint, and the border and padding it insets the page area by. Every page
         // of the flow gets the same sheet, so this is resolved once and stamped per page below.
@@ -450,8 +521,41 @@ internal static class WptDocumentRenderer
         // through `-003` each force the break themselves, so where the content divides does not
         // depend on the size of the page it lands on. A document whose *flow* has to divide against
         // two different page areas is the per-page layout this does not do.
+        // The name each page's content puts on it, so a page whose content sits on `@page b` is
+        // printed on b's box while its neighbours keep the unconditional one. Only the box differs:
+        // the flow above is still laid out against one page area, which is sound here for the same
+        // reason it is for page one — `page-name-unnamed-trailing-001` divides its flow with its own
+        // `break-after: page`, so where the content splits does not depend on the page it lands on.
+        var names = PageNames(container.LatestFragmentTree, areaHeight, pages);
+
+        // A page's *area* is what its flow was divided against, and only now is it known which page
+        // rule each page takes. When every page turns out to name the same one, the whole flow
+        // should have been laid out against that page's area rather than the unconditional one, so
+        // it is laid out again — `page-name-table-001` is a single page on `@page square { size:
+        // 5in }`, and dividing it against the default page first puts its content in the wrong
+        // place. Once, and only when the box actually changes: a document with mixed names keeps
+        // the unconditional area, which is the approximation the uniform layout already is.
+        if (!renamed && resolvePage is not null && SoleName(names) is { } sole)
+        {
+            var uniform = resolvePage(sole, false);
+            if (uniform != page)
+            {
+                return RenderPaged(
+                    document, html, uniform, backgroundColor,
+                    stylesheetLoad, imageLoad, baseUrl, decoration, resolvePage,
+                    renamed: true);
+            }
+        }
+
         var sheets = compared
-            .Select(number => number == 1 && firstPage is { } first ? first : page)
+            .Select(number =>
+            {
+                if (resolvePage is null)
+                    return page;
+
+                var name = number <= names.Length ? names[number - 1] : null;
+                return resolvePage(name, number == 1);
+            })
             .ToArray();
 
         var slotTop = new int[sheets.Length];

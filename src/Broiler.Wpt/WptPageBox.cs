@@ -77,7 +77,8 @@ internal readonly record struct WptPageBox(
     /// matters is that both sides resolve them identically, which is why this reads the document
     /// rather than taking them from the runner.
     /// </remarks>
-    internal static WptPageBox Resolve(string html, SizeF defaultBoxSize, bool firstPage = false)
+    internal static WptPageBox Resolve(
+        string html, SizeF defaultBoxSize, bool firstPage = false, string? pageName = null)
     {
         var box = new WptPageBox(defaultBoxSize, 0, 0, 0, 0);
         double? areaWidth = null, areaHeight = null;
@@ -89,7 +90,7 @@ internal readonly record struct WptPageBox(
         // here and settled after the loop.
         var auto = new AutoMargins();
 
-        foreach (var (declarations, _) in EnumerateAppliedPageBlocks(html, firstPage))
+        foreach (var (declarations, _) in EnumerateAppliedPageBlocks(html, firstPage, pageName))
         {
             double fontSize = FontSizeOf(declarations.Declarations.ToList());
 
@@ -196,9 +197,18 @@ internal readonly record struct WptPageBox(
     /// </para>
     /// </remarks>
     internal static IEnumerable<(CssDeclarationBlock Declarations, string BlockText)>
-        EnumerateAppliedPageBlocks(string html, bool firstPage = false)
+        EnumerateAppliedPageBlocks(string html, bool firstPage = false, string? pageName = null)
     {
-        var used = SoleUsedPageName(html);
+        // A null name asks for the document-wide guess; an empty one says the caller knows the
+        // pages individually and wants none. Only the unpaginated path guesses — it renders a
+        // single sheet, so "the one name the document uses" is a reasonable stand-in for the page
+        // that sheet is. A paged render reads each page's name off the laid-out flow instead, and a
+        // guess there would put one page's margins on all of them: that is what gave
+        // `page-name-unnamed-trailing-001` a 260px page area, and so a fourth page, where its
+        // reference has three at 300px.
+        var used = pageName is null ? SoleUsedPageName(html)
+            : pageName.Length == 0 ? null
+            : pageName;
 
         foreach (var (selector, block) in EnumeratePageBlocks(html))
         {

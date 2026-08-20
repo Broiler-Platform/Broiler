@@ -1027,19 +1027,28 @@ Worth separating from the rest, because the test itself may be at fault:
       [the fixed entry](wpt-rendering-gaps-fixed.md#an-out-of-flow-subtree-never-broke-on-a-page-name);
       it trades one-for-one against `page-name-abspos-002`, which states the
       opposite rule and which Chromium fails too.
-    - **`page-name-unnamed-trailing-001` is the only one that really needs
-      per-page boxes**, and it needs `page-orientation` besides: its middle page
-      takes `@page landscape { margin: 20px; page-orientation: rotate-left }`. It
-      also renders four pages against the reference's three, and the trailing
-      `break-after: page` is *not* the cause — the reference carries the same one
-      on the same last element and still comes out at three. The extra page is a
-      named-page break landing on top of the forced break already there.
+    - **`page-name-unnamed-trailing-001` — page count fixed, still failing.**
+      Per-page boxes landed and the count is now right, three against three; the
+      test went `SizeMismatch` at 0.0% → **96.4% `MissingContent`** and did not
+      pass. See
+      [the fixed entry](wpt-rendering-gaps-fixed.md#a-paged-render-guessed-one-page-name-for-the-whole-document).
+      Two of the three assumptions recorded here were wrong and are kept because
+      the correction is the reusable part. **The four pages were the runner's own
+      doing, not a named-page break**: the test uses exactly one *name*
+      (`landscape`, on its middle page), so the document-wide guess introduced by
+      [the earlier named-page fix](wpt-rendering-gaps-fixed.md#the-sheet-ignored-the-named-page-the-document-put-its-content-on)
+      applied that page's `margin: 20px` to all of them — area 260px and a fourth
+      page, where the reference (two names, so no guess) got 300px and three. And
+      **`page-orientation` is not needed**: both sides declare `rotate-left` on the
+      same page, so it cancels, exactly as the test's own comment implies when it
+      names the margin as the distinguishing factor.
+      What remains is the residual 3.6%, which is per-page **layout**: the boxes
+      now differ per page but the flow is still divided against one page area.
 
     So the per-page **layout** the model cannot do — a flow dividing against two
     different page areas — is wanted by exactly one of the four, and it is the only
     one still open: `page-name-img-003`/`-004` and `page-name-003` are closed, and
-    `page-name-unnamed-trailing-001` remains, needing per-page boxes,
-    `page-orientation`, and the page-count question above.
+    `page-name-unnamed-trailing-001` remains at 96.4%, needing only that.
   - **`page-background-002` is the page *count* itself**, and it is the cleanest
     one to start on: test and reference are the same three-page document except
     that the reference draws its image as `position: absolute; top: 0`, and the

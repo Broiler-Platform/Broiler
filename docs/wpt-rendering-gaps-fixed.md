@@ -433,7 +433,10 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   unconditional rule and the used named one. The sheet is as wide as the widest
   emitted page and as tall as they add up to.
 - **The limit, stated rather than hidden.** The *flow* is still laid out against one
-  page area, so only page one's box may differ. That is sound for these four
+  page area, so only page one's box may differ. (Any page's box may differ since
+  [the per-page named boxes](#a-paged-render-guessed-one-page-name-for-the-whole-document)
+  landed; the flow is still divided against one area, which is the half of this
+  limit that stands.) That is sound for these four
   because each forces its own break, so where the content divides does not depend
   on the size of the page it lands on. A document whose flow has to divide against
   two different page areas needs per-page *layout*, which this is not —
@@ -517,6 +520,56 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   of 224 reftests with the average 88.37% → **88.83%**, `css/css-break` does not
   move, and a fail-list diff shows exactly one test changing state with none lost.
   Against the pinned pointer the repo is unchanged test-for-test.
+
+### A paged render guessed one page name for the whole document
+
+- **Test:** `css-page/page-size-010-print` — under `BROILER_WPT_PAGED_PRINT=1`,
+  **→ passes**. The test this was opened for, `page-name-unnamed-trailing-001`,
+  goes from `SizeMismatch` at 0.0% to **96.4% `MissingContent`** and still fails;
+  that is the honest result, and the corpus gain comes from `page-size-010-print`
+  instead.
+- **Owner:** the WPT runner (`WptDocumentRenderer.RenderPaged`, `WptPageBox`) plus
+  one field on `Broiler.Layout`'s `ComputedStyle`. Main repo, no patch.
+- **The bug was one this document's own earlier entry introduced.**
+  [The named-page fix](#the-sheet-ignored-the-named-page-the-document-put-its-content-on)
+  guesses the page a document is printed on by finding the one page name it uses,
+  which is right for the unpaginated path — that renders a single sheet, so "the
+  one name in the document" is a fair stand-in for the page that sheet is. A
+  *paged* render knows its pages one at a time and should never have guessed.
+  `page-name-unnamed-trailing-001` uses exactly one name, `landscape`, on its
+  middle page, so the guess applied `@page landscape { margin: 20px }` to every
+  page: area 260px, four pages, against a reference (which uses two names, so no
+  guess applies) at area 300px and three pages. Traced side by side as
+  `actual=813.8 area=260 pages=4` versus `actual=860 area=300 pages=3`.
+- **What landed.** `ComputedStyle` now carries `page`, so the name survives into
+  the fragment IR — it is not otherwise recoverable from a laid-out fragment.
+  `RenderPaged` reads the name off the *first* fragment to start on each page
+  (§5.3: a page's name is the used name of the first box on it; a later box on the
+  same page cannot rename it, because a different name would have forced a break),
+  and prints each page on the box that name resolves to. `WptPageBox.Resolve` takes
+  the name as a parameter, with an empty string as the sentinel for "the caller
+  knows its pages, take no named rule" — that is what stops the paged path
+  guessing while leaving the unpaginated path exactly as it was.
+- **One re-layout, not per-page layout.** When every page turns out to name the
+  same rule, the flow was divided against the wrong area and is laid out again
+  against that rule's area — once, and only when the box actually changes.
+  `page-name-table-001` needs it: it is a single page on `@page square { size: 5in }`,
+  and dividing it against the default page first puts its content in the wrong
+  place. A document with *mixed* names still divides its flow against the
+  unconditional area; only the boxes differ. That approximation is what
+  `page-name-unnamed-trailing-001` is now missing content against, and it is the
+  same limit the entry above states.
+- **`page-orientation` turned out not to be needed**, contrary to what the open
+  entry assumed: both sides of that test declare `rotate-left` on the same page, so
+  it cancels, and the test's own comment names the margin as the distinguishing
+  factor.
+- **Verified:** `WptPageBoxTests` is at 63 focused tests, two of them new for the
+  explicit name replacing the guess and for an unknown name falling back to the
+  unconditional rule. The paged run goes 135 → **136** of 224 with the average
+  77.53% → **78.27%**, `css/css-break` does not move, and a fail-list diff shows
+  one test gained and none lost. The default unpaginated run is unchanged at
+  143/107. One speculative variant — "the innermost name at a page edge wins" —
+  was tried, measured at no change, and reverted.
 
 ---
 

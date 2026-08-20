@@ -2804,15 +2804,20 @@ internal sealed partial class WptTestRunner
 
             if (PagedRender)
             {
-                // Page one's own box, for the `@page :first` that describes it.
-                var firstPage = WptPageBox.Resolve(
-                    html, new System.Drawing.SizeF(_width, _height), firstPage: true);
+                // A paged render knows its pages one by one, so it takes no document-wide guess at
+                // a named page: the base box below is the unconditional rule, page one adds
+                // `@page :first`, and every other page's name is read off the laid-out flow.
+                var surface = new System.Drawing.SizeF(_width, _height);
+                WptPageBox ResolvePage(string? name, bool first) =>
+                    WptPageBox.Resolve(html, surface, firstPage: first, pageName: name ?? string.Empty);
+
+                var basePage = ResolvePage(null, first: false);
 
                 return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderPaged(
-                    renderDocument, html, declaredPage,
+                    renderDocument, html, basePage,
                     backgroundColor: BColor.White,
                     stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl,
-                    decoration: decoration, firstPage: firstPage));
+                    decoration: decoration, resolvePage: ResolvePage));
             }
 
             if (decoration is not null)

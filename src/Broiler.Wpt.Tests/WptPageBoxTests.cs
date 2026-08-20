@@ -128,6 +128,39 @@ public sealed class WptPageBoxTests
         Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox).BoxSize);
     }
 
+    // A caller that knows its pages one by one asks for a name explicitly, and an empty name says
+    // "take no named rule at all" — which is what a paged render wants, because guessing one name
+    // for the whole document puts one page's margins on every page.
+    // page-name-unnamed-trailing-001 is the case: it uses exactly one *name*, but its flow starts
+    // unnamed, so the guess gave it a 260px page area and a fourth page.
+    [Fact]
+    public void An_Explicit_Page_Name_Replaces_The_Document_Wide_Guess()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 200px 300px; margin: 0; } @page landscape { margin: 20px; }"
+            + "</style></head><body><div style=\"page: landscape\"></div></body></html>";
+
+        // The guess: one name used, so it is taken for the whole document.
+        Assert.Equal(20, WptPageBox.Resolve(html, DefaultBox).MarginTop, 3);
+
+        // Asked for by name: the same rule, but because the caller said so.
+        Assert.Equal(20, WptPageBox.Resolve(html, DefaultBox, pageName: "landscape").MarginTop, 3);
+
+        // Asked for no name at all: the unconditional rule alone.
+        Assert.Equal(0, WptPageBox.Resolve(html, DefaultBox, pageName: string.Empty).MarginTop, 3);
+    }
+
+    // A name the document declares no rule for leaves the unconditional one standing.
+    [Fact]
+    public void An_Unknown_Page_Name_Falls_Back_To_The_Unconditional_Rule()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 200px 300px; margin: 5px; } @page landscape { margin: 20px; }"
+            + "</style></head><body><div style=\"page: landscape\"></div></body></html>";
+
+        Assert.Equal(5, WptPageBox.Resolve(html, DefaultBox, pageName: "nosuchpage").MarginTop, 3);
+    }
+
     // ---- page one's own box ----------------------------------------------
 
     // ...except when the caller is asking for page one specifically, which only a paged render
