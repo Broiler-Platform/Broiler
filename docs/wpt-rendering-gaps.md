@@ -36,15 +36,20 @@ being hidden by [a missing check in the runner](wpt-rendering-gaps-fixed.md#--ve
    ([details](wpt-rendering-gaps-open.md#the-flag-can-be-a-false-negative)). And the
    inverse exists too: two `css-view-transitions` tests
    [pass on CI and are demonstrably wrong](wpt-rendering-gaps-open.md#two-tests-are-green-on-ci-and-wrong).
-3. **One rendering fix on these pages is waiting on a patch, and a patch number
-   identifies nothing.** That fix is
-   [the media-element one](wpt-rendering-gaps-fixed.md#a-media-element-with-nothing-to-show-painted-a-black-box)
-   — *Paint a media element's box only when it shows controls*, in `Broiler.HTML`,
-   listed in `scripts/apply-pending-wpt-patches.sh` so the pixel suites exercise it on
-   top of the pinned pointer. Every *other* submodule fix in these documents is an
-   ancestor of the pointer and live on CI outright, including the SVG-renderer
-   unification and the `object-fit` call site that each held `0001` before it. That is
-   the whole problem with numbering them: [`patches/`](../patches/README.md) is a
+3. **No rendering fix on these pages is waiting on a patch any more, and a patch
+   number identifies nothing.** The last one that was — *Paint a media element's box
+   only when it shows controls*,
+   [the media-element fix](wpt-rendering-gaps-fixed.md#a-media-element-with-nothing-to-show-painted-a-black-box)
+   in `Broiler.HTML` — landed upstream as `a9be60a` and the pinned pointer contains
+   it, so it reaches CI through the pointer and its entry in
+   `scripts/apply-pending-wpt-patches.sh` is gone. Every submodule fix in these
+   documents is now an ancestor of its pointer, including the SVG-renderer
+   unification and the `object-fit` call site that each held `0001` before it. (One
+   patch *is* pending, `Broiler.CSS`'s *Resolve the absolute length units in
+   ParseToPixels*, but it belongs to the
+   [reftest suite's](wpt-reftests.md#border-72pt-solid-red-painted-a-3px-black-line)
+   work rather than to these pages.) That is the whole problem with numbering them:
+   [`patches/`](../patches/README.md) is a
    backlog rather than an archive — a file is deleted once its fix is upstream and
    numbering restarts from `0001` — so the same number names different changes at
    different times, and a `patches/NNNN` reference in an older commit or comment is

@@ -214,6 +214,40 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A box with an `aspect-ratio` and a definite height is now that shape, and a `border` width may
+  be written in a physical unit. Two unrelated defects, both found by asking why a whole WPT
+  reftest family was failing uniformly rather than by working down the run's biggest-problems
+  list. Over the whole reftest corpus (27 327 tests) they are **18 644 → 18 886 passing, +244 won
+  against 2 lost**. Details in
+  [`docs/wpt-reftests.md`](docs/wpt-reftests.md#a-definite-height-and-an-aspect-ratio-did-not-make-a-square).
+  - **`aspect-ratio` only transferred one way.** The engine took an `auto` *height* from a width
+    that had already filled the containing block, but never the inverse, so
+    `<div style="height: 100px; aspect-ratio: 1/1">` painted a viewport-wide 100px band where
+    every engine paints a 100px square. The transfer now supersedes the block-level stretch-fit,
+    the CSS2.1 §10.3.7 inset equation and the float/abspos shrink-to-fit alike — each of those
+    answers "how wide is a box with no width of its own?", which a ratio plus a definite height
+    already answers. `min-height`/`max-height` clamp before the transfer and
+    `min-width`/`max-width` after it, both in the box `box-sizing` names; the clamp order is now
+    right for the grid-item caller that already existed too.
+  - **`aspect-ratio: 1 / 2` parsed as no ratio at all** — the value is split on whitespace and a
+    lone `/` token carries no number, so the whole declaration was rejected. `1/2` worked and
+    `1 / 2` did not, and the spaced spelling is the one most of these tests use.
+  - **`border: 72pt solid red` painted a 3px black line.** `CssLengthParser.ParseToPixels` left
+    out CSS Values 3 §5.2's absolute units — `pt`, `pc`, `in`, `cm`, `mm`, `Q` — and answered
+    `NaN`, which its callers read as "not a length". The `border` shorthand therefore filed the
+    width under *colour*, dropping both the width and the declared colour; the longhand
+    (`border-left-width: 72pt`) was right the whole time. A media query such as `(min-width: 8in)`
+    and a container query with an absolute length were evaluating as invalid for the same reason.
+    This one is **`patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch`** —
+    `CssLengthParser` is in the `Broiler.CSS` submodule, whose remote is outside a
+    this-repository session's push scope — and is listed in
+    `scripts/apply-pending-wpt-patches.sh`, so the pixel suites exercise it on top of the pinned
+    pointer. It is worth **+220 of the 244** on its own.
+  - Both losses are `*-print` tests, and both are false passes ending rather than regressions:
+    each states a `border` in inches on the test *and* on its reference, so neither side painted
+    a border and the two matched. They render their borders now, and what separates them is the
+    fragmentation the tests were written to measure, which needs the paged render to judge.
+
 - WPT tests that need a user gesture run again. A test asks for one through
   `test_driver.bless(intent, action)`, which the conformance runner shims — there is no user in a
   headless run and nothing checks activation, so the shim just runs the action. But the shim went in

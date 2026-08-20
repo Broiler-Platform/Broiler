@@ -702,40 +702,214 @@ unmapped, and it is the pair to fix against when someone works out the mapping.
 That is also the reason the family only moved 60 of its 224 tests: the rest fail
 on their *test* side, which is what these were written to exercise.
 
-## Next lead: an out-of-flow replaced element with an auto size renders nothing
+## An out-of-flow replaced element renders now — that lead is closed
 
-Diagnosed, not fixed. `css/CSS2/positioning/absolute-replaced-width-*` is 40
-failures at 96.5–98.8 % match, and what the diff is missing is the whole image:
+This section used to be the standing "next lead": an `<img>` painted in flow and
+painted out of flow **only when both dimensions were stated**, which cost
+`css/CSS2/positioning/absolute-replaced-width-*` 40 failures at 96.5–98.8 %
+match. All three of the defects it named are fixed, in two separate pieces of
+work, and re-rendering its own probe on 2026-08-20 paints every image:
 
 ```html
 <div style="position:relative; width:200px; height:60px">
-  <img src="blue15x15.png" style="position:absolute">      <!-- nothing paints -->
-  <img src="blue15x15.png" style="float:left">             <!-- nothing paints -->
-  <img src="blue15x15.png" style="position:absolute; width:40px; height:40px">
-</div>                                                      <!-- this one paints -->
+  <img src="60x60-green.png" style="position:absolute">     <!-- 3 600 px -->
+  <img src="60x60-green.png" style="float:left">            <!-- 3 600 px -->
+  <img src="60x60-green.png" style="position:absolute; width:40px; height:40px">
+                                                            <!-- 1 600 px, and the
+                                                                 only one that used
+                                                                 to paint at all -->
+  text <img src="60x60-green.png" style="float:left"> text  <!-- 3 600 px -->
+</div>                                                      <!-- 12 400 px of green, exactly -->
 ```
 
-An `<img>` paints in flow, and paints out of flow **only when both dimensions are
-stated**. Dumping the fragment tree separates three distinct defects, and each
-wants its own before/after sweep:
+- The **absolutely positioned** halves — auto size, and `display: block` — were
+  `ResolveBlockUsedWidth` running the §10.3.7 *non-replaced* branches over a
+  replaced box, which measured its (nonexistent) children and produced zero. See
+  [the entry in the gaps document](wpt-rendering-gaps-fixed.md#an-absolutely-positioned-img-rendered-nothing-at-all).
+- The **floated** half was CSS2.1 §9.7's other blockification: a floated replaced
+  box stayed inline-level and took `PerformLayoutImp`'s else-branch, which sizes a
+  box from its words and a replaced box has none. `CssBox.IsBlockifiedFloatedReplaced`
+  is the fix and `FloatedReplacedBlockificationTests` pins it, including the
+  deliberate narrowing to *replaced* floats.
 
-1. **Absolutely positioned, auto size.** The box is laid out (it has a line box)
-   but its fragment comes out `0×0`, so nothing of it is painted — not the image,
-   not even a background set on it.
-2. **Floated.** `CreateLineBoxes` skips floats as out-of-flow and the loop that
-   lays them out afterwards iterates the container's own `Boxes` — so a float
-   inside an *anonymous* block (which is where an `<img>` between text nodes ends
-   up) is never reached at all. Its anonymous parent is left `lines=1`, height 0.
-3. **`display: block` and absolutely positioned.** No fragment is produced for the
-   image at all.
+Left here rather than deleted because a stale "next lead" is worse than none, and
+because the shape of the diagnosis — dump the fragment tree, separate one
+symptom into three defects, sweep each on its own — is the part worth reusing.
+The current lead is [a flex item that has a ratio and no
+width](#next-lead-a-flex-items-main-size-ignores-its-aspect-ratio).
 
-The engine is right at the point where the fix belongs: `CssBox.PerformLayout`
-routes `IsBlock || isOutOfFlow` down the block path, and `isOutOfFlow` covers
-`absolute`/`fixed` but not `float`; neither path sizes a *replaced* box from its
-image the way the inline path does. Keep any fix narrow to boxes that carry an
-image word — those render nothing today, so the blast radius of getting them
-wrong is small, while the same change on non-replaced boxes would touch every
-float in the corpus.
+## A definite height and an `aspect-ratio` did not make a square
+
+`aspect-ratio` was implemented in one direction only. `TryResolveAspectRatioBlockHeight`
+takes an auto *height* from a width that has already filled the containing block,
+which is what an ordinary in-flow box needs; the inverse — an auto *width* taken
+from a definite height — existed as `TryResolveAspectRatioInlineWidth` and had
+exactly one caller, a grid item whose `justify-self` is positional. Nothing
+consulted it for an ordinary box, so:
+
+```html
+<div style="background: green; height: 100px; aspect-ratio: 1/1"></div>
+```
+
+painted a **viewport-wide 100px band** where every engine paints a 100px square.
+That is `css-sizing/aspect-ratio/block-aspect-ratio-002`, and it is the shape the
+whole directory is built from: the tests compare against
+`css/reference/ref-filled-green-100px-square`, so the assertion *is* the width.
+
+The fix (`CssBox.TryResolveAspectRatioAutoInlineWidth`, called from
+`ResolveBlockUsedWidth`) supersedes every auto-width rule in that method — the
+block-level stretch-fit, the §10.3.7 inset equation, and the float/abspos
+shrink-to-fit. That breadth is not an over-reach: each of those answers "how wide
+is a box with no width of its own?", and a ratio plus a definite height is such a
+width. Chromium agrees on all of them, including the one that looks wrong — an
+abspos box with `left: 0; right: 0`, `height: 100px` and `aspect-ratio: 1/1` is
+100px wide, not stretched to its insets.
+
+**Which constraint wins where is the whole of the rest of it**, and it was read
+out of Chromium rather than out of the prose:
+
+- The transfer reads the **used** block size, so `min-height`/`max-height` clamp
+  *before* it: `height: 100px; min-height: 200px; aspect-ratio: 1/1` is a 200px
+  square.
+- `min-width`/`max-width` clamp *after* it, and do not feed back through the
+  ratio: `max-width: 40px` on that box gives 40×100, not 40×40.
+- Both clamps and the ratio itself apply to the box `box-sizing` names. A
+  `content-box` box with `padding: 0 20px; max-width: 60px` and a 100px
+  transferred content width is **100px** wide — 60 plus the padding — which is
+  what makes the clamp order observable. `TryResolveAspectRatioInlineWidth`
+  clamped the border-box width against a bound stated in the content box and so
+  came out at 60; it now clamps first and converts second, which also corrects
+  the grid-item caller it already had.
+- Auto margins still centre the result. The free space a ratio-derived width
+  leaves is ordinary free space, so `margin: 0 auto` splits it.
+
+A **column** flex item is the one box that keeps stretching, and it is not an
+exception the transfer has to encode: `ApplyFlexColumnInlineAxisAlignment` runs
+afterwards and widens an `align-items: stretch` item to the container, which is
+what Chromium does too (`400 × 60`, not `60 × 60`).
+
+`AspectRatioInlineSizeTests` pins all of it, Chromium-derived expectations
+included.
+
+### The other half was a `/` with spaces around it
+
+`aspect-ratio: 1 / 2` parsed as **no ratio at all**. `TryParseAspectRatio` splits
+the value on whitespace, so the slash can arrive attached to the numerator, to the
+denominator, in the middle of both, or entirely on its own — and the lone-slash
+token carries no number, so the numerator parse failed and the whole declaration
+was rejected. `1/2` worked; `1 / 2` did not; the two are the same value, and the
+spaced spelling is the one most of these tests use. That was worth **8 tests on
+its own** in `css-sizing/aspect-ratio` after the transfer above had landed, and it
+is invisible in any test that happens to write the value without spaces.
+
+**Together: `css/css-sizing/aspect-ratio` 147 → 168 of 266.** Over the whole
+corpus (27 327 reftests, 2026-08-20) the pair is **18 644 → 18 668 passing, +24
+won and none lost** — 22 of the 24 in `css-sizing/aspect-ratio` itself, plus
+`css-sizing/border-box-and-max-content-002` and
+`css-values/calc-size/calc-size-aspect-ratio-004`.
+
+The narrowness is the interesting part of that number, and it is what says the
+change is the rule and not a bulldozer: a box that has *both* a definite height
+and a ratio is not a common shape outside the directory that tests it, so almost
+nothing else could move. Compare it with the absolute-unit fix below, which is a
+smaller change and worth ten times as much, for the opposite reason.
+
+## `border: 72pt solid red` painted a 3px black line
+
+The biggest single win in this pass is not a layout rule at all, and nothing in
+the failure names points at it. `css/CSS2/positioning`'s `left-*` and `right-*`
+families were failing in a tight cluster at 98.8–98.9 % — 8 928 differing pixels,
+which is 96×93 and looks like a small offset. It is not: the rendered image had
+**no black square and no red one**. Neither border was painted.
+
+`CssLengthParser.ParseToPixels` — the entry point that answers "is this a length,
+and how many pixels is it?" with no font and no viewport to consult — handled
+`px`, the font-relative family and the viewport family, and simply left out CSS
+Values 3 §5.2's **absolute** units: `pt`, `pc`, `in`, `cm`, `mm`, `Q`. Those are
+the easiest of the lot (fixed multiples of the reference pixel, and `CssMetrics`
+already states every factor), and they answered `NaN`.
+
+Its callers read that `NaN` as *"not a length"* and act on it. The `border`
+shorthand is the loud one: `IsLengthOrPercentage` asks whether `72pt` is a length,
+is told no, and the expansion therefore files
+`border-left: 72pt solid red`'s first component under **colour**. The width falls
+back to `medium` and the declared colour is dropped — a declaration that should
+paint a 96px red band paints a 3px black line. The *longhand*
+(`border-left-width: 72pt`) was right the whole time, which is exactly what makes
+this hard to see from the outside: it is not "units are broken", it is "units are
+broken in one shorthand".
+
+**It matters far out of proportion to six keywords, because the CSS2.1 suite
+states its geometry in physical units by convention.** Over the whole corpus it is
+**18 668 → 18 886 passing, +220 won against 2 lost** — nine times what the layout
+rule above is worth, out of twenty lines. The wins are almost entirely
+`css/CSS2`: `margin-padding-clear` +78, `normal-flow` +76, `positioning` +30
+(364 → 394 of 520), `borders` +21, `fonts` +12.
+
+Two quieter callers were answering the same `NaN`: a media query such as
+`(min-width: 8in)`, and a container query with an absolute length, both evaluated
+as *invalid* rather than as the length they name. `css/mediaqueries` is one of
+the +220 for exactly that reason.
+
+**Both losses are false passes ending, and both were checked rather than
+assumed** — this is *do not "fix" a reftest by making both sides equally wrong*
+(below, under [quirks mode](#quirks-mode-reaches-the-render-as-of-the-doctype-round-trip-fix))
+caught in the act. `css-break/overflowing-block-002-print` states
+`border: 0.5in solid purple` on an absolutely positioned box and on an in-flow
+one, and neither side painted a single purple pixel before: the test rendered 984
+black pixels against the reference's 5 106, a 0.5 % difference that fits inside
+the 1 % gate. Both sides paint their border now (69 120 and 84 480 purple pixels),
+and what is left is the real difference between a shrink-to-fit abspos box and a
+stretched in-flow one — which is what the test is about and which needs the paged
+render to judge. `css-break/flexbox/multi-line-row-flex-fragmentation-080-print`
+is the same shape with `border: 0.25in solid black`. Neither was measuring
+anything while the border was missing.
+
+**This one ships as a patch, not as a commit.** `CssLengthParser` is in the
+`Broiler.CSS` submodule and the push is a 403, so it is
+`patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch` and is
+listed in `scripts/apply-pending-wpt-patches.sh` — which the reftest shard action
+runs, so a CI run exercises it on top of the pinned pointer. There is no
+main-repo half to fall back on: the shorthand expansion is entirely inside
+`Broiler.CSS`. Identify it by its commit subject, *Resolve the absolute length
+units in ParseToPixels*, not by the number — see
+[`patches/README.md`](../patches/README.md) on why the number means nothing.
+
+## Next lead: a flex item's main size ignores its aspect ratio
+
+Diagnosed, not fixed, and measured against Chromium on 2026-08-20. In a **row**
+flex container an item with a ratio and no width paints nothing at all:
+
+```html
+<div style="display: flex; width: 400px; height: 100px">
+  <div style="background: green; height: 60px; width: 50px"></div>        <!-- 50×60 ✔ -->
+  <div style="background: green; height: 60px"></div>                     <!-- 0×60, correct -->
+  <div style="background: green; height: 60px; aspect-ratio: 1/1"></div>  <!-- nothing; Chromium: 60×60 -->
+  <div style="background: green; aspect-ratio: 1/1"></div>                <!-- nothing; Chromium: 100×100 -->
+</div>
+```
+
+The second box is a fair control and shows the rule is specific: an empty item
+with a height and no width genuinely *is* zero wide, in Chromium too. The last two
+are the gap — CSS Flexbox §9.2 step 3 takes the flex base size of an item with a
+preferred aspect ratio and a definite cross size from the **transferred** size,
+and the fourth box's cross size becomes definite by `align-items: stretch` before
+the main size is resolved.
+
+**It is not the transfer added above, and that fix cannot reach it.** A row item's
+width comes from `ResolveFlexItemBaseOuterWidth`, whose three branches are
+`flex-basis`, a stated `width`, and — for everything else —
+`GetMinMaxWidth`'s preferred content width, which is zero for an empty box. The
+aspect ratio is not consulted in any of them, so whatever
+`ResolveBlockUsedWidth` resolved is replaced. The missing branch belongs there,
+between the stated width and the content measurement.
+
+Worth roughly the 20 remaining `css-sizing/aspect-ratio/flex-aspect-ratio-*`
+failures plus whatever a flex container used as a strip contributes elsewhere.
+Probe it against Chromium first: `flex-basis`, `flex-grow` and the item's
+min-content contribution all interact with the transferred size, and the flex
+path is on the order of a thousand reftests, so this is not a change to make on
+one test's evidence.
 
 ## Flex items are stretched now, and what that says about the scoreboard
 

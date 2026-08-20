@@ -368,12 +368,29 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 width = minW;
         }
 
+        // CSS Sizing 4 §4: a box with a preferred aspect ratio and a definite block size takes
+        // its auto inline size from the ratio instead of the containing block. The transfer
+        // supersedes every auto-width rule below — the block-level stretch-fit, the §10.3.7
+        // inset equation, and the float/abspos shrink-to-fit — because each of those answers
+        // "how wide is a box with no width of its own?", and a ratio plus a definite height is
+        // exactly such a width. Without it `height: 100px; aspect-ratio: 1/1` painted a
+        // viewport-wide band where every engine paints a 100px square.
+        bool inlineSizeFromAspectRatio = false;
+
+        if (!replacedSizeSettled && TryResolveAspectRatioAutoInlineWidth(out double aspectRatioInlineWidth))
+        {
+            inlineSizeFromAspectRatio = true;
+            width = aspectRatioInlineWidth;
+        }
+
         Size = new SizeF((float)width, Size.Height);
 
         // CSS2.1 §10.3.3: For block-level, non-replaced elements in
         // normal flow with an explicit width and auto margins, resolve
         // the auto margins so the element is centered horizontally.
-        if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width)
+        // A ratio-derived width counts as a resolved one here: it leaves the same free space
+        // for `margin: 0 auto` to split, and CSS Sizing 4 §4 does not exempt it.
+        if ((inlineSizeFromAspectRatio || (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width)))
             && Float == CssConstants.None
             && Position != CssConstants.Absolute && Position != CssConstants.Fixed)
         {
@@ -440,6 +457,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        if (inlineSizeFromAspectRatio)
+        {
+            // The ratio already settled this box's inline size, and every branch of this chain
+            // is an answer to the question it just answered — each would overwrite the derived
+            // width with the containing block's or with the content's.
+        }
         // CSS2.1 §10.3.7: Absolutely positioned non-replaced elements
         // with auto width use shrink-to-fit when at least one of
         // left/right is auto.  Shrink-to-fit =
@@ -450,7 +473,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // <img> or <canvas> has none — so an `<img position:absolute; left:4em; top:4em>` came out
         // zero pixels wide and painted nothing at all. With `right` also set the branch was skipped
         // and the same image stretched across the inset box instead; both are now the natural size.
-        if (!replacedSizeSettled
+        else if (!replacedSizeSettled
             && (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
             && (Position == CssConstants.Absolute || Position == CssConstants.Fixed)
             && (Left == null || Left == CssConstants.Auto
