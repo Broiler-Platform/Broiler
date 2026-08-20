@@ -232,6 +232,47 @@ sides only the first block paints. **It cannot change what CI reports for this
 test in any case** — CI scores it unpaginated against Chromium's blank
 `vertical-rl` viewport capture.
 
+### `page-name-abspos-002` — its reference asserts a break Chromium makes anyway
+
+Two WPT tests state opposite rules for near-identical markup, so one of them has
+to go. Both put an absolutely positioned wrapper around a `page: a` div and a
+`page: b` div:
+
+* `css-page/page-name-003-print` — reference is **two pages** of in-flow content,
+  so a page-name change **does** break inside an out-of-flow subtree. It cites the
+  Chromium bug that established this.
+* `css-page/page-name-abspos-002-print` — reference keeps the wrapper and drops the
+  names, so it is **one page**: no break.
+
+Printed to PDF by the Chromium that generates this project's references
+(2026-08-20, 5in × 3in pages, no margins), counting `/Type /Page`:
+
+| document | pages |
+| --- | --- |
+| `page-name-003-print` | 2 |
+| `page-name-003-print-ref` | 2 |
+| `page-name-abspos-002-print` | 2 |
+| `page-name-abspos-002-print-ref` | 1 |
+
+So Chromium breaks in **both**, passing the first pair and **failing the second
+against its own reference**. `page-name-abspos-001` and `-003` are not in tension
+with either: they are about an out-of-flow box's *own* name not reaching its
+siblings' flow, which is a different rule and still holds.
+
+Broiler now breaks inside an out-of-flow subtree, so it passes `page-name-003`
+and fails this one — the same way round as Chromium. The swap is exactly
+one-for-one, and the reason to take it is that the rule it removes ("an
+out-of-flow subtree never breaks on a page name") is not one any engine
+implements.
+
+To re-check it, serve the checkout and print both pairs:
+
+```sh
+python3 -m http.server 8731 --bind 127.0.0.1   # from tests/wpt/checkout
+# then page.pdf({width:'5in', height:'3in', margin:0}) each document in the
+# pinned Playwright and count /Type /Page
+```
+
 ## The inverse case: a reftest reference no shipping engine matches
 
 Everything above is *golden fails, reftest passes*. The reftest suite produces the

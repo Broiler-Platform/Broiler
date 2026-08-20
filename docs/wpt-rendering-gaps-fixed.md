@@ -343,6 +343,35 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   does not move, and a fail-list diff shows exactly one test changed state and none
   regressed. The golden-image score is unchanged (99.0%, passing either way).
 
+### An out-of-flow subtree never broke on a page name
+
+- **Test:** `css-page/page-name-003-print` — **0.0% → passes** under
+  `BROILER_WPT_PAGED_PRINT=1`.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Fragmentation.cs`). Main repo.
+- **The bug.** `CarriesThePageFlow` walked the whole ancestor chain and answered
+  *no* for anything inside a `position: absolute` or `fixed` subtree, so a page-name
+  change between two children of an out-of-flow box never forced a break. Two rules
+  were being conflated: an out-of-flow box does not carry its **own** name into its
+  parent's flow — which is `ParticipatesInPageNamePropagation`'s job and is what
+  `page-name-abspos-001` and `-003` are built on — but its children are stacked in
+  its own block flow, and a name change between two of *them* is still a break.
+- **Two WPT tests state this opposite ways, so the fix had to be adjudicated
+  rather than argued.** `page-name-003` (citing the Chromium bug that established
+  the behaviour) wants the break; `page-name-abspos-002`, on near-identical markup,
+  wants none. Printing all four documents to PDF in the Chromium that generates
+  this project's references settled it: Chromium breaks in **both**, giving
+  `page-name-003` two pages against its two-page reference and
+  `page-name-abspos-002` two against its one-page reference — it passes the first
+  and fails the second. Broiler now lands the same way round, and
+  `page-name-abspos-002` is filed with that evidence in
+  [won't fix](wpt-rendering-gaps-wont-fix.md#page-name-abspos-002--its-reference-asserts-a-break-chromium-makes-anyway).
+- **The swap is exactly one-for-one and the score does not move** —
+  `css/css-page` stays at 135 of 224 and 77.53 % average under the paged lever,
+  `css/css-break` at 90, and the default unpaginated run is unchanged. This is kept
+  for the rule it removes, not for a number: "an out-of-flow subtree never breaks
+  on a page name" is not something any engine implements, and leaving it in the
+  fragmentation model would mislead the next change to it.
+
 ### A `display: block` image lost its page name
 
 - **Tests:** `css-page/page-name-img-003` and `-004` — both **0.0% → pass at

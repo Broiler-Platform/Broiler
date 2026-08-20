@@ -214,6 +214,20 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — a page-name change breaks inside an out-of-flow subtree.
+  `CarriesThePageFlow` walked the whole ancestor chain and answered no for
+  anything inside a `position: absolute` or `fixed` box, conflating two rules: an
+  out-of-flow box does not carry its *own* page name into its parent's flow, but
+  its children are stacked in its own block flow and a name change between two of
+  them is still a page break. `css-page/page-name-003-print` states that and now
+  passes. It trades exactly one-for-one against `page-name-abspos-002-print`,
+  which asserts the opposite on near-identical markup — printed to PDF, Chromium
+  breaks in both cases, passing the first and failing the second against its own
+  reference, so Broiler now lands the same way round and that test is filed in
+  `docs/wpt-rendering-gaps-wont-fix.md` with the page counts. The score does not
+  move (paged `css/css-page` stays at 135 of 224, `css/css-break` at 90, default
+  unpaginated unchanged); this is kept for the rule it removes.
+
 - `Broiler.HTML` (**pending patch**, `patches/0003`) — a block-level image keeps
   its page name. `CorrectImgBoxes` implements a block-level replaced element by
   wrapping the image in an anonymous block and demoting the image itself to

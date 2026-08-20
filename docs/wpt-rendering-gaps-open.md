@@ -1021,15 +1021,12 @@ Worth separating from the rest, because the test itself may be at fault:
       box fragmentation sees is the one the cascade wrote to. **`Display` is the
       only signal that can separate `-001` from `-003`**, so this cannot be worked
       around in `TakesAPageName`.
-    - **`page-name-003` is a break that never fires.** One page rendered against
-      the reference's two. Its two named divs sit inside a
-      `position: absolute` wrapper, and `ParticipatesInPageNamePropagation`
-      excludes out-of-flow boxes outright. That exclusion is right for what it was
-      written for — `page-name-propagated-003`/`-005` need a name to propagate
-      *past* an out-of-flow box — but it also stops the name change *between two
-      children of* the out-of-flow box from breaking, which is what this test (and
-      the Chromium bug it cites) is about. Not propagating a name out of a subtree
-      and not breaking inside it are two different things.
+    - **`page-name-003` — fixed.** It was `CarriesThePageFlow` answering *no* for
+      anything inside an out-of-flow subtree, conflating "does not carry its own
+      name out" with "does not break inside itself". See
+      [the fixed entry](wpt-rendering-gaps-fixed.md#an-out-of-flow-subtree-never-broke-on-a-page-name);
+      it trades one-for-one against `page-name-abspos-002`, which states the
+      opposite rule and which Chromium fails too.
     - **`page-name-unnamed-trailing-001` is the only one that really needs
       per-page boxes**, and it needs `page-orientation` besides: its middle page
       takes `@page landscape { margin: 20px; page-orientation: rotate-left }`. It
@@ -1039,8 +1036,10 @@ Worth separating from the rest, because the test itself may be at fault:
       named-page break landing on top of the forced break already there.
 
     So the per-page **layout** the model cannot do — a flow dividing against two
-    different page areas — is wanted by exactly one of the four, and even that one
-    needs two other fixes first.
+    different page areas — is wanted by exactly one of the four, and it is the only
+    one still open: `page-name-img-003`/`-004` and `page-name-003` are closed, and
+    `page-name-unnamed-trailing-001` remains, needing per-page boxes,
+    `page-orientation`, and the page-count question above.
   - **`page-background-002` is the page *count* itself**, and it is the cleanest
     one to start on: test and reference are the same three-page document except
     that the reference draws its image as `position: absolute; top: 0`, and the
