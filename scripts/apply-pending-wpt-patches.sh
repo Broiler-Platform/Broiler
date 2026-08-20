@@ -228,12 +228,6 @@ set -euo pipefail
 #     it is cast by, so a card with a shadow paints as a solid block of shadow colour.
 
 PENDING_PATCHES=(
-  "Broiler.CSS|patches/0001-evaluate-a-math-function-where-a-length-is-expected.patch"
-  "Broiler.CSS|patches/0002-match-link-and-visited-apart.patch"
-  "Broiler.HTML|patches/0003-draw-the-face-the-style-asked-for.patch"
-  "Broiler.HTML|patches/0004-filter-a-scaled-bitmap.patch"
-  "Broiler.HTML|patches/0005-itemise-flex-and-grid-children-and-keep-a-split-element.patch"
-  "Broiler.HTML|patches/0006-clip-an-outset-box-shadow.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
