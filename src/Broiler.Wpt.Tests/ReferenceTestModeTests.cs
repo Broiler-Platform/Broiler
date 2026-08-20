@@ -236,6 +236,30 @@ public class ReferenceTestModeTests : IDisposable
     }
 
     [Fact]
+    public void RunReferenceTest_Passes_When_A_Mismatch_Reference_Differs_By_Less_Than_The_Pass_Threshold()
+    {
+        // The assertion a rel=mismatch test makes is "these are not the same picture",
+        // and it is routinely made with a very small mark: the difference below is a
+        // 20x20 square on a 320x240 page — 400 of 76 800 pixels, 0.52%, comfortably
+        // under the 1% the pass threshold allows a rel=match pair to differ by.
+        //
+        // Deciding this with the rel=match gate reported the pair as identical and
+        // failed the test while the square was on screen the whole time. That is what
+        // sank the css/css-text/white-space/control-chars-* family (63 tests, one 4em
+        // glyph each against a reference with none, ~0.17% of the page): the engine
+        // rendered them correctly and the threshold erased the evidence.
+        var test = WriteFile(
+            "small-difference.html",
+            PageWithLink("mismatch", "small-difference-notref.html",
+                "<div style=\"width:20px;height:20px;background:green\"></div>"));
+        WriteFile("small-difference-notref.html", Page(string.Empty));
+
+        var result = CreateRunner().RunReferenceTest(test, _tempDir);
+
+        Assert.True(result.Passed, result.Message);
+    }
+
+    [Fact]
     public void RunReferenceTest_Passes_On_The_Second_Match_Reference_When_The_First_Differs()
     {
         // WPT's own rule for several rel=match links: the test passes if it

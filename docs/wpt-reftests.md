@@ -82,13 +82,63 @@ Implemented in
 2. **Render.** The test is rendered by Broiler. A reference href naming a bitmap
    (`.png`, `.jpg`, …) is decoded as-is; any other reference is rendered by
    Broiler too.
-3. **Compare** at the run's pixel pass threshold (99% by default, i.e. at most 1%
-   of pixels may differ) — the same threshold and comparer the golden-image suite
-   uses.
+3. **Compare** with the same comparer the golden-image suite uses. A
+   `rel="match"` pair is judged at the run's pixel pass threshold (99% by
+   default, i.e. at most 1% of pixels may differ); a `rel="mismatch"` pair is
+   judged on inequality instead — see below.
 4. **Verdict.** A `rel="match"` reference must be reproduced; with several of
    them the test passes on the first one it reproduces (WPT's own rule) and the
    closest candidate is what a failure reports. A test whose references are all
    `rel="mismatch"` passes only when it differs from every one of them.
+
+### A `rel="mismatch"` is decided on inequality, not on the pass threshold
+
+The two relations ask opposite questions, and only one of them wants a
+tolerance. `rel="match"` asks *are these the same picture?* — a question a 99%
+threshold answers usefully, because anti-aliasing and rounding should not fail a
+pair that agrees. `rel="mismatch"` asks *are these **not** the same picture?*,
+and running that through the same gate inverts it: any difference smaller than
+1% of the viewport gets reported as "identical", so a test the engine rendered
+**correctly** fails.
+
+That is the normal size of what these tests assert, because a mismatch reference
+is deliberately minimal — it differs from the test by one glyph, one rule, one
+box. `css/css-text/white-space/control-chars-*` is the worked example: 63 tests,
+each rendering a single 4em control-character glyph against a reference that has
+none. That glyph moves **2 217** pixels of a 1024×768 page, against the **7 864**
+that 1% of 786 432 absorbs — so 62 of the 63 were reported as matching the
+reference they were asserting they differ from, and failed, with the glyph on
+screen the whole time. Fixing the comparison — not the renderer, which was
+already right — passed all 62.
+
+Across the corpus it is not a niche correction: 559 of the reftests are
+mismatch-only. Re-running the 3 331 failures
+[issue #1716](https://github.com/Broiler-Platform/Broiler/issues/1716) recorded,
+before and after the change, takes them from **11 passing to 253** — **242
+recovered, 0 regressed**. The change can only move a test in that direction: a
+mismatch test that passed before differed from its reference by *more* than the
+threshold, so it still differs by more than zero. The largest groups are
+`control-chars` (62), `html-ruby-extensions` (48, which declares up to ten
+mismatch references per test), `css/css-writing-modes/forms` (27) and
+`css/css-text/text-align` (16). The golden-image suite is untouched — this code
+path only runs under `--reftests-only`.
+
+Upstream wptrunner compares reftest screenshots for equality and applies a
+tolerance only where the test opts in through `fuzzy` metadata, so inequality is
+also what WPT means by the relation. Broiler still applies the per-channel
+`ColorTolerance`, so "differs" means a visibly different pixel rather than a
+rounding wobble; both sides come out of the same deterministic renderer, so two
+renders of the same picture are byte-identical regardless.
+
+**The lesson generalises past this one comparison.** A whole family of tests
+failing together, at a suspiciously uniform match percentage, is as likely to be
+the harness measuring the wrong thing as it is to be an engine gap — and the
+family's *size* is what puts it high on a failure list, which then reads as
+evidence that the gap is real. `control-chars` was the second-largest failure
+family in [issue #1716](https://github.com/Broiler-Platform/Broiler/issues/1716)
+(39 of its listed failures) and had never been a rendering gap at all. When a
+family fails uniformly, render one member and its reference and *look at them*
+before believing the score.
 
 Manual tests, variant tests, and media-playback tests are skipped exactly as in
 the golden-image path. Reference *chains* — a reference that itself declares a
@@ -189,6 +239,21 @@ against white for the second, on both engines. **When the oracle reproduces the
 disagreement, stop: there is nothing here to fix, and the pair will head the
 next biggest-problems list too.** That the list ranks by blast radius does not
 make its top entry winnable, and two of three is a fair rate to expect.
+
+**It held exactly to that prediction in
+[issue #1716](https://github.com/Broiler-Platform/Broiler/issues/1716)**, where
+`root-box-003` and `forced-colors-mode-49` head the list again and the third
+entry is a new instance of the *unwinnable-by-construction* kind: `html/rendering/
+replaced-elements/images/abs-pos-transferred-max-width-from-percentage-max-height-in-
+auto-height-containing-block.html` declares `<link rel=match href="/css/support/60x60-green.png">`
+— a bare 60×60 bitmap, compared against a 1024×768 full-page render that also
+carries the test's `<p>` of instructions. No threshold can reconcile those, and
+it is the corpus's **only** bitmap-reference reftest, so there is no category
+here to fix either. Three for three now: **the biggest-problems list has not
+produced a real defect in two consecutive runs**, which is the strongest
+argument for reading it as a ranking of blast radius rather than a work queue.
+Issue #1716's actual defect was found by ignoring that list and asking why a
+63-test family was failing uniformly — see the mismatch-comparison section above.
 
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
