@@ -214,6 +214,33 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — a `position: fixed` box is on every page of a paged render,
+  and it lands where its insets say. Three bugs met in one family of tests. CSS
+  Paged Media makes the page area the fixed-positioning containing block, so a
+  fixed box repeats per page rather than appearing once in the document;
+  `FragmentTreeBuilder` now emits the extra appearances, one page further down
+  each, as fragments and never boxes — a fixed box is out of flow, contributes no
+  height, and the page count is unchanged. Second, `PositionAbsoluteBox` — the
+  post-layout pass that re-resolves `right`/`bottom` once the used size is known —
+  ran for `absolute` and not for `fixed`, and the earlier pass recovers a height
+  only from an explicit non-percentage `height`, so a fixed box sized by its
+  content and anchored with `bottom` was anchored by its *top* edge to the
+  viewport's bottom: one box-height low, which in a paged render is the top of the
+  next page. Third, that same first pass placed a bottom-anchored `absolute` box
+  at its containing block's bottom edge while its height was still unknown, so the
+  subtree laid out below that edge and `LayoutEnvironment.ActualSize` — a running
+  maximum — kept the overshoot after the box was corrected; a document 36px too
+  tall is a whole extra blank page. It now stays at its static position until the
+  height is known. Under `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 134 → 135
+  of 224, average 77.21% → 77.67%, `fixedpos-009-print` gained and none lost; nine
+  more `fixedpos-*` go from passing at 99.2%–99.9% to exactly 100%, eight of them
+  on the default unpaginated path too. Paged `css/css-break` (91), `css/CSS2` (96),
+  `css/css-backgrounds` (424) and `css/css-values` (104) do not move, and the
+  default run holds at 142. Two tests slip slightly, both the fix correctly
+  repeating a box that is misplaced for an unrelated reason: `fixedpos-011`
+  (multicol not column-filling inside the fixed box) and `page-margin-005`
+  (percentage `@page` margins).
+
 - `Broiler.Wpt` / `Broiler.Layout` — a paged render lays the flow out once per
   distinct page area instead of once per document, so a document whose named
   `@page` rules size the page differently divides against each page's own area —

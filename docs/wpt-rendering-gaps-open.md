@@ -1053,13 +1053,15 @@ Worth separating from the rest, because the test itself may be at fault:
     [the fixed entry](wpt-rendering-gaps-fixed.md#a-paged-render-laid-every-page-out-against-one-page-area),
     which also records the measured result honestly: the capability moves exactly
     one test, because every test it was built for is blocked behind something
-    else. What each of those is blocked on is enumerated there — `position: fixed`
-    not repeating per page (`fixedpos-010`), `page-orientation` not rotating
-    (`page-orientation-on-*`), `vw`/`vh` not resolving against the first page's
-    area (`page-size-009`), page-box percentages not resolved per named page
-    (`page-box-004`), `auto` margins on named pages (`page-margin-auto-*`), and a
-    `flow-root` container paginating short inside `page-size-007`/`-008`'s
-    reference. None of those is per-page layout.
+    else. What each of those is blocked on is enumerated there — `page-orientation`
+    not rotating (`page-orientation-on-*`), `vw`/`vh` not resolving against the
+    first page's area (`page-size-009`), page-box percentages not resolved per
+    named page (`page-box-004`), `auto` margins on named pages
+    (`page-margin-auto-*`), and a `flow-root` container paginating short inside
+    `page-size-007`/`-008`'s reference. None of those is per-page layout. The
+    sixth on that list, `fixedpos-010`'s `position: fixed` not repeating per page,
+    [has since been fixed](wpt-rendering-gaps-fixed.md#a-fixed-position-box-appeared-once-in-the-document-not-once-on-every-page) —
+    it took `fixedpos-009` with it, and left `-010` failing on its page count.
   - **`page-background-002` is the page *count* itself**, and it is the cleanest
     one to start on: test and reference are the same three-page document except
     that the reference draws its image as `position: absolute; top: 0`, and the

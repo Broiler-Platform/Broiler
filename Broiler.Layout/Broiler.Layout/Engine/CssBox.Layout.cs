@@ -1133,7 +1133,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     if (boxHeight <= 0)
                         boxHeight = Size.Height;
 
-                    newY = (float)(cbPadTop + cbPadHeight - cssBottom - ActualMarginBottom - boxHeight);
+                    // Still nothing: the box is sized by content that has not been laid out yet, so
+                    // any placement made now is wrong by the height it is about to get.
+                    // `PositionAbsoluteBox` re-places it once that height is known, and until then
+                    // the static position is the better guess — placing it at the containing
+                    // block's bottom edge instead puts the whole subtree *below* that edge while
+                    // the children lay out, and `LayoutEnvironment.ActualSize` is a running maximum
+                    // that keeps the overshoot after the box is corrected. In a paged render that
+                    // is a whole extra blank page: `fixedpos-009-print`'s reference is two pages of
+                    // `height: 100vh` and came out three, its content ending 36px — one masked
+                    // pencil — past the end.
+                    if (boxHeight > 0)
+                        newY = (float)(cbPadTop + cbPadHeight - cssBottom - ActualMarginBottom - boxHeight);
                 }
 
                 Location = new PointF(newX, newY);
@@ -1820,7 +1831,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     private void PositionAbsoluteBox()
     {
-        if (Position == CssConstants.Absolute)
+        // A fixed box is placed the same way and needs the same second look: its `right`/`bottom`
+        // are resolved against its own used width and height, and both are still zero when it is
+        // first positioned. The earlier pass recovers a height from an explicit, non-percentage
+        // `height` and from nothing else, so a fixed box sized by its content and anchored with
+        // `bottom` was left anchored by its *top* edge to the viewport's bottom — off by its own
+        // height, which in a paged render puts it at the top of the next page. WPT's
+        // `css-page/fixedpos-001-print` and its neighbours are written on `bottom: 0` with no
+        // height at all. Only the containing block differs: the viewport, not an ancestor.
+        if (Position is CssConstants.Absolute or CssConstants.Fixed)
         {
             bool hasLeft = Left != null && Left != CssConstants.Auto;
             bool hasRight = Right != null && Right != CssConstants.Auto;
@@ -1829,8 +1848,18 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             if ((!hasLeft && hasRight) || (!hasTop && hasBottom))
             {
-                var cb = FindPositionedContainingBlock();
-                GetAbsoluteContainingBlockPaddingBox(cb, out double cbPadLeft, out double cbPadTop, out double cbPadWidth, out double cbPadHeight);
+                double cbPadLeft, cbPadTop, cbPadWidth, cbPadHeight;
+                if (Position == CssConstants.Fixed)
+                {
+                    var viewport = FixedPositioningViewport();
+                    (cbPadLeft, cbPadTop) = (viewport.X, viewport.Y);
+                    (cbPadWidth, cbPadHeight) = (viewport.Width, viewport.Height);
+                }
+                else
+                {
+                    var cb = FindPositionedContainingBlock();
+                    GetAbsoluteContainingBlockPaddingBox(cb, out cbPadLeft, out cbPadTop, out cbPadWidth, out cbPadHeight);
+                }
 
                 float newX = Location.X;
                 float newY = Location.Y;

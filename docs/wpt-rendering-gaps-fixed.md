@@ -618,7 +618,9 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
     **reference** side still comes out short (four pages against six), inside its
     `flow-root` containers.
   - `fixedpos-010` is not per-page layout at all: it needs `position: fixed` to
-    repeat on every page, and Broiler paints it once.
+    repeat on every page, and Broiler paints it once. (That
+    [has since been fixed](#a-fixed-position-box-appeared-once-in-the-document-not-once-on-every-page);
+    the test still fails, now on three pages against its reference's four.)
   - `page-orientation-on-landscape-001`/`-portrait-001` need `page-orientation`
     to actually rotate the page.
   - `page-size-009` needs `vw`/`vh` to resolve against the **first** page's area
@@ -638,6 +640,60 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   `css/css-break` 91, `css/CSS2` 96, `css/css-backgrounds` 424, `css/css-values`
   104, and the default unpaginated `css/css-page` 142. `page-size-010` also goes
   99.0% → 100%; `page-size-009` slips 55.6% → 54.7% and passes neither way.
+
+### A fixed-position box appeared once in the document, not once on every page
+
+- **Tests:** `css-page/fixedpos-009-print` — **0.0% → passes at 100%** under
+  `BROILER_WPT_PAGED_PRINT=1`. Nine more of the family go from *passing* at
+  99.2%–99.9% to **exactly 100%**, and eight of those on the **default**
+  unpaginated path as well — they were over the 99% gate while drawing the box in
+  the wrong place, which is the kind of pass that stops being one the moment
+  anything else moves.
+- **Owner:** `Broiler.Layout` (`FragmentTreeBuilder`, `CssBox.Layout`). Main repo,
+  no patch.
+- **Three bugs, and only the first is the one the tests are named for.**
+- **A fixed box appeared once in the document.** CSS Paged Media makes the page
+  area the fixed-positioning containing block, so a fixed box is on every page —
+  WPT's `fixedpos-*` say so in the text they render, *"This should repeat on every
+  page"*, and their references state the same layout with one absolutely
+  positioned copy per page. `FragmentTreeBuilder` now emits the extra appearances,
+  one page further down each. They are fragments and never boxes: a fixed box is
+  out of flow, contributes no height, and the page count is what it was.
+- **A bottom-anchored fixed box sized by its content was off by its own height.**
+  `PositionAbsoluteBox` — the post-layout pass that re-resolves `right`/`bottom`
+  once the used size is known — ran for `absolute` and not for `fixed`. The
+  earlier pass recovers a height from an explicit, non-percentage `height` and
+  from nothing else, so a fixed box sized by its content and anchored with
+  `bottom` was anchored by its **top** edge to the viewport's bottom: one whole
+  box-height low, which in a paged render is the top of the *next* page. That is
+  what `fixedpos-001` through `-003` were really failing on — not "the box is
+  missing from pages 2 and 3" but "the box is on the wrong page, once" — and it is
+  why they read as 99.8% rather than as something obviously broken.
+- **And that first placement cost a whole page.** The same pass places
+  `absolute` boxes, and with the height still unknown it put the box *at* the
+  containing block's bottom edge — so the subtree laid out below that edge, and
+  `LayoutEnvironment.ActualSize`, a running maximum, kept the overshoot after
+  `PositionAbsoluteBox` corrected the box. `fixedpos-009`'s reference is two pages
+  of `height: 100vh` and came out three, its content ending 36px — one masked
+  pencil — past the end. The first pass now leaves such a box at its static
+  position and lets the post-layout pass place it.
+- **Two tests go slightly down, and both are the fix working on content that is
+  wrong for another reason.** `fixedpos-011` 97.7% → 97.0%: its fixed box is a
+  four-column multicol whose 400px child does not column-fill, so it overflows its
+  100px box and the repeats now duplicate the overflow. `page-margin-005`
+  80.3% → 80.0%: percentage `@page` margins are not resolved against the
+  corresponding dimension, so the two sides' page areas differ and their repeated
+  boxes land in different places. Neither is a fixed-positioning question.
+- **`fixedpos-010` still fails**, and it is not this either: it renders three
+  pages against its reference's four, which is where a named run ends.
+- **Verified:** three render tests in `PagedPrintRenderTests` — the repeat, the
+  bottom-anchored content-sized placement, and the page that the overshoot added —
+  each confirmed to fail with its fix reverted and pass with it. Measured with the
+  submodules at their pinned pointers: paged `css/css-page` 134 → **135** of 224,
+  average 77.21% → **77.67%**, one test gained and none lost; the default
+  unpaginated run holds at 142 with its average 88.37% → 88.38%; paged
+  `css/css-break` (91), `css/CSS2` (96), `css/css-backgrounds` (424) and
+  `css/css-values` (104) do not move.
 
 ---
 
