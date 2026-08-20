@@ -343,6 +343,24 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   does not move, and a fail-list diff shows exactly one test changed state and none
   regressed. The golden-image score is unchanged (99.0%, passing either way).
 
+### A paged render stamped a page for a document that generates none
+
+- **Test:** `css-page/root-element-display-none-print` — under
+  `BROILER_WPT_PAGED_PRINT=1`, **0.0% → passes**. The unpaginated path, which is
+  the default, was already right.
+- **Owner:** the WPT runner (`src/Broiler.Wpt/WptDocumentRenderer.cs`). Main repo.
+- **The bug.** A root element that generates no box generates no page either, so
+  the sheet keeps none of its own paint. `RenderDecorated` has honoured that since
+  the page paint landed — `GeneratesPageContent` gates it — but `RenderPaged` never
+  asked, so a document whose `@page` states `border: solid red; background: hotpink`
+  and whose `html` is `display: none` still had a decorated first page stamped
+  against a deliberately blank reference.
+- **What landed:** the same gate, before the output sheet is allocated, returning
+  one blank page — an empty document is one empty page, not none.
+- **Verified:** the paged run goes 127 → **128** of 224 with the average 73.24% →
+  **73.69%**, exactly one test changing state and none lost. The default
+  unpaginated run is untouched.
+
 ### A media query had no way to know it was being printed
 
 - **Test:** `css-page/media-queries-001-print` — `rel=match` **0.0% → passes at

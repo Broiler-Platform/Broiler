@@ -958,23 +958,63 @@ Worth separating from the rest, because the test itself may be at fault:
   800px` and both references spell their expected geometry out in absolute pixels,
   so the rings land at the right widths on a sheet of the wrong size and the
   content inside them is laid out against the wrong page area.
-- **The obvious fix is measurably wrong, which is the point of this entry.**
-  Honouring the declared box for every `-print` document — rendering the flow into
-  the page area and compositing onto a sheet of the declared size — was tried on
-  2026-08-20 and **regressed** the suite: `css/css-page` 140 → 128 passed,
-  `css/css-break` 107 → 104. The reason is asymmetry, not the geometry. A reference
-  such as `page-box-008-print-ref` declares the same `size` but paints nothing on
-  the sheet, so it takes the undecorated path and keeps the viewport; resizing only
-  the side that carries a decoration resizes one half of the comparison. This is
-  the same trap the existing code comment warns about.
-- **So the exit is pagination, not a sheet size.** The sheet can only be the
-  declared page once *both* sides of a comparison are laid out against it, which
-  means the paged path — and that path is off by default because it currently
-  scores worse (`css/css-page` 140 → 125 passed with `BROILER_WPT_PAGED_PRINT=1`,
-  measured the same day). It shares a root cause with
+- **Three ways of doing the obvious thing were tried on 2026-08-20, and all three
+  are worse. That is the point of this entry.** Starting from `css/css-page` at 142
+  of 224 and `css/css-break` at 109 of 204:
+
+  | what was tried | css-page | css-break |
+  | --- | --- | --- |
+  | declared box, viewport default | 128 | 104 |
+  | WPT's 5in × 3in default alone, sheet unchanged | 142 (no change) | — |
+  | declared box, 5in × 3in default | **114** | 103 |
+
+  The first two attempts were diagnosed as asymmetry — a reference that paints
+  nothing on the sheet takes the undecorated path and keeps the viewport, so only
+  one half of the comparison resizes — and the WPT default was meant to remove it,
+  since `page-rule-specificity-001-print` says outright that *"WPT Print Reftest
+  default size is 5x3in"*. It removed the asymmetry and made things **worse**,
+  which is what identifies the real cause.
+- **The real cause is that one sheet at the real page size can only hold page one.**
+  A 5in × 3in page area is 288px tall; the runner's viewport is 768. Every `-print`
+  document whose flow runs past its first page currently shows the overflow, and
+  its reference — written to be read as a stack of pages — shows it too, so the two
+  agree. Shrink the sheet to one true page and everything past it is clipped away
+  on both sides but *not equally*, because the two sides put different content
+  there. The declared page box is not a sheet-size change at all: it is pagination.
+- **So the work is to make the paged path good enough to become the default**,
+  and the gap is now measured rather than guessed. `BROILER_WPT_PAGED_PRINT=1`
+  scores `css/css-page` **128 of 224** against the unpaginated 142 — it was 125
+  when this entry was first written, and
+  [the empty-root fix](wpt-rendering-gaps-fixed.md#a-paged-render-stamped-a-page-for-a-document-that-generates-none),
+  named pages and the paged formatting context have since closed three of it.
+  Paged **wins 8** tests the unpaginated path fails — `basic-pagination-003`/`-004`,
+  five `margin-boxes/content-*`, `page-margin-004` — and **loses 22**, which sort
+  into three groups:
+  - **13 are `SizeMismatch` at 0.0 %**: the two sides render a different number of
+    pages. Seven of those need a **per-page box** the model cannot carry —
+    `page-rule-specificity-001`–`-003` (`@page :first { size: portrait }`),
+    `page-name-003`, `page-name-img-003`/`-004`, `page-name-unnamed-trailing-001`.
+  - **`page-background-002` is the page *count* itself**, and it is the cleanest
+    one to start on: test and reference are the same three-page document except
+    that the reference draws its image as `position: absolute; top: 0`, and the
+    count comes from `container.ActualSize.Height`, which that image inflates — the
+    test renders 300×150 (three pages) against the reference's 300×250 (five).
+    **Deriving the count from the in-flow extent instead was tried and does not
+    pay**: excluding `absolute` and `fixed` subtrees goes 128 → 127 (fixes
+    `fixedpos-009`, breaks `-005` and `-006`), excluding only `absolute` goes
+    128 → 125. The average rises either way (73.69 % → 74.64 %), so the extent is
+    closer to right and the page *count* is not what those `fixedpos` tests turn
+    on. Whatever replaces it has to satisfy them too.
+  - **The rest are near-misses** just under the 99 % gate (`monolithic-overflow-018`
+    at 98.1 %, `page-size-006` at 98.7 %, `margin-boxes/alignment-001` at 98.5 %)
+    plus four that are further out (`page-margin-005`/`-006`,
+    `monolithic-overflow-021`, `safe-printable-inset-003`).
+
+  It also shares a root cause with
   [the physical-Y-axis pagination entry](#pagination-runs-along-the-physical-y-axis-only)
-  above: fix the block-axis abstraction there first, then re-measure the paged lever
-  before touching the sheet size here.
+  above, which is what the vertical-writing-mode print tests are waiting on.
+- **Do not re-run the three experiments in the table.** They are recorded so the
+  next attempt starts from per-page boxes and the page count, not from the sheet.
 - **Exit gate:** `page-box-008-print` and `-009-print` match, and the unpaginated
   `-print` corpus does not lose a test.
 

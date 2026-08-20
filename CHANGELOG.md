@@ -214,6 +214,16 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` — a paged render no longer stamps a page for a document that
+  generates none. A root element with no box generates no page, so the sheet
+  keeps none of its own paint; `RenderDecorated` has gated that on
+  `GeneratesPageContent` since the page paint landed, but `RenderPaged` never
+  asked, so `css-page/root-element-display-none-print` had a hotpink,
+  red-bordered first page stamped against a deliberately blank reference. Under
+  `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 127 → 128 of 224, average
+  73.24% → 73.69%, one test changing state and none lost; the default
+  unpaginated run is untouched.
+
 - `Broiler.Wpt` — `@page { margin: auto }` centres the page area instead of
   leaving every margin at zero. `auto` is a value of the margin property and the
   shorthand parser read it as a failure to parse, rejecting the whole

@@ -404,6 +404,18 @@ internal static class WptDocumentRenderer
         int boxWidth = Math.Max(1, (int)Math.Round(page.BoxSize.Width));
         int boxHeight = Math.Max(1, (int)Math.Round(page.BoxSize.Height));
 
+        // A root element that generates no box generates no page either, so the sheet keeps none of
+        // its own paint — not the `@page` background or border, and not the margin boxes.
+        // `root-element-display-none-print` states exactly that against a blank reference, and the
+        // unpaginated path has honoured it since the page paint landed; this one was still stamping
+        // a decorated first page. One blank sheet, because an empty document is one empty page.
+        if (!GeneratesPageContent(container.LatestFragmentTree))
+        {
+            var blank = new BBitmap(boxWidth, boxHeight);
+            blank.Clear(backgroundColor);
+            return blank;
+        }
+
         var output = new BBitmap(boxWidth, boxHeight * pages);
         output.Clear(backgroundColor);
 
