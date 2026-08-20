@@ -226,8 +226,22 @@ set -euo pipefail
 #     way has no box for its background to propagate from and the page renders white.
 #   * 0006 (Broiler.HTML, clip an outset box-shadow) — an unclipped outer shadow fills the element
 #     it is cast by, so a card with a shadow paints as a solid block of shadow colour.
+#
+# All six of those landed upstream and the pinned pointers contain them, so each reaches CI
+# through the pointer now and their entries and patch files are gone. The numbering restarted at
+# 0001 against what was left, which was nothing.
+#
+# 0001 (Broiler.CSS, "Resolve the absolute length units in ParseToPixels") is listed, and it is
+# as plain a case as the anonymous-table one above: without it the `border` shorthand reads
+# `border: 72pt solid red`'s first component as a *colour*, so the width falls back to `medium`
+# and the colour is dropped — a declaration that should paint a 96px red band paints a 3px black
+# line instead. The CSS2.1 suite states its geometry in physical units by convention, so this is
+# not a corner: `css/CSS2/positioning` alone goes 364 → 394 of 520 reftests with the patch
+# applied and none lost. There is no main-repo half to fall back on — the shorthand expansion is
+# entirely inside Broiler.CSS — which is precisely why it has to be applied here to reach a run.
 
 PENDING_PATCHES=(
+  "Broiler.CSS|patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

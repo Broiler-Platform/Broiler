@@ -694,11 +694,92 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             specifiedWidth = contentHeight * ratio;
         }
 
-        // CSS2.1 §10.4: the derived size is still subject to min-/max-width.
-        borderBoxWidth = ResolveInlineSizeBounds().Clamp(ResolveSpecifiedWidthToBorderBox(specifiedWidth));
+        // CSS2.1 §10.4: the derived size is still subject to min-/max-width, and the clamp
+        // happens in the box `box-sizing` names — the same frame the bounds are stated in —
+        // before the result is mapped back to a border box. Clamping the border-box width
+        // instead double-counts padding against the bound: a `content-box` item with
+        // `padding: 0 20px; max-width: 60px` and a 100px transferred content width is 100px
+        // wide (60 + 40), not the 60 a border-box clamp leaves.
+        borderBoxWidth = ResolveSpecifiedWidthToBorderBox(ResolveInlineSizeBounds().Clamp(specifiedWidth));
 
         return borderBoxWidth > 0
             && !double.IsNaN(borderBoxWidth) && !double.IsInfinity(borderBoxWidth);
+    }
+
+    /// <summary>
+    /// CSS Sizing 4 §4: the used border-box width an <c>auto</c> inline axis takes from this
+    /// box's own definite block size through its preferred aspect ratio — the case
+    /// <see cref="TryResolveAspectRatioInlineWidth"/> serves for a grid item, resolved here
+    /// from the box's own <c>height</c> rather than from one a caller has settled.
+    /// </summary>
+    /// <remarks>
+    /// <para>This is the transfer that stops a block-level box stretching. A block's
+    /// <c>auto</c> width normally fills its containing block, and
+    /// <see cref="TryResolveAspectRatioBlockHeight"/> then derives the height from it; when the
+    /// block size is definite the dependency runs the other way and the ratio sizes the inline
+    /// axis instead, so <c>&lt;div style="height: 100px; aspect-ratio: 1/1"&gt;</c> is a 100px
+    /// square rather than a viewport-wide 100px band. Every engine does this, and the WPT
+    /// <c>css-sizing/aspect-ratio</c> tests state it directly.</para>
+    /// <para>The block size is the box's own specified <c>height</c>, clamped by
+    /// <c>min-height</c>/<c>max-height</c> — the transfer reads the <em>used</em> block size, so
+    /// <c>height: 100px; min-height: 200px; aspect-ratio: 1/1</c> is a 200px square. A
+    /// percentage height counts only when it resolves against a definite containing block
+    /// (CSS2.1 §10.5); otherwise it computes to <c>auto</c> and there is nothing to transfer.</para>
+    /// <para>Replaced boxes stay out: an <c>&lt;img&gt;</c> sizes from its natural size and ratio
+    /// through <see cref="ResolveReplacedContentSize"/>, which already resolves both axes
+    /// together.</para>
+    /// </remarks>
+    internal bool TryResolveAspectRatioAutoInlineWidth(out double borderBoxWidth)
+    {
+        borderBoxWidth = 0;
+
+        if (Width != CssConstants.Auto && !string.IsNullOrEmpty(Width))
+            return false;
+
+        if (!TryParseAspectRatio(AspectRatio, out double ratio) || !(ratio > 0))
+            return false;
+
+        if (IsImage || TryGetNaturalReplacedSize(out _))
+            return false;
+
+        if (!TryGetDefiniteSpecifiedBorderBoxHeight(out double borderBoxHeight))
+            return false;
+
+        return TryResolveAspectRatioInlineWidth(borderBoxHeight, out borderBoxWidth);
+    }
+
+    /// <summary>
+    /// The used border-box height this box's own <c>height</c> declares, or <c>false</c> when
+    /// the block axis is indefinite. Mirrors the height resolution in
+    /// <c>ResolveUsedBlockHeight</c>, which runs too late to size the inline axis from.
+    /// </summary>
+    private bool TryGetDefiniteSpecifiedBorderBoxHeight(out double borderBoxHeight)
+    {
+        borderBoxHeight = 0;
+
+        if (Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+            return false;
+
+        if (IsIntrinsicSizingHeightKeyword(Height)
+            || string.Equals(Height, "inherit", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // CSS2.1 §10.5: a percentage against an auto-height containing block computes to auto.
+        if (HeightPercentageResolvesToAuto())
+            return false;
+
+        double specifiedHeight = Height.Contains('%')
+            ? ParseUsedLength(Height, PercentageHeightContainingBlockHeight())
+            : ParseLengthWithLineHeight(Height, 0);
+
+        if (double.IsNaN(specifiedHeight) || double.IsInfinity(specifiedHeight) || !(specifiedHeight > 0))
+            return false;
+
+        borderBoxHeight = ResolveSpecifiedHeightToBorderBox(ClampSpecifiedHeightToMinMax(specifiedHeight));
+
+        return borderBoxHeight > 0;
     }
 
     /// <summary>Parses an <c>aspect-ratio</c> value (<c>&lt;number&gt; [ /
@@ -714,6 +795,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         double w = double.NaN, h = 1;
 
+        // The `/` is a token of the grammar, not a character of the numbers around it, so
+        // whitespace may sit on either side of it — `1 / 2` and `1/2` are the same value, and
+        // `1 / 2` is how most of the WPT css-sizing tests spell it. Splitting on whitespace can
+        // therefore hand this loop the slash attached to the numerator, attached to the
+        // denominator, in the middle of both, or entirely on its own; only the last of those has
+        // no number in it at all, and rejecting that token used to reject the whole declaration.
+        bool sawSlash = false;
+
         foreach (var token in value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries))
         {
             if (token.Equals("auto", StringComparison.OrdinalIgnoreCase)
@@ -723,21 +812,31 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             int slash = token.IndexOf('/');
             if (slash >= 0)
             {
-                if (!double.TryParse(token[..slash].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out w))
-                    return false;
+                string numerator = token[..slash].Trim();
+                string denominator = token[(slash + 1)..].Trim();
 
-                string rest = token[(slash + 1)..].Trim();
-                if (rest.Length > 0 && !double.TryParse(rest, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
+                if (numerator.Length > 0
+                    && !double.TryParse(numerator, NumberStyles.Float, CultureInfo.InvariantCulture, out w))
+                {
                     return false;
+                }
+
+                sawSlash = true;
+
+                if (denominator.Length > 0
+                    && !double.TryParse(denominator, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
+                {
+                    return false;
+                }
             }
-            else if (double.IsNaN(w))
+            else if (double.IsNaN(w) && !sawSlash)
             {
                 if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out w))
                     return false;
             }
             else
             {
-                // A second bare number is the denominator (e.g. `1 / 1` split on space).
+                // A bare number after the numerator is the denominator (`1 / 1` split on space).
                 if (!double.TryParse(token, NumberStyles.Float, CultureInfo.InvariantCulture, out h))
                     return false;
             }

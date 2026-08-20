@@ -6,12 +6,10 @@
 > [How this was verified](wpt-rendering-gaps.md#how-the-2026-08-13-split-was-verified).
 
 Gaps that are closed. Each entry keeps the root cause, what landed, the evidence,
-and — where there was one — the wrong turn worth not repeating. **One is waiting on a
-patch** — the media-element fix, whose `Broiler.HTML` remote is outside a
-this-repository session's push scope; it is listed in
-`scripts/apply-pending-wpt-patches.sh`, so the pixel suites run with it applied on top
-of the pinned pointer. Every other submodule fix named below is an ancestor of that
-pointer.
+and — where there was one — the wrong turn worth not repeating. **Every submodule fix
+named below is now an ancestor of its pinned pointer**, the media-element one included
+(it landed upstream as `Broiler.HTML` `a9be60a`), so all of them reach CI through the
+pointer and none is waiting on `scripts/apply-pending-wpt-patches.sh`.
 
 Where a fix landed in a submodule it is identified by its **commit subject**, not
 by a patch number. Patch numbers named nothing durable — `patches/` was a backlog,
@@ -1511,11 +1509,11 @@ the test that exposed it.
 
 - **Tests:** `conformance-checkers/html/elements/{track,video}/src-isvalid` 14.4% →
   **100%**, and `.../audio/src-isvalid` 19.8% → **100%**.
-- **Owner:** `Broiler.HTML` (`Parse/DomParser.cs`). **Waiting on a patch** —
-  `patches/0008-media-element-painting.patch`, listed in
-  `scripts/apply-pending-wpt-patches.sh` so the pixel suites exercise it. Identify it by
-  its commit subject, *Paint a media element's box only when it shows controls*, not by
-  the number.
+- **Owner:** `Broiler.HTML` (`Parse/DomParser.cs`). It was waiting on a patch while its
+  remote sat outside a this-repository session's push scope; it is upstream now as
+  `a9be60a`, *Paint a media element's box only when it shows controls*, and the pinned
+  pointer contains it, so it reaches CI through the pointer. Identify it by that commit
+  subject, never by the patch number it once had.
 - **What was wrong.** A `<video>` with no decodable media filled its whole box black, and
   an `<audio>` without `controls` laid out as a 300×32 black bar instead of not laying out
   at all. Each of those two test pages is 250 media elements; Chromium renders both as
