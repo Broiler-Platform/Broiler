@@ -2411,6 +2411,35 @@ internal sealed partial class WptTestRunner
     /// The <c>rel="mismatch"</c> half of <see cref="RunReferenceTest"/>: the render has
     /// to differ from every declared reference, so any one it reproduces is a failure.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A mismatch is decided on inequality, not on the pass threshold.</b> The
+    /// <c>rel="match"</c> half asks "are these the same picture?" and answers it with a
+    /// tolerance — at the default threshold, up to 1% of the pixels may differ. Reusing that
+    /// gate here inverts the assertion the test is making: <c>rel="mismatch"</c> says the two
+    /// renders must not be the same picture, and a difference smaller than 1% of the viewport
+    /// is still a difference. Under the old <c>diff.IsMatch</c> test anything below the
+    /// threshold was reported as "identical", so a test that Broiler rendered *correctly*
+    /// failed: the engine drew exactly the thing the test asked for, and the gate absorbed it.
+    /// </para>
+    /// <para>
+    /// That is the normal size of what these tests assert, because a mismatch reference is
+    /// deliberately minimal — it differs from the test by one glyph, one rule, one box. The
+    /// <c>css/css-text/white-space/control-chars-*</c> family (63 tests) renders one 4em glyph
+    /// against a reference that has none: 2 217 differing pixels on a 1024×768 page, against
+    /// the 7 864 that 1% of 786 432 absorbs. 62 of the 63 failed with the glyph on screen the
+    /// whole time, which is also why the family topped the suite's failure list. Upstream
+    /// wptrunner compares reftest screenshots for equality and applies a tolerance only where
+    /// the test itself opts in via <c>fuzzy</c> metadata, so inequality is also what WPT means
+    /// by the relation.
+    /// </para>
+    /// <para>
+    /// The per-channel <see cref="HTML.Core.IR.DeterministicRenderConfig.ColorTolerance"/> still
+    /// applies, so "differs" means a visibly different pixel rather than a rounding wobble. Both
+    /// sides come out of the same deterministic renderer, so two renders of the same picture are
+    /// byte-identical and land on 0 differing pixels regardless.
+    /// </para>
+    /// </remarks>
     private WptTestResult CompareAgainstMismatchReferences(
         string testPath,
         string? wptRoot,
@@ -2426,18 +2455,20 @@ internal sealed partial class WptTestRunner
             using (reference)
             {
                 using var diff = PixelDiffRunner.Compare(rendered, reference, _pixelDiffConfig);
-                if (!diff.IsMatch)
+                if (diff.DiffPixelCount > 0)
                     continue;
 
-                double matchPct = (1.0 - diff.DiffRatio) * 100;
+                // Reaching here means zero differing pixels, so the match is 100% by
+                // construction — reported as such rather than recomputed from the ratio,
+                // which can only be 0 at this point.
                 var images = SaveFailureImages(testPath, wptRoot, rendered, reference, diff.DiffBitmap);
                 return new WptTestResult
                 {
                     TestPath = testPath,
                     Passed = false,
-                    MatchPercent = matchPct,
+                    MatchPercent = 100,
                     Message =
-                        $"Render is identical ({matchPct:F1}%) to {DescribeReference(referencePath, wptRoot)}, " +
+                        $"Render is pixel-identical to {DescribeReference(referencePath, wptRoot)}, " +
                         "which the test declares it must differ from (rel=mismatch).",
                     Category = FailureCategory.PixelMismatch,
                     RenderedImagePath = images.Rendered,
