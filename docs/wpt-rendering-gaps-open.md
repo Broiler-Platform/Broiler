@@ -993,13 +993,48 @@ Worth separating from the rest, because the test itself may be at fault:
   into three groups:
   - **`SizeMismatch` at 0.0 %** was the largest group, and page one's own box plus
     `reftest-pages` has since closed `page-rule-specificity-001`–`-003`. **Four
-    remain, and they are the harder half:** `page-name-003`,
-    `page-name-img-003`/`-004` and `page-name-unnamed-trailing-001` put *different*
-    named pages on different pages of one flow, so the flow has to divide against
-    more than one page area. That is per-page **layout**, not a per-page box —
-    `RenderPaged` lays the whole flow out once against a single page area and cuts
-    bands out of it, which is exactly what cannot express them. Page one is the one
-    page whose box may differ without that, because nothing before it has to fit.
+    remain, and three of them are not per-page layout at all** — that was the
+    working assumption until each was rendered and its page count compared against
+    its reference on 2026-08-20, which is what the rest of this bullet records.
+    Each is a *page count* disagreement with its own cause:
+
+    - **`page-name-img-003` and `-004` are an image-box bug in `Broiler.Layout`,
+      not a paged-media one.** Each renders two pages where its reference renders
+      one. `TakesAPageName` asks `CssBox.Display` whether a box is block-level,
+      because an *inline* image must ignore its own `page` name — that is what
+      `page-name-img-001`/`-002` state, and they pass. `-003`/`-004` are their
+      twins with `display: block` on the `<img>`, and there the name must be
+      honoured. It is not: the box reports `Display == "inline"`. The cascade sets
+      it correctly (traced: `img display <- 'block' => 'block'`) and **layout
+      honours it** — an `<img style="display:block">` followed by text puts the
+      text on the next line — but by the time fragmentation runs the box reads
+      `inline` again, so the image's `page: b` is dropped, it stays on the body's
+      page `a`, and the following `div { page: b }` forces a break the reference
+      does not have. Nothing resets `Display` for images and no caller passes
+      `InheritStyle(…, everything: true)`, so the next step is to find whether the
+      box fragmentation sees is the one the cascade wrote to. **`Display` is the
+      only signal that can separate `-001` from `-003`**, so this cannot be worked
+      around in `TakesAPageName`.
+    - **`page-name-003` is a break that never fires.** One page rendered against
+      the reference's two. Its two named divs sit inside a
+      `position: absolute` wrapper, and `ParticipatesInPageNamePropagation`
+      excludes out-of-flow boxes outright. That exclusion is right for what it was
+      written for — `page-name-propagated-003`/`-005` need a name to propagate
+      *past* an out-of-flow box — but it also stops the name change *between two
+      children of* the out-of-flow box from breaking, which is what this test (and
+      the Chromium bug it cites) is about. Not propagating a name out of a subtree
+      and not breaking inside it are two different things.
+    - **`page-name-unnamed-trailing-001` is the only one that really needs
+      per-page boxes**, and it needs `page-orientation` besides: its middle page
+      takes `@page landscape { margin: 20px; page-orientation: rotate-left }`. It
+      also renders four pages against the reference's three, and the trailing
+      `break-after: page` is *not* the cause — the reference carries the same one
+      on the same last element and still comes out at three. The extra page is a
+      named-page break landing on top of the forced break already there.
+
+    So the per-page **layout** the model cannot do — a flow dividing against two
+    different page areas — is wanted by exactly one of the four, and even that one
+    needs two other fixes first.
   - **`page-background-002` is the page *count* itself**, and it is the cleanest
     one to start on: test and reference are the same three-page document except
     that the reference draws its image as `position: absolute; top: 0`, and the
