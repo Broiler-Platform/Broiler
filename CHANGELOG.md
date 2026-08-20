@@ -214,6 +214,38 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A grid container is as wide as the columns it actually has. The shrink-to-fit inline size of
+  a grid summed only the tracks named in `grid-template-columns`: implicit columns contributed
+  nothing, `grid-auto-columns` was never consulted, and a grid with no template at all fell
+  back to measuring inline content — 0, for a grid of empty boxes. So
+  `<div style="display: inline-grid; grid-auto-columns: 15px; border: 1px solid">` holding one
+  child at `grid-column: 3 / span 4` painted a 2px border and nothing else, where it is six
+  15px tracks wide. Details in
+  [`docs/wpt-reftests.md`](docs/wpt-reftests.md#a-grid-built-from-implicit-columns-was-as-wide-as-its-border).
+  - The definite-width pass was already right, so the intrinsic path stopped answering
+    separately: item collection and auto-placement are shared between the two, and the column
+    count the size is built from is the one the real pass will resolve. Tracks past the
+    template are sized from `grid-auto-columns`, and gaps are charged across all the columns
+    rather than the template's. `grid-auto-columns` defaults to `auto`, whose size is its
+    items', so a grid that does not declare a definite one is answered exactly as before.
+  - Fixing the width exposed a placement bug behind it: a grid whose every track is a definite
+    fixed length now runs the real track pass even when an item is a nested grid, flex or
+    table container, so that child lands in the columns its `grid-column` asks for instead of
+    being stretched across the container by the fallback. The gate it relaxes exists to
+    distrust an item's measured height when a row is auto-sized — which cannot arise when no
+    track takes its size from a measurement.
+  - **On the reftest scoreboard this is 4 tests worse, and that is the change working.**
+    Over 5 140 reftests in `css-grid`, `css-flexbox`, `css-sizing`, `css-tables`,
+    `css-display`, `css-inline`, `css-writing-modes` and `css-position`: **2 494 → 2 490
+    passing**, with exactly 10 tests moving at all. The four that flip —
+    `css-grid/subgrid/repeat-auto-fill-002/-003/-004` and `orthogonal-writing-mode-005` — were
+    passing because the test *and its reference* both collapsed to a 2px border on a blank
+    page and so matched each other. Both sides render at their true width now, and the
+    disagreement that was always underneath them is filed as its own gap: a subgrid resolves
+    neither `repeat(auto-fill, <line-names>)` nor the name-plus-index lines the tests place
+    items with. The `css-grid/grid-lanes` subset, which the gap entry named as the thing not
+    to regress, is unchanged at 195 of 869 passing.
+
 - A box with an `aspect-ratio` and a definite height is now that shape, and a `border` width may
   be written in a physical unit. Two unrelated defects, both found by asking why a whole WPT
   reftest family was failing uniformly rather than by working down the run's biggest-problems

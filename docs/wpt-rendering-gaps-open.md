@@ -251,43 +251,33 @@ golden suite never looks at a passing test's own reference.
   byte-compatibility on a dropped declaration is not the same as implementing
   subgrid.
 
-### A grid's intrinsic inline size counts only its explicit tracks
+### A subgrid does not resolve `repeat(auto-fill, <line-names>)`
 
-- **Tests:** `css-grid/grid-lanes/subgrid/…/track-sizing/column-subgrid-auto-fill-008`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).17, **0.2%** against its
-  own reference — the worst real render in that run), and the plain-subgrid twins
-  `css-grid/subgrid/repeat-auto-fill-001` and `-008`.
-- **Owner:** `Broiler.Layout` (`Engine/CssBoxGrid.cs`, `TryComputeGridIntrinsicContentWidth`).
-  Main repo.
-- **Root cause, and it is on the *reference* side.** The shrink-to-fit inline size of a grid
-  container sums only the tracks listed in `grid-template-columns`. Implicit columns — from
-  auto-placement past the template, or from a `grid-column` reaching past it — contribute
-  nothing, and `grid-auto-columns` is never consulted on that path at all. With no template
-  the method bails outright and the caller falls back to measuring inline *content*, which
-  for a grid of empty divs is 0. The definite-width pass is correct and already does all of
-  this (`colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count)`,
-  `ParseSingleImplicitSpec(GridAutoColumns, em)`); the intrinsic path duplicates none of it.
-- **Measured by probe.** `display: inline-grid; grid-auto-columns: 15px` with one
-  auto-placed item paints nothing and reports content width 0 where 15px is required;
-  `grid-column: 3 / span 4` gives 0 where 90px is; the same grid at `width: 300px` places
-  the item at x 30..89, so only intrinsic sizing is wrong. The `-008` reference is 20 boxes
-  that should each be 92px wide and come out 2px — border only.
-- **The four edits are known** and are all inside that one method: drop the
-  `specs.Count == 0` half of the early-out; derive the column count from the same placement
-  the real pass runs; size a track beyond the template from `grid-auto-columns`, returning
-  false the moment that spec is intrinsic so today's content-based fallback is preserved for
-  the common `auto` case; and charge gaps for the full column count. That last guard is what
-  bounds the blast radius — only grids declaring a fixed-length `grid-auto-columns` change.
-- **It will not make `-008` pass**, and the entry should not pretend otherwise: the test and
-  its reference remain structurally different documents (see the `grid-lanes` entry above).
-  What it buys is that the reference stops being a lie, and that a real class of
-  shrink-to-fit grids — `inline-grid`, floats, `fit-content`, nested grid items — stops
-  collapsing to zero. **64 files under `tests/wpt/checkout/css` combine `grid-auto-columns`
-  with an intrinsically-sized container.**
-- **Exit gate:** the probes above report the required widths, and the full
-  `css/css-grid/grid-lanes` subset (850 tests, 193 passing) does not regress — a large
-  share of those passes are grids that agree with their reference *because both sides
-  collapse*.
+- **Tests:** `css-grid/subgrid/repeat-auto-fill-001` … `-006` and
+  `orthogonal-writing-mode-005`, plus the `grid-lanes` twins under
+  `grid-subgridded-to-grid-lanes/track-sizing`. `-002` and `-004` sit at 87.9%
+  against their own reference, `-003` at 74.3%, `-001` at 66.7%.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxGrid.cs`, `ExpandAutoRepeatTrackList`
+  and `ParseGridLine`). Main repo.
+- **Newly visible, and that is the point.** These tests were *passing* until the
+  [intrinsic inline size fix](wpt-rendering-gaps-fixed.md#a-grids-intrinsic-inline-size-counted-only-its-explicit-tracks),
+  and they were passing because the test and its reference **both collapsed to a
+  2px border on a blank page** and therefore matched each other. Both sides now
+  render at their true 92px, and what is left is a real disagreement that was
+  always there. Do not read the flip as a regression; read it as the false pass
+  ending.
+- **Two things are missing, and the second is the harder one.**
+  `ExpandAutoRepeatTrackList` declines outright for any `repeat()` combined with
+  `subgrid`, so a subgridded template's auto-repeat produces no tracks and no line
+  names — CSS Grid 2 §7.2.3.1 counts those repetitions from the subgrid's *span in
+  its parent*, not from an available size. And the items are placed by
+  **name-plus-index** lines (`grid-column: y 5`, `grid-column: y -1`), which
+  `ParseSingleGridLine` does not parse at all: a named line falls back to `auto`.
+  Neither half is worth anything without the other.
+- **Exit gate:** `repeat-auto-fill-002` and `-004` reach 100% against
+  `repeat-auto-fill-001-ref`, and the `-008` pair in
+  `grid-subgridded-to-grid-lanes/track-sizing` — currently 16.8% — moves with them,
+  since it is the same two features over a `grid-lanes` parent.
 
 ### The flag can be a false negative
 

@@ -1093,6 +1093,68 @@ the test that exposed it.
   its area (a fix that applied the ratio unconditionally would pass the first and fail the
   second), the stated-width and `min-width` guards, and the `box-sizing` case.
 
+### A grid's intrinsic inline size counted only its explicit tracks
+
+- **Tests:** `css-grid/grid-lanes/subgrid/…/track-sizing/column-subgrid-auto-fill-008`
+  ([#1723](https://github.com/Broiler-Platform/Broiler/issues/1723).8) goes **0.2% → 16.8%**
+  against its own reference, and `column-subgrid-orthogonal-writing-mode-004` 95.0% → 95.5%.
+  Neither passes; see the cost below, which is the more important half of this entry.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxGrid.cs`). Main repo, no patch.
+- **Root cause.** The shrink-to-fit inline size of a grid container summed only the tracks
+  listed in `grid-template-columns`. Implicit columns — from auto-placement past the
+  template, or from a `grid-column` reaching past it — contributed nothing, and
+  `grid-auto-columns` was never consulted on that path at all; with no template the method
+  bailed outright and the caller fell back to measuring inline *content*, which for a grid
+  of empty divs is 0. So a grid built entirely from implicit columns painted its border and
+  nothing else.
+- **The definite-width pass was already correct, and the intrinsic path duplicated none of
+  it.** Rather than write the column count a second way, `TryApplyGridTrackLayout`'s item
+  collection and auto-placement were extracted to `TryCollectGridPlacements` and
+  `TryPlaceGridItems`, and the intrinsic path runs the same two — so the count it sizes from
+  is the count the real pass will resolve, by construction. Tracks outside the template are
+  sized from `grid-auto-columns`, and gaps are charged across the full column count.
+- **`grid-auto-columns` bounds it.** It defaults to `auto`, whose size is its items' and so
+  the real track pass' job, so a grid that does not declare a definite `grid-auto-columns`
+  returns exactly what it returned before and never reaches the placement replay.
+- **A second bug fell out of it, and is fixed here too.** With the container finally 92px
+  wide, a layout assertion showed the child ignoring `grid-column: 3 / span 4` and stretching
+  across all six tracks. The implicit-only pass declines for a nested grid/flex/table item
+  because sizing an *auto* row from one measurement of a nested container is untrustworthy —
+  but that premise fails when every track is a declared fixed length, since then no
+  measurement reaches a track at all. `AllTrackSizesAreFixed` relaxes exactly that half of
+  the gate; the baseline half stays unconditional.
+- **The cost: 8 reftests moved down, 4 of them out of passing, and every one is a false pass
+  ending.** `css-grid/subgrid/repeat-auto-fill-002` and `-004` (100.0% → 87.9%), `-003`
+  (99.2% → 74.3%) and `orthogonal-writing-mode-005` (99.7% → 98.4%) were passing because the
+  test **and its reference** both collapsed to a 2px border on a blank page and matched each
+  other. Rendering both at their true 92px is what exposes the disagreement, which is now
+  filed as
+  [a subgrid does not resolve `repeat(auto-fill, <line-names>)`](wpt-rendering-gaps-open.md#a-subgrid-does-not-resolve-repeatauto-fill-line-names).
+  This was checked by rendering test and reference side by side on both builds rather than
+  inferred: before, four thin black lines; after, four correctly-sized boxes whose contents
+  differ.
+- **Sweep: 5 140 reftests over `css-grid`, `css-flexbox`, `css-sizing`, `css-tables`,
+  `css-display`, `css-inline`, `css-writing-modes` and `css-position`, before and after on
+  the same build — 2 494 → 2 490 passing, +0 and −4.** Exactly **10 tests in 5 140 move at
+  all**, and all 8 of the losers are the one shape this fix widens: an `inline-grid` with a
+  fixed `grid-auto-columns`. `Broiler.Layout.Tests`, `Broiler.Wpt.Tests` and the
+  grid/sizing slice of `Broiler.Cli.Tests` are byte-identical before and after.
+- **The gap's own exit gate is met.** It asked that the `css/css-grid/grid-lanes` subset not
+  regress, on the stated grounds that many of its passes are grids agreeing with their
+  reference *because both sides collapse*: 869 tests, **195 → 195 passing, +0 / −0**. The
+  collapse-pairs that did break are all in the plain-subgrid twins the same entry named.
+- **What was tried and rejected.** Widening the item gate so a nested grid is always "simple"
+  does fix the placement in isolation (a four-way probe goes 10/12 → 12/12), but leaves all
+  four tests failing and drives two of them *further* down (87.9% → 83.9%), because the
+  residual is the unimplemented subgrid auto-fill rather than the gate. Reverted.
+- **Tests:** `Broiler.Cli.Tests/GridImplicitColumnIntrinsicWidthTests.cs` — the definite
+  `grid-column` past the template, the templateless auto-placed item, implicit columns
+  extending rather than replacing a template, gaps charged between implicit columns, and the
+  guard that an intrinsic `grid-auto-columns` leaves the old answer alone.
+  `Broiler.Cli.Tests/GridFixedTrackItemPlacementTests.cs` — a plain block, a nested grid and
+  a nested subgrid child all landing in the columns they asked for, plus the auto-row case
+  that must still be gated away.
+
 ---
 
 ## Paint and the renderer
