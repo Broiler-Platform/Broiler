@@ -214,6 +214,34 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` — a box taller than a column set continues in the next column
+  instead of staying whole in the first one. The engine filled a column set by
+  moving whole boxes into it, which covers a column set made of several blocks and
+  not the shape most of the fragmentation corpus is written in: one block, taller
+  than the column set, whose decoration is the thing under test.
+  `FindMultiColumnFragmentParent` also answered null for a column set with a single
+  child — fewer than two boxes, nothing to distribute — so a one-child
+  multi-column box was not columnised at all, however tall that child was. That
+  rule was right while the only thing a column set could do was move boxes; it
+  stops being right the moment a box can be cut. `SliceTallFragments` now divides
+  a fragment taller than the column into a run of column-tall pieces, and the
+  decoration is sliced rather than repeated (`box-decoration-break`'s initial
+  value): the border and its rounded corners belong to the two outer ends of the
+  run and the joins between are square and open. Only a box with no content of its
+  own is cut, because a slice here is a real box rather than a paint instruction;
+  and a background image, gradient or box shadow keeps the whole box, because
+  those are positioned against the box they are on and slicing paints them once
+  per piece instead of once across the run. Under `BROILER_WPT_PAGED_PRINT=1`
+  `css/css-break` goes 91 → 92 of 204, average 87.11% → 87.38%: `borders-002`,
+  `out-of-flow-in-multicolumn-014` and `table/table-border-007` gained, and
+  `fieldset-002` (86.4% → 98.7%), `borders-003` through `-006` and
+  `rounded-clipped-border` all move a long way without reaching the gate.
+  `out-of-flow-in-multicolumn-019` and `overflowing-block-003` are lost, both of
+  which were passing on the pixel budget while rendering content that already ran
+  out of the bottom of the column set. `css/css-page` holds at 135 paged and 142
+  default with `fixedpos-011-print` 97.0% → 98.3% and 95.2% → 97.0%; paged
+  `css/CSS2`, `css/css-backgrounds` and `css/css-values` do not move.
+
 - `Broiler.Layout` — a `position: fixed` box is on every page of a paged render,
   and it lands where its insets say. Three bugs met in one family of tests. CSS
   Paged Media makes the page area the fixed-positioning containing block, so a

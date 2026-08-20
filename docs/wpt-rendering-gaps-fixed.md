@@ -680,7 +680,9 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 - **Two tests go slightly down, and both are the fix working on content that is
   wrong for another reason.** `fixedpos-011` 97.7% → 97.0%: its fixed box is a
   four-column multicol whose 400px child does not column-fill, so it overflows its
-  100px box and the repeats now duplicate the overflow. `page-margin-005`
+  100px box and the repeats now duplicate the overflow. (That
+  [has since been fixed](#a-box-taller-than-a-column-set-stayed-in-the-first-column);
+  the test recovered to 98.3% and still fails.) `page-margin-005`
   80.3% → 80.0%: percentage `@page` margins are not resolved against the
   corresponding dimension, so the two sides' page areas differ and their repeated
   boxes land in different places. Neither is a fixed-positioning question.
@@ -1587,6 +1589,71 @@ the test that exposed it.
   `Broiler.Cli.Tests/GridFixedTrackItemPlacementTests.cs` — a plain block, a nested grid and
   a nested subgrid child all landing in the columns they asked for, plus the auto-row case
   that must still be gated away.
+
+### A box taller than a column set stayed in the first column
+
+- **Tests:** `css-break/borders-002` **95.3% → passes at 99.2%**,
+  `out-of-flow-in-multicolumn-014` **94.3% → passes at 100%**, and
+  `table/table-border-007` **98.0% → passes at 99.2%**. Six more move a long way
+  without reaching the gate: `fieldset-002` 86.4% → 98.7%, `borders-003`
+  88.9% → 96.7%, `-004` 89.1% → 96.8%, `-005` 89.6% → 96.9%, `-006`
+  95.3% → 98.8%, and `rounded-clipped-border` 85.1% → 89.6%. Two are lost, and
+  they are the honest part of this entry — see below.
+- **Owner:** `Broiler.Layout` (`CssBox.MultiColumn`). Main repo, no patch.
+- **The engine filled a column set by *moving* whole boxes into it**, which covers
+  a column set made of several blocks and not the shape most of the fragmentation
+  corpus is actually written in: **one** block, taller than the column set, whose
+  decoration is the thing under test. `borders-003` is a 250px bordered box in
+  three 100px columns; `css-page/fixedpos-011-print` is a 400px block in four;
+  `background-image-000` is four of them at once. Each rendered as a single column
+  running out of the bottom of the column set.
+- **Two things stood in the way, and the first is the smaller and the more
+  decisive.** `FindMultiColumnFragmentParent` answered *null* for a column set
+  with a single child — fewer than two boxes, nothing to distribute — so a
+  one-child multi-column box was not columnised **at all**, however tall that child
+  was. That rule was exactly right while the only thing a column set could do was
+  move boxes; it stops being right the moment a box can be cut.
+- **The second is the cut.** `SliceTallFragments` divides a fragment taller than
+  the column into a run of column-tall pieces, and the loop that distributes
+  fragments then places them without knowing anything about fragmentation. The
+  decoration is *sliced*, not repeated — `box-decoration-break`'s initial value
+  (§5.2) — so the border and its rounded corners belong to the two outer ends of
+  the run and the joins between are square and open. That is what `borders-003`
+  states in its own words: "The border should be rounded at the start (first
+  column) and at the end (last column)."
+- **Only a box with nothing in it is cut**, because a slice here is a real box in
+  the tree rather than a paint instruction: a box with content would need that
+  content divided too, which is the general fragmentation this engine does not do.
+  A box with no content of its own is entirely described by its own decoration,
+  and is what these tests are made of.
+- **A background image, a gradient and a box shadow are deliberately not sliced.**
+  They are positioned against the box they are on, so cutting the box paints them
+  once per piece instead of once across the run. Measured: slicing them cost
+  `background-image-000` through `-002` and `box-shadow-002` through `-005`, so a
+  box carrying one keeps the whole box until the paint can be told what the
+  unfragmented run looked like.
+- **Two tests are lost, and both were passing while rendering the wrong thing.**
+  `out-of-flow-in-multicolumn-019` 100% → 98.9% and `overflowing-block-003`
+  99.7% → 98.9%. Rendering the second at the old code shows why: its green content
+  already ran 84px out of the bottom of both black boxes and it scored 99.7%
+  anyway, because on a 1024×768 canvas 0.3% is 2,400 pixels. The change adds the
+  column the test asks for and moves the mismatch around rather than causing it.
+  That is an argument about what these two scores were worth, not a defence of
+  losing them.
+- **`fieldset-001` (79.6% → 78.0%) and `break-inside-avoid-min-block-size-1`/`-2`
+  (83.7% → 82.0%) also slip**, and are not diagnosed.
+- **Verified:** four render tests in `MultiColumnFragmentationTests` — the cut
+  itself, a block that fits staying put, `break-inside: avoid` keeping a box
+  whole, and the border being drawn only at the run's two ends; two of the four
+  fail with the fix reverted. Measured with the submodules at their pinned
+  pointers: paged `css/css-break` 91 → **92** of 204 with the average
+  87.11% → **87.38%**, three gained and two lost. `css/css-page` holds at 135
+  paged and 142 default, with `fixedpos-011-print` 97.0% → 98.3% paged and
+  95.2% → 97.0% default; paged `css/CSS2` (96), `css/css-backgrounds` (424) and
+  `css/css-values` (104) do not move. One change in the set — not counting the
+  whitespace between two elements as a fragment — moved no test on its own, and is
+  kept because it is what makes the single-child rule mean what it says rather
+  than depend on how the markup is indented.
 
 ---
 
