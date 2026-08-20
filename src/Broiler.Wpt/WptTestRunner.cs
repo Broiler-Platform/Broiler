@@ -2902,6 +2902,16 @@ internal sealed partial class WptTestRunner
         bool previousPrint = PrintMedia;
         PrintMedia = IsPrintTestPath(testPath);
         PagedRender = PagedPrint && PrintMedia;
+
+        // The formatting context has to be established here rather than around the render itself:
+        // a document's style sheets are cascaded while it is being built, well before the render
+        // phase, and the engine memoizes the rule set that cascade produced. A media query answered
+        // on the screen surface before the paged context existed would stay answered that way.
+#if BROILER_CSS_PAGED_MEDIA
+        using var pagedMedia = PrintMedia
+            ? Broiler.CSS.Dom.CssPagedMedia.Pin(WptInitialPageArea.Width, WptInitialPageArea.Height)
+            : null;
+#endif
         try
         {
             return body();

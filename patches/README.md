@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**One patch is waiting on a maintainer.** See the index below.
+**Two patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -51,6 +51,7 @@ again with the one below.
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.CSS` | Resolve the absolute length units in ParseToPixels |
+| `0002` | `Broiler.CSS` | Give a media query a paged formatting context |
 
 ### `0001` — `border: 72pt solid red` painted a thin black line
 
@@ -79,3 +80,55 @@ as *invalid* rather than as the length they name.
 
 The `in` spelling has to be tested after the viewport-unit scan, which claims
 `vmin`.
+
+### `0002` — a media query had no way to know it was being printed
+
+**Apply `0001` first, or rather: apply both.** On its own this one does not make
+`css-page/media-queries-001-print` pass, because that test writes its whole
+assertion in inches and `ParseToPixels` cannot resolve them until `0001` lands.
+They touch different files, so they apply cleanly in either order.
+
+A formatting context has media-query answers of its own, and neither of the two
+that matter for print was reachable from outside `Broiler.CSS`:
+
+* `EvaluateMediaType` matched `screen` and `all` unconditionally, so
+  `@media print` never applied to a document being printed; and
+* Media Queries 4 evaluates `width`/`height` against the **page area**, which is
+  not the surface a paged renderer happens to allocate.
+
+`CssPagedMedia` carries both, thread-static and inert unless pinned — like the
+layout engine's other render levers — so a continuous render evaluates exactly as
+before.
+
+The page area it carries is the **initial** one the formatter is handed, not the
+one `@page` declares. That reads as a bug until the circularity shows up: a
+`@page` rule may itself sit inside a media query, so resolving the query against
+the declared page would need the query already resolved.
+`media-queries-001-print` states it outright — it declares
+`@page { size: 10in; margin: 2in }` and then asserts a query matching only
+between 4in and 5in wide and 2in and 3in tall, which is WPT's initial 5in × 3in
+page whether or not a default margin comes off it. The declared 10in page is
+precisely what the query must not see.
+
+`Suspend()` is the other half, and it is not an optimisation: a **nested**
+browsing context is its own formatting context, so the page area of the document
+embedding a frame is not that frame's viewport. Without it
+`media-queries-002-print` and `-003-print` go red, each embedding a 100 × 100
+frame whose own sheet asserts `@media (width: 100px) and (height: 100px)`.
+`Broiler.Layout`'s `EmbeddedCanvas.Pin` suspends it around every embedded render,
+which covers the call site inside `Broiler.HTML` that the main repo cannot reach.
+
+**The main-repo half is already in and inert.** `EmbeddedCanvas` and
+`WptTestRunner` carry the two call sites behind a `BROILER_CSS_PAGED_MEDIA`
+compile constant that both `.csproj` files define only when
+`Broiler.CSS/Broiler.CSS.Dom/CssPagedMedia.cs` exists — the same file-existence
+probe `Broiler.Render.Stage.Benchmarks.csproj` uses. Against the pinned pointer
+the repo builds and renders byte-identically to before (verified: `css/css-page`
+and `css/css-break` are unchanged test-for-test). Once this patch lands and the
+pointer is bumped, the probe finds the file, the constant is defined and the two
+call sites compile in — no further main-repo change needed.
+
+Measured on top of `0001`: `css/css-page` goes 142 → **143** of 224 reftests with
+the average 88.37% → **88.83%**, `css/css-break` does not move, and a fail-list
+diff shows exactly one test changing state — `media-queries-001-print`, 0.0% →
+100% — with none lost.

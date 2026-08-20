@@ -343,6 +343,59 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   does not move, and a fail-list diff shows exactly one test changed state and none
   regressed. The golden-image score is unchanged (99.0%, passing either way).
 
+### A media query had no way to know it was being printed
+
+- **Test:** `css-page/media-queries-001-print` — `rel=match` **0.0% → passes at
+  100%**, measured 2026-08-20. It was the 5th-biggest problem in the
+  [#1726 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1726).
+- **Owner:** `Broiler.CSS` (`CssPagedMedia`, `CssStyleEngine.Values`) — **a
+  pending submodule patch**, `patches/0002`, because the push to
+  `Broiler-Platform/Broiler.CSS` answers 403. The call sites are in the main repo
+  (`Broiler.Layout/Engine/EmbeddedCanvas.cs`, `src/Broiler.Wpt/WptTestRunner.cs`)
+  behind the `BROILER_CSS_PAGED_MEDIA` file-existence probe, so the repo builds
+  and renders identically against the pinned pointer and switches on when the
+  patch lands. The WPT shard actions run `scripts/apply-pending-wpt-patches.sh`,
+  so it reaches a CI run without waiting for the pointer.
+- **Two bugs met in one test, and only one of them was about paged media.**
+- **The first was a length parser.** `CssLengthParser.ParseToPixels` handled
+  `px`, the font-relative units and the viewport family, and none of the absolute
+  ones — `in`, `cm`, `mm`, `pt`, `pc`, `q` all answered `NaN`, which every caller
+  reads as "not a length". That is
+  [`patches/0001`](../patches/README.md), already pending before this work and
+  found independently; this entry does not duplicate it. `media-queries-001-print`
+  writes its whole assertion in inches, so it needs that patch too — **neither
+  patch fixes the test alone**.
+- **The second is that a formatting context has media-query answers of its own.**
+  `EvaluateMediaType` matched `screen` and `all` unconditionally, so `@media
+  print` never applied to a document being printed, and Media Queries 4 evaluates
+  `width`/`height` against the page area rather than the surface a paged renderer
+  allocated. `CssPagedMedia` carries both, thread-static and inert unless pinned.
+- **The page area is the *initial* one, not the declared one, and that is not a
+  shortcut.** A `@page` rule may itself sit inside a media query, so resolving the
+  query against the declared page would need the query already resolved. The test
+  states this outright: it declares `@page { size: 10in; margin: 2in }` and then
+  asserts a query matching only between 4in and 5in wide and 2in and 3in tall —
+  WPT's initial 5in × 3in page, whether or not a default margin comes off it. Its
+  own comment is the clearest statement of the rule in the suite.
+- **The wrong turn, and it cost two tests before it was caught.** The context was
+  first pinned around the render phase, but a document's style sheets are
+  cascaded while it is being *built* and the engine memoizes what that cascade
+  produced, so the query was answered on the screen surface and stayed answered
+  that way; it belongs around the whole test, where `PrintMedia` is set. And it
+  must **not** reach a nested browsing context: `media-queries-002-print` and
+  `-003-print` each embed a 100 × 100 frame whose own sheet asserts `@media
+  (width: 100px) and (height: 100px)`, and both went red until
+  `EmbeddedCanvas.Pin` suspended the paged context around every embedded render —
+  which is also how the call site inside `Broiler.HTML` is covered without
+  touching that submodule.
+- **Verified:** focused tests in `Broiler.CSS.Dom.Tests` cover both surfaces of
+  the media type including `not print`, the page-area override against an
+  environment still carrying the layout viewport, the restore on dispose, and the
+  frame suspension. Measured on top of `0001`, `css/css-page` goes 142 → **143**
+  of 224 reftests with the average 88.37% → **88.83%**, `css/css-break` does not
+  move, and a fail-list diff shows exactly one test changing state with none lost.
+  Against the pinned pointer the repo is unchanged test-for-test.
+
 ---
 
 ## CSS engine

@@ -214,6 +214,25 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.CSS` (**pending patch**, `patches/0002`) — a media query can tell it
+  is being printed. `EvaluateMediaType` matched `screen` and `all`
+  unconditionally, so `@media print` never applied to a document being printed,
+  and Media Queries 4's `width`/`height` features evaluated against whatever
+  surface the renderer allocated instead of the page area. `CssPagedMedia`
+  carries both, thread-static and inert unless pinned, so a continuous render is
+  byte-identical to before. The page area it carries is the *initial* one rather
+  than the one `@page` declares, because a `@page` rule may itself sit inside a
+  media query — `css-page/media-queries-001-print` declares
+  `@page { size: 10in; margin: 2in }` and then asserts a query matching only
+  between 4in and 5in wide and 2in and 3in tall. `Suspend()` keeps the context
+  out of a nested browsing context, whose frame has its own viewport. Together
+  with the already-pending absolute-length patch (`0001`, which that test needs
+  because it states its assertion in inches) `css/css-page` goes 142 → 143 of 224
+  reftests, 88.37% → 88.83% average, `css/css-break` unmoved, exactly one test
+  changing state. The main-repo call sites sit behind a `BROILER_CSS_PAGED_MEDIA`
+  file-existence probe, so the repo builds and renders identically against the
+  pinned submodule pointer.
+
 - `Broiler.Wpt` — the sheet takes the named page the document puts its content
   on. `WptPageBox` read only the unconditional `@page`, so
   `css-page/page-name-table-001-print` — a table on `page: square`, a
