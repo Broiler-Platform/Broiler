@@ -213,8 +213,27 @@ internal partial class CssBox
         // Grids with an explicit template on the affected axis keep going through
         // this pass exactly as before; only the implicit-only takeover is gated.
 
+        // Implicit tracks (grid-auto-columns/rows); default 'auto'.
+        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
+        GridTrackSpec implicitRow = ParseSingleImplicitSpec(GridAutoRows, em);
+
+        // The item-shape half of that gate exists to protect a track whose size
+        // comes from an item's measurement. When every track on both axes is a
+        // definite fixed length — templates and `grid-auto-*` alike — no
+        // measurement reaches a track at all, so no item shape can mis-size one and
+        // the gate has nothing left to protect. Declining anyway is what left an
+        // `inline-grid { grid-auto-columns: 15px; grid-auto-rows: 8px }` holding a
+        // nested grid to the approximation, which ignores the child's
+        // `grid-column: 3 / span 4` and stretches it across the whole container
+        // (WPT css-grid/subgrid/repeat-auto-fill-002/-003/-004). The baseline half
+        // stays unconditional: a shared baseline shifts items *within* a row, which
+        // fixed tracks do not make safe.
+        bool allTracksFixed = AllTrackSizesAreFixed(colSpecs, implicitCol)
+            && AllTrackSizesAreFixed(rowSpecs, implicitRow);
+
         if ((colImplicitOnly || rowImplicitOnly)
-            && (GridUsesBaselineSelfAlignment() || !GridImplicitPathItemsAreSimple()))
+            && (GridUsesBaselineSelfAlignment()
+                || !(allTracksFixed || GridImplicitPathItemsAreSimple())))
             return false;
 
         // Implicit tracks are allowed to carry the whole axis for a subgrid, an
@@ -231,10 +250,6 @@ internal partial class CssBox
 
         if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
-
-        // Implicit tracks (grid-auto-columns/rows); default 'auto'.
-        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
-        GridTrackSpec implicitRow = ParseSingleImplicitSpec(GridAutoRows, em);
 
         // Collect in-flow grid items in document order. Absolutely-positioned
         // children are gathered separately: they take no part in track sizing or
@@ -1419,6 +1434,26 @@ internal partial class CssBox
             && value.Contains("baseline", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// True when every track an axis can produce is a definite fixed length — each
+    /// explicit sizing function in <paramref name="specs"/> on both its
+    /// <c>minmax()</c> sides, and the <c>grid-auto-*</c> function any implicit track
+    /// takes. Such an axis is sized entirely from its declarations, so nothing an
+    /// item measures can change a track size on it. <c>grid-auto-*</c> defaults to
+    /// <c>auto</c>, so an axis that declares none is not fixed.
+    /// </summary>
+    private static bool AllTrackSizesAreFixed(List<GridTrackSpec> specs, GridTrackSpec implicitSpec)
+    {
+        if (implicitSpec.Min.Kind != GridSizeKind.Fixed || implicitSpec.Max.Kind != GridSizeKind.Fixed)
+            return false;
+
+        foreach (var spec in specs)
+            if (spec.Min.Kind != GridSizeKind.Fixed || spec.Max.Kind != GridSizeKind.Fixed)
+                return false;
+
+        return true;
+    }
+
+    /// <summary>
     /// True when every in-flow item of this grid is a plain box whose used block
     /// size the bounded track pass can trust from a single measurement — used to
     /// gate the implicit-only takeover away from item shapes the pass sizes worse
@@ -1553,9 +1588,8 @@ internal partial class CssBox
         }
 
         double gap = ResolveGridGap(ColumnGap, 0, em);
-        GridSize implicitSide = useMax
-            ? ParseSingleImplicitSpec(GridAutoColumns, em).Max
-            : ParseSingleImplicitSpec(GridAutoColumns, em).Min;
+        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
+        GridSize implicitSide = useMax ? implicitCol.Max : implicitCol.Min;
 
         // `grid-auto-columns` defaults to `auto`, and an intrinsic implicit track
         // is sized by its items — the real track pass' job. Answer such a grid from
@@ -1574,9 +1608,10 @@ internal partial class CssBox
         if (!TryCountGridIntrinsicColumns(specs.Count, em, out int colCount))
             return false;
 
-        // Every track outside [explicitStart, explicitStart + specs.Count) — the
-        // leading implicit tracks as well as the trailing ones — is an implicit
-        // column, and gaps are charged between all of them (§7.2).
+        // Every column the placement produced beyond the template — the leading
+        // implicit tracks a before-grid line references as well as the trailing
+        // ones — is an implicit track, and gaps are charged between all of the
+        // columns rather than just the template's (§7.2).
         contentWidth = explicitSum
             + (colCount - specs.Count) * Math.Max(0, implicitSide.Value)
             + gap * (colCount - 1);
