@@ -313,6 +313,36 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   tests is byte-identical before and after (98.4%, 98.4%, 98.9% against a locally
   generated Chromium reference), so the change is free on that side.
 
+### The sheet ignored the named page the document put its content on
+
+- **Test:** `css-page/page-name-table-001-print` — `rel=match` **0.0% → passes at
+  100%**, measured 2026-08-20. It was the 7th-biggest problem in the
+  [#1726 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1726).
+- **Owner:** the WPT runner (`src/Broiler.Wpt/WptPageBox.cs`). Main repo.
+- **The bug.** `WptPageBox` read only the *unconditional* `@page`. The test puts a
+  table on `page: square`, sizes `@page square` to 5in and paints it `#eee`, and
+  leaves the unconditional `@page` painting red — so the sheet came out the default
+  size under a red background where the reference is a 5in `#eee` square. Nothing
+  of the test's own page reached either the box or the decoration.
+- **What landed:** `EnumerateAppliedPageBlocks` yields the unconditional rules and
+  then, layered over them as the cascade orders it, the rule for the one named page
+  the document actually uses. The runner renders a single sheet and that sheet is
+  page one, so it takes the box of the page the flow starts on. Both the geometry
+  and the decoration go through that one enumerator, so both follow.
+- **Exactly one name is the whole of the guard,** and it is what separates this from
+  the earlier attempt that read every selectored rule and regressed this very test.
+  A document that uses two names needs a per-page box, which one surface cannot
+  carry, so none is taken — `page-margin-auto-print` names six pages and is
+  untouched. A named rule the document never puts content on is still ignored, which
+  is what keeps `A_Page_Rule_With_A_Selector_Is_Ignored` passing unchanged. A
+  pseudo-class selector is never read at all.
+- **Verified:** eight focused tests cover the applied case from a style attribute
+  and from a style rule, two names, `page: auto`, an unused name, the layering order
+  both ways round, and the pseudo-class exclusion. Suite-wide, `css/css-page` goes
+  141 → **142** passing of 224 with the average 87.92% → **88.37%**, `css/css-break`
+  does not move, and a fail-list diff shows exactly one test changed state and none
+  regressed. The golden-image score is unchanged (99.0%, passing either way).
+
 ---
 
 ## CSS engine

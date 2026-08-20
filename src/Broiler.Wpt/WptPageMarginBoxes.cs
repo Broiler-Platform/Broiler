@@ -50,7 +50,7 @@ internal static class WptPageMarginBoxes
         var boxes = new Dictionary<WptMarginBoxSlot, List<CssDeclaration>>();
         var pageDeclarations = new List<CssDeclaration>();
 
-        foreach (var block in WptPageBox.EnumerateUnconditionalPageBlocks(html))
+        foreach (var block in WptPageBox.EnumerateAppliedPageBlocks(html))
         {
             foreach (var declaration in block.Declarations.Declarations)
             {

@@ -28,10 +28,13 @@ namespace Broiler.Wpt;
 /// against the box resolved here, behind <see cref="WptTestRunner.PagedPrint"/>.
 /// </para>
 /// <para>
-/// Only the unconditional <c>@page</c> is read. A page selector — <c>:first</c>, <c>:left</c>,
-/// <c>:right</c>, or a named page — describes particular pages of the flow, and a per-page box
-/// size is not something this model can carry; taking one anyway paints the wrong page's geometry
-/// everywhere.
+/// The unconditional <c>@page</c> is read, and so is the rule for the one named page the document
+/// puts its content on — the runner renders a single sheet, and that sheet is page one. A
+/// pseudo-class selector (<c>:first</c>, <c>:left</c>, <c>:right</c>) never is, and neither is any
+/// named rule once the document uses more than one name: those describe particular pages of a flow,
+/// and a per-page box size is not something this model can carry; taking one anyway paints the
+/// wrong page's geometry everywhere. See
+/// <see cref="EnumerateAppliedPageBlocks"/> for the guard and the test that states it.
 /// </para>
 /// </remarks>
 internal readonly record struct WptPageBox(
@@ -71,7 +74,7 @@ internal readonly record struct WptPageBox(
         double? areaWidth = null, areaHeight = null;
         var axes = WptPageAxes.Resolve(html);
 
-        foreach (var (declarations, _) in EnumerateUnconditionalPageBlocks(html))
+        foreach (var (declarations, _) in EnumerateAppliedPageBlocks(html))
         {
             double fontSize = FontSizeOf(declarations.Declarations.ToList());
 
@@ -150,16 +153,61 @@ internal readonly record struct WptPageBox(
     }
 
     /// <summary>
-    /// The document's <c>@page</c> rules that carry no page selector: each one's declarations, and
-    /// its block as written.
+    /// The <c>@page</c> rules that describe the sheet this document is rendered on: each one's
+    /// declarations, and its block as written.
     /// </summary>
     /// <remarks>
-    /// The raw text comes with them because the parser does not descend into the at-rules nested
-    /// inside an <c>@page</c> — the sixteen margin boxes of CSS Paged Media 3 §5 are left in it,
-    /// and <see cref="WptPageMarginBoxes"/> reads them from there.
+    /// <para>
+    /// Every unconditional <c>@page</c>, and then — layered over them, as the cascade orders it —
+    /// the rule for the named page the document actually uses, if there is exactly one such name.
+    /// The runner renders a single sheet, and that sheet is page one, so it takes the box of the
+    /// page the flow starts on. <c>page-name-table-001-print</c> is the pair that states it: a table
+    /// on <c>page: square</c>, a <c>@page square</c> that sizes the sheet 5in and paints it
+    /// <c>#eee</c>, and a reference that spells the same page as the unconditional rule. Reading
+    /// only the unconditional one left the sheet the default size under a red background and scored
+    /// 0.0 %.
+    /// </para>
+    /// <para>
+    /// <strong>Exactly one</strong> name is the whole of the guard, and it is what keeps this from
+    /// being the earlier attempt that read every selectored rule. A document that uses two named
+    /// pages needs a per-page box, which one surface cannot carry, so none of them is taken;
+    /// <c>page-margin-auto-print</c> (six names) and a document that names none are both left
+    /// exactly as they were. A pseudo-class selector — <c>:first</c>, <c>:left</c>, <c>:right</c> —
+    /// is never read: it describes particular pages of a flow this model does not paginate.
+    /// </para>
+    /// <para>
+    /// The raw text comes with each block because the parser does not descend into the at-rules
+    /// nested inside an <c>@page</c> — the sixteen margin boxes of CSS Paged Media 3 §5 are left in
+    /// it, and <see cref="WptPageMarginBoxes"/> reads them from there.
+    /// </para>
     /// </remarks>
     internal static IEnumerable<(CssDeclarationBlock Declarations, string BlockText)>
-        EnumerateUnconditionalPageBlocks(string html)
+        EnumerateAppliedPageBlocks(string html)
+    {
+        var used = SoleUsedPageName(html);
+
+        foreach (var (selector, block) in EnumeratePageBlocks(html))
+        {
+            if (selector.Length == 0)
+                yield return block;
+        }
+
+        if (used is null)
+            yield break;
+
+        foreach (var (selector, block) in EnumeratePageBlocks(html))
+        {
+            if (selector.Equals(used, StringComparison.OrdinalIgnoreCase))
+                yield return block;
+        }
+    }
+
+    /// <summary>
+    /// Every <c>@page</c> rule in the document, as its selector — empty for the unconditional rule —
+    /// and its block. A selector carrying a pseudo-class is skipped outright.
+    /// </summary>
+    private static IEnumerable<(string Selector, (CssDeclarationBlock Declarations, string BlockText) Block)>
+        EnumeratePageBlocks(string html)
     {
         foreach (var source in EnumerateStyleSources(html))
         {
@@ -181,13 +229,79 @@ internal readonly record struct WptPageBox(
 
                 if (!head.Equals("page", StringComparison.OrdinalIgnoreCase))
                     continue;
-                if (split >= 0 || !string.IsNullOrWhiteSpace(atRule.Prelude))
+
+                var selector = ((split < 0 ? string.Empty : name[split..]) + " " + atRule.Prelude).Trim();
+                if (selector.Contains(':'))
                     continue;
 
-                yield return (declarations, atRule.BlockText ?? string.Empty);
+                yield return (selector, (declarations, atRule.BlockText ?? string.Empty));
             }
         }
     }
+
+    /// <summary>
+    /// The one page name this document puts content on, or <c>null</c> when it names none or names
+    /// more than one.
+    /// </summary>
+    /// <remarks>
+    /// The <c>page</c> property, read from the style rules and from the <c>style</c> attributes —
+    /// the two places a WPT page test puts it. <c>auto</c> is the initial value and names no page.
+    /// Deliberately a scan for the same reason the rest of this file is one: it runs before the
+    /// document is built, to decide the surface it will be rendered on.
+    /// </remarks>
+    private static string? SoleUsedPageName(string html)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var source in EnumerateStyleSources(html))
+        {
+            CssStyleSheet sheet;
+            try { sheet = new CssParser().ParseStyleSheet(source); }
+            catch { continue; }
+
+            foreach (var rule in sheet.Rules)
+            {
+                if (rule is CssStyleRule styleRule)
+                    CollectPageNames(styleRule.Declarations, names);
+            }
+        }
+
+        foreach (var declarations in EnumerateStyleAttributes(html))
+        {
+            CssDeclarationBlock block;
+            try { block = new CssParser().ParseDeclarations(declarations); }
+            catch { continue; }
+
+            CollectPageNames(block, names);
+        }
+
+        return names.Count == 1 ? names.First() : null;
+
+        static void CollectPageNames(CssDeclarationBlock block, HashSet<string> into)
+        {
+            foreach (var declaration in block.Declarations)
+            {
+                if (!declaration.Name.Trim().Equals("page", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var value = declaration.Value.Text.Trim();
+                if (value.Length != 0 && !value.Equals("auto", StringComparison.OrdinalIgnoreCase))
+                    into.Add(value);
+            }
+        }
+    }
+
+    /// <summary>The text of each <c>style</c> attribute in the markup.</summary>
+    private static IEnumerable<string> EnumerateStyleAttributes(string html)
+    {
+        foreach (System.Text.RegularExpressions.Match match in StyleAttribute.Matches(html))
+            yield return match.Groups["css"].Value;
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex StyleAttribute = new(
+        """\bstyle\s*=\s*("(?<css>[^"]*)"|'(?<css>[^']*)')""",
+        System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     /// <summary>
     /// Whether <paramref name="name"/> is one of the four flow-relative margin longhands, and which

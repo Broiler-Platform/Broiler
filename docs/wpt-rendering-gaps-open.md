@@ -261,14 +261,25 @@ golden suite never looks at a passing test's own reference.
   by construction. Measured locally on 2026-08-20, `css-grid/grid-lanes/alignment`
   is 9 passed / 114 failed out of 123.
 - **And implementing it would cost more than it wins, on the suite the project
-  scores itself by.** The checkout carries 870 `grid-lanes` tests with a
-  `rel=match` and 976 candidate documents overall; the golden-image manifest lists
-  **193** `grid-lanes` failures, so on the order of 780 currently do *not* fail it
-  — they match Chromium's pixels precisely because Chromium drops the declaration
-  too and both engines render the identical fallback. Shipping `grid-lanes` trades
-  up to 500 reftest wins for most of those. (The manifest records failures only, so
-  that 780 includes any skips; treat it as an upper bound on what is at risk, not
-  an exact count.)
+  scores itself by — now measured rather than inferred.** The first pass at this
+  read the golden manifest, which records *failures only*, and could not tell a pass
+  from a skip. So on 2026-08-20 a 60-test sample of the 869 `grid-lanes` tests with a
+  `rel=match` (the twelve from #1726's top thirty plus a seeded random draw) was run
+  against **freshly generated Chromium references**, served over HTTP so the 288
+  Ahem-dependent tests load their font: **46 of ~69 compared tests pass, at a 97.09%
+  average**. Two thirds of the directory currently matches Chromium's pixels
+  *because* Chromium drops the declaration too and both engines render the identical
+  fallback. Shipping `grid-lanes` trades up to 500 reftest wins for most of ~580
+  golden passes.
+  ```sh
+  # how it was measured — the reference generator has no print/forced-colors modes,
+  # so a plain screen screenshot at the runner's 1024x768 is what CI compares against
+  python3 -m http.server 8731 --bind 127.0.0.1   # from tests/wpt/checkout
+  # screenshot each test with the pinned Playwright + /opt/pw-browsers/chromium,
+  # write <refdir>/<relpath>.png, then:
+  dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt/checkout \
+    --reference-dir <refdir> --subset css/css-grid/grid-lanes
+  ```
 - **Do not flip this as a side effect of anything else.** The rejection is stated
   in three places — `Broiler.Layout/Engine/CssUtils.cs`,
   `Broiler.CSS.Dom/CssStyleEngine.Values.cs`, and this entry — and the two suites

@@ -128,6 +128,97 @@ public sealed class WptPageBoxTests
         Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox).BoxSize);
     }
 
+    // ---- the named page the document actually uses ----
+
+    // The runner renders one sheet and that sheet is page one, so it takes the box of the page the
+    // flow starts on. page-name-table-001-print is the pair: a table on `page: square`, a
+    // `@page square` sizing the sheet 5in, and a reference that spells the same page as the
+    // unconditional rule. Reading only the unconditional rule scored it 0.0 %.
+    [Fact]
+    public void The_One_Named_Page_The_Document_Uses_Is_Applied()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page square { size: 5in; }"
+            + "</style></head><body><table style=\"page: square;\"></table></body></html>";
+
+        Assert.Equal(new SizeF(480, 480), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // The name can come from a style rule rather than a style attribute.
+    [Fact]
+    public void A_Page_Name_From_A_Style_Rule_Counts_As_Used()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "table { page: square; } @page square { size: 5in; }"
+            + "</style></head><body><table></table></body></html>";
+
+        Assert.Equal(new SizeF(480, 480), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // Two names need a per-page box, which one surface cannot carry, so neither is taken.
+    // page-margin-auto-print names six pages and must stay exactly as it was.
+    [Fact]
+    public void Two_Named_Pages_Leave_The_Unconditional_Box_Alone()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page aaa { size: 5in; } @page bbb { size: 7in; }"
+            + "</style></head><body>"
+            + "<div style=\"page: aaa;\"></div><div style=\"page: bbb;\"></div>"
+            + "</body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // `auto` is the initial value and names no page.
+    [Fact]
+    public void Page_Auto_Names_No_Page()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page square { size: 5in; }"
+            + "</style></head><body><div style=\"page: auto;\"></div></body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // A named rule the document never puts content on is still ignored — which is what keeps this
+    // narrower than the earlier attempt that read every selectored rule.
+    [Fact]
+    public void A_Named_Page_Nothing_Uses_Is_Ignored()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page square { size: 5in; }"
+            + "</style></head><body><div></div></body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // The named rule layers over the unconditional one, whichever order they are written in.
+    [Theory]
+    [InlineData("@page { size: 100px; margin: 4px; } @page square { margin: 9px; }")]
+    [InlineData("@page square { margin: 9px; } @page { size: 100px; margin: 4px; }")]
+    public void The_Named_Rule_Layers_Over_The_Unconditional_One(string rules)
+    {
+        var html = "<!DOCTYPE html><html><head><style>" + rules
+            + "</style></head><body><div style=\"page: square;\"></div></body></html>";
+
+        var box = WptPageBox.Resolve(html, DefaultBox);
+
+        Assert.Equal(new SizeF(100, 100), box.BoxSize);
+        Assert.Equal(9, box.MarginTop, 3);
+    }
+
+    // A pseudo-class describes particular pages of a flow this model does not paginate, so it is
+    // never read — even when the document uses exactly one named page beside it.
+    [Fact]
+    public void A_Pseudo_Class_Selector_Is_Never_Read()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page :first { size: 5in; } @page square:first { size: 7in; }"
+            + "</style></head><body><div style=\"page: square;\"></div></body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
     // ...but the unconditional rule in the same sheet still applies.
     [Fact]
     public void The_Unconditional_Rule_Applies_Alongside_Selectored_Ones()

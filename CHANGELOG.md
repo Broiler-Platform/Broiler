@@ -214,6 +214,23 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` — the sheet takes the named page the document puts its content
+  on. `WptPageBox` read only the unconditional `@page`, so
+  `css-page/page-name-table-001-print` — a table on `page: square`, a
+  `@page square` sizing the sheet 5in and painting it `#eee`, an unconditional
+  `@page` painting red — rendered at the default size under red where its
+  reference is a 5in `#eee` square, and scored 0.0%. The runner renders one sheet
+  and that sheet is page one, so it now takes the box of the page the flow starts
+  on: `EnumerateAppliedPageBlocks` yields the unconditional rules and then layers
+  the used named rule over them, and both the geometry and the `@page` decoration
+  follow because both read that one enumerator. **Exactly one** used name is the
+  whole of the guard — a document naming two pages needs a per-page box that one
+  surface cannot carry, so none is taken (`page-margin-auto-print` names six and
+  is untouched), a named rule nothing uses is still ignored, and a pseudo-class
+  selector is never read. `css/css-page` goes 141 → 142 of 224 reftests with the
+  average 87.92% → 88.37%, `css/css-break` does not move, exactly one test
+  changed state, and the golden-image score is unchanged.
+
 - `Broiler.Wpt` — a `@page` rule's flow-relative margins and padding are read.
   CSS Paged Media 3 §3.2 lets the page box carry `margin-inline-start` and its
   seven siblings, and neither half of the runner's `@page` model understood them:
