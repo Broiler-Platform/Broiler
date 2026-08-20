@@ -214,6 +214,34 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` / `Broiler.Layout` — a paged render lays the flow out once per
+  distinct page area instead of once per document, so a document whose named
+  `@page` rules size the page differently divides against each page's own area —
+  where its floats wrap and where its breaks fall — and not against the
+  unconditional one. Each run of consecutive pages sharing a name is taken from
+  the pass that used its area, which is sound because a page-name change forces a
+  break (CSS Paged Media 3 §5.3): a run always starts at a page boundary in every
+  pass, so its content divides against its own area alone. The *order* of the runs
+  is a property of the document and is read from the flow in document order; only
+  each run's length is a property of the page. Reading both off a scan of the
+  laid-out bands was tried and is wrong twice over — content overflowing its page
+  area invents runs the document never asked for, and it derives the page count
+  from fragment bounds when the content height settles it, which cost nine tests
+  in one measured run. Alongside it, `ApplyForcedPageBreakBefore` no longer steps
+  over a float: a float declares no break of its own, but a `break-after: page` on
+  the sibling before it ends the page the float would otherwise sit on. Measured
+  with the submodules at their pinned pointers, this moves exactly one test —
+  `page-name-unnamed-trailing-001-print`, 96.4% → 100% — because every test the
+  capability was built for turns out to be blocked behind something else
+  (`position: fixed` not repeating per page, `page-orientation` not rotating,
+  `vw`/`vh` not resolving against the first page's area, page-box percentages not
+  resolved per named page, `auto` margins on named pages); those are enumerated in
+  `docs/wpt-rendering-gaps-fixed.md`. Under `BROILER_WPT_PAGED_PRINT=1`
+  `css/css-page` goes 133 → 134 of 224, average 77.19% → 77.21%, none lost; paged
+  `css/css-break` (91), `css/CSS2` (96), `css/css-backgrounds` (424) and
+  `css/css-values` (104) do not move, and the default unpaginated run is unchanged
+  at 142.
+
 - `Broiler.Wpt` / `Broiler.Layout` — a paged render prints each page on the box
   the *name that page carries* resolves to, instead of guessing one name for the
   whole document. The guess arrived with the earlier named-page fix and is right

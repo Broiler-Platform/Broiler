@@ -86,6 +86,92 @@ public sealed class PagedPrintRenderTests : IDisposable
         Assert.Equal(100, rendered.Height);
     }
 
+    // A named page may be a different size, and then the flow on it divides against *that* area.
+    // Here the named block is 250px tall on a 300px page of its own, so it is one page; laid out
+    // against the unconditional 100px area — which is what one layout for the whole document can
+    // only ever do — it would be three, and the sheet would come out 1000px instead of 400px.
+    [Fact]
+    public void A_Named_Page_Divides_Its_Flow_Against_Its_Own_Area()
+    {
+        using var rendered = RenderPrint(
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "@page { size: 200px 100px; margin: 0; }"
+            + "@page tall { size: 200px 300px; }"
+            + "html,body { margin: 0; padding: 0; }"
+            + "</style>"
+            + "<div style=\"height:80px; background:#000\"></div>"
+            + "<div style=\"page:tall; height:250px; background:#000\"></div>");
+
+        Assert.Equal(200, rendered.Width);
+        Assert.Equal(400, rendered.Height);
+        Assert.True(IsInk(rendered, 100, 340), "the named page should carry the whole block");
+    }
+
+    // And the page after a named one goes back to the unconditional rule. A run of pages is bounded
+    // by the name changes on either side of it, so an unnamed run following a named one is its own
+    // run and not a continuation — `page-name-unnamed-trailing-001` is built on exactly that.
+    [Fact]
+    public void An_Unnamed_Page_After_A_Named_One_Returns_To_The_Unconditional_Box()
+    {
+        using var rendered = RenderPrint(
+            InsetStyle
+            + "<div style=\"height:60px; background:#000\"></div>"
+            + "<div style=\"page:mid; height:40px; background:#000\"></div>"
+            + "<div style=\"height:60px; background:#000\"></div>");
+
+        Assert.Equal(300, rendered.Height);
+        Assert.True(IsInk(rendered, 5, 5), "page 1 has no margin, so its content starts at the corner");
+        Assert.False(IsInk(rendered, 5, 105), "page 2 is inset by @page mid's margin");
+        Assert.True(IsInk(rendered, 25, 125), "page 2's content starts inside that margin");
+        Assert.True(IsInk(rendered, 5, 205), "page 3 is back on the unconditional box");
+    }
+
+    // The name belongs to the innermost box that starts the page, not the outermost. A plain
+    // wrapper around named content does not claim the page for itself — the same rule the flow
+    // applies when it decides where to break (CssBox.StartPageName).
+    [Fact]
+    public void A_Wrapper_Does_Not_Claim_The_Page_Its_Child_Names()
+    {
+        using var rendered = RenderPrint(
+            InsetStyle
+            + "<div style=\"height:60px; background:#000\"></div>"
+            + "<div><div style=\"page:mid; height:40px; background:#000\"></div></div>"
+            + "<div style=\"height:60px; background:#000\"></div>");
+
+        Assert.Equal(300, rendered.Height);
+        Assert.False(IsInk(rendered, 5, 105), "page 2 is inset by @page mid's margin");
+        Assert.True(IsInk(rendered, 25, 125), "page 2's content starts inside that margin");
+    }
+
+    // A float declares no break of its own, but it does not get to step over one either: a
+    // `break-after: page` on the box before it ends the page the float would otherwise sit on.
+    [Fact]
+    public void A_Float_Follows_A_Forced_Break_Onto_The_Next_Page()
+    {
+        using var rendered = RenderPrint(
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "@page { size: 200px 100px; margin: 0; }"
+            + "html,body { margin: 0; padding: 0; }"
+            + "</style>"
+            + "<div style=\"display:flow-root\">"
+            + "<div style=\"break-after:page; height:20px\"></div>"
+            + "<div style=\"float:left; width:40px; height:40px; background:#000\"></div>"
+            + "</div>");
+
+        Assert.Equal(200, rendered.Height);
+        Assert.False(IsInk(rendered, 20, 40), "the float should not stay on the page the break ended");
+        Assert.True(IsInk(rendered, 20, 120), "the float belongs after the break");
+    }
+
+    // A 200x100 sheet whose `mid` page carries a 20px margin and whose unconditional page carries
+    // none, so which box a page took is readable from where its content starts.
+    private const string InsetStyle =
+        "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+        + "@page { size: 200px 100px; margin: 0; }"
+        + "@page mid { margin: 20px; }"
+        + "html,body { margin: 0; padding: 0; }"
+        + "</style>";
+
     // Nothing declares a break here: the content is simply taller than one page area, and the
     // bands are cut from a continuous surface, so it continues on the next page by itself. That is
     // the whole of automatic fragmentation in this model.

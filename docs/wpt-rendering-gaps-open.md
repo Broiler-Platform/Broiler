@@ -1042,13 +1042,24 @@ Worth separating from the rest, because the test itself may be at fault:
       **`page-orientation` is not needed**: both sides declare `rotate-left` on the
       same page, so it cancels, exactly as the test's own comment implies when it
       names the margin as the distinguishing factor.
-      What remains is the residual 3.6%, which is per-page **layout**: the boxes
-      now differ per page but the flow is still divided against one page area.
+      What remained was the residual 3.6%, and **that too is now closed**: the
+      wrapper `.page` div was claiming its own page, so the landscape child's box
+      never reached the page it was on. All four are now closed.
 
-    So the per-page **layout** the model cannot do — a flow dividing against two
-    different page areas — is wanted by exactly one of the four, and it is the only
-    one still open: `page-name-img-003`/`-004` and `page-name-003` are closed, and
-    `page-name-unnamed-trailing-001` remains at 96.4%, needing only that.
+    So all four are shut, and the per-page **layout** they were the argument for —
+    a flow dividing against more than one page area — landed with them: the
+    document is now laid out once per distinct page area and each run of pages
+    takes its own. See
+    [the fixed entry](wpt-rendering-gaps-fixed.md#a-paged-render-laid-every-page-out-against-one-page-area),
+    which also records the measured result honestly: the capability moves exactly
+    one test, because every test it was built for is blocked behind something
+    else. What each of those is blocked on is enumerated there — `position: fixed`
+    not repeating per page (`fixedpos-010`), `page-orientation` not rotating
+    (`page-orientation-on-*`), `vw`/`vh` not resolving against the first page's
+    area (`page-size-009`), page-box percentages not resolved per named page
+    (`page-box-004`), `auto` margins on named pages (`page-margin-auto-*`), and a
+    `flow-root` container paginating short inside `page-size-007`/`-008`'s
+    reference. None of those is per-page layout.
   - **`page-background-002` is the page *count* itself**, and it is the cleanest
     one to start on: test and reference are the same three-page document except
     that the reference draws its image as `position: absolute; top: 0`, and the

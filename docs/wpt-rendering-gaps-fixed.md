@@ -433,15 +433,14 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   unconditional rule and the used named one. The sheet is as wide as the widest
   emitted page and as tall as they add up to.
 - **The limit, stated rather than hidden.** The *flow* is still laid out against one
-  page area, so only page one's box may differ. (Any page's box may differ since
+  page area, so only page one's box may differ. (Neither half of that limit still
+  stands: any page's box may differ since
   [the per-page named boxes](#a-paged-render-guessed-one-page-name-for-the-whole-document)
-  landed; the flow is still divided against one area, which is the half of this
-  limit that stands.) That is sound for these four
+  landed, and the flow divides against each page's own area since
+  [the per-area layout passes](#a-paged-render-laid-every-page-out-against-one-page-area)
+  did.) That is sound for these four
   because each forces its own break, so where the content divides does not depend
-  on the size of the page it lands on. A document whose flow has to divide against
-  two different page areas needs per-page *layout*, which this is not —
-  the four remaining `page-name-*` `SizeMismatch` failures are that case and are
-  still [open](wpt-rendering-gaps-open.md#a--print-document-renders-on-the-viewport-not-on-the-page-it-declares).
+  on the size of the page it lands on.
 - **Verified:** 19 focused tests across `WptReftestPagesTests` and `WptPageBoxTests`
   cover the meta's spellings, ranges, sorting and the declarations that name nothing
   usable, plus `:first` layering over the unconditional rule and the other
@@ -557,8 +556,10 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   and dividing it against the default page first puts its content in the wrong
   place. A document with *mixed* names still divides its flow against the
   unconditional area; only the boxes differ. That approximation is what
-  `page-name-unnamed-trailing-001` is now missing content against, and it is the
-  same limit the entry above states.
+  `page-name-unnamed-trailing-001` is now missing content against.
+  (Superseded: the whole-document re-layout became the one-run case of
+  [the per-area layout passes](#a-paged-render-laid-every-page-out-against-one-page-area),
+  which lay each run of pages out against its own area.)
 - **`page-orientation` turned out not to be needed**, contrary to what the open
   entry assumed: both sides of that test declare `rotate-left` on the same page, so
   it cancels, and the test's own comment names the margin as the distinguishing
@@ -570,6 +571,73 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   one test gained and none lost. The default unpaginated run is unchanged at
   143/107. One speculative variant — "the innermost name at a page edge wins" —
   was tried, measured at no change, and reverted.
+
+### A paged render laid every page out against one page area
+
+- **Test:** `css-page/page-name-unnamed-trailing-001-print` — under
+  `BROILER_WPT_PAGED_PRINT=1`, **96.4% → passes at 100%**. That is the *only*
+  test this moves, and the honest headline is below: the capability landed and
+  the corpus barely noticed, because every test it was built for turns out to be
+  blocked behind something else.
+- **Owner:** the WPT runner (`WptDocumentRenderer`) and one fragmentation fix in
+  `Broiler.Layout`. Main repo, no patch.
+- **The gap.** A named `@page` rule may size the page differently, and then the
+  flow on those pages has to divide against *that* area — where the floats wrap,
+  where the breaks fall. One continuous surface has one width and one band
+  height, so it can express one page area and no more. Since
+  [the per-page *boxes* landed](#a-paged-render-guessed-one-page-name-for-the-whole-document)
+  each page could be *printed* on its own box, but the flow was still cut on one
+  grid, and that was the documented limit.
+- **What landed: one layout per page area, not one per document.** The document
+  is laid out once per distinct area, and each run of consecutive pages sharing a
+  name is taken from the pass that used its area. That is sound because a
+  page-name change forces a break (§5.3), so a run starts at a page boundary in
+  every pass and its content divides against its own area alone.
+- **The order of the runs is a property of the document; only their lengths are a
+  property of the page.** So the order is read from the flow in document order and
+  each length from that run's own pass. Reading both off one band scan was tried
+  first and is wrong twice over: content that overflows its page area lands on
+  bands that are not pages, inventing runs no part of the document asked for
+  (`page-size-007`'s 640px-wide container on a 200px page produced a phantom
+  trailing page), and it derives the page *count* from fragment bounds when the
+  count is settled by the content height — that cost nine tests in one measured
+  run, `fixedpos-003` and `monolithic-overflow-012` among them, every one a page
+  count disagreement. The walk now says only where each run starts.
+- **A float follows a forced break.** `ApplyForcedPageBreakBefore` skipped floats
+  outright. A float declares no break of its own — `break-before` does not apply
+  to it and it carries no page name into the flow — but a break the sibling before
+  it forces is a break in the flow the float sits in.
+  `page-size-007-print`'s reference is built on that: `break-after: page` on a div
+  with a float immediately after it, and the float stayed on the page the break
+  had just ended while the text following it moved. **This closes no test**, and
+  it is kept because it is right and has a test of its own.
+- **What is actually blocking the tests this was built for**, each established by
+  rendering it rather than assumed — this is the useful part of the entry:
+  - `page-size-007`/`-008`: the **test** side now schedules six pages against the
+    three page areas it declares, which is what the feature was for. The
+    **reference** side still comes out short (four pages against six), inside its
+    `flow-root` containers.
+  - `fixedpos-010` is not per-page layout at all: it needs `position: fixed` to
+    repeat on every page, and Broiler paints it once.
+  - `page-orientation-on-landscape-001`/`-portrait-001` need `page-orientation`
+    to actually rotate the page.
+  - `page-size-009` needs `vw`/`vh` to resolve against the **first** page's area
+    for the whole document, which is what its reference states by sizing page one
+    with `@page :first`.
+  - `page-box-004` needs the page box's percentage margins and padding resolved
+    per named page.
+  - `page-margin-auto-print` and `page-margin-auto-and-non-zero-print` need `auto`
+    margins on six named pages.
+- **Verified:** four render-level tests in `PagedPrintRenderTests` — a named page
+  dividing its flow against its own area (1000px of sheet if it does not, 400px if
+  it does), an unnamed page after a named one returning to the unconditional box,
+  a wrapper not claiming the page its child names, and the float following the
+  forced break. Measured with the submodules at their pinned pointers: paged
+  `css/css-page` 133 → **134** of 224 with the average 77.19% → **77.21%**, one
+  test gained and none lost. Everything else is byte-for-byte unchanged — paged
+  `css/css-break` 91, `css/CSS2` 96, `css/css-backgrounds` 424, `css/css-values`
+  104, and the default unpaginated `css/css-page` 142. `page-size-010` also goes
+  99.0% → 100%; `page-size-009` slips 55.6% → 54.7% and passes neither way.
 
 ---
 

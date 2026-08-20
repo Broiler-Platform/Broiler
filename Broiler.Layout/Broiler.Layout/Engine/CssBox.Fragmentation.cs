@@ -427,14 +427,26 @@ internal partial class CssBox
             return 0;
 
         if (child.Position is CssConstants.Absolute or CssConstants.Fixed
-            || child.Float != CssConstants.None
             || child.Display == CssConstants.None)
         {
             return 0;
         }
 
-        if (!ForcesPageBreak(child.BreakBefore)
-            && !(previous is not null && ForcesPageBreak(previous.BreakAfter))
+        bool afterAForcedBreak = previous is not null && ForcesPageBreak(previous.BreakAfter);
+
+        if (child.Float != CssConstants.None)
+        {
+            // A float declares no break of its own — <c>break-before</c> does not apply to it, and
+            // it carries no page name into the flow — but a break the sibling before it forces is a
+            // break in the flow the float is placed in, so the float belongs after it too. Without
+            // this a float is the one thing a forced break steps over: `page-size-007-print`'s
+            // reference puts `break-after: page` on a div and a float immediately after it, and the
+            // float stayed on the page the break had just ended while the text following it moved.
+            if (!afterAForcedBreak)
+                return 0;
+        }
+        else if (!ForcesPageBreak(child.BreakBefore)
+            && !afterAForcedBreak
             && !StartsANewPageType(child, PreviousOnAPage(Boxes, childIndex)))
         {
             return 0;
