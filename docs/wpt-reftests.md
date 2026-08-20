@@ -166,15 +166,29 @@ problems, all at 0.0–1.4% match):
   asserts that `html { display: none; background: green }` still paints the
   canvas green. Chromium renders it white, and so does Broiler — because
   `css/css-backgrounds/background-color-root-propagation-001` asserts the
-  opposite and is the modern rule. Making it pass means regressing that one.
-  **A reftest failing is not by itself evidence of a defect**, and this suite
-  will never tell you which of a contradictory pair to believe.
+  opposite — its title is "don't propagate html background when display:none" —
+  and is the modern rule. Making it pass means regressing that one, which
+  Broiler passes. **A reftest failing is not by itself evidence of a defect**,
+  and this suite will never tell you which of a contradictory pair to believe.
 - **A feature nothing here implements**, where the render is honest and the
   match is 0% anyway: the three `jpegxl/` tests need a JPEG XL decoder (Chromium
-  has none either), the `fullscreen/` and customizable-`select` ones need
-  `testdriver.js` to drive them, `forced-colors-mode-49` needs the run to be in
+  has none either), `forced-colors-mode-49` needs the run to be in
   forced-colors mode, and the two `*.sub.html` colour-scheme tests need the WPT
-  server for their cross-origin substitution.
+  server for their cross-origin substitution. The `fullscreen/` and
+  customizable-`select` ones used to be read this way too — they are not: the
+  runner drives them, and when they fail it is because that driving broke. See
+  [the testdriver override](#testdriverjs-overwrote-the-shim-that-drives-it).
+
+**Both of the first two answers came up again in
+[issue #1714](https://github.com/Broiler-Platform/Broiler/issues/1714)**, whose
+three biggest problems were all at 0.0%. Only the third, `backdrop-iframe`, was
+a defect. `root-box-003` and `forced-colors-mode-49` were each re-checked in
+Chromium on 2026-08-20 by the oracle recipe above, and Chromium splits test from
+reference exactly as Broiler does — white against green for the first, green
+against white for the second, on both engines. **When the oracle reproduces the
+disagreement, stop: there is nothing here to fix, and the pair will head the
+next biggest-problems list too.** That the list ranks by blast radius does not
+make its top entry winnable, and two of three is a fair rate to expect.
 
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
@@ -442,6 +456,69 @@ today.
 **The tell for this class of bug is a test that renders its "before" state.**
 Nothing errors, nothing is skipped, and the rendered image is a plausible render
 — of the document as it stood before a script it never ran.
+
+## testdriver.js overwrote the shim that drives it
+
+The same tell, from the other direction, and it is the reason
+`fullscreen/rendering/backdrop-iframe` headed
+[issue #1714](https://github.com/Broiler-Platform/Broiler/issues/1714)'s biggest
+problems at 0.0%. The render was not blank. It showed the test's un-fullscreened
+state **plus a grey box reading "This test requires user interaction. Please
+click here to allow fullscreen."** — which is upstream `testdriver.js` announcing
+that it is waiting for a WebDriver click nobody is going to send.
+
+A test that needs a user gesture asks for one through testdriver:
+
+```js
+test_driver.bless('fullscreen', () => {
+  document.querySelector('iframe').requestFullscreen();
+});
+```
+
+The runner has always shimmed `bless` — there is no user here and nothing checks
+activation, so it just runs the action. What it could not survive was **being
+injected first**. `BrowserApiStubs` goes in at position 0, ahead of the page's
+scripts; `/resources/testdriver.js` is inlined from the checkout like any other
+external script and assigns `window.test_driver` wholesale. The shim's
+`if (typeof test_driver.bless === 'undefined')` guard ran while the name was
+still free, installed, and was overwritten seconds later. Upstream's `bless`
+then appends its button and awaits `test_driver.click`, which routes through
+`test_driver_internal` — and WPT's in-tree `testdriver-vendor.js`, the file a
+vendor is expected to substitute its own implementations into, **is empty**. The
+promise never settles, the action never runs, `reftest-wait` is never dropped.
+
+The fix is to stop guarding and start winning: `TestDriverStubs` is its own
+constant now, it assigns unconditionally, and the runner appends it to every
+`testdriver*.js` it inlines as well as to `BrowserApiStubs`. Whatever the page
+loads, and in whichever order, the runner's `bless` and `Actions` are what the
+page's own scripts see.
+
+- **The reftest suite: 880 → 910 of 1258, nothing regressed.** A paired A/B over
+  every directory holding a reftest that loads testdriver.js, in a checkout
+  sparse to `css/`, `html/semantics/`, `fullscreen/` and `forced-colors-mode/` —
+  so the figure is a floor, not the corpus-wide total. `fullscreen/rendering`
+  went 3/6 → 6/6, and the `::backdrop` trio landed back on exactly the figures
+  [wont-fix](wpt-rendering-gaps-wont-fix.md#fullscreen-backdrop--the-reference-never-entered-fullscreen)
+  recorded for it on 2026-08-13 — 99.1%, 100%, 100% — which is what says this
+  was a regression rather than a gap. The other 27 are
+  customizable-`select`, `interestfor` and `css/css-shadow/part`.
+- **The golden-image suite: +5, −3**, over five of the affected directories (823
+  tests). Both directions are the same trade, because the reference generator
+  drives nothing either: five tests were nearer Chromium's screenshot once
+  Broiler stopped painting a differently-sized interaction button, and three are
+  now *further* from it because Broiler runs the test and Chromium does not.
+  `css/css-pseudo/pseudo-element-removal` is the clean example — its
+  `test_driver.Actions().send()` used to reject, abandoning the promise_test
+  before it removed the pseudo-element, and both engines rendered the leftover.
+  That is the cost [wont-fix](wpt-rendering-gaps-wont-fix.md) exists to record,
+  and it is why this suite is the one that can judge the change.
+
+**A capability guard is only right when nothing can arrive later and claim the
+name.** The `typeof … === 'undefined'` idiom is correct for the rest of
+`BrowserApiStubs`, which fills in APIs the bridge lacks and would be wrong to
+override. It is exactly backwards for a name the *page* is about to define, and
+the failure is silent: the shim installs, reports nothing, and is gone by the
+time anything calls it.
 
 ## `clip` is implemented, and most of what it clips is nothing
 

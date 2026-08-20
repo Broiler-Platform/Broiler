@@ -136,6 +136,16 @@ backdrop painted indiscriminately: it sets `--bg: red` on `body` and `--bg: gree
 on the `div`, and asserts `div::backdrop` inherits from the *fullscreen element*.
 Broiler renders green. A backdrop painted from the wrong parent would be red.
 
+> **If a re-measurement shows these at 0.0% on `rel=match` too, the shim has
+> stopped winning rather than the backdrop having broken.** All three read 0.0%
+> / 0.0% / 1.1% in the [#1714](https://github.com/Broiler-Platform/Broiler/issues/1714)
+> reftest run because upstream `testdriver.js` was overwriting the runner's
+> `test_driver` after it was injected, so no blessed callback ran at all; the
+> settled set's 99.1% / 100% / 100% came straight back once it stopped. The give-away is the
+> render, which carries testdriver's own "This test requires user interaction"
+> button. See
+> [testdriver.js overwrote the shim that drives it](wpt-reftests.md#testdriverjs-overwrote-the-shim-that-drives-it).
+
 > `backdrop-object` is new to this list. The
 > [#1618 write-up](https://github.com/Broiler-Platform/Broiler/issues/1618) named
 > it as one of two "tests worth a maintainer's time" once the six then-known
