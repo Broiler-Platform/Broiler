@@ -875,6 +875,72 @@ main-repo half to fall back on: the shorthand expansion is entirely inside
 units in ParseToPixels*, not by the number — see
 [`patches/README.md`](../patches/README.md) on why the number means nothing.
 
+## A grid built from implicit columns was as wide as its border
+
+`inline-grid` with no `grid-template-columns` at all, one child, and a
+`grid-auto-columns` to size the tracks it generates:
+
+```html
+<div style="display: inline-grid; grid-auto-columns: 15px; border: 1px solid">
+  <div style="grid-column: 3 / span 4; background: grey"></div>
+</div>
+```
+
+`grid-column: 3 / span 4` puts the child in columns 3–6, so the grid is six 15px
+tracks — 90px of content inside a 1px border. Broiler made it **2px**: the border,
+and nothing else. The child came out 0px wide at x 1 instead of 60px at x 31.
+
+`TryComputeGridIntrinsicContentWidth` summed only the tracks named in
+`grid-template-columns`. Implicit columns contributed nothing, `grid-auto-columns`
+was never consulted on that path, and a grid with no template bailed out entirely
+so the caller measured inline *content* instead — 0, for a grid of empty divs.
+That is the shape every test in
+`css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing` and
+`css-grid/subgrid/repeat-auto-fill-*` is built from.
+
+The definite-width pass had always been right, so the repair was to stop having
+two answers: `TryApplyGridTrackLayout`'s item collection and auto-placement moved
+into `TryCollectGridPlacements` and `TryPlaceGridItems`, and the intrinsic path
+now runs the same two. The count it sizes from is the count the real pass will
+resolve, by construction, rather than a second implementation that can drift.
+`grid-auto-columns` bounds the change: it defaults to `auto`, whose size is its
+items' and therefore the track pass' job, so a grid that does not declare a
+definite one is answered exactly as before.
+
+**Fixing the width exposed the next bug in the same document.** With the container
+finally 92px, a layout assertion showed the child ignoring its `grid-column` and
+spanning all six tracks. The implicit-only pass declines for a nested
+grid/flex/table item, because sizing an *auto* row from a single measurement of a
+nested container collapses it — but when every track is a declared fixed length,
+no measurement reaches a track at all and the gate is protecting nothing.
+`AllTrackSizesAreFixed` relaxes that half; the baseline half stays, since a shared
+baseline shifts items within a row no matter how the tracks are sized.
+
+### The scoreboard goes down, and it is worth reading rather than summing
+
+**5 140 reftests, before and after on the same build: 2 494 → 2 490 passing, +0
+and −4.** Ten tests in 5 140 move at all — two up, eight down — and every one of
+the eight is the same `inline-grid` + fixed `grid-auto-columns` shape.
+
+The four that flip were passing **because the test and its reference both
+collapsed**. Rendered side by side on both builds, before is four thin black lines
+on a white page, on the test side and the reference side alike — an identical
+blank, scored 100.0%. After, both render 92px boxes, and the boxes disagree. The
+disagreement was always there; nothing was drawing it.
+
+So the honest summary of this change is that it makes the renders substantially
+more correct and the *scoreboard* four worse, and the two facts are the same fact.
+The residual is now filed as its own gap: a subgrid resolves neither
+`repeat(auto-fill, <line-names>)` nor the name-plus-index lines (`grid-column:
+y 5`) the tests place items with. Widening the item gate further was tried and
+reverted — it fixes the isolated placement (a probe goes 10/12 → 12/12) while
+leaving all four tests red and pushing two of them further down.
+
+The gap entry that predicted this asked for one thing: that
+`css/css-grid/grid-lanes` not regress, because so many of its passes are grids
+agreeing with their reference on a shared collapse. **869 tests, 195 → 195, +0 /
+−0.**
+
 ## Next lead: a flex item's main size ignores its aspect ratio
 
 Diagnosed, not fixed, and measured against Chromium on 2026-08-20. In a **row**

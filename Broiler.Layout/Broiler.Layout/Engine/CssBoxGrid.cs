@@ -213,8 +213,27 @@ internal partial class CssBox
         // Grids with an explicit template on the affected axis keep going through
         // this pass exactly as before; only the implicit-only takeover is gated.
 
+        // Implicit tracks (grid-auto-columns/rows); default 'auto'.
+        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
+        GridTrackSpec implicitRow = ParseSingleImplicitSpec(GridAutoRows, em);
+
+        // The item-shape half of that gate exists to protect a track whose size
+        // comes from an item's measurement. When every track on both axes is a
+        // definite fixed length — templates and `grid-auto-*` alike — no
+        // measurement reaches a track at all, so no item shape can mis-size one and
+        // the gate has nothing left to protect. Declining anyway is what left an
+        // `inline-grid { grid-auto-columns: 15px; grid-auto-rows: 8px }` holding a
+        // nested grid to the approximation, which ignores the child's
+        // `grid-column: 3 / span 4` and stretches it across the whole container
+        // (WPT css-grid/subgrid/repeat-auto-fill-002/-003/-004). The baseline half
+        // stays unconditional: a shared baseline shifts items *within* a row, which
+        // fixed tracks do not make safe.
+        bool allTracksFixed = AllTrackSizesAreFixed(colSpecs, implicitCol)
+            && AllTrackSizesAreFixed(rowSpecs, implicitRow);
+
         if ((colImplicitOnly || rowImplicitOnly)
-            && (GridUsesBaselineSelfAlignment() || !GridImplicitPathItemsAreSimple()))
+            && (GridUsesBaselineSelfAlignment()
+                || !(allTracksFixed || GridImplicitPathItemsAreSimple())))
             return false;
 
         // Implicit tracks are allowed to carry the whole axis for a subgrid, an
@@ -232,65 +251,19 @@ internal partial class CssBox
         if (colSpecs.Count > MaxGridLine || rowSpecs.Count > MaxGridLine)
             return false;
 
-        // Implicit tracks (grid-auto-columns/rows); default 'auto'.
-        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
-        GridTrackSpec implicitRow = ParseSingleImplicitSpec(GridAutoRows, em);
-
         // Collect in-flow grid items in document order. Absolutely-positioned
         // children are gathered separately: they take no part in track sizing or
         // auto-placement, but when the grid container is their containing block
         // (i.e. it is positioned) their grid area forms their containing block
         // (CSS Grid §9), which the abspos pass below resolves once tracks exist.
         bool gridIsAbsposContainingBlock = Position is CssConstants.Relative or CssConstants.Absolute or CssConstants.Fixed;
-        var placements = new List<GridPlacement>();
-        List<CssBox> absposItems = null;
 
         var colNames = ParseLineNames(GridTemplateColumns);
         var rowNames = ParseLineNames(GridTemplateRows);
 
-        foreach (var child in Boxes)
-        {
-            if (child.Display == CssConstants.None)
-                continue;
-
-            // CSS Grid §4: every in-flow child becomes a grid item, EXCEPT a
-            // contiguous run of collapsible white space that is not contained in
-            // a non-anonymous box — such an anonymous box "is not rendered (just
-            // as if it were display:none)" and must not occupy a track. Broiler's
-            // box tree keeps the inter-item white space between block-level grid
-            // items as anonymous whitespace-only boxes; left in, each auto-places
-            // into its own phantom track and inflates the grid (e.g. the
-            // grid-lanes subgrid reftests gained spurious rows).
-            if (IsCollapsibleWhitespaceItem(child))
-                continue;
-
-            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
-            {
-                if (gridIsAbsposContainingBlock)
-                    (absposItems ??= []).Add(child);
-
-                continue;
-            }
-
-            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, rowSpecs.Count, rowNames);
-            var (colStart, colSpan) = ParseGridLine(child.GridColumn, colSpecs.Count, colNames);
-
-            // Decline rather than lay out an implausibly large grid. A negative
-            // start references a leading implicit track (normalised below), so bound
-            // its magnitude too.
-            if (rowSpan > MaxGridLine || colSpan > MaxGridLine
-                || Math.Abs(rowStart ?? 0) > MaxGridLine || Math.Abs(colStart ?? 0) > MaxGridLine)
-                return false;
-
-            placements.Add(new GridPlacement
-            {
-                Item = child,
-                RowStart = rowStart,
-                RowSpan = rowSpan,
-                ColStart = colStart,
-                ColSpan = colSpan,
-            });
-        }
+        if (!TryCollectGridPlacements(colSpecs.Count, rowSpecs.Count, colNames, rowNames,
+                gridIsAbsposContainingBlock, out var placements, out List<CssBox> absposItems))
+            return false;
 
         // A grid with no in-flow items has no tracks to size *from*, so the pass
         // normally declines to the approximation. It must not when the grid carries
@@ -304,62 +277,9 @@ internal partial class CssBox
         if (placements.Count == 0 && absposItems == null)
             return false;
 
-        int explicitRowStart;
-
-        // CSS Grid §8.3: a definite line that resolves before the explicit grid
-        // (a negative index here) references a *leading* implicit track. Normalise
-        // by shifting every placement right/down so the leftmost/topmost referenced
-        // line is index 0; the explicit grid then begins at explicitColStart /
-        // explicitRowStart. leading == 0 for every grid without a before-grid line,
-        // so those are byte-identical to before. Auto-placement into leading tracks
-        // is out of scope, so decline when an auto-placed item coexists with them.
-        int explicitColStart;
-        int minCol = 0, minRow = 0;
-
-        foreach (var p in placements)
-        {
-            if (p.ColStart.HasValue) minCol = Math.Min(minCol, p.ColStart.Value);
-            if (p.RowStart.HasValue) minRow = Math.Min(minRow, p.RowStart.Value);
-        }
-
-        explicitColStart = -minCol;
-        explicitRowStart = -minRow;
-
-        if (explicitColStart > 0 || explicitRowStart > 0)
-        {
-            foreach (var p in placements)
-                if (!p.ColStart.HasValue || !p.RowStart.HasValue)
-                    return false;
-
-            for (int i = 0; i < placements.Count; i++)
-            {
-                var p = placements[i];
-                p.ColStart += explicitColStart;
-                p.RowStart += explicitRowStart;
-                placements[i] = p;
-            }
-        }
-
-        bool flowRow = (GridAutoFlow ?? "row").IndexOf("column", StringComparison.OrdinalIgnoreCase) < 0;
-        bool dense = (GridAutoFlow ?? "").Contains("dense", StringComparison.OrdinalIgnoreCase);
-
-        PlaceItems(placements, colSpecs.Count + explicitColStart, rowSpecs.Count + explicitRowStart, flowRow, dense);
-
-        // Track counts after placement, including any implicit tracks.
-        int maxColEnd = 0, maxRowEnd = 0;
-        foreach (var p in placements)
-        {
-            maxColEnd = Math.Max(maxColEnd, p.PlacedCol + p.ColSpan);
-            maxRowEnd = Math.Max(maxRowEnd, p.PlacedRow + p.RowSpan);
-        }
-
-        if (maxColEnd > MaxGridLine || maxRowEnd > MaxGridLine)
+        if (!TryPlaceGridItems(placements, colSpecs.Count, rowSpecs.Count,
+                out int explicitColStart, out int explicitRowStart, out int colCount, out int rowCount))
             return false;
-
-        // The explicit tracks occupy [explicitColStart, explicitColStart+count); any
-        // leading implicit tracks precede them, so the axis is at least that wide.
-        int colCount = Math.Max(maxColEnd, explicitColStart + colSpecs.Count);
-        int rowCount = Math.Max(maxRowEnd, explicitRowStart + rowSpecs.Count);
 
         // A subgridded axis adopts the parent grid's gutter (CSS Grid L2 §7.3).
         double colGap = colSubgrid && SubgridColumnGap.HasValue
@@ -584,6 +504,141 @@ internal partial class CssBox
             total += (span - 1) * gap;
 
         return total;
+    }
+
+    /// <summary>
+    /// CSS Grid §4 + §8.3: collects this container's in-flow children as grid
+    /// placements in document order, resolving each one's <c>grid-row</c>/
+    /// <c>grid-column</c> against the two explicit track counts. Absolutely-
+    /// positioned children take no part in track sizing or auto-placement and come
+    /// back separately in <paramref name="absposItems"/> — only when
+    /// <paramref name="collectAbspos"/> says this container is their containing
+    /// block, in which case their grid areas are resolved once tracks exist
+    /// (§9). Returns <c>false</c> for an implausibly large placement, which
+    /// declines the caller's whole pass.
+    /// </summary>
+    private bool TryCollectGridPlacements(int explicitCols, int explicitRows,
+        IReadOnlyDictionary<string, List<int>> colNames, IReadOnlyDictionary<string, List<int>> rowNames,
+        bool collectAbspos, out List<GridPlacement> placements, out List<CssBox> absposItems)
+    {
+        placements = [];
+        absposItems = null;
+
+        foreach (var child in Boxes)
+        {
+            if (child.Display == CssConstants.None)
+                continue;
+
+            // CSS Grid §4: every in-flow child becomes a grid item, EXCEPT a
+            // contiguous run of collapsible white space that is not contained in
+            // a non-anonymous box — such an anonymous box "is not rendered (just
+            // as if it were display:none)" and must not occupy a track. Broiler's
+            // box tree keeps the inter-item white space between block-level grid
+            // items as anonymous whitespace-only boxes; left in, each auto-places
+            // into its own phantom track and inflates the grid (e.g. the
+            // grid-lanes subgrid reftests gained spurious rows).
+            if (IsCollapsibleWhitespaceItem(child))
+                continue;
+
+            if (child.Position == CssConstants.Absolute || child.Position == CssConstants.Fixed)
+            {
+                if (collectAbspos)
+                    (absposItems ??= []).Add(child);
+
+                continue;
+            }
+
+            var (rowStart, rowSpan) = ParseGridLine(child.GridRow, explicitRows, rowNames);
+            var (colStart, colSpan) = ParseGridLine(child.GridColumn, explicitCols, colNames);
+
+            // Decline rather than lay out an implausibly large grid. A negative
+            // start references a leading implicit track (normalised by
+            // TryPlaceGridItems), so bound its magnitude too.
+            if (rowSpan > MaxGridLine || colSpan > MaxGridLine
+                || Math.Abs(rowStart ?? 0) > MaxGridLine || Math.Abs(colStart ?? 0) > MaxGridLine)
+                return false;
+
+            placements.Add(new GridPlacement
+            {
+                Item = child,
+                RowStart = rowStart,
+                RowSpan = rowSpan,
+                ColStart = colStart,
+                ColSpan = colSpan,
+            });
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// CSS Grid §8.3 + §8.5: normalises leading implicit tracks, runs
+    /// auto-placement over <paramref name="placements"/>, and reports the track
+    /// count each axis ends up with (explicit template plus any implicit tracks the
+    /// placement generated) together with the index the explicit tracks start at.
+    /// Returns <c>false</c> for a grid this bounded pass declines to lay out.
+    /// </summary>
+    private bool TryPlaceGridItems(List<GridPlacement> placements, int explicitCols, int explicitRows,
+        out int explicitColStart, out int explicitRowStart, out int colCount, out int rowCount)
+    {
+        colCount = 0;
+        rowCount = 0;
+
+        // CSS Grid §8.3: a definite line that resolves before the explicit grid
+        // (a negative index here) references a *leading* implicit track. Normalise
+        // by shifting every placement right/down so the leftmost/topmost referenced
+        // line is index 0; the explicit grid then begins at explicitColStart /
+        // explicitRowStart. leading == 0 for every grid without a before-grid line,
+        // so those are byte-identical to before. Auto-placement into leading tracks
+        // is out of scope, so decline when an auto-placed item coexists with them.
+        int minCol = 0, minRow = 0;
+
+        foreach (var p in placements)
+        {
+            if (p.ColStart.HasValue) minCol = Math.Min(minCol, p.ColStart.Value);
+            if (p.RowStart.HasValue) minRow = Math.Min(minRow, p.RowStart.Value);
+        }
+
+        explicitColStart = -minCol;
+        explicitRowStart = -minRow;
+
+        if (explicitColStart > 0 || explicitRowStart > 0)
+        {
+            foreach (var p in placements)
+                if (!p.ColStart.HasValue || !p.RowStart.HasValue)
+                    return false;
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                var p = placements[i];
+                p.ColStart += explicitColStart;
+                p.RowStart += explicitRowStart;
+                placements[i] = p;
+            }
+        }
+
+        bool flowRow = (GridAutoFlow ?? "row").IndexOf("column", StringComparison.OrdinalIgnoreCase) < 0;
+        bool dense = (GridAutoFlow ?? "").Contains("dense", StringComparison.OrdinalIgnoreCase);
+
+        PlaceItems(placements, explicitCols + explicitColStart, explicitRows + explicitRowStart, flowRow, dense);
+
+        // Track counts after placement, including any implicit tracks.
+        int maxColEnd = 0, maxRowEnd = 0;
+        foreach (var p in placements)
+        {
+            maxColEnd = Math.Max(maxColEnd, p.PlacedCol + p.ColSpan);
+            maxRowEnd = Math.Max(maxRowEnd, p.PlacedRow + p.RowSpan);
+        }
+
+        if (maxColEnd > MaxGridLine || maxRowEnd > MaxGridLine)
+            return false;
+
+        // The explicit tracks occupy [explicitColStart, explicitColStart+count); any
+        // leading implicit tracks precede them, so the axis is at least that wide.
+        colCount = Math.Max(maxColEnd, explicitColStart + explicitCols);
+        rowCount = Math.Max(maxRowEnd, explicitRowStart + explicitRows);
+
+        return true;
     }
 
     /// <summary>
@@ -1379,6 +1434,26 @@ internal partial class CssBox
             && value.Contains("baseline", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// True when every track an axis can produce is a definite fixed length — each
+    /// explicit sizing function in <paramref name="specs"/> on both its
+    /// <c>minmax()</c> sides, and the <c>grid-auto-*</c> function any implicit track
+    /// takes. Such an axis is sized entirely from its declarations, so nothing an
+    /// item measures can change a track size on it. <c>grid-auto-*</c> defaults to
+    /// <c>auto</c>, so an axis that declares none is not fixed.
+    /// </summary>
+    private static bool AllTrackSizesAreFixed(List<GridTrackSpec> specs, GridTrackSpec implicitSpec)
+    {
+        if (implicitSpec.Min.Kind != GridSizeKind.Fixed || implicitSpec.Max.Kind != GridSizeKind.Fixed)
+            return false;
+
+        foreach (var spec in specs)
+            if (spec.Min.Kind != GridSizeKind.Fixed || spec.Max.Kind != GridSizeKind.Fixed)
+                return false;
+
+        return true;
+    }
+
+    /// <summary>
     /// True when every in-flow item of this grid is a plain box whose used block
     /// size the bounded track pass can trust from a single measurement — used to
     /// gate the implicit-only takeover away from item shapes the pass sizes worse
@@ -1455,17 +1530,26 @@ internal partial class CssBox
     /// <summary>
     /// CSS Grid §5.1 / Sizing 3: the grid container's intrinsic (min-content when
     /// <paramref name="useMax"/> is false, else max-content) **content-box** width —
-    /// the sum of its <c>grid-template-columns</c> track sizes plus gaps, for a
-    /// horizontal writing mode (a vertical grid's physical-width axis is the rows,
-    /// applied through the rotation — declined below). Bounded to templates whose
-    /// tracks are all definite fixed lengths (a plain length or a <c>minmax()</c>
-    /// with fixed sides — <c>repeat(&lt;int&gt;,…)</c> already expanded by
+    /// the sum of its column track sizes plus gaps, for a horizontal writing mode
+    /// (a vertical grid's physical-width axis is the rows, applied through the
+    /// rotation — declined below). The column axis is the one the real pass would
+    /// resolve: the <c>grid-template-columns</c> tracks, plus every *implicit*
+    /// column that auto-placement or a definite <c>grid-column</c> generates (§7.5),
+    /// each sized from <c>grid-auto-columns</c>. Bounded to tracks that are all
+    /// definite fixed lengths (a plain length or a <c>minmax()</c> with fixed sides
+    /// — <c>repeat(&lt;int&gt;,…)</c> already expanded by
     /// <see cref="ParseTrackList"/>): declines for <c>fr</c>/<c>auto</c>/
     /// content/percentage/<c>auto-fill</c> tracks, whose size needs the real track
-    /// pass (and the items). Lets a shrink-to-fit grid (float, <c>inline-grid</c>,
+    /// pass (and the items). Since <c>grid-auto-columns</c> defaults to <c>auto</c>,
+    /// that bound confines the implicit half of this to grids declaring a definite
+    /// <c>grid-auto-columns</c>: every other grid keeps its previous answer — the
+    /// explicit template alone, or a decline to the content-based fallback when it
+    /// has no template. Lets a shrink-to-fit grid (float, <c>inline-grid</c>,
     /// <c>fit-content</c>/<c>min-content</c>/<c>max-content</c>) size to its tracks
-    /// instead of collapsing to its (often empty) inline content
-    /// (WPT css-grid grid-gutters-and-tracks-001, …-margin-border-padding-vertical-rl).
+    /// instead of collapsing to its (often empty) inline content (WPT css-grid
+    /// grid-gutters-and-tracks-001, …-margin-border-padding-vertical-rl, and the
+    /// <c>grid-auto-columns</c> grids of
+    /// css-grid/…/track-sizing/column-subgrid-auto-fill-008).
     /// </summary>
     private bool TryComputeGridIntrinsicContentWidth(bool useMax, out double contentWidth)
     {
@@ -1482,24 +1566,94 @@ internal partial class CssBox
 
         double em = GetEmHeight();
         var specs = ParseTrackList(GridTemplateColumns, em);
-        if (specs == null || specs.Count == 0 || specs.Count > MaxGridLine)
+
+        // A `none`/empty template is not "no grid": the axis is implicit-only and
+        // takes all of its tracks from auto-placement, sized by grid-auto-columns.
+        // An *unsupported* token (subgrid, auto-fill, a bare `auto`, …) also parses
+        // to null and still declines — its size needs the real track pass.
+        if (specs == null && IsNoneOrEmptyTemplate(GridTemplateColumns))
+            specs = [];
+
+        if (specs == null || specs.Count > MaxGridLine)
             return false;
 
-        double sum = 0;
+        double explicitSum = 0;
         foreach (var spec in specs)
         {
             GridSize side = useMax ? spec.Max : spec.Min;
             if (side.Kind != GridSizeKind.Fixed)
                 return false;                 // needs the real track pass
 
-            sum += Math.Max(0, side.Value);
+            explicitSum += Math.Max(0, side.Value);
         }
 
         double gap = ResolveGridGap(ColumnGap, 0, em);
-        sum += gap * (specs.Count - 1);
-        contentWidth = sum;
+        GridTrackSpec implicitCol = ParseSingleImplicitSpec(GridAutoColumns, em);
+        GridSize implicitSide = useMax ? implicitCol.Max : implicitCol.Min;
+
+        // `grid-auto-columns` defaults to `auto`, and an intrinsic implicit track
+        // is sized by its items — the real track pass' job. Answer such a grid from
+        // the explicit template alone, and decline outright when it has none: this
+        // is the pre-existing behaviour, so only a grid declaring a definite
+        // `grid-auto-columns` reaches the placement replay below.
+        if (implicitSide.Kind != GridSizeKind.Fixed)
+        {
+            if (specs.Count == 0)
+                return false;
+
+            contentWidth = explicitSum + gap * (specs.Count - 1);
+            return true;
+        }
+
+        if (!TryCountGridIntrinsicColumns(specs.Count, em, out int colCount))
+            return false;
+
+        // Every column the placement produced beyond the template — the leading
+        // implicit tracks a before-grid line references as well as the trailing
+        // ones — is an implicit track, and gaps are charged between all of the
+        // columns rather than just the template's (§7.2).
+        contentWidth = explicitSum
+            + (colCount - specs.Count) * Math.Max(0, implicitSide.Value)
+            + gap * (colCount - 1);
 
         return true;
+    }
+
+    /// <summary>
+    /// The number of columns the real track pass would resolve for this grid: the
+    /// explicit template extended by every implicit column that auto-placement or a
+    /// definite <c>grid-column</c> generates, leading implicit tracks included. Runs
+    /// the same collection and placement that pass runs, so the two agree on the
+    /// count; declines (<c>false</c>) wherever it would, and for a row template this
+    /// size query cannot resolve — auto-placement flows through the rows, and a
+    /// <c>repeat(auto-fill, …)</c> row count needs a block size that is not
+    /// available while an inline size is still being computed.
+    /// </summary>
+    private bool TryCountGridIntrinsicColumns(int explicitCols, double em, out int colCount)
+    {
+        colCount = explicitCols;
+
+        var rowSpecs = ParseTrackList(GridTemplateRows, em);
+        if (rowSpecs == null && IsNoneOrEmptyTemplate(GridTemplateRows))
+            rowSpecs = [];
+
+        if (rowSpecs == null || rowSpecs.Count > MaxGridLine)
+            return false;
+
+        if (!TryCollectGridPlacements(explicitCols, rowSpecs.Count,
+                ParseLineNames(GridTemplateColumns), ParseLineNames(GridTemplateRows),
+                collectAbspos: false, out var placements, out _))
+            return false;
+
+        // Nothing placed: the explicit template is the whole axis, exactly as
+        // before. With no template either there are no tracks at all, so an
+        // item-less implicit-only grid keeps the content-based fallback.
+        if (placements.Count == 0)
+            return explicitCols > 0;
+
+        return TryPlaceGridItems(placements, explicitCols, rowSpecs.Count,
+                   out _, out _, out colCount, out _)
+               && colCount > 0;
     }
 
     /// <summary>
