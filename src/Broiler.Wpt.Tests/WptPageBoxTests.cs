@@ -373,6 +373,114 @@ public sealed class WptPageBoxTests
         Assert.Equal(10, box.MarginRight, 3);
     }
 
+    // ---- `auto` page margins ----------------------------------------------
+
+    // css-page-3 §3.2: with a `size` fixing the box and `width`/`height` fixing the area inside it,
+    // the margins absorb the difference — so `auto` centres the page area. page-margin-auto-print
+    // states exactly this page: 20em x 7em holding a 12em x 3em area.
+    [Fact]
+    public void An_Auto_Margin_Centres_The_Page_Area_In_Its_Box()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 20em 7em; width: 12em; height: 3em; margin: auto;"), DefaultBox);
+
+        Assert.Equal(new SizeF(320, 112), box.BoxSize);
+        Assert.Equal(new SizeF(192, 48), box.AreaSize);
+        Assert.Equal(64, box.MarginLeft, 3);
+        Assert.Equal(64, box.MarginRight, 3);
+        Assert.Equal(32, box.MarginTop, 3);
+        Assert.Equal(32, box.MarginBottom, 3);
+    }
+
+    // One `auto` beside a stated margin takes the whole remainder rather than half of it, which is
+    // how page-margin-auto-print's `@page bbb { margin-top: 0 }` pushes the area to the top.
+    [Theory]
+    [InlineData("margin: auto; margin-top: 0;", 0, 64)]
+    [InlineData("margin: auto; margin-bottom: 0;", 64, 0)]
+    public void A_Single_Auto_Takes_The_Whole_Remainder(string extra, float top, float bottom)
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 20em 7em; width: 12em; height: 3em;" + extra), DefaultBox);
+
+        Assert.Equal(top, box.MarginTop, 3);
+        Assert.Equal(bottom, box.MarginBottom, 3);
+    }
+
+    // The remainder is signed: an area larger than its box hangs off every edge rather than
+    // clamping to zero. page-margin-auto-negative-print states a 300px page with a 340px area and
+    // expects exactly -20 on each side.
+    [Fact]
+    public void An_Area_Larger_Than_Its_Box_Gives_Negative_Auto_Margins()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 300px; width: 340px; height: 340px; margin: auto;"), DefaultBox);
+
+        Assert.Equal(new SizeF(300, 300), box.BoxSize);
+        Assert.Equal(-20, box.MarginLeft, 3);
+        Assert.Equal(-20, box.MarginRight, 3);
+        Assert.Equal(-20, box.MarginTop, 3);
+        Assert.Equal(-20, box.MarginBottom, 3);
+        Assert.Equal(new SizeF(340, 340), box.AreaSize);
+    }
+
+    // With no area stated there is nothing for an `auto` margin to take, so it is zero — and the
+    // page keeps the size it declared rather than collapsing to it.
+    [Fact]
+    public void Auto_With_No_Stated_Area_Is_Zero()
+    {
+        var box = WptPageBox.Resolve(Page("size: 300px; margin: auto;"), DefaultBox);
+
+        Assert.Equal(new SizeF(300, 300), box.BoxSize);
+        Assert.Equal(0, box.MarginTop, 3);
+        Assert.Equal(0, box.MarginLeft, 3);
+    }
+
+    // With no `auto` on the axis the area plus its margins *is* the box, and a declared `size`
+    // gives way to it. page-size-013-print states this over-constrained resolution outright, and
+    // its reference spells the answer out: `size: 500px; margin: 50px; width: 200px; height: 300px`
+    // is the same page as `size: 300px 400px; margin: 50px`.
+    [Fact]
+    public void An_Over_Constrained_Axis_Resizes_The_Box_Around_Its_Area()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 500px; margin: 50px; width: 200px; height: 300px;"), DefaultBox);
+
+        Assert.Equal(new SizeF(300, 400), box.BoxSize);
+        Assert.Equal(new SizeF(200, 300), box.AreaSize);
+        Assert.Equal(50, box.MarginLeft, 3);
+    }
+
+    // `auto` inside the shorthand used to reject the whole declaration, leaving every margin at
+    // zero; it expands like any other component.
+    [Fact]
+    public void Auto_Expands_Through_The_Shorthand()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 20em 7em; width: 12em; height: 3em; margin: 10px auto;"), DefaultBox);
+
+        Assert.Equal(10, box.MarginTop, 3);
+        Assert.Equal(10, box.MarginBottom, 3);
+        Assert.Equal(64, box.MarginLeft, 3);
+        Assert.Equal(64, box.MarginRight, 3);
+    }
+
+    // A declared `size` survives a declared area only when an `auto` margin is there to absorb the
+    // difference — which is the one thing that separates page-margin-auto-print (keeps its 20em x
+    // 7em sheet) from page-size-013-print (resized to 300x400).
+    [Fact]
+    public void A_Declared_Size_Survives_A_Declared_Area_Only_Under_Auto()
+    {
+        Assert.Equal(
+            new SizeF(320, 112),
+            WptPageBox.Resolve(
+                Page("size: 20em 7em; width: 12em; height: 3em; margin: auto;"), DefaultBox).BoxSize);
+
+        Assert.Equal(
+            new SizeF(192, 48),
+            WptPageBox.Resolve(
+                Page("size: 20em 7em; width: 12em; height: 3em; margin: 0;"), DefaultBox).BoxSize);
+    }
+
     [Theory]
     [InlineData("size: nonsense")]
     [InlineData("margin: nonsense")]

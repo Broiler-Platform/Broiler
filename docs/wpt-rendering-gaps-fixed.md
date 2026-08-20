@@ -2428,6 +2428,44 @@ test cannot be satisfied by a blank group). Swept over all 458 local
 
 Kept because they are right and covered, not because they moved a number.
 
+### `@page { margin: auto }` left every margin at zero
+
+- **Owner:** the WPT runner (`src/Broiler.Wpt/WptPageBox.cs`). Main repo.
+- **The bug.** `auto` is a value of the margin property, and `TryParseMarginShorthand` read it as
+  a failure to parse: any `auto` component rejected the *whole* shorthand, so
+  `@page { margin: auto }` left all four margins at zero and the page area was never centred. The
+  longhands did the same. Alongside it, a page that declared both `size` and `width`/`height`
+  always had its box recomputed as area-plus-margins, which is right when the margins are stated
+  and wrong when they are `auto` — that is the case where the box is the thing being centred *in*.
+- **What landed:** `SettleAxis` resolves each axis once every declaration has been seen. With no
+  `auto` on the axis the area plus its margins is the box, and a declared `size` gives way — the
+  over-constrained resolution. With an `auto` the box stands and the `auto` sides take the
+  remainder, halved between two of them or taken whole by one. The remainder is signed, so an area
+  larger than its box hangs off the edges instead of clamping.
+- **Three tests state the three cases, and their references spell out the answers:**
+  `page-size-013-print` (over-constrained: `size: 500px; margin: 50px; width: 200px; height: 300px`
+  against a reference of `size: 300px 400px; margin: 50px`), `page-margin-auto-print` (a 20em × 7em
+  page centring a 12em × 3em area under 64/32px margins), and
+  `page-margin-auto-negative-print.tentative` (a 300px page with a 340px area, hanging 20px off
+  every edge).
+- **It closes none of them, and the reason is worth knowing.** The unpaginated render consults the
+  page box only when the `@page` *paints* — `WptTestRunner` takes the decorated path on a
+  background, border or padding and otherwise renders straight onto the viewport — and not one of
+  the `page-margin-*` tests paints anything. They are all gated on
+  [rendering at the declared page box](wpt-rendering-gaps-open.md#a--print-document-renders-on-the-viewport-not-on-the-page-it-declares)
+  instead, and `page-margin-auto-print` and `-auto-and-non-zero-print` additionally need six page
+  boxes at once, which one surface cannot carry.
+- **The paged path did catch a wrong first attempt,** which is the argument for keeping this
+  covered. Resolving the over-constrained case as "declared margins stand, `size` wins" dropped
+  `page-size-013-print` under `BROILER_WPT_PAGED_PRINT=1` (127 → 126 passing); that test's own
+  reference is what settled the rule. With the corrected rule the paged run goes 72.97% → **73.24%**
+  average at an unchanged 127 of 224, and the default unpaginated run is byte-identical
+  test-for-test.
+- **Verified:** eight focused tests in `WptPageBoxTests` pin centring, one `auto` taking the whole
+  remainder, negative remainders, `auto` with no stated area, the over-constrained resize, `auto`
+  expanding through the shorthand, and the single thing that separates `size`-stands from
+  `size`-gives-way.
+
 ### A scroll past the end did not stop at the end
 
 - CSSOM View §"scroll an element" normalizes the requested position to the scrolling box's

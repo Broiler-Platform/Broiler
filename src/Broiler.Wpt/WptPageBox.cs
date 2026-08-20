@@ -49,6 +49,15 @@ internal readonly record struct WptPageBox(
         Math.Max(1, BoxSize.Width - MarginLeft - MarginRight),
         Math.Max(1, BoxSize.Height - MarginTop - MarginBottom));
 
+    /// <summary>The margin on one physical <paramref name="side"/>.</summary>
+    internal float Margin(WptPageSide side) => side switch
+    {
+        WptPageSide.Top => MarginTop,
+        WptPageSide.Right => MarginRight,
+        WptPageSide.Bottom => MarginBottom,
+        _ => MarginLeft,
+    };
+
     /// <summary>This box with the margin on one physical <paramref name="side"/> replaced.</summary>
     internal WptPageBox WithMargin(WptPageSide side, float margin) => side switch
     {
@@ -74,6 +83,12 @@ internal readonly record struct WptPageBox(
         double? areaWidth = null, areaHeight = null;
         var axes = WptPageAxes.Resolve(html);
 
+        // `auto` is a margin value, not an unparseable one, and the difference decides the page
+        // box: an auto margin takes whatever the page area leaves over, so it cannot be resolved
+        // until `size`, `width` and `height` have all been seen. Which sides are auto is tracked
+        // here and settled after the loop.
+        var auto = new AutoMargins();
+
         foreach (var (declarations, _) in EnumerateAppliedPageBlocks(html))
         {
             double fontSize = FontSizeOf(declarations.Declarations.ToList());
@@ -95,8 +110,10 @@ internal readonly record struct WptPageBox(
                         ? box.BoxSize.Height
                         : box.BoxSize.Width;
 
-                    if (TryParseLength(value, basis, fontSize, out var logical))
-                        box = box.WithMargin(side, logical);
+                    if (IsAuto(value))
+                        auto = auto.With(side, true).Also(ref box, side, 0);
+                    else if (TryParseLength(value, basis, fontSize, out var logical))
+                        auto = auto.With(side, false).Also(ref box, side, logical);
                     continue;
                 }
 
@@ -118,36 +135,33 @@ internal readonly record struct WptPageBox(
                         break;
                     case "margin":
                         if (TryParseMarginShorthand(value, box.BoxSize, fontSize, out var m))
+                        {
                             box = box with
                             {
                                 MarginTop = m.Top, MarginRight = m.Right,
                                 MarginBottom = m.Bottom, MarginLeft = m.Left,
                             };
+                            auto = m.Auto;
+                        }
                         break;
                     case "margin-top":
-                        if (TryParseLength(value, box.BoxSize.Height, fontSize, out var mt))
-                            box = box with { MarginTop = mt };
+                        auto = ParseSide(value, WptPageSide.Top, box.BoxSize.Height, fontSize, auto, ref box);
                         break;
                     case "margin-right":
-                        if (TryParseLength(value, box.BoxSize.Width, fontSize, out var mr))
-                            box = box with { MarginRight = mr };
+                        auto = ParseSide(value, WptPageSide.Right, box.BoxSize.Width, fontSize, auto, ref box);
                         break;
                     case "margin-bottom":
-                        if (TryParseLength(value, box.BoxSize.Height, fontSize, out var mb))
-                            box = box with { MarginBottom = mb };
+                        auto = ParseSide(value, WptPageSide.Bottom, box.BoxSize.Height, fontSize, auto, ref box);
                         break;
                     case "margin-left":
-                        if (TryParseLength(value, box.BoxSize.Width, fontSize, out var ml))
-                            box = box with { MarginLeft = ml };
+                        auto = ParseSide(value, WptPageSide.Left, box.BoxSize.Width, fontSize, auto, ref box);
                         break;
                 }
             }
         }
 
-        if (areaWidth is { } aw)
-            box = box with { BoxSize = new SizeF((float)(aw + box.MarginLeft + box.MarginRight), box.BoxSize.Height) };
-        if (areaHeight is { } ah)
-            box = box with { BoxSize = new SizeF(box.BoxSize.Width, (float)(ah + box.MarginTop + box.MarginBottom)) };
+        box = SettleAxis(box, areaWidth, auto, horizontal: true);
+        box = SettleAxis(box, areaHeight, auto, horizontal: false);
 
         return box;
     }
@@ -303,6 +317,127 @@ internal readonly record struct WptPageBox(
         System.Text.RegularExpressions.RegexOptions.IgnoreCase
             | System.Text.RegularExpressions.RegexOptions.Compiled);
 
+    /// <summary>Which of the page box's four margins were declared <c>auto</c>.</summary>
+    private readonly record struct AutoMargins(bool Top, bool Right, bool Bottom, bool Left)
+    {
+        internal AutoMargins With(WptPageSide side, bool value) => side switch
+        {
+            WptPageSide.Top => this with { Top = value },
+            WptPageSide.Right => this with { Right = value },
+            WptPageSide.Bottom => this with { Bottom = value },
+            _ => this with { Left = value },
+        };
+
+        internal bool On(WptPageSide side) => side switch
+        {
+            WptPageSide.Top => Top,
+            WptPageSide.Right => Right,
+            WptPageSide.Bottom => Bottom,
+            _ => Left,
+        };
+
+        /// <summary>Sets <paramref name="box"/>'s margin as well, so a caller states both at once.</summary>
+        internal AutoMargins Also(ref WptPageBox box, WptPageSide side, float margin)
+        {
+            box = box.WithMargin(side, margin);
+            return this;
+        }
+    }
+
+    /// <summary>CSS Paged Media 3 §3.2's <c>auto</c>, which is a margin value rather than a length.</summary>
+    private static bool IsAuto(string value) =>
+        value.Equals("auto", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Reads one physical margin longhand into <paramref name="box"/>, recording whether it was
+    /// <c>auto</c>. A value that is neither <c>auto</c> nor a length leaves both untouched.
+    /// </summary>
+    private static AutoMargins ParseSide(
+        string value, WptPageSide side, float percentBasis, double fontSize,
+        AutoMargins auto, ref WptPageBox box)
+    {
+        if (IsAuto(value))
+            return auto.With(side, true).Also(ref box, side, 0);
+
+        return TryParseLength(value, percentBasis, fontSize, out var length)
+            ? auto.With(side, false).Also(ref box, side, length)
+            : auto;
+    }
+
+    /// <summary>
+    /// Settles one axis of the page box once every declaration has been seen: what the page area
+    /// leaves over goes to the <c>auto</c> margins on that axis.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>width</c>/<c>height</c> size the page <em>area</em>, and what happens to the box around it
+    /// turns on whether a margin on that axis is <c>auto</c>.
+    /// </para>
+    /// <para>
+    /// <b>No <c>auto</c> margin:</b> the area plus its margins <em>is</em> the box, and a declared
+    /// <c>size</c> gives way to it. That is the over-constrained resolution
+    /// <c>page-size-013-print</c> states outright — <c>size: 500px; margin: 50px; width: 200px;
+    /// height: 300px</c> against a reference of <c>size: 300px 400px; margin: 50px</c> — and it is
+    /// also how <c>margin-boxes/dimensions-011</c> writes one page two ways
+    /// (<c>width: 20em; height: 16em; margin: 6em</c> = <c>size: 32em 28em; margin: 0</c>).
+    /// </para>
+    /// <para>
+    /// <b>An <c>auto</c> margin:</b> the box stands and the <c>auto</c> sides take what is left
+    /// over, which is what makes <c>auto</c> centre the page area.
+    /// <c>page-margin-auto-print</c> states it: a 20em × 7em page holding a 12em × 3em area
+    /// centres it under 64px side and 32px block margins. One <c>auto</c> beside a stated margin
+    /// takes the whole remainder rather than half, which is how that test's
+    /// <c>@page bbb { margin-top: 0 }</c> pushes the area to the top.
+    /// </para>
+    /// <para>
+    /// The remainder is signed. An area larger than its box gives a negative one and the margins go
+    /// negative with it rather than clamping: <c>page-margin-auto-negative-print</c> states a 300px
+    /// page with a 340px area and expects it to hang 20px off every edge.
+    /// </para>
+    /// <para>
+    /// With no <c>width</c>/<c>height</c> at all there is nothing to centre, so an <c>auto</c>
+    /// margin stays the zero it was recorded as and the box keeps the size it declared.
+    /// </para>
+    /// </remarks>
+    private static WptPageBox SettleAxis(
+        WptPageBox box, double? areaSize, AutoMargins auto, bool horizontal)
+    {
+        if (areaSize is not { } areaExtent)
+            return box;
+
+        var (start, end) = horizontal
+            ? (WptPageSide.Left, WptPageSide.Right)
+            : (WptPageSide.Top, WptPageSide.Bottom);
+
+        float area = (float)areaExtent;
+        float startMargin = box.Margin(start);
+        float endMargin = box.Margin(end);
+        bool autoStart = auto.On(start), autoEnd = auto.On(end);
+
+        if (!autoStart && !autoEnd)
+        {
+            float extent = area + startMargin + endMargin;
+            return box with
+            {
+                BoxSize = horizontal
+                    ? new SizeF(extent, box.BoxSize.Height)
+                    : new SizeF(box.BoxSize.Width, extent),
+            };
+        }
+
+        float boxExtent = horizontal ? box.BoxSize.Width : box.BoxSize.Height;
+        float remainder = boxExtent - area
+            - (autoStart ? 0 : startMargin)
+            - (autoEnd ? 0 : endMargin);
+
+        if (autoStart && autoEnd)
+            return box.WithMargin(start, remainder / 2).WithMargin(end, remainder / 2);
+
+        return autoStart
+            ? box.WithMargin(start, remainder)
+            : box.WithMargin(end, remainder);
+    }
+
     /// <summary>
     /// Whether <paramref name="name"/> is one of the four flow-relative margin longhands, and which
     /// axis and end it names. The <c>margin-block</c> and <c>margin-inline</c> shorthands are not
@@ -403,7 +538,8 @@ internal readonly record struct WptPageBox(
         return true;
     }
 
-    private readonly record struct Margins(float Top, float Right, float Bottom, float Left);
+    private readonly record struct Margins(
+        float Top, float Right, float Bottom, float Left, AutoMargins Auto);
 
     /// <summary>The <c>margin</c> shorthand: one to four lengths, in the usual TRBL order.</summary>
     private static bool TryParseMarginShorthand(string value, SizeF boxSize, double fontSize, out Margins margins)
@@ -415,8 +551,18 @@ internal readonly record struct WptPageBox(
             return false;
 
         var parsed = new float[tokens.Length];
+        var isAuto = new bool[tokens.Length];
         for (int i = 0; i < tokens.Length; i++)
         {
+            // `auto` is a value of the property, not a failure to parse it. Reading it as one used
+            // to reject the whole shorthand, so `@page { margin: auto }` left every margin at zero
+            // and the page area was never centred.
+            if (IsAuto(tokens[i]))
+            {
+                isAuto[i] = true;
+                continue;
+            }
+
             // Percentages on the block-axis margins resolve against the page width, as elsewhere in
             // CSS; the axis only matters for a percentage, and using width for all of them is the
             // rule rather than a shortcut.
@@ -424,13 +570,18 @@ internal readonly record struct WptPageBox(
                 return false;
         }
 
-        margins = parsed.Length switch
+        // The usual one-to-four expansion, applied to the values and their auto flags alike.
+        (int top, int right, int bottom, int left) = parsed.Length switch
         {
-            1 => new Margins(parsed[0], parsed[0], parsed[0], parsed[0]),
-            2 => new Margins(parsed[0], parsed[1], parsed[0], parsed[1]),
-            3 => new Margins(parsed[0], parsed[1], parsed[2], parsed[1]),
-            _ => new Margins(parsed[0], parsed[1], parsed[2], parsed[3]),
+            1 => (0, 0, 0, 0),
+            2 => (0, 1, 0, 1),
+            3 => (0, 1, 2, 1),
+            _ => (0, 1, 2, 3),
         };
+
+        margins = new Margins(
+            parsed[top], parsed[right], parsed[bottom], parsed[left],
+            new AutoMargins(isAuto[top], isAuto[right], isAuto[bottom], isAuto[left]));
         return true;
     }
 

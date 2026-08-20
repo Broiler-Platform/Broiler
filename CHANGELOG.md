@@ -214,6 +214,22 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` — `@page { margin: auto }` centres the page area instead of
+  leaving every margin at zero. `auto` is a value of the margin property and the
+  shorthand parser read it as a failure to parse, rejecting the whole
+  declaration; the longhands did the same. Resolution now happens once per axis
+  after every declaration is seen: with no `auto` the area plus its margins is
+  the box and a declared `size` gives way (the over-constrained case
+  `page-size-013-print` states, its reference writing the same page as
+  `size: 300px 400px; margin: 50px`), and with an `auto` the box stands while the
+  `auto` sides take the remainder — halved between two, taken whole by one, and
+  signed, so an area larger than its box hangs off the edges rather than
+  clamping. This closes no reftest: the unpaginated render consults the page box
+  only when the `@page` paints, and none of the `page-margin-*` tests do. Under
+  `BROILER_WPT_PAGED_PRINT=1`, which does use it, `css/css-page` goes 72.97% →
+  73.24% average at an unchanged 127 of 224 passing, and the default run is
+  byte-identical test-for-test.
+
 - `Broiler.CSS` (**pending patch**, `patches/0002`) — a media query can tell it
   is being printed. `EvaluateMediaType` matched `screen` and `all`
   unconditionally, so `@media print` never applied to a document being printed,
