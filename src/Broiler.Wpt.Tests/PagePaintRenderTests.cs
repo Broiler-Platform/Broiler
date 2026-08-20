@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.IO;
 using Broiler.HTML.Image;
 using Xunit;
@@ -139,12 +140,12 @@ public sealed class PagePaintRenderTests : IDisposable
     [InlineData("@page { padding: 1px; }", true)]
     [InlineData("@page :first { background: yellow; }", false)]
     public void A_Page_Is_Decorated_Only_When_It_Paints(string css, bool decorated) =>
-        Assert.Equal(decorated, WptPageDecoration.Resolve("<style>" + css + "</style>") is not null);
+        Assert.Equal(decorated, Decoration("<style>" + css + "</style>") is not null);
 
     [Fact]
     public void Later_Declarations_Win_And_Land_On_The_Box_They_Belong_To()
     {
-        var decoration = WptPageDecoration.Resolve(
+        var decoration = Decoration(
             "<style>@page { background: red; border: 1px solid; }</style>"
             + "<style>@page { background: green; }</style>");
 
@@ -159,11 +160,62 @@ public sealed class PagePaintRenderTests : IDisposable
     [Fact]
     public void A_Border_Radius_Alone_Insets_Nothing()
     {
-        var decoration = WptPageDecoration.Resolve("<style>@page { border-radius: 4px; }</style>");
+        var decoration = Decoration("<style>@page { border-radius: 4px; }</style>");
 
         Assert.NotNull(decoration);
         Assert.False(decoration!.HasInsets);
     }
+
+    // The probe the decoration renders on is horizontal-tb and its containing block is not the
+    // page, so neither the axis mapping nor the percentage basis of a flow-relative padding can be
+    // left to it. page-box-008-print and -009-print both expect a 16/32/48/80 ring on a 400x800
+    // page from 2/8/6/20 %, and state the writing mode in different places.
+    [Theory]
+    [InlineData(":root { writing-mode: vertical-rl; }", "")]
+    [InlineData("", "writing-mode: vertical-rl;")]
+    public void Logical_Padding_Becomes_The_Physical_Longhand_It_Means(string rootCss, string pageCss)
+    {
+        var decoration = Decoration(
+            "<style>" + rootCss + "@page { " + pageCss + "size: 400px 800px;"
+            + "padding-inline-start: 2%; padding-block-start: 8%;"
+            + "padding-inline-end: 6%; padding-block-end: 20%; }</style>");
+
+        Assert.NotNull(decoration);
+        Assert.Equal(
+            "padding-top:16px;padding-right:32px;padding-bottom:48px;padding-left:80px;",
+            decoration!.BoxCss);
+        Assert.True(decoration.HasInsets);
+    }
+
+    // A percentage is taken against the page box, not the box the page's margins leave: the ring
+    // above is 2 % of 800 even though the border box is only 736 tall.
+    [Fact]
+    public void Logical_Padding_Percentages_Resolve_Against_The_Whole_Page_Box()
+    {
+        var decoration = Decoration(
+            "<style>@page { size: 400px 800px; margin: 100px; padding-block-start: 10%; }</style>");
+
+        Assert.Equal("padding-top:80px;", decoration!.BoxCss);
+    }
+
+    // Physical and flow-relative padding are both longhands, so the later one wins wherever they
+    // name the same side.
+    [Fact]
+    public void Logical_Padding_Cascades_With_The_Physical_Longhand()
+    {
+        var decoration = Decoration(
+            "<style>@page { padding-top: 1px; padding-block-start: 2px; }</style>");
+
+        Assert.Equal("padding-top:2px;", decoration!.BoxCss);
+    }
+
+    /// <summary>
+    /// The decoration a document declares, resolved against its own page box the way
+    /// <c>WptTestRunner</c> resolves it — the box is what a flow-relative padding's percentage
+    /// needs.
+    /// </summary>
+    private static WptPageDecoration? Decoration(string html) =>
+        WptPageDecoration.Resolve(html, WptPageBox.Resolve(html, new SizeF(800, 600)));
 
     private static void AssertColor(BBitmap bitmap, int x, int y, int r, int g, int b)
     {

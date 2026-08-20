@@ -198,6 +198,90 @@ public sealed class WptPageBoxTests
         Assert.Equal(new SizeF(320, 256), box.AreaSize);
     }
 
+    // ---- flow-relative margins ----
+
+    // css-page-3 §3.2 lets the page box carry the flow-relative margins, and the two tests that
+    // state them disagree on purpose about where the writing mode comes from: page-box-008-print
+    // puts `vertical-rl` on the root element, page-box-009-print puts it on the `@page` rule. Both
+    // expect the same 16/32/48/80 ring on a 400x800 page from 2/8/6/20 %, which is each percentage
+    // taken against the dimension its physical side runs along.
+    [Theory]
+    [InlineData(":root { writing-mode: vertical-rl; }", "")]
+    [InlineData("", "writing-mode: vertical-rl;")]
+    public void Logical_Margins_Resolve_Through_The_Pages_Writing_Mode(string rootCss, string pageCss)
+    {
+        var html = "<!DOCTYPE html><html><head><style>" + rootCss + "@page { " + pageCss
+            + "size: 400px 800px;"
+            + "margin-inline-start: 2%; margin-block-start: 8%;"
+            + "margin-inline-end: 6%; margin-block-end: 20%; }"
+            + "</style></head><body></body></html>";
+
+        var box = WptPageBox.Resolve(html, DefaultBox);
+
+        Assert.Equal(16, box.MarginTop, 3);      // inline-start, 2 % of the 800px height
+        Assert.Equal(32, box.MarginRight, 3);    // block-start,  8 % of the 400px width
+        Assert.Equal(48, box.MarginBottom, 3);   // inline-end,   6 % of the height
+        Assert.Equal(80, box.MarginLeft, 3);     // block-end,   20 % of the width
+    }
+
+    // The initial axes map block to vertical and inline to horizontal, so a document that states no
+    // writing mode reads the flow-relative names as the physical ones they coincide with.
+    [Fact]
+    public void Logical_Margins_On_The_Initial_Axes_Are_The_Physical_Ones()
+    {
+        var box = WptPageBox.Resolve(
+            Page("margin-block-start: 1px; margin-block-end: 2px;"
+                + "margin-inline-start: 3px; margin-inline-end: 4px;"),
+            DefaultBox);
+
+        Assert.Equal(1, box.MarginTop, 3);
+        Assert.Equal(2, box.MarginBottom, 3);
+        Assert.Equal(3, box.MarginLeft, 3);
+        Assert.Equal(4, box.MarginRight, 3);
+    }
+
+    // `direction: rtl` reverses the inline axis and leaves the block axis alone.
+    [Fact]
+    public void Rtl_Swaps_The_Inline_Sides()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "html { direction: rtl; }"
+            + "@page { margin-inline-start: 3px; margin-block-start: 1px; }"
+            + "</style></head><body></body></html>";
+
+        var box = WptPageBox.Resolve(html, DefaultBox);
+
+        Assert.Equal(3, box.MarginRight, 3);
+        Assert.Equal(1, box.MarginTop, 3);
+    }
+
+    // A writing mode further down the tree styles a box inside the page, not the page.
+    [Fact]
+    public void Only_The_Root_Elements_Writing_Mode_Turns_The_Page()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "body { writing-mode: vertical-rl; }"
+            + "@page { margin-block-start: 7px; }"
+            + "</style></head><body></body></html>";
+
+        Assert.Equal(7, WptPageBox.Resolve(html, DefaultBox).MarginTop, 3);
+    }
+
+    // A flow-relative longhand is a longhand: it overrides the shorthand it follows, and is
+    // overridden by the physical longhand that follows it.
+    [Fact]
+    public void Logical_And_Physical_Margins_Cascade_In_Source_Order()
+    {
+        var box = WptPageBox.Resolve(
+            Page("margin: 10px; margin-block-start: 20px; margin-inline-start: 30px;"
+                + "margin-left: 40px;"),
+            DefaultBox);
+
+        Assert.Equal(20, box.MarginTop, 3);
+        Assert.Equal(40, box.MarginLeft, 3);
+        Assert.Equal(10, box.MarginRight, 3);
+    }
+
     [Theory]
     [InlineData("size: nonsense")]
     [InlineData("margin: nonsense")]

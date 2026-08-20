@@ -250,6 +250,30 @@ golden suite never looks at a passing test's own reference.
   [won't fix](wpt-rendering-gaps-wont-fix.md#two-fall-through-the-99-gate). Chasing
   byte-compatibility on a dropped declaration is not the same as implementing
   subgrid.
+- **The reftest suite has since made that call urgent, and put a number on both
+  sides of it.** `grid-lanes` is no longer three subgrid stragglers: it is **500 of
+  the 2 998 failures** in the
+  [#1726 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1726) —
+  one failure in six, the largest single cause in the suite, and twelve of that
+  run's top thirty. It has to be that large, because the suite's references
+  *implement* the feature by hand (`column-align-items-001-ref` builds the lanes
+  out of a `display: grid` of flex columns), so dropping the declaration fails them
+  by construction. Measured locally on 2026-08-20, `css-grid/grid-lanes/alignment`
+  is 9 passed / 114 failed out of 123.
+- **And implementing it would cost more than it wins, on the suite the project
+  scores itself by.** The checkout carries 870 `grid-lanes` tests with a
+  `rel=match` and 976 candidate documents overall; the golden-image manifest lists
+  **193** `grid-lanes` failures, so on the order of 780 currently do *not* fail it
+  — they match Chromium's pixels precisely because Chromium drops the declaration
+  too and both engines render the identical fallback. Shipping `grid-lanes` trades
+  up to 500 reftest wins for most of those. (The manifest records failures only, so
+  that 780 includes any skips; treat it as an upper bound on what is at risk, not
+  an exact count.)
+- **Do not flip this as a side effect of anything else.** The rejection is stated
+  in three places — `Broiler.Layout/Engine/CssUtils.cs`,
+  `Broiler.CSS.Dom/CssStyleEngine.Values.cs`, and this entry — and the two suites
+  genuinely want opposite behaviour. What is needed is a decision about which suite
+  governs an unshipped draft feature, not a patch.
 
 ### A subgrid does not resolve `repeat(auto-fill, <line-names>)`
 
@@ -908,6 +932,40 @@ Worth separating from the rest, because the test itself may be at fault:
   path. "page-margin" in the name means the page's margin, not a margin box.
 - **Exit gate:** the four `body-background-*-print` tests match, and a horizontal-writing-mode
   paged test does not move.
+
+### A `-print` document renders on the viewport, not on the page it declares
+
+- **Tests:** the whole `-print` corpus, but the two that isolate it are
+  `css-page/page-box-008-print` (`rel=match` **6.7%**) and `page-box-009-print`
+  (**79.8%**) — measured 2026-08-20, after
+  [the flow-relative page insets fix](wpt-rendering-gaps-fixed.md#the-page-box-dropped-its-flow-relative-margins-and-padding),
+  which resolved their margin and padding rings correctly and still left them here.
+- **Owner:** the WPT runner (`src/Broiler.Wpt/WptTestRunner.cs`). Main repo.
+- **Root cause.** The unpaginated path — the default for every `-print` reftest —
+  reads the `@page`'s *margins* from the rule but throws its `size` away, keeping
+  the runner's 1024×768 viewport as the sheet. Both tests declare `size: 400px
+  800px` and both references spell their expected geometry out in absolute pixels,
+  so the rings land at the right widths on a sheet of the wrong size and the
+  content inside them is laid out against the wrong page area.
+- **The obvious fix is measurably wrong, which is the point of this entry.**
+  Honouring the declared box for every `-print` document — rendering the flow into
+  the page area and compositing onto a sheet of the declared size — was tried on
+  2026-08-20 and **regressed** the suite: `css/css-page` 140 → 128 passed,
+  `css/css-break` 107 → 104. The reason is asymmetry, not the geometry. A reference
+  such as `page-box-008-print-ref` declares the same `size` but paints nothing on
+  the sheet, so it takes the undecorated path and keeps the viewport; resizing only
+  the side that carries a decoration resizes one half of the comparison. This is
+  the same trap the existing code comment warns about.
+- **So the exit is pagination, not a sheet size.** The sheet can only be the
+  declared page once *both* sides of a comparison are laid out against it, which
+  means the paged path — and that path is off by default because it currently
+  scores worse (`css/css-page` 140 → 125 passed with `BROILER_WPT_PAGED_PRINT=1`,
+  measured the same day). It shares a root cause with
+  [the physical-Y-axis pagination entry](#pagination-runs-along-the-physical-y-axis-only)
+  above: fix the block-axis abstraction there first, then re-measure the paged lever
+  before touching the sheet size here.
+- **Exit gate:** `page-box-008-print` and `-009-print` match, and the unpaginated
+  `-print` corpus does not lose a test.
 
 ## Transforms
 

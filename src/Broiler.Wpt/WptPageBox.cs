@@ -46,6 +46,15 @@ internal readonly record struct WptPageBox(
         Math.Max(1, BoxSize.Width - MarginLeft - MarginRight),
         Math.Max(1, BoxSize.Height - MarginTop - MarginBottom));
 
+    /// <summary>This box with the margin on one physical <paramref name="side"/> replaced.</summary>
+    internal WptPageBox WithMargin(WptPageSide side, float margin) => side switch
+    {
+        WptPageSide.Top => this with { MarginTop = margin },
+        WptPageSide.Right => this with { MarginRight = margin },
+        WptPageSide.Bottom => this with { MarginBottom = margin },
+        _ => this with { MarginLeft = margin },
+    };
+
     /// <summary>
     /// Resolves the page box for <paramref name="html"/>, starting from a default box of
     /// <paramref name="defaultBoxSize"/> with no margins.
@@ -60,6 +69,7 @@ internal readonly record struct WptPageBox(
     {
         var box = new WptPageBox(defaultBoxSize, 0, 0, 0, 0);
         double? areaWidth = null, areaHeight = null;
+        var axes = WptPageAxes.Resolve(html);
 
         foreach (var (declarations, _) in EnumerateUnconditionalPageBlocks(html))
         {
@@ -68,7 +78,26 @@ internal readonly record struct WptPageBox(
             foreach (var declaration in declarations.Declarations)
             {
                 var value = declaration.Value.Text.Trim();
-                switch (declaration.Name.ToLowerInvariant())
+                var name = declaration.Name.ToLowerInvariant();
+
+                // The flow-relative margins name a physical side through the page's own axes, and
+                // then behave exactly like the physical longhand they resolved to — percentage
+                // included. `page-box-008-print` and `-009-print` state the same 16/32/48/80 ring
+                // from `margin-inline-start: 2%` and friends on a 400×800 page, which only comes out
+                // if each percentage is taken against the dimension its physical side runs along.
+                if (TryLogicalMargin(name, out bool inline, out bool start))
+                {
+                    var side = axes.Side(inline, start);
+                    float basis = side is WptPageSide.Top or WptPageSide.Bottom
+                        ? box.BoxSize.Height
+                        : box.BoxSize.Width;
+
+                    if (TryParseLength(value, basis, fontSize, out var logical))
+                        box = box.WithMargin(side, logical);
+                    continue;
+                }
+
+                switch (name)
                 {
                     // `width` and `height` size the page *area* — the box less its margins — the
                     // way they size any other box's content. margin-boxes/dimensions-011 states the
@@ -161,11 +190,31 @@ internal readonly record struct WptPageBox(
     }
 
     /// <summary>
+    /// Whether <paramref name="name"/> is one of the four flow-relative margin longhands, and which
+    /// axis and end it names. The <c>margin-block</c> and <c>margin-inline</c> shorthands are not
+    /// among them: they set two sides at once and no page test states one.
+    /// </summary>
+    private static bool TryLogicalMargin(string name, out bool inline, out bool start)
+    {
+        foreach (var (longhand, isInline, isStart) in WptPageAxes.LogicalLonghands("margin"))
+        {
+            if (!name.Equals(longhand, StringComparison.Ordinal))
+                continue;
+
+            (inline, start) = (isInline, isStart);
+            return true;
+        }
+
+        (inline, start) = (false, false);
+        return false;
+    }
+
+    /// <summary>
     /// The text of each <c>&lt;style&gt;</c> element in the markup. Deliberately a scan rather than
     /// a parse: this runs before the document is built, to decide the surface it will be rendered
     /// on, and a <c>@page</c> rule can only come from a style sheet the document carries.
     /// </summary>
-    private static IEnumerable<string> EnumerateStyleSources(string html)
+    internal static IEnumerable<string> EnumerateStyleSources(string html)
     {
         int index = 0;
         while (true)

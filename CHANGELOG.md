@@ -214,6 +214,27 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Wpt` — a `@page` rule's flow-relative margins and padding are read.
+  CSS Paged Media 3 §3.2 lets the page box carry `margin-inline-start` and its
+  seven siblings, and neither half of the runner's `@page` model understood them:
+  `WptPageBox` switched on the physical margin longhands alone, so a
+  flow-relative one left the margin at zero, and a flow-relative padding reached
+  the decoration probe — a bare `<div>` whose writing mode is the initial one and
+  whose containing block is not the page, so it resolved to the wrong side and
+  took its percentage against the wrong box. `WptPageAxes` now resolves the
+  page's writing mode — its own declaration where it makes one, the root
+  element's otherwise, which is exactly what `css-page/page-box-008-print` and
+  `-009-print` disagree about on purpose — and maps each flow-relative side to a
+  physical one, with percentages taken against the page-box dimension that side
+  runs along. The two tests go 4.0% → 6.7% and 67.0% → 79.8% against their own
+  references, `css/css-page` 87.86% → 87.93% average with 140 of 223 passing
+  either way, and `css/css-break` does not move: nothing regressed, and the
+  golden-image score for every affected test is unchanged. What still separates
+  them from their references is the sheet, not the ring — an unpaginated `-print`
+  render keeps the runner's viewport instead of the page the document declares;
+  see
+  [`docs/wpt-rendering-gaps-open.md`](docs/wpt-rendering-gaps-open.md#a--print-document-renders-on-the-viewport-not-on-the-page-it-declares).
+
 - A grid container is as wide as the columns it actually has. The shrink-to-fit inline size of
   a grid summed only the tracks named in `grid-template-columns`: implicit columns contributed
   nothing, `grid-auto-columns` was never consulted, and a grid with no template at all fell
