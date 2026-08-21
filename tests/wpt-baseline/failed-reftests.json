@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 1766,
+      "count": 1764,
       "examples": [
         "css/compositing/root-element-background-image-transparency-003.html",
         "css/css-align/abspos/align-self-static-position-003.html",
@@ -39,7 +39,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 307,
+      "count": 308,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-borders/corner-shape/corner-shape-backdrop-filter-overflow.html",
@@ -63,7 +63,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 228,
+      "count": 229,
       "examples": [
         "css/css-animations/animate-with-background-color-hsla-to-legacy-rgb.html",
         "css/css-backgrounds/background-size/vector/wide--cover--nonpercent-width-omitted-height-viewbox.html",
@@ -3807,7 +3807,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-break/widows-orphans-019.html",
@@ -20890,7 +20890,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "web-animations/animation-model/side-effects-of-animations-current.html",
