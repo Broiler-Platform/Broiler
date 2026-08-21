@@ -584,6 +584,59 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             Size = new SizeF((float)stfWidth, Size.Height);
         }
+        else if (!replacedSizeSettled
+            && (Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
+            && IsRenderedLegend)
+        {
+            // HTML §15.5.13: "If the computed value of 'inline-size' is 'auto', then the used
+            // value is the fit-content inline size." A rendered legend is blockified, but unlike
+            // an ordinary block child it does not stretch to the fieldset's content width — it
+            // shrink-wraps, and the fieldset's block-start border is then painted around it.
+            // Without this the legend filled the fieldset, so WPT's
+            // `the-fieldset-and-legend-elements/legend-block-position-centering` drew a
+            // fieldset-wide legend border where every engine draws a content-wide one.
+            EnsureDescendantWordsMeasured(g);
+
+            double ownPadBorder = ActualBorderLeftWidth + ActualBorderRightWidth
+                                + ActualPaddingLeft + ActualPaddingRight;
+
+            // Same framing as the intrinsic-keyword branch below: ComputeShrinkToFitWidth is a
+            // content-box width and GetMinMaxWidth a border-box one, so strip this box's own
+            // padding and border off the min side before combining the two.
+            double maxContent = ComputeShrinkToFitWidth();
+
+            GetMinMaxWidth(out double legendMinBorderBox, out _);
+
+            if (double.IsNaN(legendMinBorderBox))
+                legendMinBorderBox = 0;
+
+            if (double.IsNaN(maxContent))
+                maxContent = 0;
+
+            double legendMinContent = Math.Max(0, legendMinBorderBox - ownPadBorder);
+            double legendAvailable = Math.Max(0, width - ActualMarginLeft - ActualMarginRight - ownPadBorder);
+
+            double legendWidth = Math.Min(Math.Max(legendMinContent, legendAvailable), maxContent);
+
+            if (MaxWidth != "none" && !string.IsNullOrEmpty(MaxWidth))
+            {
+                double maxW = ResolveMaxWidthLength(width);
+
+                if (legendWidth > maxW)
+                    legendWidth = maxW;
+            }
+
+            if (MinWidth != "0" && !string.IsNullOrEmpty(MinWidth))
+            {
+                double minW = ResolveMinWidthLength(width);
+
+                if (legendWidth < minW)
+                    legendWidth = minW;
+            }
+
+            legendWidth += ownPadBorder;
+            Size = new SizeF((float)legendWidth, Size.Height);
+        }
         else if ((Width == CssConstants.Auto || string.IsNullOrEmpty(Width))
             && Float == CssConstants.None
             && Position != CssConstants.Absolute && Position != CssConstants.Fixed

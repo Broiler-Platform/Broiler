@@ -116,6 +116,47 @@ public sealed class FieldsetLegendRenderTests : IDisposable
         Assert.False(IsGreen(rendered, 100, 30), "but no taller than its maximum block size");
     }
 
+    // HTML §15.5.13: "If the computed value of 'inline-size' is 'auto', then the used value is the
+    // fit-content inline size." The rendered legend is blockified but does not stretch to the
+    // fieldset's content width the way an ordinary block child would.
+    [Fact(Timeout = 600000)]
+    public void A_Rendered_Legend_Shrink_Wraps_Rather_Than_Filling_The_Fieldset()
+    {
+        using var rendered = Render(
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "* { margin: 0; padding: 0; } body { background: #fff; }"
+            + "fieldset { border: 4px solid #008000; width: 300px; }"
+            + "legend { display: block; background: #000; }"
+            + "legend span { display: inline-block; width: 40px; height: 20px; }"
+            + "</style><fieldset><legend><span></span></legend></fieldset>");
+
+        // The legend's width is its own content's, not the fieldset's: it runs from the content
+        // edge (x=4) for 40px and no further.
+        Assert.True(IsBlack(rendered, 20, 8), "the legend is drawn at its content's width");
+        Assert.False(IsBlack(rendered, 200, 8), "and does not stretch across the fieldset");
+    }
+
+    // The legend belongs to the block-start border, not to the content, so it must not also be
+    // counted as a block in the fieldset's auto height — which left the fieldset a legend taller
+    // than every engine draws it (WPT legend-block-position-centering rendered a 100px-bordered
+    // fieldset 315px tall against a 218px reference).
+    [Fact(Timeout = 600000)]
+    public void A_Rendered_Legend_Is_Not_Counted_Twice_In_The_Auto_Height()
+    {
+        using var rendered = Render(
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "* { margin: 0; padding: 0; } body { background: #fff; }"
+            + "fieldset { border: 30px solid #008000; width: 300px; }"
+            + "legend { display: block; background: #000; width: 40px; height: 20px; }"
+            + "div { height: 20px; background: #0000ff; }"
+            + "</style><fieldset><legend></legend><div></div></fieldset>");
+
+        // Border 30 + content 20 + border 30 = 80: the bottom border runs 50..80, and nothing of
+        // the fieldset is drawn past it. The legend's 20px box is inside the border, not below it.
+        Assert.True(IsGreen(rendered, 200, 60), "the bottom border sits directly below the content");
+        Assert.False(IsGreen(rendered, 200, 85), "and the fieldset ends there");
+    }
+
     private static bool IsBlack(BBitmap bitmap, int x, int y) => IsColor(bitmap, x, y, 0, 0, 0);
 
     private static bool IsBlue(BBitmap bitmap, int x, int y) => IsColor(bitmap, x, y, 0, 0, 255);

@@ -295,7 +295,25 @@ set -euo pipefail
 # unit-tested in UnobservableIsolationGroupTests), and that half is narrower by construction: it
 # cannot reach a group opened for `opacity` or for a real `mix-blend-mode`. Only this patch keeps
 # those, and only the pixel suite can say the subtree reached the canvas.
+# That compositing-group patch landed upstream and its pointer is bumped, so it reaches CI through
+# the pointer and its file is gone with it — which emptied patches/ again and restarted the
+# numbering, so the 0001 below is a different change once more.
+#
+# 0001 (Broiler.JS, "Classify a private-name key by its marker and '#', not the marker alone") IS
+# listed, and for the widest reason anything here has been: without it WPT's testharness.js throws
+# while loading. It builds its escape map with `formatEscapeMap[String.fromCharCode(p)]`, and for
+# p = 1 that key begins with the private-name marker, which the classifier read as a private name
+# — so the write raised the brand-check TypeError and took the whole harness down with it. A
+# testharness test whose harness never loaded reports nothing at all and renders none of the
+# pass/fail table its reference shows, so this is not one element mispainted but every
+# testharness-based page in the corpus. Its unit tests pin the classification (StorageTests,
+# Issue693Tests); only a run of a real harness page can say the harness survives loading.
+#
+# NOTE: the WPT workflows do not run this script — only privacy-test-pages.yml and
+# real-world-render-tests.yml do — so the entry below serves those two. The WPT suite picks the
+# fix up when a maintainer lands it upstream and bumps the pointer.
 PENDING_PATCHES=(
+  "Broiler.JS|patches/0001-js-private-name-key-classification.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
