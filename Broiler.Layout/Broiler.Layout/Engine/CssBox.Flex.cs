@@ -598,6 +598,377 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         ActualBottom = Math.Max(ActualBottom, cursorY + ActualPaddingBottom + ActualBorderBottomWidth);
     }
 
+    private sealed class FlexColumnLine
+    {
+        public List<CssBox> Items { get; } = [];
+
+        /// <summary>Sum of the items' outer heights and the gaps between them.</summary>
+        public double MainSize { get; set; }
+
+        /// <summary>The line's extent across the inline axis.</summary>
+        public double CrossSize { get; set; }
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.3/§9.5/§9.6 for a <c>column</c> flex container: breaks its items into flex
+    /// lines along the main (block) axis, stacks those lines across the inline axis, and packs
+    /// each line from the direction's main-start — the block-<em>end</em> edge, for
+    /// <c>column-reverse</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A column container has no flex algorithm of its own here: its items stack through ordinary
+    /// block flow, one per line (the line-break-per-item path in <c>CssLayoutEngine</c>), and the
+    /// two passes that follow this one size and align that single stack. Neither of the two things
+    /// this pass exists for is expressible that way. <c>flex-wrap</c> in a column needs the stack
+    /// broken into several, which no post-pass over one line can do — so a wrapping column
+    /// container rendered every item in one full-width column that overflowed the container
+    /// (WPT css-flexbox/flex-lines/multi-line-wrap-with-column-reverse laid its six items out as
+    /// six stacked bands instead of three columns). And <c>column-reverse</c> reverses the main
+    /// axis, so its items are ordered bottom-to-top and packed from the block-end edge, which the
+    /// block flow that produced them cannot express at all — the keyword was parsed, recognised
+    /// everywhere it selects the column path, and then laid out exactly like <c>column</c>.
+    /// </para>
+    /// <para>
+    /// Returns <see langword="false"/> — leaving the existing single-line passes to run — for the
+    /// case they already handle: one line in ordinary <c>column</c> order. So this changes nothing
+    /// about a container that does not wrap and does not reverse, which is nearly all of them.
+    /// </para>
+    /// <para>
+    /// Line breaking needs a definite main size to break against (§9.3), so a column container
+    /// whose <c>height</c> is <c>auto</c> keeps everything on one line however it is wrapped —
+    /// its main size is what its content adds up to, and nothing can overflow it.
+    /// </para>
+    /// </remarks>
+    private bool PerformFlexColumnLineLayout(ILayoutEnvironment g)
+    {
+        if (!IsFlexContainer() || IsRowFlexContainer())
+            return false;
+
+        // `column` names the *block* axis, so under a vertical writing mode the main axis is
+        // horizontal and the cross axis vertical — the opposite of every axis this pass reads.
+        // The single-line passes it would displace make the same horizontal assumption, so
+        // declining here leaves a vertical container exactly as it was rather than transposed
+        // (WPT css-flexbox/gap-003-lr and -rl are `vertical-lr`/`-rl` column containers).
+        if (IsVerticalWritingMode(WritingMode))
+            return false;
+
+        double contentWidth = Math.Max(0, Size.Width
+            - ActualBorderLeftWidth - ActualBorderRightWidth
+            - ActualPaddingLeft - ActualPaddingRight);
+
+        if (contentWidth <= 0)
+            return false;
+
+        var items = new List<CssBox>();
+
+        foreach (var child in Boxes)
+        {
+            if (!IsInFlowFlexItem(child) || IsCollapsibleWhitespaceItem(child))
+                continue;
+
+            items.Add(child);
+        }
+
+        if (items.Count == 0)
+            return false;
+
+        bool reverse = string.Equals(FlexDirection?.Trim(), "column-reverse", StringComparison.OrdinalIgnoreCase);
+        bool wrap = FlexWrap is "wrap" or "wrap-reverse";
+        double? definiteMain = TryGetDefiniteMainAxisContentHeight();
+        double rowGap = ResolveFlexGap(RowGap, definiteMain ?? 0);
+        double columnGap = ResolveFlexGap(ColumnGap, contentWidth);
+
+        var lines = CollectFlexColumnLines(items, wrap ? definiteMain : null, rowGap);
+
+        if (lines.Count == 1 && !reverse)
+            return false;
+
+        using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Flex);
+
+        ResolveFlexColumnLineCrossSizes(lines, contentWidth, columnGap, out double lineOffset, out double lineGap);
+
+        // `wrap-reverse` flips the cross axis, so the first line is placed at the cross-end.
+        if (FlexWrap == "wrap-reverse")
+            lines.Reverse();
+
+        double cursorX = ClientLeft + lineOffset;
+        double usedMain = 0;
+
+        foreach (var line in lines)
+        {
+            // Each line is laid out against the container's own main size when that is definite;
+            // that is the size the lines were broken against, and what an item's `flex-grow` share
+            // and `justify-content`'s free space are measured from.
+            double lineMain = definiteMain ?? line.MainSize;
+
+            ResolveFlexColumnLineItemSizes(g, line, lineMain, rowGap);
+            PlaceFlexColumnLineItems(line, lineMain, rowGap, cursorX, reverse);
+
+            usedMain = Math.Max(usedMain, Math.Min(lineMain, line.MainSize));
+            cursorX += line.CrossSize + lineGap;
+        }
+
+        // This pass owns the container's in-flow content extent now: without this the block flow's
+        // one-item-per-line stack would still be the height reported, which for a wrapped
+        // container is every line's content added up rather than the tallest line's.
+        ActualBottom = ClientTop + usedMain + ActualPaddingBottom + ActualBorderBottomWidth;
+        return true;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.3 step 5: collects the items into flex lines, breaking before an item that
+    /// would not fit in the main size still available on the current line.
+    /// </summary>
+    /// <param name="mainLimit">
+    /// The definite main size to break against, or <c>null</c> for a single-line container — which
+    /// is both what <c>nowrap</c> asks for and all an indefinite main size can produce.
+    /// </param>
+    private static List<FlexColumnLine> CollectFlexColumnLines(List<CssBox> items, double? mainLimit, double rowGap)
+    {
+        var lines = new List<FlexColumnLine>();
+        var current = new FlexColumnLine();
+
+        foreach (var child in items)
+        {
+            double outerHeight = GetFlexItemOuterHeight(child);
+
+            if (mainLimit is { } limit && current.Items.Count > 0
+                && current.MainSize + rowGap + outerHeight > limit + 0.5)
+            {
+                lines.Add(current);
+                current = new FlexColumnLine();
+            }
+
+            if (current.Items.Count > 0)
+                current.MainSize += rowGap;
+
+            current.Items.Add(child);
+            current.MainSize += outerHeight;
+        }
+
+        lines.Add(current);
+        return lines;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.4 step 8 and §9.6 step 15/16: sizes each line across the cross (inline) axis
+    /// — the widest item's margin box — and then distributes the container's leftover cross space
+    /// per <c>align-content</c>.
+    /// </summary>
+    private void ResolveFlexColumnLineCrossSizes(
+        List<FlexColumnLine> lines, double contentWidth, double columnGap, out double lineOffset, out double lineGap)
+    {
+        double usedCross = 0;
+
+        foreach (var line in lines)
+        {
+            double cross = 0;
+
+            foreach (var child in line.Items)
+                cross = Math.Max(cross, child.Size.Width + child.ActualMarginLeft + child.ActualMarginRight);
+
+            line.CrossSize = cross;
+            usedCross += cross;
+        }
+
+        double freeCross = contentWidth - usedCross - Math.Max(0, lines.Count - 1) * columnGap;
+        string align = NormalizeBoxAlignment(AlignContent);
+
+        // `normal` behaves as `stretch` for a flex container, and it is what an unstyled one has.
+        if (align is "" or "auto" or "normal")
+            align = "stretch";
+
+        if (align == "stretch")
+        {
+            lineOffset = 0;
+            lineGap = columnGap;
+
+            if (freeCross > 0.5)
+            {
+                double share = freeCross / lines.Count;
+
+                foreach (var line in lines)
+                    line.CrossSize += share;
+            }
+
+            return;
+        }
+
+        ResolveContentDistribution(align, lines.Count, Math.Max(0, freeCross), columnGap, out lineOffset, out lineGap);
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.7 and §9.4 step 11 for one column flex line: grows the items into the line's
+    /// free main space per <c>flex-grow</c>, and stretches an <c>auto</c>-width item across the
+    /// line's cross size.
+    /// </summary>
+    /// <remarks>
+    /// Both are settled in a single re-layout per item, because they resize different axes of the
+    /// same box: laying an item out at its stretched width and then again at its grown height
+    /// would let the second layout re-derive the width from the <c>auto</c> declaration and undo
+    /// the stretch. Growth only, no shrinking — the same restriction as the single-line pass, and
+    /// for the reason given there.
+    /// </remarks>
+    private void ResolveFlexColumnLineItemSizes(ILayoutEnvironment g, FlexColumnLine line, double lineMain, double rowGap)
+    {
+        double freeMain = lineMain - line.MainSize;
+        double growTotal = 0;
+
+        if (freeMain > 0.5)
+        {
+            foreach (var child in line.Items)
+                growTotal += ParseFlexFactor(child.FlexGrow, 0);
+        }
+
+        double mainSize = 0;
+
+        for (int i = 0; i < line.Items.Count; i++)
+        {
+            var child = line.Items[i];
+            double outerHeight = GetFlexItemOuterHeight(child);
+            double? targetHeight = null;
+            double? targetWidth = null;
+
+            if (growTotal > 0)
+            {
+                double factor = ParseFlexFactor(child.FlexGrow, 0);
+                double grown = outerHeight + freeMain * (factor / growTotal);
+
+                if (factor > 0 && Math.Abs(grown - outerHeight) > 0.5)
+                    targetHeight = Math.Max(0, grown);
+            }
+
+            if (ShouldStretchFlexColumnItemAcrossLine(child, line.CrossSize))
+                targetWidth = line.CrossSize;
+
+            if (targetHeight is not null || targetWidth is not null)
+                LayoutFlexItemAtTargetSize(g, child, targetWidth, targetHeight);
+
+            mainSize += GetFlexItemOuterHeight(child) + (i > 0 ? rowGap : 0);
+        }
+
+        line.MainSize = mainSize;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.4 step 11 on the axis a column container crosses: whether an item's
+    /// <c>auto</c> cross size should be stretched to its line.
+    /// </summary>
+    private bool ShouldStretchFlexColumnItemAcrossLine(CssBox child, double lineCrossSize)
+    {
+        if (ResolveFlexItemAlignment(child) != "stretch")
+            return false;
+        if (!string.IsNullOrEmpty(child.Width) && child.Width != CssConstants.Auto)
+            return false;
+        if (child.IsSpecifiedMarginLeftAuto || child.IsSpecifiedMarginRightAuto)
+            return false;
+
+        double outerWidth = child.Size.Width + child.ActualMarginLeft + child.ActualMarginRight;
+        return lineCrossSize - outerWidth > 0.5;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.5: places one column flex line's items along the main axis per
+    /// <c>justify-content</c>, and across the line per <c>align-items</c>/<c>align-self</c>.
+    /// </summary>
+    /// <remarks>
+    /// For <c>column-reverse</c> the main-start is the line's block-end edge, so the items run
+    /// bottom-to-top from there: the first item in order-modified document order sits lowest.
+    /// </remarks>
+    private void PlaceFlexColumnLineItems(
+        FlexColumnLine line, double lineMain, double rowGap, double lineLeft, bool reverse)
+    {
+        double freeMain = Math.Max(0, lineMain - line.MainSize);
+        ResolveJustifyContent(line.Items.Count, freeMain, rowGap, out double mainOffset, out double itemGap);
+
+        double cursorY = reverse
+            ? ClientTop + lineMain - mainOffset
+            : ClientTop + mainOffset;
+
+        foreach (var child in line.Items)
+        {
+            double outerHeight = GetFlexItemOuterHeight(child);
+            double outerWidth = child.Size.Width + child.ActualMarginLeft + child.ActualMarginRight;
+            double crossOffset = ResolveFlexColumnCrossOffset(child, line.CrossSize, outerWidth);
+
+            double top = reverse ? cursorY - outerHeight : cursorY;
+            double targetTop = top + child.ActualMarginTop;
+            double targetLeft = lineLeft + crossOffset + child.ActualMarginLeft;
+
+            double dy = targetTop - child.Location.Y;
+            double dx = targetLeft - child.Location.X;
+
+            if (Math.Abs(dy) > 0.1)
+                child.OffsetTop(dy);
+
+            if (Math.Abs(dx) > 0.1)
+                child.OffsetLeft(dx);
+
+            cursorY += reverse ? -(outerHeight + itemGap) : outerHeight + itemGap;
+        }
+    }
+
+    /// <summary>
+    /// Where an item sits across its column flex line, per the cross-axis alignment that
+    /// <c>align-self</c>/<c>align-items</c> resolve to. A stretched item has already been sized to
+    /// the line and lands at 0.
+    /// </summary>
+    private double ResolveFlexColumnCrossOffset(CssBox child, double lineCrossSize, double itemOuterWidth)
+    {
+        double freeSpace = lineCrossSize - itemOuterWidth;
+
+        if (freeSpace <= 0)
+            return 0;
+
+        return ResolveFlexItemAlignment(child) switch
+        {
+            "center" => freeSpace / 2,
+            "end" or "flex-end" or "self-end" or "right" => freeSpace,
+            _ => 0
+        };
+    }
+
+    /// <summary>
+    /// Lays a flex item out again at a target outer width, a target outer height, or both — one
+    /// layout, so neither axis re-derives from the declaration the other one is overriding.
+    /// </summary>
+    private static void LayoutFlexItemAtTargetSize(
+        ILayoutEnvironment g, CssBox child, double? targetOuterWidth, double? targetOuterHeight)
+    {
+        string savedWidth = child.Width;
+        string savedHeight = child.Height;
+
+        if (targetOuterWidth is { } outerWidth)
+        {
+            double borderBoxWidth = Math.Max(0, outerWidth - child.ActualMarginLeft - child.ActualMarginRight);
+            double cssWidth = child.UsesBorderBoxSizing
+                ? borderBoxWidth
+                : borderBoxWidth
+                  - child.ActualPaddingLeft - child.ActualPaddingRight
+                  - child.ActualBorderLeftWidth - child.ActualBorderRightWidth;
+
+            child.Width = FormatCssPx(Math.Max(0, cssWidth));
+        }
+
+        if (targetOuterHeight is { } outerHeight)
+        {
+            double borderBoxHeight = Math.Max(0, outerHeight - child.ActualMarginTop - child.ActualMarginBottom);
+            double cssHeight = child.UsesBorderBoxSizing
+                ? borderBoxHeight
+                : borderBoxHeight
+                  - child.ActualPaddingTop - child.ActualPaddingBottom
+                  - child.ActualBorderTopWidth - child.ActualBorderBottomWidth;
+
+            child.Height = FormatCssPx(Math.Max(0, cssHeight));
+        }
+
+        child.PerformLayout(g);
+
+        child.Width = savedWidth;
+        child.Height = savedHeight;
+    }
+
     /// <summary>
     /// The column flex container's definite main-axis content height — its specified
     /// <c>height</c> clamped by <c>min-height</c>/<c>max-height</c> — or <c>null</c> when
@@ -701,13 +1072,27 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
     }
 
-    private void ResolveJustifyContent(int itemCount, double freeSpace, double baseGap, out double lineOffset, out double itemGap)
+    private void ResolveJustifyContent(int itemCount, double freeSpace, double baseGap, out double lineOffset, out double itemGap) =>
+        ResolveContentDistribution(NormalizeBoxAlignment(JustifyContent), itemCount, freeSpace, baseGap,
+            out lineOffset, out itemGap);
+
+    /// <summary>
+    /// CSS Box Alignment 3 §5: turns a content-distribution keyword and the free space on one
+    /// axis into the offset before the first subject and the gap between subjects.
+    /// </summary>
+    /// <remarks>
+    /// Shared by <c>justify-content</c> along a flex line's main axis and by
+    /// <c>align-content</c> across a multi-line container's lines, which distribute the same way.
+    /// <c>stretch</c> is not handled here — it resizes the subjects rather than spacing them, so
+    /// each caller applies it to whatever it is distributing.
+    /// </remarks>
+    private static void ResolveContentDistribution(
+        string keyword, int itemCount, double freeSpace, double baseGap, out double lineOffset, out double itemGap)
     {
         lineOffset = 0;
         itemGap = baseGap;
 
-        string justify = NormalizeBoxAlignment(JustifyContent);
-        switch (justify)
+        switch (keyword)
         {
             case "center":
                 lineOffset = freeSpace / 2;
