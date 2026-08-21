@@ -376,11 +376,23 @@ public class GraphicsAbstractionTests
     [Fact(Timeout = 600000)]
     public void Raster_Stream_Image_Load_Uses_BackendNeutral_Bitmap_Without_Materializing_Skia_Compat_Bitmap()
     {
-        using var source = new BBitmap(2, 2);
-        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
-        source.SetPixel(1, 0, new BColor(0, 255, 0, 255));
-        source.SetPixel(0, 1, new BColor(0, 0, 255, 255));
-        source.SetPixel(1, 1, new BColor(255, 255, 0, 255));
+        // Quadrants of a 4x4, blitted 1:1 — a scaled blit is sampled bilinearly now and would not
+        // land the source's own colours on the pixels asserted below. See the blit test further
+        // down; what this one is about is that neither side materialises a Skia bitmap.
+        using var source = new BBitmap(4, 4);
+        for (int y = 0; y < 4; y++)
+        {
+            for (int x = 0; x < 4; x++)
+            {
+                source.SetPixel(x, y, (x < 2, y < 2) switch
+                {
+                    (true, true) => new BColor(255, 0, 0, 255),
+                    (false, true) => new BColor(0, 255, 0, 255),
+                    (true, false) => new BColor(0, 0, 255, 255),
+                    (false, false) => new BColor(255, 255, 0, 255),
+                });
+            }
+        }
 
         using var loaded = Assert.IsType<ImageAdapter>(
             StubImageAdapter.Instance.ImageFromStream(new MemoryStream(source.Encode(ImageEncodeFormat.Png))));
@@ -1136,9 +1148,18 @@ public class GraphicsAbstractionTests
     [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Image_Blit_Through_Backend_Neutral_Primitives()
     {
-        using var source = new BBitmap(2, 1);
-        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
-        source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
+        // Drawn 1:1. BCanvas.DrawBitmap samples bilinearly whenever the destination is not the
+        // source's own size ("Filter a bitmap when it is drawn at a size other than its own"), so
+        // a scaled blit no longer lands exact source colours on the edge pixels. What this pins is
+        // the routing, not the sampling, and at 1:1 the two are separable again.
+        using var source = new BBitmap(4, 2);
+        for (int y = 0; y < 2; y++)
+        {
+            source.SetPixel(0, y, new BColor(255, 0, 0, 255));
+            source.SetPixel(1, y, new BColor(255, 0, 0, 255));
+            source.SetPixel(2, y, new BColor(0, 0, 255, 255));
+            source.SetPixel(3, y, new BColor(0, 0, 255, 255));
+        }
 
         using var dest = new BBitmap(4, 2);
         dest.Clear(BColor.White);
@@ -1156,9 +1177,17 @@ public class GraphicsAbstractionTests
     [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Background_Image()
     {
-        using var source = new BBitmap(2, 1);
-        source.SetPixel(0, 0, new BColor(255, 0, 0, 255));
-        source.SetPixel(1, 0, new BColor(0, 0, 255, 255));
+        // 4x2 and painted at 4px x 2px: the background is drawn at the image's own size, which is
+        // the path that samples a source pixel exactly. See the sibling blit test above.
+        using var source = new BBitmap(4, 2);
+        for (int y = 0; y < 2; y++)
+        {
+            source.SetPixel(0, y, new BColor(255, 0, 0, 255));
+            source.SetPixel(1, y, new BColor(255, 0, 0, 255));
+            source.SetPixel(2, y, new BColor(0, 0, 255, 255));
+            source.SetPixel(3, y, new BColor(0, 0, 255, 255));
+        }
+
         string pngBase64 = Convert.ToBase64String(source.Encode(ImageEncodeFormat.Png, 100));
 
         using var container = new HtmlContainer();

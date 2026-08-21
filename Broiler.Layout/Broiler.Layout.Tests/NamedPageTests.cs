@@ -196,17 +196,47 @@ public sealed class NamedPageTests
         Assert.Equal(PageHeight, container.Location.Y, 3);
     }
 
-    // An out-of-flow subtree is positioned against its containing block rather than following the
-    // flow, so a page name inside it has no page boundary to name (css-page/page-name-abspos-002).
+    // Being out of flow is not one of these. An out-of-flow box does not carry its *own* name into
+    // its parent's flow — that is a separate rule, pinned below — but its children are stacked in
+    // its own block flow, and a name change between two of them is still a page break
+    // (css-page/page-name-003, citing the Chromium bug that established it).
+    // css-page/page-name-abspos-002 states the opposite on near-identical markup and is the odd one
+    // out: Chromium fails it against its own reference too. See docs/wpt-rendering-gaps-wont-fix.md.
     [Theory]
     [InlineData(CssConstants.Absolute)]
     [InlineData(CssConstants.Fixed)]
-    public void A_Page_Name_Inside_An_Out_Of_Flow_Subtree_Breaks_Nothing(string position)
+    public void A_Page_Name_Change_Inside_An_Out_Of_Flow_Subtree_Still_Breaks(string position)
     {
-        AssertNamesChangeNothing((container, first, second) =>
-        {
-            container.Position = position;
-        });
+        var root = Root();
+        var container = Block(root, height: null);
+        container.Position = position;
+        Block(container, ChildHeight, page: "a");
+        var second = Block(container, ChildHeight, page: "b");
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(PageHeight, second.Location.Y, 3);
+    }
+
+    // ...and the other half of that pair: the out-of-flow box's own name never reaches the flow it
+    // was taken out of, so the two in-flow siblings around it share a page and nothing breaks
+    // (css-page/page-name-abspos-001).
+    [Theory]
+    [InlineData(CssConstants.Absolute)]
+    [InlineData(CssConstants.Fixed)]
+    public void An_Out_Of_Flow_Boxs_Own_Page_Name_Stays_Out_Of_The_Flow(string position)
+    {
+        var root = Root();
+        Block(root, ChildHeight, page: "a");
+
+        var outOfFlow = Block(root, ChildHeight, page: "b");
+        outOfFlow.Position = position;
+
+        var third = Block(root, ChildHeight, page: "a");
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(ChildHeight, third.Location.Y, 3);
     }
 
     // A box whose block axis is not the page's stacks its children sideways, where a page boundary
@@ -240,8 +270,8 @@ public sealed class NamedPageTests
     /// </summary>
     /// <remarks>
     /// The comparison is against the same tree rather than against a stated coordinate because
-    /// these are the cases where the container places its children itself: a flex container, an
-    /// out-of-flow box, a box writing sideways. Where those put their children is the container's
+    /// these are the cases where the container places its children itself: a flex or grid
+    /// container, a box writing sideways. Where those put their children is the container's
     /// business, and asserting a number here would be asserting that as well. What the rule claims
     /// is only that the names change nothing, which is exactly what this measures.
     /// </remarks>

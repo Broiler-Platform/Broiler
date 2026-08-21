@@ -405,8 +405,28 @@ public sealed partial class DomBridge
                 {
                     try
                     {
-                        subModuleContext.RunScriptAsync(root.Source, root.BaseUrl ?? subBaseUrl ?? string.Empty,
-                            uniqueModuleID: root.Key).GetAwaiter().GetResult();
+                        // Started here, awaited only if it is already done. Unlike the main page's roots
+                        // (ScriptEngine.RunPageScripts, which runs between executions), this code is
+                        // reached *from inside* one: a frame's srcdoc is assigned by the parent's script,
+                        // so that script is still on the stack. The engine queues a module's
+                        // continuations to run when the outermost execution finishes, so blocking here
+                        // waits for work that cannot start until this call returns — the thread
+                        // deadlocks outright. An iframe module with a static `data:` import is enough to
+                        // do it, and it is a *hang*, not a failure: the whole process stops there.
+                        //
+                        // Not awaiting is also what a module means. Modules are deferred, so the frame's
+                        // DOM effects are due when the engine drains at the end of the outer execution —
+                        // before anything the page does next can observe them — rather than at the
+                        // assignment that queued them.
+                        var run = subModuleContext.RunScriptAsync(
+                            root.Source,
+                            root.BaseUrl ?? subBaseUrl ?? string.Empty,
+                            uniqueModuleID: root.Key);
+
+                        if (run.IsCompleted)
+                            run.GetAwaiter().GetResult();
+                        else
+                            LogSubDocumentModuleFailure(run, root.Key);
                     }
                     catch (Exception ex)
                     {
@@ -421,6 +441,27 @@ public sealed partial class DomBridge
             RecordSubDocumentGlobals(containerElement, globalsBefore);
         });
     }
+
+    /// <summary>
+    /// Reports a sub-document module root that failed after the call that started it had returned.
+    /// </summary>
+    /// <remarks>
+    /// The root above is not awaited, so nothing else observes its exception; without this the module
+    /// would simply appear not to have run, which is the one outcome that looks identical to the
+    /// documented limitation and so hides a real failure inside it.
+    /// </remarks>
+    private static void LogSubDocumentModuleFailure(System.Threading.Tasks.Task run, string key) =>
+        run.ContinueWith(
+            completed => RenderLogger.LogWarning(
+                LogCategory.JavaScript,
+                "DomBridge.ExecuteSubDocumentScripts",
+                $"Sub-document module root {key} error: " +
+                    $"{completed.Exception?.GetBaseException().Message}",
+                completed.Exception),
+            System.Threading.CancellationToken.None,
+            System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted
+                | System.Threading.Tasks.TaskContinuationOptions.ExecuteSynchronously,
+            System.Threading.Tasks.TaskScheduler.Default);
 
     /// <summary>
     /// Returns true if the content type indicates XML-family content

@@ -53,6 +53,54 @@ else
   fi
 fi
 
+# --- 1b. The SDK the Phase 0 fixture pins ---------------------------------------
+# tests/broiler-code-phase0/fixture/global.json pins an SDK *feature band*, and the
+# design-time evaluator honours it rather than substituting the SDK it is running
+# under — that is the behaviour Broiler.Code.Language.CSharp.Tests exercises. So "a
+# .NET 10 SDK" is not enough: the Ubuntu archive ships 10.0.1xx, the fixture asks
+# for 10.0.3xx, and `rollForward: latestFeature` will not go *down* a band. Without
+# a satisfying SDK those tests fail with "A compatible .NET SDK was not found",
+# which reads like a product bug and is not one.
+#
+# `dotnet --version` run inside the fixture is the resolver's own answer, so it is
+# the check: non-zero means nothing installed satisfies the pin.
+ensure_fixture_sdk() {
+  local fixture="$REPO_DIR/tests/broiler-code-phase0/fixture"
+  [ -f "$fixture/global.json" ] || return 0
+  command -v dotnet >/dev/null 2>&1 || return 0
+
+  if (cd "$fixture" && dotnet --version >/dev/null 2>&1); then
+    return 0
+  fi
+
+  local pinned
+  pinned="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' \
+    "$fixture/global.json" | head -1)"
+  if [ -z "$pinned" ]; then
+    log "war: could not read the SDK version pinned by the Phase 0 fixture"
+    return 0
+  fi
+
+  log "Installing the .NET SDK $pinned pinned by the Phase 0 fixture ..."
+  local script root
+  script="$(mktemp)"
+  # Install beside the SDK already on PATH so `dotnet` finds both bands.
+  root="$(dirname "$(readlink -f "$(command -v dotnet)")")"
+  if curl -sSL --connect-timeout 20 "https://dot.net/v1/dotnet-install.sh" -o "$script"; then
+    chmod +x "$script"
+    if "$script" --version "$pinned" --install-dir "$root" --no-path >/dev/null 2>&1; then
+      log ".NET SDK $pinned installed."
+    else
+      log "war: could not install the .NET SDK $pinned — the Phase 0 evaluation tests"
+      log "      (Broiler.Code.Language.CSharp.Tests) will report no compatible SDK."
+    fi
+  else
+    log "war: dotnet-install.sh unreachable (egress policy?) — skipping the $pinned SDK"
+  fi
+  rm -f "$script"
+}
+ensure_fixture_sdk
+
 # Make sure dotnet is on PATH for the rest of the session.
 if command -v dotnet >/dev/null 2>&1; then
   echo "export PATH=\"\$PATH:$(dirname "$(command -v dotnet)")\"" >> "${CLAUDE_ENV_FILE:-/dev/null}"

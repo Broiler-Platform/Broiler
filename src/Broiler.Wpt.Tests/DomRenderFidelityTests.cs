@@ -20,6 +20,7 @@ namespace Broiler.Wpt.Tests;
 /// body-targeted style, and an ordinary document must render the same on both paths.
 /// </para>
 /// </remarks>
+[Collection("DomRender")]
 public sealed class DomRenderFidelityTests : IDisposable
 {
     private readonly string _tempDir;
