@@ -268,7 +268,6 @@ set -euo pipefail
 # feature-probes and self-skips until this is applied; only the pixel suite can say a mirrored
 # element reached the canvas.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0006-paint-an-element-its-transform-mirrors.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
