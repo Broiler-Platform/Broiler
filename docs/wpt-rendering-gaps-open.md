@@ -515,6 +515,59 @@ other direction. None is a sizing bug.
   the reference by having no natural size to transfer from. **A flexbox rule, not a
   replaced-sizing one.**
 
+### Cutting a box with content in it across columns — attempted, and it does not pay
+
+- **Tests:** `css-break/fieldset-001` (77.7%), `fieldset-003` (92.1%),
+  `fieldset-004` (88.5%) and the rest of the column-fragmentation family.
+- **The gap.** A column set fills itself by placing whole boxes into it, and
+  [cuts one that has nothing in it](wpt-rendering-gaps-fixed.md#a-box-taller-than-a-column-set-stayed-in-the-first-column).
+  A box that has *boxes* in it is not cut: it is either moved whole or thrown away
+  by the "deep fragment" path, which columnises its children and leaves the box's
+  own border and background drawn once, around the first column. That is what
+  `fieldset-001` needs — a `<fieldset>` in a three-column set, with a legend and a
+  block inside it.
+- **It was built, and it works.** Each piece is a copy of the box carrying the part
+  of its subtree that falls in that piece, with a child straddling the cut cut in
+  turn; text is where it stops, because a piece is a real box beside the original
+  rather than a paint instruction and the words of a box are not copied onto it.
+  A controlled render confirms it: a 5px-bordered box holding a 120px green block
+  and a 120px blue one, in a 300 × 100 three-column set, comes out as three pieces
+  — green filling column one, green then blue in column two, blue then the bottom
+  border in column three, with the side borders on every piece, no border at the
+  joins, and the rounded corners only at the two outer ends. That is
+  `box-decoration-break: slice` across a column set, which is what the family asks
+  for.
+- **And on the corpus it does not pay.** Every configuration was measured against
+  paged `css/css-break` at 92 of 204, average 87.45%:
+
+  | configuration | passed | average |
+  | --- | --- | --- |
+  | the cut, with the deep-fragment path stood down for a cuttable box | 91 | 87.41% |
+  | …and the single-child descent stopped at a box that paints | **86** | 87.21% |
+  | the cut, for a decorated box only | 91 | 87.42% |
+  | the cut, strictly additive — the deep path unchanged | 92 | 87.42% |
+  | …and a wrapper cut only for its own decoration | 92 | 87.44% |
+
+  The best of them holds the test count and loses 0.01 of a point, with
+  `fieldset-004` down 88.5% → 84.4% — undoing a gain from
+  [the legend fix](wpt-rendering-gaps-fixed.md#legend-was-an-inline-box-and-two-things-behind-it)
+  — against `fieldset-001` up 77.7% → 78.0% and still failing. **The whole of it
+  was reverted**; nothing of it is in the tree.
+- **Why, as far as it was chased.** The engine's older answer — flatten a tall
+  wrapper into its children and let its decoration stay in the first column — is
+  what the rest of the column set is built around: where the balancing search puts
+  the boundaries, and what the deep-fragment path hands the distribution loop. A
+  correct cut disagrees with it, and the disagreement shows up as pixels in tests
+  that are not about the wrapper at all. And the one configuration that would let
+  `fieldset-001` reach the cut — stopping the single-child descent at a box that
+  paints its own decoration, which is the right rule — costs **six** tests on its
+  own.
+- **What this says for the next attempt.** The cut is not the missing piece by
+  itself. The descent and the deep-fragment path are the two workarounds built in
+  its absence, and both have to come out with it, together, in one change that
+  re-derives the column boundaries rather than inheriting them. Doing the cut
+  alone, as here, buys nothing.
+
 ---
 
 ## Images

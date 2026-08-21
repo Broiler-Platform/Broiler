@@ -1625,7 +1625,10 @@ the test that exposed it.
   the tree rather than a paint instruction: a box with content would need that
   content divided too, which is the general fragmentation this engine does not do.
   A box with no content of its own is entirely described by its own decoration,
-  and is what these tests are made of.
+  and is what these tests are made of. (Cutting one *with* content was built and
+  measured afterwards, and reverted — it works and it does not pay. The numbers
+  are in
+  [the open entry](wpt-rendering-gaps-open.md#cutting-a-box-with-content-in-it-across-columns--attempted-and-it-does-not-pay).)
 - **A background image, a gradient and a box shadow are deliberately not sliced.**
   They are positioned against the box they are on, so cutting the box paints them
   once per piece instead of once across the run. Measured: slicing them cost

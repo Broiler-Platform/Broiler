@@ -214,6 +214,22 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Nothing in the tree changed for column fragmentation of a box that has content
+  in it, and that is the result rather than an omission. It was built — each piece
+  a copy of the box carrying the part of its subtree in that piece, a straddling
+  child cut in turn, text left alone because a piece is a real box and the words of
+  a box are not copied onto it — and a controlled render confirms it does exactly
+  what `box-decoration-break: slice` asks for across a column set. Five
+  configurations were then measured against paged `css/css-break` at 92 of 204,
+  average 87.45%, and the best of them holds the count and loses 0.01 of a point,
+  with `css-break/fieldset-004` down 88.5% → 84.4% against `fieldset-001` up
+  77.7% → 78.0% and still failing; the one configuration that would let
+  `fieldset-001` reach the cut costs six tests. The whole of it was reverted and
+  the numbers are recorded in `docs/wpt-rendering-gaps-open.md`, because the cut is
+  not the missing piece on its own: the single-child descent and the deep-fragment
+  path are the two workarounds built in its absence, and all three have to move
+  together.
+
 - `Broiler.Layout` (with **pending patches** `0004`/`0005` for `Broiler.CSS` and
   `Broiler.HTML`) — a `<legend>` is a block box, a fieldset's first one is
   rendered on the fieldset's block-start border, an `aspect-ratio` no longer sizes
