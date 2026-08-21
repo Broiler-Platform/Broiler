@@ -16,8 +16,12 @@ public sealed partial class DomBridge
     {
         window.FastAddValue((KeyString)"document", document, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.localStorage — in-memory stub backed by a plain JSObject
-        window.FastAddValue((KeyString)"localStorage", Dom.Features.WebStorageBinding.BuildLocalStorage(), JSPropertyAttributes.EnumerableConfigurableValue);
+        // window.localStorage / window.sessionStorage — the two Web Storage areas (HTML §12.2),
+        // each an in-memory Storage object of its own. Built separately because they are separate
+        // areas: a page that stashes per-tab state in one and durable state in the other must not
+        // see the two answer each other's reads.
+        window.FastAddValue((KeyString)"localStorage", Dom.Features.WebStorageBinding.BuildStorage(), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"sessionStorage", Dom.Features.WebStorageBinding.BuildStorage(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.matchMedia(query) — evaluates basic media queries
         window.FastAddValue((KeyString)"matchMedia", new DomFunction((in a) => Dom.Features.MatchMediaBinding.MatchMedia(this, in a), "matchMedia", 1), JSPropertyAttributes.EnumerableConfigurableValue);

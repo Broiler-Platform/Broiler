@@ -105,6 +105,12 @@ internal sealed class SubWindowBinding(
         "setTimeout", "clearTimeout", "setInterval", "clearInterval",
         "requestAnimationFrame", "cancelAnimationFrame", "queueMicrotask",
         "atob", "btoa", "structuredClone", "performance", "crypto",
+
+        // The two storage areas. A frame gets the parent's objects rather than fresh ones, which
+        // is what a same-origin frame sees in a browser: the Storage object differs there, the
+        // *area* behind it does not, and a frame that cannot read what its opener wrote is the
+        // more visible wrong answer.
+        "localStorage", "sessionStorage",
     ];
 
     /// <summary>Gets or builds the sub-window JS object for a nested-browsing-context container.</summary>

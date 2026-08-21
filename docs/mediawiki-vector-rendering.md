@@ -127,6 +127,13 @@ rest of what the skin needs turned up in order:
   `requestIdleCallback` were missing, and each threw out of a module the skin loads.
 * `MediaQueryList` had no `addEventListener`/`removeEventListener`/`onchange`, which is how the
   skin watches its own breakpoints.
+* `sessionStorage` did not exist — only `localStorage` did. `window` **is** the global object here,
+  so the bare `sessionStorage` the page writes was a `ReferenceError` rather than an undefined
+  property, and that aborts the whole script. MediaWiki serves its modules as one `load.php`
+  bundle, so a single identifier took ResourceLoader, the skin and every module queued behind them
+  with it. Both areas are now registered, with the `length`/`key()` pair and the named-property
+  access (`storage.foo`) that go with them, and a `Storage` interface global for the
+  `typeof Storage !== 'undefined'` feature test.
 
 ## What is left
 

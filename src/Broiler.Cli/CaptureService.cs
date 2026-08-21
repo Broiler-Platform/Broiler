@@ -1058,64 +1058,25 @@ public class CaptureService
             document,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.localStorage — in-memory stub
-        var storage = new JSObject();
-        var store = new Dictionary<string, string>();
-
-        storage.FastAddValue(
-            (KeyString)"getItem",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length == 0) return JSNull.Value;
-                var key = a[0]?.ToString() ?? string.Empty;
-                return store.TryGetValue(key, out var val) ? new JSString(val) : JSNull.Value;
-            }, "getItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        storage.FastAddValue(
-            (KeyString)"setItem",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length >= 2)
-                {
-                    var key = a[0]?.ToString() ?? string.Empty;
-                    var val = a[1]?.ToString() ?? string.Empty;
-                    store[key] = val;
-                    storage[(KeyString)key] = new JSString(val);
-                }
-                return JSUndefined.Value;
-            }, "setItem", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        storage.FastAddValue(
-            (KeyString)"removeItem",
-            new JSFunction((in Arguments a) =>
-            {
-                if (a.Length > 0)
-                {
-                    var key = a[0]?.ToString() ?? string.Empty;
-                    store.Remove(key);
-                    storage.Delete((KeyString)key);
-                }
-                return JSUndefined.Value;
-            }, "removeItem", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        storage.FastAddValue(
-            (KeyString)"clear",
-            new JSFunction((in Arguments a) =>
-            {
-                foreach (var key in store.Keys.ToList())
-                    storage.Delete((KeyString)key);
-                store.Clear();
-                return JSUndefined.Value;
-            }, "clear", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // window.localStorage / window.sessionStorage — the same in-memory Storage areas the DOM
+        // path builds, rather than a second, thinner copy of the same code that drifts from it: the
+        // hand-rolled stub here had no `sessionStorage`, no `length` and no `key()`.
+        // Registered on the global as well, because the unqualified spelling is the one page
+        // scripts use and an unqualified miss is a ReferenceError that aborts the whole script.
+        var localStorage = Broiler.HtmlBridge.Dom.Features.WebStorageBinding.BuildStorage();
+        var sessionStorage = Broiler.HtmlBridge.Dom.Features.WebStorageBinding.BuildStorage();
 
         window.FastAddValue(
             (KeyString)"localStorage",
-            storage,
+            localStorage,
             JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue(
+            (KeyString)"sessionStorage",
+            sessionStorage,
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        context["localStorage"] = localStorage;
+        context["sessionStorage"] = sessionStorage;
 
         // window.matchMedia(query) — stub returning { matches: false }
         window.FastAddValue(
