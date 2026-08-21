@@ -10,8 +10,10 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// Reflected content-attribute IDL accessors for various HTML element interfaces, co-located as an
 /// HtmlBridge feature module (Phase 3): the plain string reflectors (<c>label.htmlFor</c> ↔ <c>for</c>,
 /// <c>meta.httpEquiv</c> ↔ <c>http-equiv</c>, <c>.type</c>, and the generic named string / numeric
-/// dimension setters) and the URL-typed getters (<c>&lt;object&gt;.data</c> and
-/// <c>&lt;a&gt;/&lt;area&gt;/&lt;base&gt;/&lt;link&gt;.href</c>), which resolve their relative content
+/// dimension setters) and the URL-typed getters (<c>&lt;object&gt;.data</c>,
+/// <c>&lt;a&gt;/&lt;area&gt;/&lt;base&gt;/&lt;link&gt;.href</c> and
+/// <c>&lt;script&gt;/&lt;img&gt;.src</c>, with <c>&lt;img&gt;.currentSrc</c> alongside it), which
+/// resolve their relative content
 /// attribute against the live page URL. Content-attribute reads/writes use the bridge's neutral
 /// <c>internal static</c> <c>TryGetAttribute</c>/<c>SetAttr</c> helpers directly; only the page URL — read
 /// at call time — comes through the one-member <see cref="IElementReflectionHost"/> contract. Was the
@@ -47,11 +49,20 @@ internal static class ElementReflectionBinding
     public static JSValue GetHref(IElementReflectionHost host, DomElement element, in Arguments _)
         => new JSString(ResolveReflectedUrl(host.PageUrl, element, "href"));
 
-    // <script>.src getter — reflected URL, resolved against the page URL like href/data. Absolute is
-    // what the IDL returns even when the content attribute is relative, which is what a page
-    // comparing script.src against a known URL expects.
+    // <script>/<img>.src getter — reflected URL, resolved against the page URL like href/data.
+    // Absolute is what the IDL returns even when the content attribute is relative, which is what a
+    // page comparing script.src against a known URL — or handing img.src to a URL parser — expects.
     public static JSValue GetSrc(IElementReflectionHost host, DomElement element, in Arguments _)
         => new JSString(ResolveReflectedUrl(host.PageUrl, element, "src"));
+
+    // <img>.currentSrc getter — read-only, the URL the element settled on. Srcset candidate selection
+    // happens in layout and is not visible from here, so a src is reported as the URL that was chosen
+    // and no src at all as the empty string: the two answers `img.currentSrc || img.src` is written
+    // against. Never the bare page URL, which is what resolving an absent (or empty) src would give.
+    public static JSValue GetCurrentSrc(IElementReflectionHost host, DomElement element, in Arguments a)
+        => DomBridge.TryGetAttribute(element, "src", out var value) && value.Length > 0
+            ? GetSrc(host, element, in a)
+            : new JSString(string.Empty);
 
     public static JSValue SetSrc(DomElement element, in Arguments a)
     {

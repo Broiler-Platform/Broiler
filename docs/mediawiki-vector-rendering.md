@@ -134,6 +134,13 @@ rest of what the skin needs turned up in order:
   with it. Both areas are now registered, with the `length`/`key()` pair and the named-property
   access (`storage.foo`) that go with them, and a `Storage` interface global for the
   `typeof Storage !== 'undefined'` feature test.
+* `HTMLImageElement` carried nothing but `width`/`height`, so **`img.src` was `undefined`** — not
+  the empty string a missing content attribute reflects as. MultimediaViewer's bootstrap walks the
+  page's thumbnails and hands each one's `src` to `mw.util.parseImageUrl`, which opens with
+  `url.match( … )`: "Cannot get property match of undefined". One bundle again, so that throw took
+  the rest of it. `src` and `currentSrc` are now resolved URLs, and `alt`, `srcset`, `sizes`,
+  `useMap`, `isMap` and the fetch hints reflect their content attributes in both directions —
+  writing one used to set a plain JS property on the wrapper that nothing else in the engine saw.
 
 ## What is left
 

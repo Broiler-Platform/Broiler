@@ -214,6 +214,25 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `img.src` is a string. `HTMLImageElement` carried nothing but `width`/`height`,
+  so every other IDL attribute in the interface read back as `undefined` — not the
+  empty string a missing content attribute reflects as — and the first string
+  method a caller reached for threw on it. `www.mediawiki.org`'s start page died
+  exactly there: MultimediaViewer walks the page's thumbnails, hands each one's
+  `src` to `mw.util.parseImageUrl`, and that function opens with `url.match( … )`.
+  Because MediaWiki serves its modules as one `load.php` bundle, the throw took
+  the thumbnail walk and everything queued behind it down with it.
+  - `src` and `currentSrc` are resolved URLs, as they are in a browser, and the
+    absolute one even when the content attribute is relative. `currentSrc` reports
+    the empty string when there is no `src` to settle on, so the
+    `img.currentSrc || img.src` idiom reaches its second operand rather than a
+    page URL manufactured out of an absent attribute.
+  - `alt`, `srcset`, `sizes`, `useMap`, `isMap`, `crossOrigin`, `referrerPolicy`,
+    `decoding`, `loading` and `fetchPriority` reflect their content attributes in
+    both directions. Writing one used to set a plain JS property on the wrapper
+    that no content attribute — and so no layout, cascade or serialization — ever
+    saw.
+
 - `sessionStorage` exists. Only `localStorage` was ever registered, and because
   `window` **is** the global object, the bare `sessionStorage` a page writes was a
   `ReferenceError` rather than an undefined property — which aborts the entire
