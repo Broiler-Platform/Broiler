@@ -4,7 +4,7 @@ namespace Broiler.Cli.Tests;
 
 public class FontFamilyFallbackPolicyTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveDefaultMappings_Maps_Generic_Families_And_Helvetica_Alias()
     {
         var mappings = FontFamilyFallbackPolicy.ResolveDefaultMappings(
@@ -24,7 +24,7 @@ public class FontFamilyFallbackPolicyTests
         Assert.Equal("Arial", mappings["Helvetica"]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveDefaultMappings_Uses_First_Available_Fallbacks_And_Skips_Redundant_Helvetica_Alias()
     {
         var mappings = FontFamilyFallbackPolicy.ResolveDefaultMappings(

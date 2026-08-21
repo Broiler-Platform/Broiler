@@ -74,7 +74,7 @@ public sealed class ObjectFitPlacementTests
     }
 
     /// <summary>A box already at the content's ratio needs no clip under <c>cover</c>.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cover_At_The_Contents_Own_Ratio_Needs_No_Clip()
     {
         var placement = Resolve(new RectangleF(0, 0, 32, 16), Wide, "cover");
@@ -119,7 +119,7 @@ public sealed class ObjectFitPlacementTests
     /// instead of a 16×32 one, which is what regressed <c>object-fit-cover-svg-004i</c> when the
     /// ratio was first taken from the reported size.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Ratio_Without_An_Intrinsic_Size_Sizes_By_The_Ratio()
     {
         var placement = Resolve(
@@ -186,7 +186,7 @@ public sealed class ObjectFitPlacementTests
     /// axis is smaller than the offset — <c>bottom 1px right 2px</c> against zero free width is 2px
     /// off the left edge, and needs the clip that says so.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Offset_Past_The_Free_Space_Overflows_And_Clips()
     {
         var placement = Resolve(new RectangleF(0, 0, 48, 32), Wide, "contain", "bottom 1px right 2px");
@@ -200,7 +200,7 @@ public sealed class ObjectFitPlacementTests
     /// absolute offset from an edge still does, and the fast path for "nothing declared" must not
     /// swallow it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fill_Still_Honours_An_Absolute_Object_Position()
     {
         var placement = Resolve(new RectangleF(0, 0, 48, 32), Wide, "fill", "bottom 1px right 2px");

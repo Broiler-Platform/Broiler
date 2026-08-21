@@ -36,7 +36,7 @@ public sealed class WptPassThresholdTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_Threshold_Defaults_To_99_Percent()
     {
         Environment.SetEnvironmentVariable(PassThresholdEnvironmentVariable, null);
@@ -47,7 +47,7 @@ public sealed class WptPassThresholdTests : IDisposable
         Assert.Equal(99, WptTestRunner.DefaultPassThresholdPercent);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Command_Line_Pass_Threshold_Wins_Over_The_Environment()
     {
         Environment.SetEnvironmentVariable(PassThresholdEnvironmentVariable, "90");
@@ -56,7 +56,7 @@ public sealed class WptPassThresholdTests : IDisposable
         Assert.Equal(97.5, percent);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Environment_Pass_Threshold_Is_Used_When_No_Argument_Is_Given()
     {
         Environment.SetEnvironmentVariable(PassThresholdEnvironmentVariable, "95");
@@ -89,7 +89,7 @@ public sealed class WptPassThresholdTests : IDisposable
         Assert.Equal(expectedRatio, config.PixelDiffThreshold, precision: 10);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Two_Percent_Mismatch_Fails_At_99_But_Passes_At_97()
     {
         const int width = 200;

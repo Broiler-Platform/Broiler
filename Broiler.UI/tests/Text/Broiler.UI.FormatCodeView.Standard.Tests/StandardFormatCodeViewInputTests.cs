@@ -7,7 +7,7 @@ namespace Broiler.UI.FormatCodeView.Standard.Tests;
 
 public sealed class StandardFormatCodeViewInputTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Committed_Ime_Text_Raises_One_Structured_Edit()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -36,7 +36,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Empty(scene.View.CompositionText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_On_Code_Requests_Semantic_Removal_Not_Bracket_Deletion()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(
@@ -56,7 +56,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.IsType<ApplyFormatCodeInlineIntent>(edit?.Intent);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_Windows_Text_Event_Does_Not_Insert_U0008()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -80,7 +80,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Empty(edit.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Committed_Text_Filters_Control_Characters()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -102,7 +102,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Equal("xy", intent.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Committed_Ime_Text_Filters_Control_Characters()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -124,7 +124,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Equal("xy", intent.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pointer_Click_Requests_Typed_Navigation_And_Drag_Selects()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(
@@ -146,7 +146,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.True(document.IsValid(navigation.Mapping.DocumentPosition));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Keyboard_Navigation_Preserves_Directional_Selection_And_Copies()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -167,7 +167,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Equal(scene.View.Text.Length, scene.View.SelectionLength);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Search_Exit_And_Activation_Are_Exposed_To_The_Host()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -193,7 +193,7 @@ public sealed class StandardFormatCodeViewInputTests
         Assert.Equal(8, scene.View.SelectionStart);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wheel_Scrolls_Overflowing_Content()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(

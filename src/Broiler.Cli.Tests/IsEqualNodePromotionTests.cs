@@ -25,7 +25,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         return CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Equal_And_Unequal_Element_Trees()
     {
         var result = Run(
@@ -36,7 +36,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         Assert.Contains("true|false|false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attribute_Order_Irrelevant_But_Values_Matter()
     {
         var result = Run(
@@ -47,7 +47,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         Assert.Contains("true|false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Text_Nodes_Equal_By_Data()
     {
         var result = Run(

@@ -35,7 +35,7 @@ public sealed class LogicalMinMaxSizeTests
         return box;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Block_Bounds_Are_The_Height_Bounds_In_Horizontal_Writing_Mode()
     {
         var box = Box();
@@ -46,7 +46,7 @@ public sealed class LogicalMinMaxSizeTests
         Assert.Equal("20px", box.MaxHeight);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inline_Bounds_Are_The_Width_Bounds_In_Horizontal_Writing_Mode()
     {
         var box = Box();
@@ -58,7 +58,7 @@ public sealed class LogicalMinMaxSizeTests
     }
 
     // The block axis is horizontal in a vertical writing mode, so the two swap.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Axes_Swap_In_A_Vertical_Writing_Mode()
     {
         var box = Box("vertical-rl");
@@ -71,7 +71,7 @@ public sealed class LogicalMinMaxSizeTests
 
     // The physical longhand is not overridden — it is the one the author wrote last in the cascade,
     // and by the time layout reads either the cascade has already picked between them.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Physical_Bound_Wins_Over_The_Flow_Relative_One()
     {
         var box = Box();
@@ -82,7 +82,7 @@ public sealed class LogicalMinMaxSizeTests
     }
 
     // And a box that declares neither still reports the initial values rather than an empty string.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Box_With_Neither_Keeps_The_Initial_Values()
     {
         var box = Box();

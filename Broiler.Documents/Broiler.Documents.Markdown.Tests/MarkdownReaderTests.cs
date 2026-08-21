@@ -2,7 +2,7 @@ namespace Broiler.Documents.Markdown.Tests;
 
 public sealed class MarkdownReaderTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Headings_Paragraphs_And_Inline_Styles()
     {
         RichTextDocument document = Read("# Title\n\nHello **bold** *italic* `code` ~~gone~~");
@@ -18,7 +18,7 @@ public sealed class MarkdownReaderTests
         Assert.True(second.StyleAt(23).Strikethrough);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Links_And_Drops_Disallowed_Schemes()
     {
         DocumentReadResult result = ReadResult("[ok](https://example.test) [bad](javascript:alert(1))");
@@ -30,7 +30,7 @@ public sealed class MarkdownReaderTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "markdown.link");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Bullet_And_Numbered_Lists()
     {
         RichTextDocument document = Read("- One\n- Two\n\n1. First\n2. Second");
@@ -42,7 +42,7 @@ public sealed class MarkdownReaderTests
         Assert.Equal(ListKind.Numbered, document.Paragraphs[3].Style.ListKind);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Blockquotes_As_Indented_Paragraphs()
     {
         RichTextDocument document = Read("> quoted text");
@@ -51,7 +51,7 @@ public sealed class MarkdownReaderTests
         Assert.Equal(1, document.Paragraphs[0].Style.IndentLevel);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Hard_Line_Breaks_As_Soft_Breaks()
     {
         RichTextDocument document = Read("A  \nB");
@@ -59,7 +59,7 @@ public sealed class MarkdownReaderTests
         Assert.Equal("A" + (char)0x2028 + "B", document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Fenced_Code_As_Monospace_With_Soft_Breaks()
     {
         RichTextDocument document = Read("```\na\nb\n```");

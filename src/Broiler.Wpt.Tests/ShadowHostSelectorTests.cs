@@ -85,7 +85,7 @@ h=document.querySelector('host-5');r=h.attachShadow({mode:'open'});
 r.innerHTML='<style> :host(host-1) { background: red !important; } </style>';
 """;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostFunctionalRule_RendersSingleSolidGreenBox()
     {
         var (red, green, minX, minY, maxX, maxY) = Render(FiveHostsBody, FiveHostsScript);
@@ -101,7 +101,7 @@ r.innerHTML='<style> :host(host-1) { background: red !important; } </style>';
         Assert.Equal(100 * 100, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostSelector_DoesNotLeakToTheWholeDocument()
     {
         // Guard the original failure directly: a bare :host rule in one shadow tree must style
@@ -115,7 +115,7 @@ r.innerHTML='<style> :host(host-1) { background: red !important; } </style>';
         Assert.InRange(red, 1, 50 * 20);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SlotlessShadowRoot_HidesHostLightChildren()
     {
         // With no <slot> in the shadow tree the light children can never be assigned, so they

@@ -5,7 +5,7 @@ namespace Broiler.Cli.Tests;
 
 public class GraphicsBackendCutoverTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BGraphicsBackend_Defaults_To_Broiler_Raster_Mode()
     {
         Assert.Equal(BGraphicsBackend.BroilerRasterId, BGraphicsBackend.CurrentId);
@@ -13,7 +13,7 @@ public class GraphicsBackendCutoverTests
         Assert.True(BGraphicsBackend.UseBroilerRasterPipeline);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BGraphicsBackend_Ignores_The_Legacy_Environment_Variable_Fallback()
     {
         const string legacyVariable = "BROILER_GRAPHICS_BACKEND";
@@ -61,7 +61,7 @@ public class GraphicsBackendCutoverTests
     /// coverage of the <c>renderBackend</c> metadata anywhere, and it runs the real
     /// <c>--capture-image</c> path end to end.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task CaptureArtifactMetadata_Records_The_Active_Backend()
     {
         var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");

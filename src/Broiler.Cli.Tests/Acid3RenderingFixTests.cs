@@ -18,7 +18,7 @@ public class Acid3RenderingFixTests
     /// baseline.  The layout engine must parse the length and offset the
     /// inline-block accordingly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VerticalAlign_Length_Raises_InlineBlock()
     {
         // Use padding-top on the container so the raised box stays within
@@ -59,7 +59,7 @@ body { margin: 0; padding: 0; }
     /// below the baseline.  Verify the offset code path is exercised and
     /// the box is rendered without error.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VerticalAlign_Negative_Length_Lowers_InlineBlock()
     {
         var html = @"<!DOCTYPE html>
@@ -105,7 +105,7 @@ body { margin: 0; padding: 0; }
     /// vertical-align: 1em raises that bottom edge 1em above the parent
     /// baseline, so the box top = baseline - boxHeight - 1em.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VerticalAlign_Em_Units_Resolved()
     {
         // Use a container tall enough (padding-top: 80px) so that the
@@ -150,7 +150,7 @@ body { margin: 0; }
     /// WHATWG rendering spec §14.3.5.  This ensures they participate
     /// correctly in inline flow and have the expected default border.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Has_Default_InlineBlock_Display()
     {
         var html = @"<!DOCTYPE html>
@@ -182,7 +182,7 @@ document.getElementById('test').textContent =
     /// it still affects layout. Borders, backgrounds and content should
     /// NOT be painted for hidden elements.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Visibility_Hidden_Hides_Border_In_Render()
     {
         var html = @"<!DOCTYPE html>
@@ -214,7 +214,7 @@ body { margin: 0; background: white; }
     /// CSS 2.1 §11.2: Children of a visibility:hidden element can
     /// override with visibility:visible and should be painted.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Visibility_Hidden_Child_Visible_Painted()
     {
         var html = @"<!DOCTYPE html>
@@ -244,7 +244,7 @@ body { margin: 0; background: white; }
     /// collapse to a single space in normal flow.  Words from adjacent
     /// text nodes should not run together.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inline_Text_Preserves_Whitespace_Between_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -275,7 +275,7 @@ document.getElementById('test').setAttribute('data-text', p.textContent);
     /// positioned relative to their containing block (nearest positioned
     /// ancestor or initial containing block).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoElement_Absolute_Position_Computed()
     {
         var html = @"<!DOCTYPE html>
@@ -306,7 +306,7 @@ body { margin: 0; background: white; position: relative; }
     /// vertical-align:2em.  With font:0/0 on the container, the strut
     /// height is zero, so the inline-blocks should be compactly laid out.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Bucket_Layout_With_VerticalAlign_2em()
     {
         var html = @"<!DOCTYPE html>
@@ -345,7 +345,7 @@ body { margin: 0; }
     /// Combined with !important, this ensures the full override in the
     /// Acid3 rule: * + * > * > p { border: 1px solid !important }
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Border_Shorthand_Resets_All_SubProperties()
     {
         var html = @"<!DOCTYPE html>
@@ -374,7 +374,7 @@ body { margin: 0; background: white; }
     /// previous 'border: 2em dotted red' on all sub-properties including
     /// border-width, border-style, and border-color.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Border_Important_Overrides_All_SubProperties()
     {
         var html = @"<!DOCTYPE html>

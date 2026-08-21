@@ -27,7 +27,7 @@ public sealed class SharedGeometryZoomSizeTests
         return ctx.Eval(expr).ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Client_Metrics_Are_Unzoomed_By_Own_Zoom()
     {
         // zoom:2 container, width 20 + padding 10px 20px → clientWidth 60, clientHeight 40
@@ -37,7 +37,7 @@ public sealed class SharedGeometryZoomSizeTests
             "(function(){var c=document.getElementById('c');return [c.clientWidth,c.clientHeight].join(',');})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Offset_Metrics_Are_Unzoomed_By_Own_Zoom()
     {
         const string body = "<div id='c' style='zoom:2;width:100px;height:40px'></div>";
@@ -45,7 +45,7 @@ public sealed class SharedGeometryZoomSizeTests
             "(function(){var c=document.getElementById('c');return [c.offsetWidth,c.offsetHeight].join(',');})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Scroll_Overflow_Counts_Child_Zoom_In_Unzoomed_Container_Pixels()
     {
         // Container (no zoom) 20×20 + padding 10px 20px; child 20×20 with zoom:2 renders
@@ -58,7 +58,7 @@ public sealed class SharedGeometryZoomSizeTests
             "return [c.clientWidth,c.clientHeight,c.scrollWidth,c.scrollHeight].join(',');})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Zoomed_Client_Stays_Unzoomed_After_A_Snapshot_Build()
     {
         // RF-BRIDGE-1b render-doc/live-doc separation regression: an unzoomed query (u)
@@ -74,7 +74,7 @@ public sealed class SharedGeometryZoomSizeTests
             "var z=document.getElementById('z');return first+'|'+z.clientWidth;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Container_Own_Zoom_Divides_Out_Of_Scroll_Overflow()
     {
         // Container zoom:2, child 20×20 (no own zoom) → scrollWidth 60 in container pixels.

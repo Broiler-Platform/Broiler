@@ -47,7 +47,7 @@ public sealed class GridAbsposImplicitTrackTests
         new("2 / 4", "2 / 4", 415, 265, 400, 300),
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsposItems_ResolveAgainstImplicitExtendedGrid()
     {
         var body = new System.Text.StringBuilder();

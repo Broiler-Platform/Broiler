@@ -54,7 +54,7 @@ public class SkiaDecouplingGuardTests
         "SkiaSharp.NativeAssets.Linux",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonImage_Production_Source_Does_Not_Reference_SkiaSharp()
     {
         var violations = new List<string>();
@@ -110,7 +110,7 @@ public class SkiaDecouplingGuardTests
             "Non-image production source should stay Skia-free.\n" + string.Join(Environment.NewLine, violations));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HighLevel_Rendering_Surface_Does_Not_Expose_SkiaSharp()
     {
         var members = GetHighLevelSkiaCompatibilityMembers();
@@ -121,7 +121,7 @@ public class SkiaDecouplingGuardTests
             string.Join(Environment.NewLine, members.Select(DescribeMember)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonAbstraction_Cli_Tests_Do_Not_Reference_SkiaSharp()
     {
         var violations = FindSkiaSourceViolations(
@@ -134,7 +134,7 @@ public class SkiaDecouplingGuardTests
             string.Join(Environment.NewLine, violations));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Project_Carries_Skia_Package_References()
     {
         var actual = Directory.EnumerateFiles(RepoRoot, "*.csproj", SearchOption.AllDirectories)
@@ -158,7 +158,7 @@ public class SkiaDecouplingGuardTests
         Assert.Empty(actual);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Image_Compat_Project_Does_Not_Carry_SkiaSharp_Packages()
     {
         var projectPath = Path.Combine(RepoRoot, ImageCompatProjectRelativePath);
@@ -177,7 +177,7 @@ public class SkiaDecouplingGuardTests
         Assert.DoesNotContain("SkiaSharp.NativeAssets.Linux", packages.Keys);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Image_Color_Parsing_Does_Not_Call_SkiaSharp_Color_Parser()
     {
         var adapterPath = Path.Combine(
@@ -193,7 +193,7 @@ public class SkiaDecouplingGuardTests
         Assert.DoesNotContain("SKColor.TryParse", source, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Image_System_Font_Enumeration_Does_Not_Call_Skia_Font_Manager()
     {
         var adapterPath = Path.Combine(

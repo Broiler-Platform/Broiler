@@ -77,7 +77,7 @@ public class NativeDocScrollWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineScrollsDocumentContent_AndPinsFixed()
     {
         var r = Render(native: true);

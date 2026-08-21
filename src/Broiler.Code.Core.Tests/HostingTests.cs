@@ -5,7 +5,7 @@ namespace Broiler.Code.Core.Tests;
 
 public sealed class HostingTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Dispatcher_Runs_Posted_Work_On_The_Thread_That_Created_It()
     {
         var dispatcher = new UiThreadDispatcher();
@@ -24,7 +24,7 @@ public sealed class HostingTests
         Assert.Equal(uiThread, ranOn);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Check_Access_Is_False_Off_The_Ui_Thread()
     {
         var dispatcher = new UiThreadDispatcher();
@@ -33,7 +33,7 @@ public sealed class HostingTests
         Assert.False(Task.Run(dispatcher.CheckAccess).Result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Draining_Off_The_Ui_Thread_Throws_Rather_Than_Running_Ui_Work_There()
     {
         var dispatcher = new UiThreadDispatcher();
@@ -46,7 +46,7 @@ public sealed class HostingTests
         Assert.Equal(1, dispatcher.PendingCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Callback_That_Posts_More_Work_Cannot_Starve_The_Frame()
     {
         var dispatcher = new UiThreadDispatcher();
@@ -67,7 +67,7 @@ public sealed class HostingTests
         Assert.Equal(1, dispatcher.PendingCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Wake_Callback_Fires_So_A_Host_Knows_To_Drain()
     {
         int woken = 0;
@@ -78,7 +78,7 @@ public sealed class HostingTests
         Assert.Equal(1, woken);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Routing_Gives_Every_Event_A_Distinct_Ordered_Header()
     {
         var router = new DesktopInputRouter("test-host");
@@ -92,7 +92,7 @@ public sealed class HostingTests
         Assert.Equal(first.Header.DeviceId, second.Header.DeviceId);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pointer_And_Keyboard_Events_Come_From_Different_Devices()
     {
         var router = new DesktopInputRouter("test-host");
@@ -119,7 +119,7 @@ public sealed class HostingTests
     public void Virtual_Keys_Map_To_The_Names_The_Controls_Switch_On(int virtualKey, string expected) =>
         Assert.Equal(expected, DesktopInputRouter.MapVirtualKey(virtualKey));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Cancelled_Composition_Is_Not_An_Empty_Commit()
     {
         var router = new DesktopInputRouter("test-host");
@@ -217,7 +217,7 @@ public sealed class HostingTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Report_Distinguishes_An_Honest_Gap_From_A_Substitute()
     {
         var withGap = new HostServiceReport("gap",

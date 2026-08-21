@@ -46,7 +46,7 @@ public sealed class GridImplicitColumnIntrinsicWidthTests
         + ".item{background:grey;height:8px}"
         + "</style></head><body>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DefiniteGridColumn_PastTheTemplate_SizesTheContainerFromGridAutoColumns()
     {
         // `grid-column: 3 / span 4` occupies columns 3..6, so the grid is six
@@ -62,7 +62,7 @@ public sealed class GridImplicitColumnIntrinsicWidthTests
         Assert.Equal(60, Value("div#a", "width", by), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AutoPlacedItem_InATemplatelessGrid_SizesTheContainerFromGridAutoColumns()
     {
         // No template at all: the single auto-placed item generates the one
@@ -76,7 +76,7 @@ public sealed class GridImplicitColumnIntrinsicWidthTests
         Assert.Equal(15, Value("div#a", "width", by), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImplicitColumns_ExtendTheTemplate_RatherThanReplacingIt()
     {
         // Two 20px explicit tracks, then two 15px implicit ones for the item at
@@ -92,7 +92,7 @@ public sealed class GridImplicitColumnIntrinsicWidthTests
         Assert.Equal(56, Value("div#a", "offset-x", by), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColumnGap_IsChargedBetweenTheImplicitColumnsToo()
     {
         // Three implicit tracks carry two gaps: 3×15 + 2×10 = 65, plus the border.
@@ -105,7 +105,7 @@ public sealed class GridImplicitColumnIntrinsicWidthTests
         Assert.Equal(67, Value("div#g", "width", by), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnIntrinsicGridAutoColumns_LeavesTheIntrinsicWidthAlone()
     {
         // `grid-auto-columns` is left at its initial `auto`, whose size comes from

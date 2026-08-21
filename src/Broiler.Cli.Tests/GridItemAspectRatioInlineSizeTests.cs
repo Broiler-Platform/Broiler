@@ -87,13 +87,13 @@ public sealed class GridItemAspectRatioInlineSizeTests
     /// nothing to fill in and the stated size stands whatever <c>justify-self</c> says. This
     /// is the case that caught the first draft, where testing "does not fill its area" alone
     /// let the ratio overwrite the author's 20px with its own 16.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AStatedWidthIsNotOverriddenByTheRatio() =>
         Assert.Equal(20, Item("start", "width:20px;").width, 3);
 
     /// <summary>CSS2.1 §10.4: the derived inline size is still subject to
     /// <c>min-width</c>/<c>max-width</c>. The ratio asks for 16; the floor says 20.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheDerivedInlineSizeIsClampedToMinWidth() =>
         Assert.Equal(20, Item("start", "min-width:20px;").width, 3);
 
@@ -105,7 +105,7 @@ public sealed class GridItemAspectRatioInlineSizeTests
     /// box to 20. Measured in Chromium as 20.00 × 36.00 rather than derived on paper — the
     /// arithmetic this test first shipped with said 18 and was wrong.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheRatioAppliesInTheBoxNamedByBoxSizing()
     {
         var item = Item("start", "box-sizing:content-box;padding:2px;");

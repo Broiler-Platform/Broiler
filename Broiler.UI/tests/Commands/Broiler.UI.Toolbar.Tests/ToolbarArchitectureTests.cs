@@ -50,7 +50,7 @@ public sealed class ToolbarArchitectureTests
         Assert.DoesNotContain(references, reference => reference.Contains("Direct2D", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Toolbar_Assembly_Exposes_Abstract_Base_And_Standard_Assembly_One_Primary_Control()
     {
         Assert.True(typeof(UiToolbar).IsAbstract);
@@ -64,7 +64,7 @@ public sealed class ToolbarArchitectureTests
         Assert.Equal(typeof(StandardToolbar), actual);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Toolbar_Runtime_Assemblies_Do_Not_Expose_Native_Handles_Or_Windows_Types()
     {
         Assembly[] assemblies =

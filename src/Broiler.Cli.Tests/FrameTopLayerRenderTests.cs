@@ -73,7 +73,7 @@ public class FrameTopLayerRenderTests
 
     /// <summary>The bug itself: a modal dialog in a frame is centred in that frame's viewport.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModalDialogInFrame_IsCentredInTheFrameViewport()
     {
         var (centre, _) = Render(ShowModal);
@@ -83,7 +83,7 @@ public class FrameTopLayerRenderTests
 
     /// <summary>And its <c>::backdrop</c> scrim paints behind it, over the rest of the frame.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModalDialogInFrame_PaintsItsBackdrop()
     {
         var (_, corner) = Render(ShowModal);
@@ -97,7 +97,7 @@ public class FrameTopLayerRenderTests
     /// frame's stylesheet-set size to be readable at all: against a 0×0 viewport the scrim was
     /// generated and then painted nothing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModalDialogInFrame_PaintsItsBackdrop_WhenSynthesizedAsADiv()
     {
         var (_, corner) = Render(ShowModal, nativeBackdrop: false);
@@ -109,7 +109,7 @@ public class FrameTopLayerRenderTests
     /// A non-modal <c>show()</c> is not a top-layer dialog: no centring, no scrim. It stays where
     /// normal flow puts it, so the frame's corner is its own white canvas and the centre is empty.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonModalDialogInFrame_IsLeftInNormalFlow()
     {
         var (centre, corner) = Render(Show);
@@ -120,7 +120,7 @@ public class FrameTopLayerRenderTests
 
     /// <summary>A frame with no open dialog is untouched — the frame's own canvas, no scrim.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameWithNoOpenDialog_IsUntouched()
     {
         var (centre, corner) = Render(string.Empty);

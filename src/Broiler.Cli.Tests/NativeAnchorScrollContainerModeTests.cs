@@ -49,7 +49,7 @@ public sealed class NativeAnchorScrollContainerModeTests
         return html.Substring(open, close - open + 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MvpScrollContainerBox_IsNeverBaked()
     {
         var tag = TargetTag(ResolveAndSerialize(nativeMode: true));

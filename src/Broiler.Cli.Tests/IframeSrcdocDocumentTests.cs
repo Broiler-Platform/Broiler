@@ -42,7 +42,7 @@ public class IframeSrcdocDocumentTests
 
     /// <summary>The bug itself: a srcdoc document renders, rather than leaving the frame empty.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Srcdoc_RendersItsDocument()
     {
         Assert.Equal(Blue, RenderFrameCentre(
@@ -53,7 +53,7 @@ public class IframeSrcdocDocumentTests
     /// <c>srcdoc</c> wins over <c>src</c>: the frame navigates to the inline markup and never
     /// fetches the URL.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Srcdoc_TakesPrecedenceOverSrc()
     {
         Assert.Equal(Blue, RenderFrameCentre(
@@ -62,7 +62,7 @@ public class IframeSrcdocDocumentTests
 
     /// <summary>A frame with only <c>src</c> is unaffected — the path that already worked keeps
     /// working.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SrcOnly_StillRendersItsDocument()
     {
         Assert.Equal(Red, RenderFrameCentre(
@@ -73,14 +73,14 @@ public class IframeSrcdocDocumentTests
     /// An empty <c>srcdoc</c> is not a document to paint: the reference browser leaves the frame
     /// showing nothing, so the host page shows through rather than a blank canvas appearing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmptySrcdoc_PaintsNothing()
     {
         Assert.Equal(HostGreen, RenderFrameCentre("""<iframe srcdoc=""></iframe>"""));
     }
 
     /// <summary>Neither attribute is still an empty frame.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameWithNeitherAttribute_PaintsNothing()
     {
         Assert.Equal(HostGreen, RenderFrameCentre("<iframe></iframe>"));
@@ -90,7 +90,7 @@ public class IframeSrcdocDocumentTests
     /// The srcdoc markup is a whole document, not a fragment: its own <c>&lt;style&gt;</c> applies
     /// to it and not to the host (the host's green would otherwise be overwritten).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SrcdocStylesApplyInsideTheFrameOnly()
     {
         var html = """
@@ -114,7 +114,7 @@ public class IframeSrcdocDocumentTests
     /// A <c>&lt;frame&gt;</c> has no <c>srcdoc</c> content attribute, so one written on it is
     /// inert and the element falls back to <c>src</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameElement_HasNoSrcdoc()
     {
         var html = """

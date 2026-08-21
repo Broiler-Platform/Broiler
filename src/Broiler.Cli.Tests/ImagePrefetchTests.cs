@@ -163,7 +163,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// Guards the guard: every document above must actually reach the walk, or the equality
     /// assertions are comparing the serial path with itself.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void These_Documents_Actually_Reach_The_Walk()
     {
         foreach ((string name, string html) in Documents)
@@ -184,7 +184,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// A budget of one is the pre-change path, not a one-wide version of the new one: the walk does
     /// not run, so every box creates its loader in <c>MeasureWordsSize</c> exactly where it used to.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Budget_Of_One_Does_Not_Walk_At_All()
     {
         var counts = RenderCounting(Documents["several images"], concurrentLoads: 1);
@@ -202,7 +202,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// One image is not worth a worker: there is nothing to overlap it with, because the layout pass
     /// that would otherwise have loaded it has not started.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_Naming_One_Image_Is_Left_Alone()
     {
         var counts = RenderCounting(
@@ -217,7 +217,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// A document with no images at all is neither walked nor counted as a skip — "nothing to do" is
     /// not one of the two reasons a page can be declined for.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_With_No_Images_Is_Not_Counted_At_All()
     {
         var counts = RenderCounting(Document("<p>no images here</p>"), concurrentLoads: 4);
@@ -237,7 +237,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// a relayout request on a worker it never agreed to be called back on is exactly what a
     /// speculation must not do. So the configuration is declined rather than accommodated.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Host_That_Permits_Late_Image_Loading_Is_Skipped()
     {
         var counts = RenderCounting(
@@ -259,7 +259,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// way, so a walk that loaded it would render identically and differ only in what it fetched and
     /// what it reported. Two of the five images in this document are hidden.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Image_In_A_Hidden_Subtree_Is_Not_Claimed()
     {
         var counts = RenderCounting(Documents["hidden images"], concurrentLoads: 4);
@@ -279,7 +279,7 @@ public sealed class ImagePrefetchTests : IClassFixture<ImagePrefetchTests.ImageF
     /// the loads no longer complete in document order and nothing about an image failure's meaning
     /// depends on which of two the host hears about first.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Broken_Source_Is_Reported_The_Same_Number_Of_Times()
     {
         var serial = CountImageErrors(Documents["broken sources"], concurrentLoads: 1);

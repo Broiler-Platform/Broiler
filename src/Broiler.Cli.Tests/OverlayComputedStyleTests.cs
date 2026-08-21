@@ -10,7 +10,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class OverlayComputedStyleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OverlayComputedValue_IsNone_ForOrdinaryElement()
     {
         var html = @"<!DOCTYPE html><html><body>
@@ -23,7 +23,7 @@ document.getElementById('result').textContent = 'overlay=' + getComputedStyle(do
         Assert.Contains("overlay=none", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShownPopover_WithDiscreteOverlayTransition_ComputesOverlayNone_DuringTransitionIn()
     {
         // The overlay-transition-finished guard: right after showPopover(), a step-end + allow-discrete
@@ -43,7 +43,7 @@ document.getElementById('result').textContent = 'overlay=' + getComputedStyle(p)
         Assert.Contains("overlay=none", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShownPopover_WithoutOverlayTransition_ComputesOverlayAuto()
     {
         // A settled top-layer element (no overlay transition) computes to `auto`.

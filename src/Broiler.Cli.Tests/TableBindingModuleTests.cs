@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class TableBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(TableBinding);
@@ -23,7 +23,7 @@ public sealed class TableBindingModuleTests
         Assert.False(typeof(ITableHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Table_Through_The_Host_Contract()
     {
         Assert.True(typeof(ITableHost).IsAssignableFrom(typeof(DomBridge)));
@@ -32,7 +32,7 @@ public sealed class TableBindingModuleTests
             static field => field.FieldType == typeof(TableBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertRow_And_InsertCell_Build_The_Table_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -57,7 +57,7 @@ document.body.appendChild(out);
         Assert.Contains("rows=1|cells=2|rowIndex=0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rows_Are_Collected_In_Section_Spec_Order_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -84,7 +84,7 @@ document.body.appendChild(out);
         Assert.Contains("order=h,b,f", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateTHead_And_DeleteRow_Mutate_The_Table_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

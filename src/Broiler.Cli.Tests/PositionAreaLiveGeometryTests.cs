@@ -58,7 +58,7 @@ public sealed class PositionAreaLiveGeometryTests
         Assert.Equal(height, h);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonStretchExplicitSize_ReportsUsedBox_NotTheGridCell()
     {
         // A NON-stretch, explicitly-sized position-area box: borderless 300×300 CB, 100×100
@@ -85,7 +85,7 @@ public sealed class PositionAreaLiveGeometryTests
         Assert.Equal(200, Read("offsetTop"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderlessCb_IsUnaffected_ByThePaddingBoxFrame()
     {
         // Control: with no CB border the padding-box and border-box origins coincide, so the
@@ -111,7 +111,7 @@ public sealed class PositionAreaLiveGeometryTests
         Assert.Equal(100, H());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BakedPositionArea_MarginPadding_ResolveAgainstContainingBlockInlineAxis()
     {
         // CSS Writing Modes §7.4 / CSS Box Model §3: percentage margins and padding
@@ -162,7 +162,7 @@ public sealed class PositionAreaLiveGeometryTests
             "horizontal-CB padding must exceed vertical-CB padding (inline-axis basis differs)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetBoundingClientRect_LivePositionArea_AgreesWithOffsetGetters()
     {
         // getBoundingClientRect must report the same live position-area geometry as

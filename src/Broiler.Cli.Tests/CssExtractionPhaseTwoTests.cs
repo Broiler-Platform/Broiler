@@ -6,7 +6,7 @@ namespace Broiler.Cli.Tests;
 
 public sealed class CssExtractionPhaseTwoTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Renderer_And_Bridge_Reference_The_Shared_Css_Kernel()
     {
         var root = FindRepositoryRoot();
@@ -28,7 +28,7 @@ public sealed class CssExtractionPhaseTwoTests
             @"..\..\Broiler.CSS\Broiler.CSS\Broiler.CSS.csproj");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_Uses_Shared_Parsing_For_Complex_Declarations_And_Media_Rules()
     {
         const string css = """
@@ -63,7 +63,7 @@ public sealed class CssExtractionPhaseTwoTests
         Assert.Equal("calc(10px + 5px)", mediaAsset.Declarations.GetPropertyValue("width"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_No_Longer_Declares_Regex_Rule_Splitters()
     {
         var root = FindRepositoryRoot();

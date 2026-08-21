@@ -10,7 +10,7 @@ public class CssRenderingTests
 {
     // ────────────────────── hsl() color parsing ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsl_Color_Applied_Via_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -27,7 +27,7 @@ document.getElementById('result').textContent = d.style.color;
         Assert.Contains("hsl(0, 100%, 50%)", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsl_Color_GetComputedStyle_Returns_Value()
     {
         var html = @"<!DOCTYPE html>
@@ -51,7 +51,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsla_Color_Applied_Via_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -68,7 +68,7 @@ document.getElementById('result').textContent = d.style.color;
         Assert.Contains("hsla(0, 0%, 0%, 1.0)", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsla_Color_GetComputedStyle_Returns_Value()
     {
         var html = @"<!DOCTYPE html>
@@ -92,7 +92,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsla_Color_Without_Percent_Signs()
     {
         // Acid3 uses: color: hsla(0, 0, 0, 1) — without % on saturation/lightness
@@ -114,7 +114,7 @@ document.getElementById('result').textContent = cs.color;
         Assert.Contains("hsla(0, 0, 0, 1)", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsl_Color_Override_Previous_Value()
     {
         // Acid3 pattern: color: red; color: hsla(0, 0%, 0%, 1.0);
@@ -138,7 +138,7 @@ document.getElementById('result').textContent = cs.color;
 
     // ────────────────────── @font-face rule handling ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontFace_Rule_In_StyleSheet_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -171,7 +171,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontFace_Rule_Style_Property_Access()
     {
         var html = @"<!DOCTYPE html>
@@ -202,7 +202,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssFontFaceRule_Exposes_Style_Backreferences_And_Style_Methods()
     {
         var html = @"<!DOCTYPE html>
@@ -237,7 +237,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssFontFaceRule_Preserves_Mixed_Rule_Order_With_Charset_And_Page()
     {
         var html = @"<!DOCTYPE html>
@@ -268,7 +268,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPropertyRule_Exposes_Name_Syntax_Inherits_InitialValue_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -305,7 +305,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPropertyRule_Preserves_Mixed_Rule_Order_With_Charset_FontFace_And_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -341,7 +341,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssCounterStyleRule_Exposes_Name_Descriptors_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -379,7 +379,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssCounterStyleRule_Preserves_Mixed_Rule_Order_With_Charset_Property_FontFace_And_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -420,7 +420,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleRule_Has_Type_1()
     {
         var html = @"<!DOCTYPE html>
@@ -444,7 +444,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleRule_SelectorText_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -471,7 +471,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── text-shadow property ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextShadow_GetComputedStyle_Returns_Value()
     {
         var html = @"<!DOCTYPE html>
@@ -496,7 +496,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextShadow_Set_Via_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -517,7 +517,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextShadow_CssText_Includes_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -536,7 +536,7 @@ document.getElementById('result').textContent = el.style.cssText.indexOf('text-s
 
     // ────────────────────── position: fixed ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionFixed_GetComputedStyle_Returns_Fixed()
     {
         var html = @"<!DOCTYPE html>
@@ -561,7 +561,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionFixed_Set_Via_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -585,7 +585,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionFixed_With_Percentage_Values()
     {
         var html = @"<!DOCTYPE html>
@@ -612,7 +612,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── data: URI backgrounds ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUri_Background_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -637,7 +637,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUri_Background_Set_Via_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -659,7 +659,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── :root selector styling ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Selector_GetComputedStyle_Applies()
     {
         var html = @"<!DOCTYPE html>
@@ -682,7 +682,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Selector_Does_Not_Apply_To_Body()
     {
         var html = @"<!DOCTYPE html>
@@ -707,7 +707,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── CSS rule style object ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRule_Style_CamelCase_Access()
     {
         var html = @"<!DOCTYPE html>
@@ -732,7 +732,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRule_Style_KebabCase_Access()
     {
         var html = @"<!DOCTYPE html>
@@ -756,7 +756,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRule_Style_Cssom_Methods_Enumerate_And_Read_Priority()
     {
         var html = @"<!DOCTYPE html>
@@ -783,7 +783,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("red,important,2,color,font-size,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRule_Style_SetProperty_And_RemoveProperty_Modify_Rule_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -811,7 +811,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("2px,important,2px,true,red,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRule_Style_CssText_Getter_And_Setter_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -838,7 +838,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,blue,left,2,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRule_Parent_Backreferences_Are_Exposed()
     {
         var html = @"<!DOCTYPE html>
@@ -863,7 +863,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_And_Computed_Style_ParentRule_Is_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -887,7 +887,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssMediaRule_Exposes_Type_Media_And_Nested_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -913,7 +913,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssMediaRule_Nested_Rules_Expose_Backreferences()
     {
         var html = @"<!DOCTYPE html>
@@ -940,7 +940,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssMediaRule_CssText_Rebuilds_From_Nested_Rules()
     {
         var html = @"<!DOCTYPE html>
@@ -965,7 +965,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssMediaRule_CssRules_Item_InsertRule_And_DeleteRule_Update_Nested_List_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -997,7 +997,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssImportRule_Exposes_Type_Href_Media_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -1023,7 +1023,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssImportRule_Can_Use_Quoted_Href_Syntax()
     {
         var html = @"<!DOCTYPE html>
@@ -1047,7 +1047,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssImportRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1076,7 +1076,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssKeyframesRule_Exposes_Type_Name_And_Nested_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -1103,7 +1103,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssKeyframesRule_Keyframe_Rules_Expose_Style_And_Backreferences()
     {
         var html = @"<!DOCTYPE html>
@@ -1132,7 +1132,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssKeyframesRule_CssText_Rebuilds_From_Nested_Keyframes()
     {
         var html = @"<!DOCTYPE html>
@@ -1157,7 +1157,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssKeyframesRule_CssRules_InsertRule_And_DeleteRule_Update_Keyframes_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -1189,7 +1189,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssKeyframesRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1220,7 +1220,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssSupportsRule_Exposes_Type_ConditionText_And_Nested_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -1246,7 +1246,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssSupportsRule_Nested_Rules_Expose_Backreferences()
     {
         var html = @"<!DOCTYPE html>
@@ -1273,7 +1273,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssSupportsRule_CssText_Rebuilds_From_Nested_Rules()
     {
         var html = @"<!DOCTYPE html>
@@ -1298,7 +1298,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssSupportsRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1329,7 +1329,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssLayerRule_Exposes_Type_Name_And_Nested_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -1355,7 +1355,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssLayerRule_Anonymous_Block_Exposes_Null_Name_And_Backreferences()
     {
         var html = @"<!DOCTYPE html>
@@ -1383,7 +1383,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssLayerRule_Statement_Form_Is_Preserved_In_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -1411,7 +1411,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssLayerRule_CssText_Rebuilds_From_Nested_Rules()
     {
         var html = @"<!DOCTYPE html>
@@ -1436,7 +1436,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssLayerRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1469,7 +1469,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssNamespaceRule_Exposes_Type_NamespaceUri_And_Prefix()
     {
         var html = @"<!DOCTYPE html>
@@ -1499,7 +1499,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssNamespaceRule_Supports_Url_Syntax_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -1525,7 +1525,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssNamespaceRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1556,7 +1556,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPageRule_Exposes_Type_SelectorText_And_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -1585,7 +1585,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPageRule_Supports_Pseudo_Selectors_And_CssText_Rebuild()
     {
         var html = @"<!DOCTYPE html>
@@ -1612,7 +1612,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPageRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1643,7 +1643,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssCharsetRule_Exposes_Type_Encoding_And_CssText()
     {
         var html = @"<!DOCTYPE html>
@@ -1671,7 +1671,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssCharsetRule_Preserves_Mixed_Rule_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -1707,7 +1707,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Acid3-specific CSS patterns ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Style_Block_FontFace_And_Rules()
     {
         // Simulates the Acid3 CSS structure with @font-face + regular rules
@@ -1754,7 +1754,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Position_Fixed_Object_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -1780,7 +1780,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Multiple_CamelCase_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -1807,7 +1807,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontFace_Rule_Does_Not_Match_As_Selector()
     {
         // @font-face should not be applied as a selector rule
@@ -1835,7 +1835,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Multiple_StyleSheets_Both_Have_Rules()
     {
         var html = @"<!DOCTYPE html>
@@ -1871,7 +1871,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DeleteRule_On_StyleSheet()
     {
         var html = @"<!DOCTYPE html>
@@ -1894,7 +1894,7 @@ document.getElementById('result').textContent = initLen + ':' + sheet.cssRules.l
         Assert.Contains("2:1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertRule_On_StyleSheet_Updates_Live_CssRules_And_Clears_Deleted_Indices()
     {
         var html = @"<!DOCTYPE html>
@@ -1926,7 +1926,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheet_InsertRule_Does_Not_Reappear_After_Owner_TextContent_Is_Replaced()
     {
         var html = @"<!DOCTYPE html>
@@ -1955,7 +1955,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheet_InsertRule_Is_Observed_By_GetComputedStyle()
     {
         // Phase 6 store unification: a script CSSOM insertRule()/deleteRule() must be
@@ -1985,7 +1985,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheet_InsertRule_Reaches_The_Rendered_Document()
     {
         // insertRule()/deleteRule() mutate the shared rule model, not the <style>
@@ -2016,7 +2016,7 @@ document.styleSheets[0].deleteRule(1);
         Assert.DoesNotContain(".doomed", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheet_Without_Cssom_Mutation_Keeps_Its_Author_Text()
     {
         // The bake is gated on the mutated flag: an untouched stylesheet must serialize
@@ -2037,7 +2037,7 @@ document.styleSheets[0].deleteRule(1);
         Assert.Contains("/* keep me */", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cursor_Property_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -2058,7 +2058,7 @@ document.getElementById('result').textContent = cs.cursor;
         Assert.Contains("help", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontWeight_Bolder_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -2082,7 +2082,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderWidth_Shorthand_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -2107,7 +2107,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Margin_Negative_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>

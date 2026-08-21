@@ -25,7 +25,7 @@ public class RootContentReplacementTests : IDisposable
     private const int W = 400;
     private const int H = 300;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootContentUrl_ReplacesRoot_BodyBackgroundDoesNotReachCanvas()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-rootcontent-" + System.Guid.NewGuid().ToString("N"));
@@ -77,7 +77,7 @@ public class RootContentReplacementTests : IDisposable
     /// aquamarine canvas. The render prep used to clear the root's background alongside the
     /// body's, leaving a white canvas — 1.3% pixel match against the Chromium reference.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootContentUrl_RootOwnBackgroundStillReachesCanvas()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-rootcontent-" + System.Guid.NewGuid().ToString("N"));
@@ -120,7 +120,7 @@ public class RootContentReplacementTests : IDisposable
 
     // A normal page (no root `content`) must be unaffected: the body background
     // still propagates to the canvas.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NormalPage_BodyBackgroundStillPropagatesToCanvas()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-rootcontent-" + System.Guid.NewGuid().ToString("N"));

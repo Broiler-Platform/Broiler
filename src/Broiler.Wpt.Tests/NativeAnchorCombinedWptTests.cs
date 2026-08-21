@@ -82,7 +82,7 @@ public class NativeAnchorCombinedWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineSizesAndPlacesCombinedBox()
     {
         var red = Render(nativeAnchor: true);

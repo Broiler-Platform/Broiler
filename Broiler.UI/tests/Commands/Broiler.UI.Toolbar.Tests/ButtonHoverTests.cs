@@ -9,7 +9,7 @@ namespace Broiler.UI.Toolbar.Tests;
 
 public sealed class ButtonHoverTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Button_Hover_Background_Clears_After_Pointer_Leaves()
     {
         var host = new TestHost(new BSize(220, 60));

@@ -52,7 +52,7 @@ public class FixedPositionContainingBlockWptTests
 <div id="containing-block"><span id="contain-paint"><div id="fixed"></div></span></div>
 """;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FixedChild_ResolvesAgainstTransformedAncestor_NotTheViewport()
     {
         using var bmp = Render(Html);
@@ -75,7 +75,7 @@ public class FixedPositionContainingBlockWptTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FixedChild_WithNoEstablishingAncestor_StillUsesTheViewport()
     {
         // The other direction: with nothing establishing a containing block, a fixed box keeps

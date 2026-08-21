@@ -48,7 +48,7 @@ public sealed class ShellChromeTests : IDisposable
         return directory;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Menu_Text_Carries_A_Mnemonic_Ampersand()
     {
         using Fixture fixture = Fixture.Create();
@@ -60,7 +60,7 @@ public sealed class ShellChromeTests : IDisposable
             Assert.DoesNotContain("&", item.Text, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Top_Level_Menus_Still_Have_Their_Access_Keys()
     {
         using Fixture fixture = Fixture.Create();
@@ -75,7 +75,7 @@ public sealed class ShellChromeTests : IDisposable
         Assert.Equal('S', file.Children.First(c => c.CommandName == CodeCommandNames.Save).AccessKey);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Toolbar_Carries_Buttons_Bound_To_Commands()
     {
         using Fixture fixture = Fixture.Create();
@@ -95,7 +95,7 @@ public sealed class ShellChromeTests : IDisposable
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Toolbar_Button_Runs_The_Same_Command_The_Menu_Does()
     {
         using Fixture fixture = Fixture.Create();
@@ -114,7 +114,7 @@ public sealed class ShellChromeTests : IDisposable
         Assert.Equal(2, fixture.Controls.Tabs.Tabs.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Toolbar_Button_Reflects_Its_Commands_Availability()
     {
         using Fixture fixture = Fixture.Create();
@@ -137,7 +137,7 @@ public sealed class ShellChromeTests : IDisposable
         Assert.False(build.IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task New_Project_Writes_A_Standard_Solution_And_Opens_It()
     {
         string target = Grant("projects");
@@ -167,7 +167,7 @@ public sealed class ShellChromeTests : IDisposable
         Assert.False(fixture.Editor.IsReadOnly);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task New_Project_Refuses_A_Name_That_Is_Not_An_Identifier()
     {
         string target = Grant("projects");
@@ -182,7 +182,7 @@ public sealed class ShellChromeTests : IDisposable
         Assert.Empty(Directory.GetFileSystemEntries(target));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task New_Project_Does_Not_Overwrite_An_Existing_One()
     {
         string target = Grant("projects");

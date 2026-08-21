@@ -119,7 +119,7 @@ public class GoogleSearchComplianceTests
     /// The rendered image must not be entirely white — there should be
     /// visible content (text, buttons, etc).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_Renders_NonBlank_Image()
     {
         using var bitmap = RenderGoogleLike();
@@ -139,7 +139,7 @@ public class GoogleSearchComplianceTests
     /// The top bar (Gmail, Images, Sign in) should contain some visible content
     /// in the first ~50 pixels of the page.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_TopBar_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
@@ -152,7 +152,7 @@ public class GoogleSearchComplianceTests
     /// The logo area (roughly y=120-250) should contain visible text/content.
     /// The logo is rendered as coloured text spans.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_LogoArea_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
@@ -168,7 +168,7 @@ public class GoogleSearchComplianceTests
     /// widget rendering is now implemented with UA default styles and
     /// value text injection for submit buttons.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_SearchBox_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
@@ -184,7 +184,7 @@ public class GoogleSearchComplianceTests
     /// Input submit button rendering is now implemented with value text
     /// injection and UA default styles.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_Buttons_Have_Content()
     {
         using var bitmap = RenderGoogleLike();
@@ -200,7 +200,7 @@ public class GoogleSearchComplianceTests
     /// simplified footer's absolute positioning is rendered into the bottom
     /// viewport band.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_Footer_Has_Content()
     {
         using var bitmap = RenderGoogleLike();
@@ -218,7 +218,7 @@ public class GoogleSearchComplianceTests
     /// implemented), but the colour detection thresholds in this test may
     /// need adjustment for Google's specific blue (#4285F4 has G=133).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_Logo_Contains_Coloured_Pixels()
     {
         using var bitmap = RenderGoogleLike();
@@ -251,7 +251,7 @@ public class GoogleSearchComplianceTests
     /// engine — errors should be caught and execution should continue.
     /// This verifies the catch-and-continue pattern in ExecuteScriptsWithDom.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_JS_Execution_Does_Not_Crash()
     {
         // Simplified HTML with a Google-style inline script that accesses

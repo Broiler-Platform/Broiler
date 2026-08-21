@@ -56,7 +56,7 @@ public sealed class RichEditClipboardTests
         return editor;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Copy_Then_Paste_Round_Trips_Formatting_Through_Rtf()
     {
         TestRichEdit source = Editor(RichTextDocument.FromParagraphs(new[]
@@ -78,7 +78,7 @@ public sealed class RichEditClipboardTests
         Assert.Equal(new BColor(255, 0, 0), paragraph.StyleAt(paragraph.Text.IndexOf("red")).Foreground);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Copy_Returns_False_When_There_Is_No_Selection()
     {
         var editor = new TestRichEdit { Document = RichTextDocument.FromPlainText("text") };
@@ -86,7 +86,7 @@ public sealed class RichEditClipboardTests
         Assert.False(RichEditClipboard.Copy(editor, new FakeRichClipboard()));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paste_Falls_Back_To_Plain_Text_When_No_Rtf_Is_Present()
     {
         var host = new FakeRichClipboard();
@@ -97,7 +97,7 @@ public sealed class RichEditClipboardTests
         Assert.Equal("just text", target.Document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paste_Into_A_Read_Only_Editor_Does_Nothing()
     {
         var host = new FakeRichClipboard();
@@ -108,7 +108,7 @@ public sealed class RichEditClipboardTests
         Assert.Equal(string.Empty, target.Document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rich_Paste_Sanitizes_Malicious_Rtf()
     {
         // An embedded object and a javascript: hyperlink must not survive the paste.
@@ -124,7 +124,7 @@ public sealed class RichEditClipboardTests
         Assert.DoesNotContain(paragraph.Runs, run => run.Style.LinkHref is not null);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelectionToRtf_Serializes_Only_The_Selection()
     {
         var editor = new TestRichEdit

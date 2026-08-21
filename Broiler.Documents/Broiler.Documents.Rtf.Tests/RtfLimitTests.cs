@@ -9,7 +9,7 @@ public sealed class RtfLimitTests
     private static DocumentReadResult Read(string rtf, DocumentLimits limits) =>
         RtfReader.Read(Bytes(rtf), new DocumentReadOptions(limits));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Group_Depth_Limit_Is_Enforced_Without_Overflow()
     {
         DocumentReadResult result = Read(
@@ -20,7 +20,7 @@ public sealed class RtfLimitTests
         Assert.Contains(result.Diagnostics, d => d.Code == "rtf.depth");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Size_Limit_Truncates_And_Reports()
     {
         DocumentReadResult result = Read(
@@ -30,7 +30,7 @@ public sealed class RtfLimitTests
         Assert.Contains(result.Diagnostics, d => d.Code == "rtf.size");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paragraph_Count_Limit_Caps_Paragraphs_And_Reports()
     {
         DocumentReadResult result = Read(
@@ -41,7 +41,7 @@ public sealed class RtfLimitTests
         Assert.Contains(result.Diagnostics, d => d.Code == "rtf.paragraphs");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paragraph_Limit_Bounds_Work_After_The_Cap()
     {
         string body = string.Concat(Enumerable.Range(0, 500).Select(_ => "X\\par "));
@@ -50,7 +50,7 @@ public sealed class RtfLimitTests
         Assert.Equal(2, result.Document.ParagraphCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Run_Length_Limit_Still_Preserves_The_Full_Text()
     {
         DocumentReadResult result = Read(
@@ -60,7 +60,7 @@ public sealed class RtfLimitTests
         Assert.Equal(new string('a', 20), result.Document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bin_Binary_Is_Skipped_So_It_Cannot_Corrupt_Structure()
     {
         // Five raw bytes "}}}}X" would prematurely close groups if not skipped.
@@ -72,7 +72,7 @@ public sealed class RtfLimitTests
         Assert.Contains(result.Diagnostics, d => d.Code == "rtf.bin");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Codec_Read_Honours_Options_Limits()
     {
         var codec = new RtfDocumentCodec();

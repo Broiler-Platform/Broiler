@@ -25,7 +25,7 @@ public sealed class ElementRemoveTests
         return ctx.Eval(script).ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Remove_Detaches_Element_Without_Throwing()
     {
         Assert.Equal("true|0|ok", Eval(
@@ -36,7 +36,7 @@ public sealed class ElementRemoveTests
             "})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Remove_On_Detached_Element_Is_A_Noop()
     {
         Assert.Equal("ok", Eval(

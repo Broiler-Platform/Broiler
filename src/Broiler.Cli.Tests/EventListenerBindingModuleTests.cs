@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class EventListenerBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EventListener_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(EventListenerBinding);
@@ -22,7 +22,7 @@ public sealed class EventListenerBindingModuleTests
         Assert.False(moduleType.IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Duplicate_Registrations_Are_Deduplicated_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -49,7 +49,7 @@ document.body.appendChild(out);
         Assert.Contains("count=1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveEventListener_Is_Capture_Scoped_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -78,7 +78,7 @@ document.body.appendChild(out);
         Assert.Contains("fired=1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Once_Option_Fires_Handler_A_Single_Time_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

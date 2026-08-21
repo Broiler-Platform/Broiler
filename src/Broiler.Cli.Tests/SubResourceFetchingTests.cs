@@ -11,7 +11,7 @@ public class SubResourceFetchingTests
     //  2.1 File:// sub-resource fetching
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_FileUrl_Html_Loads_ContentDocument()
     {
         // Create a temporary HTML file to serve as an iframe source
@@ -47,7 +47,7 @@ document.getElementById('out').textContent = r.join('|');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_FileUrl_Relative_Resolves_Against_Base()
     {
         // Ensure relative URLs are resolved against the page's file:// URL
@@ -89,7 +89,7 @@ document.getElementById('out').textContent = r.join('|');
     //  2.2 Content-type-aware contentDocument
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ImagePng_Gets_Minimal_Empty_Document()
     {
         // An iframe pointing to an image should get a minimal document with empty body
@@ -128,7 +128,7 @@ document.getElementById('out').textContent = r.join(',');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_TextPlain_Gets_Document_With_Text_Content()
     {
         // An iframe pointing to a text/plain file should get a document with the text content
@@ -165,7 +165,7 @@ document.getElementById('out').textContent = r.join(',');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Html_Gets_Full_Parsed_Document()
     {
         // An iframe pointing to an HTML file should get a fully parsed DOM
@@ -207,7 +207,7 @@ document.getElementById('out').textContent = r.join('|');
     //  2.3 <object> fallback handling
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Http404_ContentDocument_Returns_Null()
     {
         // When an <object> data URL returns HTTP 404, contentDocument should be null
@@ -230,7 +230,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Successful_Load_Has_ContentDocument()
     {
         // When an <object> data URL loads successfully, contentDocument should not be null
@@ -272,7 +272,7 @@ document.getElementById('out').textContent = r.join('|');
     //  2.4 External <script src=""> loading from file://
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_Script_FileUrl_Executes()
     {
         // External scripts referenced via relative URL should be fetched from file://
@@ -298,7 +298,7 @@ document.getElementById('out').textContent = r.join('|');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_Script_FileUrl_Ordering_Preserved()
     {
         // Multiple external scripts from file:// should execute in document order
@@ -328,7 +328,7 @@ document.getElementById('out').textContent = r.join('|');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FetchExternalScript_FileUrl_Returns_Content()
     {
         // FetchExternalScript should read from file:// URLs
@@ -347,7 +347,7 @@ document.getElementById('out').textContent = r.join('|');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FetchExternalScript_FileUrl_NonExistent_Returns_Empty()
     {
         // FetchExternalScript should return empty for non-existent file:// URLs
@@ -359,7 +359,7 @@ document.getElementById('out').textContent = r.join('|');
     //  2.5 Content-type detection edge cases
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Css_File_Gets_Minimal_Document()
     {
         // CSS files should NOT be parsed as HTML
@@ -395,7 +395,7 @@ document.getElementById('out').textContent = r.join(',');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentType_Detection_From_Extension()
     {
         // Verify MIME type detection from file extensions used in sub-resource handling

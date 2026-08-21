@@ -136,7 +136,7 @@ input{font-family:inherit}
         return (top, bottom, left, right);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_ButtonsVisible()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
@@ -148,7 +148,7 @@ input{font-family:inherit}
             $"Buttons must render visible text (dark pixels={dark})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_NoFullWidthGrayLines()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
@@ -158,7 +158,7 @@ input{font-family:inherit}
         Assert.Equal(0, fullWidth);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_ButtonsContentSized()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
@@ -173,7 +173,7 @@ input{font-family:inherit}
             "not full-width (>700) or invisible (0)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_ButtonsCentered()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
@@ -190,7 +190,7 @@ input{font-family:inherit}
             $"Buttons must be centered (offset={offset}px from viewport center)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_SearchBoxBordersVisible()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
@@ -219,7 +219,7 @@ input{font-family:inherit}
             $"Search box borders must be visible (found {wideNonWhiteRows} wide rows)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_HiddenInputsInvisible()
     {
         // Render ONLY hidden inputs — they must produce zero visible pixels
@@ -241,7 +241,7 @@ input{font-family:inherit}
         Assert.Equal(0, nonWhite);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_BackgroundUrlDoesNotBreakButtonText()
     {
         // background:url() with failed image load must not prevent text rendering
@@ -262,7 +262,7 @@ input{font-family:inherit}
             $"Button text must be visible despite failed background:url() (dark={dark})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_GoogleLogoTextVisible()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 500);
@@ -286,7 +286,7 @@ input{font-family:inherit}
             $"Google logo text must render in brand colors (colored={colored})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_FooterLinksVisible()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(GoogleDeHtml, 800, 600);

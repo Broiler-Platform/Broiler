@@ -103,7 +103,7 @@ public class FormControlClickTests
             AppendRenderedText(child, buffer);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputSubmit_IsClickable()
     {
         var root = GetLayoutRoot("<html><body><input type='submit' value='Go'></body></html>");
@@ -112,7 +112,7 @@ public class FormControlClickTests
         Assert.True(inputBox.IsClickable, "input[type=submit] should be clickable");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputButton_IsClickable()
     {
         var root = GetLayoutRoot("<html><body><input type='button' value='Click'></body></html>");
@@ -121,7 +121,7 @@ public class FormControlClickTests
         Assert.True(inputBox.IsClickable, "input[type=button] should be clickable");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputReset_IsClickable()
     {
         var root = GetLayoutRoot("<html><body><form><input type='reset' value='Reset'></form></body></html>");
@@ -130,7 +130,7 @@ public class FormControlClickTests
         Assert.True(inputBox.IsClickable, "input[type=reset] should be clickable");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ButtonElement_IsClickable()
     {
         var root = GetLayoutRoot("<html><body><button>Click Me</button></body></html>");
@@ -139,7 +139,7 @@ public class FormControlClickTests
         Assert.True(buttonBox.IsClickable, "<button> element should be clickable");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputText_IsNotClickable()
     {
         var root = GetLayoutRoot("<html><body><input type='text' value='Hello'></body></html>");
@@ -148,7 +148,7 @@ public class FormControlClickTests
         Assert.False(inputBox.IsClickable, "input[type=text] should NOT be clickable");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EditableInputHitTest_FindsTextInput()
     {
         using var container = CreateLaidOutContainer("<html><body style='margin:0'><input id='q' name='query' type='text' value='Hello'></body></html>", 400, 40);
@@ -164,7 +164,7 @@ public class FormControlClickTests
         Assert.Equal("Hello", input.Value);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EditableInputValueUpdate_UpdatesAttributeAndRenderedText()
     {
         using var container = CreateLaidOutContainer("<html><body style='margin:0'><input id='q' type='text'></body></html>", 400, 40);
@@ -178,7 +178,7 @@ public class FormControlClickTests
         Assert.Contains("Broiler", CollectRenderedText(container.HtmlContainerInt.Root));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorLink_StillClickable()
     {
         var root = GetLayoutRoot("<html><body><a href='http://example.com'>Link</a></body></html>");
@@ -187,7 +187,7 @@ public class FormControlClickTests
         Assert.True(aBox.IsClickable, "<a> link should still be clickable");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetLinkBox_FindsSubmitButton()
     {
         var html = @"<html><body style='margin:0'>
@@ -206,7 +206,7 @@ public class FormControlClickTests
         Assert.True(foundBox.IsClickable);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetLinkBox_FindsButtonElement()
     {
         var html = @"<html><body style='margin:0'>
@@ -223,7 +223,7 @@ public class FormControlClickTests
         Assert.True(foundBox.IsClickable);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Summary_In_Open_Details_Has_Open_Disclosure_Marker()
     {
         var root = GetLayoutRoot("""
@@ -240,7 +240,7 @@ public class FormControlClickTests
         Assert.StartsWith("▾ ", CollectRenderedText(summaryBox));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Summary_In_Closed_Details_Has_Closed_Disclosure_Marker()
     {
         var root = GetLayoutRoot("""

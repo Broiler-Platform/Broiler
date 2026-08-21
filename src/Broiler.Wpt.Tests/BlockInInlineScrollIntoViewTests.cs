@@ -60,7 +60,7 @@ public class BlockInInlineScrollIntoViewTests : IDisposable
     // Mirrors css-inline/empty-span-scroll: an absolutely-positioned empty <a>
     // target inside nested spans, after a 3000px filler span; scrollIntoView must
     // bring the following green box into view.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_TargetAfterBlockInInlineSibling_ScrollsGreenIntoView()
     {
         const string html =
@@ -91,7 +91,7 @@ public class BlockInInlineScrollIntoViewTests : IDisposable
     // span (and its abspos target) default to the document origin, and scrollIntoView
     // computes 0 — the red filler stays on screen. This is the whitespace variant the
     // single-line test above does not exercise.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_TargetInWhitespaceIndentedRelativeSpan_ScrollsGreenIntoView()
     {
         const string html =
@@ -116,7 +116,7 @@ public class BlockInInlineScrollIntoViewTests : IDisposable
 
     // The direct (non-span) form must keep working — guards against over-counting
     // plain siblings.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_TargetAfterBlockSibling_StillScrolls()
     {
         const string html =

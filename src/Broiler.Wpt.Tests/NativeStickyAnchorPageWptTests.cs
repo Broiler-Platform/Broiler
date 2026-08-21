@@ -81,7 +81,7 @@ public class NativeStickyAnchorPageWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_PinsStickyBox_OnAnchorPage()
     {
         var red = Render(nativeAnchor: true);

@@ -12,7 +12,7 @@ public sealed class MarkdownArchitectureTests
         "../Broiler.Documents/Broiler.Documents.csproj",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Markdown_Project_Targets_Net10_And_References_Only_Documents_Core()
     {
         XDocument project = XDocument.Load(MarkdownProjectPath());
@@ -22,7 +22,7 @@ public sealed class MarkdownArchitectureTests
         Assert.Equal(ExpectedReferences, ProjectReferences(project));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Markdown_Project_Does_Not_Reference_Ui_Dom_Input_Or_Windows()
     {
         string[] references = ProjectReferences(XDocument.Load(MarkdownProjectPath()));
@@ -33,7 +33,7 @@ public sealed class MarkdownArchitectureTests
         Assert.DoesNotContain(references, reference => reference.Contains("Windows", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Markdown_Codec_Has_No_Module_Initializer()
     {
         MethodInfo[] initializers = typeof(MarkdownDocumentCodec).Assembly

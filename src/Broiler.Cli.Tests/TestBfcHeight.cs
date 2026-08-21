@@ -4,7 +4,7 @@ namespace Broiler.Cli.Tests;
 
 public class BfcHeightTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BfcAbsPos_WithOnlyFloatChild_IncludesFloatInHeight()
     {
         // An absolutely positioned element (BFC) containing only a float.
@@ -41,7 +41,7 @@ public class BfcHeightTests
             $"Only {black} black pixels. Side borders should extend to float height.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BfcAbsPos_EarStructure_RendersCorrectly()
     {
         // Simplified ACID2 ear structure: abs-pos blockquote with side borders

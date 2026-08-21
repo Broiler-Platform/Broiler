@@ -78,7 +78,7 @@ public class Acid2ImageComparisonTests
     ///
     /// Threshold: fewer than 200 red pixels (current baseline: ~100).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_RedPixelCount_BelowThreshold()
     {
         using var bitmap = RenderAcid2();
@@ -109,7 +109,7 @@ public class Acid2ImageComparisonTests
     /// <c>#top</c> face region.  The intro has <c>color: black</c> text
     /// and <c>color: blue</c> links, confirming basic rendering works.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_IntroSection_HasVisibleTextContent()
     {
         using var bitmap = RenderAcid2();
@@ -147,7 +147,7 @@ public class Acid2ImageComparisonTests
     /// basic smoke test for content rendering.  The yellow border may or
     /// may not be present depending on layout engine maturity.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_FixedPositionContent_HasBlackPixels()
     {
         using var bitmap = RenderAcid2();
@@ -184,7 +184,7 @@ public class Acid2ImageComparisonTests
     /// Threshold: at least 5,000 (catches regressions without being
     /// overly sensitive to minor layout changes).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_ContentPixelCount_AboveMinimum()
     {
         using var bitmap = RenderAcid2();
@@ -213,7 +213,7 @@ public class Acid2ImageComparisonTests
     /// entirely red (stylesheet loading failure).  The image should have
     /// a mix of colors indicating at least partial rendering.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_Render_IsNotBlankOrAllRed()
     {
         using var bitmap = RenderAcid2();
@@ -248,7 +248,7 @@ public class Acid2ImageComparisonTests
     /// where the rendering pipeline (layout → anchor lookup → paint) fails
     /// at high scroll offsets.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_RenderAtAnchor_HasFaceContent()
     {
         var html = LoadAcid2Html();
@@ -302,7 +302,7 @@ public class Acid2ImageComparisonTests
     /// <c>&lt;p&gt;</c> tag, enabling the <c>p + table + p</c> sibling
     /// combinator that hides <c>p.bad</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_PostProcessor_PreservesTables()
     {
         var html = LoadAcid2Html();
@@ -330,7 +330,7 @@ public class Acid2ImageComparisonTests
     /// constraint by checking that black pixels (the scalp bar background)
     /// do not span more than 60px horizontally on any single scan line.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_FixedPositionViewportSizing_WidthClampedByMaxWidth()
     {
         // Use a controlled test: a fixed-position element with width:140%
@@ -396,7 +396,7 @@ public class Acid2ImageComparisonTests
     /// simple box with <c>min-height: 100px; max-height: 50px</c> and
     /// verify the box is at least 100px tall via colored-pixel detection.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssMinHeightOverridesMaxHeight_WhenMinExceedsMax()
     {
         const string html = @"
@@ -437,7 +437,7 @@ public class Acid2ImageComparisonTests
     /// float right, placing its content toward the right edge of the
     /// container.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssFloatInherit_ResolvesToParentValue()
     {
         const string html = @"
@@ -479,7 +479,7 @@ public class Acid2ImageComparisonTests
     /// a syntax error (missing colon).  The valid declaration that
     /// follows the malformed one should still apply.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssErrorRecovery_MalformedDeclarationIsIgnored()
     {
         // The first declaration is malformed (missing colon).
@@ -518,7 +518,7 @@ public class Acid2ImageComparisonTests
     /// correctly matches the second <c>&lt;p&gt;</c> after a
     /// <c>&lt;table&gt;</c>, hiding it via <c>display:none</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssAdjacentSiblingCombinator_WithTableImplicitPClosure()
     {
         // The p + table + p selector should match the second <p>.
@@ -561,7 +561,7 @@ public class Acid2ImageComparisonTests
     /// for the rule to apply.  Verify the compound selector matches a
     /// conforming element and does not match non-conforming elements.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssCompoundAttributeSelector_MatchesCorrectly()
     {
         const string html = @"
@@ -608,7 +608,7 @@ public class Acid2ImageComparisonTests
     /// <c>clear</c> affect vertical positioning of the smile elements.
     /// Verify the region contains non-white, non-red content pixels.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid2_MarginCollapsingWithClear_SmileRegionHasContent()
     {
         var html = LoadAcid2Html();
@@ -667,7 +667,7 @@ public class Acid2ImageComparisonTests
     /// <c>position: relative; bottom: -20px</c> should be pushed 20px
     /// downward from its normal flow position.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPositionRelativeBottomOffset_MovesElementDown()
     {
         const string html = @"
@@ -711,7 +711,7 @@ public class Acid2ImageComparisonTests
     /// inside a parent with bottom border should not collapse its margin
     /// with elements outside the parent.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssNegativeMarginDoesNotCollapseThroughBorders()
     {
         const string html = @"
@@ -766,7 +766,7 @@ public class Acid2ImageComparisonTests
     /// <c>display: table</c> renders its <c>&lt;li&gt;</c> children
     /// with table layout.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssDisplayTable_AnonymousTableCells_RenderCorrectly()
     {
         const string html = @"
@@ -816,7 +816,7 @@ public class Acid2ImageComparisonTests
     /// with <c>overflow: hidden</c> should be clipped to the parent's
     /// height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssOverflowHidden_ClipsContentToParentBounds()
     {
         const string html = @"
@@ -866,7 +866,7 @@ public class Acid2ImageComparisonTests
     /// padding box.  Verify that a small data-URI image with fixed
     /// attachment renders as a non-empty background.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssBackgroundAttachmentFixed_RendersFromViewportOrigin()
     {
         // Use a 1x1 yellow pixel PNG as background with fixed attachment.
@@ -904,7 +904,7 @@ public class Acid2ImageComparisonTests
     /// rendered as a CSS background image.  The Acid2 forehead region uses
     /// a 1×1 yellow pixel PNG as the background of <c>.forehead</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssDataUriBackgroundImage_RendersCorrectly()
     {
         // 1x1 yellow pixel PNG (same as Acid2 .forehead background)
@@ -940,7 +940,7 @@ public class Acid2ImageComparisonTests
     /// The Acid2 <c>.forehead</c> has <c>width: 8em</c> with children
     /// at <c>width: 12em</c>, and no overflow clipping.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssOverflowVisible_DoesNotClipWiderChildren()
     {
         const string html = @"
@@ -976,7 +976,7 @@ public class Acid2ImageComparisonTests
     /// render their CSS borders.  The Acid2 nose uses border tricks on
     /// pseudo-elements to create triangle shapes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPseudoElementBorderTrick_RendersTriangles()
     {
         // A simplified version of the Acid2 nose border trick:
@@ -1017,7 +1017,7 @@ public class Acid2ImageComparisonTests
             "render CSS borders (triangle shapes via border trick).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPseudoElement_ContentUrl_Renders_Image_Content()
     {
         var greenImagePath = CreateSolidTempPng(new BColor(0, 255, 0, 255));
@@ -1080,7 +1080,7 @@ public class Acid2ImageComparisonTests
     /// <c>width: auto</c> use shrink-to-fit width.  The element's width
     /// should be determined by its content, not the containing block.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssAbsolutePositionShrinkToFit_UsesContentWidth()
     {
         const string html = @"
@@ -1129,7 +1129,7 @@ public class Acid2ImageComparisonTests
     /// float backgrounds, then inline content.  Verify that a float
     /// paints over a block's background but under inline text.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssPaintOrder_FloatOverBlockBackground()
     {
         const string html = @"

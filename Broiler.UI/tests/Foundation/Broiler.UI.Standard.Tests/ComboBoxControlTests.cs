@@ -6,7 +6,7 @@ namespace Broiler.UI.Standard.Tests;
 
 public sealed class ComboBoxControlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Open_Drop_Down_Renders_After_Later_Sibling_Controls()
     {
         var host = new TestHost(new BSize(160, 120));

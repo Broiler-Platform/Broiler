@@ -36,7 +36,7 @@ public class HtmlFormSerializerTests
         return null;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextInputsContributeNameAndValue()
     {
         DomElement form = Form("<form action='/search'><input name='q' value='broiler'></form>");
@@ -44,7 +44,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("q=broiler", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SpacesAndReservedCharactersAreFormUrlEncoded()
     {
         DomElement form = Form("<form><input name='q' value=\"a b&c=d\"></form>");
@@ -53,7 +53,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("q=a+b%26c%3Dd", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HiddenInputsAreSubmitted()
     {
         DomElement form = Form(
@@ -62,7 +62,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("src=hp&q=x", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisabledControlsAreNotSuccessful()
     {
         DomElement form = Form("<form><input name='a' value='1' disabled><input name='b' value='2'></form>");
@@ -70,7 +70,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("b=2", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnnamedControlsAreNotSuccessful()
     {
         DomElement form = Form("<form><input value='1'><input name='b' value='2'></form>");
@@ -78,7 +78,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("b=2", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyCheckedCheckboxesAreSubmitted()
     {
         DomElement form = Form(
@@ -88,7 +88,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("a=1", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CheckboxWithoutValueSubmitsOn()
     {
         DomElement form = Form("<form><input type='checkbox' name='agree' checked></form>");
@@ -96,7 +96,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("agree=on", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CheckedStateCanBeOverriddenByTheHost()
     {
         DomElement form = Form(
@@ -114,7 +114,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("a=1", body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResetControlsAreNeverSubmitted()
     {
         DomElement form = Form(
@@ -123,7 +123,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("q=x", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFileControlWithNothingChosenStillSubmitsAnEmptyEntry()
     {
         DomElement form = Form("<form><input type='file' name='f'><input name='q' value='x'></form>");
@@ -138,7 +138,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("f=&q=x", HtmlFormSerializer.EncodeUrlEncoded(entries));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UrlEncodedAndTextPlainSubmitAFilesNameNotItsBytes()
     {
         DomElement form = Form("<form><input type='file' name='f'></form>");
@@ -150,7 +150,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("f=notes.txt\r\n", HtmlFormSerializer.EncodeTextPlain(entries));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MultipartCarriesTheFilesNameAndBytes()
     {
         DomElement form = Form("<form><input type='file' name='f'></form>");
@@ -166,7 +166,7 @@ public class HtmlFormSerializerTests
             body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MultipartCopiesFileBytesVerbatimRatherThanReEncodingThem()
     {
         DomElement form = Form("<form><input type='file' name='f'></form>");
@@ -196,7 +196,7 @@ public class HtmlFormSerializerTests
         return -1;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyTheSubmitterContributesItsOwnNameAndValue()
     {
         DomElement form = Form(
@@ -225,7 +225,7 @@ public class HtmlFormSerializerTests
         throw new InvalidOperationException($"No control named {name}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextAreaSubmitsItsTextContent()
     {
         DomElement form = Form("<form><textarea name='q'>typed text</textarea></form>");
@@ -233,7 +233,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("q=typed+text", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelectSubmitsTheSelectedOption()
     {
         DomElement form = Form(
@@ -243,7 +243,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("s=b", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SingleSelectWithNoSelectionSubmitsItsFirstOption()
     {
         DomElement form = Form(
@@ -252,7 +252,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("s=a", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MultiSelectSubmitsEverySelectedOption()
     {
         DomElement form = Form(
@@ -262,7 +262,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("s=a&s=c", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OptionWithoutValueSubmitsItsText()
     {
         DomElement form = Form("<form><select name='s'><option selected>Plain</option></select></form>");
@@ -270,7 +270,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("s=Plain", HtmlFormSerializer.BuildFormData(form));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ApplyQueryReplacesAnExistingQueryAndDropsTheFragment()
     {
         Assert.Equal("https://x/search?q=1", HtmlFormSerializer.ApplyQuery("https://x/search", "q=1"));
@@ -279,7 +279,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("https://x/search", HtmlFormSerializer.ApplyQuery("https://x/search?old=9", string.Empty));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PostFormsAreNotTreatedAsGetSubmissions()
     {
         Assert.True(HtmlFormSerializer.IsGetSubmission(Form("<form action='/a'></form>")));
@@ -287,7 +287,7 @@ public class HtmlFormSerializerTests
         Assert.False(HtmlFormSerializer.IsGetSubmission(Form("<form action='/a' method='post'></form>")));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FindEnclosingFormWalksUpThroughWrappers()
     {
         DomElement root = Parse("<form action='/a'><div><span><input id='q' name='q'></span></div></form>");
@@ -299,7 +299,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("/a", form.GetAttribute("action"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FindEnclosingFormReturnsNullOutsideAnyForm()
     {
         DomElement root = Parse("<div><input id='q' name='q'></div>");
@@ -308,7 +308,7 @@ public class HtmlFormSerializerTests
         Assert.Null(HtmlFormSerializer.FindEnclosingForm(input));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ControlsAreFoundByTypeNameAndValueWhenTheyHaveNoId()
     {
         DomElement root = Parse(
@@ -326,7 +326,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("lucky", found.GetAttribute("name"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EncodingIsTakenFromEnctypeWithUrlEncodedAsTheDefault()
     {
         Assert.Equal(HtmlFormSerializer.UrlEncoded, HtmlFormSerializer.ResolveEncoding(Form("<form></form>")));
@@ -342,7 +342,7 @@ public class HtmlFormSerializerTests
             HtmlFormSerializer.ResolveEncoding(Form("<form enctype='application/json'></form>")));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryEncodingIsBuiltFromTheSameEntryList()
     {
         DomElement form = Form(
@@ -356,7 +356,7 @@ public class HtmlFormSerializerTests
         Assert.Equal("a=1\r\nb=two words\r\n", HtmlFormSerializer.EncodeTextPlain(entries));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MultipartWrapsEachEntryInItsOwnPart()
     {
         DomElement form = Form("<form><input name='a' value='1'></form>");
@@ -369,7 +369,7 @@ public class HtmlFormSerializerTests
             body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MultipartBoundariesAreUnique()
     {
         Assert.NotEqual(

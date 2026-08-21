@@ -75,7 +75,7 @@ public class NativePageScrollStickyWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_PinsPageScrolledStickyToViewportEdge()
     {
         var red = RenderNative(scrollTop: 200);
@@ -86,7 +86,7 @@ public class NativePageScrollStickyWptTests : IDisposable
         Assert.True(System.Math.Abs(red.y1 - 49) <= 2, $"sticky bottom={red.y1}, expected ~49.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_DoesNotPinBeforeScrollingPastInset()
     {
         var red = RenderNative(scrollTop: 0);

@@ -44,7 +44,7 @@ public sealed class BackgroundColorInheritChainTests
     // The `background` shorthand form (`background: inherit`) needs the Broiler.CSS patch 0024 to set
     // background-color:inherit at all; on the un-patched engine it stays transparent. Feature-probe
     // and self-skip so this stays green either way while still verifying the chain when patched.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundShorthandInherit_ResolvesThroughAChain_WhenSupported()
     {
         const string html =

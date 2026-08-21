@@ -37,7 +37,7 @@ public sealed class ScriptPrefetchTests : IDisposable
 
     private static string PageUrl(string dir) => new Uri(Path.Combine(dir, "page.html")).AbsoluteUri;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_External_Script_Is_Prefetched()
     {
         const string html = """
@@ -52,7 +52,7 @@ public sealed class ScriptPrefetchTests : IDisposable
         Assert.Equal(3, prefetcher.RequestedCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Script_Included_Twice_Is_Requested_Once()
     {
         const string html = """
@@ -66,7 +66,7 @@ public sealed class ScriptPrefetchTests : IDisposable
         Assert.Equal(2, prefetcher!.RequestedCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inline_And_Data_Uri_Scripts_Are_Not_Requested()
     {
         const string html = """
@@ -81,7 +81,7 @@ public sealed class ScriptPrefetchTests : IDisposable
         Assert.Equal(2, prefetcher!.RequestedCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_With_One_External_Script_Gets_No_Prefetcher()
     {
         // Nothing to overlap a single round trip with, so the sequential path is left exactly as
@@ -91,7 +91,7 @@ public sealed class ScriptPrefetchTests : IDisposable
         Assert.Null(ScriptExtractionService.CreateScriptPrefetcher(html, PageUrl(_dir), csp: null));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Csp_Blocked_Script_Is_Not_Requested()
     {
         // Prefetching a blocked script would put the very request CSP forbids on the wire —
@@ -112,7 +112,7 @@ public sealed class ScriptPrefetchTests : IDisposable
         Assert.False(prefetcher.IsPending("https://evil.example/x.js"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Extraction_Returns_The_Same_Scripts_In_The_Same_Order_As_Before_Prefetching()
     {
         // The exit gate: prefetching may only change when a request starts, never what the
@@ -134,7 +134,7 @@ public sealed class ScriptPrefetchTests : IDisposable
         Assert.Equal(["var c = 3;"], result.DeferredScripts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Script_That_Cannot_Be_Fetched_Is_Skipped_Exactly_As_Before()
     {
         WriteScript("a.js", "var a = 1;");

@@ -54,7 +54,7 @@ public sealed class SvgColorFilterTests
     /// The WPT case. <c>#ffaa00</c> inverts to (0, 0.333, 1); the arithmetic composite multiplies the
     /// premultiplied channels by 255 and every non-zero one saturates, giving cyan.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InvertThenSaturate_TurnsOrangeIntoCyan()
     {
         var fill = RenderedRectFill(Doc(InvertAndSaturate,
@@ -67,7 +67,7 @@ public sealed class SvgColorFilterTests
     /// A shape that does not reference the filter is untouched — the table is keyed by
     /// <c>url(#id)</c>, not applied to everything in the document.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnreferencedFilter_LeavesTheShapeAlone()
     {
         var fill = RenderedRectFill(Doc(InvertAndSaturate,
@@ -80,7 +80,7 @@ public sealed class SvgColorFilterTests
     /// The default filter colour space is linearRGB, which this does not model, so a filter that does
     /// not declare sRGB is left unapplied rather than computed in the wrong space.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WithoutExplicitSrgb_TheFilterIsNotModelled()
     {
         var filter = InvertAndSaturate.Replace(" color-interpolation-filters=\"sRGB\"", string.Empty);
@@ -136,7 +136,7 @@ public sealed class SvgColorFilterTests
     /// Only the arithmetic <c>feComposite</c> operator is a pure colour operation; the Porter-Duff
     /// operators combine two different inputs, which one colour cannot represent.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APorterDuffComposite_IsNotModelled()
     {
         var filter = InvertAndSaturate.Replace("operator=\"arithmetic\" k2=\"255\"", "operator=\"in\"");
@@ -150,7 +150,7 @@ public sealed class SvgColorFilterTests
     /// The chain has to be straight. A primitive reading a result other than the previous one's is a
     /// graph, not a chain, so the model declines it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APrimitiveReadingAnEarlierResult_IsNotModelled()
     {
         var filter = InvertAndSaturate.Replace(
@@ -165,7 +165,7 @@ public sealed class SvgColorFilterTests
     /// A stroked shape is not one colour, so recolouring its fill would not describe what the filter
     /// does to it. It is left unfiltered.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AStrokedShape_IsLeftUnfiltered()
     {
         var fill = RenderedRectFill(Doc(InvertAndSaturate,
@@ -179,7 +179,7 @@ public sealed class SvgColorFilterTests
     /// exactly, which is the guard against the arithmetic in <see cref="SvgColorFilter.Apply"/>
     /// drifting.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnIdentityColorMatrix_LeavesTheColourExactlyAsItWas()
     {
         var filter = @"<filter id=""f"" color-interpolation-filters=""sRGB"">
@@ -196,7 +196,7 @@ public sealed class SvgColorFilterTests
     /// keeps the area *outside* a filtered shape transparent, which is why a colour-only chain does
     /// not need a filter region to be modelled correctly here.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AMatrixThatZeroesAlpha_MakesTheShapeTransparent()
     {
         var filter = @"<filter id=""f"" color-interpolation-filters=""sRGB"">
@@ -212,7 +212,7 @@ public sealed class SvgColorFilterTests
     /// An <c>feFlood</c>-only filter still resolves through the flood path, which this must not have
     /// displaced: the two models cover disjoint filters.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFloodOnlyFilter_StillFloods()
     {
         var filter = "<filter id=\"f\"><feFlood flood-color=\"green\" /></filter>";
@@ -231,7 +231,7 @@ public sealed class SvgColorFilterTests
     /// <c>css/filter-effects/tainting-*</c> family and
     /// <c>conformance-checkers/html-svg/filters-blend-01-b</c> rendered as.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFloodFeedingAnotherPrimitive_DoesNotFloodTheShape()
     {
         var filter = @"<filter id=""f"">
@@ -265,7 +265,7 @@ public sealed class SvgColorFilterTests
         Assert.Equal(BColor.FromArgb(255, r, g, b), fill);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFloodsOpacityReachesTheBlend()
     {
         // A half-transparent lime backdrop under opaque blue: source-over leaves the source, so the
@@ -286,7 +286,7 @@ public sealed class SvgColorFilterTests
         Assert.InRange(fill.B, 126, 129);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnUnmodelledBlendMode_LeavesTheShapeUnfiltered()
     {
         var filter = @"<filter id=""f"" color-interpolation-filters=""sRGB"">
@@ -299,7 +299,7 @@ public sealed class SvgColorFilterTests
         Assert.Equal(BColor.Blue, fill);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ABlendWhoseBackdropIsNotAFlood_LeavesTheShapeUnfiltered()
     {
         // in2 names something this model cannot reduce to one colour, so the whole chain declines.

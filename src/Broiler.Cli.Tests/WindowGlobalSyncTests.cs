@@ -46,7 +46,7 @@ public sealed class WindowGlobalSyncTests
     /// unreachable unqualified until the mirror was re-run. It is reachable immediately now, so the
     /// assertion is made before the sync — the sync is then run to prove it changes nothing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RuntimeWindowMember_IsReachableUnqualified_WithoutSyncing()
     {
         var (context, bridge) = Attach();
@@ -68,7 +68,7 @@ public sealed class WindowGlobalSyncTests
     /// mechanism promoted a fixed list of 13 testharness names and left every other library behind.
     /// These six are exactly what <c>interpolation-testcommon.js</c> closes by assigning.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryExportOfASupportLibrary_BecomesReachable()
     {
         var (context, bridge) = Attach();
@@ -100,7 +100,7 @@ public sealed class WindowGlobalSyncTests
     /// object — an object registered through <c>window.x</c> is mutable through the unqualified
     /// <c>x</c> and vice versa.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MirroredMember_IsTheSameObject_NotACopy()
     {
         var (context, bridge) = Attach();
@@ -121,7 +121,7 @@ public sealed class WindowGlobalSyncTests
     /// have when the mirror ran — the property that lets <c>innerWidth</c> and friends work
     /// unqualified after a resize.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AccessorMember_StaysLive()
     {
         var (context, bridge) = Attach();
@@ -149,7 +149,7 @@ Object.defineProperty(window, 'liveTick', { configurable: true, get: function() 
     /// about defending the realm from the page.
     /// </para>
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EngineBuiltins_SurviveRegistration()
     {
         var (context, bridge) = Attach();
@@ -171,7 +171,7 @@ Object.defineProperty(window, 'liveTick', { configurable: true, get: function() 
     /// Safe to call after every script: repeating it neither throws nor disturbs what it already
     /// mirrored, and it still picks up what the next script adds.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RepeatedSync_IsIdempotentAndPicksUpLaterMembers()
     {
         var (context, bridge) = Attach();
@@ -194,7 +194,7 @@ Object.defineProperty(window, 'liveTick', { configurable: true, get: function() 
     /// repeated syncing does not leave engine plumbing enumerable on the global for a page (or a
     /// <c>for…in</c> over <c>globalThis</c>) to trip over.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Sync_LeavesNoScratchBindingBehind()
     {
         var (context, bridge) = Attach();

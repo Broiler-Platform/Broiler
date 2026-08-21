@@ -21,7 +21,7 @@ public sealed class BrowsingContextManagerTests
         return doc.CreateElement("iframe");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDocument_Identity_RoundTrips()
     {
         var m = new BrowsingContextManager();
@@ -34,7 +34,7 @@ public sealed class BrowsingContextManagerTests
         Assert.Same(subDoc, got);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetSubWindow_LinksBothDirections()
     {
         var m = new BrowsingContextManager();
@@ -51,7 +51,7 @@ public sealed class BrowsingContextManagerTests
         Assert.Contains(subWindow, m.SubWindows);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveContainerCaches_DropsForwardSubWindow_ButKeepsReverse()
     {
         // Preserves the pre-consolidation asymmetry: InvalidateCachedSubDocument removed the
@@ -73,7 +73,7 @@ public sealed class BrowsingContextManagerTests
         Assert.True(m.TryGetSubWindowContainer(subWindow, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResetSession_ClearsReverseMap_AndCurrentWindow_ButNotForward()
     {
         // Matches the pre-consolidation ClearRuntimeSessionState: it bulk-cleared _subWindowContainers
@@ -93,7 +93,7 @@ public sealed class BrowsingContextManagerTests
         Assert.True(m.TryGetSubWindow(frame, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LoadMarks_Track_ObjectFailure_And_OnloadFired()
     {
         var m = new BrowsingContextManager();
@@ -110,7 +110,7 @@ public sealed class BrowsingContextManagerTests
         Assert.False(m.HasOnloadFired(el));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentDocument_Links_And_Unlinks_BothDirections()
     {
         var m = new BrowsingContextManager();
@@ -127,7 +127,7 @@ public sealed class BrowsingContextManagerTests
         Assert.Null(m.UnlinkContentDocument(frame)); // idempotent
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OwnershipGuard_BridgeOwnsManager_AndScatteredFieldsAreGone()
     {
         var bridgeFields = typeof(DomBridge)

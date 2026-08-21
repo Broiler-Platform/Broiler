@@ -16,7 +16,7 @@ public sealed class EventLoopOrderingTests
     private const string Url = "file:///el3.html";
     private const string Html = "<!DOCTYPE html><html><head></head><body></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_From_Regular_Script_Fires_After_Deferred_Scripts()
     {
         // The regular script schedules a timer that records the value of a marker attribute. A deferred
@@ -41,7 +41,7 @@ public sealed class EventLoopOrderingTests
         Assert.Contains("data-timer-saw=\"deferred-ran\"", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timers_Still_Fire_And_Settle_By_Capture()
     {
         // A timer's DOM effect is still present in the final render (it fires during the post-load drain).

@@ -101,7 +101,7 @@ public sealed class FetchContentTypeTests
     /// google.com's own path: <c>setRequestHeader</c> on an <c>XMLHttpRequest</c>. The polyfill
     /// forwards <c>_headers</c> to <c>fetch</c>, so this is the second way into the same throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Xhr_SetRequestHeaderContentType_ReachesTheOrigin()
     {
         using var origin = new RecordingOrigin();
@@ -125,7 +125,7 @@ public sealed class FetchContentTypeTests
     /// With no <c>Content-Type</c> of its own a string body keeps the Fetch default,
     /// <c>text/plain;charset=UTF-8</c> — the behaviour before the fix, unchanged.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_WithoutAContentType_DefaultsToTextPlainUtf8()
     {
         using var origin = new RecordingOrigin();
@@ -141,7 +141,7 @@ public sealed class FetchContentTypeTests
     /// The charset parameter travels in the header; it does not choose the encoding. Fetch encodes a
     /// string body as UTF-8 whatever the author wrote, so a non-ASCII body arrives intact.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_EncodesTheBodyAsUtf8_WhateverCharsetTheHeaderNames()
     {
         using var origin = new RecordingOrigin();
@@ -164,7 +164,7 @@ public sealed class FetchContentTypeTests
     /// A value too malformed to parse is still sent rather than costing the request — losing the
     /// whole POST over a header the page spelled badly is the failure this file exists to remove.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_WithAnUnparseableContentType_StillSendsTheRequest()
     {
         using var origin = new RecordingOrigin();
@@ -183,7 +183,7 @@ public sealed class FetchContentTypeTests
     }
 
     /// <summary>The page sees the origin's answer, not an error <c>Response</c> standing in for it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_WithAParameterisedContentType_ResolvesWithTheOriginsResponse()
     {
         using var origin = new RecordingOrigin();

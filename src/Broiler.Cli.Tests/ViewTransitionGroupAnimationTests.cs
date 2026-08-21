@@ -83,7 +83,7 @@ public class ViewTransitionGroupAnimationTests
         AssertPixel(bitmap, 150, 25, 102, 51, 153, "the backdrop above the yellow item");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Default_Timing_Leaves_The_Group_At_The_Old_Geometry()
     {
         // linear (and every ease / cubic-bezier / jump-end steps) is 0 at input 0, so the group stays
@@ -96,7 +96,7 @@ public class ViewTransitionGroupAnimationTests
         AssertPixel(bitmap, 150, 150, 255, 255, 0, "the yellow item at its old geometry");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Class_Rule_Does_Not_Reach_A_Group_Without_That_Class()
     {
         // `view-transition-class` gates the match: a rule for `.other` must not time these groups,

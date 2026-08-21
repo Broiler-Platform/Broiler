@@ -16,7 +16,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DocumentQueryBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentQuery_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(DocumentQueryBinding);
@@ -28,7 +28,7 @@ public sealed class DocumentQueryBindingModuleTests
         Assert.True(typeof(IDocumentQueryHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Queries_Find_Elements_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

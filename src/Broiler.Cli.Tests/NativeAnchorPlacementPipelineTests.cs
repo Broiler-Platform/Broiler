@@ -69,7 +69,7 @@ public sealed class NativeAnchorPlacementPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_PlacesPositionAreaBox_InBottomRightCell()
     {
         var box = LayoutTarget(nativeAnchor: true);
@@ -82,7 +82,7 @@ public sealed class NativeAnchorPlacementPipelineTests
         Assert.Equal(30f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_LeavesPositionAreaBoxUnplaced()
     {
         // With the flag off the engine ignores position-area, so the box sits at its

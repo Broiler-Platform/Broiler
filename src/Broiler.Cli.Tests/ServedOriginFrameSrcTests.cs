@@ -71,7 +71,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     }
 
     /// <summary>The fix: an absolute URL on a served host loads the file under the root.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_On_A_Served_Host_Loads_From_The_Document_Root()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -84,7 +84,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     /// The whole point of the WPT case: the <em>second</em> origin is served from the same root, so
     /// a cross-origin frame renders the document that host would have returned.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_On_The_Alternate_Host_Loads_From_The_Same_Root()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -110,7 +110,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     /// Null by default: a host that declares no served origins renders exactly as before, so an
     /// absolute URL stays the unfetchable, empty box it has always been.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Served_Hosts_Leaves_An_Absolute_Url_Unresolved()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -120,7 +120,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     }
 
     /// <summary>A served host without a root has nothing to resolve against.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Document_Root_Leaves_An_Absolute_Url_Unresolved()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -147,7 +147,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     }
 
     /// <summary>A subdomain resolves only when the caller lists it, which is how WPT declares its own.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Listed_Subdomain_Is_Served()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -161,7 +161,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     /// Only http(s) is served: a <c>file:</c> or <c>data:</c> URL keeps whatever meaning it already
     /// had rather than being re-pointed at the root.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Non_Http_Scheme_Is_Left_Alone()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -175,7 +175,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     /// beside the page. The page lives in <c>pages/</c> and holds a red frame document of its own,
     /// so resolving against the page's directory would paint red instead of blue.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Path_Is_Root_Relative_Not_Page_Relative()
     {
         WriteResource(Path.Combine("pages", "frame.html"), RedDocument);
@@ -189,7 +189,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     /// A query addresses a server that is not there; the path alone names the file. WPT decorates
     /// resource URLs with <c>?pipe=</c> and cache-busters routinely.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Query_Or_Fragment_Does_Not_Stop_The_Resolve()
     {
         WriteResource(Path.Combine("css", "frame.html"), RedDocument);
@@ -199,7 +199,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     }
 
     /// <summary>A served URL that names nothing on disk stays the empty box, rather than throwing.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Served_Url_That_Names_Nothing_Paints_Empty()
     {
         Assert.Equal(White, RenderFrameCentre(
@@ -207,7 +207,7 @@ public class ServedOriginFrameSrcTests : IDisposable
     }
 
     /// <summary>`..` in a served URL cannot walk out of the document root.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Served_Url_Cannot_Escape_The_Root()
     {
         var outside = Path.Combine(Path.GetDirectoryName(_root)!,

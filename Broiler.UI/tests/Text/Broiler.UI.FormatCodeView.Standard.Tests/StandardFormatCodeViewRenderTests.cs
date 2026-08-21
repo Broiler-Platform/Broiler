@@ -5,7 +5,7 @@ namespace Broiler.UI.FormatCodeView.Standard.Tests;
 
 public sealed class StandardFormatCodeViewRenderTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typed_Tokens_Render_With_Distinct_Roles_And_No_Child_Controls()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(
@@ -22,7 +22,7 @@ public sealed class StandardFormatCodeViewRenderTests
         Assert.Empty(scene.View.Children);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selection_Caret_And_Clip_Are_Deterministic()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -38,7 +38,7 @@ public sealed class StandardFormatCodeViewRenderTests
         list.Validate();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wrapping_And_Both_Scrollbars_Follow_View_Policies()
     {
         string text = string.Join('\n', Enumerable.Repeat(new string('x', 100), 20));
@@ -57,7 +57,7 @@ public sealed class StandardFormatCodeViewRenderTests
         Assert.True(scene.View.HasVerticalScrollbar);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Million_Character_Line_Submits_Only_The_Visible_Slice()
     {
         using FormatCodeViewScene scene = FormatCodeViewStandardHarness.Create(
@@ -98,7 +98,7 @@ public sealed class StandardFormatCodeViewRenderTests
         list.Validate();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Factory_Produces_The_Contract_Control()
     {
         var factory = new StandardFormatCodeViewFactory();

@@ -13,7 +13,7 @@ public class SvgImageRenderingTests
 {
     // ────────────────────── SVG byte-level detection (BSvgRasterizer.IsSvgData) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_True_For_Xml_Declaration_With_SvgTag()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
@@ -21,7 +21,7 @@ public class SvgImageRenderingTests
         Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_True_For_Direct_SvgTag()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
@@ -29,7 +29,7 @@ public class SvgImageRenderingTests
         Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_True_With_Leading_Whitespace()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
@@ -37,7 +37,7 @@ public class SvgImageRenderingTests
         Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_True_With_Utf8_Bom()
     {
         var bom = new byte[] { 0xEF, 0xBB, 0xBF };
@@ -50,7 +50,7 @@ public class SvgImageRenderingTests
         Assert.True(BSvgRasterizer.IsSvgData(data));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_True_With_Comment_And_Doctype_Preamble()
     {
         var svg = System.Text.Encoding.UTF8.GetBytes(
@@ -61,7 +61,7 @@ public class SvgImageRenderingTests
         Assert.True(BSvgRasterizer.IsSvgData(svg));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_False_For_NonSvg_Xml()
     {
         var xml = System.Text.Encoding.UTF8.GetBytes(
@@ -69,7 +69,7 @@ public class SvgImageRenderingTests
         Assert.False(BSvgRasterizer.IsSvgData(xml));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSvgData_Returns_False_For_Png_Bytes()
     {
         var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
@@ -78,7 +78,7 @@ public class SvgImageRenderingTests
 
     // ────────────────────── SVG rasterization via BSvgRasterizer ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_SvgImage_Is_Rendered_As_Bitmap()
     {
         // A red 50×50 SVG as a data-URI.  The rendering engine should
@@ -104,7 +104,7 @@ public class SvgImageRenderingTests
         Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_SvgImage_Blue_Circle_Rendered()
     {
         var svgDataUri = "data:image/svg+xml;base64," +
@@ -124,7 +124,7 @@ public class SvgImageRenderingTests
         Assert.True(pixel.R < 50, $"Expected red channel < 50, got {pixel.R}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_SvgImage_With_ViewBox_Rendered()
     {
         // SVG with viewBox and no explicit width/height — should use viewBox dimensions.
@@ -144,7 +144,7 @@ public class SvgImageRenderingTests
         Assert.True(pixel.G > 100, $"Expected green channel > 100, got {pixel.G}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_EmptySvg_Does_Not_Crash()
     {
         var svgDataUri = "data:image/svg+xml;base64," +
@@ -158,7 +158,7 @@ public class SvgImageRenderingTests
         Assert.Equal(200, bitmap.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BSvgRasterizer_RasterizeToBitmap_Returns_BackendNeutral_Bitmap()
     {
         var svgBytes = System.Text.Encoding.UTF8.GetBytes(
@@ -177,7 +177,7 @@ public class SvgImageRenderingTests
         Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BSvgRasterizer_RasterizeToBitmap_With_Explicit_Size_Scales_Content()
     {
         const string svgMarkup =
@@ -196,7 +196,7 @@ public class SvgImageRenderingTests
         Assert.True(pixel.B < 50, $"Expected blue channel < 50, got {pixel.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BSvgRasterizer_IsSvgData_Accepts_Commented_Svg_Preamble()
     {
         var svgBytes = System.Text.Encoding.UTF8.GetBytes(
@@ -205,7 +205,7 @@ public class SvgImageRenderingTests
         Assert.True(BSvgRasterizer.IsSvgData(svgBytes));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BSvgRasterizer_IsSvgData_Rejects_Comment_That_Mentions_Svg_But_Has_NonSvg_Root()
     {
         var xmlBytes = System.Text.Encoding.UTF8.GetBytes(
@@ -214,7 +214,7 @@ public class SvgImageRenderingTests
         Assert.False(BSvgRasterizer.IsSvgData(xmlBytes));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_NonSvg_Image_Still_Works()
     {
         // A minimal 1×1 red PNG encoded as base64 data URI.
@@ -227,7 +227,7 @@ public class SvgImageRenderingTests
         Assert.Equal(200, bitmap.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_SvgImage_ComplexSvg_With_Path()
     {
         // A simple SVG with a path element (triangle) - tests path rendering.
@@ -251,7 +251,7 @@ public class SvgImageRenderingTests
         Assert.True(pixel.G > 100, $"Expected green channel > 100 (orange), got {pixel.G}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_SvgImage_With_Text()
     {
         // SVG with text element — verifies text rendering doesn't crash.
@@ -270,7 +270,7 @@ public class SvgImageRenderingTests
         Assert.Equal(300, bitmap.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_MultipleSvgImages()
     {
         // Two different SVG images side by side.
@@ -323,7 +323,7 @@ public class SvgImageRenderingTests
         Assert.True(interiorPixel.B < 50, $"Expected blue channel < 50, got {interiorPixel.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlRender_SvgImage_With_Degenerate_ViewBox_Does_Not_Paint_Over_Background()
     {
         var svgDataUri = "data:image/svg+xml;base64," +

@@ -16,7 +16,7 @@ public class Acid3CssComplianceTests
     /// the slash element is visible after removeAttribute('class') removes
     /// the "hidden" class, and firstChild.data updates work correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Score_Display_Slash_Visible_After_RemoveAttribute()
     {
         var html = @"<!DOCTYPE html>
@@ -53,7 +53,7 @@ span.nextSibling.nextSibling.firstChild.data = '100';
     /// Verifies that firstChild.data can read and write text node content.
     /// This is critical for the Acid3 score update mechanism.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FirstChild_Data_ReadWrite_TextNode()
     {
         var html = @"<!DOCTYPE html>
@@ -77,7 +77,7 @@ document.getElementById('result').textContent = before + '|' + after;
     /// Verifies nextSibling navigation works across sibling elements,
     /// as used by the Acid3 score display update code.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NextSibling_Navigation_Across_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -102,7 +102,7 @@ document.getElementById('result').textContent = b.id + ':' + c.id;
     /// Verifies that CSS 'cm' units are recognized by getComputedStyle.
     /// At 96 DPI, 2cm should be approximately 75.6px (2 × 37.795275591).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cm_Unit_Border_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -136,7 +136,7 @@ document.getElementById('result').textContent = r.join(',');
     /// This is the pattern used by Acid3: html { border: 2cm solid gray }
     /// then :root { border-width: 0 0.2em 0.2em 0 }.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderWidth_FourValue_Cascade_Override()
     {
         var html = @"<!DOCTYPE html>
@@ -167,7 +167,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that hsla(0, 0%, 0%, 1.0) — the color used for the #slash
     /// element — is recognized as valid CSS and produces black text.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsla_Black_Color_For_Slash_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -196,7 +196,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies HSLA parsing with zero-percent saturation and lightness —
     /// boundary condition that should produce pure black or white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hsla_Zero_Saturation_Produces_Valid_Color()
     {
         var html = @"<!DOCTYPE html>
@@ -226,7 +226,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that display: inline-block with vertical-align in em units
     /// is recognized by getComputedStyle, as used by Acid3 bucket elements.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlock_VerticalAlign_Em_Units()
     {
         var html = @"<!DOCTYPE html>
@@ -263,7 +263,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that negative margins combined with borders are recognized,
     /// as used by Acid3 for overlapping layout (e.g. margin: -0.2em 0 0 -0.2em).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Negative_Margin_With_Border_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -297,7 +297,7 @@ document.getElementById('result').textContent = r.join(',');
     /// preserves original CSS units rather than resolving to px; real browsers
     /// would return computed values in px.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Large_Negative_Margin_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -328,7 +328,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that float: left with height/width: 0 is recognized,
     /// as used by Acid3 for iframe elements.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ZeroSized_Float_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -360,7 +360,7 @@ document.getElementById('result').textContent = r.join(',');
     /// separator between the score number and total, and that the score
     /// updates correctly via the update loop pattern.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Score_Display_Contains_Slash_Separator()
     {
         var html = @"<!DOCTYPE html>
@@ -416,7 +416,7 @@ document.getElementById('output').textContent =
     /// Acid3 pattern: * { border: 1px blue } overridden by
     /// * + * > * > p { border: 1px solid !important }.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Important_Border_Override_Universal_Selector()
     {
         var html = @"<!DOCTYPE html>
@@ -449,7 +449,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that @font-face rules with url() src are parsed and
     /// accessible via the CSSOM, even if the font file is not loaded.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontFace_With_Url_Src_Accessible_Via_CSSOM()
     {
         var html = @"<!DOCTYPE html>
@@ -481,7 +481,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that whitespace between inline elements is preserved in
     /// serialized output — text should not collapse to remove word boundaries.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Whitespace_Preserved_Between_Inline_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -507,7 +507,7 @@ document.getElementById('result').textContent = p.textContent;
     /// the .hidden { visibility: hidden } rule.  After removal, the
     /// element's computed visibility should revert to "visible".
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveAttribute_Class_Clears_Visibility_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -538,7 +538,7 @@ document.getElementById('result').textContent =
     /// Verifies that classList.remove() triggers CSS style recalculation,
     /// removing styles from rules that no longer match.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassList_Remove_Triggers_Style_Invalidation()
     {
         var html = @"<!DOCTYPE html>
@@ -566,7 +566,7 @@ document.getElementById('result').textContent =
     /// Verifies that setAttribute('class', ...) triggers CSS style
     /// recalculation so new class rules apply and old ones are removed.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetAttribute_Class_Triggers_Style_Recalculation()
     {
         var html = @"<!DOCTYPE html>
@@ -596,7 +596,7 @@ document.getElementById('result').textContent =
     /// Verifies that id/class mutations update the serialized CSS-derived
     /// inline styles used by the post-script render pass.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Class_And_Id_Mutations_Recalculate_Serialized_Styles()
     {
         var html = @"<!DOCTYPE html>
@@ -626,7 +626,7 @@ document.getElementById('bar').setAttribute('id', 'baz');
     /// Verifies that sibling-dependent selectors are recalculated for the
     /// neighboring element when a previous sibling gains a matching class.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Class_Change_Invalidates_Sibling_Dependent_Styles()
     {
         var html = @"<!DOCTYPE html>
@@ -655,7 +655,7 @@ document.getElementById('toggler').classList.add('sibling');
     /// Verifies that reflected boolean property changes invalidate serialized
     /// selector-driven styles such as :disabled.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_Property_Recalculates_Serialized_Styles()
     {
         var html = @"<!DOCTYPE html>
@@ -682,7 +682,7 @@ document.getElementById('target').disabled = true;
     /// Verifies that selector invalidation recomputes filtered sibling positions
     /// for <c>:nth-child(... of selector)</c> after a class mutation.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthChild_OfSelector_Recomputes_After_Class_Change()
     {
         var html = @"<!DOCTYPE html>
@@ -718,7 +718,7 @@ document.getElementById('result').textContent = before + ',' + after;
     /// This is the Acid3 pattern: html { border: 2cm solid gray }
     /// then :root { border-width: 0 0.2em 0.2em 0 }.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Selector_Overrides_Html_Border_Width()
     {
         var html = @"<!DOCTYPE html>
@@ -756,7 +756,7 @@ document.getElementById('result').textContent = r.join(',');
     /// border and pushes the Acid3 title roughly 76px down the page. Asserts on pixels,
     /// so it fails if the cascade resolves correctly but layout ignores the result.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Selector_Overrides_Html_Border_Top_In_Rendered_Output()
     {
         var html = @"<!DOCTYPE html><html>
@@ -795,7 +795,7 @@ h1:first-child { font-size: 5em; font-weight: bolder; margin-bottom: -0.4em; }
     /// Verifies that font-weight: bolder resolves to a numeric weight
     /// (700 when parent is normal/400) per CSS 2.1 §15.6.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontWeight_Bolder_Resolves_To_700_From_Normal_Parent()
     {
         var html = @"<!DOCTYPE html>
@@ -821,7 +821,7 @@ document.getElementById('result').textContent = 'fw=' + cs.fontWeight;
     /// Verifies that font-weight: lighter resolves to a numeric weight
     /// (100 when parent is normal/400) per CSS 2.1 §15.6.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontWeight_Lighter_Resolves_To_100_From_Normal_Parent()
     {
         var html = @"<!DOCTYPE html>
@@ -847,7 +847,7 @@ document.getElementById('result').textContent = 'fw=' + cs.fontWeight;
     /// Verifies that font-weight: bolder resolves to 900 when the parent
     /// already has font-weight: bold (700).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontWeight_Bolder_From_Bold_Parent_Resolves_To_900()
     {
         var html = @"<!DOCTYPE html>
@@ -876,7 +876,7 @@ document.getElementById('result').textContent = 'fw=' + cs.fontWeight;
     /// CSS and accessible via getComputedStyle, as used by Acid3's h1
     /// text-shadow: rgba(192,192,192,1.0) 3px 3px.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextShadow_Rgba_Color_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -904,7 +904,7 @@ document.getElementById('result').textContent = 'shadow=' + (ts !== '' && ts !==
     /// Verifies that word spacing works correctly with inherited font sizes.
     /// The text "To pass the test" should preserve spaces between words.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WordSpacing_With_Inherited_Font_Size()
     {
         var html = @"<!DOCTYPE html>
@@ -941,7 +941,7 @@ document.getElementById('result').textContent = 'words=' + words;
     /// on the instructions element.  "x-bogus" is an unknown keyword for
     /// white-space, so it must be discarded and "pre-wrap" must remain.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WhiteSpace_Invalid_Value_Discarded_By_Error_Recovery()
     {
         var html = @"<!DOCTYPE html>
@@ -968,7 +968,7 @@ document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
     /// the same property in the same rule, the valid one must win.
     /// Tests multiple enumerated properties.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Invalid_Display_Value_Discarded_Keeps_Previous()
     {
         var html = @"<!DOCTYPE html>
@@ -992,7 +992,7 @@ document.getElementById('result').textContent = 'display=' + cs.display;
     /// <summary>
     /// CSS2.1 §4.1.8: Invalid visibility value should be discarded.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Invalid_Visibility_Value_Discarded()
     {
         var html = @"<!DOCTYPE html>
@@ -1017,7 +1017,7 @@ document.getElementById('result').textContent = 'vis=' + cs.visibility;
     /// CSS2.1 §4.1.8: Invalid overflow value should be discarded.
     /// Validates that the rendering engine does not apply unknown overflow keywords.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Invalid_Overflow_Value_Discarded()
     {
         var html = @"<!DOCTYPE html>
@@ -1042,7 +1042,7 @@ document.getElementById('result').textContent = 'overflow=' + cs.overflow;
     /// CSS error recovery: valid "inherit" keyword should be accepted for
     /// enumerated properties even when validated.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inherit_Value_Accepted_For_Enumerated_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -1074,7 +1074,7 @@ document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
     /// font) + border + margin should fit within a 1024px viewport.
     /// This is a getComputedStyle validation for TODO-1.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Html_Width_32em_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -1105,7 +1105,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Tests that the full Acid3-like box model (border: 2cm + border-width
     /// override + width: 32em + margin) produces valid computed styles.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Full_BoxModel_Computed_Styles()
     {
         var html = @"<!DOCTYPE html>
@@ -1147,7 +1147,7 @@ document.getElementById('result').textContent = r.join(',');
     /// <c>color: gray; color: -acid3-bogus;</c> should result in gray
     /// because -acid3-bogus is an invalid color and must be rejected.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Instructions_Color_Error_Recovery()
     {
         var html = @"<!DOCTYPE html>
@@ -1176,7 +1176,7 @@ document.getElementById('result').textContent = 'color=' + cs.color;
     /// Uses id selector instead of :last-child since the rendering engine
     /// may not support :last-child pseudo-class.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Instructions_WhiteSpace_Error_Recovery()
     {
         var html = @"<!DOCTYPE html>
@@ -1203,7 +1203,7 @@ document.getElementById('result').textContent = 'ws=' + cs.whiteSpace;
     /// Verifies that @font-face rules are counted correctly in the CSSOM
     /// and that the font-family name is accessible.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontFace_FontFamily_Name_Accessible()
     {
         var html = @"<!DOCTYPE html>
@@ -1233,7 +1233,7 @@ document.getElementById('result').textContent = 'ff=' + ff;
     /// Verifies that <c>&lt;object&gt;</c> elements with position: fixed are
     /// recognized in the DOM and have valid computed styles.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Position_Fixed_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -1264,7 +1264,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that data: URI background images are preserved in the
     /// CSS computed style, not stripped during post-processing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUri_Background_Image_Preserved()
     {
         var html = @"<!DOCTYPE html>
@@ -1292,7 +1292,7 @@ document.getElementById('result').textContent = 'has-data-uri=' + (bg.indexOf('d
     /// Verifies that pseudo-element positioning with absolute coordinates
     /// is recognized by the CSS engine (map::after pattern from Acid3).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoElement_Absolute_Position_In_CSSOM()
     {
         var html = @"<!DOCTYPE html>
@@ -1330,7 +1330,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Note: :root is rewritten to html by HtmlPostProcessor, so we use
     /// html directly here to test what the rendering engine sees.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Base_Css_Cascade_Integration()
     {
         var html = @"<!DOCTYPE html>
@@ -1373,7 +1373,7 @@ document.getElementById('output').textContent = r.join('|');
     /// Integration test: verifies that the Acid3 bucket CSS rules produce
     /// valid computed styles for inline-block elements with dotted borders.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Bucket_InlineBlock_Css_Integration()
     {
         var html = @"<!DOCTYPE html>
@@ -1416,7 +1416,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Acid3 uses <c>border: 2cm solid gray</c> on &lt;html&gt; — the gray
     /// must propagate to all four border-*-color properties.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Border_Shorthand_Expands_Color_To_Individual_Sides()
     {
         var html = @"<!DOCTYPE html>
@@ -1448,7 +1448,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that the <c>border-color</c> 4-value shorthand expands into
     /// individual side-color longhands following CSS box-model order.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderColor_FourValue_Shorthand_Expands_To_Sides()
     {
         var html = @"<!DOCTYPE html>
@@ -1484,7 +1484,7 @@ document.getElementById('result').textContent = r.join(',');
     /// for properties commonly queried by Acid3 that were not previously in
     /// the initial-values dictionary (z-index, width, height, etc.).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Returns_Correct_Initial_Values()
     {
         var html = @"<!DOCTYPE html>
@@ -1542,7 +1542,7 @@ document.getElementById('result').textContent = r.join(',');
     /// no CSS rule sets a border color (CSS2.1: border color defaults to the
     /// element's color property, but initial value is currentColor → black).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderColor_Initial_Values_Return_Black()
     {
         var html = @"<!DOCTYPE html>
@@ -1575,7 +1575,7 @@ document.getElementById('result').textContent = r.join(',');
     /// formatting context — multiple inline-block elements should lay out side-by-side.
     /// The Acid3 test buckets use this pattern for the six colored boxes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlock_Elements_Participate_In_Inline_Formatting_Context()
     {
         var html = @"<!DOCTYPE html>
@@ -1623,7 +1623,7 @@ document.getElementById('result').textContent = r.join(',');
     /// accessible via getComputedStyle. Acid3 bucket elements use
     /// <c>border: 2em dotted red</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DottedBorder_Style_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -1661,7 +1661,7 @@ document.getElementById('result').textContent = r.join(',');
     /// <c>padding-right</c> does not collapse or remove text content.
     /// Acid3 instruction text uses <c>margin-right: -20px; padding-right: 20px</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Negative_Margin_With_Padding_Preserves_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -1694,7 +1694,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Verifies that <c>overflow-x</c> and <c>overflow-y</c> initial values
     /// are correctly returned by getComputedStyle.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflow_XY_Initial_Values_Are_Visible()
     {
         var html = @"<!DOCTYPE html>
@@ -1722,7 +1722,7 @@ document.getElementById('result').textContent = r.join(',');
     /// computed. Acid3 uses <c>font: 900 small-caps 10px sans-serif</c> on
     /// the #linktest element.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontVariant_SmallCaps_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -1751,7 +1751,7 @@ document.getElementById('result').textContent = 'fv=' + cs.fontVariant;
     /// The total width must be: content (640px) + left border (0) + right border (4px) = 644px,
     /// which fits within a 1024px viewport.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BoxModel_Border2cm_Width32em_Computed_Dimensions()
     {
         var html = @"<!DOCTYPE html>
@@ -1798,7 +1798,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Verifies that RenderToImageAutoSized with maxHeight clips the bitmap
     /// to the specified height, ensuring viewport-constrained rendering.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Constrained_Render_Clips_At_MaxHeight()
     {
         // Create content taller than the viewport
@@ -1827,7 +1827,7 @@ div { width: 50px; height: 300px; background: red; }
     /// Top and left borders should be absent (0), while bottom and right borders should
     /// be present (0.2em = 4px at 20px font size).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Asymmetric_Border_Width_Renders_Correctly()
     {
         var html = @"<!DOCTYPE html>
@@ -1872,7 +1872,7 @@ body { margin: 0; }
     /// Verifies that the root (html) and body element overflow defaults to
     /// 'visible' when no overflow property is set, per CSS 2.1.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_And_Body_Default_Overflow_Is_Visible()
     {
         var html = @"<!DOCTYPE html>
@@ -1901,7 +1901,7 @@ document.getElementById('result').textContent = r.join(',');
     /// html element's margin (1em = 20px) and the content should start
     /// immediately (since border-left-width is 0).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Html_Border_Column_Offsets()
     {
         var html = @"<!DOCTYPE html>
@@ -1939,7 +1939,7 @@ body { margin: 0; padding: 0; }
     /// overrides a previous border shorthand in the HtmlRender layout engine.
     /// The rendered border geometry should reflect the override.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderWidth_Override_Renders_Zero_Top_Left()
     {
         var html = @"<!DOCTYPE html>
@@ -1982,7 +1982,7 @@ body { margin: 0; padding: 0; }
     /// CSS 2.1 §15.4 which states that font-size:0 gives a zero-size em box.
     /// The Acid3 .buckets container uses this pattern to collapse text height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontSize_Zero_Creates_NearZero_Height_Container()
     {
         var html = @"<!DOCTYPE html>

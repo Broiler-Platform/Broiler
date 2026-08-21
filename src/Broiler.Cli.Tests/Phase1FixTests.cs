@@ -4,7 +4,7 @@ namespace Broiler.Cli.Tests;
 
 public class Phase1FixTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToFixed_NegativeZero_Returns_PositiveString()
     {
         using var c = new JSContext();
@@ -12,7 +12,7 @@ public class Phase1FixTests
         Assert.Equal("0.0000", r.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Substr_Negative_Start()
     {
         using var c = new JSContext();
@@ -20,7 +20,7 @@ public class Phase1FixTests
         Assert.Equal("cat", r.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NullByte_In_Regex_Test()
     {
         using var c = new JSContext();

@@ -30,7 +30,7 @@ public sealed class AnchorInsetLiveGeometryTests
     private static double Read(JSContext c, string expr) =>
         double.Parse(c.Eval(expr).ToString()!, System.Globalization.CultureInfo.InvariantCulture);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StartInsets_LiveOffsetsAndRect_ResolveToAnchorEdge()
     {
         using var context = new JSContext();
@@ -51,7 +51,7 @@ public sealed class AnchorInsetLiveGeometryTests
         Assert.Equal(expectedLeft, Read(context, "document.getElementById('t').getBoundingClientRect().left"), 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EndInsets_ResolveAgainstContainingBlockMinusBox()
     {
         using var context = new JSContext();
@@ -76,7 +76,7 @@ public sealed class AnchorInsetLiveGeometryTests
   <div id='cb'><div id='a'></div><div id='s'></div><div id='p'></div></div>
 </body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_LiveDimensions_ResolveToAnchorSize()
     {
         using var context = new JSContext();
@@ -90,7 +90,7 @@ public sealed class AnchorInsetLiveGeometryTests
         Assert.Equal(70, Read(context, "document.getElementById('s').getBoundingClientRect().height"), 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_ContentBox_AddsPaddingAndBorderToBorderBox()
     {
         using var context = new JSContext();
@@ -112,7 +112,7 @@ public sealed class AnchorInsetLiveGeometryTests
   <div id='cb'><div id='a'></div><div id='o'></div></div>
 </body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OpposingInsets_AutoSize_SpanBetweenResolvedInsets()
     {
         using var context = new JSContext();

@@ -13,7 +13,7 @@ public class SelectorsAndCssomTests
 {
     // ────────────────────── Pseudo-class: :only-child ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyChild_Matches_Single_Element_Child()
     {
         var html = @"<!DOCTYPE html>
@@ -32,7 +32,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyChild_Fails_With_Multiple_Children()
     {
         var html = @"<!DOCTYPE html>
@@ -53,7 +53,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────────── Pseudo-class: :empty ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Matches_Element_Without_Children()
     {
         var html = @"<!DOCTYPE html>
@@ -73,7 +73,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Dynamic_AddRemove_Children()
     {
         var html = @"<!DOCTYPE html>
@@ -99,7 +99,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ─────────────────────── Pseudo-class: :root ──────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Matches_DocumentElement_Only()
     {
         var html = @"<!DOCTYPE html>
@@ -118,7 +118,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,HTML,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Not_Root_Matches_Non_Root_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -144,7 +144,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Pseudo-class: :lang() ─────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Matches_Element_With_Lang_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -164,7 +164,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Inherits_From_Parent()
     {
         var html = @"<!DOCTYPE html>
@@ -182,7 +182,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Matches_Quoted_Argument()
     {
         var html = @"<!DOCTYPE html>
@@ -201,7 +201,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Matches_Html_Lang_With_Quoted_And_Unquoted_Arguments()
     {
         var html = @"<!DOCTYPE html>
@@ -221,7 +221,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Matches_Extended_Wildcard_Range()
     {
         var html = @"<!DOCTYPE html>
@@ -240,7 +240,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Invalid_Range_Invalidates_Whole_Pseudo()
     {
         var html = @"<!DOCTYPE html>
@@ -262,7 +262,7 @@ document.getElementById('result').textContent = cs.zIndex;
         Assert.Contains("7", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Digit_Only_Range_Does_Not_Match()
     {
         var html = @"<!DOCTYPE html>
@@ -284,7 +284,7 @@ document.getElementById('result').textContent = cs.zIndex;
         Assert.Contains("7", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lang_Matches_XmlLang_Ancestor()
     {
         var html = @"<!DOCTYPE html>
@@ -303,7 +303,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Open_Matches_Details_With_Open_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -325,7 +325,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Open_Tracks_Details_Open_State_Changes()
     {
         var html = @"<!DOCTYPE html>
@@ -351,7 +351,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Has_NthChild_Invalidation_Tracks_Removals()
     {
         var html = """
@@ -416,7 +416,7 @@ document.body.setAttribute('data-after', [
         Assert.Contains("data-after=\"false;false;false;false\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Has_GeneralSibling_NestedNthChild_Invalidation_Tracks_Removals()
     {
         var html = """
@@ -456,7 +456,7 @@ document.body.setAttribute('data-after', matches('#first:not(:has(~ .item > :nth
         Assert.Contains("data-after=\"true\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Has_IsAndWhereWrappedSelectors_Invalidation_Tracks_Removals()
     {
         var html = """
@@ -536,7 +536,7 @@ document.body.setAttribute('data-after', [
 
     // ─────────── Pseudo-classes: :enabled, :disabled, :checked ────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Enabled_Disabled_Checkbox()
     {
         var html = @"<!DOCTYPE html>
@@ -560,7 +560,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Checked_Matches_Checked_Input()
     {
         var html = @"<!DOCTYPE html>
@@ -586,7 +586,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────── Pseudo-classes: :last-of-type, :only-of-type ────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LastOfType_Matches_Last_Sibling_Of_Same_Tag()
     {
         var html = @"<!DOCTYPE html>
@@ -610,7 +610,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyOfType_Matches_Single_Tag_Type()
     {
         var html = @"<!DOCTYPE html>
@@ -636,7 +636,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ─────── :nth-of-type, :nth-last-of-type, :nth-last-child ──────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthOfType_Matches_Correct_Position()
     {
         var html = @"<!DOCTYPE html>
@@ -666,7 +666,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthLastOfType_Matches_From_End()
     {
         var html = @"<!DOCTYPE html>
@@ -694,7 +694,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthLastChild_Matches_From_End()
     {
         var html = @"<!DOCTYPE html>
@@ -720,7 +720,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthChild_Odd_Even()
     {
         var html = @"<!DOCTYPE html>
@@ -747,7 +747,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthChild_OfSelector_Matches_Filtered_Siblings()
     {
         var html = @"<!DOCTYPE html>
@@ -777,7 +777,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NthLastChild_OfSelector_Matches_Filtered_Siblings()
     {
         var html = @"<!DOCTYPE html>
@@ -807,7 +807,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Duplicate_Class_Attribute_First_Wins_During_Html_Parse()
     {
         var html = @"<!DOCTYPE html>
@@ -838,7 +838,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("c,c,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Duplicate_Id_Attribute_First_Wins_During_Html_Parse()
     {
         var html = @"<!DOCTYPE html>
@@ -861,7 +861,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────── Attribute selectors: |=, ~=, ^=, $=, *= ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttributeSelector_DashMatch()
     {
         var html = @"<!DOCTYPE html>
@@ -883,7 +883,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,d1,true,d2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttributeSelector_WordMatch()
     {
         var html = @"<!DOCTYPE html>
@@ -903,7 +903,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,d1,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttributeSelector_StartsWith_EndsWith_Contains()
     {
         var html = @"<!DOCTYPE html>
@@ -926,7 +926,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ─────────────────── document.defaultView ─────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DefaultView_Returns_Window()
     {
         var html = @"<!DOCTYPE html>
@@ -947,7 +947,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ─────────────────── getComputedStyle ──────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Returns_Inline_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -968,7 +968,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("red,16px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Matches_CSS_Rules()
     {
         var html = @"<!DOCTYPE html>
@@ -995,7 +995,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("5,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Via_DefaultView()
     {
         var html = @"<!DOCTYPE html>
@@ -1016,7 +1016,7 @@ document.getElementById('result').textContent = cs.zIndex;
         Assert.Contains("42", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_PseudoClass_Selector_In_StyleSheet()
     {
         // Use dynamic element creation to ensure :first-child matches the first element.
@@ -1053,7 +1053,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ───────────────────────── cssFloat ────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssFloat_Reads_Float_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -1074,7 +1074,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,right,none", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_Length_And_Item_Enumerate_Inline_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -1096,7 +1096,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("2,color,font-size,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_GetPropertyPriority_Reads_Important_And_Strips_Value()
     {
         var html = @"<!DOCTYPE html>
@@ -1118,7 +1118,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("important,blue,blue,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_SetProperty_Priority_Argument_Is_Reflected()
     {
         var html = @"<!DOCTYPE html>
@@ -1140,7 +1140,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("important,2px,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_GetPropertyValue_Expands_Inline_Margin_Shorthand()
     {
         var html = @"<!DOCTYPE html>
@@ -1163,7 +1163,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("1px,2px,3px,4px,4px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_SetProperty_Shorthand_Resolves_Longhands_Without_Changing_Enumeration()
     {
         var html = @"<!DOCTYPE html>
@@ -1187,7 +1187,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("1,margin,5px,10px,10px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_CssText_Setter_Resolves_Border_Longhands_Without_Duplicating_Declarations()
     {
         var html = @"<!DOCTYPE html>
@@ -1211,7 +1211,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("1,border,3px,solid,red", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Length_And_Item_Enumerate_Computed_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -1241,7 +1241,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Priority_Is_Empty_And_Values_Are_Normalized()
     {
         var html = @"<!DOCTYPE html>
@@ -1267,7 +1267,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── matchMedia ─────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchMedia_Basic_All_Query()
     {
         var html = @"<!DOCTYPE html>
@@ -1288,7 +1288,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────── document.createElementNS ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateElementNS_Creates_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -1309,7 +1309,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── element.title ──────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Title_Property_ReadWrite()
     {
         var html = @"<!DOCTYPE html>
@@ -1333,7 +1333,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ───────────────────────── node.data ───────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Data_Property_On_TextNodes()
     {
         var html = @"<!DOCTYPE html>
@@ -1353,7 +1353,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("hello,world", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Data_Property_On_CommentNodes()
     {
         var html = @"<!DOCTYPE html>
@@ -1375,7 +1375,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────── setAttribute('style', ...) syncs to style object ──────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetAttribute_Style_Syncs_To_Style_Object()
     {
         var html = @"<!DOCTYPE html>
@@ -1398,7 +1398,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ─────────── getComputedStyle with @media rules ───────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Media_All()
     {
         var html = @"<!DOCTYPE html>
@@ -1432,7 +1432,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────── Combined selectors with pseudo-classes in getComputedStyle ─────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_SelectorTest_Pattern()
     {
         // Mimics the Acid3 selectorTest pattern:
@@ -1464,7 +1464,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ───────── Acid3 test 33 pattern: class & attribute selectors ──────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test33_ClassSelector_CaseSensitive()
     {
         var html = @"<!DOCTYPE html>
@@ -1491,7 +1491,7 @@ document.getElementById('result').textContent = cs.zIndex;
 
     // ─────────── Acid3 test 34 pattern: :lang and [|=] ─────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test34_Lang_And_DashMatch()
     {
         var html = @"<!DOCTYPE html>

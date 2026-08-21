@@ -25,7 +25,7 @@ public sealed class TableFontInheritanceQuirkTests
 {
     private static readonly Uri BaseUrl = new("file:///table-font-quirk.html");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Table_Does_Not_Inherit_The_Parents_Font_Size()
     {
         InQuirksMode(() =>
@@ -41,7 +41,7 @@ public sealed class TableFontInheritanceQuirkTests
 
     // The 7-Zip shape. Three nested tables, each cell asking for 80%: every cell resolves against
     // its table's reset size, so all three land on the same 12.8px rather than 10.24 / 8.19 / 6.55.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Cells_Percentage_Does_Not_Compound_Through_Nested_Tables()
     {
         InQuirksMode(() =>
@@ -63,7 +63,7 @@ public sealed class TableFontInheritanceQuirkTests
 
     // The same document in standards mode is the control: there the table inherits, so the 80%
     // compounds and each level is 80% of the one above it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Nesting_Still_Compounds_In_Standards_Mode()
     {
         InStandardsMode(() =>
@@ -80,7 +80,7 @@ public sealed class TableFontInheritanceQuirkTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Other_Six_Properties_Are_Reset_Too()
     {
         InQuirksMode(() =>
@@ -106,7 +106,7 @@ public sealed class TableFontInheritanceQuirkTests
 
     // font-family is not in the spec's list, so a quirks-mode table keeps the page's typeface and
     // only loses the size. 7-Zip's tables still render in the body's Verdana.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Font_Family_Is_Still_Inherited()
     {
         InQuirksMode(() =>
@@ -122,7 +122,7 @@ public sealed class TableFontInheritanceQuirkTests
 
     // The spec states the reset as a UA-origin rule, and the cascade applies the element's own
     // declarations after inheriting — so an author font-size on the table itself still wins.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Author_Declaration_On_The_Table_Overrides_The_Reset()
     {
         InQuirksMode(() =>
@@ -139,7 +139,7 @@ public sealed class TableFontInheritanceQuirkTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nothing_Happens_In_Standards_Mode()
     {
         InStandardsMode(() =>
@@ -157,7 +157,7 @@ public sealed class TableFontInheritanceQuirkTests
 
     // The selector in the spec's rule is an element selector, so a box that merely lays out as a
     // table is unaffected — as is any other element.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Only_The_Table_Element_Is_Reset()
     {
         InQuirksMode(() =>
@@ -177,7 +177,7 @@ public sealed class TableFontInheritanceQuirkTests
     // `everything: true` is the inline-splitting path, which clones an already-cascaded box onto
     // its two halves — HtmlTag included. Re-running the reset there would throw away the author
     // values the original ended up with, so it must not fire.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Clone_Path_Keeps_The_Originals_Values()
     {
         InQuirksMode(() =>

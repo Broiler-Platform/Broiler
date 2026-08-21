@@ -33,7 +33,7 @@ public sealed class DatasetTests
     /// carries no such attribute yet. This is the case a snapshot object cannot serve — the write
     /// has to reach the element, not a throwaway copy — so it asserts the attribute afterwards.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WritingANewKey_ReachesTheElementAsADataAttribute()
     {
         var (context, bridge) = Attach("<div id='t'></div>");
@@ -48,7 +48,7 @@ public sealed class DatasetTests
     }
 
     /// <summary>An attribute the markup carries is readable without anything having written it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MarkupAttributes_AreReadable()
     {
         var (context, bridge) = Attach("<div id='t' data-ved='abc' data-eqid='q1'></div>");
@@ -63,7 +63,7 @@ public sealed class DatasetTests
     /// The name mapping runs both ways: <c>dataset.fooBar</c> is <c>data-foo-bar</c>, and an
     /// attribute set directly is visible under its camel-cased name.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NamesMapBetweenCamelCaseAndDashes_InBothDirections()
     {
         var (context, bridge) = Attach("<div id='t'></div>");
@@ -82,7 +82,7 @@ public sealed class DatasetTests
     /// filter the key list through <c>getOwnPropertyDescriptor</c>, so a map that answers only
     /// <c>ownKeys</c> enumerates as empty — which is why both are asserted.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheMapEnumerates_AndSerializes()
     {
         var (context, bridge) = Attach("<div id='t' data-one='1' data-two-part='2' class='c'></div>");
@@ -94,7 +94,7 @@ public sealed class DatasetTests
     }
 
     /// <summary>Non-<c>data-</c> attributes are not part of the map.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OtherAttributes_AreNotInTheMap()
     {
         var (context, bridge) = Attach("<div id='t' data-one='1' title='hello'></div>");
@@ -106,7 +106,7 @@ public sealed class DatasetTests
     }
 
     /// <summary><c>in</c> distinguishes a present key from an absent one.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MembershipIsAnswered()
     {
         var (context, bridge) = Attach("<div id='t' data-ved='abc'></div>");
@@ -118,7 +118,7 @@ public sealed class DatasetTests
     }
 
     /// <summary>Deleting through the map removes the attribute from the element.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DeletingAKey_RemovesTheAttribute()
     {
         var (context, bridge) = Attach("<div id='t' data-ved='abc'></div>");
@@ -135,7 +135,7 @@ public sealed class DatasetTests
     /// An empty attribute value is a value, not an absence — the distinction the traps have to keep
     /// so <c>data-x=""</c> reads as <c>""</c> and enumerates, rather than looking like no attribute.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnEmptyValue_IsAValueNotAnAbsence()
     {
         var (context, bridge) = Attach("<div id='t' data-empty=''></div>");
@@ -152,7 +152,7 @@ public sealed class DatasetTests
     /// made through <c>setAttribute</c> is visible through a reference taken beforehand, and the
     /// element hands back the same object each time as a browser does.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheMapIsLive_AndTheSameObjectEachTime()
     {
         var (context, bridge) = Attach("<div id='t' data-n='1'></div>");
@@ -167,7 +167,7 @@ public sealed class DatasetTests
     }
 
     /// <summary>An element created by script has the map too, not only one parsed from markup.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ACreatedElement_HasTheMap()
     {
         var (context, bridge) = Attach("");

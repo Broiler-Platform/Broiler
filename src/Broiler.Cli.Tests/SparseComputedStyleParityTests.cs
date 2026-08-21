@@ -88,7 +88,7 @@ public sealed class SparseComputedStyleParityTests
     private static readonly HashSet<string> FontWeightKeywords =
         new(["normal", "bold", "bolder", "lighter"], StringComparer.OrdinalIgnoreCase);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CanonicalSparseProjection_Reproduces_Bridge_GetComputedProps_Modulo_Documented_Delta()
     {
         // Divergences that are NOT explained by one of the four documented classes — these are

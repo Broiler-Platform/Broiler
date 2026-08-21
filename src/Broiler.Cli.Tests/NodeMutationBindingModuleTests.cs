@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class NodeMutationBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeMutation_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(NodeMutationBinding);
@@ -29,7 +29,7 @@ public sealed class NodeMutationBindingModuleTests
         Assert.True(typeof(INodeMutationHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Node_Mutation_Flows_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>
@@ -73,7 +73,7 @@ document.body.appendChild(out);
     /// <c>undefined</c> and threw — mid-script, after whatever the script had already done
     /// to the tree.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Exposes_The_ParentNode_Mixin()
     {
         var html = @"<!DOCTYPE html>
@@ -114,7 +114,7 @@ document.body.appendChild(out);
     /// then reads as having no root element at all, silently, which is a blank page rather
     /// than an error.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Prepend_Rejects_An_Element_Before_The_Doctype()
     {
         var html = @"<!DOCTYPE html>
@@ -142,7 +142,7 @@ document.documentElement.querySelector('body').appendChild(out);
     /// <summary>
     /// With no doctype in the way, `prepend` inserts at the front like the mixin says.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Prepend_Inserts_At_The_Front_When_No_Doctype_Blocks_It()
     {
         var html = @"<html><body>
@@ -170,7 +170,7 @@ document.documentElement.querySelector('body').appendChild(out);
     /// raise left the document with no root element at all, so the page rendered blank — the
     /// failure mode worth naming, because nothing about it points at <c>append</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Append_Restores_A_Detached_Root_Clone()
     {
         var html = @"<!DOCTYPE html>
@@ -196,7 +196,7 @@ document.append(root.cloneNode(true));
     /// <c>replaceChildren()</c> with no arguments empties the node — the one call in the mixin
     /// whose whole effect is the removal half.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_ReplaceChildren_With_No_Arguments_Empties_The_Document()
     {
         var html = @"<!DOCTYPE html>

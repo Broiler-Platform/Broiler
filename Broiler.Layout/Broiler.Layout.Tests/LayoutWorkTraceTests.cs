@@ -53,7 +53,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
         LayoutWorkTrace.Reset();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_it_records_nothing()
     {
         LayoutWorkTrace.Count(LayoutWorkTrace.Counters.BoxesLaidOut, 17);
@@ -67,7 +67,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
         Assert.Empty(LayoutWorkTrace.Times());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_whole_layout_pass_records_nothing_when_disabled()
     {
         // The call sites, not the API: the point of the disabled contract is that an engine carrying
@@ -81,7 +81,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
         Assert.Empty(LayoutWorkTrace.Times());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_nested_scope_is_charged_to_the_inner_operation_and_subtracted_from_the_outer()
     {
         LayoutWorkTrace.Enabled = true;
@@ -106,7 +106,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
             $"the inner scope did most of the work, so it must carry most of the time ({intrinsic} vs {table})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Self_times_never_exceed_the_span_that_contains_them()
     {
         LayoutWorkTrace.Enabled = true;
@@ -134,7 +134,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
             $"disjoint self times must fit inside the span containing them ({sum} vs {start.Elapsed.TotalMilliseconds})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Repeated_scopes_of_one_operation_accumulate()
     {
         LayoutWorkTrace.Enabled = true;
@@ -150,7 +150,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
         Assert.True(twice > once, $"a second scope must add to the first ({twice} vs {once})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Counters_sum_and_CountMax_takes_the_maximum()
     {
         LayoutWorkTrace.Enabled = true;
@@ -165,7 +165,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
         Assert.Equal(9, counts[LayoutWorkTrace.Counters.TreeDepth]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reset_discards_the_counts_and_the_times()
     {
         LayoutWorkTrace.Enabled = true;
@@ -180,7 +180,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
         Assert.Empty(LayoutWorkTrace.Times());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_enabled_pass_counts_every_box_it_lays_out()
     {
         var root = TextTree();
@@ -203,7 +203,7 @@ public sealed class LayoutWorkTraceTests : IDisposable
     /// The union counter is the one the published ceiling uses, so the case that separates it from a
     /// per-class sum is asserted: a box under two independent roots at once.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_box_under_two_independent_roots_is_counted_once()
     {
         var environment = new StubLayoutEnvironment();

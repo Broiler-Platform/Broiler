@@ -63,7 +63,7 @@ public class PageLoaderContentTypeTests
     private static string[] ContentTypeValues(CapturingHandler handler) =>
         handler.Request!.Content!.Headers.GetValues("Content-Type").ToArray();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task UrlEncodedForm_PostsThatMediaTypeAndNoOther()
     {
         // The consent dialog's own body, shortened.
@@ -82,7 +82,7 @@ public class PageLoaderContentTypeTests
         Assert.Equal(Body, handler.Body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task ContentTypeIsAbsentFromTheDefaultedCase()
     {
         // No media type on the request: the loader falls back to the form default, and that
@@ -96,7 +96,7 @@ public class PageLoaderContentTypeTests
         Assert.Equal(["application/x-www-form-urlencoded"], ContentTypeValues(handler));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task TextPlainForm_KeepsTheMediaTypeTheFormChose()
     {
         var handler = await SubmitAsync(new PageRequest(
@@ -108,7 +108,7 @@ public class PageLoaderContentTypeTests
         Assert.Equal(["text/plain"], ContentTypeValues(handler));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task MultipartForm_KeepsItsBoundaryParameterAndItsBytes()
     {
         byte[] body = [0x2D, 0x2D, 0x78, 0x79, 0x7A, 0xFF, 0xFE, 0x0D, 0x0A];
@@ -127,7 +127,7 @@ public class PageLoaderContentTypeTests
         Assert.Equal(body, handler.Bytes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task AnUnparseableMediaTypeStillGoesOutRatherThanFailingTheRequest()
     {
         var handler = await SubmitAsync(new PageRequest(
@@ -139,7 +139,7 @@ public class PageLoaderContentTypeTests
         Assert.Equal(["not a media type"], ContentTypeValues(handler));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task AGetNavigationSendsNoBodyAndNoContentType()
     {
         var handler = await SubmitAsync(PageRequest.ForUrl("https://www.google.de/search?q=test"));

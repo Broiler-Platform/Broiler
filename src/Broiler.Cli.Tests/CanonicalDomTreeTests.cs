@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CanonicalDomTreeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Exposes_Canonical_Dom_Elements_Only()
     {
         // The public element seams surface canonical Broiler.Dom.DomElement — no facade
@@ -34,7 +34,7 @@ public sealed class CanonicalDomTreeTests
         Assert.All(bridge.Elements, element => Assert.IsType<Broiler.Dom.DomElement>(element));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Parses_Implicit_Structure_With_Consistent_Parent_Links()
     {
         // Replaces the retired HtmlTreeBuilder characterization test: the bridge parses
@@ -58,7 +58,7 @@ public sealed class CanonicalDomTreeTests
         Assert.All(host.ChildNodes.OfType<Broiler.Dom.DomElement>(), child => Assert.Same(host, child.ParentNode));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Owns_The_Canonical_Document_And_Exposes_Tree_Derived_Elements()
     {
         var bridge = new DomBridge();
@@ -72,7 +72,7 @@ public sealed class CanonicalDomTreeTests
             bridge.Document.GetElementById("child"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Serialization_Is_Stable_Without_Intervening_Mutations()
     {
         const string html = """
@@ -96,7 +96,7 @@ public sealed class CanonicalDomTreeTests
         Assert.Contains("<span>ready</span>", first, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Mutation_Preserves_Parent_And_Flat_Element_Views()
     {
         const string html = """

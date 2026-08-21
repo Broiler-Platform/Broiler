@@ -35,7 +35,7 @@ public sealed class NativePositionTryBridgeModeTests
         return bridge.SerializeToHtml();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeMode_PreservesAnchorAndPositionTryCss()
     {
         var html = ResolveAndSerialize(nativeMode: true);
@@ -71,7 +71,7 @@ public sealed class NativePositionTryBridgeModeTests
         return bridge.SerializeToHtml();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OpposingInsetBase_LeavesBoxUnbaked()
     {
         // The target is not touched — no baked inline style, so its opposing-inset anchor() base
@@ -96,7 +96,7 @@ public sealed class NativePositionTryBridgeModeTests
         "</style></head><body><div id='cb'><div id='anchor'></div>" +
         "<div id='target'><span></span></div></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MinContentBase_LeavesBoxUnbaked()
     {
         var native = ResolveAndSerialize(nativeMode: true, MinContentHtml);
@@ -120,7 +120,7 @@ public sealed class NativePositionTryBridgeModeTests
         "</style></head><body><div id='cb'><div id='anchor'></div>" +
         "<div id='target'><span></span><span></span></div></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MaxContentBase_LeavesBoxUnbaked()
     {
         var native = ResolveAndSerialize(nativeMode: true, MaxContentHtml);
@@ -140,7 +140,7 @@ public sealed class NativePositionTryBridgeModeTests
         "</style></head><body><div id='cb'><div id='anchor'></div>" +
         "<div id='target'><span></span><span></span></div></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FitContentBase_LeavesBoxUnbaked()
     {
         var native = ResolveAndSerialize(nativeMode: true, FitContentHtml);

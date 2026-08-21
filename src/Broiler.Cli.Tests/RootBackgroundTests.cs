@@ -16,7 +16,7 @@ public class RootBackgroundTests
     /// Verifies that <c>html { background: silver; }</c> causes the canvas to
     /// be cleared with silver (RGB 192,192,192) instead of white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Background_Silver_Propagates_To_Canvas()
     {
         var html = @"<!DOCTYPE html>
@@ -38,7 +38,7 @@ public class RootBackgroundTests
     /// Verifies that when no root background is specified, the canvas defaults
     /// to white (backward compatibility).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Root_Background_Defaults_To_White()
     {
         var html = @"<!DOCTYPE html>
@@ -59,7 +59,7 @@ public class RootBackgroundTests
     /// Verifies that an explicit backgroundColor parameter controls the
     /// canvas when the root element does not specify a CSS background.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Explicit_BackgroundColor_Parameter_Overrides_Root()
     {
         // No CSS background on html — the explicit parameter should control the canvas.
@@ -81,7 +81,7 @@ public class RootBackgroundTests
     /// Verifies that <c>RenderToImageAutoSized</c> also picks up the root
     /// background color.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AutoSized_Root_Background_Silver_Propagates()
     {
         var html = @"<!DOCTYPE html>
@@ -101,7 +101,7 @@ public class RootBackgroundTests
     /// <summary>
     /// Verifies that named CSS colors on the root element are handled (e.g. red).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Background_Named_Color_Red()
     {
         var html = @"<!DOCTYPE html>
@@ -121,7 +121,7 @@ public class RootBackgroundTests
     /// <summary>
     /// Verifies that hex color codes on the root element work correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Background_Hex_Color()
     {
         var html = @"<!DOCTYPE html>
@@ -143,7 +143,7 @@ public class RootBackgroundTests
     /// <c>html</c> by <see cref="HtmlPostProcessor"/> so that
     /// HtmlRenderer correctly applies root-level styling.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PostProcessor_Rewrites_Root_Selector_To_Html()
     {
         var input = "<style>:root { background: silver; }</style>";
@@ -157,7 +157,7 @@ public class RootBackgroundTests
     /// rewritten by post-processing and then HtmlRender uses silver as the
     /// canvas background.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Full_Pipeline_Root_Selector_Background()
     {
         var html = @"<!DOCTYPE html>
@@ -181,7 +181,7 @@ public class RootBackgroundTests
     /// CSS 2.1 §14.2: when the root element has a transparent background,
     /// the body element's background should be used for the canvas.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Background_Fallback_When_Root_Is_Transparent()
     {
         var html = @"<!DOCTYPE html>

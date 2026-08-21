@@ -101,7 +101,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     // 1. Root overflow: hidden is still programmatically scrollable
     // ---------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootOverflowHidden_StillAcceptsProgrammaticScroll()
     {
         const string html =
@@ -120,7 +120,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     }
 
     /// <summary><c>overflow: clip</c> genuinely suppresses the scroll container, so it must stay pinned.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootOverflowClip_RemainsUnscrollable()
     {
         const string html =
@@ -147,7 +147,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     /// ended at the green block's border box, capping the scroll one viewport earlier and leaving
     /// green filling the screen.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollableOverflow_IncludesTrailingBottomMargin()
     {
         const string html =
@@ -176,7 +176,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     /// 192, so the scroll lands at 998.4 and the blue border-top paints at 1382.4 - 998.4 = 384 —
     /// the vertical centre the test's own message describes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_HonoursScrollPaddingAndScrollMarginShorthands()
     {
         const string html =
@@ -212,7 +212,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     /// for: only the root element propagates to the viewport. Honouring body's would shorten the
     /// snapport to 576 and push the stripe off-screen.</para>
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MandatorySnap_EndAlignment_LandsTargetAtScrollportEnd()
     {
         const string html =
@@ -242,7 +242,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     /// leaving the orange stripe 25px down rather than at the bottom edge. Guards the snap hook
     /// against firing on ordinary scroll containers.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WithoutScrollSnapType_ScrollIntoViewStartAligns()
     {
         const string html =
@@ -262,7 +262,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     }
 
     /// <summary><c>proximity</c> leaves the snap decision to the UA, so it must not move the scroll.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ProximityScrollSnapType_DoesNotSnap()
     {
         const string html =
@@ -290,7 +290,7 @@ public class ScrollSnapRootPropagationTests : IDisposable
     /// end, so a <c>thick</c> (5px) bottom border must be part of the measured size. Reconstructing
     /// the size from computed-style strings dropped the keyword and left the border off-screen.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoViewEnd_CountsKeywordBorderWidthInTargetSize()
     {
         const string html =

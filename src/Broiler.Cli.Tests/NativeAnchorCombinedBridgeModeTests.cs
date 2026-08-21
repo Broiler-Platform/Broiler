@@ -37,7 +37,7 @@ public sealed class NativeAnchorCombinedBridgeModeTests
         return bridge.SerializeToHtml();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeMode_PreservesBothAnchorFunctionsThroughSerialization()
     {
         var html = ResolveAndSerialize(nativeMode: true);

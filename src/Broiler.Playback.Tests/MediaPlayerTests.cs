@@ -18,7 +18,7 @@ public class MediaPlayerTests
         Assert.Equal(expected, player.CanPlayType(mime));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task OpenAsync_RoutesToVideo_WhenAudioDoesNotMatch()
     {
         var videoCodec = new FakeVideoCodec();

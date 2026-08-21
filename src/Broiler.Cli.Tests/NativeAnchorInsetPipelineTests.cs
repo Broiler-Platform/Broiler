@@ -67,7 +67,7 @@ public sealed class NativeAnchorInsetPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_PlacesAnchorInsetBox_AtAnchorEdges()
     {
         var box = LayoutTarget(nativeAnchor: true);
@@ -77,7 +77,7 @@ public sealed class NativeAnchorInsetPipelineTests
         Assert.Equal(30f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_LeavesAnchorInsetBoxUnplaced()
     {
         // Flag off → the engine cannot parse anchor() as a length, so #target sits at its

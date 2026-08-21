@@ -38,13 +38,13 @@ public sealed class ListViewMultiSelectionTests
     /// <summary>Y coordinate inside the row at <paramref name="index"/>.</summary>
     private static double RowY(int index) => (index * RowHeight) + (RowHeight / 2);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Single_Is_The_Default_Mode()
     {
         Assert.Equal(UiListSelectionMode.Single, new StandardListView().SelectionMode);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Selection_List_Still_Replaces_On_Every_Click()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Single);
@@ -62,7 +62,7 @@ public sealed class ListViewMultiSelectionTests
     /// a synthesized pointer press with no modifiers, so requiring Ctrl would put
     /// multi-selection out of reach of touch entirely.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Click_Adds_And_Removes_One_Item()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -75,7 +75,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["c"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shift_Click_Selects_The_Range_From_The_Anchor()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -91,7 +91,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["b", "c"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shift_Click_Ranges_Backwards_Too()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -106,7 +106,7 @@ public sealed class ListViewMultiSelectionTests
     /// Ctrl-click toggles, the same result the desktop convention gives it, so
     /// muscle memory from other platforms still works.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Control_Click_Toggles_Like_An_Unmodified_Click()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -117,7 +117,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["a", "c"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Selection_List_Ignores_Modifiers()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Single);
@@ -129,7 +129,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["c"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shift_Arrow_Extends_And_A_Plain_Arrow_Replaces()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -142,7 +142,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["b"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Space_Toggles_Without_Moving_So_A_Gapped_Selection_Is_Reachable_By_Keyboard()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -156,7 +156,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Empty(listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetSelectedItems_Reports_In_Item_Order_Whatever_Order_It_Is_Given()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -166,7 +166,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["a", "c", "d"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetSelectedItems_Ignores_Unknown_Ids_And_Duplicates()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -176,7 +176,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["a"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetSelectedItems_Keeps_Only_The_First_In_Single_Mode()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Single);
@@ -186,7 +186,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["b"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Narrowing_To_Single_Keeps_The_Primary_And_Drops_The_Rest()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -200,7 +200,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal("d", listView.SelectedItemId);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Replacing_The_Items_Drops_Selections_That_No_Longer_Exist()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -211,7 +211,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["c"], listView.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelectionChanged_Reports_The_Whole_Set_On_Every_Change()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);
@@ -227,7 +227,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["a", "c"], observed.NewItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Selection_Change_Still_Reports_A_One_Item_Set()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Single);
@@ -242,7 +242,7 @@ public sealed class ListViewMultiSelectionTests
         Assert.Equal(["b"], observed.NewItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Selected_Row_Is_Highlighted_Not_Just_The_Primary()
     {
         StandardListView listView = CreateList(UiListSelectionMode.Multiple);

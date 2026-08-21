@@ -102,7 +102,7 @@ public sealed class GridLanesFallbackTests
     /// browser takes, and the reason the auto-repeat references are viewport-wide
     /// squares rather than the small track-count squares #1230 assumed.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridLanesContainer_AspectRatio_AutoWidthFillsThenSquares()
     {
         string html =
@@ -123,7 +123,7 @@ public sealed class GridLanesFallbackTests
     /// min-height wins, so the box is 50×200 (an intentionally non-square result
     /// that pins the clamp order — aspect-ratio first, then min-height).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridLanesContainer_AspectRatio_MinHeightFloorsSquare()
     {
         string html =
@@ -143,7 +143,7 @@ public sealed class GridLanesFallbackTests
     /// <c>height:100%</c> child to the aspect-ratio square. Here a 120px-wide 1/1
     /// grid-lanes container is 120×120, so its <c>height:100%</c> child is 120 tall.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridLanesContainer_AspectRatio_PercentageHeightChildFillsSquare()
     {
         string html =
@@ -164,7 +164,7 @@ public sealed class GridLanesFallbackTests
     /// is exactly 120×80 — not the 120×120 aspect-ratio square — proving the ratio
     /// never overrides an author-specified height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridLanesContainer_ExplicitSize_KeepsAuthorDimensions()
     {
         string html =
@@ -187,7 +187,7 @@ public sealed class GridLanesFallbackTests
     /// grid-lanes container relying on <c>height:100%</c> children (the WPT
     /// row-auto-repeat cluster) exercises once it falls back to block.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PercentageHeight_ResolvesAgainstFixedHeightBlockParent()
     {
         string html =

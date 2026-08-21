@@ -69,7 +69,7 @@ public sealed class FetchRequestHeadersTests
     }
 
     /// <summary>A mixed set arrives whole, each half routed to the collection that accepts it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestAndContentHeaders_TravelTogether()
     {
         using var origin = new RecordingOrigin();
@@ -98,7 +98,7 @@ public sealed class FetchRequestHeadersTests
     /// waiting for bytes that never arrive. Fetch forbids authors the header for the same reason.
     /// What must hold is that the length on the wire describes the body actually sent.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentLength_IsNotTakenFromThePage()
     {
         using var origin = new RecordingOrigin();
@@ -111,7 +111,7 @@ public sealed class FetchRequestHeadersTests
     }
 
     /// <summary>The XHR path sets headers the same way, so it gains the same reach.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Xhr_SetRequestHeader_SendsContentHeadersToo()
     {
         using var origin = new RecordingOrigin();
@@ -136,7 +136,7 @@ public sealed class FetchRequestHeadersTests
     /// change what the request means, which is a worse trade than the dropped header — this pins the
     /// boundary rather than endorsing it. Request-level headers are unaffected and must still arrive.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BodylessRequest_SendsRequestHeaders_ButHasNoContentToCarryEntityOnes()
     {
         using var origin = new RecordingOrigin();

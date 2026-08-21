@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class IframeElementBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(IframeElementBinding);
@@ -28,7 +28,7 @@ public sealed class IframeElementBindingModuleTests
         Assert.True(typeof(IIframeElementHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentDocument_ContentWindow_And_GetSVGDocument_Resolve_Same_Origin()
     {
         var html = @"<!DOCTYPE html>
@@ -51,7 +51,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Src_And_Srcdoc_Round_Trip_Through_The_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>

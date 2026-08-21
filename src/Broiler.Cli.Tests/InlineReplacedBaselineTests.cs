@@ -63,7 +63,7 @@ public class InlineReplacedBaselineTests
     /// tops do not. Before the fix all three tops coincided and the bottoms did not — the exact
     /// inverse.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Images_Of_Different_Heights_Share_A_Baseline_Not_A_Top()
     {
         var html = Page($"""
@@ -92,7 +92,7 @@ public class InlineReplacedBaselineTests
     /// line clears the image rather than overlapping it. This is the half that was already
     /// implemented; it is pinned here because the two halves have to agree.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Tall_Image_Leaves_The_Struts_Descent_Below_Its_Baseline()
     {
         var html = Page($"""
@@ -124,7 +124,7 @@ public class InlineReplacedBaselineTests
     /// because that edge <em>is</em> the line's baseline. Aligning the image by a font ascent
     /// instead put it at the line's top and left the text up there with it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Text_On_The_Line_Sits_On_The_Images_Bottom_Edge()
     {
         var html = Page($"""

@@ -59,7 +59,7 @@ public sealed class VerticalFlowWordListSyncTests
     private static List<CssRect> PaintedWords(CssBox root) =>
         [.. Tree(root).SelectMany(b => b.LineBoxes).SelectMany(l => l.Words)];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryPaintedGlyphIsRegisteredOnItsOwnerBox()
     {
         var root = VerticalRootWithRun();
@@ -79,7 +79,7 @@ public sealed class VerticalFlowWordListSyncTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APostRotationOffsetMovesThePaintedGlyphs()
     {
         var root = VerticalRootWithRun();

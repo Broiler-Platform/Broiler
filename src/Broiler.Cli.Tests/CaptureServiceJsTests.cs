@@ -6,7 +6,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class CaptureServiceJsTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Returns_Original_Html_When_No_Scripts()
     {
         var html = "<html><body><p>Hello</p></body></html>";
@@ -17,7 +17,7 @@ public class CaptureServiceJsTests
         Assert.Equal(html, result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Runs_Inline_Script()
     {
         var html = @"<!DOCTYPE html>
@@ -39,7 +39,7 @@ div.appendChild(p);
         Assert.Contains("<p>generated</p>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_DocumentBody_Is_Accessible()
     {
         var html = @"<!DOCTYPE html>
@@ -59,7 +59,7 @@ document.body.appendChild(p);
         Assert.Contains("<p>body-child</p>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Handles_CreateElement_And_SetAttribute()
     {
         var html = @"<!DOCTYPE html>
@@ -78,7 +78,7 @@ document.body.appendChild(span);
         Assert.Contains("styled", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Handles_Script_Errors_Gracefully()
     {
         var html = @"<!DOCTYPE html>
@@ -99,7 +99,7 @@ el.appendChild(p);
         Assert.Contains("after-error", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DecodeDataUri_Decodes_Percent_Encoded()
     {
         var uri = "data:text/javascript,d1%20%3D%20'one'%3B";
@@ -109,7 +109,7 @@ el.appendChild(p);
         Assert.Equal("d1 = 'one';", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DecodeDataUri_Decodes_Base64()
     {
         // "d2 = 'two';" in base64 is "ZDIgPSAndHdvJzs="
@@ -120,7 +120,7 @@ el.appendChild(p);
         Assert.Equal("d2 = 'two';", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DecodeDataUri_Decodes_Percent_Encoded_Base64()
     {
         // Acid3 uses percent-encoded base64 payloads
@@ -131,14 +131,14 @@ el.appendChild(p);
         Assert.Equal("d2 = 'two';", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DecodeDataUri_Returns_Empty_For_Invalid_Uri()
     {
         Assert.Equal(string.Empty, CaptureService.DecodeDataUri("not-a-data-uri"));
         Assert.Equal(string.Empty, CaptureService.DecodeDataUri("data:no-comma"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Runs_Data_Uri_Scripts()
     {
         // d1 is set by a data: URI script, then used in an inline script
@@ -161,7 +161,7 @@ el.appendChild(p);
         Assert.DoesNotContain(">fail<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Document_Write_Appends_Content()
     {
         var html = @"<!DOCTYPE html>
@@ -174,7 +174,7 @@ el.appendChild(p);
         Assert.Contains("from-write", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Preserves_Existing_Content()
     {
         var html = @"<!DOCTYPE html>

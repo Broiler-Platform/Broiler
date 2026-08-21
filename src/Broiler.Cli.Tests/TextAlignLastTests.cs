@@ -53,7 +53,7 @@ public class TextAlignLastTests
     private const string TwoLineContent =
         "wwww wwww wwww<br><span style=\"color:red\">EE</span>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextAlignLast_Right_PushesLastLineToTheRight()
     {
         var rightAligned = RenderRedMarkerExtent("text-align-last:right", TwoLineContent);
@@ -70,7 +70,7 @@ public class TextAlignLastTests
         Assert.True(leftAligned.left < Width / 2, $"left marker should be before the midpoint: {leftAligned.left}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextAlignLast_Center_CentersLastLine()
     {
         var centered = RenderRedMarkerExtent("text-align-last:center", TwoLineContent);
@@ -82,7 +82,7 @@ public class TextAlignLastTests
             $"centered marker should be right of left-aligned: centered.left={centered.left}, left.left={leftAligned.left}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextAlignLast_OverridesTextAlign_OnLastLine()
     {
         // text-align:right aligns every line right; text-align-last:left pulls the
@@ -96,7 +96,7 @@ public class TextAlignLastTests
         Assert.True(overridden.left < Width / 2, $"overridden last line should be on the left: {overridden.left}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextAlignLastJustify_StretchesTheLastLine()
     {
         // A single-line block IS its own last line.  Under a plain justify the last

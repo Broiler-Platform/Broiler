@@ -14,7 +14,7 @@ public class SvgFloodFilterTests
 {
     // The feFlood filter region is the rect bbox (10,10,100,100) grown by -10%/+10% → (0,0,120,120)
     // in SVG user space, so green fills the top-left of the svg and (10,10) reads green.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgRect_WithFeFloodFilter_InSameSvg_PaintsFloodColorOverFilterRegion()
     {
         const string html = """
@@ -43,7 +43,7 @@ public class SvgFloodFilterTests
 
     // The filter can be defined in a *different* <svg> subtree than the referencing shape — resolution
     // uses the document-wide filter table, not the per-<svg> string the renderer sees.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgRect_ResolvesFeFloodFilter_DefinedInAnotherSvg()
     {
         const string html = """
@@ -64,7 +64,7 @@ public class SvgFloodFilterTests
     }
 
     // A rect referencing an unknown / unmodelled filter renders normally (unfiltered), not blanked.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgRect_WithUnknownFilterReference_RendersUnfiltered()
     {
         const string html = """

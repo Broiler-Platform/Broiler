@@ -40,7 +40,7 @@ public sealed class GridWhitespaceItemTests
         return by.TryGetValue("div#g", out var m) && m.TryGetValue("height", out var h) ? h : double.NaN;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WhitespaceBetweenGridItems_DoesNotAddPhantomTracks()
     {
         // Newlines + indentation between the three items (the natural authoring

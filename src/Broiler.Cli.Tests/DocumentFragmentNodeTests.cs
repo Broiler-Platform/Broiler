@@ -22,7 +22,7 @@ public sealed class DocumentFragmentNodeTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocumentFragment_Reports_Fragment_Node()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -37,7 +37,7 @@ public sealed class DocumentFragmentNodeTests
         Assert.Equal("11|#document-fragment|true|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Append_Unpacks_Fragment_Children_Into_Host()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body><div id=\"host\"></div></body></html>", out var context);
@@ -59,7 +59,7 @@ public sealed class DocumentFragmentNodeTests
         Assert.Equal("2|0|one|two", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fragment_Query_And_Children_Work()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -80,7 +80,7 @@ public sealed class DocumentFragmentNodeTests
         Assert.Equal("2|true|no-gebid", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fragment_CloneNode_Deep_Copies_Children()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -98,7 +98,7 @@ public sealed class DocumentFragmentNodeTests
         Assert.Equal("11|1|hi|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_ExtractContents_Returns_Fragment()
     {
         using var bridge = Attach(

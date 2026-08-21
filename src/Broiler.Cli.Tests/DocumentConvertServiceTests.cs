@@ -6,7 +6,7 @@ namespace Broiler.Cli.Tests;
 
 public sealed class DocumentConvertServiceTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Convert_Html_To_Rtf_Uses_Document_Catalog()
     {
         string directory = CreateTempDirectory();
@@ -30,7 +30,7 @@ public sealed class DocumentConvertServiceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Convert_Rtf_To_Html_Uses_Document_Catalog()
     {
         string directory = CreateTempDirectory();
@@ -55,7 +55,7 @@ public sealed class DocumentConvertServiceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Convert_Markdown_To_Rtf_Uses_Document_Catalog()
     {
         string directory = CreateTempDirectory();
@@ -79,7 +79,7 @@ public sealed class DocumentConvertServiceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Convert_Html_To_Markdown_Uses_Document_Catalog()
     {
         string directory = CreateTempDirectory();
@@ -101,7 +101,7 @@ public sealed class DocumentConvertServiceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Convert_Html_To_Docx_Uses_Document_Catalog()
     {
         string directory = CreateTempDirectory();
@@ -122,7 +122,7 @@ public sealed class DocumentConvertServiceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Convert_Docx_To_Text_Uses_Document_Catalog()
     {
         string directory = CreateTempDirectory();

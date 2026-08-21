@@ -22,7 +22,7 @@ public sealed class SharedLayoutGeometryParityTests
 
     private const double TolerancePx = 1.0; // matches WptTestRunner.LayoutAssertionTolerancePx
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UseSharedLayoutGeometry_Is_Enabled_By_Default()
     {
         // Increments 1-3 landed and the parity gate below confirms the shared
@@ -71,7 +71,7 @@ public sealed class SharedLayoutGeometryParityTests
         return (matched, total, files);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TypedDocument_Applies_Author_StyleSheet()
     {
         const string styled = "<!DOCTYPE html><html><head><style>#x{width:50px;height:50px}</style></head>" +
@@ -123,7 +123,7 @@ public sealed class SharedLayoutGeometryParityTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shared_Geometry_Answers_CheckLayout_Corpus()
     {
         var shared = MeasureCorpus();
@@ -162,7 +162,7 @@ public sealed class SharedLayoutGeometryParityTests
     // engine rather than to this cutover. Asserting them here would mean asserting behavior
     // Broiler does not yet have.
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nested_Abspos_Relpos_Auto_Tree_Reads_Stably_Through_The_Snapshot()
     {
         // Mirrors css/css-align/blocks/align-content-block-002.html: a list-item test box
@@ -188,7 +188,7 @@ public sealed class SharedLayoutGeometryParityTests
         AssertSnapshotReadsAreStable(html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Deep_Auto_Height_Chain_Reads_Stably_Through_The_Snapshot()
     {
         // Each level's extent references its containing block and its children — the

@@ -29,7 +29,7 @@ document.getElementById('result').textContent = r.join(',');
         return CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Interface_Constructors_Are_Defined_As_Bare_Globals()
     {
         var result = Run(@"
@@ -45,7 +45,7 @@ r.push(typeof Element === 'function');
         Assert.Contains("true,true,true,true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Is_Instance_Of_HTMLElement_Element_And_Node()
     {
         var result = Run(@"
@@ -66,7 +66,7 @@ r.push(!(d instanceof Document));
     /// over the HTML5 sectioning elements. Each has no dedicated interface of its own, so each is
     /// a plain HTMLElement and specifically *not* an HTMLUnknownElement.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html5_Sectioning_Elements_Are_HTMLElement_And_Not_Unknown()
     {
         var result = Run(@"
@@ -84,7 +84,7 @@ for (var i = 0; i < els.length; i++) {
     /// both. A hyphenated name is a custom element, which the spec makes an HTMLElement rather
     /// than an unknown one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unknown_And_Custom_Element_Names_Are_Distinguished()
     {
         var result = Run(@"
@@ -98,7 +98,7 @@ r.push(!(custom instanceof HTMLUnknownElement));
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Character_Data_Document_And_Fragment_Nodes_Answer_Their_Interfaces()
     {
         var result = Run(@"
@@ -124,7 +124,7 @@ r.push(!(f instanceof Element));
     }
 
     /// <summary>A non-node value is not an instance of any of them, and does not throw.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Non_Node_Values_Are_Not_Instances()
     {
         var result = Run(@"
@@ -143,7 +143,7 @@ r.push(!('div' instanceof HTMLElement));
     /// <c>document.createElement</c> and friends, so calling one directly throws rather than
     /// handing back a plain object that merely looks like an element.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Interface_Constructors_Are_Not_Directly_Constructible()
     {
         var result = Run(@"
@@ -162,7 +162,7 @@ for (var i = 0; i < names.length; i++) {
     /// The <c>Node</c> global keeps its DOM type constants — it gained an <c>@@hasInstance</c>,
     /// it was not replaced.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Constants_Survive_Alongside_InstanceOf_Support()
     {
         var result = Run(@"

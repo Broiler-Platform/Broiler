@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DocumentCollectionBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentCollection_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(DocumentCollectionBinding);
@@ -29,7 +29,7 @@ public sealed class DocumentCollectionBindingModuleTests
         Assert.True(typeof(IDocumentCollectionHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Collections_Enumerate_Elements_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>
@@ -65,7 +65,7 @@ document.body.appendChild(out);
     }
 
     // document.scripts, in tree order and counting <script src> as well as inline ones.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Scripts_Enumerates_Every_Script_Element_In_Tree_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -101,7 +101,7 @@ document.body.appendChild(out);
     // down. `document.currentScript` is also unbound, so the `||` did not short-circuit past it.
     // Cloudflare injects that script into every page it serves with email obfuscation on, which is
     // how it reached a report about html5test.com.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AScriptCanFindAndRemoveItselfThroughTheScriptsCollection()
     {
         var html = @"<!DOCTYPE html>

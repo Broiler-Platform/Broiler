@@ -50,7 +50,7 @@ public sealed class SvgStructureAndPaintTests
         Assert.Empty(rects);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shape_After_A_NonRendering_Container_Is_Still_Painted()
     {
         // The container's suppression has to end at its end tag. Tracking it by name alone made a
@@ -64,14 +64,14 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(BColor.Blue, painted.Fill);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Commented_Out_Markup_Is_Not_Painted()
     {
         // Most of the SVG 1.1 suite carries a commented-out <g id="draft-watermark">.
         Assert.Empty(Rects("<!-- <rect width='10' height='10' fill='red'/> -->"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Display_None_Suppresses_The_Element_And_Its_Children()
     {
         Assert.Empty(Rects("<g display='none'><rect width='10' height='10' fill='red'/></g>"));
@@ -79,14 +79,14 @@ public sealed class SvgStructureAndPaintTests
 
     // ── Inherited presentation attributes ─────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Group_Fill_Reaches_A_Child_That_Declares_None()
     {
         var rect = Assert.Single(Rects("<g fill='blue'><rect width='10' height='10'/></g>"));
         Assert.Equal(BColor.Blue, rect.Fill);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Child_Fill_Wins_Over_The_Group_It_Inherits_From()
     {
         var rect = Assert.Single(Rects("<g fill='blue'><rect width='10' height='10' fill='red'/></g>"));
@@ -95,7 +95,7 @@ public sealed class SvgStructureAndPaintTests
 
     // ── transform ─────────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Group_Transform_Moves_Its_Children()
     {
         var rect = Assert.Single(Rects(
@@ -105,7 +105,7 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(60, rect.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Rotated_Transform_Turns_A_Rect_Into_A_Polygon()
     {
         // Not a TransformItem: the raster canvas takes only translations and uniform scales, and a
@@ -120,7 +120,7 @@ public sealed class SvgStructureAndPaintTests
 
     // ── Paint servers ─────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unresolvable_Paint_Reference_Takes_Its_Fallback_Colour()
     {
         // It used to fall through the colour parser to the caller's default — solid black.
@@ -128,14 +128,14 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(BColor.FromName("lime"), rect.Fill);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unresolvable_Paint_Reference_With_No_Fallback_Paints_Nothing()
     {
         var rect = Assert.Single(Rects("<rect width='10' height='10' fill='url(#missing)'/>"));
         Assert.True(rect.Fill.IsEmpty);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Zero_Sized_Pattern_Falls_Back_Rather_Than_Painting()
     {
         var rect = Assert.Single(Rects(
@@ -145,7 +145,7 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(BColor.FromName("lime"), rect.Fill);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_UserSpaceOnUse_Pattern_Tiles_Across_The_Shape()
     {
         var items = Render(
@@ -164,7 +164,7 @@ public sealed class SvgStructureAndPaintTests
         Assert.True(host.Fill.IsEmpty);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Pattern_Inherits_The_One_Its_Href_Points_At()
     {
         var items = Render(
@@ -180,7 +180,7 @@ public sealed class SvgStructureAndPaintTests
 
     // ── use / symbol ──────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Use_Renders_The_Symbol_It_References_Into_Its_Own_Viewport()
     {
         var items = Render(
@@ -198,13 +198,13 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(20, rect.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Use_Pointing_At_Nothing_Renders_Nothing()
     {
         Assert.Empty(Render("<use x='10' y='10' width='10' height='10' xlink:href='#missing'/>"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Pattern_Fill_Moves_With_The_Transform_On_The_Shape()
     {
         // The tiles are separate display items from the shape they fill, so the shape's transform
@@ -223,7 +223,7 @@ public sealed class SvgStructureAndPaintTests
         Assert.Equal(60, clip.ClipRect.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Use_Clones_A_Non_Viewport_Target_At_Its_Own_Offset()
     {
         // Anything but a <symbol>/<svg> is a translated deep clone: width/height do not apply, and

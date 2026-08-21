@@ -17,7 +17,7 @@ public sealed class DiagnosticsTests
             new CodeDiagnosticAdornment(start, 4, CodeDiagnosticSeverity.Error, $"{code} build", code),
             version, buildId);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Older_Build_Cannot_Replace_Newer_Live_Results()
     {
         var merge = new DocumentDiagnosticMerge();
@@ -36,7 +36,7 @@ public sealed class DiagnosticsTests
         Assert.Equal(DiagnosticOrigin.Live, merged[0].Origin);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Current_Build_Contributes_What_Live_Did_Not_Find()
     {
         var merge = new DocumentDiagnosticMerge();
@@ -50,7 +50,7 @@ public sealed class DiagnosticsTests
         Assert.Equal(2, merge.GetMerged().Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Diagnostic_From_Both_Origins_Appears_Once()
     {
         var merge = new DocumentDiagnosticMerge();
@@ -63,7 +63,7 @@ public sealed class DiagnosticsTests
         Assert.Equal(DiagnosticOrigin.Live, single.Origin);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Live_Results_For_An_Older_Snapshot_Are_Refused()
     {
         var merge = new DocumentDiagnosticMerge();
@@ -74,7 +74,7 @@ public sealed class DiagnosticsTests
         Assert.Equal("CS0103", Assert.Single(merge.GetMerged()).Adornment.Code);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Older_Build_Finishing_Last_Does_Not_Win()
     {
         var merge = new DocumentDiagnosticMerge();
@@ -84,7 +84,7 @@ public sealed class DiagnosticsTests
         Assert.Equal("newer", merge.BuildId);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Project_Level_Diagnostic_Survives_A_Stale_Build()
     {
         var merge = new DocumentDiagnosticMerge();
@@ -102,7 +102,7 @@ public sealed class DiagnosticsTests
         Assert.Equal("NETSDK1045", Assert.Single(merge.GetMerged()).Adornment.Code);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Counts_Ignore_The_Filter_So_Hiding_Warnings_Is_Not_A_Clean_Bill()
     {
         var snapshot = new SourceBufferDocument(new SourceBuffer("one\ntwo\nthree\n")).Snapshot;
@@ -123,7 +123,7 @@ public sealed class DiagnosticsTests
         Assert.Equal(new ProblemCounts(1, 1, 1), model.Counts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Status_Line_States_The_Analysis_Mode()
     {
         var counts = new ProblemCounts(0, 0, 0);
@@ -134,7 +134,7 @@ public sealed class DiagnosticsTests
         Assert.EndsWith("information", counts.Describe(CodeAnalysisMode.LiveSemantic), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Entries_Resolve_To_The_Line_And_Column_Of_Their_Own_Snapshot()
     {
         var snapshot = new SourceBufferDocument(new SourceBuffer("alpha\nbeta\ngamma\n")).Snapshot;
@@ -147,7 +147,7 @@ public sealed class DiagnosticsTests
         Assert.Contains("line 2, column 3", entry.AccessibleDescription, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Project_Level_Entry_Has_No_Position_And_Still_Lists()
     {
         var model = new ProblemsModel();
@@ -160,7 +160,7 @@ public sealed class DiagnosticsTests
         Assert.DoesNotContain("line", entry.AccessibleDescription, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Replacing_One_Documents_Entries_Leaves_The_Others_Alone()
     {
         var snapshot = new SourceBufferDocument(new SourceBuffer("a\nb\n")).Snapshot;
@@ -173,7 +173,7 @@ public sealed class DiagnosticsTests
         Assert.Equal(["CS2", "CS3"], model.GetVisible().Select(e => e.Code).Order());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Grouping_And_Search_Narrow_The_List()
     {
         var snapshot = new SourceBufferDocument(new SourceBuffer("a\nb\n")).Snapshot;

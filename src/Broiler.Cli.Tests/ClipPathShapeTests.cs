@@ -36,7 +36,7 @@ public class ClipPathShapeTests
     /// The document element's clip-path clips both its subtree and the background it propagated to
     /// the canvas, so the red root background never reaches the screen: a green "L" on white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClipPathOnDocumentElement_ClipsThePropagatedCanvasBackground()
     {
         using var bitmap = Render($$"""
@@ -63,7 +63,7 @@ div { width: 500px; height: 500px; background: green; }
     /// The <c>will-change: transform</c> variant of the same WPT test — promoting the root to its
     /// own compositing layer must not change what it paints.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClipPathOnDocumentElement_WithWillChange_ClipsIdentically()
     {
         using var bitmap = Render($$"""
@@ -83,7 +83,7 @@ div { width: 500px; height: 500px; background: green; }
     }
 
     /// <summary>The WPT reference: three 50x50 squares laid out as the same "L".</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClipPathOnDocumentElement_MatchesTheWptReferenceRendering()
     {
         using var test = Render($$"""
@@ -112,7 +112,7 @@ div { position: absolute; width: 50px; height: 50px; background: green; }
     }
 
     /// <summary>A polygon on an ordinary element clips that element's own painting.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PolygonClipPath_OnNonRootElement_ClipsToTheShape()
     {
         using var bitmap = Render("""
@@ -130,7 +130,7 @@ div { width: 100px; height: 100px; background: green; clip-path: polygon(0px 0px
     }
 
     /// <summary>Percentage vertices resolve against the element's own box, per axis.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PolygonClipPath_ResolvesPercentagesAgainstTheReferenceBox()
     {
         using var bitmap = Render("""
@@ -148,7 +148,7 @@ div { width: 200px; height: 100px; background: green; clip-path: polygon(50% 0%,
     }
 
     /// <summary>A leading <c>&lt;fill-rule&gt;</c> is accepted and does not shift the vertex list.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PolygonClipPath_AcceptsALeadingFillRule()
     {
         using var bitmap = Render("""
@@ -167,7 +167,7 @@ div { width: 100px; height: 100px; background: green; clip-path: polygon(evenodd
     /// <summary>
     /// <c>inset()</c> — the shape the paint walker already handled — still clips rectangularly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsetClipPath_StillClips()
     {
         using var bitmap = Render("""
@@ -188,7 +188,7 @@ div { width: 100px; height: 100px; background: green; clip-path: inset(25px); }
     /// A shape the rasterizer does not model leaves the element unclipped rather than guessing a
     /// clip — showing too much beats erasing content the page meant to show.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnsupportedClipPathShape_LeavesTheElementUnclipped()
     {
         using var bitmap = Render("""
@@ -304,7 +304,7 @@ div { width: {{width}}px; height: {{height}}px; background: green; clip-path: {{
     /// 50px red border around a 150x100 box and centres the ellipse at 125px 100px — the middle of
     /// the 250x200 border box — so a correct clip shows the green content and none of the border.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EllipseClipPath_ResolvesAgainstTheBorderBox()
     {
         using var bitmap = Render("""
@@ -326,7 +326,7 @@ div {
     /// A circle percentage resolves against sqrt(w² + h²) / sqrt(2), not against either side, so
     /// on a non-square box it is neither half the width nor half the height (CSS Shapes §3.1).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CircleClipPath_ResolvesPercentageRadiusAgainstTheDiagonal()
     {
         using var bitmap = Render("""
@@ -346,7 +346,7 @@ div { width: 240px; height: 100px; background: green; clip-path: circle(25%); }
     /// A zero radius is a valid, empty shape — and an empty shape clips everything away. (A
     /// <em>negative</em> radius is invalid instead, so it drops the declaration and clips nothing.)
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CircleClipPath_WithAZeroRadius_ClipsEverythingAway()
     {
         using var bitmap = Render("""
@@ -366,7 +366,7 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(0px); }
     /// The four-value edge-offset position form is not modelled; like any other unhandled syntax it
     /// leaves the element unclipped rather than clipping it in the wrong place.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CircleClipPath_WithAnUnmodelledPosition_LeavesTheElementUnclipped()
     {
         using var bitmap = Render("""
@@ -394,7 +394,7 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(20px at 
     /// a 150x100 box inside a 50px red border. (The <c>150px</c> width also pins that a unit suffix
     /// on an SVG geometry attribute is honoured rather than read as zero.)
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgReferenceClipPath_UserSpaceOnUse_UsesCssPixelsFromTheReferenceBox()
     {
         using var bitmap = Render("""
@@ -440,7 +440,7 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(20px at 
     /// Under <c>clipPathUnits="objectBoundingBox"</c> the same numbers are fractions of the
     /// referencing element's own box instead, so 0.5 is its midpoint however large it is.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgReferenceClipPath_ObjectBoundingBox_ResolvesFractionsOfTheElementBox()
     {
         using var bitmap = Render("""
@@ -459,7 +459,7 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(20px at 
     }
 
     /// <summary>A <c>&lt;polygon&gt;</c> child clips to its outline, not to its bounding box.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgReferenceClipPath_PolygonChild_ClipsToTheOutline()
     {
         using var bitmap = Render("""
@@ -474,7 +474,7 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(20px at 
     }
 
     /// <summary>A <c>&lt;circle&gt;</c> child clips to the circle.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgReferenceClipPath_CircleChild_ClipsToTheCircle()
     {
         using var bitmap = Render("""
@@ -512,7 +512,7 @@ div { width: 100px; height: 100px; background: green; clip-path: circle(20px at 
     /// A <c>&lt;rect&gt;</c> with zero width or height disables rendering of the shape (SVG 1.1
     /// §9.2), and a clip path with no shape in it clips everything away.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SvgReferenceClipPath_WithAZeroSizedRect_ClipsEverythingAway()
     {
         using var bitmap = Render("""

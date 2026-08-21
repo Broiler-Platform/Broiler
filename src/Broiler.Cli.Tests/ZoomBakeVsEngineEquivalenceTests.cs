@@ -64,30 +64,30 @@ public sealed class ZoomBakeVsEngineEquivalenceTests
         "return [t.offsetWidth,t.offsetHeight,t.offsetLeft,t.offsetTop,t.clientWidth,t.clientHeight," +
         "Math.round(r.width),Math.round(r.height)].join(',');})()";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteLengths_Padding_ReadIsStable() =>
         AssertReadIsStable("<div id='t' style='zoom:2;width:100px;height:40px;padding:10px 20px'></div>");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedZoom_Compounds_ReadIsStable() =>
         AssertReadIsStable(
             "<div style='zoom:2'><div id='t' style='zoom:2;width:50px;height:30px;padding:5px'></div></div>");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsolutePositionedInsets_ReadIsStable() =>
         AssertReadIsStable(
             "<div style='position:relative;width:300px;height:300px'>" +
             "<div id='t' style='position:absolute;zoom:2;left:10px;top:20px;width:50px;height:50px'></div></div>");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Margins_ReadIsStable() =>
         AssertReadIsStable("<div id='t' style='zoom:2;width:60px;height:30px;margin:5px 15px;border:2px solid'></div>");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsLengthLineHeight_ReadIsStable() =>
         AssertReadIsStable("<div id='t' style='zoom:2;width:80px;line-height:30px;font-size:10px'>x</div>");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NoZoom_Control_ReadIsStable() =>
         AssertReadIsStable("<div id='t' style='width:123px;height:45px;padding:7px'></div>");
 
@@ -95,28 +95,28 @@ public sealed class ZoomBakeVsEngineEquivalenceTests
     // Relative units + calc() under zoom — the read path now reports the correct unzoomed CSS px (the
     // element's own computed size), which the old serialization bake mis-scaled. These pin the fix.
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PercentageWidth_ReadIsEngineUsedValue() =>
         // width:50% of a 200px CB → offsetWidth 100 (bug was 50); gBCR magnified ×2 → 200.
         AssertReadIsEngineUsedValue(
             "<div style='width:200px'><div id='t' style='zoom:2;width:50%;height:20px'></div></div>",
             "100,20,0,0,100,20,200,40");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CalcMixedLengths_ReadIsEngineUsedValue() =>
         // calc(50px + 10% of 400) → 90 (bug was 45).
         AssertReadIsEngineUsedValue(
             "<div style='width:400px'><div id='t' style='zoom:2;width:calc(50px + 10%);height:calc(20px + 20px)'></div></div>",
             "90,40,0,0,90,40,180,80");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmLengths_ReadIsEngineUsedValue() =>
         // 3em @ font-size:10px → 30 (bug was 60).
         AssertReadIsEngineUsedValue(
             "<div style='font-size:10px'><div id='t' style='zoom:2;width:3em;height:2em;font-size:10px'></div></div>",
             "30,20,0,0,30,20,60,40");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemLength_ReadIsEngineUsedValue() =>
         // 2rem (root 16px) → 32 (bug was 16).
         AssertReadIsEngineUsedValue(

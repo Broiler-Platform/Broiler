@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class WindowDocumentMiscBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowDocumentMisc_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(WindowDocumentMiscBinding);
@@ -25,7 +25,7 @@ public sealed class WindowDocumentMiscBindingModuleTests
         Assert.True(typeof(IWindowDocumentMiscHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Alert_Now_Scale_ContentType_And_Cookie_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

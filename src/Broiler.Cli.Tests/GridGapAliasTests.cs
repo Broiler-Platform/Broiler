@@ -44,7 +44,7 @@ public sealed class GridGapAliasTests
             .ToArray();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridGapShorthand_AddsGutterBetweenTracks()
     {
         var cells = Cells("grid-gap:16px;");
@@ -55,7 +55,7 @@ public sealed class GridGapAliasTests
         Assert.Equal(116, cells[3].x, 1); Assert.Equal(116, cells[3].y, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridRowColumnGapLonghands_UseIndependentGutters()
     {
         var cells = Cells("grid-row-gap:12px;grid-column-gap:23px;");
@@ -65,7 +65,7 @@ public sealed class GridGapAliasTests
         Assert.Equal(123, cells[3].x, 1); Assert.Equal(112, cells[3].y, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridGapAlias_MatchesModernGapSpelling()
     {
         var legacy = Cells("grid-gap:16px;");

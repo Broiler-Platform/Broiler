@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class TimerBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(TimerBinding);
@@ -33,7 +33,7 @@ public sealed class TimerBindingModuleTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Schedule_And_Cancel_Flow_Through_The_Module_And_Event_Loop()
     {
         var html = @"<!DOCTYPE html>

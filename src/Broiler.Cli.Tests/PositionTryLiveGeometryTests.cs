@@ -37,7 +37,7 @@ public sealed class PositionTryLiveGeometryTests
     private static double Read(JSContext c, string expr) =>
         double.Parse(c.Eval(expr).ToString()!, System.Globalization.CultureInfo.InvariantCulture);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OverflowingBase_SelectsFallback_LiveOffsets()
     {
         using var c = new JSContext();
@@ -70,7 +70,7 @@ public sealed class PositionTryLiveGeometryTests
   @position-try --flip { left: auto; right: anchor(--a left); top: auto; bottom: anchor(--a top); }
 </style></head><body><div id='cb'><div id='anchor'></div><div id='t'></div></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FixedSizeOverflowingBase_SelectsFallback_LiveOffsets()
     {
         using var c = new JSContext();

@@ -25,7 +25,7 @@ namespace Broiler.Wpt.Tests;
 /// </summary>
 public class ScrollWriteGeometryTimeoutTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task OverflowAlignment_ScrollWrites_RenderWellWithinRunnerTimeout()
     {
         var wptRoot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(),

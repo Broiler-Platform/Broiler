@@ -10,7 +10,7 @@ public class Acid3SpecialRegressionTests
     // Test 97 — data: URI parsing
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test97_DataUri_BasicParsing()
     {
         var html = @"<!DOCTYPE html>
@@ -34,7 +34,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test97_EncodeDecodeURIComponent_RoundTrip()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test97_DataUri_SpecialCharacters()
     {
         var html = @"<!DOCTYPE html>
@@ -86,7 +86,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test97_DataUri_ScriptSrcDoesNotCrash()
     {
         // Verify that a <script> with a data: src attribute does not crash the engine,
@@ -115,7 +115,7 @@ if (el.textContent !== 'executed') {
     // Test 98 — XHTML and the DOM
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test98_CreateDocument_XhtmlNamespace()
     {
         var html = @"<!DOCTYPE html>
@@ -140,7 +140,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test98_CreateDocument_ElementNamespaceURI()
     {
         var html = @"<!DOCTYPE html>
@@ -171,7 +171,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test98_CreateDocumentType_XhtmlIds()
     {
         var html = @"<!DOCTYPE html>
@@ -199,7 +199,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test98_TagName_Vs_LocalName_In_Namespace()
     {
         var html = @"<!DOCTYPE html>
@@ -235,7 +235,7 @@ document.getElementById('result').textContent = r.join('|');
     // Test 99 — "Weirdest bug ever" — unusual edge cases
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test99_CreateElement_UnusualValidNames()
     {
         var html = @"<!DOCTYPE html>
@@ -264,7 +264,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test99_TypeofChecks_DomObjects()
     {
         var html = @"<!DOCTYPE html>
@@ -291,7 +291,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test99_NumericPropertyCoercion()
     {
         var html = @"<!DOCTYPE html>
@@ -318,7 +318,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test99_SetUnusualPropertyValues()
     {
         var html = @"<!DOCTYPE html>
@@ -351,7 +351,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test99_InvalidElementNames_Throw()
     {
         var html = @"<!DOCTYPE html>

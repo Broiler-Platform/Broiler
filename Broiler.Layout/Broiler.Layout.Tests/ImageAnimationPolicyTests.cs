@@ -44,7 +44,7 @@ public sealed class ImageAnimationPolicyTests
         Assert.Equal(frozen ? TimeSpan.Zero : null, div.ImagePresentationTime);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Initial_Value_Follows_The_Document_Clock()
     {
         var (_, _, div) = Tree();
@@ -55,7 +55,7 @@ public sealed class ImageAnimationPolicyTests
 
     // Inherited: the box walk copies it down in InheritStyle, so a value on the root reaches a
     // descendant that never declared one.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Value_Inherits_To_Descendants()
     {
         var (html, body, div) = Tree();
@@ -71,7 +71,7 @@ public sealed class ImageAnimationPolicyTests
 
     // The root asks for the pause and body's background is the one that reaches the canvas, so the
     // canvas image is paused (WPT image-animation-body-background-root-propagation-paused).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Propagating_Body_Background_Takes_The_Roots_Value()
     {
         var (html, body, _) = Tree();
@@ -85,7 +85,7 @@ public sealed class ImageAnimationPolicyTests
     // carries body's background up to the canvas but not the property that governs it, so body
     // asking for a pause does not pause the canvas image (WPT
     // image-animation-body-background-no-propagation-paused).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Propagating_Body_Background_Ignores_Bodys_Own_Value()
     {
         var (_, body, _) = Tree();
@@ -112,7 +112,7 @@ public sealed class ImageAnimationPolicyTests
 
     // The root's own background is the canvas background rather than something propagated to it,
     // so the root's value governs it whether or not body says anything.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Roots_Own_Background_Uses_The_Roots_Value()
     {
         var (html, body, _) = Tree();

@@ -60,7 +60,7 @@ public class InlineBackgroundPaintOrderTests : IDisposable
         return (text, bg);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineSpanBackground_PaintsBehindText_TextRemainsVisible()
     {
         var (textPixels, bgPixels) = CountColors("<span class=\"s\">WWWWWW</span>");

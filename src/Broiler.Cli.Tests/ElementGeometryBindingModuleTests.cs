@@ -29,7 +29,7 @@ public sealed class ElementGeometryBindingModuleTests
         return ctx.Eval(expr).ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Geometry_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ElementGeometryBinding);
@@ -42,7 +42,7 @@ public sealed class ElementGeometryBindingModuleTests
         Assert.True(typeof(IElementGeometryHost).IsAssignableFrom(typeof(DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Box_Model_Metrics_Report_Own_Css_Pixels()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";
@@ -50,7 +50,7 @@ public sealed class ElementGeometryBindingModuleTests
             "(function(){var a=document.getElementById('a');return a.offsetWidth+','+a.offsetHeight;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetBoundingClientRect_Returns_A_Full_DomRect()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";
@@ -60,7 +60,7 @@ public sealed class ElementGeometryBindingModuleTests
             "return r.width+','+r.height+','+((r.right-r.left)===r.width)+','+((r.bottom-r.top)===r.height);})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollTop_Round_Trips_Through_The_Binding()
     {
         // A scroll container with overflowing content; setting scrollTop then reading it back returns the value.
@@ -71,7 +71,7 @@ public sealed class ElementGeometryBindingModuleTests
             "return before+'|'+s.scrollTop;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetClientRects_Returns_An_Array()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";
@@ -80,7 +80,7 @@ public sealed class ElementGeometryBindingModuleTests
             "return Array.isArray(rects)+','+rects.length;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Boxed_Element_Reads_Real_Shared_Geometry()
     {
         // A box-generating element answers all four metrics from the shared layout
@@ -92,7 +92,7 @@ public sealed class ElementGeometryBindingModuleTests
             "return [e.offsetWidth,e.offsetHeight,e.clientWidth,e.scrollWidth].join(',');})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisplayNone_Element_Reads_Zero_Geometry()
     {
         // display:none produces no box, so every metric reads zero. The declared

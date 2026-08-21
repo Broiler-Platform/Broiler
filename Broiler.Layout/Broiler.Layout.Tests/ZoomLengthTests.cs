@@ -38,7 +38,7 @@ public sealed class ZoomLengthTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsolutePadding_Margin_Border_Scale_By_EffectiveZoom()
     {
         var box = Box(Root(), "2");
@@ -55,7 +55,7 @@ public sealed class ZoomLengthTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedZoom_Compounds_On_Lengths()
     {
         var outer = Box(Root(), "2");
@@ -65,7 +65,7 @@ public sealed class ZoomLengthTests
         WithNativeZoom(() => Assert.Equal(30, inner.ActualPaddingLeft, 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmLength_Scales_Once_Through_The_Zoomed_Font()
     {
         var plain = Box(Root());
@@ -77,7 +77,7 @@ public sealed class ZoomLengthTests
             Assert.Equal(2.0, zoomed.ActualPaddingLeft / plain.ActualPaddingLeft, 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OutlineWidth_And_Offset_Scale_By_EffectiveZoom()
     {
         // Paint-only lengths (increment 5): outline does not affect layout, but its used width/offset
@@ -94,7 +94,7 @@ public sealed class ZoomLengthTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OutlineWidth_Keyword_Scales_By_EffectiveZoom()
     {
         var box = Box(Root(), "2");
@@ -104,7 +104,7 @@ public sealed class ZoomLengthTests
         WithNativeZoom(() => Assert.Equal(10, box.ActualOutlineWidth, 3)); // thick = 5px × 2
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ComputedStyleIr_Carries_EffectiveZoom_For_PaintOnly_Lengths()
     {
         // The paint layer resolves a few paint-only lengths (e.g. text-shadow offsets) from raw strings
@@ -116,7 +116,7 @@ public sealed class ZoomLengthTests
             Assert.Equal(2.0, Broiler.Layout.IR.ComputedStyleBuilder.FromBox(zoomed).EffectiveZoom, 6));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderRadius_Absolute_Scales_By_EffectiveZoom()
     {
         // Paint-only used length (increment 5): an absolute corner radius scales with the box's zoom.
@@ -131,7 +131,7 @@ public sealed class ZoomLengthTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderRadius_Percent_ResolvesAgainstZoomedBox_NotReScaled()
     {
         // A `%` radius resolves against the box's own (already zoom-scaled) border box, so it carries the
@@ -142,7 +142,7 @@ public sealed class ZoomLengthTests
         WithNativeZoom(() => Assert.Equal(50, box.ActualCornerNw, 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderRadius_Disabled_Unscaled()
     {
         var box = Box(Root(), "2");
@@ -150,7 +150,7 @@ public sealed class ZoomLengthTests
         Assert.Equal(8, box.ActualCornerNw, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Outline_Disabled_Unscaled()
     {
         var box = Box(Root(), "2");
@@ -162,7 +162,7 @@ public sealed class ZoomLengthTests
         Assert.Equal(5, box.ActualOutlineOffset, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_LeavesLengths_Unscaled()
     {
         var box = Box(Root(), "2");

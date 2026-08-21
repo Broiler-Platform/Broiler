@@ -87,7 +87,7 @@ public class NativeAnchorContainCbWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineResolvesContainCb_AndFillsCell()
     {
         var red = Render(nativeAnchor: true);

@@ -36,7 +36,7 @@ public class WebAnimationsTests : IDisposable
         return runner.RenderHtmlFileBitmapPublic(file, _root);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Animate_BackgroundColor_BakesInterpolatedColor()
     {
         // black → magenta at 50% (delay -50s of a 100s animation) is rgb(~100,0,~100).
@@ -50,7 +50,7 @@ public class WebAnimationsTests : IDisposable
             $"backgroundColor should interpolate to mid magenta; got {c.R},{c.G},{c.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Animate_TransformTranslate_BakesInterpolatedOffset()
     {
         // translateX(0 → 400px) at 50% = 200px: the 80px green box sits around x≈200, not x≈0.
@@ -65,7 +65,7 @@ public class WebAnimationsTests : IDisposable
         Assert.True(IsGreen(bmp.GetPixel(230, 40)), "box must render around the interpolated x≈200.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Animate_TransformUniformScale_BakesInterpolatedScale()
     {
         // scale(1 → 3) at 50% = scale(2): a 40px box becomes ~80px, so a pixel at (60,60)
@@ -80,7 +80,7 @@ public class WebAnimationsTests : IDisposable
             $"uniform scale(2) should enlarge the box to cover (60,60); got {c.R},{c.G},{c.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Animate_NoOptions_IsInert_AndDoesNotThrow()
     {
         // A malformed/zero-duration animate() must leave the element at its base value.

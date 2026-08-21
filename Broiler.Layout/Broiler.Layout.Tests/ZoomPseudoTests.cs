@@ -45,7 +45,7 @@ public sealed class ZoomPseudoTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoBox_Inherits_OriginatingZoom_ExactlyOnce()
     {
         var originating = Originating("2");
@@ -56,7 +56,7 @@ public sealed class ZoomPseudoTests
         WithNativeZoom(() => Assert.Equal(2.0, pseudo.EffectiveZoom, 6));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoBox_OwnZoom_Compounds_On_Top_Of_Originating()
     {
         var originating = Originating("2");
@@ -66,7 +66,7 @@ public sealed class ZoomPseudoTests
         WithNativeZoom(() => Assert.Equal(3.0, pseudo.EffectiveZoom, 6));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoBox_Lengths_Scale_By_InheritedZoom()
     {
         var originating = Originating("2");
@@ -81,7 +81,7 @@ public sealed class ZoomPseudoTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_LeavesPseudoBox_Unscaled()
     {
         var originating = Originating("2");

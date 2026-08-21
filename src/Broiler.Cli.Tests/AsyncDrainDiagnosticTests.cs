@@ -25,7 +25,7 @@ public class AsyncDrainDiagnosticTests
     /// serialized output.</summary>
     private const string Page = "<!DOCTYPE html><html><head></head><body><div id=\"out\"></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NormalScript_DoesNotFlagExhaustion()
     {
         var engine = new ScriptEngine();
@@ -46,7 +46,7 @@ public class AsyncDrainDiagnosticTests
     /// such page burnt the whole iteration budget and was then reported as a probable runaway. That
     /// is most real pages; google.com's home page was one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Interval_DoesNotFlagExhaustion()
     {
         var engine = new ScriptEngine();
@@ -65,7 +65,7 @@ public class AsyncDrainDiagnosticTests
     /// iteration budget happened to run out. With a 5000 ms budget a 1000 ms interval is due at
     /// 1000…5000 inclusive — five ticks — and its sixth tick belongs to a page that kept running.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Interval_RunsUpToTheHorizonAndNoFurther()
     {
         var engine = new ScriptEngine();
@@ -83,7 +83,7 @@ public class AsyncDrainDiagnosticTests
     }
 
     /// <summary>A timeout inside the horizon still runs — the drain did not simply stop early.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TimeoutWithinTheHorizon_StillRuns()
     {
         var engine = new ScriptEngine();
@@ -101,7 +101,7 @@ public class AsyncDrainDiagnosticTests
     /// A timeout past the horizon does not run, and that is not an error: a capture is a moment
     /// shortly after load, and a minute-long refresh timer belongs to a session it does not cover.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TimeoutBeyondTheHorizon_DoesNotRun_AndIsNotFlagged()
     {
         var engine = new ScriptEngine();
@@ -120,7 +120,7 @@ public class AsyncDrainDiagnosticTests
         Assert.False(engine.AsyncDrainLimitExhausted);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunawayTimerLoop_FlagsExhaustion()
     {
         var engine = new ScriptEngine();

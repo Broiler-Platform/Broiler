@@ -29,7 +29,7 @@ public class ViewTransitionOffscreenChildTests
         return HtmlRender.RenderToImageWithStyleSet(bridge.SerializeToHtml(), 300, 350);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OffscreenChild_OfNonClippingTarget_IsCapturedInTheSnapshot()
     {
         // .target (overflow:visible) holds an absolutely-positioned green child at top:-100px; the

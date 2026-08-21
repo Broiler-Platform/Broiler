@@ -2,7 +2,7 @@ namespace Broiler.Wpt.Tests;
 
 public sealed class LayoutAssertionFailureTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Describe_Formats_Element_Property_Expected_And_Actual()
     {
         var failure = new LayoutAssertionFailure("span.abspos[title=start]", "offset-y", 0, 13);
@@ -10,7 +10,7 @@ public sealed class LayoutAssertionFailureTests
         Assert.Equal("span.abspos[title=start] expected offset-y=0, got 13", failure.Describe());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Describe_Trims_Trailing_Zeros_On_Fractional_Values()
     {
         var failure = new LayoutAssertionFailure("div#box", "width", 100, 99.5);

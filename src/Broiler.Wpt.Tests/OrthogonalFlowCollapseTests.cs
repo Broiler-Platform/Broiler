@@ -61,7 +61,7 @@ public class OrthogonalFlowCollapseTests : IDisposable
         return (double)nonWhite / (width * height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmptyVerticalRlBox_InAutoHeightBlock_CollapsesInsteadOfFillingViewport()
     {
         // .g is an auto-height block (a light-grey background makes any spurious
@@ -85,7 +85,7 @@ public class OrthogonalFlowCollapseTests : IDisposable
             "(orthogonal-flow auto inline-size regressed to filling the containing block).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VerticalRlBox_WithDefiniteHeightContainingBlock_IsUnaffected()
     {
         // A definite containing-block block size (an explicit-height parent) keeps

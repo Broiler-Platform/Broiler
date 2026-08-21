@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class GlobalAttributeBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GlobalAttribute_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(GlobalAttributeBinding);
@@ -27,7 +27,7 @@ public sealed class GlobalAttributeBindingModuleTests
         Assert.True(typeof(IGlobalAttributeHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reflected_Global_Attributes_Round_Trip_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true,true,true,true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Draggable_Default_Is_False_And_Unset_Id_Reads_Empty_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -80,7 +80,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Id_Invalidates_Style_Scope_So_Selectors_Recompute()
     {
         // #target { color: red } — assigning the id after insertion must re-run the cascade

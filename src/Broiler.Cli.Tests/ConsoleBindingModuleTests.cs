@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ConsoleBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Console_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(ConsoleBinding);
@@ -27,7 +27,7 @@ public sealed class ConsoleBindingModuleTests
         Assert.NotNull(moduleType.GetMethod("Build", BindingFlags.Public | BindingFlags.Static));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Console_Methods_Are_Callable_Through_The_Bridge_And_Return_Undefined()
     {
         var html = @"<!DOCTYPE html>

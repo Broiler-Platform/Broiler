@@ -4,7 +4,7 @@ namespace Broiler.UI.Standard.Tests;
 
 public sealed class StandardServicesTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Session_Builder_Creates_Session_With_Default_Dispatcher_And_Clock()
     {
         var host = new TestHost();
@@ -14,7 +14,7 @@ public sealed class StandardServicesTests
         Assert.True(session.Clock.Now.Elapsed >= TimeSpan.Zero);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Render_Traversal_Uses_Session_Render_Frame()
     {
         var host = new TestHost();

@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ModuleScriptSliceTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inline_Module_Is_Recorded_Executable_And_Exposed_As_A_Root()
     {
         const string html =
@@ -39,7 +39,7 @@ public sealed class ModuleScriptSliceTests
         Assert.DoesNotContain(result.Scripts, s => s.Contains("globalThis"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_Module_With_Unresolvable_Url_Is_Mapped_But_Not_A_Root()
     {
         // No page URL → the relative src cannot be resolved/fetched → mapped but not executable, no root.
@@ -56,7 +56,7 @@ public sealed class ModuleScriptSliceTests
         Assert.Equal("app.mjs", entry.Key);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUri_Module_Is_Decoded_And_Exposed_As_A_Root()
     {
         // A data: URI module is decoded through the same path as a classic data script.
@@ -71,7 +71,7 @@ public sealed class ModuleScriptSliceTests
         Assert.Equal("globalThis.y = 2;", entry.Source);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_File_Module_Is_Fetched_And_Exposed_As_A_Root()
     {
         // An external module resolvable to a local file is fetched and exposed as a root.
@@ -97,7 +97,7 @@ public sealed class ModuleScriptSliceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Repeated_Module_Url_Is_A_Single_Root_Module_Map_Dedup()
     {
         var dir = Path.Combine(Path.GetTempPath(), $"broiler-mod-{Guid.NewGuid():N}");
@@ -123,7 +123,7 @@ public sealed class ModuleScriptSliceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Csp_Blocked_Inline_Module_Is_Mapped_But_Not_A_Root()
     {
         const string html =
@@ -137,7 +137,7 @@ public sealed class ModuleScriptSliceTests
         Assert.Null(result.ModuleMap.Entries[0].Source);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_With_No_Modules_Has_An_Empty_Map_And_No_Roots()
     {
         var result = ScriptExtractionService.ExtractAll("<script>var a=1;</script>");

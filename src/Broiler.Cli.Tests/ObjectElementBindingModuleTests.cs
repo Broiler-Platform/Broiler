@@ -16,7 +16,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ObjectElementBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ObjectElement_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ObjectElementBinding);
@@ -29,7 +29,7 @@ public sealed class ObjectElementBindingModuleTests
         Assert.True(typeof(IObjectElementHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_ContentDocument_And_GetSVGDocument_Resolve_Same_Origin()
     {
         var html = @"<!DOCTYPE html>
@@ -50,7 +50,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Setter_Writes_The_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -70,7 +70,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_ContentDocument_Is_Null_For_Cross_Origin_Data()
     {
         var html = @"<!DOCTYPE html>

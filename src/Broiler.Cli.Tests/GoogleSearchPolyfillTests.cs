@@ -31,7 +31,7 @@ public class GoogleSearchPolyfillTests
     //  TODO-G1: DOM query null-vs-undefined
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetElementById_Returns_Null_Not_Undefined_For_Missing_Element()
     {
         var result = ExecJs(@"
@@ -41,7 +41,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("NULL", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void QuerySelector_Returns_Null_Not_Undefined_For_Missing_Element()
     {
         var result = ExecJs(@"
@@ -51,7 +51,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("NULL", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void QuerySelectorAll_Returns_Empty_Array_For_No_Matches()
     {
         var result = ExecJs(@"
@@ -61,7 +61,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("LEN:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentElement_BeforeBegin_Inserts_Sibling()
     {
         var result = ExecJs(@"
@@ -78,7 +78,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("before|host", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentText_AfterBegin_Prepends_Text()
     {
         var result = ExecJs(@"
@@ -94,7 +94,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("hello|tail", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentHtml_BeforeEnd_Appends_Parsed_Nodes()
     {
         var result = ExecJs(@"
@@ -110,7 +110,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("LAST:two", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentHtml_AfterEnd_Inserts_After_Element()
     {
         var result = ExecJs(@"
@@ -125,7 +125,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("after|host", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentHtml_Invalid_Position_Throws_SyntaxError()
     {
         var result = ExecJs(@"
@@ -140,7 +140,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("SyntaxError", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildNode_Before_Inserts_Node_And_Text_Before_Element()
     {
         var result = ExecJs(@"
@@ -158,7 +158,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("before|alpha|host", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildNode_After_Inserts_Node_And_Text_After_Element()
     {
         var result = ExecJs(@"
@@ -176,7 +176,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("host|after|omega", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildNode_ReplaceWith_Replaces_Element_With_Node_And_Text()
     {
         var result = ExecJs(@"
@@ -194,7 +194,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("alpha|replacement|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_IsConnected_Is_False_For_Detached_Node_And_True_After_Append()
     {
         var result = ExecJs(@"
@@ -210,7 +210,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("false|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_GetRootNode_Defaults_To_Shadow_Root_Inside_Shadow_Tree()
     {
         var result = ExecJs(@"
@@ -231,7 +231,7 @@ public class GoogleSearchPolyfillTests
     //  TODO-G2: performance.now()
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Performance_Now_Returns_Number()
     {
         var result = ExecJs(@"
@@ -242,7 +242,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("GTE0:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Performance_TimeOrigin_Is_Number()
     {
         var result = ExecJs(@"
@@ -263,7 +263,7 @@ public class GoogleSearchPolyfillTests
     /// on <c>document.hidden == 0</c>, which an absent property turns permanently false. See
     /// docs/google-search-post-consent-challenge.md.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Hidden_Is_False_And_Compares_Loosely_To_Zero()
     {
         var result = ExecJs(@"
@@ -277,7 +277,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("EQ0:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_VisibilityState_Is_Visible()
     {
         var result = ExecJs(@"
@@ -286,7 +286,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("STATE:visible", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Performance_GetEntriesByType_Returns_Array()
     {
         var result = ExecJs(@"
@@ -300,7 +300,7 @@ public class GoogleSearchPolyfillTests
     //  TODO-G3: navigator.sendBeacon()
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Navigator_SendBeacon_Returns_True()
     {
         var result = ExecJs(@"
@@ -310,7 +310,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("RESULT:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Navigator_SendBeacon_Forwards_Post_Body_And_Keepalive_To_Fetch()
     {
         var result = ExecJs(@"
@@ -340,7 +340,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("RESULT|https://example.com/log|POST|data=1|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Navigator_SendBeacon_Returns_False_When_Fetch_Throws()
     {
         var result = ExecJs(@"
@@ -356,7 +356,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("RESULT:false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Navigator_UserAgent_Is_String()
     {
         var result = ExecJs(@"
@@ -366,7 +366,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("HAS:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Navigator_Language_Is_String()
     {
         var result = ExecJs(@"
@@ -379,7 +379,7 @@ public class GoogleSearchPolyfillTests
     //  TODO-G4: clientWidth / clientHeight
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html_Element_Has_ClientWidth()
     {
         var result = ExecJs(@"
@@ -389,7 +389,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("CW:1024", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Element_Has_ClientHeight()
     {
         var result = ExecJs(@"
@@ -399,7 +399,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("CH:768", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_InnerWidth_Returns_Viewport_Width()
     {
         var result = ExecJs(@"
@@ -409,7 +409,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("H:768", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_GetBoundingClientRect_Returns_Object()
     {
         var result = ExecJs(@"
@@ -420,7 +420,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("TOP:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ClientDimensions_Ignore_Zoom()
     {
         var result = ExecJs(@"
@@ -439,7 +439,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("PW:64,ZW:64,ZH:64", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_BoundingClientRect_Scales_With_Zoom()
     {
         var result = ExecJs(@"
@@ -455,7 +455,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("W:256,H:256", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_ElementFromPoint_Uses_Hit_Test_Order_And_Skips_PointerEvents_None()
     {
         var result = ExecJs(@"
@@ -493,7 +493,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("purple|yellow|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_ElementsFromPoint_Returns_Target_Then_Ancestors_And_Viewport_Bounds()
     {
         var result = ExecJs(@"
@@ -515,7 +515,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("target|0|0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Uses_Html_But_Not_Body_For_Iframe_Viewport_Fallback()
     {
         var result = ExecJs(@"
@@ -537,7 +537,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("1|HTML|", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Tracks_AutoSized_Ancestors_With_Negative_Margins()
     {
         var result = ExecJs(@"
@@ -554,7 +554,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("inner|inner&gt;outer&gt;BODY&gt;HTML", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_InnerHtml_Reparses_Nodes_Into_The_Live_Dom()
     {
         var result = ExecJs(@"
@@ -570,7 +570,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("true|outer|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AutoSized_ScrollMetrics_Ignore_MarginOnly_NonOverflow_Cases()
     {
         var result = ExecJs(@"
@@ -592,7 +592,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Returns_Null_For_Documents_Without_A_Viewport()
     {
         var result = ExecJs(@"
@@ -606,7 +606,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("true|0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry()
     {
         var result = ExecJs(@"
@@ -645,7 +645,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("180|140|svgRoot|svgRect|svgRect|svgRoot", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow()
     {
         var result = ExecJs(@"
@@ -688,7 +688,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("0|98|secondRect|secondRect|secondSvg", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate()
     {
         var result = ExecJs(@"
@@ -796,7 +796,7 @@ public class GoogleSearchPolyfillTests
             result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Uses_Svg_Text_Tspan_And_TextPath_Content()
     {
         var result = ExecJs(@"
@@ -879,7 +879,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("text1|svgRoot|tspan1|textpath1|tspan2|text4", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Uses_Table_Cell_Layout_For_Rtl_And_Vertical_Writing_Modes()
     {
         var result = ExecJs(@"
@@ -933,7 +933,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("td11,testtable,sandbox,BODY,HTML|testtable,sandbox,BODY,HTML|td14|td14|td41", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Uses_Image_Map_Areas_Before_Associated_Images()
     {
         var result = ExecJs(@"
@@ -970,7 +970,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("rectG|rectG,dinos,BODY,HTML|dinos", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Excludes_Rounded_Corners_From_Fieldset_Hits()
     {
         var result = ExecJs(@"
@@ -988,7 +988,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("fieldsetDiv|fieldset|other", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_HitTesting_Extends_List_Items_To_Outside_Markers()
     {
         var result = ExecJs(@"
@@ -1019,7 +1019,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("outsideText|outsideImage|insideText", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ScrollTo_Updates_ScrollOffsets()
     {
         var result = ExecJs(@"
@@ -1038,7 +1038,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("L:13,T:27", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Scroll_Alias_And_Object_Arguments_Update_Offsets()
     {
         var result = ExecJs(@"
@@ -1060,7 +1060,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("L:75,T:75", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ScrollOffsets_Clamp_And_Respect_WritingMode_Direction()
     {
         var result = ExecJs(@"
@@ -1095,7 +1095,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("150,300|-150,300|150,300|150,-300|0,300|-150,-300", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Scroll_Ignores_Elements_Without_A_Scrolling_Box()
     {
         var result = ExecJs(@"
@@ -1135,7 +1135,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("40,50|0,0|0,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ScrollParent_Finds_Nearest_Relevant_Scroll_Container()
     {
         var result = ExecJs(@"
@@ -1182,7 +1182,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("scroller1|hidden|true|scroller2|scroller3|true|true|scroller1|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ScrollParent_Crosses_Open_And_Closed_Shadow_Roots()
     {
         var result = ExecJs(@"
@@ -1224,7 +1224,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("outerScroller|outerScroller|outerScroller|outerScroller|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ClientMetrics_Ignore_Effective_Zoom()
     {
         var result = ExecJs(@"
@@ -1271,7 +1271,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("OK:true,W:64,H:64,T:0,L:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ClientAndScrollMetrics_Include_Padding_Without_Counting_Internal_Negative_Margins_As_Overflow()
     {
         var result = ExecJs(@"
@@ -1307,7 +1307,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("60,40,60,40|60,40,60,40", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ScrollMetrics_Include_Child_Zoom_Overflow_In_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
@@ -1348,7 +1348,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("60,40,80,60|60,40,60,40|60,40,80,60", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_OffsetDimensions_Exclude_Target_Zoom_But_Include_Borders()
     {
         var result = ExecJs(@"
@@ -1426,7 +1426,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("OK:true,UW:10,ZW:10,IW:102,OW:102", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_OffsetPosition_Uses_OffsetParent_And_Excludes_Target_Zoom()
     {
         var result = ExecJs(@"
@@ -1533,7 +1533,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("VALUES:11,11,21,21,11,51,11,11,21,21,11,51,10,11,1,1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchMedia_Uses_Viewport_Dimensions_And_Viewport_Lengths()
     {
         var result = ExecJs(@"
@@ -1550,7 +1550,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("true,true,true,true,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchMedia_Uses_Vmin_And_Vmax_Viewport_Lengths()
     {
         var result = ExecJs(@"
@@ -1565,7 +1565,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MediaQueries_Use_MainDocument_Viewport_Lengths_In_Computed_Styles()
     {
         var result = ExecJs(@"
@@ -1588,7 +1588,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("40px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MediaQueries_Use_Vmin_And_Vmax_Lengths_In_Computed_Styles()
     {
         var result = ExecJs(@"
@@ -1611,7 +1611,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("40px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchMedia_Clamps_Negative_Calc_Lengths_To_Zero()
     {
         var result = ExecJs(@"
@@ -1621,7 +1621,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("MATCH:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Calc_Lengths_Resolve_In_BoundingClientRect()
     {
         var result = ExecJs(@"
@@ -1642,7 +1642,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("RECT:-50,-50,1074,818", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Calc_Lengths_With_Percentages_Resolve_In_BoundingClientRect()
     {
         var result = ExecJs(@"
@@ -1663,7 +1663,7 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("RECT:-512,-384,1536,1152", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Lengths_Can_Be_Explicitly_Inherited_And_Feed_Rem_And_Em_Font_Sizes()
     {
         var result = CaptureService.ExecuteScriptsWithDom(@"<!doctype html>
@@ -1691,7 +1691,7 @@ document.getElementById('result').textContent =
         Assert.Contains("512,768,512,512,768,1024,768", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Lengths_Interpolate_In_Animation_Snapshots()
     {
         var result = CaptureService.ExecuteScriptsWithDom(@"<!doctype html>
@@ -1726,7 +1726,7 @@ document.getElementById('result').textContent =
         Assert.Contains("id=\"mixed-box\" class=\"box\" style=\"width: 1024px; height: 768px\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Applies_ScrollPadding_And_ScrollMargin()
     {
         var result = ExecJs(@"
@@ -1764,7 +1764,7 @@ document.getElementById('result').textContent =
         Assert.Contains("950,950", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Resolves_Inherited_ScrollPadding_And_ScrollMargin_Under_Zoom()
     {
         var result = ExecJs(@"
@@ -1810,7 +1810,7 @@ document.getElementById('result').textContent =
         Assert.Contains("950,920", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Scales_Zoomed_Target_ScrollMargin_In_Scroller_Coordinates()
     {
         var result = ExecJs(@"
@@ -1853,7 +1853,7 @@ document.getElementById('result').textContent =
         Assert.Contains("300,300", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Scrolls_Absolutely_Positioned_Targets_In_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
@@ -1893,7 +1893,7 @@ document.getElementById('result').textContent =
         Assert.Contains("300,240|300,240", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Scrolls_Percentage_Positioned_Targets_In_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
@@ -1936,7 +1936,7 @@ document.getElementById('result').textContent =
         Assert.Contains("300,300|300,300|300,300|300,300", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Converts_Inherited_ScrollPadding_From_Owner_To_Zoomed_Scroller_Coordinates()
     {
         var result = ExecJs(@"
@@ -2001,7 +2001,7 @@ document.getElementById('result').textContent =
         Assert.Contains("980|980", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Honors_Block_And_Inline_Options_In_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
@@ -2042,7 +2042,7 @@ document.getElementById('result').textContent =
         Assert.Contains("180,190|180,190", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Legacy_False_Aligns_To_Block_End()
     {
         var result = ExecJs(@"
@@ -2076,7 +2076,7 @@ document.getElementById('result').textContent =
         Assert.Contains("0,140", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Defaults_To_InlineNearest_For_Omitted_Options_And_Boolean_Overloads()
     {
         var result = ExecJs(@"
@@ -2125,7 +2125,7 @@ document.getElementById('result').textContent =
         Assert.Contains("40,300|40,300|40,220", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_Scroll_APIs_Update_Root_Scroll_Offsets_And_VisualViewport()
     {
         var result = ExecJs(@"
@@ -2155,7 +2155,7 @@ document.getElementById('result').textContent =
         Assert.Contains("50|1015|50|1015|50|1015|50|1015|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VisualViewport_ScrollIntoView_Fixed_Target_Uses_Visual_Page_Offset()
     {
         var result = ExecJs(@"
@@ -2212,7 +2212,7 @@ document.getElementById('result').textContent =
     // OffsetWithinAncestorForFixedPreferShared) to the correct, non-saturated value, so a
     // regression in the fixed-subtree scroll accounting is caught here rather than hidden by
     // the clamp.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VisualViewport_ScrollIntoView_Target_In_TopFixed_Scroller_Uses_Unclamped_Offset()
     {
         var result = ExecJs(@"
@@ -2258,7 +2258,7 @@ document.getElementById('result').textContent =
         Assert.Contains("500|650|true|2|384", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Does_Not_Scroll_Root_For_Targets_Inside_Unscrollable_Fixed_Containers()
     {
         var result = ExecJs(@"
@@ -2290,7 +2290,7 @@ document.getElementById('result').textContent =
         Assert.Contains("0,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Scrolls_Fixed_Scrollers_Without_Bubbling_To_The_Root()
     {
         var result = ExecJs(@"
@@ -2329,7 +2329,7 @@ document.getElementById('result').textContent =
         Assert.Contains("0,0|300,300", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Clamps_Fixed_Scrollers_To_Their_Scroll_Bounds()
     {
         var result = ExecJs(@"
@@ -2365,7 +2365,7 @@ document.getElementById('result').textContent =
         Assert.Contains("0,0|160,160|310,150", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Does_Not_Scroll_Hidden_Root_For_Zoomed_Scrollers()
     {
         var result = ExecJs(@"
@@ -2415,7 +2415,7 @@ document.getElementById('result').textContent =
         Assert.Contains("0,0,300,240|0,0,300,240", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container()
     {
         var result = ExecJs(@"
@@ -2453,7 +2453,7 @@ document.getElementById('result').textContent =
         Assert.Contains("200|300|100|0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollIntoView_Maps_Block_And_Inline_Axes_For_WritingModes()
     {
         var result = ExecJs(@"
@@ -2500,7 +2500,7 @@ document.getElementById('result').textContent =
         Assert.Contains("-200,200|-150,100|-100,-150", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted_By_Scroll_Handler()
     {
         using var ctx = new Broiler.JavaScript.Engine.JSContext();
@@ -2549,7 +2549,7 @@ document.getElementById('result').textContent =
         Assert.Equal("1|1|2|1", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontRelative_Ch_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"
@@ -2574,7 +2574,7 @@ document.getElementById('result').textContent =
         Assert.Contains("40,80|40,80", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontRelative_Ex_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"
@@ -2599,7 +2599,7 @@ document.getElementById('result').textContent =
         Assert.Contains("40,80|40,80", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontRelative_Ic_Units_Resolve_To_Raw_Css_Pixels_Under_Zoom()
     {
         var result = ExecJs(@"
@@ -2624,7 +2624,7 @@ document.getElementById('result').textContent =
         Assert.Contains("80,160|80,160", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attr_Lengths_Resolve_In_Direct_And_Max_Length_Cases()
     {
         var result = ExecJs(@"
@@ -2655,7 +2655,7 @@ document.getElementById('result').textContent =
         Assert.Contains("200,200,200", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Zoom_CssomView_Geometry_APIs_Use_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
@@ -2700,7 +2700,7 @@ document.getElementById('result').textContent =
         Assert.Contains("8,8,64,64|8,72,256,256|8,328,512,512|512,512", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Zoom_Client_Scroll_And_Offset_Metrics_Stay_In_Raw_Css_Pixels()
     {
         var result = ExecJs(@"
@@ -2778,7 +2778,7 @@ document.getElementById('result').textContent =
         Assert.Contains("100,100,250,250,500,125,125,11,11,21,21", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OffsetTopLeft_Are_Measured_From_OffsetParent_Padding_Edge()
     {
         var result = ExecJs(@"
@@ -2831,7 +2831,7 @@ document.getElementById('result').textContent =
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontRelative_Lh_Units_Resolve_From_Parent_LineHeight_Under_Zoom()
     {
         var result = ExecJs(@"
@@ -2861,7 +2861,7 @@ document.getElementById('result').textContent =
         Assert.Contains("40,40|40,40", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontRelative_Rlh_Units_Resolve_From_Root_LineHeight_Under_Zoom()
     {
         var result = ExecJs(@"
@@ -2889,7 +2889,7 @@ document.getElementById('result').textContent =
     //  TODO-G6: Image() constructor
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Image_Constructor_Creates_Object()
     {
         var result = ExecJs(@"
@@ -2901,7 +2901,7 @@ document.getElementById('result').textContent =
         Assert.Contains("W:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Image_Constructor_With_Dimensions()
     {
         var result = ExecJs(@"
@@ -2916,7 +2916,7 @@ document.getElementById('result').textContent =
     //  TODO-G7: document.cookie stub
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Cookie_Read_Returns_String()
     {
         var result = ExecJs(@"
@@ -2925,7 +2925,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TYPE:string", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Cookie_Write_Does_Not_Throw()
     {
         var result = ExecJs(@"
@@ -2939,7 +2939,7 @@ document.getElementById('result').textContent =
     //  TODO-G10: IntersectionObserver
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IntersectionObserver_Constructor_Exists()
     {
         var result = ExecJs(@"
@@ -2948,7 +2948,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TYPE:function", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IntersectionObserver_Observe_Invokes_Callback()
     {
         var result = ExecJs(@"
@@ -2964,7 +2964,7 @@ document.getElementById('result').textContent =
     //  TODO-G11: ResizeObserver
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResizeObserver_Constructor_Exists()
     {
         var result = ExecJs(@"
@@ -2973,7 +2973,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TYPE:function", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResizeObserver_Observe_Does_Not_Throw()
     {
         var result = ExecJs(@"
@@ -2989,7 +2989,7 @@ document.getElementById('result').textContent =
     //  TODO-G13: TextEncoder / TextDecoder
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextEncoder_Encode_Returns_Uint8Array()
     {
         var result = ExecJs(@"
@@ -3001,7 +3001,7 @@ document.getElementById('result').textContent =
         Assert.Contains("B0:72", result); // 'H' = 72
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextDecoder_Decode_Returns_String()
     {
         var result = ExecJs(@"
@@ -3018,7 +3018,7 @@ document.getElementById('result').textContent =
     //  TODO-G14: URL / URLSearchParams
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void URLSearchParams_Get_Returns_Value()
     {
         var result = ExecJs(@"
@@ -3029,7 +3029,7 @@ document.getElementById('result').textContent =
         Assert.Contains("LANG:en", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void URLSearchParams_Has_Returns_Boolean()
     {
         var result = ExecJs(@"
@@ -3040,7 +3040,7 @@ document.getElementById('result').textContent =
         Assert.Contains("HAS_X:false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void URL_Constructor_Parses_Href()
     {
         var result = ExecJs(@"
@@ -3058,7 +3058,7 @@ document.getElementById('result').textContent =
     //  TODO-G16: AbortController
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbortController_Constructor_Exists()
     {
         var result = ExecJs(@"
@@ -3068,7 +3068,7 @@ document.getElementById('result').textContent =
         Assert.Contains("ABORTED:false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbortController_Abort_Sets_Signal()
     {
         var result = ExecJs(@"
@@ -3083,7 +3083,7 @@ document.getElementById('result').textContent =
     //  TODO-G17: CustomEvent (verify existing)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CustomEvent_Constructor_Exists()
     {
         var result = ExecJs(@"
@@ -3098,7 +3098,7 @@ document.getElementById('result').textContent =
     //  TODO-G18: crypto.getRandomValues()
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Crypto_GetRandomValues_Fills_Array()
     {
         var result = ExecJs(@"
@@ -3109,7 +3109,7 @@ document.getElementById('result').textContent =
         Assert.Contains("LEN:4", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Crypto_RandomUUID_Returns_String()
     {
         var result = ExecJs(@"
@@ -3124,7 +3124,7 @@ document.getElementById('result').textContent =
     //  Window.screen properties
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_Screen_Has_Dimensions()
     {
         var result = ExecJs(@"
@@ -3138,7 +3138,7 @@ document.getElementById('result').textContent =
     //  Combined: Google-style script should not crash
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleStyle_Init_Script_Runs_Without_Crash()
     {
         var result = ExecJs(@"
@@ -3167,7 +3167,7 @@ document.getElementById('result').textContent =
     //  TODO-G9: -webkit- CSS prefix mapping (via getComputedStyle)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Webkit_Prefixed_Property_Mapped_To_Unprefixed()
     {
         var result = ExecJs(@"
@@ -3186,7 +3186,7 @@ document.getElementById('result').textContent =
     //  TODO-G12: MutationObserver with _records tracking
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Has_Records_Array()
     {
         var result = ExecJs(@"
@@ -3199,7 +3199,7 @@ document.getElementById('result').textContent =
         Assert.Contains("LEN:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Observe_AppendChild_Delivers_ChildList_Record()
     {
         var result = ExecJs(@"
@@ -3226,7 +3226,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TAG:span", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Observe_RemoveChild_Delivers_ChildList_Record()
     {
         var result = ExecJs(@"
@@ -3253,7 +3253,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TAG:span", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_TakeRecords_Returns_And_Clears()
     {
         var result = ExecJs(@"
@@ -3268,7 +3268,7 @@ document.getElementById('result').textContent =
         Assert.Contains("AFTER:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Disconnect_Clears_Records()
     {
         var result = ExecJs(@"
@@ -3283,7 +3283,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TARGETS:0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Notify_Invokes_Callback()
     {
         var result = ExecJs(@"
@@ -3300,7 +3300,7 @@ document.getElementById('result').textContent =
         Assert.Contains("TYPE:childList", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Observe_SetAttribute_Delivers_Attribute_Record()
     {
         var result = ExecJs(@"
@@ -3324,7 +3324,7 @@ document.getElementById('result').textContent =
         Assert.Contains("VALUE:value", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Observe_RemoveAttribute_Captures_Old_Value()
     {
         var result = ExecJs(@"
@@ -3349,7 +3349,7 @@ document.getElementById('result').textContent =
         Assert.Contains("HAS:false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Observe_CharacterData_Delivers_Record()
     {
         var result = ExecJs(@"
@@ -3371,7 +3371,7 @@ document.getElementById('result').textContent =
         Assert.Contains("VALUE:after", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Observe_CharacterData_Captures_Old_Value()
     {
         var result = ExecJs(@"
@@ -3397,7 +3397,7 @@ document.getElementById('result').textContent =
     //  TODO-G20: Async script detection
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptExtractor_Separates_Async_Scripts()
     {
         var html = @"<html><head>

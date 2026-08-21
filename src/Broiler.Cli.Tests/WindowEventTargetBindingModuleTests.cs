@@ -16,7 +16,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class WindowEventTargetBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowEventTarget_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(WindowEventTargetBinding);
@@ -28,7 +28,7 @@ public sealed class WindowEventTargetBindingModuleTests
         Assert.True(typeof(IWindowEventTargetHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_Add_Dispatch_Remove_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

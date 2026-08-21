@@ -41,7 +41,7 @@ public class BackdropPaintingPropertiesWptTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackdropOpacity_CompositesScrimOverTheCanvas()
     {
         // The WPT fixture: an opaque green ::backdrop at opacity 0.5 over the white canvas.
@@ -67,7 +67,7 @@ public class BackdropPaintingPropertiesWptTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackdropWithoutOpacity_StaysFullyOpaque()
     {
         // Guards the other direction: carrying painting properties across must not invent an

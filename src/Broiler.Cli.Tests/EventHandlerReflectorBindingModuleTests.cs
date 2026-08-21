@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class EventHandlerReflectorBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EventHandlerReflector_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(EventHandlerReflectorBinding);
@@ -27,7 +27,7 @@ public sealed class EventHandlerReflectorBindingModuleTests
         Assert.True(typeof(IEventHandlerReflectorHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void On_Handler_Assigns_Reads_Fires_And_Clears()
     {
         var html = @"<!DOCTYPE html>

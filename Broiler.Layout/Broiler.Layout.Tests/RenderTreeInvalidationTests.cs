@@ -43,7 +43,7 @@ public class RenderTreeInvalidationTests
         return (document, root, paragraph, text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_untouched_document_needs_no_rebuild()
     {
         var (document, _, _, _) = Tree();
@@ -53,7 +53,7 @@ public class RenderTreeInvalidationTests
         Assert.Equal(0, ledger.ObservedMutations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attribute_write_on_a_connected_element_requires_a_rebuild()
     {
         var (document, _, paragraph, _) = Tree();
@@ -65,7 +65,7 @@ public class RenderTreeInvalidationTests
         Assert.Equal(1, ledger.RenderAffectingMutations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attribute_write_on_a_detached_element_does_not()
     {
         var (document, _, _, _) = Tree();
@@ -81,7 +81,7 @@ public class RenderTreeInvalidationTests
         Assert.Equal(1, ledger.ElidedMutations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_text_write_is_classified_by_whether_the_text_node_is_in_the_tree()
     {
         var (document, _, _, text) = Tree();
@@ -100,7 +100,7 @@ public class RenderTreeInvalidationTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Building_a_subtree_off_the_document_requires_no_rebuild()
     {
         var (document, _, _, _) = Tree();
@@ -120,7 +120,7 @@ public class RenderTreeInvalidationTests
         Assert.False(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inserting_that_subtree_requires_one()
     {
         var (document, _, paragraph, _) = Tree();
@@ -135,7 +135,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Removing_a_connected_child_requires_a_rebuild()
     {
         var (document, root, paragraph, _) = Tree();
@@ -146,7 +146,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moving_a_connected_node_into_a_detached_parent_requires_a_rebuild()
     {
         // The trap this classification could have fallen into: the *insertion* record names a
@@ -162,7 +162,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Editing_a_subtree_after_it_leaves_the_tree_requires_only_the_removals_rebuild()
     {
         var (document, root, paragraph, _) = Tree();
@@ -181,7 +181,7 @@ public class RenderTreeInvalidationTests
         Assert.False(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Mutations_inside_a_document_fragment_require_no_rebuild()
     {
         var (document, _, _, _) = Tree();
@@ -195,7 +195,7 @@ public class RenderTreeInvalidationTests
         Assert.False(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MarkRebuilt_clears_the_verdict_and_a_later_connected_write_sets_it_again()
     {
         var (document, _, paragraph, _) = Tree();
@@ -211,7 +211,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_version_bump_the_ledger_never_saw_requires_a_rebuild()
     {
         // The backstop, and the case that makes the elision safe against publish paths this type
@@ -228,7 +228,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_same_value_write_never_reaches_the_ledger_at_all()
     {
         // Not this type's doing, and worth pinning because the roadmap named "a mutation that
@@ -250,7 +250,7 @@ public class RenderTreeInvalidationTests
         Assert.False(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disposing_stops_observing()
     {
         var (document, _, paragraph, _) = Tree();
@@ -272,7 +272,7 @@ public class RenderTreeInvalidationTests
     /// assembly's sole user of it: xUnit runs classes in parallel but a class's own cases serially.
     /// A second class that touches those counters needs both in one collection.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Decisions_counts_rebuilds_required_and_elided()
     {
         var (document, _, paragraph, _) = Tree();
@@ -311,7 +311,7 @@ public class RenderTreeInvalidationTests
         return (document, paragraph, ledger);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_connected_write_of_an_attribute_no_sheet_can_see_requires_no_rebuild()
     {
         // The row the relayout profile sizes at 997.8 ms on the rule-heavy page.
@@ -324,7 +324,7 @@ public class RenderTreeInvalidationTests
         Assert.Equal(1, ledger.ElidedMutations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_connected_write_of_an_attribute_a_selector_filters_on_requires_one()
     {
         var (_, paragraph, ledger) = Styled("[data-k=\"3\"]{color:red}");
@@ -335,7 +335,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_a_set_every_connected_write_still_rebuilds()
     {
         // The default, and what a container that never installs a set gets: the first slice's
@@ -350,7 +350,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_unstyled_class_token_is_elidable_and_a_styled_one_is_not()
     {
         var (_, paragraph, ledger) = Styled(".styled{color:red}");
@@ -384,7 +384,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nothing_inside_an_svg_subtree_is_elidable()
     {
         // FragmentTreeBuilder serializes an inline <svg> subtree back to markup attribute by
@@ -404,7 +404,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_namespaced_attribute_is_never_elidable()
     {
         var (document, _, paragraph, _) = Tree();
@@ -416,7 +416,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Child_list_and_text_edits_are_not_reached_by_the_attribute_rule()
     {
         // The set answers a question about attributes, and the classification must not let it
@@ -434,7 +434,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_sheet_the_scanner_gave_up_on_elides_nothing()
     {
         var (_, paragraph, ledger) = Styled(".a\\.b{color:red}");
@@ -447,7 +447,7 @@ public class RenderTreeInvalidationTests
         Assert.True(ledger.RequiresRebuild());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_installed_set_describes_the_tree_that_was_built()
     {
         // MarkRebuilt(set) is one call because the two facts are one fact. A mutation classified
@@ -471,7 +471,7 @@ public class RenderTreeInvalidationTests
         Assert.NotNull(ledger.CascadeDependencies);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TrySkipRebuild_marks_current_only_when_it_skips()
     {
         var (document, _, paragraph, _) = Tree();

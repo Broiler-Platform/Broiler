@@ -14,7 +14,7 @@ public class LogSubscriptionTests : IDisposable
         RenderLogger.Clear();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Subscription_Receives_Entries()
     {
         var entries = new List<RenderLogEntry>();
@@ -28,7 +28,7 @@ public class LogSubscriptionTests : IDisposable
         Assert.Equal("msg2", entries[1].Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Subscription_Respects_Minimum_Level()
     {
         var entries = new List<RenderLogEntry>();
@@ -44,7 +44,7 @@ public class LogSubscriptionTests : IDisposable
         Assert.Equal("err msg", entries[1].Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Stops_Receiving_Entries()
     {
         var entries = new List<RenderLogEntry>();
@@ -58,7 +58,7 @@ public class LogSubscriptionTests : IDisposable
         Assert.Equal("before", entries[0].Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Double_Dispose_Is_Safe()
     {
         var sub = new LogSubscription(_ => { });

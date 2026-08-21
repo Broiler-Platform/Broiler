@@ -5,7 +5,7 @@ namespace Broiler.UI.RichEdit.Standard.Tests;
 
 public sealed class StandardRichEditRenderTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Multi_Paragraph_Text_Draws_One_Line_Per_Paragraph()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 200), "one\ntwo\nthree");
@@ -17,7 +17,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Long_Line_Wraps_Into_Multiple_Visual_Lines()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(120, 200), "the quick brown fox jumps over the lazy dog again");
@@ -29,7 +29,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selection_Draws_Highlight_Rectangles()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 120), "hello world");
@@ -42,7 +42,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Focused_Edit_Draws_A_Caret()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 120), "hi");
@@ -54,7 +54,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Focus_Draws_A_Ring_And_Unfocused_Draws_A_Border()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 120), "hi");
@@ -68,7 +68,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_Edit_Uses_Disabled_Surface_And_Draws_No_Caret()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 120), "hi");
@@ -82,7 +82,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Edit_Draws_Placeholder()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 120));
@@ -94,7 +94,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Render_List_Balances_Clip_Stack()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(300, 120), "clip test");
@@ -106,7 +106,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflowing_Content_Draws_A_Vertical_Scrollbar()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(180, 70),
@@ -120,7 +120,7 @@ public sealed class StandardRichEditRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fitting_Content_Does_Not_Draw_An_Auto_Scrollbar()
     {
         RichEditScene scene = RichEditStandardHarness.Create(new BSize(180, 100), "fits");

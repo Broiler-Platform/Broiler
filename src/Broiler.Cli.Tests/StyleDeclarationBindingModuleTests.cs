@@ -22,7 +22,7 @@ public sealed class StyleDeclarationBindingModuleTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleDeclaration_Feature_Module_Is_Co_Located_And_Internal_Static()
     {
         var moduleType = typeof(StyleDeclarationBinding);
@@ -32,7 +32,7 @@ public sealed class StyleDeclarationBindingModuleTests
         Assert.True(moduleType is { IsAbstract: true, IsSealed: true }); // C# static class
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementStyle_CamelCase_And_Kebab_And_CssText_Reflect_One_State()
     {
         using var bridge = Attach(out var context,
@@ -55,7 +55,7 @@ public sealed class StyleDeclarationBindingModuleTests
         Assert.Equal("red|red|4px|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementStyle_RemoveProperty_And_Length_And_Item_Work_Through_The_Module()
     {
         using var bridge = Attach(out var context,
@@ -74,7 +74,7 @@ public sealed class StyleDeclarationBindingModuleTests
         Assert.Equal("2|blue|1|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementStyle_CssFloat_Maps_To_Float_Property_Through_The_Module()
     {
         using var bridge = Attach(out var context,
@@ -91,7 +91,7 @@ public sealed class StyleDeclarationBindingModuleTests
         Assert.Equal("left|left", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Read_Only_Declaration_Is_Built_By_The_Module()
     {
         using var bridge = Attach(out var context,
@@ -113,7 +113,7 @@ public sealed class StyleDeclarationBindingModuleTests
         Assert.Equal("true|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheet_Rule_Declaration_Is_Built_By_The_Module()
     {
         using var bridge = Attach(out var context,
@@ -135,7 +135,7 @@ public sealed class StyleDeclarationBindingModuleTests
     // -- P3.63: the `element.style = "..."` assignment setter, moved off the bridge
     //    (JsJsObjectsSetStyle025Core) into StyleDeclarationBinding.SetInlineStyleCssText. --
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Assigning_ElementStyle_A_String_Parses_CssText_And_Writes_Through()
     {
         using var bridge = Attach(out var context,
@@ -156,7 +156,7 @@ public sealed class StyleDeclarationBindingModuleTests
         Assert.Equal("red|10px|true||" + "|4px", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Assigning_ElementStyle_A_NonString_Is_A_No_Op()
     {
         using var bridge = Attach(out var context,

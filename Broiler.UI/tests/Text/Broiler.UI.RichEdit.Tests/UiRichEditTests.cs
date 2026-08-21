@@ -4,7 +4,7 @@ namespace Broiler.UI.RichEdit.Tests;
 
 public sealed class UiRichEditTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void New_Control_Is_Empty_And_Editable()
     {
         var edit = new FakeRichEdit();
@@ -16,7 +16,7 @@ public sealed class UiRichEditTests
         Assert.True(edit.AcceptsReturn);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Document_Raises_Document_And_Selection_Changed()
     {
         var edit = new FakeRichEdit();
@@ -27,7 +27,7 @@ public sealed class UiRichEditTests
         Assert.Equal(new[] { "DocumentChanged", "SelectionChanged" }, edit.Events);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Null_Document_Throws()
     {
         var edit = new FakeRichEdit();
@@ -35,7 +35,7 @@ public sealed class UiRichEditTests
         Assert.Throws<ArgumentNullException>(() => edit.Document = null!);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Same_Selection_Does_Not_Raise()
     {
         var edit = new FakeRichEdit();
@@ -47,7 +47,7 @@ public sealed class UiRichEditTests
         Assert.Empty(edit.Events);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Selection_Raises_SelectionChanged()
     {
         var edit = new FakeRichEdit();
@@ -60,7 +60,7 @@ public sealed class UiRichEditTests
         Assert.False(edit.Selection.IsEmpty);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Semantic_Node_Uses_RichEdit_Role_And_Flat_Text_Metadata()
     {
         var edit = new FakeRichEdit();
@@ -77,7 +77,7 @@ public sealed class UiRichEditTests
         Assert.False(node.TextInfo.IsPassword);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReadOnly_Is_Reflected_In_Semantics()
     {
         var edit = new FakeRichEdit { IsReadOnly = true };
@@ -89,7 +89,7 @@ public sealed class UiRichEditTests
         Assert.False(node.TextInfo!.IsEditable);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selection_With_Content_Sets_Selected_State_And_Length()
     {
         var edit = new FakeRichEdit();
@@ -103,7 +103,7 @@ public sealed class UiRichEditTests
         Assert.Equal(3, node.TextInfo.SelectionLength);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Change_Invalidates_Measure_And_Semantic()
     {
         (UiSession session, FakeRichEdit edit, FakeRichEditHost host) = RichEditHarness.Attach();
@@ -115,7 +115,7 @@ public sealed class UiRichEditTests
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selection_Change_Invalidates_Render_And_Semantic_Only()
     {
         (UiSession session, FakeRichEdit edit, FakeRichEditHost host) = RichEditHarness.Attach();
@@ -129,7 +129,7 @@ public sealed class UiRichEditTests
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PreferredSize_Change_Invalidates_Measure()
     {
         (UiSession session, FakeRichEdit edit, FakeRichEditHost host) = RichEditHarness.Attach();

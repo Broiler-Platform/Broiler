@@ -43,7 +43,7 @@ public class HtmlFormStateTests
             ["value"] = value,
         };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClickingSubmitCarriesTheFormsFieldsIntoTheUrl()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -57,7 +57,7 @@ public class HtmlFormStateTests
         Assert.Equal("https://example.com/search?q=broiler&src=hp&btnG=Search", target?.Url);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TypedTextReachesTheSubmittedUrl()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -90,7 +90,7 @@ public class HtmlFormStateTests
         throw new InvalidOperationException("The page has no editable input.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PressingEnterInAFieldSubmitsItsFormWithoutAButton()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -103,7 +103,7 @@ public class HtmlFormStateTests
         Assert.Equal("https://example.com/search?q=broiler&src=hp", target?.Url);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OrdinaryLinksInsideAFormAreNotTurnedIntoSubmissions()
     {
         using HtmlContainer container = LayOut(
@@ -119,7 +119,7 @@ public class HtmlFormStateTests
         Assert.Null(target);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PostFormsCarryTheirFieldsInTheRequestBody()
     {
         using HtmlContainer container = LayOut(
@@ -140,7 +140,7 @@ public class HtmlFormStateTests
         Assert.False(request.IsRepeatable);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PostFormsHonourTheirDeclaredEncoding()
     {
         using HtmlContainer container = LayOut(
@@ -156,7 +156,7 @@ public class HtmlFormStateTests
         Assert.Equal("a=1\r\ns=Go\r\n", request?.Body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AGetFormIgnoresEnctypeBecauseItHasNoBody()
     {
         using HtmlContainer container = LayOut(
@@ -173,7 +173,7 @@ public class HtmlFormStateTests
         Assert.Null(request?.Body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ControlsOutsideAnyFormAreNotSubmissions()
     {
         using HtmlContainer container = LayOut(
@@ -184,7 +184,7 @@ public class HtmlFormStateTests
             container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://example.com/"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToggledCheckboxStateIsLayeredOverTheMarkup()
     {
         using HtmlContainer container = LayOut(
@@ -208,7 +208,7 @@ public class HtmlFormStateTests
             state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AChangedSelectionIsLayeredOverTheMarkup()
     {
         using HtmlContainer container = LayOut(
@@ -231,7 +231,7 @@ public class HtmlFormStateTests
             state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResetForgetsPerPageControlState()
     {
         HtmlFormState state = new();
@@ -244,7 +244,7 @@ public class HtmlFormStateTests
         Assert.Null(state.GetSelectedValue("sel", "colour"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeAndAbsoluteActionsBothResolve()
     {
         Assert.Equal("https://x/search", HtmlFormState.ResolveAction("/search", "https://x/page"));
@@ -253,7 +253,7 @@ public class HtmlFormStateTests
         Assert.Equal("https://x/page", HtmlFormState.ResolveAction(null, "https://x/page"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnparseablePagesFallBackInsteadOfThrowing()
     {
         HtmlFormState state = new();
@@ -266,7 +266,7 @@ public class HtmlFormStateTests
     /// Checkbox and radio geometry is only reachable by id, so the browsing path
     /// stamps one on controls that lack it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToggleControlsAreStampedWithIdsForGeometryLookup()
     {
         string stamped = HtmlPostProcessor.StampFormControlIds(
@@ -276,7 +276,7 @@ public class HtmlFormStateTests
         Assert.Contains($"id=\"{HtmlPostProcessor.SyntheticIdPrefix}1\"", stamped);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StampingKeepsExistingIdsAndLeavesOtherControlsAlone()
     {
         string stamped = HtmlPostProcessor.StampFormControlIds(
@@ -287,7 +287,7 @@ public class HtmlFormStateTests
         Assert.DoesNotContain(HtmlPostProcessor.SyntheticIdPrefix, stamped);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StampedControlsKeepTheirAttributesAndSelfClosingForm()
     {
         string stamped = HtmlPostProcessor.StampFormControlIds(
@@ -300,7 +300,7 @@ public class HtmlFormStateTests
         Assert.EndsWith("/>", stamped);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AChosenFileIsPostedAsAMultipartPart()
     {
         string path = Path.Combine(Path.GetTempPath(), $"broiler-form-{Guid.NewGuid():N}.txt");
@@ -333,7 +333,7 @@ public class HtmlFormStateTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFileThatHasGoneAwaySubmitsAsNothingChosen()
     {
         using HtmlContainer container = LayOut(
@@ -353,7 +353,7 @@ public class HtmlFormStateTests
         Assert.Contains("filename=\"\"", body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResetForgetsAChosenFile()
     {
         HtmlFormState state = new();
@@ -364,7 +364,7 @@ public class HtmlFormStateTests
         Assert.Null(state.GetSelectedFile("f", "doc"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AMultipleFileInputSubmitsOnePartPerFile()
     {
         string first = WriteTempFile("one");
@@ -396,7 +396,7 @@ public class HtmlFormStateTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFileInputWithoutMultipleSubmitsOnlyItsFirstFile()
     {
         string first = WriteTempFile("one");
@@ -426,7 +426,7 @@ public class HtmlFormStateTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddingTheSameFileTwiceDoesNotDuplicateIt()
     {
         HtmlFormState state = new();
@@ -436,7 +436,7 @@ public class HtmlFormStateTests
         Assert.Equal(["/tmp/a"], state.GetSelectedFiles("f", "docs"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PickingASingleFileReplacesThePreviousChoice()
     {
         HtmlFormState state = new();
@@ -446,7 +446,7 @@ public class HtmlFormStateTests
         Assert.Equal(["/tmp/b"], state.GetSelectedFiles("f", "doc"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnreadableFilesAreDroppedWithoutLosingTheReadableOnes()
     {
         string good = WriteTempFile("kept");
@@ -485,7 +485,7 @@ public class HtmlFormStateTests
     /// History gates re-navigation on this: a GET can be replayed freely, a
     /// submission goes through a confirmation first.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyGetRequestsAreRepeatable()
     {
         Assert.True(PageRequest.ForUrl("https://x/").IsRepeatable);
@@ -493,7 +493,7 @@ public class HtmlFormStateTests
         Assert.False(new PageRequest("https://x/", PageRequest.Post, Body: "a=1").IsRepeatable);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ARequestCarriesEitherATextOrABinaryBody()
     {
         Assert.False(PageRequest.ForUrl("https://x/").HasBody);
@@ -501,7 +501,7 @@ public class HtmlFormStateTests
         Assert.True(new PageRequest("https://x/", PageRequest.Post) { BinaryBody = [1, 2] }.HasBody);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AMultiSelectSubmitsEveryChosenOption()
     {
         using HtmlContainer container = LayOut(
@@ -524,7 +524,7 @@ public class HtmlFormStateTests
             state.TryBuildSubmitRequest(container.GetHtml(), SubmitAttributes("go", "s", "Go"), "https://x/s")?.Url);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnEmptiedMultiSelectSubmitsNothingForItself()
     {
         using HtmlContainer container = LayOut(

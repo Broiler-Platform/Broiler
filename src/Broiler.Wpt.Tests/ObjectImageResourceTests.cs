@@ -66,7 +66,7 @@ public class ObjectImageResourceTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModalDialogInObjectFallback_DoesNotRender_AndResourceDoes()
     {
         var test = Render(
@@ -83,7 +83,7 @@ public class ObjectImageResourceTests : IDisposable
         Assert.Equal(reference, test);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ObjectWithoutImageType_KeepsFallback()
     {
         // Guard the gate: fallback exists so a failed/non-image resource can degrade (Acid2's

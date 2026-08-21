@@ -75,7 +75,7 @@ public sealed class NativeAnchorInlineCbPipelineTests
         return (geometry[anchor!], geometry[br!]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_PlacesInlineCbPositionAreaBox_AtGridCorner()
     {
         var (anchor, br) = LayoutBoxes(nativeAnchor: true);
@@ -94,7 +94,7 @@ public sealed class NativeAnchorInlineCbPipelineTests
         Assert.Equal(25f, br.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_LeavesInlineCbPositionAreaBoxUnplaced()
     {
         // Flag off → the engine ignores position-area, so #br sits at its ordinary abspos

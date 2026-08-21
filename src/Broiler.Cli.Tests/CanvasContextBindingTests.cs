@@ -30,7 +30,7 @@ public sealed class CanvasContextBindingTests
         return context.Eval(script).ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetContext_2d_Returns_A_NonNull_Context_Object()
     {
         // The 2d context is a live object exposing the drawing-state properties and methods.
@@ -39,7 +39,7 @@ public sealed class CanvasContextBindingTests
             "return (typeof ctx)+','+(ctx!==null&&typeof ctx.fillRect==='function');})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetContext_Non2d_And_NonCanvas_Return_Null()
     {
         Assert.Equal("true", Eval(
@@ -47,7 +47,7 @@ public sealed class CanvasContextBindingTests
             "return (c.getContext('webgl')===null)+'';})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FillStyle_And_StrokeStyle_Round_Trip()
     {
         Assert.Equal("#ff0000|#00ff00", Eval(
@@ -56,7 +56,7 @@ public sealed class CanvasContextBindingTests
             "return ctx.fillStyle+'|'+ctx.strokeStyle;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Save_Restore_Is_A_State_Stack()
     {
         // save() snapshots the style state; mutating then restore() reverts it — script-observable.
@@ -67,7 +67,7 @@ public sealed class CanvasContextBindingTests
             "return '#111111->'+mid+'->'+ctx.fillStyle;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Drawing_Methods_Are_Callable_And_Do_Not_Throw()
     {
         // Every drawing entry point stays callable and total — a malformed or degenerate call must not

@@ -47,7 +47,7 @@ public sealed class NativeFixedSizingTests
         return geometry[document.GetElementById("f")!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EngineSizesFixedBox_FromOpposingInsets()
     {
         // 800x600 viewport, insets top/bottom 20, left/right 30 → 740x560 at (30,20).
@@ -58,7 +58,7 @@ public sealed class NativeFixedSizingTests
         Assert.Equal(20f, box.BorderBox.Top, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EngineSizesFixedBox_FromInsetShorthand()
     {
         var box = EngineLayout(InsetShorthandHtml);
@@ -66,7 +66,7 @@ public sealed class NativeFixedSizingTests
         Assert.Equal(560f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BridgeNeverBakesFixedSize()
     {
         static string ResolveAndSerialize()

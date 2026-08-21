@@ -66,7 +66,7 @@ public class CommentWhitespaceCollapseTests : IDisposable
         return BlueRun(bmp, y: 15, width: 400);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LeadingComment_DoesNotProduceLeadingSpace()
     {
         // A comment (with surrounding whitespace) before the first inline-block
@@ -83,7 +83,7 @@ public class CommentWhitespaceCollapseTests : IDisposable
             $"leading comment shifted the first box: with={withComment.left}, without={withoutComment.left}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CommentBetweenBoxes_KeepsSingleSpace()
     {
         // A comment between two inline-blocks must collapse to the same single

@@ -71,7 +71,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
 
     /// <summary>An untouched frame still renders straight from its resource — the path that already
     /// worked keeps working.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnscriptedSrcFrame_RendersItsResource()
     {
         WriteResource("child.html", "<!DOCTYPE html><body style='margin:0;background:red'></body>");
@@ -80,7 +80,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
 
     /// <summary>The bug: a parent mutating the frame's document through
     /// <c>contentDocument</c> changes what the frame paints.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParentMutatingContentDocument_RendersTheMutation()
     {
         WriteResource("child.html", "<!DOCTYPE html><body style='margin:0;background:red'></body>");
@@ -95,7 +95,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
 
     /// <summary>The shape <c>transition-in-empty-iframe</c> drives: the parent calls a function the
     /// frame declared, which unhides content inside the frame.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParentCallingIntoFrame_RendersWhatTheFrameDid()
     {
         WriteResource("child.html", """
@@ -124,7 +124,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
 
     /// <summary>A frame's own load-time script counts too: what it did to its document is what the
     /// frame shows.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameMutatingItselfOnLoad_RendersTheMutation()
     {
         WriteResource("child.html", """
@@ -142,7 +142,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
     /// from, not against the containing page — the frame travels to the renderer as markup, so it has
     /// to carry that URL with it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutatedFrame_ResolvesRelativeUrlsAgainstItsOwnResource()
     {
         // Same file name in both directories, different colours: only the frame's own copy is blue.
@@ -167,7 +167,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
     /// still paints nothing — a separate gap this change deliberately does not reach into, and the
     /// case that keeps WPT <c>input-targets-root-while-render-blocked</c> from regressing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptedBlankFrame_IsLeftToTheRenderer()
     {
         Assert.Equal((0, 128, 0), RenderFrameCentre("about:blank", """

@@ -28,7 +28,7 @@ public sealed class DocumentCurrentScriptTests
     /// The reported line, on the reported page's shape: a JSON-LD data block, then a script with a
     /// <c>src</c> that reads its own URL out of <c>document.currentScript</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AScriptReadsItsOwnSrc_PastTheDataBlockInFrontOfIt()
     {
         // `new URL(document.currentScript.src)` — the reported expression, over a data: URI so the
@@ -60,7 +60,7 @@ public sealed class DocumentCurrentScriptTests
     /// <c>undefined</c>, which is what an unbound property reads as and what the reported script
     /// dereferenced.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OutsideAScriptItIsNullAndNotUndefined()
     {
         const string Html = """
@@ -90,7 +90,7 @@ public sealed class DocumentCurrentScriptTests
     /// <c>&lt;script defer&gt;</c> on the page — and <c>document.write</c> appended to
     /// <c>&lt;body&gt;</c> rather than writing at the script's position.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ADeferredScriptIsTheCurrentScriptWhileItRuns()
     {
         const string Html = """
@@ -114,7 +114,7 @@ public sealed class DocumentCurrentScriptTests
     /// the written fragment belongs immediately after the script that wrote it, and with a data
     /// block counted in front of it the position came from a different element.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentWriteLandsAfterTheScriptThatWroteIt_PastADataBlock()
     {
         const string Html = """
@@ -142,7 +142,7 @@ public sealed class DocumentCurrentScriptTests
     /// bucket runs, a module belongs to neither classic bucket, and <c>defer</c> decides which of
     /// the two an element is counted in.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheElementMapCountsOnlyWhatEachBucketRuns()
     {
         const string Html = """

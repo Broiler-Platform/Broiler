@@ -74,7 +74,7 @@ public class SubDocumentViewTransitionTests
     private static readonly (int R, int G, int B) LightGreen = (144, 238, 144);
 
     /// <summary>The gap itself: the method exists on a nested browsing context's document.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDocument_ExposesStartViewTransition()
     {
         var (_, _) = Render(string.Empty, """
@@ -108,7 +108,7 @@ public class SubDocumentViewTransitionTests
     /// With the old snapshot pinned, the frame shows its pre-callback state — the callback still ran
     /// (it is what makes the transition's "new" state), it is just not what the still captures.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OldSnapshotPinned_FrameShowsThePreCallbackState()
     {
         var (frame, _) = Render(PinOldVisible, """
@@ -125,7 +125,7 @@ public class SubDocumentViewTransitionTests
 
     /// <summary>The mirror: with the new snapshot pinned, the frame shows the post-callback state.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NewSnapshotPinned_FrameShowsThePostCallbackState()
     {
         var (frame, _) = Render(PinNewVisible, """
@@ -142,7 +142,7 @@ public class SubDocumentViewTransitionTests
 
     /// <summary>An unpinned transition has run its animation to completion by the time anything is
     /// captured, so the frame shows the new state.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnpinnedTransition_FrameShowsThePostCallbackState()
     {
         var (frame, _) = Render(string.Empty, """
@@ -165,7 +165,7 @@ public class SubDocumentViewTransitionTests
     /// post-callback lightgreen. Reaching lightgreen at all is what proves the script ran on; before
     /// this, the main document never got its <c>background</c> set, let alone its transition.</para>
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDocumentTransition_DoesNotAbortTheDrivingScript()
     {
         var (frame, main) = Render(PinOldVisible, """
@@ -188,7 +188,7 @@ public class SubDocumentViewTransitionTests
     /// <c>skipTransition()</c> ends the transition, so nothing is held back and the frame shows its
     /// live state even under the old-snapshot pinning.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SkipTransition_ReleasesTheHeldOldState()
     {
         var (frame, _) = Render(PinOldVisible, """
@@ -206,7 +206,7 @@ public class SubDocumentViewTransitionTests
 
     /// <summary>The returned object carries the promises a caller awaits, all already resolved.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TransitionObject_ResolvesItsPromises()
     {
         using var context = new JSContext();
@@ -253,7 +253,7 @@ public class SubDocumentViewTransitionTests
     /// The page is frozen on a snapshot taken before the frame changed, so the frame keeps showing
     /// what it showed then — the change made inside it afterwards does not appear.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootSnapshotFrozenOnOldState_HoldsTheFrameAsItWasCaptured()
     {
         var (frame, _) = Render(FrameBackground("orange"), """
@@ -275,7 +275,7 @@ public class SubDocumentViewTransitionTests
     /// The hold reaches back only as far as the capture: a frame changed <em>before</em> the main
     /// transition started is captured in its changed state, not its original one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootSnapshotHoldsTheStateAtCaptureTime_NotTheOriginal()
     {
         var (frame, _) = Render(FrameBackground("orange"), """
@@ -299,7 +299,7 @@ public class SubDocumentViewTransitionTests
     /// snapshot has no copy of it and its live content shows through — what
     /// <c>sibling-frames-transition</c> and <c>-with-name-on-iframe</c> pin.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NamedFrame_IsNotPartOfTheRootSnapshot()
     {
         var (frame, _) = Render(FrameBackground("orange"), """
@@ -318,7 +318,7 @@ public class SubDocumentViewTransitionTests
 
     /// <summary>With the page showing its NEW state there is no old snapshot on screen, so nothing is
     /// held and the frame renders live.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootSnapshotShowingNewState_DoesNotHoldTheFrame()
     {
         var (frame, _) = Render(FrameBackground("orange"), """
@@ -339,7 +339,7 @@ public class SubDocumentViewTransitionTests
     /// The two holds compose: a frame already frozen on its own old state is what the page's snapshot
     /// records, so both agree about what was on screen.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootSnapshotRecordsWhatAFrozenFrameWasShowing()
     {
         var (frame, _) = Render(PinOldVisible, """

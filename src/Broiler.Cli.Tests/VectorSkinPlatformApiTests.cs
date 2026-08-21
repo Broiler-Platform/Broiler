@@ -19,7 +19,7 @@ public sealed class VectorSkinPlatformApiTests
     /// work therefore waited forever — which is what left the appearance panel in the page column
     /// and the site notice unrendered.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_ReadyState_Is_Loading_During_Parse()
     {
         const string html = """
@@ -41,7 +41,7 @@ document.body.appendChild(el);
 
     /// <summary>And it advances, announcing each step — the event is how a script that loads after
     /// `interactive` still learns that the document is ready.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_ReadyState_Advances_And_Fires_ReadyStateChange()
     {
         const string html = """
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /// changes, and reads <c>history.state</c> back. A missing <c>history</c> object threw on the
     /// first call and took the rest of the module with it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void History_Records_And_Returns_Pushed_State()
     {
         const string html = """
@@ -101,7 +101,7 @@ document.body.appendChild(el);
     /// and its deferred work are built on. Neither existed, and the constructor call threw before
     /// anything after it in the module ran.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PerformanceObserver_And_RequestIdleCallback_Exist_And_Are_Usable()
     {
         const string html = """
@@ -138,7 +138,7 @@ document.body.appendChild(el);
     /// breakpoints through one, and <c>addListener</c> alone (the deprecated spelling, which did
     /// exist) is not what current code calls.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MediaQueryList_Is_An_EventTarget()
     {
         const string html = """

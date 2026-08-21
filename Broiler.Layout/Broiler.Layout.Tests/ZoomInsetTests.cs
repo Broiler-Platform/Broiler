@@ -47,7 +47,7 @@ public sealed class ZoomInsetTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteInset_ScalesBy_EffectiveZoom()
     {
         var b = InsetBox("40px", "2");
@@ -60,7 +60,7 @@ public sealed class ZoomInsetTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PercentInset_ScalesBy_OwnZoom_AgainstContainingBlock()
     {
         var b = InsetBox("10%", "2");
@@ -73,7 +73,7 @@ public sealed class ZoomInsetTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteHeightFallback_ScalesBy_EffectiveZoom()
     {
         // With Size.Height still 0, §10.6.4 block-axis centring derives the box height from the explicit
@@ -92,7 +92,7 @@ public sealed class ZoomInsetTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteHeightFallback_Disabled_IsUnscaled()
     {
         var root = Box(null, new SizeF(1000, 1000), "static");
@@ -105,7 +105,7 @@ public sealed class ZoomInsetTests
         Assert.Equal(100, b.ActualMarginTop, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_LeavesInsets_Unscaled()
     {
         var b = InsetBox("40px", "2");

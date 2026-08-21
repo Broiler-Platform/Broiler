@@ -23,7 +23,7 @@ public sealed class StandardRichEditStyledRenderTests
     private static IEnumerable<BRenderCommand.FillRect> Fills(BRenderList list) =>
         list.Commands.OfType<BRenderCommand.FillRect>();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bold_Run_Is_Drawn_With_A_Bold_Font_Weight()
     {
         RichEditScene scene = WithSelectionAll("hello");
@@ -35,7 +35,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Italic_Run_Is_Drawn_With_An_Italic_Slant()
     {
         RichEditScene scene = WithSelectionAll("hello");
@@ -47,7 +47,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Foreground_Command_Colors_The_Run_Text()
     {
         RichEditScene scene = WithSelectionAll("hello");
@@ -59,7 +59,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Font_Command_Draws_Run_With_Selected_Font()
     {
         RichEditScene scene = WithSelectionAll("hello");
@@ -78,7 +78,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Caret_After_Styled_Run_Uses_The_Run_Font_Advance()
     {
         BFontStyle font = new("Consolas", 22, BFontWeight.Bold, BFontSlant.Italic);
@@ -96,7 +96,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Underline_Run_Draws_A_Thin_Rule_In_The_Text_Color()
     {
         RichEditScene scene = WithSelectionAll("hello");
@@ -110,7 +110,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Strikethrough_Run_Draws_A_Thin_Rule()
     {
         RichEditScene scene = WithSelectionAll("hello");
@@ -124,7 +124,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Background_Command_Fills_A_Highlight_Behind_The_Run()
     {
         BColor highlight = BColor.FromArgb(0xFF, 0xFF, 0xF0, 0x88);
@@ -138,7 +138,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Mixed_Styles_Split_A_Line_Into_Multiple_Draw_Runs()
     {
         RichEditScene scene = Create(new BSize(320, 160), "abcd");
@@ -155,7 +155,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Composition_Preview_Text_Is_Drawn_At_The_Caret()
     {
         RichEditScene scene = Create(new BSize(320, 160), "hi");
@@ -169,7 +169,7 @@ public sealed class StandardRichEditStyledRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Plain_Text_Still_Draws_One_Run_Per_Line()
     {
         RichEditScene scene = Create(new BSize(320, 160), "one\ntwo");

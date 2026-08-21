@@ -88,7 +88,7 @@ public sealed class PortableClassifierTests
         document.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Character_Edit_Relexes_One_Line_In_A_Large_File()
     {
         var builder = new StringBuilder();
@@ -113,7 +113,7 @@ public sealed class PortableClassifierTests
         document.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unclosable_Raw_String_Relexes_To_The_End_And_Stays_Correct()
     {
         var builder = new StringBuilder();
@@ -138,7 +138,7 @@ public sealed class PortableClassifierTests
         document.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cancellation_Is_Observed_Rather_Than_Running_To_Completion()
     {
         var builder = new StringBuilder();
@@ -156,7 +156,7 @@ public sealed class PortableClassifierTests
         document.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Keywords_Strings_And_Comments_Are_Classified_By_Neutral_Kind()
     {
         (SourceBufferDocument document, _) = Create("public int x = 1; // note\n");

@@ -31,7 +31,7 @@ public sealed class PagePaintRenderTests : IDisposable
 
     private const string Text = "text";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Background_Paints_The_Whole_Sheet()
     {
         using var rendered = RenderPrint(
@@ -43,7 +43,7 @@ public sealed class PagePaintRenderTests : IDisposable
 
     // The control: the same document without the page background renders on white, as every
     // undecorated render does. Nothing about the decorated path may leak into it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_With_No_Paint_Leaves_The_Sheet_White()
     {
         using var rendered = RenderPrint("<!DOCTYPE html><style>@page { margin: 0; }</style>" + Text);
@@ -54,7 +54,7 @@ public sealed class PagePaintRenderTests : IDisposable
     // `@page` applies to paged media and to nothing else, so a test that is not a print test never
     // paints one. `page-background-image-print` says as much in its own words: its background
     // should print and not show on screen.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Background_Does_Not_Paint_On_Screen()
     {
         using var rendered = Render(
@@ -67,7 +67,7 @@ public sealed class PagePaintRenderTests : IDisposable
     // CSS Paged Media 3 §7.2 paints the page background over the whole page box, margin area
     // included — `page-background-004-print` states a page with a 50px margin and matches a
     // reference that is solid yellow corner to corner.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Background_Covers_The_Margin_Area()
     {
         using var rendered = RenderPrint(
@@ -77,7 +77,7 @@ public sealed class PagePaintRenderTests : IDisposable
     }
 
     // The border, unlike the background, sits on the box the margins leave.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Border_Is_Drawn_Inside_The_Page_Margin()
     {
         using var rendered = RenderPrint(
@@ -90,7 +90,7 @@ public sealed class PagePaintRenderTests : IDisposable
     // A page that states a border and padding moves its page area in by them, which is how
     // `page-box-011-print` lines up with a reference that insets its content with a `body` border
     // and padding of its own.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Border_And_Padding_Inset_The_Flow()
     {
         using var withInsets = RenderPrint(
@@ -104,7 +104,7 @@ public sealed class PagePaintRenderTests : IDisposable
     // css-page-3 §5.1: `visibility` applies in the page context. `page-visibility-hidden-001-print`
     // hides a red page border and matches a reference whose border is `solid transparent` — so the
     // border keeps its space and paints nothing.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Hidden_Page_Paints_Neither_Its_Background_Nor_Its_Border()
     {
         using var rendered = RenderPrint(
@@ -118,7 +118,7 @@ public sealed class PagePaintRenderTests : IDisposable
     // A root element that generates no box generates no page, so nothing of the sheet is painted.
     // `root-element-display-none-print` states a hotpink page with a red border and matches an
     // empty document.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Display_None_Root_Leaves_The_Sheet_Blank()
     {
         using var rendered = RenderPrint(
@@ -142,7 +142,7 @@ public sealed class PagePaintRenderTests : IDisposable
     public void A_Page_Is_Decorated_Only_When_It_Paints(string css, bool decorated) =>
         Assert.Equal(decorated, Decoration("<style>" + css + "</style>") is not null);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Later_Declarations_Win_And_Land_On_The_Box_They_Belong_To()
     {
         var decoration = Decoration(
@@ -157,7 +157,7 @@ public sealed class PagePaintRenderTests : IDisposable
 
     // `border-radius` changes the shape the border draws, not the space it takes, so it comes along
     // with the border without making the page area worth measuring.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Border_Radius_Alone_Insets_Nothing()
     {
         var decoration = Decoration("<style>@page { border-radius: 4px; }</style>");
@@ -189,7 +189,7 @@ public sealed class PagePaintRenderTests : IDisposable
 
     // A percentage is taken against the page box, not the box the page's margins leave: the ring
     // above is 2 % of 800 even though the border box is only 736 tall.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Logical_Padding_Percentages_Resolve_Against_The_Whole_Page_Box()
     {
         var decoration = Decoration(
@@ -200,7 +200,7 @@ public sealed class PagePaintRenderTests : IDisposable
 
     // Physical and flow-relative padding are both longhands, so the later one wins wherever they
     // name the same side.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Logical_Padding_Cascades_With_The_Physical_Longhand()
     {
         var decoration = Decoration(

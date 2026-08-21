@@ -82,7 +82,7 @@ public class NativePositionTryWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineAppliesFallback_ToFittingPosition()
     {
         var red = Render(nativeAnchor: true);

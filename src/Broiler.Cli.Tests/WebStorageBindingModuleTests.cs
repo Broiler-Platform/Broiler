@@ -27,7 +27,7 @@ public sealed class WebStorageBindingModuleTests
     private static void SetItem(JSObject storage, string key, string value) =>
         Fn(storage, "setItem").InvokeFunction(new Arguments(storage, new JSString(key), new JSString(value)));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WebStorage_Feature_Module_Is_Internal_And_Has_No_Host_Contract()
     {
         var moduleType = typeof(WebStorageBinding);
@@ -39,7 +39,7 @@ public sealed class WebStorageBindingModuleTests
         Assert.Null(moduleType.Assembly.GetType("Broiler.HtmlBridge.Dom.Features.IWebStorageHost"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Storage_Object_Round_Trips_Through_Its_Callbacks()
     {
         var storage = WebStorageBinding.BuildStorage();
@@ -67,7 +67,7 @@ public sealed class WebStorageBindingModuleTests
         Assert.Null(GetItem(storage, "c"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Length_And_Key_Enumerate_The_Area_In_Insertion_Order()
     {
         // How a page walks an area it did not write itself: `for (i = 0; i < s.length; i++) s.key(i)`.
@@ -94,7 +94,7 @@ public sealed class WebStorageBindingModuleTests
         Assert.Equal("second", Key(0));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Directly_Assigned_Property_Is_Stored_As_An_Item()
     {
         // Storage is a legacy platform object with named property setters, so `s.foo = 1` and
@@ -112,7 +112,7 @@ public sealed class WebStorageBindingModuleTests
         Assert.Equal(0d, (storage[(KeyString)"length"] as JSNumber)?.DoubleValue);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Item_Named_Like_A_Method_Does_Not_Replace_The_Method()
     {
         // A browser survives this because its methods sit on Storage.prototype and the named
@@ -129,7 +129,7 @@ public sealed class WebStorageBindingModuleTests
         Assert.Null(GetItem(storage, "clear"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Each_Built_Area_Has_A_Store_Of_Its_Own()
     {
         // localStorage and sessionStorage are separate areas: one Build call per area.

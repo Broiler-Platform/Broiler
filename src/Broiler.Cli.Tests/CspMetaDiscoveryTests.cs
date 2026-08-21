@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CspMetaDiscoveryTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Finds_The_Directive_String_Of_A_Csp_Meta_Tag()
     {
         const string html =
@@ -20,7 +20,7 @@ public sealed class CspMetaDiscoveryTests
         Assert.Equal("script-src 'self'", CspMetaDiscovery.FindPolicyContent(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Returns_The_Raw_Unparsed_Content_Not_A_Policy_Object()
     {
         // Discovery returns the directive string verbatim; it does not evaluate or normalise it.
@@ -29,13 +29,13 @@ public sealed class CspMetaDiscoveryTests
         Assert.Equal("default-src none; script-src \"nonce-abc\"", CspMetaDiscovery.FindPolicyContent(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Returns_Null_When_No_Csp_Meta_Present()
     {
         Assert.Null(CspMetaDiscovery.FindPolicyContent("<html><head><title>x</title></head></html>"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ignores_NonCsp_Meta_Tags()
     {
         const string html =
@@ -43,7 +43,7 @@ public sealed class CspMetaDiscoveryTests
         Assert.Null(CspMetaDiscovery.FindPolicyContent(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Returns_The_First_Csp_Meta_When_Several_Are_Present()
     {
         const string html =
@@ -63,7 +63,7 @@ public sealed class CspMetaDiscoveryTests
 
     // ── Phase 7 item 2: parser-backed discovery (Broiler.Dom.Html tokenizer) ──
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ignores_A_Csp_Meta_Inside_An_Html_Comment()
     {
         // The former regex scan matched <meta> anywhere in the string, including inside a comment; the
@@ -73,7 +73,7 @@ public sealed class CspMetaDiscoveryTests
         Assert.Null(CspMetaDiscovery.FindPolicyContent(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ignores_A_Csp_Meta_Written_As_Text_Inside_A_Script_Body()
     {
         // <script> is a raw-text element: a meta literal inside it is script text, not a document meta.
@@ -82,7 +82,7 @@ public sealed class CspMetaDiscoveryTests
         Assert.Null(CspMetaDiscovery.FindPolicyContent(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Does_Not_Truncate_A_Content_Value_Containing_A_Greater_Than_Sign()
     {
         // The old <meta[^>]*> regex stopped at the first '>', truncating a policy whose value contained

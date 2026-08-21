@@ -5,7 +5,7 @@ namespace Broiler.Documents.Docx.Tests;
 
 public sealed class DocxWriterTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_A_Minimal_Docx_Package()
     {
         byte[] bytes = DocxDocumentCodec.WriteToArray(RichTextDocument.FromPlainText("hello"));
@@ -20,7 +20,7 @@ public sealed class DocxWriterTests
         Assert.Contains("wordprocessingml", documentXml);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_Hyperlink_Relationships_And_Numbering()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(new[]
@@ -41,7 +41,7 @@ public sealed class DocxWriterTests
         Assert.Contains("https://example.test", relationships);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Model_To_Docx_To_Model_RoundTrips_Supported_Subset()
     {
         RichTextDocument expected = RichTextDocument.FromParagraphs(new[]
@@ -81,7 +81,7 @@ public sealed class DocxWriterTests
         DocumentAssert.Equivalent(expected, actual);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Alpha_Color_Writes_Rgb_And_Reports_Diagnostic()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(new[]

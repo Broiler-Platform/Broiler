@@ -15,7 +15,7 @@ namespace Broiler.Wpt.Tests;
 /// </remarks>
 public sealed class XhtmlScriptCdataTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Cdata_Section_Leaves_Only_The_Script()
     {
         Assert.Equal(

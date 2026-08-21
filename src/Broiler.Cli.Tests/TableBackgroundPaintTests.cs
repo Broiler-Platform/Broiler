@@ -43,7 +43,7 @@ public class TableBackgroundPaintTests
         Assert.True(p is { R: 255, G: 255, B: 0 }, $"{what} at ({x},{y}) was {p.R},{p.G},{p.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Real_Table_Paints_Its_Own_Background()
     {
         if (!TableBackgroundPaints())
@@ -55,7 +55,7 @@ public class TableBackgroundPaintTests
         AssertYellow(bitmap, 200, 50, "table background");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Display_Table_Box_Paints_Its_Own_Background()
     {
         if (!TableBackgroundPaints())
@@ -67,7 +67,7 @@ public class TableBackgroundPaintTests
         AssertYellow(bitmap, 200, 50, "display:table background");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Table_With_A_Table_Cell_Child_Paints_Its_Own_Background()
     {
         if (!TableBackgroundPaints())
@@ -80,7 +80,7 @@ public class TableBackgroundPaintTests
         AssertYellow(bitmap, 200, 50, "table background behind a cell");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Table_Paints_Its_Own_Border()
     {
         if (!TableBackgroundPaints())
@@ -97,7 +97,7 @@ public class TableBackgroundPaintTests
     // The cells' own backgrounds are layers 5–6 and must still paint exactly once. An opaque cell
     // background cannot show double-painting, so this uses a semi-transparent one: painted twice it
     // composites to a darker colour than painted once.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Cell_Background_Paints_Exactly_Once()
     {
         using var bitmap = Render(

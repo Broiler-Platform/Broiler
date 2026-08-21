@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class MutationObserverBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MutationObserver_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(MutationObserverBinding);
@@ -24,7 +24,7 @@ public sealed class MutationObserverBindingModuleTests
         Assert.False(typeof(IMutationObserverHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_MutationObserver_Through_The_Host_Contract()
     {
         Assert.True(typeof(IMutationObserverHost).IsAssignableFrom(typeof(DomBridge)));
@@ -33,7 +33,7 @@ public sealed class MutationObserverBindingModuleTests
             static field => field.FieldType == typeof(MutationObserverBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Observer_Registry_Is_Owned_By_The_Module_Not_The_Bridge()
     {
         // The MutationObserverHub state authority is now owned by the feature module, not the bridge.
@@ -47,7 +47,7 @@ public sealed class MutationObserverBindingModuleTests
             field => field.FieldType == hubType);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildList_Mutations_Are_Delivered_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -75,7 +75,7 @@ document.body.appendChild(out);
         Assert.Contains("log=childList:1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attribute_Mutations_With_OldValue_Are_Delivered_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -103,7 +103,7 @@ document.body.appendChild(out);
         Assert.Contains("log=attributes:data-x:one", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disconnect_Stops_Delivery_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

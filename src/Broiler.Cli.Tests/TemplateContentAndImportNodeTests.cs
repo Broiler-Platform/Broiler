@@ -35,14 +35,14 @@ public sealed class TemplateContentAndImportNodeTests
         "<template id=\"t\"><style>li{color:red}</style><li class=\"item\">One</li></template>" +
         "<div id=\"host\"></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Content_Exposes_The_Template_Children_As_A_Fragment()
     {
         Assert.Equal("2", Eval(TemplateDoc, "document.getElementById('t').content.childNodes.length"));
         Assert.Equal("object", Eval(TemplateDoc, "typeof document.getElementById('t').content"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Content_Returns_The_Same_Fragment_Every_Time()
     {
         // A component may populate `content` before stamping it, so the fragment has to be stable
@@ -51,7 +51,7 @@ public sealed class TemplateContentAndImportNodeTests
             "var t = document.getElementById('t'); t.content === t.content"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Content_Is_A_Snapshot_Not_A_Live_View()
     {
         // Pins the documented deviation rather than the spec: the fragment is a copy, so the
@@ -59,14 +59,14 @@ public sealed class TemplateContentAndImportNodeTests
         Assert.Equal("2", Eval(TemplateDoc, "document.getElementById('t').childNodes.length"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportNode_Deep_Copies_The_Whole_Subtree()
     {
         Assert.Equal("2", Eval(TemplateDoc,
             "document.importNode(document.getElementById('t').content, true).childNodes.length"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportNode_Without_Deep_Copies_The_Node_Alone()
     {
         // `deep` defaults to false, so a bare importNode() takes the node without its children.
@@ -74,14 +74,14 @@ public sealed class TemplateContentAndImportNodeTests
             "document.importNode(document.getElementById('t').content).childNodes.length"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportNode_Yields_A_Copy_Not_The_Original()
     {
         Assert.Equal("false", Eval(TemplateDoc,
             "var c = document.getElementById('t').content; document.importNode(c, true) === c"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Stamping_Idiom_Populates_A_Shadow_Root()
     {
         // The whole point: what every component in WPT's shadow-dom tests does.
@@ -91,7 +91,7 @@ public sealed class TemplateContentAndImportNodeTests
             "r.childNodes.length"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Stamped_Copy_Keeps_Its_Classes_So_Selectors_Still_Match()
     {
         Assert.Equal("item", Eval(TemplateDoc,

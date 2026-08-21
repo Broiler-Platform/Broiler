@@ -133,7 +133,7 @@ public class RasterBandParallelismTests
     /// Guards the guard: every case above must actually reach the partitioner's split path, or the
     /// equality assertions are comparing the sequential rasterizer with itself.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Band_Parallelism_Actually_Splits_These_Fills()
     {
         foreach ((string name, Action<BCanvas> operation) in Operations)
@@ -164,7 +164,7 @@ public class RasterBandParallelismTests
     /// A thread budget of one is the sequential rasterizer, not an approximation of it: no fill is
     /// split however large it is.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Budget_Of_One_Splits_Nothing()
     {
         var previous = BRasterParallelism.MaxDegreeOfParallelism;

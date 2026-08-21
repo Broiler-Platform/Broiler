@@ -28,25 +28,25 @@ public sealed class LineBreakWordSplittingTests
         return box.Words.Select(w => w.Text).ToArray();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Normal_Keeps_Runs_As_Single_Words()
     {
         Assert.Equal(new[] { "XXXX" }, SplitToWords("XXXX"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LineBreak_Anywhere_Splits_Every_Character()
     {
         Assert.Equal(new[] { "X", "X", "X", "X" }, SplitToWords("XXXX", lineBreak: "anywhere"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WordBreak_BreakAll_Splits_Every_Character()
     {
         Assert.Equal(new[] { "X", "X", "X", "X" }, SplitToWords("XXXX", wordBreak: "break-all"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LineBreak_Anywhere_Decodes_Multichar_Entity_As_One_Unit()
     {
         // U+FEFF (WORD JOINER / ZWNBSP) written as a numeric character reference.
@@ -56,7 +56,7 @@ public sealed class LineBreakWordSplittingTests
             SplitToWords("XX&#xFEFF;XX", lineBreak: "anywhere"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LineBreak_Anywhere_Keeps_Surrogate_Pairs_Intact()
     {
         // U+1F600 GRINNING FACE is one typographic unit spanning two UTF-16 units.

@@ -10,7 +10,7 @@ public class DomEventsEdgeCaseTests
 {
     // ──────────────────── 5.1 Event handler attribute reflection ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnClick_Getter_Returns_Function_From_HTML_Attribute()
     {
         // element.onclick must return a function (not a string) when set via HTML attribute
@@ -30,7 +30,7 @@ document.getElementById('result').textContent = r;
         Assert.Contains("function", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnClick_Null_Removes_Handler()
     {
         // Setting element.onclick = null must remove the handler
@@ -54,7 +54,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("null|doStuff()", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetAttribute_Returns_Source_String_SetAttribute_Compiles()
     {
         // setAttribute('onclick', code) should compile the code AND store the string
@@ -83,7 +83,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────── 5.2 Document-level event bubbling ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_AddEventListener_Receives_Bubbled_Events()
     {
         // Events must bubble from element → body → html → document
@@ -119,7 +119,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("target,body,html,doc", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Capture_Phase_Fires_Before_Target()
     {
         // document.addEventListener with capture=true should fire first (capture phase)
@@ -152,7 +152,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("doc-capture,target,doc-bubble", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddEventListener_OptionsObject_Capture_And_Remove_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -180,7 +180,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.DoesNotContain(">capture<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddEventListener_ListenerObject_HandleEvent_Is_Invoked()
     {
         var html = @"<!DOCTYPE html>
@@ -208,7 +208,7 @@ target.dispatchEvent(evt);
         Assert.Contains(">test,1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveEventListener_ListenerObject_Prevents_Future_Calls()
     {
         var html = @"<!DOCTYPE html>
@@ -235,7 +235,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">0<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddEventListener_Once_Option_Fires_Only_Once()
     {
         var html = @"<!DOCTYPE html>
@@ -259,7 +259,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Passive_Listener_PreventDefault_Does_Not_Cancel_Event()
     {
         var html = @"<!DOCTYPE html>
@@ -283,7 +283,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddEventListener_Duplicate_Registration_Is_Ignored_For_Element_Document_And_Window()
     {
         var html = @"<!DOCTYPE html>
@@ -320,7 +320,7 @@ document.getElementById('result').textContent = [elementCount, documentCount, wi
         Assert.Contains(">1,1,1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Focus_And_Blur_Do_Not_Bubble()
     {
         var html = @"<!DOCTYPE html>
@@ -346,7 +346,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">child-focus,child-blur<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Event_ComposedPath_Includes_Target_Ancestors_Document_And_Window()
     {
         var html = @"<!DOCTYPE html>
@@ -377,7 +377,7 @@ child.dispatchEvent(evt);
         Assert.Contains("6|child&gt;parent&gt;body&gt;html&gt;#document", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputEvent_Constructor_Sets_Input_Specific_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -404,7 +404,7 @@ document.getElementById('result').textContent =
         Assert.Contains(">input|x|insertText|true|true|true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_CreateEvent_InputEvent_InitInputEvent_Sets_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -426,7 +426,7 @@ document.getElementById('result').textContent =
         Assert.Contains(">input|y|deleteContentBackward|false|true|false<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_AddEventListener_Once_Option_Fires_Only_Once()
     {
         var html = @"<!DOCTYPE html>
@@ -448,7 +448,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_AddEventListener_ListenerObject_HandleEvent_Is_Invoked()
     {
         var html = @"<!DOCTYPE html>
@@ -474,7 +474,7 @@ window.dispatchEvent(evt);
         Assert.Contains(">test,1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_StopImmediatePropagation_Prevents_Later_Listeners()
     {
         var html = @"<!DOCTYPE html>
@@ -502,7 +502,7 @@ document.getElementById('result').textContent = order.join(',');
         Assert.DoesNotContain("first,second", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_StopPropagation_Does_Not_Prevent_Later_Listeners_On_Same_Target()
     {
         var html = @"<!DOCTYPE html>
@@ -529,7 +529,7 @@ document.getElementById('result').textContent = order.join(',');
         Assert.Contains(">first,second<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_DispatchEvent_Preserves_Prevented_State_And_ReturnValue()
     {
         var html = @"<!DOCTYPE html>
@@ -553,7 +553,7 @@ document.getElementById('result').textContent = [
         Assert.Contains(">false,true,false<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DispatchEvent_Resets_CurrentTarget_And_EventPhase_After_Dispatch()
     {
         var html = @"<!DOCTYPE html>
@@ -586,7 +586,7 @@ document.getElementById('result').textContent = [
 
     // ──────────────────── 5.3 Event dispatch on text nodes ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextNode_DispatchEvent_Bubbles_To_Document()
     {
         // textNode.dispatchEvent must work and events must bubble to document
@@ -619,7 +619,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────── 5.4 DOM tree GC survival ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Detached_Node_Reattach_Preserves_Identity()
     {
         // JS-held references to removed nodes must keep them alive and re-attachable
@@ -649,7 +649,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────── 5.5 Nested event dispatch ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nested_DispatchEvent_Inside_Handler_Works()
     {
         // Dispatching an event inside an event handler must work correctly
@@ -686,7 +686,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────── Acid3 Bucket 2 regression tests (17–32 gaps) ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test20_Null_Bytes_In_Element_Names_Attributes_And_Text()
     {
         // Null bytes (\0) in attribute values and text content must not crash the DOM
@@ -722,7 +722,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("dom-ok", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test24_SetAttribute_OnClick_Compiles_And_Fires()
     {
         // setAttribute('onclick', code) must compile the code as a function and fire on dispatch
@@ -751,7 +751,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("fired:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test26_Document_Tree_Lifecycle_Cross_Document_Move()
     {
         // Moving nodes between documents: create in one doc, append in another
@@ -782,7 +782,7 @@ r.push('O' + (div.ownerDocument === document ? '1' : '0'));
         Assert.Contains("D1,O1,P1,N1,Tcontent,Imoved", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test27_Cross_Document_Subtree_Preserves_Structure()
     {
         // Moving a subtree cross-document preserves children, attributes, and text
@@ -818,7 +818,7 @@ parent.appendChild(child);
         Assert.Contains("Awrapper,C1,Tspan,V42,Xkept,N1,M1,P1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test29_CloneNode_Deep_Preserves_Whitespace_Text_Nodes()
     {
         // cloneNode(true) must preserve whitespace text nodes between elements
@@ -858,7 +858,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("3,ws-yes,span,span", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test31_StopPropagation_During_Capture_Prevents_Target_And_Bubble()
     {
         // stopPropagation() in capture phase must prevent target and bubble phases
@@ -896,7 +896,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">C1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test32_Event_Bubbles_Full_Chain_Target_Parent_Body_Html_Document()
     {
         // Events must bubble through the full chain with order tracking
@@ -936,7 +936,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("target:2,parent:3,body:3,html:3,doc:3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Multiple_Capture_Listeners_Same_Element_Fire_In_Registration_Order()
     {
         // Multiple addEventListener calls with capture=true on the same element fire in order
@@ -973,7 +973,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("cap-1,cap-2,cap-3,target", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Target_Phase_Capture_Listeners_Fire_Before_Bubble_Listeners_Even_When_Registered_Later()
     {
         var html = @"<!DOCTYPE html>

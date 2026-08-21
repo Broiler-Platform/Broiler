@@ -31,7 +31,7 @@ public sealed class GridRtlTests
         Assert.Equal(w, got.w, 1); Assert.Equal(h, got.h, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InFlow_ColumnsMirrorRightToLeft()
     {
         // 400-wide grid, cols 100/200. RTL: column 1 on the right, column 2 to its left.
@@ -50,7 +50,7 @@ public sealed class GridRtlTests
         Expect(r["div#s"], 100, 0, 300, 50);    // span 1/3 covers both, full width
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Abspos_MirrorsAroundPaddingBox()
     {
         // WPT css-grid/abspos/grid-positioned-items-within-grid-implicit-track-001,

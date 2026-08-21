@@ -20,7 +20,7 @@ public sealed class StandardRichEditEditingTests
     private static void Caret(RichEditScene scene, int paragraph, int offset) =>
         scene.Edit.Selection = RichTextRange.Caret(new RichTextPosition(paragraph, offset));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typing_Committed_Text_Inserts_At_The_Caret()
     {
         RichEditScene scene = Focused("ac");
@@ -33,7 +33,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typing_Replaces_The_Active_Selection()
     {
         RichEditScene scene = Focused("hello");
@@ -45,7 +45,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Platform_Text_Editor_Contract_Queries_Selects_And_Deletes()
     {
         RichEditScene scene = Focused("abcdef");
@@ -72,7 +72,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Control_Characters_In_Committed_Text_Are_Dropped()
     {
         RichEditScene scene = Focused();
@@ -83,7 +83,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_Deletes_The_Character_Before_The_Caret()
     {
         RichEditScene scene = Focused("abc");
@@ -95,7 +95,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Delete_Removes_The_Character_After_The_Caret()
     {
         RichEditScene scene = Focused("abc");
@@ -107,7 +107,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_At_A_Paragraph_Start_Merges_With_The_Previous_Paragraph()
     {
         RichEditScene scene = Focused("a\nb");
@@ -120,7 +120,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Enter_Splits_The_Paragraph_At_The_Caret()
     {
         RichEditScene scene = Focused("ab");
@@ -133,7 +133,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Enter_Submits_When_AcceptsReturn_Is_False()
     {
         RichEditScene scene = Focused("ab");
@@ -149,7 +149,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shift_Enter_Inserts_A_Soft_Line_Break_Within_The_Paragraph()
     {
         RichEditScene scene = Focused("ab");
@@ -162,7 +162,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ctrl_Z_Undoes_And_Ctrl_Y_Redoes_A_Typed_Edit()
     {
         RichEditScene scene = Focused("a");
@@ -178,7 +178,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ctrl_C_Copies_The_Selection_To_The_Clipboard()
     {
         RichEditScene scene = Focused("hello world");
@@ -191,7 +191,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ctrl_X_Cuts_The_Selection()
     {
         RichEditScene scene = Focused("hello world");
@@ -204,7 +204,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ctrl_V_Pastes_Clipboard_Text_At_The_Caret()
     {
         RichEditScene scene = Focused("ac");
@@ -217,7 +217,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ctrl_B_With_No_Selection_Arms_A_Pending_Bold_Style()
     {
         RichEditScene scene = Focused("hi");
@@ -233,7 +233,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ctrl_B_Toggles_Bold_On_The_Selection()
     {
         RichEditScene scene = Focused("hello");
@@ -245,7 +245,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Read_Only_Blocks_Typing_And_Deletion()
     {
         RichEditScene scene = Focused("abc");
@@ -259,7 +259,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ime_Composition_Previews_Without_Committing_Then_Commits()
     {
         RichEditScene scene = Focused();
@@ -275,7 +275,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cancelled_Composition_Clears_The_Preview_Without_Editing()
     {
         RichEditScene scene = Focused("x");
@@ -289,7 +289,7 @@ public sealed class StandardRichEditEditingTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Editing_Raises_Document_And_Command_Events()
     {
         RichEditScene scene = Focused("a");

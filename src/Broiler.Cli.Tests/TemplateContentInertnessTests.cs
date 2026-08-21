@@ -50,7 +50,7 @@ public class TemplateContentInertnessTests
             $"{what} at ({x},{y}) was {actual.R},{actual.G},{actual.B}, expected {r},{g},{b}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Style_Inside_A_Template_Does_Not_Join_The_Document_Cascade()
     {
         if (!TemplateStylesAreInert())
@@ -70,7 +70,7 @@ public class TemplateContentInertnessTests
         AssertPixel(bitmap, 50, 50, 0, 128, 0, "the probe, which the template rule must not repaint");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Template_Style_Stays_Inert_However_Deeply_It_Is_Nested()
     {
         if (!TemplateStylesAreInert())
@@ -88,7 +88,7 @@ public class TemplateContentInertnessTests
         AssertPixel(bitmap, 50, 50, 0, 128, 0, "the probe, past a nested template style");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Style_Outside_Every_Template_Still_Applies()
     {
         // The negative half: skipping template subtrees must not skip the sheet next to one.
@@ -104,7 +104,7 @@ public class TemplateContentInertnessTests
         AssertPixel(bitmap, 50, 50, 0, 0, 255, "the document stylesheet that follows a template");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Template_Contents_Do_Not_Render()
     {
         const string html = """

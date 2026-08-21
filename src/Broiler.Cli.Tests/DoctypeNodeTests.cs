@@ -23,7 +23,7 @@ public sealed class DoctypeNodeTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Parsed_Doctype_Reports_DocumentType_Node()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body>x</body></html>", out var context);
@@ -38,7 +38,7 @@ public sealed class DoctypeNodeTests
         Assert.Equal("10|html|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocumentType_Carries_Name_PublicId_SystemId()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -53,7 +53,7 @@ public sealed class DoctypeNodeTests
         Assert.Equal("10|html|html|pubX|sysY|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateHtmlDocument_Has_Html_Doctype()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -70,7 +70,7 @@ public sealed class DoctypeNodeTests
         Assert.Equal("10|html", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Doctype_CloneNode_Preserves_DocumentType_Fields()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -86,7 +86,7 @@ public sealed class DoctypeNodeTests
         Assert.Equal("10|svg|p1|s1|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialized_Document_Starts_With_Doctype()
     {
         using var bridge = Attach("<!DOCTYPE html><html><head></head><body>hi</body></html>", out _);
@@ -107,7 +107,7 @@ public sealed class DoctypeNodeTests
     /// consumer of the render path at once. No quirk could fire on the WPT path at all, whose
     /// entire <c>quirks/</c> directory is doctype-less by construction.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_With_No_Doctype_Serializes_Without_One()
     {
         using var bridge = Attach("<html><head></head><body>hi</body></html>", out _);
@@ -123,7 +123,7 @@ public sealed class DoctypeNodeTests
     /// selects standards mode through the bare emitted form exactly as it did through the original.
     /// Its public and system identifiers were already dropped here and still are.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Doctype_With_Identifiers_Still_Selects_Standards_Mode()
     {
         using var bridge = Attach(
@@ -141,7 +141,7 @@ public sealed class DoctypeNodeTests
     /// doctype at all is what preserves the mode — the bare <c>&lt;!DOCTYPE html&gt;</c> this
     /// serializer can emit would have flipped it to standards.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Non_Html_Doctype_Round_Trips_As_Quirks_Mode()
     {
         using var bridge = Attach("<!DOCTYPE foo><html><body>hi</body></html>", out _);

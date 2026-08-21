@@ -46,7 +46,7 @@ public sealed class NativeStickyBridgeModeTests
         return html.Substring(open, close - open + 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MvpStickyBox_IsNeverBakedToRelative()
     {
         // The bridge leaves position:sticky un-baked (no inline position:relative override) so the
@@ -80,7 +80,7 @@ public sealed class NativeStickyBridgeModeTests
         return bridge.SerializeToHtml();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnAnchorPage_StickyBox_IsNeverBakedToRelative()
     {
         // The sticky handoff is no longer scoped away from anchor pages: the box stays un-baked

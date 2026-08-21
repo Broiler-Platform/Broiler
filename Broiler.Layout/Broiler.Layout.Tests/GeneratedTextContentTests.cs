@@ -31,7 +31,7 @@ public sealed class GeneratedTextContentTests
     private static string[] WordsOfGeneratedChild(CssBox box) =>
         box.Boxes.Single(child => child.HtmlTag == null).Words.Select(word => word.Text).ToArray();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetGeneratedTextContent_Produces_Words()
     {
         CssBox box = CreateControlBox();
@@ -41,7 +41,7 @@ public sealed class GeneratedTextContentTests
         Assert.Equal(["hello", "world"], WordsOfGeneratedChild(box));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetGeneratedTextContent_Replaces_Previous_Words()
     {
         CssBox box = CreateControlBox();
@@ -53,7 +53,7 @@ public sealed class GeneratedTextContentTests
         Assert.Single(box.Boxes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetGeneratedTextContent_Clears_Words_For_Empty_Content()
     {
         CssBox box = CreateControlBox();

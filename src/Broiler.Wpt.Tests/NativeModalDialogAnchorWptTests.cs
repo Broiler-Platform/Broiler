@@ -74,7 +74,7 @@ public class NativeModalDialogAnchorWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_PlacesModalDialogAtScrolledAnchor()
     {
         var green = Render(native: true);

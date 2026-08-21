@@ -146,7 +146,7 @@ public sealed class CanvasBackgroundContainmentTests
     /// for <c>display: inline; contain: layout</c> and Broiler cannot tell that
     /// case apart. Recorded here as the known divergence, not asserted.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnInlineBodyStillPropagatesItsBackground()
     {
         var canvas = CanvasPixel(string.Empty, "display: inline");
@@ -160,7 +160,7 @@ public sealed class CanvasBackgroundContainmentTests
     /// back. <c>contain: layout</c> held on the pinned engine too (it only looked
     /// for <c>paint</c>), so this case runs unconditionally.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LayoutContainmentOnHtml_DoesNotSuppressHtmlsOwnBackground()
     {
         var canvas = CanvasPixel("background: #008000; contain: layout", "background: transparent");
@@ -172,7 +172,7 @@ public sealed class CanvasBackgroundContainmentTests
     /// The same for paint containment, which the pinned engine did suppress —
     /// so this one needs the patch and feature-probes for it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PaintContainmentOnHtml_DoesNotSuppressHtmlsOwnBackground()
     {
         if (!ContainmentSuppressesPropagation())
@@ -188,7 +188,7 @@ public sealed class CanvasBackgroundContainmentTests
     /// background to propagate whatever containment says (CSS Backgrounds
     /// §2.11.2). Holds on both engines.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisplayNoneBody_HasNoBackgroundToPropagate()
     {
         var canvas = CanvasPixel(string.Empty, "display: none");

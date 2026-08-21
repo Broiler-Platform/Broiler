@@ -29,7 +29,7 @@ public class PageLoaderLifetimeTests
             });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Dispose_LeavesACallerOwnedClientUsable()
     {
         using HttpClient client = new(new StubHandler());
@@ -46,7 +46,7 @@ public class PageLoaderLifetimeTests
         Assert.Contains("ok", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Dispose_DisposesAClientItWasGivenOwnershipOf()
     {
         HttpClient client = new(new StubHandler());
@@ -59,7 +59,7 @@ public class PageLoaderLifetimeTests
             () => client.GetStringAsync("https://example.com/second"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Constructor_RejectsAMissingClient() =>
         Assert.Throws<ArgumentNullException>(() => new PageLoader(null!));
 }

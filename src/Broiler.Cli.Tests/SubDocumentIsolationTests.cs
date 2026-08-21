@@ -32,7 +32,7 @@ public sealed class SubDocumentIsolationTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Materialized_SubDocument_Is_Not_A_SubdocRoot_Child_In_The_Serialized_Tree()
     {
         using var bridge = AttachFrameHost(out var context);
@@ -54,7 +54,7 @@ public sealed class SubDocumentIsolationTests
         Assert.DoesNotContain("subdoc", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentDocument_Still_Exposes_The_SubDocument_Dom()
     {
         using var bridge = AttachFrameHost(out var context);
@@ -73,7 +73,7 @@ public sealed class SubDocumentIsolationTests
         Assert.Equal("9|hi|body", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Subframe_Element_Geometry_Composes_Into_The_Main_Frame_After_Sever()
     {
         using var bridge = AttachFrameHost(out var context);
@@ -93,7 +93,7 @@ public sealed class SubDocumentIsolationTests
         Assert.Equal("130,340,50,50", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SrcDoc_Serialization_RoundTrips_Through_The_Map()
     {
         using var bridge = AttachFrameHost(out var context);
@@ -115,7 +115,7 @@ public sealed class SubDocumentIsolationTests
         Assert.Contains("mutated", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reassigning_SrcDoc_Rebuilds_The_Content_Document()
     {
         using var bridge = AttachFrameHost(out var context);

@@ -4,7 +4,7 @@ namespace Broiler.Documents.FormatCodes.Tests;
 
 public sealed class FormatCodeEditIntentTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Projected_Codes_Carry_Typed_Removal_Semantics()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(
@@ -34,7 +34,7 @@ public sealed class FormatCodeEditIntentTests
         Assert.Equal(expected, FormatCodeEditValidator.Validate(document, intent).IsValid);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Invalid_Metrics_And_Document_Limits_Are_Rejected()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("x");
@@ -50,7 +50,7 @@ public sealed class FormatCodeEditIntentTests
             document, text, new FormatCodeEditLimits { MaxInsertedCharacters = 2 }).ErrorCode);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Insert_Palette_Produces_Typed_Color_And_Structure_Intents()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("x");

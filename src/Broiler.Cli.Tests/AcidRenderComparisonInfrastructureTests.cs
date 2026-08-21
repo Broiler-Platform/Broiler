@@ -5,7 +5,7 @@ public class AcidRenderComparisonInfrastructureTests
     private static string RepoRoot => Path.GetFullPath(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid1_Comparison_Pipeline_Files_Exist()
     {
         Assert.True(File.Exists(Path.Combine(RepoRoot, "scripts", "acid1-compare.py")));
@@ -13,7 +13,7 @@ public class AcidRenderComparisonInfrastructureTests
         Assert.True(File.Exists(Path.Combine(RepoRoot, "acid", "acid1", "acid1.html")));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Playwright_Capture_Uses_Viewport_Screenshot()
     {
         var scriptPath = Path.Combine(RepoRoot, "scripts", "acid3-pixel-test.sh");
@@ -24,7 +24,7 @@ public class AcidRenderComparisonInfrastructureTests
         Assert.DoesNotContain("fullPage: true", script);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid_Umbrella_Roadmap_Covers_All_Three_Tests()
     {
         var roadmapPath = Path.Combine(RepoRoot, "docs", "roadmap", "acid-test-triage.md");

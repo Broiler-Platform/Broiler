@@ -105,7 +105,7 @@ public class WptTestRunnerTests : IDisposable
         bitmap.Save(path);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_Finds_Html_Files_Recursively()
     {
         // Arrange — create a nested directory structure with mixed file types.
@@ -131,7 +131,7 @@ public class WptTestRunnerTests : IDisposable
             t.EndsWith(".xhtml", StringComparison.OrdinalIgnoreCase)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_Excludes_NonTest_Files()
     {
         // Arrange — create actual test files mixed with non-test WPT artefacts.
@@ -175,14 +175,14 @@ public class WptTestRunnerTests : IDisposable
         Assert.Contains(tests, t => t.EndsWith("root-element-opacity.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_Returns_Empty_For_Empty_Directory()
     {
         var tests = WptTestRunner.DiscoverTests(_tempDir).ToList();
         Assert.Empty(tests);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_NonJs_Mode_Excludes_JavaScript_Dependent_Documents()
     {
         File.WriteAllText(Path.Combine(_tempDir, "visual.html"), "<html><p>visual</p></html>");
@@ -218,7 +218,7 @@ public class WptTestRunnerTests : IDisposable
         Assert.False(WptTestRunner.IsWptVariantTest("<meta name=\"assert\" content=\"visual\">"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Skips_WptVariant_Before_Reference_And_Script_Work()
     {
         var testFile = Path.Combine(_tempDir, "variant.html");
@@ -240,7 +240,7 @@ public class WptTestRunnerTests : IDisposable
         Assert.Equal("Variant assertions are expanded by the WPT server.", result.Assertion);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Returns_Skipped_When_No_Reference_Image()
     {
         // Arrange
@@ -260,7 +260,7 @@ public class WptTestRunnerTests : IDisposable
         Assert.Contains("No reference image", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Returns_Failure_For_Missing_Test_File()
     {
         var runner = new WptTestRunner();
@@ -274,7 +274,7 @@ public class WptTestRunnerTests : IDisposable
         Assert.Contains("not found", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Renders_Simple_Html_Without_Crash()
     {
         // Arrange
@@ -296,7 +296,7 @@ public class WptTestRunnerTests : IDisposable
         Assert.True(result.Skipped);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Executes_Inline_Script_Before_Render()
     {
         // Arrange — create a test with a script that modifies the DOM.
@@ -356,7 +356,7 @@ document.getElementById('out').appendChild(p);
             $"{namePrefix} should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_MaxTwentyArguments_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -393,7 +393,7 @@ document.getElementById('out').appendChild(p);
             $"max() with 20 arguments should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssVariables_BackgroundShorthands_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -461,7 +461,7 @@ document.getElementById('out').appendChild(p);
             $"css-variables background shorthand should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssVariables_InheritedPaintValues_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -534,7 +534,7 @@ document.getElementById('out').appendChild(p);
             $"Inherited var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssVariables_LogicalBorderPaintValues_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -599,7 +599,7 @@ document.getElementById('out').appendChild(p);
             $"Logical border var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssVariables_TextDecorationPaintValues_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -657,7 +657,7 @@ document.getElementById('out').appendChild(p);
             $"Text decoration var() paint values should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssVariables_MissingClosingNestedFallback_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -703,7 +703,7 @@ document.getElementById('out').appendChild(p);
             $"Malformed nested var() fallbacks should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssVariables_WideKeywords_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -794,7 +794,7 @@ document.getElementById('out').appendChild(p);
             $"css-variables wide keywords should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SvgPresentationColors_RgbAndRgba_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -832,7 +832,7 @@ document.getElementById('out').appendChild(p);
             $"SVG rgb()/rgba() presentation colors should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_WritingModes_RangeInput_ZeroInlineSize_Horizontal_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -879,7 +879,7 @@ document.getElementById('out').appendChild(p);
             $"Horizontal range input inline-size:0 should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_WritingModes_ButtonNativeComputedStyle_MultilineSizing_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -946,7 +946,7 @@ document.getElementById('result').setAttribute('style', 'width:40px;height:40px;
             $"Button native computed-style multiline sizing should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_WritingModes_SelectSizeScrollingAndSizing_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1260,7 +1260,7 @@ input {
             $"meter fallback appearance should match reference for {writingMode}/{direction}. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_DeeplyNestedCalcParentheses_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1297,7 +1297,7 @@ input {
             $"deeply nested calc parentheses should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomBasic_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1348,7 +1348,7 @@ input {
         finally { WptTestRunner.NativeZoom = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomBasic_EngineRender_MatchesReference()
     {
         // Absolute lengths: zoom:2 on a 40px box renders 80px.
@@ -1366,7 +1366,7 @@ input {
         Assert.True(result.Passed, $"engine render (absolute zoom) should match reference. Match={result.MatchPercent:F1}% {result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomPercentage_EngineRender_MatchesReference()
     {
         // Percentage under zoom: zoom:2; width:50% of a 200px CB → 100px content → renders 200px wide.
@@ -1379,7 +1379,7 @@ input {
         Assert.True(result.Passed, $"engine render (percentage zoom) should match reference. Match={result.MatchPercent:F1}% {result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomEm_EngineRender_MatchesReference()
     {
         // em under zoom: zoom:2; width:3em/height:2em at font-size:10px → 30x20 content → renders 60x40.
@@ -1391,7 +1391,7 @@ input {
         Assert.True(result.Passed, $"engine render (em zoom) should match reference. Match={result.MatchPercent:F1}% {result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomInherited_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1430,7 +1430,7 @@ input {
             $"zoom inheritance should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomExplicitInheritedBorderRadius_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1462,7 +1462,7 @@ input {
         Assert.Contains("class=\"zoomed\" style=\"width: 200px; height: 200px; border-top-width: 10px; border-right-width: 10px; border-bottom-width: 10px; border-left-width: 10px; border-radius: 40px\"", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomExplicitInheritedOutline_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1497,7 +1497,7 @@ input {
         Assert.Contains("class=\"zoomed\" style=\"width: 100px; height: 100px; margin-top: 100px; margin-right: 100px; margin-bottom: 100px; margin-left: 100px; outline-width: 20px; outline-offset: 10px\"", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomExplicitInheritedColumns_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1544,7 +1544,7 @@ input {
         Assert.Contains("class=\"zoomed\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollInsetSerialization_Scales_Explicit_And_Inherited_Values()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1595,7 +1595,7 @@ input {
         Assert.Contains("class=\"zoomed-margin-explicit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_IframeSrcDocSerialization_Preserves_Subdocument_ScrollMutations()
     {
         const string html = """
@@ -1622,7 +1622,7 @@ input {
         Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_TimeoutTrack_TableHarness_BodyOnloadProperty_Fires_On_WindowLoad()
     {
         const string html = """
@@ -1648,7 +1648,7 @@ input {
         Assert.Equal("ready", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ClientAndScrollMetricsIncludePadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1714,7 +1714,7 @@ input {
             $"client/scroll metrics should include padding without negative-margin overflow. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollMetricsIncludeChildZoomOverflow_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1783,7 +1783,7 @@ input {
             $"scroll metrics should include child zoom overflow in raw CSS pixels. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ZoomGeometryApis_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1874,7 +1874,7 @@ input {
             $"zoom geometry APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ZoomScrollAndOffsetApis_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -1988,7 +1988,7 @@ input {
             $"zoom scroll and offset APIs should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_OffsetTopLeft_BorderBoxPaddingEdge_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2059,7 +2059,7 @@ input {
             $"offsetTop/offsetLeft should resolve against the offset parent padding edge. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_ViewportMediaQueryLengths_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2091,7 +2091,7 @@ input {
             $"viewport media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_ViewportMinMaxMediaQueryLengths_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2123,7 +2123,7 @@ input {
             $"viewport min/max media-query lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_CalcMediaQueryNegativeLengthsClampToZero_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2155,7 +2155,7 @@ input {
             $"negative calc media-query lengths should clamp to zero. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_InvalidUnitlessZeroInMathFunction_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2193,7 +2193,7 @@ input {
             $"unitless zero should invalidate min/max length declarations. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_ViewportCalcLengthsWithPixels_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2228,7 +2228,7 @@ input {
             $"viewport calc lengths with pixel offsets should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_VhInherit_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2265,7 +2265,7 @@ input {
             $"viewport-length inherit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_VhEmInherit_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2300,7 +2300,7 @@ input {
             $"viewport-sized font-relative lengths should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_VhInterpolateVh_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2335,7 +2335,7 @@ input {
             $"viewport-length animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_VhInterpolatePct_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2370,7 +2370,7 @@ input {
             $"mixed percentage and viewport animation interpolation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollPadding_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2462,7 +2462,7 @@ input {
             $"zoom scroll-padding should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollMargin_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2560,7 +2560,7 @@ input {
             $"zoom scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollMargin_ZoomedTargetCases_MatchReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -2672,7 +2672,7 @@ input {
             $"zoomed target scroll-margin should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomSvg_MatchesReference()
     {
         var testHtml = @"<!doctype html>
@@ -2769,7 +2769,7 @@ input {
             $"zoom svg should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomSvg_FontRelativeUnits_MatchReference()
     {
         var testHtml = @"<!doctype html>
@@ -2852,7 +2852,7 @@ input {
             $"zoom svg font-relative units should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_PseudoImage_MatchesReference()
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
@@ -2909,7 +2909,7 @@ input {
             $"pseudo-image should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomPseudoImage_MatchesReference()
     {
         var greenImagePath = Path.Combine(_tempDir, "images", "green.png");
@@ -2982,7 +2982,7 @@ input {
             $"zoom pseudo-image should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollIntoViewAbsolutePosition_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3090,7 +3090,7 @@ input {
             $"zoom scrollIntoView absolute positioning should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollIntoViewPercentageAbsolutePosition_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3198,7 +3198,7 @@ input {
             $"zoom scrollIntoView percentage absolute positioning should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomScrollIntoViewAlignmentOptions_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3298,7 +3298,7 @@ input {
             $"zoom scrollIntoView alignment options should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_DefaultInlineNearest_Leaves_Visible_InlineAxis_Unchanged()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3408,7 +3408,7 @@ input {
             $"Default scrollIntoView inline alignment should behave like nearest when the inline axis is already visible. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_DoesNotScrollRootForUnscrollableFixedContainers_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3466,7 +3466,7 @@ input {
             $"scrollIntoView in an unscrollable fixed container should not scroll the root. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_ScrollsFixedScrollerWithoutScrollingRoot_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3532,7 +3532,7 @@ input {
             $"scrollIntoView in a fixed scroller should scroll that scroller without scrolling the root. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_Clamps_FixedScroller_To_ScrollBounds_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3593,7 +3593,7 @@ input {
             $"scrollIntoView in a fixed scroller should clamp to the scrollable range. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_WindowLoadListener_Can_Run_HarnessStyle_FixedScroller_Checks()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3656,7 +3656,7 @@ input {
             $"window.addEventListener('load', …) should drive harness-style fixed-scroller checks. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_PromiseTest_Callbacks_Run_After_Load()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3680,7 +3680,7 @@ input {
         Assert.Contains("id=\"pass\" data-promise-result=\"green\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_AsyncTest_Bodies_Do_Not_Run_In_Defer_Mode()
     {
         // Regression: the reference generator does not load testharness.js, so
@@ -3720,7 +3720,7 @@ input {
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_Test_Call_Aborts_Remaining_Script_In_Defer_Mode()
     {
         // Regression: the reference generator has `test` undefined, so a test() call
@@ -3762,7 +3762,7 @@ input {
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_CustomElements_Can_Upgrade_Parsed_ShadowTree_Nodes()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3845,7 +3845,7 @@ input {
             $"customElements.define should upgrade parsed nodes for shadow-tree harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_TestDriver_Actions_Can_Drive_VisualViewport_PinchZoom_Flow()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -3941,7 +3941,7 @@ input {
             $"test_driver.Actions pinch-zoom support should drive visual viewport harness checks. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_RootRelative_ScrollSupport_Scripts_Enable_SubframeRoot_ScrollBehavior_Page()
     {
         WriteTempSupportFile("dom/events/scrolling/scroll_support.js", """
@@ -4018,7 +4018,7 @@ function scrollNode(scrollingElement, scrollFunction, behavior, elementToRevealL
         Assert.Contains("id=\"pass\" data-scroll-result=\"green\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Harness_RootRelative_ScrollSupport_Scripts_Enable_SubframeWindow_ScrollBehavior_Page()
     {
         WriteTempSupportFile("dom/events/scrolling/scroll_support.js", """
@@ -4082,7 +4082,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("id=\"pass\" data-scroll-result=\"green\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_Fixed_FullHarness_Page_Matches_Reference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4203,7 +4203,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("id=\"pass\" style=\"background: green;", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_ChUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4245,7 +4245,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"ch unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_ExUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4287,7 +4287,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"ex unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_IcUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4329,7 +4329,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"ic unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_AttrLengthValid_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4372,7 +4372,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"attr() length should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_AttrLengthInvalidCast_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4415,7 +4415,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"invalid attr() length casts should use fallback. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_AttrInMax_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4458,7 +4458,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"attr() should resolve inside max(). Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_LhUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4500,7 +4500,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"lh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssValues_RlhUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4547,7 +4547,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"rlh unit should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_ZoomIcUnit_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -4603,7 +4603,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"ic unit should stay zoom-stable in raw CSS pixels. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunAll_Processes_Multiple_Tests()
     {
         // Arrange
@@ -4623,7 +4623,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.All(results, r => Assert.True(r.Skipped));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Returns_Null_MatchPercent_When_Skipped()
     {
         // Arrange — no reference image → skipped, MatchPercent should be null.
@@ -4643,7 +4643,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(result.MatchPercent);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Returns_Null_MatchPercent_When_File_Not_Found()
     {
         // Arrange — missing test file → error, MatchPercent should be null.
@@ -4658,7 +4658,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(result.MatchPercent);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Output_Includes_Percent_Match_And_Is_Sorted()
     {
         // The Program.Main entry point writes sorted log output to stdout.
@@ -4686,7 +4686,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("0 passed, 0 failed, 1 skipped", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Render_Mode_Writes_Png_For_A_Single_File()
     {
         // --render produces a PNG for one HTML file with no reference/compare —
@@ -4705,14 +4705,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(new FileInfo(outPath).Length > 0, "rendered PNG should be non-empty");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Render_Mode_Reports_Missing_File()
     {
         var exit = Program.Main(["--render", Path.Combine(_tempDir, "does-not-exist.html")]);
         Assert.Equal(1, exit);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Output_Includes_Progress_Updates_During_Run()
     {
         var testDir = Path.Combine(_tempDir, "progress");
@@ -4740,7 +4740,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("[INFO] Completed 2/2 tests (0 passed, 0 failed, 2 skipped)", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTestWithTimeout_Returns_Timeout_Result_With_Diagnostics()
     {
         Program.RunTestExecutor = static (runner, testPath, referenceDir, wptPath) =>
@@ -4769,7 +4769,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Timeout detection stack", result.StackTrace);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TerminationDiagnostics_Include_Current_Test_And_Progress()
     {
         var currentPath = Path.Combine(
@@ -4806,7 +4806,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Termination detection stack", diagnostics);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Records_Timeouts_In_Output_And_Summary()
     {
         var testDir = Path.Combine(_tempDir, "timeout-program");
@@ -4855,7 +4855,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Timeout detection stack", errorOutput);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Writes_Timeout_StackTrace_To_Json_Report()
     {
         var testDir = Path.Combine(_tempDir, "timeout-json");
@@ -4893,7 +4893,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Timeout detection stack", result.GetProperty("stackTrace").GetString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Surfaces_Full_Timeout_Triage_Summary_With_Subset_Commands()
     {
         var testDir = Path.Combine(_tempDir, "timeout-triage");
@@ -5001,7 +5001,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("./scripts/run-wpt-tests.sh --subset \"css/css-tables\"", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_RerunJson_Reruns_Previous_Failures_From_Generated_Report()
     {
         var testDir = Path.Combine(_tempDir, "rerun-failures");
@@ -5076,7 +5076,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Discovered    : 1 test(s)", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_RerunJson_Timeouts_Only_Reruns_Previous_Timeouts()
     {
         var testDir = Path.Combine(_tempDir, "rerun-timeouts");
@@ -5139,21 +5139,21 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(["css/timeouts/timeout.html"], rerunTests.OrderBy(path => path).ToArray());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Returns_Error_When_No_Arguments()
     {
         var exitCode = Program.Main([]);
         Assert.Equal(1, exitCode);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Returns_Error_For_Missing_Directory()
     {
         var exitCode = Program.Main(["--wpt-dir", "/nonexistent/path"]);
         Assert.Equal(1, exitCode);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Returns_Success_For_Empty_Directory()
     {
         // An empty directory has no tests → 0 failures → exit 0.
@@ -5161,7 +5161,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(0, exitCode);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Help_Returns_Zero()
     {
         var exitCode = Program.Main(["--help"]);
@@ -5170,21 +5170,21 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Crash test detection ──────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsCrashTest_Detects_CrashTestDir()
     {
         Assert.True(WptTestRunner.IsCrashTest("/wpt/css/compositing/crashtests/bgblend-root-change.html"));
         Assert.True(WptTestRunner.IsCrashTest("C:\\wpt\\crashtests\\test.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsCrashTest_Detects_CrashSuffix()
     {
         Assert.True(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-background-contain-hidden-crash.html"));
         Assert.True(WptTestRunner.IsCrashTest("/wpt/my-test-crash.htm"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsCrashTest_Returns_False_For_Normal_Tests()
     {
         Assert.False(WptTestRunner.IsCrashTest("/wpt/css/compositing/root-element-opacity.html"));
@@ -5268,7 +5268,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Help/assert metadata extraction (#9) ────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractTestMetadata_Reads_Help_Links_And_Decoded_Assert()
     {
         const string html =
@@ -5290,7 +5290,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("Box aligned to start & clamped.", metadata.Assertion);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractTestMetadata_Returns_Null_When_Absent()
     {
         var metadata = WptTestRunner.ExtractTestMetadata("<!DOCTYPE html><body>plain</body>");
@@ -5301,14 +5301,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Non-test file detection ────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_Reference_Directory()
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/reference/mix-blend-mode-video-notref.html"));
         Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\css\\compositing\\reference\\some-ref.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_Support_Directory()
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/support/helper.html"));
@@ -5316,7 +5316,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/resources/fixture.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_Tools_Directory()
     {
         // WPT keeps its own runner/server infrastructure and vendored third-party
@@ -5331,14 +5331,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/tools/build.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_Docs_Directory()
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/docs/writing-tests/index.html"));
         Assert.True(WptTestRunner.IsNonTestFile("C:\\wpt\\docs\\index.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Allows_Real_Tests_With_Similar_Names()
     {
         // Guard the new segments against over-matching: a test file or directory whose
@@ -5348,14 +5348,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(WptTestRunner.IsNonTestFile("/wpt/html/toolsbar/basic.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_TestPlan_Directory()
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/test-plan.html"));
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/css-blending-test-plan-proposal.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_Src_Html_Extension()
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/test-plan/test-plan.src.html"));
@@ -5363,7 +5363,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/spec.src.xht"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Detects_Ref_And_Notref_Suffixes()
     {
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/css/compositing/root-element-opacity-ref.html"));
@@ -5372,7 +5372,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsNonTestFile("/wpt/test-notref.xhtml"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsNonTestFile_Returns_False_For_Actual_Tests()
     {
         Assert.False(WptTestRunner.IsNonTestFile("/wpt/css/compositing/root-element-opacity.html"));
@@ -5382,7 +5382,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Media playback detection ───────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsMediaPlaybackTest_Detects_Video_With_Source()
     {
         var html = @"<html><body>
@@ -5393,14 +5393,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(WptTestRunner.IsMediaPlaybackTest(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsMediaPlaybackTest_Returns_False_For_No_Video()
     {
         var html = @"<html><body><p>No video here</p></body></html>";
         Assert.False(WptTestRunner.IsMediaPlaybackTest(html));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Skips_Media_Playback_Test()
     {
         var testFile = Path.Combine(_tempDir, "video-test.html");
@@ -5422,7 +5422,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("media playback", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_CrashTestDir_AutoPasses_Without_Reference()
     {
         // Arrange — a crash test file under a "crashtests" directory
@@ -5447,7 +5447,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Crash test", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_CrashSuffix_AutoPasses_Without_Reference()
     {
         // Arrange — file name ends with "-crash", should auto-pass.
@@ -5467,7 +5467,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(result.Passed);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Saves_Failure_Images_When_FailureImageDir_Set()
     {
         // Arrange — a test that renders a red box vs a solid-blue reference of the
@@ -5497,7 +5497,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.StartsWith(imagesDir, result.RenderedImagePath!);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractMatchHref_Reads_Rel_Match_Reference()
     {
         Assert.Equal("foo-ref.html", WptTestRunner.ExtractMatchHref(
@@ -5505,7 +5505,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(WptTestRunner.ExtractMatchHref("<link rel=\"help\" href=\"spec\">"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Flags_Suspect_Reference_When_Broiler_Matches_Ref_Html_But_Not_Committed_Png()
     {
         // Reference sanity check (#14): a reftest whose committed reference PNG is
@@ -5531,7 +5531,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("suspect reference", result.SuspectReference!);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Passes_Reftest_Against_Reference_Golden_When_Test_Golden_Is_Wrong()
     {
         // Reftest golden fallback: the committed golden is a Chromium screenshot of
@@ -5557,7 +5557,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(result.Passed, $"expected pass via reference-golden fallback; message: {result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Reftest_Fallback_Does_Not_Pass_When_Broiler_Matches_Neither_Golden()
     {
         // Broiler's render (red) matches neither the committed test golden (blue) nor
@@ -5579,7 +5579,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(FailureCategory.PixelMismatch, result.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Does_Not_Flag_Suspect_Reference_For_A_Genuine_Mismatch()
     {
         // Broiler's render (red) differs from BOTH the committed PNG (blue) and the
@@ -5602,7 +5602,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(result.SuspectReference);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Does_Not_Save_Failure_Images_By_Default()
     {
         var testFile = Path.Combine(_tempDir, "mismatch-default.html");
@@ -5623,7 +5623,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(result.DiffImagePath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTestWithTimeout_UrlSyntaxCrash_Completes_Without_Timing_Out()
     {
         var testFile = Path.Combine(_tempDir, "url-syntax-crash.html");
@@ -5665,7 +5665,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Crash test", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out()
     {
         var oversizedTrackList = string.Join(" ", Enumerable.Repeat("repeat(1000, 1px)", 5000));
@@ -5694,7 +5694,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Failure categorization ─────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_MissingFile_Returns_FileIO_Category()
     {
         var runner = new WptTestRunner();
@@ -5707,7 +5707,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(FailureCategory.FileIO, result.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Skipped_Returns_None_Category()
     {
         var testFile = Path.Combine(_tempDir, "skip-cat.html");
@@ -5723,7 +5723,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(FailureCategory.None, result.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Passed_Returns_None_Category()
     {
         // Crash tests auto-pass; verify they have Category.None.
@@ -5743,7 +5743,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(FailureCategory.None, result.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Output_Includes_Root_Cause_Analysis_For_Failures()
     {
         // When there are failures, the program should include a Root Cause
@@ -5779,7 +5779,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("[ReferenceDecodeError]", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Output_Includes_Category_Tag_On_Fail_Lines()
     {
         // Verify that [FAIL] lines include a category tag like [FileIO].
@@ -5814,7 +5814,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── MismatchClassifier ─────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_SizeMismatch_When_Dimensions_Differ()
     {
         var diff = new PixelDiffResult
@@ -5831,7 +5831,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("dimensions differ", diag.Summary);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_MinorDiff_When_Few_Pixels_Differ()
     {
         // DiffRatio < 0.01 → MinorDiff
@@ -5854,7 +5854,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Near-match", diag.Summary);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_SubpixelAntiAliasing_When_Small_Deltas()
     {
         // Small per-channel delta → SubpixelAntiAliasing
@@ -5881,7 +5881,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("anti-aliasing", diag.Summary);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_ColorShift_When_Moderate_Deltas()
     {
         // Moderate per-channel delta → ColorShift
@@ -5908,7 +5908,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("color", diag.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisplacementBands_Report_NonUniform_Band_Shift()
     {
         // Two vertical bands: an upper band whose content is aligned (output-only
@@ -5948,7 +5948,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(System.Math.Abs(upper.ShiftY) <= 2, $"upper band should be ~aligned, got {upper.ShiftY}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisplacementBands_Uniform_Shift_Not_Flagged_NonUniform()
     {
         // A single contiguous band shifted uniformly right ~10px must NOT be
@@ -5966,7 +5966,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(DisplacementBandAnalyzer.DescribeNonUniform(bands));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CheckLayoutPixelDivergence_Flagged_When_Axes_Disagree()
     {
         // The bridge check-layout estimate flags a horizontal (offset-x)
@@ -5995,7 +5995,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("vertical", note, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CheckLayoutPixelDivergence_Null_When_Axes_Agree()
     {
         // Both signals point at the vertical axis → corroborated, no warning.
@@ -6018,7 +6018,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Null(Program.CheckLayoutPixelDivergenceNote(result));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_LayoutShift_When_Large_Deltas()
     {
         // High per-channel delta → LayoutShift. Uses a blue↔green pair (no red)
@@ -6046,7 +6046,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("layout", diag.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_ReferenceOverlayExposed_When_Red_Shows_Through()
     {
         // Output paints pure red where the reference is green (the WPT
@@ -6074,7 +6074,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("red", diag.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_Does_Not_Flag_Overlay_When_Reference_Is_Also_Red()
     {
         // Both output and reference are red (just different shades): red is
@@ -6100,7 +6100,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.NotEqual(MismatchCategory.ReferenceOverlayExposed, diag.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_MissingContent_When_White_To_NonWhite()
     {
         // Majority of mismatches are white↔non-white → MissingContent
@@ -6127,7 +6127,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("missing", diag.Summary, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_Reports_Diagnostics_Metrics()
     {
         var mismatches = new List<PixelMismatch>
@@ -6153,7 +6153,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.NotNull(diag.Summary);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_Reports_BoundingBox_Of_Mismatched_Region()
     {
         // Mismatches span x∈[10,50], y∈[5,80] → box (10,5) 41×76.
@@ -6180,7 +6180,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(76, diag.BoundingHeight);  // 80 - 5 + 1
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_Estimates_Content_Shift_Direction()
     {
         // Output paints content at x≈110 where the reference is blank, and the
@@ -6206,7 +6206,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("shifted right ~100px", diag.Summary);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MismatchClassifier_Reports_Content_Absent_When_Output_Is_Blank()
     {
         // Reference has content; output is white everywhere it differs → content absent.
@@ -6231,7 +6231,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── JSON output ────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Json_Output_Creates_Valid_Json_File()
     {
         var testDir = Path.Combine(_tempDir, "json-test");
@@ -6282,7 +6282,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.True(resultsEl.GetArrayLength() > 0);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Summary_Includes_Average_Match_Percent_For_All_Pixel_Compared_Tests()
     {
         var testDir = Path.Combine(_tempDir, "average-match");
@@ -6345,7 +6345,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("- Average match: 66.67% across 3 pixel-compared test(s)", markdown);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Output_Includes_Bucket_Summaries()
     {
         var testDir = Path.Combine(_tempDir, "bucket-output");
@@ -6393,7 +6393,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("MissingReferenceImage", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Outputs_Triage_Report_With_Skip_Reasons_And_Markdown_Summary()
     {
         var testDir = Path.Combine(_tempDir, "triage-report");
@@ -6559,7 +6559,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("css/filter-effects [ExplicitFeatureGap]", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Output_Includes_SubCategory_Tag_For_PixelMismatch()
     {
         // When a PixelMismatch failure occurs, the [FAIL] line should
@@ -6598,7 +6598,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("Root Cause Analysis", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WptTestResult_ToJsonObject_Includes_MismatchDiagnostics()
     {
         var result = new WptTestResult
@@ -6636,7 +6636,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(json.ContainsKey("skipReason"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WptTestResult_ToJsonObject_Includes_SkipReason_When_Present()
     {
         var result = new WptTestResult
@@ -6654,7 +6654,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── CSS2 regression tests ──────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflow_Hidden_Clamps_Layout_Height()
     {
         // CSS2.1 §11.1.1: A box with overflow:hidden and an explicit height
@@ -6679,7 +6679,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "The blue box should appear immediately after the overflow:hidden container.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflow_Auto_Clamps_Layout_Height()
     {
         // overflow:auto should also clamp layout height, same as hidden.
@@ -6699,7 +6699,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "The blue box should appear immediately after the overflow:auto container.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fixed_Width_Block_In_Rtl_Container_Is_Right_Aligned()
     {
         // CSS2.1 §10.3.3: a block-level box with an explicit width and
@@ -6729,7 +6729,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "The block must not be left-aligned in rtl.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflow_Scroll_Clamps_Layout_Height()
     {
         // overflow:scroll should also clamp layout height, same as hidden.
@@ -6749,7 +6749,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "The blue box should appear immediately after the overflow:scroll container.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineSvg_Renders_As_InlineBlock()
     {
         // Inline <svg> elements must be treated as replaced inline-block
@@ -6772,7 +6772,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "Inline SVG should render as a replaced inline-block element.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Float_PageBreakInsideAvoid_DoesNotCrash()
     {
         // Floated elements inside a container with page-break-inside:avoid
@@ -6796,7 +6796,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Expected blue float at (50,50), got R={pixel.R} G={pixel.G} B={pixel.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineSvg_ViewBox_Scales_To_Element_Bounds()
     {
         // SVG with viewBox should scale content to the CSS element bounds,
@@ -6826,7 +6826,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "SVG viewBox scaling should fill the entire element.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OverflowHidden_Borders_Are_Visible()
     {
         // CSS2.1 §11.1.1: overflow:hidden clips content at the padding edge.
@@ -6860,7 +6860,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "Borders should not be clipped by overflow:hidden.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Float_PageBreakInsideAvoid_CorrectLayout()
     {
         // Float boxes with page-break-inside:avoid should render with
@@ -6919,7 +6919,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             "Could not locate repository root (tests/wpt not found).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Overflow009_MatchesReference()
     {
         // CSS2 §11.1.1: overflow:hidden must clip overflowing content and
@@ -6944,7 +6944,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_FloatPageBreakInsideAvoid6Print_MatchesReference()
     {
         // CSS2 §13.3.1 / §9.5.2: floated elements inside a container with
@@ -6972,7 +6972,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ReplacedElementsAllAuto_MatchesReference()
     {
         // CSS2 §10.3/§10.6: Replaced elements with auto dimensions use
@@ -6999,7 +6999,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ReplacedElementsMinHeight20_MatchesReference()
     {
         // CSS2 §10.7: min-height should enforce a minimum height.
@@ -7025,7 +7025,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ReplacedElementsMinHeight40_MatchesReference()
     {
         // CSS2 §10.7: min-height should override explicit height when greater.
@@ -7051,7 +7051,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ReplacedElementsMaxHeight20_MatchesReference()
     {
         // CSS2 §10.7: max-height on replaced elements should clamp height
@@ -7078,7 +7078,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ReplacedElementsMinWidth40_MatchesReference()
     {
         // CSS2 §10.4: min-width should override explicit width when greater.
@@ -7104,7 +7104,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ReplacedElementsMinWidth80_MatchesReference()
     {
         // CSS2 §10.4: min-width should override explicit width when greater.
@@ -7130,7 +7130,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_VerticalAlignNegativeLeading001_MatchesReference()
     {
         // CSS2 §10.8.1: Vertical alignment with leading.
@@ -7156,7 +7156,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_NoClearanceDueToLargeMargin_MatchesReference()
     {
         // CSS2 §9.5.2: No clearance when margin-top already clears the float.
@@ -7182,7 +7182,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_NoClearanceAdjoiningOppositeFloat_MatchesReference()
     {
         // CSS2 §9.5.2: clear:right should not clear left floats.
@@ -7208,7 +7208,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ControlCharacters001_MatchesReference()
     {
         // CSS2 §4.3.8: Control characters should be stripped from rendering.
@@ -7234,7 +7234,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_FloatPageBreakInsideAvoid5Print_MatchesReference()
     {
         // CSS2 §13.3.1 / §9.5.2: floated elements with page-break-inside:avoid.
@@ -7260,7 +7260,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ContainingBlockPercentMarginTop_MatchesReference()
     {
         // CSS2 §8.3: Percentage margin-top resolves against containing block width.
@@ -7286,7 +7286,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_LangPseudoclass001_MatchesReference()
     {
         // CSS2 §5.11.4: :lang() pseudo-class matching.
@@ -7312,7 +7312,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Selectors4_LangStandalonePseudo_Overrides_ClassRule_MatchesReference()
     {
         var testHtml = """
@@ -7352,7 +7352,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $":lang(...) standalone selectors should override same-specificity class rules when declared later. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Selectors4_LangExtendedWildcard_MatchesReference()
     {
         var testHtml = """
@@ -7392,7 +7392,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $":lang() extended wildcard ranges should match nested content languages. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Selectors4_LangInvalidRangeList_DoesNotMatch()
     {
         var testHtml = """
@@ -7432,7 +7432,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Invalid :lang(...) ranges should invalidate the whole pseudo. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Selectors4_LangDigitOnlyRange_DoesNotMatch()
     {
         var testHtml = """
@@ -7472,7 +7472,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Digit-only :lang(...) ranges should not match. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Selectors4_DetailsOpenPseudo_And_ClosedContent_MatchReference()
     {
         var testHtml = """
@@ -7547,7 +7547,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"details:open styling and closed details content should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SelectorsInvalidation_NthChildWhenSiblingChanges_MatchesReference()
     {
         var testHtml = """
@@ -7604,7 +7604,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"nth-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SelectorsInvalidation_NthLastChildWhenSiblingChanges_MatchesReference()
     {
         var testHtml = """
@@ -7661,7 +7661,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"nth-last-child(... of .c) sibling-change invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SelectorsInvalidation_HasWithNthChild_MatchesReference()
     {
         var testHtml = """
@@ -7728,7 +7728,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $":has(.item:nth-child(...)) invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SelectorsInvalidation_HasWithNthChildSiblingRemove_MatchesReference()
     {
         var testHtml = """
@@ -7788,7 +7788,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $":has(~ .item > :nth-child(2)) invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SelectorsInvalidation_HasWithIsWrappedSiblingRelations_MatchesReference()
     {
         var testHtml = """
@@ -7866,7 +7866,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $":has(:is(...)) sibling/nth invalidation should match reference. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AbsposInBlockInInlineInRelposInline_MatchesReference()
     {
         // CSS2 §10.1: Absolute positioning in inline contexts.
@@ -7892,7 +7892,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_InlineSvg100PercentInBody_MatchesReference()
     {
         // CSS2 / SVG: Inline SVG with 100% width/height should fill the body.
@@ -7920,14 +7920,14 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Subset pattern parsing ─────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParseSubsetPatterns_Empty_String_Returns_Empty()
     {
         Assert.Empty(WptTestRunner.ParseSubsetPatterns(""));
         Assert.Empty(WptTestRunner.ParseSubsetPatterns("   "));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParseSubsetPatterns_Single_Value()
     {
         var patterns = WptTestRunner.ParseSubsetPatterns("css/CSS2");
@@ -7935,7 +7935,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("css/CSS2", patterns[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParseSubsetPatterns_Multiple_Semicolon_Separated()
     {
         var patterns = WptTestRunner.ParseSubsetPatterns("css/CSS2;css/css-flexbox;html/semantics");
@@ -7945,7 +7945,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("html/semantics", patterns[2]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParseSubsetPatterns_Trims_Whitespace_And_Ignores_Empty()
     {
         var patterns = WptTestRunner.ParseSubsetPatterns(" css/CSS2 ; ; css/css-* ");
@@ -7956,7 +7956,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Wildcard / glob matching ───────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesPattern_Exact_Directory_Prefix()
     {
         Assert.True(WptTestRunner.MatchesPattern("css/CSS2/test.html", "css/CSS2"));
@@ -7964,7 +7964,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(WptTestRunner.MatchesPattern("css/CSS3/test.html", "css/CSS2"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesPattern_Wildcard_Star()
     {
         // css/css-* should match css/css-flexbox/..., css/css-grid/..., etc.
@@ -7973,27 +7973,27 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(WptTestRunner.MatchesPattern("css/CSS2/test.html", "css/css-*"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesPattern_Wildcard_Question()
     {
         Assert.True(WptTestRunner.MatchesPattern("css/ab/test.html", "css/a?"));
         Assert.False(WptTestRunner.MatchesPattern("css/abc/test.html", "css/a?"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesPattern_Empty_Pattern_Matches_All()
     {
         Assert.True(WptTestRunner.MatchesPattern("anything/at/all.html", ""));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesPattern_Case_Insensitive()
     {
         Assert.True(WptTestRunner.MatchesPattern("CSS/css2/test.html", "css/CSS2"));
         Assert.True(WptTestRunner.MatchesPattern("css/CSS-Flexbox/test.html", "css/css-*"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesAnyPattern_Returns_True_When_Any_Matches()
     {
         var patterns = new[] { "css/CSS2", "html/semantics" };
@@ -8002,7 +8002,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.False(WptTestRunner.MatchesAnyPattern("svg/shapes/rect.html", patterns));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesAnyPattern_Wildcards_In_Multiple_Patterns()
     {
         var patterns = new[] { "css/CSS2", "css/css-*" };
@@ -8014,7 +8014,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── DiscoverTests with subset patterns ─────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_With_Empty_Patterns_Returns_All()
     {
         // Arrange
@@ -8033,7 +8033,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal(2, tests.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_With_Exact_Pattern_Filters_Correctly()
     {
         // Arrange
@@ -8052,7 +8052,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("CSS2", tests[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_With_Wildcard_Pattern()
     {
         // Arrange
@@ -8074,7 +8074,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.All(tests, t => Assert.Contains("css-", t));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DiscoverTests_With_Semicolon_Separated_Patterns()
     {
         // Arrange
@@ -8101,7 +8101,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
 
     // ──────────── Program --subset integration ───────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Program_Subset_Filters_Tests()
     {
         // Arrange — create two directories with tests.
@@ -8131,7 +8131,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("0 passed, 0 failed, 1 skipped", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlock002_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: align-content on block containers
@@ -8158,7 +8158,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlock004_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: align-content on large block
@@ -8185,7 +8185,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlock006_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: align-content container change
@@ -8212,7 +8212,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlock008_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: align-content style change on
@@ -8239,7 +8239,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlock010_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: align-content content change in
@@ -8266,7 +8266,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnimationDelay008_MatchesReference()
     {
         // CSS Animations §animation-delay – liveness: a negative delay on a
@@ -8293,7 +8293,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer007_MatchesReference()
     {
         // CSS Anchor Positioning: dialog in top layer positioned via anchor()
@@ -8319,7 +8319,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlock001_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: non-normal align-content
@@ -8346,7 +8346,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BlockJustifySelf_MatchesReference()
     {
         // CSS Box Alignment Level 3 §6.1: justify-self on block-level boxes
@@ -8372,7 +8372,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentBlockBreakOverflow010_MatchesReference()
     {
         // CSS Box Alignment Level 3 §5.4: align-content fragmentation
@@ -8399,7 +8399,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionVisibility_HidesTarget_WhenAnchorScrolledOut()
     {
         // Validates the full position-visibility pipeline: scrollTop storage,
@@ -8450,7 +8450,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Expected target display:none but styles = [{string.Join(", ", targetStyle.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ResolveAnchorPositions_AbsPosChildOfInlineContainingBlock_PromotedWithoutThrow()
     {
         // Regression for issue #1195 (top WPT crash, signature
@@ -8485,7 +8485,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("block", absParent!.Id);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementScroll_Alias_And_Object_Arguments_Work()
     {
         const string html = @"<!DOCTYPE html>
@@ -8512,7 +8512,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Expected scrollLeft=75 and scrollTop=75, got left={bridge.GetStoredScrollOffsetOrDefault(sc, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(sc, vertical: true)}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Skips_PointerEvents_None()
     {
         const string html = @"<!DOCTYPE html>
@@ -8537,7 +8537,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("yellow|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementsFromPoint_Return_Target_Ancestors_And_Subframe_Hits()
     {
         const string html = @"<!DOCTYPE html>
@@ -8572,7 +8572,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("target>BODY>HTML|inner|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_IframeDocumentHitTesting_Uses_Html_When_Body_Does_Not_Cover_Point()
     {
         const string html = @"<!DOCTYPE html>
@@ -8599,7 +8599,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("1|HTML|", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_NegativeMargins_HitTesting_Returns_Inner_Then_AutoSized_Outer()
     {
         const string html = @"<!DOCTYPE html>
@@ -8629,7 +8629,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("inner|inner>outer>BODY>HTML", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_AutoSized_ScrollMetrics_Do_Not_Report_MarginOnly_Overflow()
     {
         const string html = @"<!DOCTYPE html>
@@ -8671,7 +8671,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_CreateHtmlDocument_Has_No_HitTesting_Viewport()
     {
         using var ctx = new Broiler.JavaScript.Engine.JSContext();
@@ -8690,7 +8690,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("true|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Viewport_And_Rect_Geometry()
     {
         const string html = @"<!DOCTYPE html>
@@ -8724,7 +8724,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("180|140|svgRoot|svgRect|svgRect|svgRoot", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Keeps_Inline_Svg_Roots_In_Normal_Flow()
     {
         const string html = @"<!DOCTYPE html>
@@ -8757,7 +8757,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("0|98|secondRect|secondRect|secondSvg", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_Images_ForeignObject_And_Translate()
     {
         const string html = @"<!DOCTYPE html>
@@ -8808,7 +8808,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Uses_Svg_Text_Tspan_And_TextPath_Content()
     {
         const string html = @"<!DOCTYPE html>
@@ -8847,7 +8847,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("text1|svgRoot|tspan1|textpath1|tspan2|text4", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Uses_Table_Cell_Layout_For_Rtl_And_Vertical_Writing_Modes()
     {
         const string html = @"<!DOCTYPE html>
@@ -8895,7 +8895,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("td11,testtable,sandbox,BODY,HTML|testtable,sandbox,BODY,HTML|td14|td14|td41", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Uses_Image_Map_Areas_Before_Associated_Images()
     {
         const string html = @"<!DOCTYPE html>
@@ -8923,7 +8923,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("rectG|rectG,dinos,BODY,HTML|dinos", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Excludes_Rounded_Fieldset_Corners()
     {
         const string html = @"<!DOCTYPE html>
@@ -8954,7 +8954,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("fieldsetDiv|fieldset|other", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementFromPoint_Extends_List_Items_To_Outside_Markers()
     {
         const string html = @"<!DOCTYPE html>
@@ -8998,7 +8998,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("outsideText|outsideImage|insideText", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped()
     {
         const string html = @"<!DOCTYPE html>
@@ -9038,7 +9038,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Expected vertical rtl scroller left=-150 top=-300, got left={bridge.GetStoredScrollOffsetOrDefault(verticalRtl, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(verticalRtl, vertical: true)}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ElementScroll_Ignores_Elements_Without_Scrolling_Boxes()
     {
         const string html = @"<!DOCTYPE html>
@@ -9090,7 +9090,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
             $"Expected default overflow element to stay at 0,0 but got left={bridge.GetStoredScrollOffsetOrDefault(implicitVisible, vertical: false)}, top={bridge.GetStoredScrollOffsetOrDefault(implicitVisible, vertical: true)}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollParent_Finds_Nearest_Relevant_Scroll_Container()
     {
         const string html = @"<!DOCTYPE html>
@@ -9141,7 +9141,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("scroller1|hidden|true|scroller2|scroller3|true|true|scroller1|true|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollParent_Crosses_Open_And_Closed_Shadow_Roots()
     {
         const string html = @"<!DOCTYPE html><body></body>";
@@ -9190,7 +9190,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("outerScroller|outerScroller|outerScroller|outerScroller|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_IframeSubframeWindowScroll_Uses_SubdocumentRoot()
     {
         const string html = @"<!DOCTYPE html>
@@ -9224,7 +9224,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScriptAssignedIframeSrcdoc_Allows_FramesDocument_FixedTarget_Scroll_Match()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -9266,7 +9266,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("id=\"pass\" style=\"background: green;", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_FixedIframeTarget_Scrolls_OuterWindow_Not_Subframe()
     {
         const string html = """
@@ -9302,7 +9302,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("140|460|0|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_ScrollableFixedIframeTarget_Scrolls_Container_And_OuterWindow()
     {
         const string html = """
@@ -9341,7 +9341,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("130|440|0|0|300|300", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_SubframeRootScrollIntoView_Uses_SmoothScrollBehavior()
     {
         const string html = """
@@ -9386,7 +9386,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("110|250", afterFlush.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_Treats_Assigned_Slot_As_Scroll_Container()
     {
         const string html = """
@@ -9435,7 +9435,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("200|300|100|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_ScrollIntoView_Maps_WritingMode_Block_And_Inline_Axes()
     {
         const string html = """
@@ -9489,7 +9489,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("-200,200|-150,100|-100,-150", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted()
     {
         const string html = """
@@ -9541,7 +9541,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("1", afterFlush.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_SubframeWindowScrollTo_Honors_Smooth_And_Instant_Behavior()
     {
         const string html = """
@@ -9588,7 +9588,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("0|0", instantResult.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_WindowScrollApis_Use_RootScrollOffsets_And_Update_VisualViewport()
     {
         const string html = """
@@ -9626,7 +9626,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("50|1015|50|1015|50|1015|50|1015|2", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_VisualViewport_ScrollIntoView_FixedTarget_Adjusts_PageTop()
     {
         const string html = """
@@ -9668,7 +9668,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("1000|1000|1384|1000|true|2|384", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_VisualScrollIntoView_002_MatchesReference()
     {
         var testHtml = @"<!DOCTYPE html>
@@ -9720,7 +9720,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Contains("id=\"name\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssomView_IframeSrcdocLoadEvent_Fires_After_Listener_Registration()
     {
         const string html = @"<!DOCTYPE html>
@@ -9744,7 +9744,7 @@ function scrollWindow(scrollingWindow, scrollFunction, behavior, elementToReveal
         Assert.Equal("true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_NestedIframeScripts_Resolve_Relative_Sources_And_Location()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-nested-iframe-{Guid.NewGuid():N}");
@@ -9800,7 +9800,7 @@ document.getElementById('target').src = 'leaf.html?scale=3';
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_CssViewport_CrossOriginIframeTemplate_Uses_LocalWptResource_And_MatchesReference()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-cross-origin-match-{Guid.NewGuid():N}");
@@ -9924,7 +9924,7 @@ iframe {
         return runner.RunTest(testFile, refDir, wptRoot);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaScrolling002_MatchesReference()
     {
         var result = RunAnchorPixelTest("position-area-scrolling-002.tentative.html");
@@ -9932,7 +9932,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaScrolling002_ResolvesPositionArea()
     {
         var bridge = RunAnchorResolution("position-area-scrolling-002.tentative.html");
@@ -9967,7 +9967,7 @@ iframe {
             $"Position area scrolling-002 mismatches:\n{string.Join("\n", errors)}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaAnchorPartiallyOutside_MatchesReference()
     {
         var result = RunAnchorPixelTest("position-area-anchor-partially-outside.html");
@@ -9975,7 +9975,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaScrolling003_MatchesReference()
     {
         var result = RunAnchorPixelTest("position-area-scrolling-003.tentative.html");
@@ -9983,7 +9983,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionTryGrid001_MatchesReference()
     {
         var result = RunAnchorPixelTest("position-try-grid-001.html");
@@ -9991,7 +9991,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorCenterScroll001_MatchesReference()
     {
         var result = RunAnchorPixelTest("anchor-center-scroll-001.html");
@@ -9999,7 +9999,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionTryCascade_MatchesReference()
     {
         var result = RunAnchorPixelTest("position-try-cascade.html");
@@ -10007,7 +10007,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer001_MatchesReference()
     {
         var result = RunAnchorMatchTest("anchor-position-top-layer-001.html");
@@ -10015,7 +10015,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer002_MatchesReference()
     {
         var result = RunAnchorMatchTest("anchor-position-top-layer-002.html");
@@ -10023,7 +10023,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer003_MatchesReference()
     {
         var result = RunAnchorMatchTest("anchor-position-top-layer-003.html");
@@ -10031,7 +10031,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer004_MatchesReference()
     {
         var result = RunAnchorMatchTest("anchor-position-top-layer-004.html");
@@ -10039,7 +10039,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer005_MatchesReference()
     {
         var result = RunAnchorMatchTest("anchor-position-top-layer-005.html");
@@ -10047,7 +10047,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AnchorPositionTopLayer006_MatchesReference()
     {
         var result = RunAnchorMatchTest("anchor-position-top-layer-006.html");
@@ -10055,7 +10055,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaPercents001_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-area-percents-001.html");
@@ -10089,7 +10089,7 @@ iframe {
         return runner.RunMatchTest(testFile, refHtmlPath, wptRoot);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisible_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible.html");
@@ -10097,7 +10097,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityInitial_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-initial.html");
@@ -10105,7 +10105,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsValidTentative_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-valid.tentative.html");
@@ -10113,7 +10113,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleCssVisibility_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-css-visibility.html");
@@ -10121,7 +10121,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityRemoveAnchorsVisible_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-remove-anchors-visible.html");
@@ -10129,7 +10129,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleChained001_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-001.html");
@@ -10137,7 +10137,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleChained002_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-002.html");
@@ -10145,7 +10145,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleChained003_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-chained-003.html");
@@ -10153,7 +10153,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisiblePositionFixed_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-position-fixed.html");
@@ -10161,7 +10161,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleBothPositionFixed_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-both-position-fixed.html");
@@ -10169,7 +10169,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleStackedChild_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-stacked-child.html");
@@ -10177,7 +10177,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleStackedChildTentative_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-stacked-child.tentative.html");
@@ -10185,7 +10185,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleWithPosition_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-with-position.html");
@@ -10193,7 +10193,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionVisibilityAnchorsVisibleAfterScrollOut_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-visibility-anchors-visible-after-scroll-out.html");
@@ -10201,7 +10201,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Transform005_MatchesReference()
     {
         var result = RunAnchorMatchTest("transform-005.html");
@@ -10209,7 +10209,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaInlineContainer_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-area-inline-container.html");
@@ -10217,7 +10217,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaAbsInlineContainer_MatchesReference()
     {
         var result = RunAnchorMatchTest("position-area-abs-inline-container.html");
@@ -10270,7 +10270,7 @@ iframe {
         return (left, top, width, height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaScrolling001_ResolvesCorrectPositions()
     {
         var bridge = RunAnchorResolution("position-area-scrolling-001.tentative.html");
@@ -10309,7 +10309,7 @@ iframe {
             $"Position area scrolling-001 mismatches:\n{string.Join("\n", errors)}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionAreaAnchorPartiallyOutside_ResolvesCorrectPositions()
     {
         var root = FindRepoRoot();
@@ -10354,7 +10354,7 @@ iframe {
             $"Anchor styles: [{styleStr}]\nAnchored styles: [{anchoredStyleStr}]");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_PositionTryCascade_FallbackApplies()
     {
         // Tests that @position-try fallback rules apply when the base
@@ -10437,7 +10437,7 @@ iframe {
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentTableCell002_MatchesReference()
     {
         RunCssAlignMatchTest("blocks/align-content-table-cell-002.html",
@@ -10445,7 +10445,7 @@ iframe {
             "align-content-table-cell-002");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentTableCell003_MatchesReference()
     {
         RunCssAlignMatchTest("blocks/align-content-table-cell-003.html",
@@ -10453,7 +10453,7 @@ iframe {
             "align-content-table-cell-003");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentTableCell004_MatchesReference()
     {
         RunCssAlignMatchTest("blocks/align-content-table-cell-004.html",
@@ -10461,7 +10461,7 @@ iframe {
             "align-content-table-cell-004");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignContentTableCell005_MatchesReference()
     {
         RunCssAlignMatchTest("blocks/align-content-table-cell-005.html",
@@ -10469,105 +10469,105 @@ iframe {
             "align-content-table-cell-005");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_SafeJustifySelfVrl_MatchesReference()
     {
         RunCssAlignTest("blocks/safe-justify-self-vrl.html",
             "safe-justify-self-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignSelfDefaultOverflowVrlRtlHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/align-self-default-overflow-vrl-rtl-htb.html",
             "align-self-default-overflow-vrl-rtl-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignSelfDefaultOverflowVrlRtlVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/align-self-default-overflow-vrl-rtl-vrl.html",
             "align-self-default-overflow-vrl-rtl-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignSelfDefaultOverflowVrlLtrHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/align-self-default-overflow-vrl-ltr-htb.html",
             "align-self-default-overflow-vrl-ltr-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignSelfDefaultOverflowVrlLtrVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/align-self-default-overflow-vrl-ltr-vrl.html",
             "align-self-default-overflow-vrl-ltr-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignSelfDefaultOverflowHtbRtlHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/align-self-default-overflow-htb-rtl-htb.html",
             "align-self-default-overflow-htb-rtl-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_AlignSelfDefaultOverflowHtbRtlVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/align-self-default-overflow-htb-rtl-vrl.html",
             "align-self-default-overflow-htb-rtl-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowVrlLtrHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-vrl-ltr-htb.html",
             "justify-self-default-overflow-vrl-ltr-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowVrlLtrVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-vrl-ltr-vrl.html",
             "justify-self-default-overflow-vrl-ltr-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowVrlRtlHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-vrl-rtl-htb.html",
             "justify-self-default-overflow-vrl-rtl-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowVrlRtlVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-vrl-rtl-vrl.html",
             "justify-self-default-overflow-vrl-rtl-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowHtbLtrHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-htb-ltr-htb.html",
             "justify-self-default-overflow-htb-ltr-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowHtbLtrVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-htb-ltr-vrl.html",
             "justify-self-default-overflow-htb-ltr-vrl");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowHtbRtlHtb_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-htb-rtl-htb.html",
             "justify-self-default-overflow-htb-rtl-htb");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_JustifySelfDefaultOverflowHtbRtlVrl_MatchesReference()
     {
         RunCssAlignTest("abspos/justify-self-default-overflow-htb-rtl-vrl.html",
@@ -10809,7 +10809,7 @@ div {{ width: 256px; height: 768px; }}
         return runner.RunTest(Path.Combine(wptRoot, fileName), repoRefDir, _tempDir);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundColorAnimationInBody_MatchesReference()
     {
         // CSS animation with cubic-bezier(0,1,1,0) at 50% progress.
@@ -10820,7 +10820,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundColorAnimationWillChangeContents_MatchesReference()
     {
         var result = RunCssBackgroundsMatchTest("animations/background-color-animation-will-change-contents.html");
@@ -10829,7 +10829,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundColorScrollIntoViewport_MatchesReference()
     {
         var result = RunCssBackgroundsMatchTest("animations/background-color-scroll-into-viewport.html");
@@ -10838,7 +10838,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundAttachmentMarginRoot001_MatchesReference()
     {
         // CSS Backgrounds §2.11.2: scroll attachment positioned relative to
@@ -10849,7 +10849,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundAttachmentMarginRoot002_MatchesReference()
     {
         // CSS Backgrounds §2.11.2: fixed attachment positioned relative to
@@ -10860,7 +10860,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundColorBodyPropagation003_MatchesReference()
     {
         // CSS 2.1 §14.2: body with display:inline still propagates its
@@ -10871,7 +10871,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundColorBodyPropagation006_MatchesReference()
     {
         // CSS Backgrounds §2.11.1: html with display:none suppresses body
@@ -10882,7 +10882,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundColorRootPropagation002_MatchesReference()
     {
         // CSS Backgrounds §2.11.1: html with display:none (set via JS)
@@ -10893,7 +10893,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundClipInherit_DoesNotThrow_RenderingError()
     {
         var testFile = Path.Combine(_tempDir, "background-clip-006.html");
@@ -10939,7 +10939,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.NotEqual(FailureCategory.RenderingError, result.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_DocumentCanvasRemoveBody_MatchesReference()
     {
         // CSS Backgrounds §2.11: removing body via JS should clear its
@@ -10950,7 +10950,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_WideAutoPercentWidthOmittedHeight_MatchesReference()
     {
         var result = RunCssBackgroundsVisualTest(
@@ -10960,7 +10960,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_WideAutoPercentWidthOmittedHeightViewbox_MatchesReference()
     {
         var result = RunCssBackgroundsVisualTest(
@@ -10970,7 +10970,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector003_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-003.html");
@@ -10979,7 +10979,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector005_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-005.html");
@@ -10988,7 +10988,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector007_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-007.html");
@@ -10997,7 +10997,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector009_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-009.html");
@@ -11006,7 +11006,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector011_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-011.html");
@@ -11015,7 +11015,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector013_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-013.html");
@@ -11024,7 +11024,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector015_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-015.html");
@@ -11033,7 +11033,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_BackgroundSizeVector017_MatchReference()
     {
         var result = RunCssBackgroundsVisualTest("background-size/vector/background-size-vector-017.html");
@@ -11079,7 +11079,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundSizeVector_TallContainViewboxCase_MatchReference()
     {
         var result = RunTempBackgroundSizeVectorVisualTest(
@@ -11261,7 +11261,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundGradientInterpolation003_MatchesReference()
     {
         var result = RunCssBackgroundsMatchTest("background-gradient-interpolation-003.html");
@@ -11270,7 +11270,7 @@ div {{ width: 256px; height: 768px; }}
             $"Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundGradientInterpolation002_DiffersFromNotRef()
     {
         var root = FindRepoRoot();
@@ -11288,7 +11288,7 @@ div {{ width: 256px; height: 768px; }}
             $"background-gradient-interpolation-002 should be visually distinct from the notref. Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundClipRoot_MatchesReference()
     {
         // CSS Backgrounds §2.11.4: background-clip has no effect on the root
@@ -11323,7 +11323,7 @@ div {{ width: 256px; height: 768px; }}
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BackgroundClipRoot_RenderHtmlFileBitmapPublic_ReturnsBackendNeutralBitmap()
     {
         var root = FindRepoRoot();
@@ -11363,7 +11363,7 @@ div {{ width: 256px; height: 768px; }}
         return runner.RunTest(testFile, refDir, wptRoot);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderBox_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-border-box.html");
@@ -11371,7 +11371,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-box: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderBoxWithPosition_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-border-box_with_position.html");
@@ -11379,7 +11379,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-box_with_position: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderBoxWithRadius_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-border-box_with_radius.html");
@@ -11387,7 +11387,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-box_with_radius: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderBoxWithSize_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-border-box_with_size.html");
@@ -11395,7 +11395,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-box_with_size: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderAreaCornerShape_VisualSubsetGuardRail_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-border-area-corner-shape.html");
@@ -11403,7 +11403,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-area-corner-shape: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipPaddingBox_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-padding-box.html");
@@ -11411,7 +11411,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-padding-box: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipPaddingBoxWithPosition_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-padding-box_with_position.html");
@@ -11419,7 +11419,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-padding-box_with_position: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipPaddingBoxWithRadius_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-padding-box_with_radius.html");
@@ -11427,7 +11427,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-padding-box_with_radius: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipPaddingBoxWithSize_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-padding-box_with_size.html");
@@ -11435,7 +11435,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-padding-box_with_size: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipContentBox_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-content-box.html");
@@ -11443,7 +11443,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-content-box: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipContentBoxWithPosition_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-content-box_with_position.html");
@@ -11451,7 +11451,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-content-box_with_position: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipContentBoxWithRadius_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-content-box_with_radius.html");
@@ -11459,7 +11459,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-content-box_with_radius: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipContentBoxWithSize_MatchesReference()
     {
         var result = RunBackgroundClipVisualTest("clip-content-box_with_size.html");
@@ -11471,7 +11471,7 @@ div {{ width: 256px; height: 768px; }}
     // These tests have <link rel="match"> and render both test and reference
     // HTML through Broiler for comparison.
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderArea_MatchesReference()
     {
         // CSS Backgrounds Level 4: background-clip: border-area fills the
@@ -11481,7 +11481,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-area: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipBorderAreaCornerShape_MatchesReference()
     {
         // CSS Backgrounds Level 4: background-clip: border-area with
@@ -11491,7 +11491,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-border-area-corner-shape: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipTextDescendants_MatchesReference()
     {
         // background-clip: text clips the background to the foreground text
@@ -11501,7 +11501,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-text-descendants: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipTextDynamic2_MatchesReference()
     {
         // background-clip: text with dynamic content changes via script.
@@ -11510,7 +11510,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-text-dynamic-2: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipTextStackingContextChild_MatchesReference()
     {
         // background-clip: text with a child that creates a stacking context.
@@ -11519,7 +11519,7 @@ div {{ width: 256px; height: 768px; }}
             $"clip-text-stacking-context-child: Match={result.MatchPercent:F1}% Message={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_ClipTextTextDecorations_MatchesReference()
     {
         // background-clip: text with text decorations (underline, etc.)
@@ -11543,7 +11543,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.Equal(tests, result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ApplyShard_Partitions_Tests_Into_Disjoint_Shards_Covering_The_Whole_Set()
     {
         const int shardCount = 8;
@@ -11564,7 +11564,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.Equal(new HashSet<string>(tests), new HashSet<string>(union));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ApplyShard_Is_Stable_For_The_Same_Relative_Path()
     {
         var tests = Enumerable.Range(0, 100)
@@ -11588,7 +11588,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.InRange(shard, 0, shardCount - 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetShardIndex_Matches_The_FNV1a_Reference_Value()
     {
         // Pins the FNV-1a algorithm so it cannot silently drift from the
@@ -11616,7 +11616,7 @@ div {{ width: 256px; height: 768px; }}
     // alignment (→ right edge), justify-self:auto follows justify-items:center
     // (→ centred), and justify-self:left wins (→ left). Verified against an explicit
     // margin-positioned reference with the same right-aligned inline text.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BlockJustifySelf_TextAlignWebkit_JustifyItems_Tandem()
     {
         const string css = ".container{width:200px;position:relative;outline:solid;} .item{background:lightblue;width:100px;height:100px;outline:solid;}";
@@ -11639,7 +11639,7 @@ div {{ width: 256px; height: 768px; }}
     // WPT issue #1100 (css-animations/crashtests/svg-use-animation-crash): inline
     // SVG carrying a prefixed attribute (xlink:href) must not crash HTML parsing.
     // Regression for the DomElement.SetAttribute prefixed-name fix.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Crashtest_SvgUseWithXlinkHref_DoesNotCrash()
     {
         const string html = @"<!DOCTYPE html><svg>
@@ -11653,7 +11653,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.True(result.Passed, $"crashtest should pass (no throw). Cat={result.Category} Msg={result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_BlockJustifySelf_AutoMarginsWin_NoShift()
     {
         const string test = @"<!DOCTYPE html><div style=""width:200px;"">
@@ -11665,7 +11665,7 @@ div {{ width: 256px; height: 768px; }}
             $"justify-self must not move an auto-margin (centred) block. Match={result.MatchPercent:F1}% {result.Message}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wpt_Stacking_NegativeZIndexBox_PaintsBehindInFlowContent()
     {
         const string test = @"<!DOCTYPE html>
@@ -11680,7 +11680,7 @@ div {{ width: 256px; height: 768px; }}
 
     // --- Root-relative resource resolution mirrors the reference generator --------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveWptRootRelativePath_Ignores_Query_And_Fragment()
     {
         // WPT tags resources with a cache-busting/identifying query — /images/blue.png?inline-style,
@@ -11724,7 +11724,7 @@ div {{ width: 256px; height: 768px; }}
     public void IsOffCorpusNetworkResource_LeavesLocalAndNonNetworkSourcesAlone(string? src) =>
         Assert.False(WptTestRunner.IsOffCorpusNetworkResource(src), src ?? "(null)");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsOffCorpusNetworkResource_LeavesCorpusServedHostsAlone()
     {
         // A `.sub` template's URLs are absolute on a WPT host once substituted, and WPT serves
@@ -11736,7 +11736,7 @@ div {{ width: 256px; height: 768px; }}
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveWptRootRelativePath_Is_Absolute_Even_From_A_Relative_Root()
     {
         // The resolved path is handed straight to the engine, which resolves what it is
@@ -11758,7 +11758,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.Equal(Path.GetFullPath(onDisk), resolved);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveWptRootRelativePath_Absolute_Root_Is_Unchanged()
     {
         // The negative half: an absolute root already produced an absolute result, which is
@@ -11771,7 +11771,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/images/blue.png", _tempDir));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveWptRootRelativePath_Decodes_Percent_Escapes()
     {
         Directory.CreateDirectory(Path.Combine(_tempDir, "sup port"));
@@ -11781,7 +11781,7 @@ div {{ width: 256px; height: 768px; }}
         Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("/sup%20port/a%20b.css", _tempDir));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveWptRootRelativePath_Rejects_Non_Root_Relative_And_Missing()
     {
         // Only root-relative URLs are remapped; a relative or absolute URL is left to the caller,

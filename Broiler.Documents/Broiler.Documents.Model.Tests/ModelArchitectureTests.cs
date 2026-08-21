@@ -13,7 +13,7 @@ public sealed class ModelArchitectureTests
         "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Model_Project_Targets_Net10_And_References_Only_Graphics()
     {
         XDocument project = XDocument.Load(ModelProjectPath());
@@ -23,7 +23,7 @@ public sealed class ModelArchitectureTests
         Assert.Equal(ExpectedReferences, ProjectReferences(project));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Model_Project_Does_Not_Reference_Ui_Dom_Input_Or_Windows()
     {
         string[] references = ProjectReferences(XDocument.Load(ModelProjectPath()));
@@ -34,7 +34,7 @@ public sealed class ModelArchitectureTests
         Assert.DoesNotContain(references, r => r.Contains("Windows", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Model_Assembly_Only_References_Graphics_At_Runtime()
     {
         string[] referenced = typeof(RichTextDocument).Assembly

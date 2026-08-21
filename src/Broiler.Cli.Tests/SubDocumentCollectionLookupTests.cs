@@ -44,7 +44,7 @@ public sealed class SubDocumentCollectionLookupTests
     private static string Eval(JSContext context, string expression) => context.Eval(expression).ToString();
 
     /// <summary>Reaching either method inside a frame must not throw.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameDocument_HasBothCollectionLookups()
     {
         var (context, bridge) = AttachWithFrame();
@@ -107,7 +107,7 @@ public sealed class SubDocumentCollectionLookupTests
     /// so a search there finds nothing while the frame's finds its own — which is what proves the
     /// sub-document is searching its own tree rather than the main one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameDocument_SearchesItsOwnTree_NotTheHosts()
     {
         var (context, bridge) = AttachWithFrame();

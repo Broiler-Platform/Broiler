@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ElementContentBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementContent_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ElementContentBinding);
@@ -27,7 +27,7 @@ public sealed class ElementContentBindingModuleTests
         Assert.True(typeof(IElementContentHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InnerHtml_Reads_And_Writes_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>
@@ -51,7 +51,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterHtml_Replaces_The_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -73,7 +73,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextContent_And_InnerText_Read_And_Write()
     {
         var html = @"<!DOCTYPE html>

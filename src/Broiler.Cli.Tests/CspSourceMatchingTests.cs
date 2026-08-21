@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CspSourceMatchingTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveUri_Keeps_Absolute_And_Resolves_Relative_Against_Page()
     {
         Assert.Equal("https://a.test/x.js",
@@ -22,7 +22,7 @@ public sealed class CspSourceMatchingTests
         Assert.Null(CspSourceMatching.ResolveUri("lib/x.js", null)); // relative with no base
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSameOrigin_Compares_Scheme_Host_Port()
     {
         var candidate = new Uri("https://a.test:443/x.js");
@@ -32,13 +32,13 @@ public sealed class CspSourceMatchingTests
         Assert.False(CspSourceMatching.IsSameOrigin(candidate, null));                       // no page
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSameOrigin_Treats_Two_File_Urls_As_Same_Origin()
     {
         Assert.True(CspSourceMatching.IsSameOrigin(new Uri("file:///a/x.js"), "file:///b/page.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSchemeSource_Recognises_Bare_Scheme_Tokens_Only()
     {
         Assert.True(CspSourceMatching.IsSchemeSource("https:"));
@@ -46,7 +46,7 @@ public sealed class CspSourceMatchingTests
         Assert.False(CspSourceMatching.IsSchemeSource("https://host.test"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchesAbsoluteSource_Requires_Scheme_Host_Port_And_Path_Prefix()
     {
         var candidate = new Uri("https://cdn.test/lib/x.js");

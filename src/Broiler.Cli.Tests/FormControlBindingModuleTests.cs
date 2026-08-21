@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class FormControlBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormControl_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(FormControlBinding);
@@ -27,7 +27,7 @@ public sealed class FormControlBindingModuleTests
         Assert.True(typeof(IFormControlHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Value_Type_Name_TabIndex_Reflect_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>
@@ -56,7 +56,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true,true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Boolean_Reflectors_Disabled_Hidden_Required_Round_Trip()
     {
         var html = @"<!DOCTYPE html>
@@ -80,7 +80,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Checked_Idl_And_Radio_Group_Mutual_Exclusion()
     {
         var html = @"<!DOCTYPE html>
@@ -107,7 +107,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Select_Value_Resolves_Through_SelectBinding()
     {
         var html = @"<!DOCTYPE html>

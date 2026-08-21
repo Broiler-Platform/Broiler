@@ -91,7 +91,7 @@ public sealed class UnhandledPromiseRejectionTests
             m => m.Contains("Unhandled promise rejection", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Rejection_Is_Reported_Once_Per_Promise()
     {
         var failures = CaptureFailures(
@@ -102,7 +102,7 @@ public sealed class UnhandledPromiseRejectionTests
             failures.Count(m => m.Contains("Unhandled promise rejection", StringComparison.Ordinal)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Report_Names_The_Error()
     {
         var failures = CaptureFailures("Promise.reject(new TypeError('describedMarker'));");
@@ -112,7 +112,7 @@ public sealed class UnhandledPromiseRejectionTests
         Assert.Contains(failures, m => m.Contains("TypeError: describedMarker", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Non_Error_Reason_Is_Still_Described()
     {
         var failures = CaptureFailures("Promise.reject('plainStringMarker');");

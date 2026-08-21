@@ -21,7 +21,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class TableGridItemTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BareOnloadAssignment_FiresOnWindowLoad()
     {
         using var ctx = new JSContext();
@@ -55,7 +55,7 @@ public sealed class TableGridItemTests
         return by.TryGetValue("th#cell", out var m) ? m : [];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TableGridItem_LaysOutCellContent()
     {
         var cell = Cell("");
@@ -65,7 +65,7 @@ public sealed class TableGridItemTests
         Assert.True(cell.TryGetValue("height", out var h) && h > 0, $"cell height should be > 0 but was {(cell.TryGetValue("height", out var y) ? y : double.NaN)}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TableGridItem_MinHeightGrowsTheRow()
     {
         double hPlain = Cell("").TryGetValue("height", out var a) ? a : double.NaN;

@@ -44,7 +44,7 @@ public class EmbeddedMediaDocumentTests : IDisposable
     private static byte[] MediaBytesThatTokeniseAsATag() =>
         [0x1A, 0x45, 0xDF, 0xA3, .. "<N4"u8, 0xEB, 0xCD, 0x93, (byte)':', 0x2F, 0xF8, 0x41, 0x98];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_To_A_Media_Resource_Does_Not_Parse_Its_Bytes_As_Markup()
     {
         WriteFile("A4.webm", MediaBytesThatTokeniseAsATag());
@@ -58,7 +58,7 @@ public class EmbeddedMediaDocumentTests : IDisposable
             $"Expected the media document's black canvas but got ({pixel.R},{pixel.G},{pixel.B}).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_To_An_Opaque_Resource_Paints_Nothing()
     {
         // A PDF has no synthesised document here: the frame stays empty rather
@@ -72,7 +72,7 @@ public class EmbeddedMediaDocumentTests : IDisposable
             $"Expected an empty frame but got ({pixel.R},{pixel.G},{pixel.B}).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_To_An_Extensionless_Binary_Resource_Does_Not_Parse_Its_Bytes_As_Markup()
     {
         // Nothing in the name says binary, so the bytes decide: a NUL byte and an
@@ -86,7 +86,7 @@ public class EmbeddedMediaDocumentTests : IDisposable
             $"Expected an empty frame but got ({pixel.R},{pixel.G},{pixel.B}).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_To_An_Extensionless_Text_Resource_Is_Still_Parsed_As_Markup()
     {
         // The common case the sniff must not break: an extensionless HTML resource
@@ -100,7 +100,7 @@ public class EmbeddedMediaDocumentTests : IDisposable
             $"Expected the frame's red document to paint but got ({pixel.R},{pixel.G},{pixel.B}).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frame_To_A_Plain_Text_Resource_Presents_The_Text()
     {
         WriteFile("notes.txt", "hello <not-a-tag>"u8.ToArray());

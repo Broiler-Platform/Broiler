@@ -11,7 +11,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CheckLayoutAssertionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Evaluates_One_Assertion_Per_Data_Attribute_With_Expected_Values()
     {
         const string html =
@@ -41,7 +41,7 @@ public sealed class CheckLayoutAssertionTests
         Assert.All(assertions, a => Assert.False(double.IsNaN(a.Actual)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Computes_Border_Box_Size_For_Explicit_Width_And_Height()
     {
         // An element with explicit width/height and no border/padding has a
@@ -64,7 +64,7 @@ public sealed class CheckLayoutAssertionTests
             $"offsetHeight expected ~30, got {byProperty["height"].Actual}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Returns_Empty_When_No_Check_Layout_Attributes()
     {
         const string html = "<!DOCTYPE html><html><body><div>plain</div></body></html>";

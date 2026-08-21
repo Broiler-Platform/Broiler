@@ -60,7 +60,7 @@ public class FrameViewportTests
     private const string Red = "red";
 
     /// <summary>The bug: a stylesheet rule sizes the frame, and its viewport follows.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StylesheetSizedFrame_ResolvesMediaQueriesAgainstItsOwnSize()
     {
         Assert.Equal(Blue, ProbeColourInFrame("width: 400px; height: 300px"));
@@ -68,7 +68,7 @@ public class FrameViewportTests
 
     /// <summary>A relative frame size resolves against the viewport the frame itself lives in — for
     /// a top-level frame, the page's. 50vw of the 1024px default page viewport is 512px.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameSizedInViewportUnits_ResolvesAgainstThePageViewport()
     {
         Assert.Equal(Blue, ProbeColourInFrame("width: 50vw; height: 50vh"));
@@ -76,7 +76,7 @@ public class FrameViewportTests
 
     /// <summary>An inline style still wins over the rule, and still works — the path that already
     /// worked. Here it makes the frame narrow, so the probe goes back to red.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineStyleSize_StillWinsOverAStylesheetRule()
     {
         Assert.Equal(Red,
@@ -85,7 +85,7 @@ public class FrameViewportTests
 
     /// <summary>As do the content attributes, for the same reason: they are the more specific
     /// statement of this frame's size.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttributeSize_StillWinsOverAStylesheetRule()
     {
         Assert.Equal(Red,
@@ -94,7 +94,7 @@ public class FrameViewportTests
 
     /// <summary>A frame sized by nothing at all still has no viewport to speak of — this change
     /// reads the cascade, it does not invent the UA's default frame size.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnsizedFrame_IsUnchanged()
     {
         Assert.Equal(Red, ProbeColourInFrame(string.Empty));

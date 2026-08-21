@@ -23,7 +23,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class AttributesBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(AttributesBinding);
@@ -33,7 +33,7 @@ public sealed class AttributesBindingModuleTests
         Assert.False(typeof(IAttributesHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Attributes_Through_The_Host_Contract()
     {
         Assert.True(typeof(IAttributesHost).IsAssignableFrom(typeof(DomBridge)));
@@ -42,7 +42,7 @@ public sealed class AttributesBindingModuleTests
             static field => field.FieldType == typeof(AttributesBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetAndGetAttribute_Round_Trip_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
@@ -64,7 +64,7 @@ public sealed class AttributesBindingModuleTests
         Assert.Equal("42|true|false", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_NamedNodeMap_And_Attr_Nodes_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\" class=\"a\" data-y=\"z\"></div></body></html>";
@@ -85,7 +85,7 @@ public sealed class AttributesBindingModuleTests
         Assert.Equal("3|data-y|z|2", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_Attribute_Write_Flows_To_Inline_Style_Through_The_Host()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
@@ -107,7 +107,7 @@ public sealed class AttributesBindingModuleTests
         Assert.Equal("red|10px", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attribute_Change_Is_Reported_To_MutationObservers_Through_The_Host()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
@@ -141,7 +141,7 @@ public sealed class AttributesBindingModuleTests
         Assert.Equal("data-k=;data-k=v1;", seen.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Attribute_Methods_Flow_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";

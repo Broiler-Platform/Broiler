@@ -40,7 +40,7 @@ public sealed class StylesheetBaseHrefInliningTests : IDisposable
 </head><body></body></html>
 """;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inlines_The_Base_Relative_Sheet_And_Never_The_Trap()
     {
         WriteSheet("stylesheet.css", "body { background-color: red; }");            // the trap
@@ -54,7 +54,7 @@ public sealed class StylesheetBaseHrefInliningTests : IDisposable
         Assert.DoesNotContain("<link", inlined);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Base_The_Sibling_Sheet_Still_Wins()
     {
         WriteSheet("stylesheet.css", "body { background-color: red; }");
@@ -73,7 +73,7 @@ public sealed class StylesheetBaseHrefInliningTests : IDisposable
         Assert.DoesNotContain("green", inlined);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Link_Whose_Base_Relative_Target_Is_Missing_Is_Left_Untouched()
     {
         // Only the sibling exists; the base points elsewhere, so nothing resolves and
@@ -86,7 +86,7 @@ public sealed class StylesheetBaseHrefInliningTests : IDisposable
         Assert.DoesNotContain("red", inlined);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Non_Stylesheet_Links_Are_Left_Untouched()
     {
         WriteSheet("resources/stylesheet.css", "body { background-color: green; }");
@@ -165,7 +165,7 @@ public sealed class HtmlBaseHrefTests
         Assert.Null(HtmlBaseHref.Resolve(url, "resources/", pageUrl: null));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Resolve_Reports_Null_When_Resolution_Is_A_No_Op()
     {
         // Nothing changes, so callers can skip the rewrite and keep output identical.

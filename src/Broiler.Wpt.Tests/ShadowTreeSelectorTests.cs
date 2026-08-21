@@ -47,7 +47,7 @@ public class ShadowTreeSelectorTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShadowTreeRule_DoesNotMatchLightDomElements()
     {
         // css-scoping-shadow-with-rules-no-style-leak, reduced: the page paints its own <div>
@@ -63,7 +63,7 @@ public class ShadowTreeSelectorTests : IDisposable
         Assert.Equal(100 * 100, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShadowTreeRule_StillMatchesItsOwnElements()
     {
         // The narrowing must not go too far: the tree's own <div> is exactly what the rule is for.
@@ -76,7 +76,7 @@ public class ShadowTreeSelectorTests : IDisposable
         Assert.Equal(100 * 40, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OneShadowTreeRule_DoesNotReachAnotherShadowTree()
     {
         // Each root is its own scope: host-a's rule must not paint host-b's content.
@@ -91,7 +91,7 @@ public class ShadowTreeSelectorTests : IDisposable
         Assert.Equal(100 * 30, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostSelectorInShadowTree_StillTargetsTheHost()
     {
         // `:host` addresses an element OUTSIDE the tree, so tree-scoping must leave it for
@@ -104,7 +104,7 @@ public class ShadowTreeSelectorTests : IDisposable
         Assert.Equal(100 * 50, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AKeyframesBlockDoesNotDerailTheRewrite()
     {
         // `@keyframes` holds keyframe selectors (`from`/`to`), not element selectors, and its
@@ -122,7 +122,7 @@ public class ShadowTreeSelectorTests : IDisposable
         Assert.Equal(100 * 100, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ARuleAfterAKeyframesBlockStillMatchesItsOwnTree()
     {
         // The other direction of the same guard: scoping must resume after the skipped block, not
@@ -137,7 +137,7 @@ public class ShadowTreeSelectorTests : IDisposable
         Assert.Equal(100 * 40, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MediaQueryBlockIsRecursedInto()
     {
         // A conditional group rule holds style rules, so its contents need the same scoping — and

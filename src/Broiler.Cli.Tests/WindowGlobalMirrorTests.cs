@@ -11,7 +11,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class WindowGlobalMirrorTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Window_Member_Is_Reachable_Unqualified()
     {
         // The guard that keeps the two in step as window members are added: sweeping, not listing.
@@ -29,7 +29,7 @@ document.getElementById('result').textContent = 'missing=' + (missing.length ? m
         Assert.Contains("missing=none", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unqualified_Window_Apis_Do_Not_Abort_The_Script()
     {
         // The failure mode was not "this call returns undefined" but "the script dies here", so
@@ -56,7 +56,7 @@ document.getElementById('result').textContent = seen.join('|');
         Assert.Contains("rgb(1, 2, 3)|string|boolean|object|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Mirrored_Accessors_Stay_Live_Rather_Than_Snapshotting()
     {
         // Descriptors are copied, not values, so an accessor-backed member such as innerWidth
@@ -78,7 +78,7 @@ document.getElementById('result').textContent = 'agree=' + agree;
         Assert.Contains("agree=true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Engine_Builtins_Are_Not_Overwritten_By_The_Mirror()
     {
         // The sweep skips any name the global already owns, so builtins and the explicit aliases

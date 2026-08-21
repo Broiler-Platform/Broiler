@@ -15,7 +15,7 @@ public class WptFontAndSelectorTests
     /// invalid per CSS 2.1 §15.8 because font-family is required.
     /// The entire declaration must be discarded.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontShorthand_EmptyFontFamily_DeclarationDiscarded()
     {
         // The font shorthand sets font-size=48px only if the font-family
@@ -60,7 +60,7 @@ document.getElementById('result').textContent = 'FONTSIZE:' + fs + ':END';
     /// Verifies that a valid font shorthand (font: 24px serif) still works
     /// correctly after the empty-font-family fix.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontShorthand_ValidFontFamily_StillWorks()
     {
         var html = @"<!DOCTYPE html>
@@ -83,7 +83,7 @@ document.getElementById('result').textContent = 'fs=' + fs;
     /// Verifies that unknown at-rules like @font-palette-values are
     /// silently ignored and don't break other CSS rules.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnknownAtRule_FontPaletteValues_Ignored()
     {
         var html = @"<!DOCTYPE html>
@@ -117,7 +117,7 @@ document.getElementById('result').textContent = cs.color;
     /// U+212A (Kelvin sign) must NOT be matched by 'k' or 'K' selectors,
     /// because Unicode case-folding is not applied.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TypeSelector_UnicodeKelvinSign_NotMatchedByAsciiK()
     {
         var html = @"<!DOCTYPE html>
@@ -142,7 +142,7 @@ document.getElementById('result').textContent = 'match=' + (matched !== null);
     /// CSS escape sequences in selectors must be decoded properly.
     /// The selector \212A should match elements with tag name U+212A.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssEscape_InSelector_DecodedToUnicode()
     {
         // The CSS rule uses \212A (CSS escape for U+212A Kelvin sign).
@@ -178,7 +178,7 @@ document.getElementById('result').textContent = 'HEIGHT:' + h + ':END';
     /// Verifies that normal ASCII type selectors remain case-insensitive
     /// (e.g. DIV and div should match the same elements).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TypeSelector_AsciiCaseInsensitive_StillWorks()
     {
         var html = @"<!DOCTYPE html>

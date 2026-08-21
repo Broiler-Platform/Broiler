@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class AnimationObjectBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnimationObject_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(AnimationObjectBinding);
@@ -22,7 +22,7 @@ public sealed class AnimationObjectBindingModuleTests
         Assert.False(moduleType.IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CurrentTime_And_Ready_Then_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

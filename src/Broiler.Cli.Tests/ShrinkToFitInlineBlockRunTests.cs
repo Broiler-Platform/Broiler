@@ -20,7 +20,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ShrinkToFitInlineBlockRunTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShrinkToFit_SumsInlineBlockRun_ButBlocksResetTheLine()
     {
         const string style =

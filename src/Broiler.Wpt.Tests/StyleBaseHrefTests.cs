@@ -52,7 +52,7 @@ public class StyleBaseHrefTests : IDisposable
     private static bool IsLime(BColor c) => c.G > 200 && c.R < 80 && c.B < 80;
     private static bool IsRed(BColor c) => c.R > 200 && c.G < 80 && c.B < 80;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeBase_ResolvesRelativeCssUrl()
     {
         // <base href="/images/"> makes url(green.png) resolve to /images/green.png (lime),
@@ -63,7 +63,7 @@ public class StyleBaseHrefTests : IDisposable
         Assert.True(IsLime(color), $"root-relative <base> should resolve url(green.png) to lime; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeBase_ResolvesUrlInScriptInsertedRule()
     {
         // The css-values/inline-cache-base-uri-cssom scenario: the url() arrives through
@@ -77,7 +77,7 @@ public class StyleBaseHrefTests : IDisposable
         Assert.True(IsLime(color), $"<base> must apply to a CSSOM-inserted url(); got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteRootRelativeUrl_WithoutBase_StillResolves()
     {
         // No <base>: a url(/images/green.png) is already root-relative and must still
@@ -87,7 +87,7 @@ public class StyleBaseHrefTests : IDisposable
         Assert.True(IsLime(color), $"absolute root-relative url() should still resolve without <base>; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeUrl_WithoutBase_DoesNotResolveToRoot()
     {
         // No <base>: a relative url(green.png) resolves against the document's own directory

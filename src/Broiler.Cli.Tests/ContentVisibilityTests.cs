@@ -17,7 +17,7 @@ public class ContentVisibilityTests
     /// A <c>content-visibility: hidden</c> box paints its own lightblue
     /// background, but the red child inside it is skipped — no red pixels.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hidden_Skips_Contents_But_Paints_Own_Box()
     {
         var html = @"<!DOCTYPE html>
@@ -44,7 +44,7 @@ public class ContentVisibilityTests
     /// normally, proving the assertion above is exercised by the property and
     /// not by some unrelated layout quirk.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Visible_Renders_Contents()
     {
         var html = @"<!DOCTYPE html>

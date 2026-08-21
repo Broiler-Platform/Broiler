@@ -82,7 +82,7 @@ public sealed class CodeShellTests : IDisposable
         return workspace;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Shell_Puts_Every_Pane_In_The_Tree()
     {
         (CodeShell shell, _, CodeShellControls controls) = CreateShell();
@@ -101,7 +101,7 @@ public sealed class CodeShellTests : IDisposable
         shell.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Menu_Has_File_And_Build_Commands()
     {
         (CodeShell shell, _, CodeShellControls controls) = CreateShell();
@@ -117,7 +117,7 @@ public sealed class CodeShellTests : IDisposable
         shell.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Attaching_A_Workspace_Gives_The_Editor_A_Document_So_Input_Works()
     {
         (CodeShell shell, StandardCodeEditor editor, CodeShellControls controls) = CreateShell();
@@ -139,7 +139,7 @@ public sealed class CodeShellTests : IDisposable
         shell.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unavailable_Build_Command_Says_So_Rather_Than_Looking_Broken()
     {
         (CodeShell shell, _, CodeShellControls controls) = CreateShell();
@@ -153,7 +153,7 @@ public sealed class CodeShellTests : IDisposable
         shell.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Save_All_Names_The_Files_It_Could_Not_Write()
     {
         (CodeShell shell, StandardCodeEditor editor, CodeShellControls controls) = CreateShell();
@@ -173,7 +173,7 @@ public sealed class CodeShellTests : IDisposable
         shell.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Problems_Group_By_Document_And_Carry_A_Severity_Decoration()
     {
         (CodeShell shell, _, CodeShellControls controls) = CreateShell();
@@ -191,7 +191,7 @@ public sealed class CodeShellTests : IDisposable
         shell.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Status_Line_Says_When_Nothing_Has_Analysed()
     {
         (CodeShell shell, _, CodeShellControls controls) = CreateShell();

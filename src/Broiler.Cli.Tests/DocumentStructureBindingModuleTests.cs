@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DocumentStructureBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentStructure_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(DocumentStructureBinding);
@@ -26,7 +26,7 @@ public sealed class DocumentStructureBindingModuleTests
         Assert.True(typeof(IDocumentStructureHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Head_And_Title_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

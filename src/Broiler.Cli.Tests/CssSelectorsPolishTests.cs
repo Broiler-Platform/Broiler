@@ -10,7 +10,7 @@ public class CssSelectorsPolishTests
 {
     // ──────── 6.1  Dynamic selector re-evaluation after DOM mutation ────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void QuerySelectorAll_Reflects_AppendChild()
     {
         var html = @"<!DOCTYPE html>
@@ -33,7 +33,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("1,2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Combinators_Work_After_RemoveChild()
     {
         var html = @"<!DOCTYPE html>
@@ -59,7 +59,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────── 6.2  Selector parser edge cases ─────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DivStar_NoSpace_Parses_As_Descendant()
     {
         var html = @"<!DOCTYPE html>
@@ -83,7 +83,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────── 6.3  :link and :visited pseudo-classes ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Link_Matches_Anchor_With_Href()
     {
         var html = @"<!DOCTYPE html>
@@ -109,7 +109,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────── 6.4  CSS cursor property in getComputedStyle ────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Cursor_CSS3_Keywords()
     {
         var html = @"<!DOCTYPE html>
@@ -140,7 +140,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────── 6.5  getComputedStyle cascade / specificity ─────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_LastChild_WhiteSpace_PreWrap_Cascade()
     {
         var html = @"<!DOCTYPE html>
@@ -166,7 +166,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("normal,pre-wrap", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Specificity_ID_Beats_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -192,7 +192,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("blue,2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_PseudoClass_Specificity_Counted()
     {
         var html = @"<!DOCTYPE html>

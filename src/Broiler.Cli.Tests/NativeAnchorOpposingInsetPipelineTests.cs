@@ -64,7 +64,7 @@ public sealed class NativeAnchorOpposingInsetPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_SizesBoxToSpanBetweenOpposingInsets()
     {
         var box = LayoutTarget(nativeAnchor: true);
@@ -74,7 +74,7 @@ public sealed class NativeAnchorOpposingInsetPipelineTests
         Assert.Equal(30f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_DoesNotSpanAnchor()
     {
         var box = LayoutTarget(nativeAnchor: false);

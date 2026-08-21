@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </remarks>
 public class WebStorageDomTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unqualified_SessionStorage_Does_Not_Abort_The_Script()
     {
         // The failure mode was not "this read returns undefined" but "the script dies here", so the
@@ -40,7 +40,7 @@ document.getElementById('result').textContent = seen.join('|');
         Assert.Contains("object|object|v|null", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Two_Areas_Are_Separate_Stores()
     {
         var html = @"<!DOCTYPE html>
@@ -60,7 +60,7 @@ document.getElementById('result').textContent =
         Assert.Contains("local|session|false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Area_Enumerates_Through_Length_And_Key()
     {
         // How a page walks an area it did not write itself. The methods must not show up among the
@@ -83,7 +83,7 @@ document.getElementById('result').textContent =
         Assert.Contains("a,b|a,b|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Named_Access_And_setItem_Address_The_Same_Item()
     {
         // Storage is a legacy platform object with named property getters and setters, so pages use
@@ -111,7 +111,7 @@ document.getElementById('result').textContent = seen.join('|');
         Assert.Contains("assigned|set|2|null|0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Storage_Interface_Global_Answers_Feature_Tests()
     {
         // `typeof Storage !== 'undefined'` is the canonical Web Storage feature test: a page that

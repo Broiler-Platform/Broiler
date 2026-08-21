@@ -10,7 +10,7 @@ namespace Broiler.UI.Standard.Tests;
 
 public sealed class Phase2StandardServicesTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Synthetic_Tree_Replays_Input_And_Emits_Deterministic_Render_List()
     {
         var host = new Phase2Host(new BSize(80, 40));
@@ -42,7 +42,7 @@ public sealed class Phase2StandardServicesTests
         Assert.Contains(child.InputKinds, kind => kind == UiInputEventKind.TextComposition);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Focus_Capture_Routing_Timing_And_Invalidation_Are_Isolated_And_Reentrant()
     {
         var host = new Phase2Host(new BSize(64, 32));
@@ -86,7 +86,7 @@ public sealed class Phase2StandardServicesTests
         Assert.Equal(1, animationTicks);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Theme_Semantics_Commands_And_HitTesting_Are_Reusable_Services()
     {
         var host = new Phase2Host(new BSize(50, 50));
@@ -119,7 +119,7 @@ public sealed class Phase2StandardServicesTests
         Assert.False(commands.TryExecute("missing"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Multiple_Sessions_Do_Not_Share_Focus_Capture_Render_Or_Theme_State()
     {
         var hostA = new Phase2Host(new BSize(20, 20));
@@ -157,7 +157,7 @@ public sealed class Phase2StandardServicesTests
         Assert.NotSame(custom, themeB.Resolve(elementB));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Legacy_Graphics_Adapter_Is_Isolated_And_Marked_For_Removal()
     {
 #pragma warning disable CS0618
@@ -171,7 +171,7 @@ public sealed class Phase2StandardServicesTests
 #pragma warning restore CS0618
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Touch_And_Pen_Events_Preserve_Contact_Data_At_The_UI_Boundary()
     {
         UiInputEvent touch = UiInputEvent.FromTouchContact(CreateTouch(11, 12));

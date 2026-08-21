@@ -86,7 +86,7 @@ public sealed class NativePositionTryPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_WithRules_AppliesFallback_ToFittingPosition()
     {
         var box = LayoutTarget(nativeAnchor: true, rules: FlipRule);
@@ -96,7 +96,7 @@ public sealed class NativePositionTryPipelineTests
         Assert.Equal(30f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_WithoutRules_KeepsOverflowingBase()
     {
         // No @position-try rule bodies handed to the engine → the overflowing base placement
@@ -106,7 +106,7 @@ public sealed class NativePositionTryPipelineTests
         Assert.Equal(90f, box.BorderBox.Top, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_LeavesBoxUnplaced()
     {
         // Flag off → the engine cannot parse anchor() as a length, so #target sits at its
@@ -178,7 +178,7 @@ public sealed class NativePositionTryPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeMaxContentBase_RealWidthDrivesFallback()
     {
         var box = LayoutTargetOf(MaxContentHtml, nativeAnchor: true, rules: MaxContentFlipRule);
@@ -187,7 +187,7 @@ public sealed class NativePositionTryPipelineTests
         Assert.Equal(100f, box.BorderBox.Left, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeMaxContentBase_WithoutRules_KeepsOverflowingBase()
     {
         // No rules → no fallback; the box stays at its overflowing base (left 150), proving the
@@ -217,7 +217,7 @@ public sealed class NativePositionTryPipelineTests
             ["--flip"] = new Dictionary<string, string> { ["left"] = "auto", ["right"] = "0" },
         };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFallback_UnitlessZeroInset_ResolvesToFlushEdge()
     {
         var box = LayoutTargetOf(UnitlessZeroHtml, nativeAnchor: true, rules: UnitlessZeroRule);

@@ -72,7 +72,7 @@ public class ElementContentReplacementTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModalDialogInsideReplacedElement_GeneratesNoBox_AndImageRenders()
     {
         var test = RenderGreen(
@@ -88,7 +88,7 @@ public class ElementContentReplacementTests : IDisposable
         Assert.Equal(reference, test);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModalDialog_OutsideReplacedElement_StillPaints()
     {
         // Guard the suppression above against over-reach: a modal dialog that is NOT inside a

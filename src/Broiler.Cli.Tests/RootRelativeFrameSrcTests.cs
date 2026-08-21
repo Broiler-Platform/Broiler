@@ -68,7 +68,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     private const string BlueDocument = "<!DOCTYPE html><body style='margin:0;background:blue'></body>";
 
     /// <summary>The fix: with a root set, the frame loads the file that root names.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeSrc_ResolvesAgainstTheDocumentRoot()
     {
         WriteResource(Path.Combine("resources", "child.html"), RedDocument);
@@ -79,7 +79,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     /// The negative half, and the reason this is a host-supplied root rather than a guess: with no
     /// root set the URL does not resolve and the frame paints nothing — exactly what it did before.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeSrc_WithoutADocumentRoot_PaintsNothing()
     {
         WriteResource(Path.Combine("resources", "child.html"), RedDocument);
@@ -90,7 +90,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     /// The root is not the page's own directory: a root-relative URL must not quietly behave like a
     /// directory-relative one. The page lives in <c>pages/</c>, so this resolves only from the root.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeSrc_DoesNotResolveAgainstThePagesOwnDirectory()
     {
         WriteResource(Path.Combine("pages", "sibling.html"), RedDocument);
@@ -112,7 +112,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     }
 
     /// <summary>A percent-escaped path names the file it decodes to.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeSrc_UnescapesThePath()
     {
         WriteResource(Path.Combine("resources", "a b.html"), RedDocument);
@@ -123,7 +123,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     /// A <c>..</c> segment must not walk out of the root: served over HTTP it could not, and the
     /// frame would 404 rather than reach an unrelated file elsewhere on the disk.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeSrc_CannotEscapeTheRoot()
     {
         var outside = Path.Combine(Path.GetDirectoryName(_root.TrimEnd(Path.DirectorySeparatorChar))!,
@@ -144,7 +144,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     /// <c>//host/path</c> is scheme-relative, not root-relative: it names another origin and is not
     /// ours to read off the local disk. Two slashes must not be mistaken for one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SchemeRelativeSrc_IsNotTreatedAsRootRelative()
     {
         WriteResource(Path.Combine("resources", "child.html"), RedDocument);
@@ -155,7 +155,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     /// A bare <c>/</c> names a directory, not a document, and resolves to nothing rather than to the
     /// root itself.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootRelativeSrc_OfJustASlash_PaintsNothing()
     {
         WriteResource(Path.Combine("resources", "child.html"), RedDocument);
@@ -200,7 +200,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     }
 
     /// <summary>A percent-escaped document-relative path names the file it decodes to, too.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeSrc_UnescapesThePath()
     {
         WriteResource(Path.Combine("pages", "a b.html"), BlueDocument);
@@ -224,7 +224,7 @@ public class RootRelativeFrameSrcTests : IDisposable
     /// The lever restores what it found rather than leaving its own value behind, so a nested
     /// render (a frame inside a frame) cannot strand a root on the thread.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pin_RestoresThePreviousRoot()
     {
         Assert.Null(DocumentRoot.Current);

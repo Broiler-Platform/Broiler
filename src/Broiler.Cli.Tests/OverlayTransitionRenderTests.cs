@@ -28,7 +28,7 @@ public class OverlayTransitionRenderTests
     // WPT overlay-transition-in-rendering: a popover transitioning `overlay` in is not painted in the
     // top layer, so an already-open (non-transitioning) popover above it covers it. #green is in the
     // top layer; #transition-in (red) is held out, so the page is green, not red.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overlay_Transitioning_In_Is_Not_In_Top_Layer()
     {
         const string html = """
@@ -61,7 +61,7 @@ public class OverlayTransitionRenderTests
     // WPT overlay-transition-backdrop-entry: during the entry transition the popover is not in the top
     // layer, so its ::backdrop does not render — the blue backdrop must not paint, leaving the green
     // body.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overlay_Transitioning_In_Suppresses_The_Backdrop()
     {
         const string html = """
@@ -95,7 +95,7 @@ public class OverlayTransitionRenderTests
     // stays an out-of-flow box at the viewport origin — it does not fall back into normal flow, and
     // it does not push the static position of the fixed #red box that follows it below the viewport.
     // The page is the popover's green at the 8px body margin and #red everywhere inside it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overlay_Transitioning_In_Keeps_UA_Fixed_Positioning()
     {
         const string html = """
@@ -134,7 +134,7 @@ public class OverlayTransitionRenderTests
 
     // Regression guard: a popover shown WITHOUT an overlay transition still promotes to the top layer
     // and paints its ::backdrop normally (the hold applies only to an in-flight overlay-in transition).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Popover_Without_Overlay_Transition_Still_Paints_Backdrop()
     {
         const string html = """
@@ -167,7 +167,7 @@ public class OverlayTransitionRenderTests
 <body><dialog id="d"></dialog></body></html>
 """;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dialog_Closed_Mid_Overlay_Transition_Still_Paints_With_Its_Backdrop()
     {
         using var bitmap = Render(DialogHtml, """
@@ -185,7 +185,7 @@ d.close();
     // The negative half: without the discrete transition the same close() tears the dialog down at
     // once, so neither it nor its backdrop is painted. Without this the test above would pass just as
     // well against a close() that never did anything.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dialog_Closed_Without_An_Overlay_Transition_Disappears_Immediately()
     {
         using var bitmap = Render(DialogHtml, """
@@ -201,7 +201,7 @@ d.close();
     // A dialog that transitions `overlay` but NOT `display` stays in the top layer yet generates no
     // box — the UA sheet's `dialog:not([open]) { display: none }` still applies, so the two halves
     // must not be collapsed into one flag.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dialog_Transitioning_Only_Overlay_Generates_No_Box()
     {
         const string html = """

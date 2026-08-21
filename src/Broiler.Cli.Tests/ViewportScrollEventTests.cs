@@ -34,7 +34,7 @@ public class ViewportScrollEventTests
         return bridge.SerializeToHtml();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_ScrollTop_Notifies_A_Window_Scroll_Listener()
     {
         var html = Run("""
@@ -49,7 +49,7 @@ public class ViewportScrollEventTests
         Assert.Contains("top=500", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollTo_And_ScrollBy_Notify_Too()
     {
         var html = Run("""
@@ -65,7 +65,7 @@ public class ViewportScrollEventTests
         Assert.Contains("top=300", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Scroll_That_Does_Not_Move_Notifies_Nothing()
     {
         // The dispatch is gated on the offset actually changing, and must stay that way — a
@@ -81,7 +81,7 @@ public class ViewportScrollEventTests
         Assert.Contains("fired=0", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Element_Scroll_Still_Reaches_Its_Own_Listener_Only()
     {
         // Only the viewport propagates to the window; a scroller's own event stays on the element,

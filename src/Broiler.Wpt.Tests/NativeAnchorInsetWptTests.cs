@@ -80,7 +80,7 @@ public class NativeAnchorInsetWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EnginePlacesAnchorInsetBox_AtAnchorEdges()
     {
         var red = Render(nativeAnchor: true);

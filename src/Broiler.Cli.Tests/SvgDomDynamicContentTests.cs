@@ -11,7 +11,7 @@ public class SvgDomDynamicContentTests
 {
     // ────────────────────── 8.2: SVG viewBox attribute ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_ViewBox_BaseVal_Has_Dimensions()
     {
         var html = @"<!DOCTYPE html>
@@ -36,7 +36,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_ViewBox_AnimVal_Equals_BaseVal()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 8.3: Dynamic style modification ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_TextNode_Data_Change_Updates_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -83,7 +83,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_AppendChild_TextNode_Updates_CssRules()
     {
         var html = @"<!DOCTYPE html>
@@ -105,7 +105,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheets_Href_Null_For_Inline()
     {
         var html = @"<!DOCTYPE html>
@@ -125,7 +125,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 8.5: XML processing instruction handling ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XML_Declaration_Does_Not_Create_Element()
     {
         var html = @"<?xml version=""1.0"" encoding=""UTF-8""?>
@@ -147,7 +147,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 8.6: Foster parenting ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Foster_Parent_Text_In_Table_Goes_Before_Table()
     {
         // Test that when HTML is parsed with text directly inside <table>,
@@ -182,7 +182,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 8.6: Implied tag closing for table elements ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Close_TD_When_Next_TD_Arrives()
     {
         var html = @"<!DOCTYPE html>
@@ -203,7 +203,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Close_Option_When_Next_Option_Arrives()
     {
         var html = @"<!DOCTYPE html>
@@ -227,7 +227,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 8.6: Misnested formatting elements ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Misnested_Formatting_Closes_On_End_Tag()
     {
         var html = @"<!DOCTYPE html>
@@ -259,7 +259,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 8.6: Doc.open/write/close tree structure ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Doc_Write_Creates_Proper_Head_Body_Structure()
     {
         var html = @"<!DOCTYPE html>
@@ -297,7 +297,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Doc_Write_Nested_Span_Script_Structure()
     {
         var html = @"<!DOCTYPE html>

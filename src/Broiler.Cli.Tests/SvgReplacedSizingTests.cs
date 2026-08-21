@@ -101,7 +101,7 @@ public sealed class SvgReplacedSizingTests
     }
 
     /// <summary>Commas are viewBox separators just like whitespace.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ViewBox_AcceptsCommaSeparators()
     {
         AssertSvgSize("viewBox=\"0,0,500,250\"", 400, 400, 200);
@@ -126,7 +126,7 @@ public sealed class SvgReplacedSizingTests
     /// A percentage width resolves against the containing block first; the ratio
     /// then transfers the <em>used</em> width, not the percentage.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PercentageWidth_TransfersUsedWidth()
     {
         AssertSvgSize("width=\"50%\" viewBox=\"0 0 500 250\"", 400, 200, 100);
@@ -136,7 +136,7 @@ public sealed class SvgReplacedSizingTests
     /// <c>max-width</c> clamps the used width before the transfer, so the ratio is
     /// applied to the clamped width (CSS2.1 §10.4 precedes Sizing 4 §4).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MaxWidth_ClampsBeforeTheTransfer()
     {
         AssertSvgSize("style=\"max-width:100px\" viewBox=\"0 0 500 250\"", 400, 100, 50);
@@ -147,7 +147,7 @@ public sealed class SvgReplacedSizingTests
     /// one the viewBox supplies (CSS Sizing 4 §4): a 1:1 viewBox drawn in a box
     /// declared 2/1 gives a 400×200 box, not a 400×400 one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AuthorAspectRatio_OverridesTheViewBoxRatio()
     {
         AssertSvgSize("style=\"width:400px;aspect-ratio:2/1\" viewBox=\"0 0 500 500\"", 400, 400, 200);
@@ -158,7 +158,7 @@ public sealed class SvgReplacedSizingTests
     /// rather than becoming the unparseable "autopx" that collapsed the box to zero
     /// width and painted nothing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AutoKeywordAttribute_LeavesTheAxisAuto()
     {
         AssertSvgSize("width=\"auto\" viewBox=\"0 0 500 250\"", 400, 400, 200);
@@ -213,7 +213,7 @@ public sealed class SvgReplacedSizingTests
     /// percentage height resolves against the containing block's block size, and against nothing
     /// when there is none.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlock_PercentageHeight_ResolvesAgainstTheBlockAxis()
     {
         string html =

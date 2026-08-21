@@ -84,7 +84,7 @@ public sealed class SemanticServiceTests
         return (new SourceBufferDocument(buffer), buffer);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Compiler_Identity_Is_Reported_So_A_Mismatch_Is_Visible()
     {
         // The service and the build worker run different compiler builds on the
@@ -94,7 +94,7 @@ public sealed class SemanticServiceTests
         Assert.StartsWith("5.", CSharpLanguageService.CompilerIdentity, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Cross_File_Error_Is_Reported_At_Its_Call_Site()
     {
         var graphs = new CachedGraphSource();
@@ -120,7 +120,7 @@ public sealed class SemanticServiceTests
         document.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Editing_One_File_Changes_The_Diagnostic_In_Another()
     {
         var graphs = new CachedGraphSource();
@@ -157,7 +157,7 @@ public sealed class SemanticServiceTests
         document.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Target_Specific_Defines_Produce_Target_Specific_Results()
     {
         string source = """
@@ -210,7 +210,7 @@ public sealed class SemanticServiceTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Untrusted_Workspace_Reports_Why_Rather_Than_Guessing()
     {
         var service = new CSharpLanguageService(new UntrustedGraphSource());
@@ -227,7 +227,7 @@ public sealed class SemanticServiceTests
         Assert.Contains("not been trusted", reason.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_Outside_The_Evaluated_Compile_Set_Says_So()
     {
         var graphs = new CachedGraphSource();
@@ -250,7 +250,7 @@ public sealed class SemanticServiceTests
         Assert.Equal("BRC1002", Assert.Single(result.ProjectDiagnostics).Code);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Analysis_Observes_Cancellation()
     {
         var graphs = new CachedGraphSource();

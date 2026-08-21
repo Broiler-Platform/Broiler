@@ -146,7 +146,7 @@ public sealed class GridTrackLayoutTests
             + body + "</body></html>";
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridAutoFlowSparse_MatchesExpectedGeometry()
     {
         using var context = new JSContext();
@@ -170,7 +170,7 @@ public sealed class GridTrackLayoutTests
     /// real grid tests (e.g. css-anchor-position/position-try-grid-001) but not
     /// exercised by the sparse-placement fixture above.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridRepeatGapAndLineSpan_MatchesExpectedGeometry()
     {
         // 3 columns of 100px, 2 rows of 50px, 10px gap. Column edges: 0..100,
@@ -244,7 +244,7 @@ public sealed class GridTrackLayoutTests
         return sb.ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridFrColumns_SplitFreeSpaceEqually()
     {
         // 300px wide, three equal fr columns -> 100px each; one 50px row.
@@ -255,7 +255,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-fr-columns.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridFixedPlusFr_FrTakesRemainder()
     {
         // 400px wide: a 100px fixed column then a 1fr column absorbing the rest.
@@ -265,7 +265,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-fixed-fr.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridRepeatFrWithGap_DistributesAfterGaps()
     {
         // repeat(2,1fr) with a 20px gap over 220px: free = 200 -> 100px each.
@@ -275,7 +275,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-repeat-fr-gap.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridMinmaxFixedFr_GrowsAboveMinimum()
     {
         // minmax(100px,1fr) twice over 300px: each fr share (150) exceeds the
@@ -286,7 +286,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-minmax.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridAutoColumns_SizeToFixedContent()
     {
         // Auto columns size to their item's max-content, driven here by a
@@ -304,7 +304,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-auto-content.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridFrRows_SplitDefiniteHeight()
     {
         // A definite 200px height with two fr rows -> 100px each.
@@ -314,7 +314,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-fr-rows.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridAutoFillColumns_ResolveCountFromDefiniteWidth()
     {
         // repeat(auto-fill, 100px) in a 350px grid -> 3 tracks (a 4th would
@@ -325,7 +325,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-auto-fill-cols.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridAutoFillColumnsWithGap_CountAndNegativeRangeSpan()
     {
         // repeat(auto-fill, 60px) with a 10px gap over 305px -> 4 tracks:
@@ -339,7 +339,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-auto-fill-gap-neg.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridNegativeLine_ResolvesFromEndOfExplicitGrid()
     {
         // Three fixed columns (40, 60, 80). Negative lines count back from the
@@ -352,7 +352,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-negative-line.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridAutoFillRows_ResolveCountFromMinHeight()
     {
         // repeat(auto-fill, 50px) rows with an indefinite height but a definite
@@ -367,7 +367,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-auto-fill-rows.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridLineNameContainingAutoFill_ParsesAsOrdinaryTracks()
     {
         // The "auto-fill" substring inside a line name must NOT be mistaken for an
@@ -378,7 +378,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-linename-auto-fill.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridImplicitOnlyTracks_WithAlignContent_DistributeRowsInDefiniteHeight()
     {
         // A template-less grid (no grid-template-columns/rows) sized purely by
@@ -397,7 +397,7 @@ public sealed class GridTrackLayoutTests
         AssertCheckLayout(html, "file:///grid-implicit-align-content.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridImplicitOnlyRows_WithExplicitColumns_SizeFromGridAutoRows()
     {
         // Explicit columns but a template-less row axis fed by grid-auto-rows:50px.

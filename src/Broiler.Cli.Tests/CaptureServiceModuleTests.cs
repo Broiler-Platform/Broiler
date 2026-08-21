@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CaptureServiceModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_Runs_Inline_Module_That_Imports_And_Mutates_Dom()
     {
         Assert.True(EngineModuleSupport.Available,
@@ -31,7 +31,7 @@ public sealed class CaptureServiceModuleTests
         Assert.Contains("data-m=\"cap\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_With_No_Scripts_Passes_Through_Untouched()
     {
         // The module bucket is part of the "nothing to run" guard: a page with neither scripts nor a

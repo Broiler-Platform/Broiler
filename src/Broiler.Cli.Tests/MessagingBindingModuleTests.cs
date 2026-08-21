@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class MessagingBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Messaging_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(MessagingBinding);
@@ -27,7 +27,7 @@ public sealed class MessagingBindingModuleTests
         Assert.False(typeof(IMessagingHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Messaging_Through_The_Host_Contract()
     {
         Assert.True(typeof(IMessagingHost).IsAssignableFrom(typeof(DomBridge)));
@@ -36,7 +36,7 @@ public sealed class MessagingBindingModuleTests
             static field => field.FieldType == typeof(MessagingBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessagingBinding_Owns_The_MessagePortRegistry_State_Authority()
     {
         // The module owns the port registry; the bridge no longer holds one directly.
@@ -48,7 +48,7 @@ public sealed class MessagingBindingModuleTests
             static field => field.FieldType == typeof(MessagePortRegistry));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessageChannel_Ports_Round_Trip_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"result\"></div></body></html>";
@@ -74,7 +74,7 @@ public sealed class MessagingBindingModuleTests
         Assert.Equal("ping", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessagePort_Queues_Messages_Until_Onmessage_Is_Assigned()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"result\"></div></body></html>";
@@ -105,7 +105,7 @@ public sealed class MessagingBindingModuleTests
         Assert.Equal("queued", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Delivers_Asynchronously_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"result\"></div></body></html>";

@@ -42,15 +42,15 @@ public sealed class PercentChildShrinkToFitTests
         + "data-expected-width=\"120\" data-expected-height=\"40\">"
         + "<div class=\"fixed\"></div><div class=\"pct\"></div></div></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Float_WithPercentChild_ShrinksToContent() =>
         AssertCheckLayout(Doc("float:left;"), "file:///stf-float-pct.html");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlock_WithPercentChild_ShrinksToContent() =>
         AssertCheckLayout(Doc("display:inline-block;"), "file:///stf-inline-block-pct.html");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Abspos_WithPercentChild_ShrinksToContent() =>
         AssertCheckLayout(Doc("position:absolute;"), "file:///stf-abspos-pct.html");
 
@@ -61,7 +61,7 @@ public sealed class PercentChildShrinkToFitTests
     /// and the item at <c>grid-column:-2</c> (negative line = second-to-last of the
     /// explicit grid) lands in the last column at x=200.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AutoFillGrid_WithPercentItem_ResolvesMinWidthColumns()
     {
         string html =

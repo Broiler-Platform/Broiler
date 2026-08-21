@@ -54,7 +54,7 @@ public sealed class DocumentGetElementsByNameTests
         """);
 
     /// <summary>The homepage bundle's form lookup, run as it spells it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetElementsByName_FindsTheSearchForm_TheWayTheHomepageBundleDoes()
     {
         var (context, bridge) = Attach();
@@ -75,7 +75,7 @@ public sealed class DocumentGetElementsByNameTests
     }
 
     /// <summary>Every element carrying the attribute, in tree order — not just the first, not just controls.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetElementsByName_ReturnsEveryMatchInTreeOrder()
     {
         var (context, bridge) = Attach();
@@ -108,7 +108,7 @@ public sealed class DocumentGetElementsByNameTests
     }
 
     /// <summary>The value is matched exactly — HTML compares it identically, so case matters.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetElementsByName_ComparesTheValueCaseSensitively()
     {
         var (context, bridge) = Attach();
@@ -133,7 +133,7 @@ public sealed class DocumentGetElementsByNameTests
     }
 
     /// <summary>It is a function on the document, alongside the query methods it sits with.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetElementsByName_IsRegisteredOnTheDocument()
     {
         var (context, bridge) = Attach();

@@ -61,7 +61,7 @@ public class Transform3dFlatteningTests
     public void A_3D_Spelling_Renders_As_Its_2D_Equivalent(string threeD, string twoD)
         => AssertSameAs(threeD, twoD);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Rotation_About_Z_Is_An_In_Plane_Rotation()
     {
         // rotate3d's axis decides: only Z rotates within the page. A negative Z reverses it, which
@@ -72,7 +72,7 @@ public class Transform3dFlatteningTests
         AssertSameAs("rotateZ(30deg)", "rotate(30deg)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Rotation_Needing_Depth_Is_Still_Skipped()
     {
         // Projecting each 3D function to the page plane on its own is not the same as composing in
@@ -86,7 +86,7 @@ public class Transform3dFlatteningTests
         AssertSameAs("rotate3d(0, 0, 0, 90deg)", "none");   // degenerate axis is a no-op per spec
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Genuinely_3D_Matrix_Is_Still_Skipped()
     {
         // Only a matrix3d whose Z row and column are the identity is a 2D matrix.

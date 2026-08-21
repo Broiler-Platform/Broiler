@@ -126,7 +126,7 @@ public class RasterTileParallelismTests
     /// Guards the guard: every document above must actually be replayed in tiles, or the equality
     /// assertions are comparing the sequential replay with itself.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void These_Documents_Are_Actually_Replayed_In_Tiles()
     {
         foreach ((string name, string html) in Documents)
@@ -145,7 +145,7 @@ public class RasterTileParallelismTests
     /// A tile budget of one is the sequential replay, not an approximation of it: the surface is
     /// never split, so no tile view is created at all.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Budget_Of_One_Creates_No_Tiles()
     {
         var counts = RenderCounting(Documents["overlapping alpha"], tiles: 1);
@@ -165,7 +165,7 @@ public class RasterTileParallelismTests
     /// a surface one: the surface here is perfectly tileable and the test would pass vacuously if it
     /// were not distinguished.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_List_The_Raster_Canvas_Cannot_Draw_Alone_Is_Not_Tiled()
     {
         var counts = RenderCounting(
@@ -190,7 +190,7 @@ public class RasterTileParallelismTests
     /// 147 and on no synthetic document tried here. A property nothing above the rasterizer can
     /// observe the tile is checkable directly; waiting for it to show up as a wrong pixel is not.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Tile_View_Reports_Its_Parents_Clip_Rather_Than_Its_Tile()
     {
         using var bitmap = new BBitmap(Width, Height);
@@ -212,7 +212,7 @@ public class RasterTileParallelismTests
     /// the surface's fallbacks are decided per call, so this is the assertion that the gap between
     /// the two is empty for the documents above rather than merely believed to be.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Tile_View_Falls_Back_To_The_Compat_Backend()
     {
         TileParallelReplay.ResetDiagnostics();

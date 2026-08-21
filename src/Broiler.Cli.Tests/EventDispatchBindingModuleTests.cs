@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class EventDispatchBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EventDispatch_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(EventDispatchBinding);
@@ -24,7 +24,7 @@ public sealed class EventDispatchBindingModuleTests
         Assert.False(typeof(IEventDispatchHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_EventDispatch_Through_The_Host_Contract()
     {
         Assert.True(typeof(IEventDispatchHost).IsAssignableFrom(typeof(DomBridge)));
@@ -33,7 +33,7 @@ public sealed class EventDispatchBindingModuleTests
             static field => field.FieldType == typeof(EventDispatchBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bubbling_Fires_Capture_Then_Target_Then_Bubble_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ document.body.appendChild(out);
         Assert.Contains("order=outer-capture,inner-target,outer-bubble", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StopPropagation_Halts_Bubbling_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -89,7 +89,7 @@ document.body.appendChild(out);
         Assert.DoesNotContain("reached=inner,outer", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PreventDefault_Sets_DefaultPrevented_And_Dispatch_Returns_False()
     {
         var html = @"<!DOCTYPE html>

@@ -35,7 +35,7 @@ public sealed class NativeModalCenteringTests
         return (double.Parse(p[0]), double.Parse(p[1]), double.Parse(p[2]), double.Parse(p[3]));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DefiniteSize_Modal_Is_Centered_In_The_Viewport()
     {
         var (left, top, width, height) = ShowModalRect("dialog { width: 200px; height: 100px; }");
@@ -48,7 +48,7 @@ public sealed class NativeModalCenteringTests
         Assert.True(height < ViewportHeight);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentSized_Modal_ShrinkWraps_And_Centers_On_Both_Axes()
     {
         // No explicit size → the UA `width/height: fit-content` default shrink-wraps the modal to its
@@ -62,7 +62,7 @@ public sealed class NativeModalCenteringTests
         Assert.Equal((ViewportHeight - height) / 2, top, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Author_Positioning_Suppresses_The_Ua_Centering()
     {
         // Author places the modal explicitly → the UA centring default must not fight it.
@@ -72,7 +72,7 @@ public sealed class NativeModalCenteringTests
         Assert.Equal(30, top, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExplicitWidth_And_ExplicitHeight_Center_On_Both_Axes()
     {
         // Both axes definite → centred on both.
@@ -84,7 +84,7 @@ public sealed class NativeModalCenteringTests
         Assert.Equal((ViewportHeight - height) / 2, top, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExplicitWidth_ContentHeight_Centers_On_Both_Axes()
     {
         // Explicit width centres horizontally; the unspecified height gets the UA fit-content default,

@@ -96,7 +96,7 @@ public class TestDriverBlessOverrideTests : IDisposable
     /// The blessed action runs even though testdriver.js has already installed its own
     /// <c>bless</c>, so the document reaches the state the reference states.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BlessedAction_Runs_Even_When_Upstream_TestDriver_Has_Claimed_test_driver()
     {
         WriteUpstreamStyleTestDriver();
@@ -118,7 +118,7 @@ public class TestDriverBlessOverrideTests : IDisposable
     /// <c>bless</c> is the shape this has to survive — and it is why
     /// <c>IsTestDriverScript</c> matches the stem rather than <c>testdriver.js</c> exactly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Override_Also_Survives_A_Vendor_Hook_Loaded_After_TestDriver()
     {
         WriteUpstreamStyleTestDriver();
@@ -155,7 +155,7 @@ public class TestDriverBlessOverrideTests : IDisposable
     /// thing separating a pass from a viewport-filling red rectangle is which <c>bless</c> ran —
     /// which is what the <c>fullscreen/rendering</c> renders showed before the fix.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BlessedAction_Does_Not_Append_The_User_Interaction_Button()
     {
         WriteUpstreamStyleTestDriver();

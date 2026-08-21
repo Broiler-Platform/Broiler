@@ -14,7 +14,7 @@ public sealed class DocxImageTests
     private static Dictionary<string, byte[]> Media(string path, byte[]? bytes = null) =>
         new(StringComparer.Ordinal) { [path] = bytes ?? DocxTestPackage.OnePixelPng };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_An_Inline_Drawing_As_One_Image_Character()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -36,7 +36,7 @@ public sealed class DocxImageTests
         Assert.Equal(36, image.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_Alternative_Text_And_Keeps_Surrounding_Text_In_Order()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -54,7 +54,7 @@ public sealed class DocxImageTests
         Assert.Null(paragraph.Runs[2].Style.Image);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Keeps_The_Runs_Own_Formatting_On_An_Image()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -72,7 +72,7 @@ public sealed class DocxImageTests
         Assert.Equal("https://example.test/", run.Style.LinkHref);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_A_Legacy_Vml_Picture_And_Its_Css_Size()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -86,7 +86,7 @@ public sealed class DocxImageTests
         Assert.Equal(45, image.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_One_Media_Part_Once_When_Several_Runs_Share_It()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -109,7 +109,7 @@ public sealed class DocxImageTests
             paragraph.Runs[1].Style.Image!.Data.ToArray());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Counts_Images_In_The_Read_Summary()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -122,7 +122,7 @@ public sealed class DocxImageTests
         Assert.Contains("embedded 1 image(s)", summary.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reports_A_Picture_Whose_Media_Part_Is_Missing()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -134,7 +134,7 @@ public sealed class DocxImageTests
         Assert.Contains(result.Diagnostics, d => d.Code == "docx.image.missing");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reports_A_Picture_Whose_Relationship_Is_Undefined()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -146,7 +146,7 @@ public sealed class DocxImageTests
         Assert.Contains(result.Diagnostics, d => d.Code == "docx.image.relationship");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reports_An_Image_Format_It_Does_Not_Carry()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -158,7 +158,7 @@ public sealed class DocxImageTests
         Assert.Contains(result.Diagnostics, d => d.Code == "docx.image.format");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Skips_An_Image_Part_Over_The_Binary_Limit()
     {
         // The limit has to clear the package's XML parts, which it also governs,
@@ -177,7 +177,7 @@ public sealed class DocxImageTests
         Assert.Contains(result.Diagnostics, d => d.Code == "docx.image.limit");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Does_Not_Fetch_An_Externally_Linked_Picture()
     {
         DocumentReadResult result = DocxTestPackage.ReadWithMedia(
@@ -191,7 +191,7 @@ public sealed class DocxImageTests
         Assert.Contains(result.Diagnostics, d => d.Code == "docx.image.external");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_An_Image_As_A_Media_Part_With_Its_Relationship_And_Content_Type()
     {
         var image = new InlineImage(DocxTestPackage.OnePixelPng, "image/png", 72, 36, "a logo");
@@ -228,7 +228,7 @@ public sealed class DocxImageTests
         Assert.DoesNotContain("￼", documentXml, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_One_Media_Part_For_An_Image_Used_Twice()
     {
         var image = new InlineImage(DocxTestPackage.OnePixelPng, "image/png", 72, 72);
@@ -246,7 +246,7 @@ public sealed class DocxImageTests
         Assert.Null(archive.GetEntry("word/media/image2.png"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Round_Trips_An_Image_Through_Write_And_Read()
     {
         var image = new InlineImage(DocxTestPackage.OnePixelPng, "image/png", 120, 60, "a logo");
@@ -272,7 +272,7 @@ public sealed class DocxImageTests
         Assert.Equal("a logo", restored.AltText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Drops_A_Placeholder_Character_That_Carries_No_Image()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(

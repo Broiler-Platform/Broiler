@@ -22,7 +22,7 @@ public sealed class SystemFontIndexTests
 {
     private static bool AnyFontsInstalled => SystemFontIndex.Families.Count > 0;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unknown_Family_Resolves_To_Nothing()
     {
         Assert.False(SystemFontIndex.TryResolve("Not A Font That Exists 12345", bold: false, italic: false, out var path));
@@ -54,7 +54,7 @@ public sealed class SystemFontIndexTests
 
     /// <summary>The defect the resolver's own cache used to hide: bold and regular are different
     /// files, and a family that has both must not answer with the same one for both.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bold_And_Regular_Are_Different_Files_When_The_Family_Has_Both()
     {
         if (!AnyFontsInstalled)
@@ -76,7 +76,7 @@ public sealed class SystemFontIndexTests
             Assert.NotEqual(regular, bold, StringComparer.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Index_Is_Stable_Across_Calls() =>
         Assert.Equal(SystemFontIndex.Families.Count, SystemFontIndex.Families.Count);
 }

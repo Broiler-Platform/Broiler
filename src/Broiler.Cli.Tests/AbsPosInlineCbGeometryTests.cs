@@ -29,7 +29,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class AbsPosInlineCbGeometryTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsPos_In_Relative_Inline_Uses_Inset_Position_From_Shared_Geometry()
     {
         var html = "<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head><body>" +

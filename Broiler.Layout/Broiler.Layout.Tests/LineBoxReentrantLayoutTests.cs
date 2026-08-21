@@ -40,7 +40,7 @@ public sealed class LineBoxReentrantLayoutTests
     private static readonly Uri BaseUrl = new("file:///reentrant.html");
 
     // The crash itself: nothing is reported, so the outer pass ran to the end.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Layout_Re_Entered_From_A_Host_Callback_Reports_No_Error()
     {
         var environment = new ReentrantLayoutEnvironment { ReenterOn = "beta" };
@@ -55,7 +55,7 @@ public sealed class LineBoxReentrantLayoutTests
 
     // ...and the pass that finished last is the one the boxes agree with, which is what the
     // paint walker and FragmentTreeBuilder read back out of CssBox.Rectangles.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Boxes_Carry_The_Rectangles_Of_The_Lines_They_Are_On()
     {
         var environment = new ReentrantLayoutEnvironment { ReenterOn = "beta" };
@@ -80,7 +80,7 @@ public sealed class LineBoxReentrantLayoutTests
 
     // The guard against fixing it by making the pass tolerant of anything: an ordinary
     // layout, with nothing re-entering, still projects every rectangle exactly once.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Ordinary_Layout_Still_Assigns_Every_Rectangle()
     {
         var environment = new ReentrantLayoutEnvironment();
@@ -102,7 +102,7 @@ public sealed class LineBoxReentrantLayoutTests
     // holds rectangles as well as words — an atomic inline is on the line as a rectangle and
     // puts no word there — so a wordless line is assigned like any other, and duplicates the
     // same way when a forced break moves the text that follows onto the next line.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Line_With_No_Words_Is_Re_Entered_The_Same_Way()
     {
         var environment = new ReentrantLayoutEnvironment { ReenterOn = "beta" };
@@ -124,7 +124,7 @@ public sealed class LineBoxReentrantLayoutTests
     // exception message and are still separate keys. Giving CssLineBox value equality — or a
     // GetHashCode over its words — would make that message literally true and turn the
     // duplicate into a real one, so this is what says it must not gain either.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Line_Boxes_Are_Keyed_By_Identity_Rather_Than_By_Their_Text()
     {
         var (_, paragraph) = Paragraph(new ReentrantLayoutEnvironment());

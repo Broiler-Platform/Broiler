@@ -46,7 +46,7 @@ public sealed class WptPageMarginBoxesTests
         Assert.Equal([slot], boxes.Keys.Select(k => k.ToString()));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Nested_Rule_That_Is_Not_A_Margin_Box_Is_Ignored()
     {
         var (boxes, _) = WptPageMarginBoxes.Resolve(Page("@middle-middle { content: \"x\"; } margin: 1px;"));
@@ -54,7 +54,7 @@ public sealed class WptPageMarginBoxesTests
         Assert.Empty(boxes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Margin_Boxs_Declarations_Are_Read()
     {
         var (boxes, _) = WptPageMarginBoxes.Resolve(
@@ -84,7 +84,7 @@ public sealed class WptPageMarginBoxesTests
         Assert.Equal(generated, WptPageMarginBoxes.GeneratesBox(boxes[TopLeft]));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Rules_For_One_Slot_Cascade()
     {
         var (boxes, _) = WptPageMarginBoxes.Resolve(
@@ -97,7 +97,7 @@ public sealed class WptPageMarginBoxesTests
 
     // The page's own font, colour and white-space are inherited by the boxes in its margin; its
     // size and margins describe the sheet and are not.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Page_Passes_Down_Everything_But_Its_Own_Geometry()
     {
         var (_, pageDeclarations) = WptPageMarginBoxes.Resolve(
@@ -108,7 +108,7 @@ public sealed class WptPageMarginBoxesTests
         Assert.Equal(["font", "white-space"], names);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Rule_With_A_Selector_Contributes_No_Margin_Boxes()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -122,7 +122,7 @@ public sealed class WptPageMarginBoxesTests
 
     // A margin box's content becomes a ::before rule and its vertical-align becomes a table-cell
     // alignment, so neither is passed through as written; everything else is.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Declarations_Handed_To_The_Render_Drop_The_Ones_It_Takes_Over()
     {
         var (boxes, _) = WptPageMarginBoxes.Resolve(
@@ -151,7 +151,7 @@ public sealed class WptPageMarginBoxesTests
             WptPageMarginBoxes.DefaultAlignment(Enum.Parse<WptMarginBoxSlot>(slot)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_With_No_Page_Rule_Has_No_Margin_Boxes()
     {
         var (boxes, pageDeclarations) = WptPageMarginBoxes.Resolve(

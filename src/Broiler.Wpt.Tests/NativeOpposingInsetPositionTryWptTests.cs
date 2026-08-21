@@ -84,7 +84,7 @@ public class NativeOpposingInsetPositionTryWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineSizesFromInsets_AndAppliesFallback()
     {
         var red = Render(nativeAnchor: true);

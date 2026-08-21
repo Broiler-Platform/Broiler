@@ -23,7 +23,7 @@ public class FlexLayoutTests
     /// Regression: CorrectBlockInsideInline was wrapping them in a
     /// single anonymous block, causing them to stack.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlexChildren_DisplayBlock_SideBySide()
     {
         var html = "<html><body style='margin:0'>" +
@@ -57,7 +57,7 @@ public class FlexLayoutTests
     /// <summary>
     /// Submit buttons inside a flex container should flow side-by-side.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlexChildren_SubmitButtons_SideBySide()
     {
         var html = "<html><body style='margin:0'>" +
@@ -90,7 +90,7 @@ public class FlexLayoutTests
     /// Flex children with display:block should use shrink-to-fit sizing,
     /// not expand to the full container width.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlexChild_DisplayBlock_NotFullWidth()
     {
         var html = "<html><body style='margin:0'>" +
@@ -118,7 +118,7 @@ public class FlexLayoutTests
     /// <summary>
     /// Grid children with display:block should also use content sizing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridChild_UsesContentSizing()
     {
         var html = "<html><body style='margin:0'>" +
@@ -147,7 +147,7 @@ public class FlexLayoutTests
     /// flex-direction:column should stack children vertically.
     /// Each child should be content-sized (shrink-to-fit width).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlexDirectionColumn_StacksVertically()
     {
         var html = "<html><body style='margin:0'>" +
@@ -185,7 +185,7 @@ public class FlexLayoutTests
     /// justify-content:center should center flex items horizontally
     /// within the flex container.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void JustifyContentCenter_CentersItems()
     {
         var html = "<html><body style='margin:0'>" +
@@ -218,7 +218,7 @@ public class FlexLayoutTests
     /// <summary>
     /// max-width should constrain an inline-block or flex item's width.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MaxWidth_CapsFlexItemWidth()
     {
         var html = "<html><body style='margin:0'>" +
@@ -251,7 +251,7 @@ public class FlexLayoutTests
     /// Google-like layout: flex container with column direction,
     /// centered buttons should render as stacked, centered, content-sized items.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_FlexColumnCenteredButtons()
     {
         var html = @"<html><body style='margin:0'>

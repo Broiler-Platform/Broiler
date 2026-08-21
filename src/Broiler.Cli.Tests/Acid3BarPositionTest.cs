@@ -13,7 +13,7 @@ public class Acid3BarPositionTest
     private readonly ITestOutputHelper _output;
     public Acid3BarPositionTest(ITestOutputHelper output) => _output = output;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Bars_Single_Line_With_Important_Border_Override()
     {
         // Full Acid3 CSS including the critical !important rule

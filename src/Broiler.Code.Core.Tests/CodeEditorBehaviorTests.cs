@@ -33,7 +33,7 @@ public sealed class CodeEditorBehaviorTests
     private static void Wait(CodeAnalysisController controller) =>
         controller.CurrentWork?.Wait(TimeSpan.FromMinutes(2));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Edit_Recolors_Incrementally_Without_Reclassifying_The_Document()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(100_000));
@@ -58,7 +58,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Result_For_A_Superseded_Snapshot_Cannot_Paint()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(50));
@@ -83,7 +83,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Burst_Of_Edits_Publishes_Only_The_Current_Snapshot()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(100_000));
@@ -109,7 +109,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stale_Edit_Intents_Are_Rejected_Rather_Than_Rebased()
     {
         using CodeEditorScene scene = CreateEditor("abcdef");
@@ -126,7 +126,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bounded_Ime_Queries_Never_Return_More_Than_Asked_For()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(100_000));
@@ -146,7 +146,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Virtualized_Accessibility_Ranges_Reject_A_Stale_Version()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(500));
@@ -177,7 +177,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Semantic_Node_Never_Carries_The_Document_Text()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(10_000));
@@ -193,7 +193,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hit_Testing_Round_Trips_Through_Tabs_And_Wide_Characters()
     {
         using CodeEditorScene scene = CreateEditor("\tint x = 1;\nabc\U0001F600def\nplain\n");
@@ -218,7 +218,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rendering_Touches_Only_The_Visible_Lines()
     {
         using CodeEditorScene scene = CreateEditor(BuildSource(100_000));
@@ -241,7 +241,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Undo_Groups_Typing_And_Breaks_On_A_Caret_Move()
     {
         using CodeEditorScene scene = CreateEditor("start\n");
@@ -266,7 +266,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Indent_And_Outdent_Apply_To_Every_Selected_Line()
     {
         using CodeEditorScene scene = CreateEditor("one\ntwo\nthree\n");
@@ -282,7 +282,7 @@ public sealed class CodeEditorBehaviorTests
         
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Read_Only_Document_Refuses_Every_Edit_Path()
     {
         using CodeEditorScene scene = CreateEditor("locked\n");

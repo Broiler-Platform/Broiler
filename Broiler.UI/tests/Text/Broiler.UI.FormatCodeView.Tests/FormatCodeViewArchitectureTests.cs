@@ -4,7 +4,7 @@ namespace Broiler.UI.FormatCodeView.Tests;
 
 public sealed class FormatCodeViewArchitectureTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Abstraction_References_Only_Projector_Ui_And_Graphics()
     {
         XDocument project = XDocument.Load(ProjectPath(

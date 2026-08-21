@@ -34,7 +34,7 @@ public sealed class DomBridgeSessionLifetimeTests
     //  Re-attach leaves no state from the prior document (exit criterion b)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReAttach_Clears_Prior_Document_Nodes()
     {
         using var bridge = new DomBridge();
@@ -50,7 +50,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.Equal("true", ctx2.Eval("document.getElementById('one') === null").ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReAttach_Clears_Pending_Timers()
     {
         using var bridge = new DomBridge();
@@ -67,7 +67,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.False(bridge.FlushTimerStep());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReAttach_Clears_Window_Listeners()
     {
         using var ctx = new JSContext();
@@ -88,7 +88,7 @@ public sealed class DomBridgeSessionLifetimeTests
     //  Two simultaneous sessions are isolated (exit criterion a)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State()
     {
         using var bridgeA = new DomBridge();
@@ -122,7 +122,7 @@ public sealed class DomBridgeSessionLifetimeTests
     //  Deterministic disposal
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Releases_The_Layout_View()
     {
         var recording = new RecordingLayoutView();
@@ -139,7 +139,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.Equal(1, recording.DisposeCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Is_Idempotent()
     {
         var recording = new RecordingLayoutView();
@@ -153,7 +153,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.Equal(1, recording.DisposeCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Sessions_Use_Their_Own_Layout_View_Factories()
     {
         var recordingA = new RecordingLayoutView();
@@ -174,7 +174,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.Equal(0, recordingB.DisposeCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Drops_Pending_Timers_Without_Running_Them()
     {
         using var ctx = new JSContext();
@@ -191,7 +191,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.Equal("false", ctx.Eval("__ran").ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Does_Not_Dispose_The_Borrowed_JsContext()
     {
         using var ctx = new JSContext();
@@ -208,7 +208,7 @@ public sealed class DomBridgeSessionLifetimeTests
     //  Use-after-dispose fails fast
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attach_After_Dispose_Throws()
     {
         using var ctx = new JSContext();
@@ -219,7 +219,7 @@ public sealed class DomBridgeSessionLifetimeTests
         Assert.Throws<ObjectDisposedException>(() => bridge.Attach(ctx, BodyHtml, "file:///d2.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_Entry_Points_After_Dispose_Throw()
     {
         using var ctx = new JSContext();
@@ -237,11 +237,11 @@ public sealed class DomBridgeSessionLifetimeTests
     //  Architecture guards
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Is_Disposable() =>
         Assert.True(typeof(IDisposable).IsAssignableFrom(typeof(DomBridge)));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridgeRuntime_Interface_Is_Not_Disposable() =>
         // Source-compatibility guard: IDomBridgeRuntime consumers must not be forced to dispose
         // the bridge (Phase 2 P2.1 keeps IDisposable on the concrete type only).

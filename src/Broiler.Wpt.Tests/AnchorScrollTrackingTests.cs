@@ -66,7 +66,7 @@ public class AnchorScrollTrackingTests : IDisposable
 </div>
 <script>document.getElementById('sc').scrollTo(150, 100);</script>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterAnchored_TracksAnchorScrolledPositionAcrossScroller()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-scroll-" + System.Guid.NewGuid().ToString("N"));
@@ -101,7 +101,7 @@ public class AnchorScrollTrackingTests : IDisposable
     // shared-geometry wiring + CB-origin conversion keep the scroll-tracked position
     // correct (and stays green against the un-patched submodule, where block-box
     // geometry is already collected correctly).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterAnchored_TracksAnchorScrolledPosition_WithSharedLayoutGeometry()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-slg-" + System.Guid.NewGuid().ToString("N"));
@@ -155,7 +155,7 @@ public class AnchorScrollTrackingTests : IDisposable
 </div>
 <script>document.getElementById('sc').scrollTo(0, 100);</script>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterAnchored_StickyAnchor_NotShiftedByScroll()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-sticky-" + System.Guid.NewGuid().ToString("N"));

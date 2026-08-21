@@ -54,7 +54,7 @@ public sealed class AutoMarginCenteringTests
         Assert.Equal(100, b.ActualMarginBottom, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SurvivesAfterMarginAlreadyReadAsAuto()
     {
         // Reading ActualMargin* first rewrites the specified `auto` string to "0" (used value);
@@ -67,7 +67,7 @@ public sealed class AutoMarginCenteringTests
         Assert.Equal(100, b.ActualMarginTop, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OnlyOneInset_NotTouched()
     {
         var b = CenteredBox();
@@ -78,7 +78,7 @@ public sealed class AutoMarginCenteringTests
         Assert.Equal(0, b.ActualMarginTop, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonAutoMargin_NotTouched()
     {
         var b = CenteredBox();
@@ -89,7 +89,7 @@ public sealed class AutoMarginCenteringTests
         Assert.Equal(5, b.ActualMarginTop, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AutoWidth_NotCentredHorizontally()
     {
         var b = CenteredBox();
@@ -100,7 +100,7 @@ public sealed class AutoMarginCenteringTests
         Assert.Equal(100, b.ActualMarginTop, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IntrinsicWidth_ShrinkWrapped_IsCentred()
     {
         // A `width: fit-content` box shrink-wraps (ResolveBlockUsedWidth resolves Size.Width before
@@ -118,7 +118,7 @@ public sealed class AutoMarginCenteringTests
         Assert.Equal(100, b.ActualMarginRight, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExcessNegative_MarginsZero()
     {
         var root = Box(null, new SizeF(1000, 1000), "static");

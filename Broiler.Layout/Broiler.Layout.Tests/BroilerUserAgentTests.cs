@@ -26,14 +26,14 @@ namespace Broiler.Layout.Tests;
 /// </remarks>
 public sealed class BroilerUserAgentTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Value_Is_A_Non_Empty_Token_Naming_The_Product()
     {
         Assert.False(string.IsNullOrWhiteSpace(BroilerUserAgent.Value));
         Assert.Contains("Broiler", BroilerUserAgent.Value);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Apply_Returns_The_Client_It_Identified()
     {
         using var client = new HttpClient();
@@ -41,7 +41,7 @@ public sealed class BroilerUserAgentTests
         Assert.Same(client, BroilerUserAgent.Apply(client));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task An_Applied_Client_Puts_The_Value_On_The_Wire()
     {
         Assert.Equal(BroilerUserAgent.Value, await SentUserAgentAsync(chosen: null));
@@ -51,7 +51,7 @@ public sealed class BroilerUserAgentTests
     /// A default, not an override. A caller that has already chosen a <c>User-Agent</c> for a
     /// request keeps it — which is what <c>fetch()</c> with an explicit header in its init relies on.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Request_That_Names_Its_Own_User_Agent_Keeps_It()
     {
         Assert.Equal("Chosen/9", await SentUserAgentAsync(chosen: "Chosen/9"));

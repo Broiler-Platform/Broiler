@@ -37,7 +37,7 @@ public sealed class SharedLayoutGeometryTests
         return container.GetLayoutGeometry(new SizeF(800, 600));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Plain_Block_BorderBox_Equals_Content_When_No_Border_Or_Padding()
     {
         const string html = "<!DOCTYPE html><html><body style='margin:0'>" +
@@ -57,7 +57,7 @@ public sealed class SharedLayoutGeometryTests
         Assert.Equal(box.BorderBox, box.ContentBox);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Block_With_Border_And_Padding_Expands_BorderBox_By_Box_Model()
     {
         // content 100x50, padding 10 each side, border 5 each side (content-box sizing):
@@ -81,7 +81,7 @@ public sealed class SharedLayoutGeometryTests
         Assert.Equal(80f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Geometry_Is_Keyed_By_The_Canonical_Document_Elements()
     {
         const string html = "<!DOCTYPE html><html><body style='margin:0'>" +

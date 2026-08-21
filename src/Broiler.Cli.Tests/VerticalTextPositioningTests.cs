@@ -10,7 +10,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class VerticalTextPositioningTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Text_Position_Consistent_With_And_Without_Background()
     {
         var htmlWithBg = @"<!DOCTYPE html>

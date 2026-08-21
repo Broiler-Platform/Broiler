@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class MatchMediaBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchMedia_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(MatchMediaBinding);
@@ -27,7 +27,7 @@ public sealed class MatchMediaBindingModuleTests
         Assert.True(typeof(IMatchMediaHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MatchMedia_Evaluates_Against_The_Viewport_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

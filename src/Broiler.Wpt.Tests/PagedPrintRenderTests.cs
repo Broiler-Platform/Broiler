@@ -43,7 +43,7 @@ public sealed class PagedPrintRenderTests : IDisposable
         + "div { height: 30px; background: #000; }"
         + "</style>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Page_Document_Renders_One_Page_Box()
     {
         using var rendered = RenderPrint(PageStyle + "<div></div>");
@@ -54,7 +54,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // A forced break puts the second block on page two, and the output grows by one page box —
     // the page count is the render's own, not a fixed number of bands.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Forced_Break_Adds_A_Page()
     {
         using var rendered = RenderPrint(
@@ -67,7 +67,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // The same document with a change of page name instead of a forced break: CSS Paged Media 3
     // §3.4 makes the two mean the same thing, which is how WPT's page-name references are written.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Change_Of_Page_Name_Adds_The_Same_Page()
     {
         using var rendered = RenderPrint(
@@ -77,7 +77,7 @@ public sealed class PagedPrintRenderTests : IDisposable
         Assert.True(IsInk(rendered, 100, 120), "page 2 should carry the second block");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Page_Name_On_Both_Blocks_Adds_No_Page()
     {
         using var rendered = RenderPrint(
@@ -90,7 +90,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // Here the named block is 250px tall on a 300px page of its own, so it is one page; laid out
     // against the unconditional 100px area — which is what one layout for the whole document can
     // only ever do — it would be three, and the sheet would come out 1000px instead of 400px.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Named_Page_Divides_Its_Flow_Against_Its_Own_Area()
     {
         using var rendered = RenderPrint(
@@ -110,7 +110,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // And the page after a named one goes back to the unconditional rule. A run of pages is bounded
     // by the name changes on either side of it, so an unnamed run following a named one is its own
     // run and not a continuation — `page-name-unnamed-trailing-001` is built on exactly that.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unnamed_Page_After_A_Named_One_Returns_To_The_Unconditional_Box()
     {
         using var rendered = RenderPrint(
@@ -129,7 +129,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // The name belongs to the innermost box that starts the page, not the outermost. A plain
     // wrapper around named content does not claim the page for itself — the same rule the flow
     // applies when it decides where to break (CssBox.StartPageName).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Wrapper_Does_Not_Claim_The_Page_Its_Child_Names()
     {
         using var rendered = RenderPrint(
@@ -145,7 +145,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // A float declares no break of its own, but it does not get to step over one either: a
     // `break-after: page` on the box before it ends the page the float would otherwise sit on.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Float_Follows_A_Forced_Break_Onto_The_Next_Page()
     {
         using var rendered = RenderPrint(
@@ -166,7 +166,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // CSS Paged Media 3: the page area is the fixed-positioning containing block, so a fixed box
     // appears once on every page rather than once in the document. WPT's `css-page/fixedpos-*`
     // say it in the text they render: "This should repeat on every page."
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Fixed_Box_Repeats_On_Every_Page()
     {
         using var rendered = RenderPrint(
@@ -185,7 +185,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // bottom — including when that height is the content's and is only known once the box has been
     // laid out. Placing it before then anchors it by its top edge instead, which in a paged render
     // drops it onto the page after the one it belongs to.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Bottom_Anchored_Fixed_Box_Sized_By_Its_Content_Sits_On_The_Page_Area()
     {
         using var rendered = RenderPrint(
@@ -204,7 +204,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // below the containing block's bottom edge, because the running maximum that decides how tall
     // the document is keeps the overshoot after the box has been corrected — and in a paged render
     // a document 36px too tall is a whole extra blank page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Bottom_Anchored_Box_Sized_By_Its_Content_Adds_No_Page()
     {
         // The masked 36x36 square and the two full-page blocks are `fixedpos-009-print`'s own
@@ -244,7 +244,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // Nothing declares a break here: the content is simply taller than one page area, and the
     // bands are cut from a continuous surface, so it continues on the next page by itself. That is
     // the whole of automatic fragmentation in this model.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Content_Taller_Than_The_Page_Area_Continues_On_The_Next_Page()
     {
         using var rendered = RenderPrint(
@@ -256,7 +256,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // Content is placed at the page's margin origin, not at the sheet's corner: the top-left 10px
     // of every page box is margin, and the page area starts inside it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Content_Is_Placed_Inside_The_Page_Margin()
     {
         using var rendered = RenderPrint(PageStyle + "<div></div>");
@@ -267,7 +267,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // Off by default, and then a print test renders on the ordinary viewport like any other — the
     // lever is what decides, so this is the control that says so.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void With_The_Lever_Off_A_Print_Test_Renders_On_The_Viewport()
     {
         WptTestRunner.PagedPrint = false;
@@ -290,7 +290,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     private static BBitmap RenderMarginBoxes(string slots) =>
         RenderPrint(MarginBoxPage.Replace("@SLOTS", slots));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Margin_Box_Paints_In_Its_Own_Slot()
     {
         using var rendered = RenderMarginBoxes("@top-left { content: \"\"; background: #000; }");
@@ -316,7 +316,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // A box on its own fills its edge; two of them share it. Both are the same rule — CSS Paged
     // Media 3 §5.3.2 gives the unused length to the boxes that state none.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Auto_Boxes_Share_Their_Edge()
     {
         using var rendered = RenderMarginBoxes(
@@ -326,7 +326,7 @@ public sealed class PagedPrintRenderTests : IDisposable
         Assert.Equal(255, rendered.GetPixel(240, 25).B);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Stated_Width_Is_Kept_And_The_Rest_Goes_To_The_Auto_Box()
     {
         using var rendered = RenderMarginBoxes(
@@ -354,7 +354,7 @@ public sealed class PagedPrintRenderTests : IDisposable
 
     // A running header: the same margin box drawn on every page, which is what page margin boxes
     // are for. The overlay is built per page rather than once, and this is what says so.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Margin_Box_Is_Drawn_On_Every_Page()
     {
         const string html =
@@ -382,7 +382,7 @@ public sealed class PagedPrintRenderTests : IDisposable
     // agree; evaluating the counters on the test side alone would separate them and lose the eight
     // margin-box tests that use one. The fix is generated content in the engine, and it fixes both
     // sides at once.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Counter_Renders_As_Written_Until_The_Engine_Evaluates_Content()
     {
         const string html =

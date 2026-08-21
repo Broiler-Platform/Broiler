@@ -41,7 +41,7 @@ public sealed class ReplacedImageSizingTests
         return word;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Percentage_Width_And_A_Stated_Height_Are_Both_Used()
     {
         var word = Measure("100%", "50px");
@@ -50,7 +50,7 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(50, word.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Length_Width_And_A_Stated_Height_Are_Both_Used()
     {
         var word = Measure("200px", "20px");
@@ -73,7 +73,7 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(expectedHeight, word.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Auto_Width_Comes_From_The_Ratio()
     {
         var word = Measure("auto", "30px", imageWidth: 20, imageHeight: 10);
@@ -82,7 +82,7 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(30, word.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Neither_Stated_Is_The_Intrinsic_Size()
     {
         var word = Measure("auto", "auto", imageWidth: 33, imageHeight: 17);
@@ -154,7 +154,7 @@ public sealed class ReplacedImageSizingTests
     }
 
     // A stated height is the author's: max-width shortens the ratio-derived width and leaves it be.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Max_Width_Shortens_The_Derived_Width_Only()
     {
         var word = MeasureInDefiniteBlock("auto", "1000px", "100px", "none", throughAnonymousBlock: false);
@@ -165,7 +165,7 @@ public sealed class ReplacedImageSizingTests
 
     // Both axes auto and both maximums violated: §10.4's table, which keeps the ratio rather than
     // taking one bound per axis (that would be 120×100 here).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Both_Maximums_Violated_Keeps_The_Intrinsic_Ratio()
     {
         var word = MeasureInDefiniteBlock("auto", "auto", "120px", "100px", throughAnonymousBlock: false,
@@ -176,7 +176,7 @@ public sealed class ReplacedImageSizingTests
     }
 
     // CSS2.1 §10.7: with nothing definite above it, a percentage max-height is `none`.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Percentage_Max_Height_Against_An_Indefinite_Ancestor_Does_Not_Clamp()
     {
         var environment = new FakeLayoutEnvironment(new ImageIntrinsics(1, 1, true));
@@ -222,7 +222,7 @@ public sealed class ReplacedImageSizingTests
 
     // The other half of that guard: zero is min-*'s initial value but a real clamp for max-*, so it
     // must not be filtered out with the keywords (WPT CSS2/normal-flow/max-height-101).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Zero_Max_Height_Clamps_To_Nothing()
     {
         var word = MeasureInDefiniteBlock("auto", "auto", "none", "0", throughAnonymousBlock: false,

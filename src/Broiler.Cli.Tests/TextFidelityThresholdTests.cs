@@ -11,7 +11,7 @@ public class TextFidelityThresholdTests
     private static bool _ahemLoaded;
     private static bool _probeSansLoaded;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_Ahem_Text_Prototype_Exactly()
     {
         EnsureAhemLoaded();
@@ -35,7 +35,7 @@ public class TextFidelityThresholdTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Representative_Text_Page_Stays_Within_M3_Bounds_Threshold()
     {
         EnsureProbeSansLoaded();

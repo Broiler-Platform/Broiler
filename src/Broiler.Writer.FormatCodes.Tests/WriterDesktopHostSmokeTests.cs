@@ -8,7 +8,7 @@ namespace Broiler.Writer.FormatCodes.Tests;
 
 public sealed class WriterDesktopHostSmokeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Desktop_Host_Renders_Toggles_And_Cycles_Focus()
     {
         var host = new Broiler.Writer.WriterUiHost(

@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class NodeAccessorsBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeAccessors_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(NodeAccessorsBinding);
@@ -29,7 +29,7 @@ public sealed class NodeAccessorsBindingModuleTests
         Assert.True(typeof(INodeAccessorsHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeAccessors_Flow_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

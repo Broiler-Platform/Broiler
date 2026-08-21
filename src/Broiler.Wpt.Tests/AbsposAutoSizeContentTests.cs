@@ -49,7 +49,7 @@ public class AbsposAutoSizeContentTests : IDisposable
         "<!DOCTYPE html><meta charset=\"utf-8\"><style>body{margin:0}</style>" +
         "<div style=\"position:absolute; left:100px; top:150px; color:red\">HELLO</div>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsposAutoSizedInlineContent_RendersAtInset_NotDoubled()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-abspos-" + System.Guid.NewGuid().ToString("N"));

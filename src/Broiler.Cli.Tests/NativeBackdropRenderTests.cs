@@ -26,7 +26,7 @@ public class NativeBackdropRenderTests
     /// from the <c>data-broiler-backdrop</c> marker, not a synthesized
     /// bridge <c>&lt;div&gt;</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativePopoverBackdrop_PaintsScrim_InRenderedImage()
     {
         const string html = """
@@ -81,7 +81,7 @@ public class NativeBackdropRenderTests
     // WPT css/css-conditional/container-queries/dialog-backdrop-remove: a dialog is its own size
     // container, and `@container (width > 1px)` switches its ::backdrop to display:none, so the red
     // backdrop must not paint — the page stays green.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContainerQuery_Hides_Dialog_Backdrop()
     {
         if (!ContainerQueriesSupported())
@@ -117,7 +117,7 @@ public class NativeBackdropRenderTests
     // WPT css/css-conditional/container-queries/top-layer-dialog-backdrop: the ::backdrop and the
     // dialog depend on an ancestor size container narrowed to 100px, so `@container (max-width: 200px)`
     // hides both — the page stays green.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContainerQuery_On_Ancestor_Hides_Backdrop_And_Dialog()
     {
         if (!ContainerQueriesSupported())

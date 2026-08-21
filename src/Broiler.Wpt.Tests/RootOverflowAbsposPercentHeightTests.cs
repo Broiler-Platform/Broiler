@@ -70,7 +70,7 @@ public class RootOverflowAbsposPercentHeightTests : IDisposable
     // Fix 1 in isolation: an explicit-height abspos box under html{overflow:hidden}
     // with an empty body. The html box is ~0px tall; before the fix its
     // overflow:hidden clipped the green box away entirely (all red / blank).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RootOverflowHidden_DoesNotClipAbsposDescendant()
     {
         const string html =
@@ -88,7 +88,7 @@ public class RootOverflowAbsposPercentHeightTests : IDisposable
     // Fix 2 in isolation: an abspos box with a percentage height and NO positioned
     // ancestor resolves against the initial containing block (viewport), not the
     // auto-height <body>. Before the fix height:100% collapsed to 0 (all red).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsposPercentageHeight_ResolvesAgainstInitialContainingBlock()
     {
         const string html =

@@ -28,20 +28,20 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         return CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_NodeType_And_NodeName()
     {
         Assert.Contains("9|#document", Run("put(document.nodeType + '|' + document.nodeName);"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_DocumentElement_Head_Body()
     {
         Assert.Contains("HTML|HEAD|BODY", Run(
             "put(document.documentElement.tagName + '|' + document.head.tagName + '|' + document.body.tagName);"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_FirstChild_Is_Doctype_And_ChildNodes_Order()
     {
         // doctype then <html>: firstChild is the DocumentType (nodeType 10), last element is <html>.
@@ -50,7 +50,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         Assert.Contains("10|HTML", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_GetElementById_And_QuerySelector()
     {
         Assert.Contains("found|found", Run(
@@ -59,7 +59,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
             "put(a + '|' + b);"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_GetRootNode_Returns_Document()
     {
         Assert.Contains("true|true", Run(
@@ -67,7 +67,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
             "put((el.getRootNode() === document) + '|' + el.isConnected);"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_AppendedElement_Is_Connected_And_Queryable()
     {
         var result = Run(
@@ -77,7 +77,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         Assert.Contains("true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialization_RoundTrips_Doctype_And_Html()
     {
         // A script mutation forces the DOM->serialize path (no-script HTML round-trips raw).
@@ -86,7 +86,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
         Assert.Contains("<html", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_Document_Is_Canonical_And_Elements_Exclude_Root()
     {
         const string html = "<!DOCTYPE html><html><head></head><body><p id=\"x\">hi</p></body></html>";

@@ -18,7 +18,7 @@ public class ScriptProfilingConsistencyTests
 {
     private const string Url = "file:///profile.html";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Profiler_Records_Inline_And_Deferred_Scripts()
     {
         var engine = new ScriptEngine { Profiler = new ScriptProfilingHook() };
@@ -35,7 +35,7 @@ public class ScriptProfilingConsistencyTests
         Assert.All(engine.Profiler!.Entries, e => Assert.True(e.Succeeded));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Profiler_Records_Entries_On_The_DomLess_Execute_Path()
     {
         var engine = new ScriptEngine { Profiler = new ScriptProfilingHook() };
@@ -47,7 +47,7 @@ public class ScriptProfilingConsistencyTests
         Assert.Equal(new[] { "inline-0", "inline-1" }, engine.Profiler!.Entries.Select(e => e.Label));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Profiler_Records_A_Throwing_Script_As_Failed()
     {
         var engine = new ScriptEngine { Profiler = new ScriptProfilingHook() };
@@ -62,7 +62,7 @@ public class ScriptProfilingConsistencyTests
         Assert.False(entry.Succeeded);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Profiler_Attached_Runs_Clean()
     {
         // The common case: no hook set. Scripts still run; nothing is measured, nothing throws.

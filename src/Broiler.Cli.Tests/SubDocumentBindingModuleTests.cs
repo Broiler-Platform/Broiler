@@ -25,7 +25,7 @@ public sealed class SubDocumentBindingModuleTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDocument_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(SubDocumentBinding);
@@ -35,7 +35,7 @@ public sealed class SubDocumentBindingModuleTests
         Assert.False(typeof(ISubDocumentHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_SubDocument_Through_The_Host_Contract()
     {
         Assert.True(typeof(ISubDocumentHost).IsAssignableFrom(typeof(DomBridge)));
@@ -44,7 +44,7 @@ public sealed class SubDocumentBindingModuleTests
             static field => field.FieldType == typeof(SubDocumentBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateHtmlDocument_Builds_Structure_And_Supports_Lookup_Through_The_Module()
     {
         using var bridge = Attach(out var context);
@@ -65,7 +65,7 @@ public sealed class SubDocumentBindingModuleTests
         Assert.Equal("9|Title|body|true|hi|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Reports_Document_NodeType_And_Doctype_Through_The_Module()
     {
         using var bridge = Attach(out var context);
@@ -82,7 +82,7 @@ public sealed class SubDocumentBindingModuleTests
         Assert.Equal("9|html|10|html", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_And_InitEvent_Work_On_A_Module_Built_Document()
     {
         using var bridge = Attach(out var context);
@@ -99,7 +99,7 @@ public sealed class SubDocumentBindingModuleTests
         Assert.Equal("custom|true|false", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AppendChild_And_RemoveChild_On_A_Module_Built_Document_Mutate_Its_Tree()
     {
         using var bridge = Attach(out var context);
@@ -121,7 +121,7 @@ public sealed class SubDocumentBindingModuleTests
         Assert.Equal("2|3|2", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Srcdoc_ContentDocument_Surface_Is_Built_By_The_Module()
     {
         using var bridge = Attach(out var context,

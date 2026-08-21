@@ -21,7 +21,7 @@ public class HtmlBridgeBoundaryGuardTests
         "Method:RegisterNamedElementGlobals(JSContext)",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IScriptEngine_Surface_Does_Not_Expose_Engine_Internal_Types()
     {
         // Phase 8 item 1 split IScriptEngine into segregated capability interfaces
@@ -42,7 +42,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.Empty(exposedMembers);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Engine_Internal_Leaks_Are_Frozen_To_The_Known_Compatibility_Surface()
     {
         var exposedMembers = typeof(DomBridge)
@@ -57,7 +57,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.Equal(AllowedDomBridgeEngineInternalLeaks, exposedMembers);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Core_And_Dom_Bridge_Assemblies_Are_Split_As_Expected()
     {
         // RF-BRIDGE-1c Phase F4: the DomElement facade that used to anchor "owned by Core"
@@ -67,7 +67,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.Equal("Broiler.HtmlBridge.Dom", typeof(DomBridge).Assembly.GetName().Name);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Core_JavaScript_Dependencies_Are_Frozen_For_Dom_Extraction()
     {
         var javaScriptDependencies = typeof(Broiler.HtmlBridge.Dom.IDomBridgeRuntime).Assembly
@@ -80,7 +80,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.Equal(AllowedCoreJavaScriptDependencies, javaScriptDependencies);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Runtime_State_Uses_Typed_Groups_Without_A_String_Property_Bag()
     {
         var bridgeAssembly = typeof(DomBridge).Assembly;
@@ -128,7 +128,7 @@ public class HtmlBridgeBoundaryGuardTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase_Three_Bridge_Owns_Canonical_Document_Without_A_Flat_Element_List()
     {
         Assert.Equal(typeof(Broiler.Dom.DomDocument), typeof(DomBridge).GetProperty(nameof(DomBridge.Document))?.PropertyType);
@@ -141,7 +141,7 @@ public class HtmlBridgeBoundaryGuardTests
                 field.FieldType.GetGenericArguments()[0] == typeof(Broiler.Dom.DomElement));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Future_Dom_Kernel_Project_Must_Remain_Dependency_Free()
     {
         var repositoryRoot = FindRepositoryRoot();
@@ -155,7 +155,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.DoesNotContain("<PackageReference", projectText, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase_Four_Html_Contracts_Are_Owned_By_The_Companion_Assembly()
     {
         Assert.Equal("Broiler.Dom.Html", typeof(Broiler.Dom.Html.HtmlTokenizer).Assembly.GetName().Name);
@@ -166,7 +166,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.Null(legacyRendererAssembly.GetType("Broiler.HTML.Dom.Parse.HtmlTokenizer"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dom_Html_Depends_Only_On_The_Canonical_Dom_Component()
     {
         var broilerDependencies = typeof(Broiler.Dom.Html.HtmlDocumentParser).Assembly
@@ -179,7 +179,7 @@ public class HtmlBridgeBoundaryGuardTests
         Assert.Equal(["Broiler.Dom"], broilerDependencies);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase_Five_Renderer_Exposes_A_Canonical_Document_Entry_Point()
     {
         var setDocument = typeof(Broiler.HTML.Image.HtmlContainer).GetMethod(
@@ -193,7 +193,7 @@ public class HtmlBridgeBoundaryGuardTests
             typeof(ITypedScriptEngine).GetMethod(nameof(ITypedScriptEngine.ExecuteToDocument))?.ReturnType);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase_Six_Traversal_State_Is_Owned_By_The_Canonical_Dom_Component()
     {
         Assert.Equal("Broiler.Dom", typeof(Broiler.Dom.DomTreeWalker).Assembly.GetName().Name);
@@ -207,7 +207,7 @@ public class HtmlBridgeBoundaryGuardTests
                 field.FieldType.ToString().Contains("IteratorState", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_Ownership_Splits_Canonical_Boundaries_From_Renderer_Geometry()
     {
         Assert.Equal("Broiler.Dom", typeof(Broiler.Dom.DomRange).Assembly.GetName().Name);

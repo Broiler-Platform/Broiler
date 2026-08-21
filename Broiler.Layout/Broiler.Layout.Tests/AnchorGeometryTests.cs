@@ -27,7 +27,7 @@ public sealed class AnchorGeometryTests
             L, T, R, B, side, 0, 0, AnchorInsetProperty.Other, 1000, 1000));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveEdge_RightProperty_FlipsAgainstCbWidth()
     {
         // property=Right → cbWidth - rawRight
@@ -35,14 +35,14 @@ public sealed class AnchorGeometryTests
             L, T, R, B, AnchorSide.Right, 0, 0, AnchorInsetProperty.Right, 200, 300));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveEdge_BottomProperty_FlipsAgainstCbHeight()
     {
         Assert.Equal(300 - B, AnchorGeometry.ResolveEdge(
             L, T, R, B, AnchorSide.Bottom, 0, 0, AnchorInsetProperty.Bottom, 200, 300));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveEdge_ScrollAdjustment_XForInlineYForBlock()
     {
         // Left/Right subtract scrollAdjX; Top/Bottom/Center subtract scrollAdjY.
@@ -51,7 +51,7 @@ public sealed class AnchorGeometryTests
         Assert.Equal((T + B) / 2 - 7, AnchorGeometry.ResolveEdge(L, T, R, B, AnchorSide.Center, 5, 7, AnchorInsetProperty.Other, 1000, 1000));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveEdge_RightProperty_AppliesScrollBeforeFlip()
     {
         // property=Right on the Right side → cbWidth - (right - scrollAdjX).
@@ -86,7 +86,7 @@ public sealed class AnchorGeometryTests
         Assert.Equal(expected, AnchorGeometry.Overflows(l, t, w, h, 100, 100, 100, 100));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflows_WhenImcbSmallerThanBox()
     {
         // Box 40×40 fits the CB but not the 30-wide IMCB.

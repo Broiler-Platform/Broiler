@@ -55,7 +55,7 @@ public class StickyPositioningTests : IDisposable
 
     // bottom:0 sticky, viewport-tall, after a viewport-tall spacer inside a
     // fixed viewport-sized container. Must pin to fill the viewport (all green).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StickyBottom_InsideFixedAncestor_PinsToFillViewport()
     {
         const string html =
@@ -75,7 +75,7 @@ public class StickyPositioningTests : IDisposable
 
     // A sticky header (top:0) in an unscrolled scroll container stays at its
     // natural top position (no spurious offset). Green bar occupies the top strip.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StickyTop_Unscrolled_StaysAtNaturalTop()
     {
         const string html =

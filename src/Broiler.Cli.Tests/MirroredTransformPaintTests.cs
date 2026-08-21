@@ -93,7 +93,7 @@ public sealed class MirroredTransformPaintTests
     /// rectangle instead of reversing it: a point just inside each edge is painted, and a point
     /// just outside is the white canvas.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MirroredTransform_KeepsTheBoxWhereItWas()
     {
         if (!MirroredTransformsPaint())
@@ -115,7 +115,7 @@ public sealed class MirroredTransformPaintTests
     /// edge each end of the ramp is attached to. Without that the ramp would keep its device-space
     /// direction and the mirrored element would be painted with an unmirrored fill.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MirroredTransform_ReversesALinearGradient()
     {
         if (!MirroredTransformsPaint())

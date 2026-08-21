@@ -9,7 +9,7 @@ public class EcmaScriptEdgeCaseTests
 {
     // ────────────────── 9.1 Number-to-string precision ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Number_ToString_Precision_Large_Integer()
     {
         var html = @"<!DOCTYPE html>
@@ -39,7 +39,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── 9.2 Date year 0 / negative year ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Date_SetFullYear_Zero_Returns_Zero()
     {
         var html = @"<!DOCTYPE html>
@@ -62,7 +62,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("0,0,1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Date_SetFullYear_Negative_Returns_Negative()
     {
         var html = @"<!DOCTYPE html>
@@ -87,7 +87,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── 9.3 Null byte in URI encoding ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EncodeURI_And_EncodeURIComponent_Null_Byte()
     {
         var html = @"<!DOCTYPE html>
@@ -111,7 +111,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── 9.4 data: URI edge cases ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataURI_Iframe_With_Html_Content()
     {
         var html = @"<!DOCTYPE html>
@@ -137,7 +137,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,hello", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataURI_With_Unusual_MimeType_Returns_Empty_Doc()
     {
         var html = @"<!DOCTYPE html>
@@ -166,7 +166,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── 9.5 XHTML DOM handling ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_ContentType_And_XHTML_Namespace_Defaults()
     {
         var html = @"<!DOCTYPE html>

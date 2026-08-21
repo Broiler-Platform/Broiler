@@ -11,7 +11,7 @@ public class DomEdgeCasePhase4Tests
     //  4.1 GC-safe DOM references (Acid3 tests 26–27)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Element_Has_OwnerDocument_With_NodeType_9()
     {
         // Elements created via createDocument must have ownerDocument = the document (nodeType=9)
@@ -36,7 +36,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,9", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Detached_Element_OwnerDocument_Survives()
     {
         // When document reference is dropped, elements must still have valid ownerDocument
@@ -83,7 +83,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,9", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Elements_Survive_Across_GC_Stress()
     {
         // Simulates test 26/27: elements survive GC stress loop
@@ -124,7 +124,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,9", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Test27_KungFuDeathGrip_Survives_Across_Tests()
     {
         // Continuation: elements stored in global variable survive across test functions
@@ -162,7 +162,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.2 Extended attribute tests (Acid3 test 64)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Resolves_Relative_URI_To_Absolute()
     {
         // object.data must resolve relative URLs to absolute
@@ -186,7 +186,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Is_Absolute_With_Http_Base()
     {
         // object.data must be an absolute URL when base is HTTP
@@ -205,7 +205,7 @@ document.getElementById('out').textContent = '' + /^http:/.test(obj.data);
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetAttribute_Does_Not_Create_JS_Property()
     {
         // setAttribute should NOT create a JS property on the element
@@ -233,7 +233,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("false,true,true,false,true,true,woof", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_GetElementsByTagName_Returns_Children()
     {
         // object.getElementsByTagName('param').length should return 1
@@ -256,7 +256,7 @@ document.getElementById('out').textContent = '' + obj.getElementsByTagName('para
     //  4.3 XHTML namespace defaults (Acid3 test 98)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_XHTML_With_DocType_Sets_OwnerDocument()
     {
         // doctype.ownerDocument should be the document it's assigned to
@@ -280,7 +280,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,9", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHTML_Document_Title_Updates_Dynamically()
     {
         // doc.title must reflect <title> element textContent changes
@@ -309,7 +309,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("|Sparrow", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHTML_Document_Forms_Collection_Updates()
     {
         // doc.forms.length must update when forms are added
@@ -336,7 +336,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("0,1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHTML_Document_Body_Accessible()
     {
         // doc.body must return the body element
@@ -363,7 +363,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.4 Complex DOM/JS interaction (Acid3 test 99)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Href_Does_Not_Affect_Child_Text()
     {
         // Setting a.href must NOT change a.firstChild.data (the "weirdest bug ever")
@@ -388,7 +388,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("www.example.com|www.example.com", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_Href_Updates_Attribute_Only()
     {
         // a.href setter only updates the href attribute, child nodes unchanged
@@ -417,7 +417,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.5 Main document ownerDocument and nodeType
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Main_Document_Has_NodeType_9()
     {
         // document.nodeType must be 9 (DOCUMENT_NODE)
@@ -434,7 +434,7 @@ document.getElementById('out').textContent = '' + document.nodeType;
         Assert.Contains("9", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Main_Document_OwnerDocument_Returns_Document()
     {
         // element.ownerDocument must return the document object (nodeType=9)
@@ -456,7 +456,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,9,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Main_Document_Forms_Collection()
     {
         // document.forms must return form elements

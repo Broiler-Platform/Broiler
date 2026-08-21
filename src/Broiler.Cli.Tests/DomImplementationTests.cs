@@ -10,7 +10,7 @@ public class DomImplementationTests
     //  1.1 document.implementation object
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_HasFeature_Returns_True()
     {
         var html = @"<!DOCTYPE html>
@@ -30,7 +30,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_CreateDocumentType_Returns_Doctype_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -54,7 +54,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("10|html|-//W3C//DTD XHTML 1.0 Strict//EN|http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_CreateDocument_Returns_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -76,7 +76,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("9|html|http://www.w3.org/1999/xhtml", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_CreateDocument_Without_QualifiedName()
     {
         var html = @"<!DOCTYPE html>
@@ -98,7 +98,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("9|", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_CreateHTMLDocument_With_Title()
     {
         var html = @"<!DOCTYPE html>
@@ -121,7 +121,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("9|html|head|body|title", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_CreateHTMLDocument_Without_Title()
     {
         var html = @"<!DOCTYPE html>
@@ -147,7 +147,7 @@ document.getElementById('out').textContent = r.join('|');
     //  1.2 Created documents support full DOM API
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateHTMLDocument_Supports_CreateElement()
     {
         var html = @"<!DOCTYPE html>
@@ -168,7 +168,7 @@ document.getElementById('out').textContent = found ? found.textContent : 'not-fo
         Assert.Contains("created-in-subdoc", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateHTMLDocument_Supports_GetElementById()
     {
         var html = @"<!DOCTYPE html>
@@ -190,7 +190,7 @@ document.getElementById('out').textContent = found ? found.textContent : 'not-fo
         Assert.Contains("found-by-id", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Supports_CreateElementNS()
     {
         var html = @"<!DOCTYPE html>
@@ -217,7 +217,7 @@ document.getElementById('out').textContent = r.join('|');
     //  1.3 DOMException
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DOMException_Constructor_Sets_Code_And_Name()
     {
         var html = @"<!DOCTYPE html>
@@ -238,7 +238,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("test message|InvalidCharacterError|5", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DOMException_Has_Static_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -259,7 +259,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("5,14,8,3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DOMException_NamespaceError_Code()
     {
         var html = @"<!DOCTYPE html>
@@ -280,7 +280,7 @@ document.getElementById('out').textContent = '' + ex.code;
     //  1.3 Element name validation
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateElement_Throws_On_Invalid_Name()
     {
         var html = @"<!DOCTYPE html>
@@ -302,7 +302,7 @@ document.getElementById('out').textContent = r;
         Assert.Contains("caught", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateElement_Accepts_Valid_Names()
     {
         var html = @"<!DOCTYPE html>
@@ -322,7 +322,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("div-ok,custom-ok,_ok", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateElementNS_Throws_On_Prefix_Without_Namespace()
     {
         var html = @"<!DOCTYPE html>
@@ -348,7 +348,7 @@ document.getElementById('out').textContent = r;
     //  1.1 + 1.2 Integration: getTestDocument pattern from Acid3
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Acts_As_GetTestDocument()
     {
         // Simulates the Acid3 getTestDocument() helper
@@ -379,7 +379,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("9|root|1|test-content", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocumentType_Name_Validation()
     {
         var html = @"<!DOCTYPE html>
@@ -408,7 +408,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("valid-ok,empty-caught", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Implementation_Available_On_SubDocuments()
     {
         var html = @"<!DOCTYPE html>
@@ -431,7 +431,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("has-impl|true|9|body", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DOCUMENT_TYPE_NODE_Constant_Available()
     {
         var html = @"<!DOCTYPE html>

@@ -40,7 +40,7 @@ public sealed class RtfRoundTripTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Plain_Paragraphs()
     {
         RichTextDocument document = Doc(
@@ -51,7 +51,7 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, RoundTrip(document));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inline_Styles()
     {
         var bold = new InlineStyle { Bold = true };
@@ -69,7 +69,7 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, RoundTrip(document));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Colors_Fonts_And_Highlight()
     {
         var red = new InlineStyle { Foreground = new BColor(255, 0, 0) };
@@ -84,7 +84,7 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, RoundTrip(document));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Alignment_Indent_And_Spacing()
     {
         ParagraphStyle style = ParagraphStyle.Default with
@@ -100,7 +100,7 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, RoundTrip(document));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unicode_Including_A_Supplementary_Character()
     {
         string text = "caf" + (char)0x00E9 + (char)0x2019 + char.ConvertFromUtf32(0x1F600);
@@ -112,7 +112,7 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, round);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hyperlink()
     {
         var link = new InlineStyle { LinkHref = "https://example.com" };
@@ -124,13 +124,13 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, round);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Document()
     {
         AssertEquivalent(RichTextDocument.Empty, RoundTrip(RichTextDocument.Empty));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Trailing_Empty_Paragraph_Is_Preserved()
     {
         RichTextDocument document = Doc(Para(("A", InlineStyle.Default)), RichTextParagraph.Empty);
@@ -141,7 +141,7 @@ public sealed class RtfRoundTripTests
         AssertEquivalent(document, round);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Read_Write_Read_Is_Stable_On_A_Fixture()
     {
         string fixture =

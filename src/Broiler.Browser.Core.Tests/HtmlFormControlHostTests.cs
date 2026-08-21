@@ -55,7 +55,7 @@ public class HtmlFormControlHostTests
         return (new HtmlFormControlHost(session.Root, state), state, session.Root);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryCheckboxAndRadioGetsAHostedControl()
     {
         using TestUiSession session = new();
@@ -69,7 +69,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(2, host.Controls.Count(c => c is StandardRadioButton));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedControlsStartFromTheMarkupsCheckedState()
     {
         using TestUiSession session = new();
@@ -87,7 +87,7 @@ public class HtmlFormControlHostTests
         Assert.True(radios[1].IsChecked);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedControlsArePlacedOverTheBoxesTheRendererLaidOut()
     {
         using TestUiSession session = new();
@@ -112,7 +112,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(lefts.Count, lefts.Distinct().Count());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedControlsFollowScrollingAndHideWhenOutOfView()
     {
         using TestUiSession session = new();
@@ -131,7 +131,7 @@ public class HtmlFormControlHostTests
         Assert.All(host.Controls, c => Assert.Equal(UiVisibility.Collapsed, c.Visibility));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TogglingACheckboxRecordsItForSubmission()
     {
         using TestUiSession session = new();
@@ -149,7 +149,7 @@ public class HtmlFormControlHostTests
         Assert.True(state.GetChecked($"{HtmlPostProcessor.SyntheticIdPrefix}0", "a", "1"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelectingARadioClearsTheOtherInItsGroup()
     {
         using TestUiSession session = new();
@@ -167,7 +167,7 @@ public class HtmlFormControlHostTests
         Assert.False(state.GetChecked($"{HtmlPostProcessor.SyntheticIdPrefix}3", "c", "y"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearRemovesEveryHostedControlFromTheOwner()
     {
         using TestUiSession session = new();
@@ -182,7 +182,7 @@ public class HtmlFormControlHostTests
         Assert.Empty(owner.Children);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RebuildingReplacesThePreviousPagesControls()
     {
         using TestUiSession session = new();
@@ -198,7 +198,7 @@ public class HtmlFormControlHostTests
         Assert.Single(owner.Children);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PagesWithoutTogglesHostNothing()
     {
         using TestUiSession session = new();
@@ -212,7 +212,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(0, host.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnparseableOrEmptyPagesHostNothingInsteadOfThrowing()
     {
         using TestUiSession session = new();
@@ -231,7 +231,7 @@ public class HtmlFormControlHostTests
         "<option value='g' selected>Green</option><option value='b'>Blue</option></select>" +
         "</form></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelectsGetAHostedComboBoxCarryingTheirOptions()
     {
         using TestUiSession session = new();
@@ -245,7 +245,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(["r", "g", "b"], combo.Items.Select(i => i.Id));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedComboBoxStartsOnTheMarkupsSelectedOption()
     {
         using TestUiSession session = new();
@@ -259,7 +259,7 @@ public class HtmlFormControlHostTests
         Assert.Equal("g", combo.SelectedItem?.Id);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ASelectWithNothingMarkedStartsOnItsFirstOption()
     {
         using TestUiSession session = new();
@@ -273,7 +273,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(0, host.Controls.OfType<StandardComboBox>().Single().SelectedIndex);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OptionsWithoutAValueSubmitTheirText()
     {
         using TestUiSession session = new();
@@ -286,7 +286,7 @@ public class HtmlFormControlHostTests
         Assert.Equal("Plain", host.Controls.OfType<StandardComboBox>().Single().SelectedItem?.Id);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChangingTheSelectionRecordsItForSubmission()
     {
         using TestUiSession session = new();
@@ -309,7 +309,7 @@ public class HtmlFormControlHostTests
         "<option value='g' selected>Green</option><option value='b' selected>Blue</option></select>" +
         "</form></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AMultiSelectIsHostedAsAMultiSelectionListView()
     {
         using TestUiSession session = new();
@@ -323,7 +323,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(["Red", "Green", "Blue"], list.Items.Select(i => i.Text));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AMultiSelectStartsOnEveryOptionTheMarkupMarks()
     {
         using TestUiSession session = new();
@@ -337,7 +337,7 @@ public class HtmlFormControlHostTests
         Assert.Equal(["1", "2"], list.SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AMultiSelectWithNothingMarkedStartsEmpty()
     {
         using TestUiSession session = new();
@@ -352,7 +352,7 @@ public class HtmlFormControlHostTests
         Assert.Empty(host.Controls.OfType<StandardListView>().Single().SelectedItemIds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChangingAMultiSelectRecordsEveryChosenValue()
     {
         using TestUiSession session = new();
@@ -368,7 +368,7 @@ public class HtmlFormControlHostTests
             state.GetSelectedValues($"{HtmlPostProcessor.SyntheticIdPrefix}0", "colours"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DeselectingEverythingInAMultiSelectIsRecordedAsEmptyNotAsUntouched()
     {
         using TestUiSession session = new();
@@ -382,7 +382,7 @@ public class HtmlFormControlHostTests
         Assert.Empty(state.GetSelectedValues($"{HtmlPostProcessor.SyntheticIdPrefix}0", "colours")!);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedComboBoxIsPlacedOverTheSelectTheRendererLaidOut()
     {
         using TestUiSession session = new();
@@ -399,7 +399,7 @@ public class HtmlFormControlHostTests
         Assert.True(combo.Bounds.Left >= viewport.Left);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FileControlsGetAHostedButtonThatAsksTheShellToPick()
     {
         using TestUiSession session = new();
@@ -420,7 +420,7 @@ public class HtmlFormControlHostTests
         Assert.Equal("doc", asked.ControlName);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AChosenFilesNameShowsOnTheHostedButton()
     {
         using TestUiSession session = new();

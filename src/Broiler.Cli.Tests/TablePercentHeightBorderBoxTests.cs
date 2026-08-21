@@ -23,7 +23,7 @@ public class TablePercentHeightBorderBoxTests
 </html>
 """;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TableRowChild_PercentHeight_BorderBox_FillsRowGreen()
     {
         using var bmp = HtmlRender.RenderToImageWithStyleSet(Html, 300, 300);

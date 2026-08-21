@@ -18,7 +18,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class EventTargetBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EventTarget_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(EventTargetBinding);
@@ -30,7 +30,7 @@ public sealed class EventTargetBindingModuleTests
         Assert.True(typeof(IEventTargetHost).IsAssignableFrom(typeof(DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Add_Remove_And_Dispatch_Flow_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
@@ -58,7 +58,7 @@ public sealed class EventTargetBindingModuleTests
         Assert.Equal("ping|1", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Click_On_Checkbox_Toggles_And_Fires_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body>" +

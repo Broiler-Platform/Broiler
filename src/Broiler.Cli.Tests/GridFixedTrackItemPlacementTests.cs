@@ -61,19 +61,19 @@ public sealed class GridFixedTrackItemPlacementTests
         Assert.Equal(60, Value("div#c", "width", by), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APlainBlockChild_LandsInTheColumnsItAskedFor() =>
         AssertPlacedInColumnsThreeToSix("");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ANestedGridChild_LandsInTheColumnsItAskedFor() =>
         AssertPlacedInColumnsThreeToSix("display:grid");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ANestedSubgridChild_LandsInTheColumnsItAskedFor() =>
         AssertPlacedInColumnsThreeToSix("display:grid;grid-template-columns:subgrid");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnAutoRow_StillGatesTheNestedGridChildAway()
     {
         // No `grid-auto-rows`: the parent's rows are content-sized from the nested

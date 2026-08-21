@@ -2,7 +2,7 @@ namespace Broiler.Wpt.Tests;
 
 public sealed class ExceptionSignatureTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryCompute_Joins_Top_Frame_And_Stripped_Message()
     {
         const string message = "Script execution failed: A prefixed name requires a namespace URI";
@@ -18,7 +18,7 @@ public sealed class ExceptionSignatureTests
             ExceptionSignature.TryCompute(message, stackTrace));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryCompute_Skips_Framework_Frames_To_Find_The_Throw_Site()
     {
         const string message = "Rendering failed: boom";
@@ -32,21 +32,21 @@ public sealed class ExceptionSignatureTests
         Assert.Equal("CssBox.Measure — boom", ExceptionSignature.TryCompute(message, stackTrace));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryCompute_Returns_Null_When_Nothing_Usable()
     {
         Assert.Null(ExceptionSignature.TryCompute(null, null));
         Assert.Null(ExceptionSignature.TryCompute("   ", ""));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryCompute_Falls_Back_To_Message_When_No_Application_Frame()
     {
         const string stackTrace = "   at System.IO.File.ReadAllText(String path)";
         Assert.Equal("disk gone", ExceptionSignature.TryCompute("Failed to read test file: disk gone", stackTrace));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Buckets_Groups_By_Signature_Most_Frequent_First()
     {
         var crash = string.Join('\n', new[]
@@ -79,7 +79,7 @@ public sealed class ExceptionSignatureTests
         Assert.Equal(new[] { "/tmp/wpt/c.html" }, buckets[1].Examples);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Buckets_Collects_Distinct_Example_Paths_Up_To_A_Cap()
     {
         const string trace = "   at Broiler.DOM.DomName..ctor(String name)";
@@ -101,7 +101,7 @@ public sealed class ExceptionSignatureTests
             bucket.Examples);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Buckets_Respects_Limit()
     {
         var failures = new[]

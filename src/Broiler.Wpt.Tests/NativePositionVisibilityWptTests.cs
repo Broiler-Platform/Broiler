@@ -77,14 +77,14 @@ public class NativePositionVisibilityWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_StaticScroller_HidesTarget()
     {
         // Intervening clip → the engine hides the target (no red painted).
         Assert.Equal(0, RenderRedCount(nativeAnchor: true, ""));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_RelativeScroller_ShowsTarget()
     {
         // The scroller IS the target's CB → no intervening clip → shown (red present).

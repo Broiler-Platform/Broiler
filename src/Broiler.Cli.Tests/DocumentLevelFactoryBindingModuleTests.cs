@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DocumentLevelFactoryBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentLevelFactory_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(DocumentLevelFactoryBinding);
@@ -27,7 +27,7 @@ public sealed class DocumentLevelFactoryBindingModuleTests
         Assert.True(typeof(IDocumentLevelFactoryHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Factories_Build_Documents_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

@@ -38,7 +38,7 @@ public sealed class ZoomFontSizeTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteFontSize_Scales_By_EffectiveZoom()
     {
         var root = Root();
@@ -54,7 +54,7 @@ public sealed class ZoomFontSizeTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmFontSize_Compounds_Ancestor_Zoom_Once()
     {
         var root = Root();
@@ -70,7 +70,7 @@ public sealed class ZoomFontSizeTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_LeavesFontSize_Unscaled()
     {
         var root = Root();

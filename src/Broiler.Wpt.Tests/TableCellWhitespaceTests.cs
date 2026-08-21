@@ -60,7 +60,7 @@ public class TableCellWhitespaceTests : IDisposable
         + "table{border-collapse:collapse;border:none}td{border:none;padding:0}"
         + "</style></head><body>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WhitespacePaddedCells_AbutLikeTightCells()
     {
         // Tight cells: <td>Xy</td><td>Xy</td>.
@@ -81,7 +81,7 @@ public class TableCellWhitespaceTests : IDisposable
             $"whitespace-padded cells did not abut like tight cells: tight right={tight}, padded right={padded}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisplayTableCells_MatchRealTable()
     {
         // A real <table> with tight cells …

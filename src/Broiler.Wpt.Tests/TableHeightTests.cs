@@ -47,7 +47,7 @@ public class TableHeightTests : IDisposable
         return (top < 0) ? 0 : bottom - top;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SpecifiedTableHeight_GreaterThanContent_IsDistributedOverRows()
     {
         // Two rows of short cells: natural height is ~40px, but the table asks

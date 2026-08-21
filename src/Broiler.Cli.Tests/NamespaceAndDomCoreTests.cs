@@ -11,7 +11,7 @@ public class NamespaceAndDomCoreTests
     //  4.1 Namespace-aware attribute methods
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetAttributeNS_And_GetAttributeNS_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -36,7 +36,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("http://example.com,http://example.com,true,bar,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveAttributeNS_Removes_Namespaced_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -63,7 +63,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.2 Null byte handling
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NullByte_In_TextNode_Preserved_And_Invalid_TagName_Throws()
     {
         var html = @"<!DOCTYPE html>
@@ -95,7 +95,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.3 Element name validation with proper DOMException
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateElement_Throws_DOMException_InvalidCharacterError()
     {
         var html = @"<!DOCTYPE html>
@@ -125,7 +125,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,InvalidCharacterError,5,true,5", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateElementNS_Throws_DOMException_NamespaceError()
     {
         var html = @"<!DOCTYPE html>
@@ -162,7 +162,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.4 cloneNode(true) whitespace preservation
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CloneNode_Deep_Preserves_Whitespace_TextNodes()
     {
         var html = @"<!DOCTYPE html>
@@ -201,7 +201,7 @@ document.getElementById('out').textContent = r.join(',');
     //  4.5 Node type constants on constructors
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Constructor_Has_Type_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -228,7 +228,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("1,2,3,4,8,9,10,11,12,function", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Prototype_Has_Type_Constants()
     {
         var html = @"<!DOCTYPE html>

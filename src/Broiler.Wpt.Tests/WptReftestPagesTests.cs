@@ -21,7 +21,7 @@ public sealed class WptReftestPagesTests
     private static string Meta(string content) =>
         $"<!DOCTYPE html><meta name=\"reftest-pages\" content=\"{content}\"><body></body>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_Without_The_Meta_Names_No_Pages() =>
         Assert.Null(WptReftestPages.Parse("<!DOCTYPE html><body>no meta here</body>"));
 
@@ -36,7 +36,7 @@ public sealed class WptReftestPagesTests
         Assert.Equal(expected, WptReftestPages.Parse(Meta(content)));
 
     // Ascending and deduplicated, so the emitted order is the document's own.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pages_Come_Back_Sorted_And_Deduplicated() =>
         Assert.Equal(new[] { 1, 2, 3 }, WptReftestPages.Parse(Meta("3,1,2,2,3")));
 
@@ -52,7 +52,7 @@ public sealed class WptReftestPagesTests
         Assert.Null(WptReftestPages.Parse(Meta(content)));
 
     // Single quotes and a reordered attribute are both spellings WPT uses.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Attribute_Spelling_Is_Not_Fixed()
     {
         Assert.Equal(
@@ -64,7 +64,7 @@ public sealed class WptReftestPagesTests
     }
 
     // A different meta must not be read as this one.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Another_Meta_Is_Not_This_One() =>
         Assert.Null(WptReftestPages.Parse("<meta name=\"assert\" content=\"2 pages\">"));
 }

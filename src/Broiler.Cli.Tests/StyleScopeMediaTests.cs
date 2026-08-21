@@ -22,7 +22,7 @@ public sealed class StyleScopeMediaTests
         return ctx.Eval($"window.getComputedStyle(document.getElementById('{id}')).color").ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonMatching_Media_Stylesheet_Is_Excluded()
     {
         // A base sheet sets green; a later sheet gated on an impossible viewport width sets red.
@@ -35,7 +35,7 @@ public sealed class StyleScopeMediaTests
         Assert.Equal("rgb(0, 128, 0)", ComputedColor(html, "t"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Matching_Media_Stylesheet_Is_Included()
     {
         var html = "<!DOCTYPE html><html><head>" +
@@ -44,7 +44,7 @@ public sealed class StyleScopeMediaTests
         Assert.Equal("rgb(0, 0, 255)", ComputedColor(html, "t"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Media_Attribute_Applies_Unconditionally()
     {
         var html = "<!DOCTYPE html><html><head>" +

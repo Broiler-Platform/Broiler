@@ -16,7 +16,7 @@ public class Acid3Todo24_28Tests
     /// expanded into individual longhand properties accessible via
     /// <c>getComputedStyle</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundColor()
     {
         var html = @"<!DOCTYPE html>
@@ -38,7 +38,7 @@ document.getElementById('result').textContent = 'bg-color=' + (cs.backgroundColo
     /// <summary>
     /// TODO-24 (CSSOM): Verifies background-repeat is expanded from the shorthand.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundRepeat()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ document.getElementById('result').textContent = 'bg-repeat=' + (cs.backgroundRep
     /// TODO-24 (CSSOM): Verifies background-image is expanded from the shorthand
     /// and preserves the data-URI content.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundImage()
     {
         var html = @"<!DOCTYPE html>
@@ -84,7 +84,7 @@ document.getElementById('result').textContent = 'has-data-uri=' + (bgImg.indexOf
     /// <summary>
     /// TODO-24 (CSSOM): Verifies simple background shorthand (no data URI) expands color.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_No_DataUri_Expands_Color()
     {
         var html = @"<!DOCTYPE html>
@@ -107,7 +107,7 @@ document.getElementById('result').textContent = 'bg-color=' + (cs.backgroundColo
     /// TODO-24 (Rendering): Verifies the HtmlRenderer renders a white
     /// background when the body uses the Acid3 background shorthand pattern.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_Renders_White()
     {
         var html = @"<!DOCTYPE html>
@@ -133,7 +133,7 @@ body { background: url(data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAA
     /// from the shorthand — both the non-integer percentage (99.8392283%) and the
     /// 1px length value.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundPosition()
     {
         var html = @"<!DOCTYPE html>
@@ -156,7 +156,7 @@ document.getElementById('result').textContent = 'bg-position=' + (cs.backgroundP
     /// TODO-24 (CSSOM): Verifies that background-attachment defaults to "scroll"
     /// when not explicitly specified in the shorthand.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_DataUri_Expands_BackgroundAttachment()
     {
         var html = @"<!DOCTYPE html>
@@ -179,7 +179,7 @@ document.getElementById('result').textContent = 'bg-attachment=' + (cs.backgroun
     /// TODO-24 (CSSOM): Verifies that explicit background-color longhand is NOT
     /// overridden by background shorthand expansion (CSS cascade precedence).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo24_Background_Shorthand_Does_Not_Override_Longhand()
     {
         var html = @"<!DOCTYPE html>
@@ -205,7 +205,7 @@ document.getElementById('result').textContent = 'bg-color=' + (cs.backgroundColo
     /// TODO-25 (CSSOM): Verifies that <c>:first-child + * .buckets p</c>
     /// correctly matches bucket elements and applies display: inline-block.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo25_FirstChild_Adjacent_Sibling_Selector_Applies_InlineBlock()
     {
         var html = @"<!DOCTYPE html>
@@ -239,7 +239,7 @@ document.getElementById('result').textContent = r.join('|');
     /// TODO-25 (Rendering): Verifies that the :first-child + * selector
     /// causes bucket elements to render as inline-block (horizontal layout).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo25_FirstChild_Adjacent_Sibling_Renders_InlineBlock()
     {
         var html = @"<!DOCTYPE html>
@@ -272,7 +272,7 @@ document.getElementById('result').textContent = r.join('|');
     /// TODO-26: Verifies that bucket color CSS rules are correctly parsed.
     /// The Acid3 CSS assigns final colors when class reaches "zPPPPPPPPPPPPPPPP".
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo26_Bucket_Color_Rules_Parsed_Correctly()
     {
         var html = @"<!DOCTYPE html>
@@ -305,7 +305,7 @@ document.getElementById('result').textContent = r.join('|');
     /// TODO-26 (Rendering): Verifies that compound #id.class selectors with
     /// background-color longhand render the correct colors.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo26_Bucket_Colors_Render_Correctly()
     {
         var html = @"<!DOCTYPE html>
@@ -333,7 +333,7 @@ p { margin: 0; padding: 0; display: block; width: 80px; height: 40px; }
     /// TODO-27 (CSSOM): Verifies that <c>h1:first-child</c> is matched and
     /// <c>margin-bottom: -0.4em</c> is correctly applied.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo27_H1_FirstChild_NegativeMarginBottom()
     {
         var html = @"<!DOCTYPE html>
@@ -357,7 +357,7 @@ document.getElementById('result').textContent = 'margin-bottom=' + (cs.marginBot
     /// TODO-27 (CSSOM): Verifies that h1:first-child selector matches
     /// when h1 is the first child of body (typical Acid3 structure).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo27_H1_FirstChild_Selector_Matches()
     {
         var html = @"<!DOCTYPE html>
@@ -387,7 +387,7 @@ document.getElementById('result').textContent = r.join('|');
     /// TODO-28 (CSSOM): Verifies that <c>iframe { float: left; height: 0; width: 0; }</c>
     /// produces zero-size layout.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo28_Iframe_ZeroSize_Layout()
     {
         var html = @"<!DOCTYPE html>
@@ -417,7 +417,7 @@ document.getElementById('result').textContent = r.join('|');
     /// TODO-28 (CSSOM): Verifies that <c>&lt;map&gt;</c> elements have no
     /// visual representation (they are semantic-only elements).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo28_Map_Element_Not_Visible()
     {
         var html = @"<!DOCTYPE html>
@@ -447,7 +447,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// TODO-28 (Rendering): Verifies that a zero-size iframe does not affect layout.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo28_Iframe_ZeroSize_No_Visual_Box()
     {
         var html = @"<!DOCTYPE html>
@@ -476,7 +476,7 @@ div { background: lime; width: 50px; height: 50px; }
     /// Acid3 uses <c>document.write()</c> to inject form elements that must remain
     /// invisible.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo28_Form_Element_No_Visible_Border()
     {
         var html = @"<!DOCTYPE html>
@@ -509,7 +509,7 @@ document.getElementById('result').textContent = r.join('|');
     /// TODO-28 (Rendering): Verifies that <c>&lt;table&gt;</c> elements with zero
     /// dimensions do not produce visible boxes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Todo28_Table_Element_No_Visible_Box()
     {
         var html = @"<!DOCTYPE html>

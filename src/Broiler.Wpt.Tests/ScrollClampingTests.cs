@@ -55,7 +55,7 @@ public class ScrollClampingTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementScrollByPastTheEndComesToRestAtTheEnd()
     {
         var (canvas, body) = Render(
@@ -65,7 +65,7 @@ public class ScrollClampingTests : IDisposable
         Assert.True(body > canvas, $"expected the body to still fill most of the viewport (body={body}, canvas={canvas})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowScrollByPastTheEndComesToRestAtTheEnd()
     {
         var (canvas, body) = Render("window.scrollBy(0, document.documentElement.scrollHeight);");
@@ -73,7 +73,7 @@ public class ScrollClampingTests : IDisposable
         Assert.True(body > canvas, $"expected the body to still fill most of the viewport (body={body}, canvas={canvas})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollToAnAbsolutePositionPastTheEndComesToRestAtTheEnd()
     {
         var (canvas, body) = Render("window.scrollTo(0, 1e9);");
@@ -81,7 +81,7 @@ public class ScrollClampingTests : IDisposable
         Assert.True(body > canvas, $"expected the body to still fill most of the viewport (body={body}, canvas={canvas})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ANegativeScrollComesToRestAtTheTop()
     {
         // The other end of the same clamp: scrolling up from the top stays at the top, so the page
@@ -92,7 +92,7 @@ public class ScrollClampingTests : IDisposable
         Assert.Equal(unscrolled, scrolledUp);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AScrollWithinRangeIsUnaffected()
     {
         // Clamping must not disturb an ordinary scroll: 100px down still shows body, and a

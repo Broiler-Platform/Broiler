@@ -25,7 +25,7 @@ public sealed class InlineBlockRelativeOffsetTests
     /// shifted location (108,68 with the default 8px body margin), leaving the in-flow origin blank.
     /// Before the fix it painted at the in-flow origin (~8,8), ignoring the offset.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeInlineBlock_PaintsAtShiftedPosition()
     {
         const string html =
@@ -52,7 +52,7 @@ public sealed class InlineBlockRelativeOffsetTests
     /// (a viewport-unit <c>top: 50vh</c> in a 768px viewport → 8 + 384 = 392; <c>left: 30px</c> →
     /// 38). This drives view-transition capture geometry, so the offset must be visible here.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeInlineBlock_BoundingClientRect_IncludesOffset()
     {
         const string html =

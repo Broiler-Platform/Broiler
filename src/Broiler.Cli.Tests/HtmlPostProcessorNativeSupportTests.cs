@@ -27,7 +27,7 @@ public sealed class HtmlPostProcessorNativeSupportTests
         return n;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Renderer_Supports_Root_Pseudo_Class_Natively()
     {
         // No HtmlPostProcessor / no :root->html rewrite: a :root background must paint natively.
@@ -39,7 +39,7 @@ public sealed class HtmlPostProcessorNativeSupportTests
         Assert.Equal((0, 128, 192), (p.R, p.G, p.B));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Renderer_Does_Not_Render_Script_Content()
     {
         // HTML-like markup inside a <script> body must NOT bleed through as rendered content.
@@ -58,7 +58,7 @@ public sealed class HtmlPostProcessorNativeSupportTests
         Assert.True(CountPixels(b2, (r, g, b) => r < 80 && g > 150 && b < 80) > 1000);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ProcessForBrowsing_Does_Not_Rewrite_Root_Selector()
     {
         const string html = "<style>:root{color:red}</style>";
@@ -66,7 +66,7 @@ public sealed class HtmlPostProcessorNativeSupportTests
         Assert.Contains(":root", browsing, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Process_TestHarness_Still_Rewrites_Root_Selector()
     {
         const string html = "<style>:root{color:red}</style>";

@@ -35,7 +35,7 @@ public sealed class MultiColumnFragmentationTests : IDisposable
 
     // Four 25px columns, and a 400px block filling all of them: every column is green and nothing
     // is drawn past the column set's own 100px.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Block_Taller_Than_The_Column_Set_Continues_In_The_Next_Column()
     {
         using var rendered = Render(
@@ -52,7 +52,7 @@ public sealed class MultiColumnFragmentationTests : IDisposable
 
     // A block that fits stays one box in the first column: the cut only happens when the content
     // does not fit, and a column set is not an excuse to move content that never overflowed.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Block_That_Fits_Stays_In_The_First_Column()
     {
         using var rendered = Render(
@@ -64,7 +64,7 @@ public sealed class MultiColumnFragmentationTests : IDisposable
 
     // CSS Fragmentation 3 §4.1: `break-inside: avoid` makes the box monolithic, so it is not cut
     // however far past the column it runs.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Block_That_Avoids_Breaking_Inside_Is_Not_Cut()
     {
         using var rendered = Render(
@@ -78,7 +78,7 @@ public sealed class MultiColumnFragmentationTests : IDisposable
 
     // CSS Fragmentation 3 §5.2, `box-decoration-break: slice`: the run is decorated as one box and
     // then cut, so the border belongs to the two outer ends and the joins between are open.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Sliced_Border_Is_Drawn_At_The_Ends_Of_The_Run_Only()
     {
         using var rendered = Render(

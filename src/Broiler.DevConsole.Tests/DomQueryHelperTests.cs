@@ -4,7 +4,7 @@ namespace Broiler.DevConsole.Tests;
 
 public class DomQueryHelperTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FindByTag_Returns_Matching_Boxes()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
@@ -19,7 +19,7 @@ public class DomQueryHelperTests
         Assert.Contains(p2, results);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FindByTag_Is_Case_Insensitive()
     {
         var root = new CssBox(null, new HtmlTag("DIV", false), new Uri("/"));
@@ -27,7 +27,7 @@ public class DomQueryHelperTests
         Assert.Single(results);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FindById_Returns_Matching_Box()
     {
         var attrs = new Dictionary<string, string> { { "id", "main" } };
@@ -40,7 +40,7 @@ public class DomQueryHelperTests
         Assert.Same(target, result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FindById_Returns_Null_When_Not_Found()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
@@ -49,7 +49,7 @@ public class DomQueryHelperTests
         Assert.Null(DomQueryHelper.FindById(root, "nonexistent"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CountBoxes_Returns_Total_Count()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
@@ -60,7 +60,7 @@ public class DomQueryHelperTests
         Assert.Equal(4, DomQueryHelper.CountBoxes(root));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CountBoxes_Single_Box_Returns_One()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));

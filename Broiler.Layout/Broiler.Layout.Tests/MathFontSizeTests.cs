@@ -19,7 +19,7 @@ public sealed class MathFontSizeTests
     private static CssBox Box(CssBox? parent, string fontSize) =>
         new(parent!, null, BaseUrl) { FontSize = fontSize };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MathResolvesToTheInheritedSize()
     {
         var parent = Box(null, "40px");
@@ -28,7 +28,7 @@ public sealed class MathFontSizeTests
         Assert.Equal(parent.ComputedFontSizePoints, child.ComputedFontSizePoints, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MathDoesNotCollapseTheSubtree()
     {
         // The failure this guards is not that `math` fails to scale — it is that the length parser
@@ -45,7 +45,7 @@ public sealed class MathFontSizeTests
         Assert.Equal(root.ComputedFontSizePoints + 2, nested.ComputedFontSizePoints, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MathIsMatchedCaseInsensitively()
     {
         var parent = Box(null, "40px");
@@ -53,7 +53,7 @@ public sealed class MathFontSizeTests
         Assert.Equal(parent.ComputedFontSizePoints, Box(parent, "MATH").ComputedFontSizePoints, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnUnrelatedKeywordIsStillNotTreatedAsMath()
     {
         // The arm must not swallow other tokens: `larger` keeps its own resolution rather than

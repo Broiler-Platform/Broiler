@@ -11,7 +11,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class ShadowRootInnerHtmlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShadowRoot_InnerHtml_ParsesWithoutMarkerNodes()
     {
         using var context = new JSContext();

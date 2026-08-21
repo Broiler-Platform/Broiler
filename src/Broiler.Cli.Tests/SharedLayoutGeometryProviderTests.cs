@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class SharedLayoutGeometryProviderTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Provider_Returns_Real_Geometry_Keyed_By_Element()
     {
         using var context = new JSContext();
@@ -39,7 +39,7 @@ public sealed class SharedLayoutGeometryProviderTests
         Assert.Equal(60f, geometry.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Provider_Caches_Snapshot_For_Same_Version_And_Viewport()
     {
         using var context = new JSContext();

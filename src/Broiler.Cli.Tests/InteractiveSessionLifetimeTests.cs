@@ -57,7 +57,7 @@ public class InteractiveSessionLifetimeTests
 
     private static readonly string[] OneScript = { "1 + 1;" };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisposingSession_DisposesBridge()
     {
         var factory = new FakeFactory();
@@ -74,7 +74,7 @@ public class InteractiveSessionLifetimeTests
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FailedConstruction_DisposesBridgeAndContext()
     {
         var factory = new FakeFactory();

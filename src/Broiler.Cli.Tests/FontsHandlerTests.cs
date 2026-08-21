@@ -5,7 +5,7 @@ namespace Broiler.Cli.Tests;
 
 public class FontsHandlerTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsFontExists_With_CommaSeparated_List_Uses_Mapped_Loaded_Family()
     {
         var fontCreator = new TestFontCreator();
@@ -19,7 +19,7 @@ public class FontsHandlerTests
         Assert.False(handler.IsFontExists("Missing, Unknown"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetCachedFont_With_CommaSeparated_List_Uses_First_Available_Mapped_Family_And_Caches_By_Resolved_Name()
     {
         var fontCreator = new TestFontCreator();
@@ -36,7 +36,7 @@ public class FontsHandlerTests
         Assert.Equal(["LoadedAhem"], fontCreator.CreatedFamilies);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetCachedFont_With_Only_Missing_List_Falls_Back_To_First_Candidate_Not_Whole_List()
     {
         var fontCreator = new TestFontCreator();

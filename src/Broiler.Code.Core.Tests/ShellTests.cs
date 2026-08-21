@@ -42,7 +42,7 @@ public sealed class ShellTests : IDisposable
 
     private CodeWorkspace CreateWorkspace() => new(new FileSystemWorkspaceStorage(_root));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Per_Document_View_State_Survives_A_Tab_Switch()
     {
         Write("A.cs", string.Join('\n', Enumerable.Range(0, 400).Select(i => $"// line {i}")));
@@ -73,7 +73,7 @@ public sealed class ShellTests : IDisposable
         Assert.Equal(editor.Snapshot.GetLineStart(120) + 3, editor.CaretPosition);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Opening_An_Already_Open_Document_Activates_Its_Tab()
     {
         Write("A.cs", "class A { }\n");
@@ -93,7 +93,7 @@ public sealed class ShellTests : IDisposable
         Assert.Equal(a, coordinator.ActiveDocument);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Cancelling_A_Dirty_Close_Keeps_The_Tab_And_The_Text()
     {
         Write("A.cs", "class A { }\n");
@@ -119,7 +119,7 @@ public sealed class ShellTests : IDisposable
         Assert.StartsWith("// edit", workspace.FindOpenDocument(a)!.Buffer.Current.ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Choosing_Save_On_Close_Writes_Then_Closes()
     {
         Write("A.cs", "class A { }\n");
@@ -143,7 +143,7 @@ public sealed class ShellTests : IDisposable
         Assert.StartsWith("// saved", await File.ReadAllTextAsync(Path.Combine(_root, "A.cs")), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Discarding_Closes_Without_Writing()
     {
         Write("A.cs", "original\n");
@@ -165,7 +165,7 @@ public sealed class ShellTests : IDisposable
         Assert.Equal("original\n", await File.ReadAllTextAsync(Path.Combine(_root, "A.cs")));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Closing_Everything_Stops_At_The_First_Cancellation()
     {
         Write("A.cs", "a\n");
@@ -194,7 +194,7 @@ public sealed class ShellTests : IDisposable
         Assert.True(workspace.HasUnsavedChanges);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task The_Solution_Explorer_Reflects_The_Workspace_And_Its_Dirty_State()
     {
         Write("src/P/P.csproj", """
@@ -237,7 +237,7 @@ public sealed class ShellTests : IDisposable
         Assert.Equal([solution, project], source.AncestorsOf(file));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Templated_Solution_Contains_Only_Standard_Sdk_Files()
     {
         var storage = new FileSystemWorkspaceStorage(_root);
@@ -270,7 +270,7 @@ public sealed class ShellTests : IDisposable
             r => r.EndsWith("Sample.Core.csproj", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Template_Refuses_To_Overwrite()
     {
         Write("src/Sample.Core/Sample.Core.csproj", "<Project />");

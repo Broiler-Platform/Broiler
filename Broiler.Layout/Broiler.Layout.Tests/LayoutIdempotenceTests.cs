@@ -35,7 +35,7 @@ public sealed class LayoutIdempotenceTests
 {
     private static readonly Uri BaseUrl = new("file:///idempotence.html");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_first_childs_top_margin_propagates_the_same_way_on_a_second_layout()
     {
         var (root, child) = TreeWithFirstChildMarginTop("8px");
@@ -50,7 +50,7 @@ public sealed class LayoutIdempotenceTests
         Assert.Equal(firstPass.Bottom, secondPass.Bottom, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_margin_is_still_applied_rather_than_dropped_from_both_passes()
     {
         // The failure this guards against is the tempting fix: clearing the state so both passes
@@ -66,7 +66,7 @@ public sealed class LayoutIdempotenceTests
             $"the 8px top margin should still move the child ({marginedChild.Location.Y} vs {plainChild.Location.Y})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ten_layouts_do_not_drift()
     {
         // Two passes catch a value that is consumed once; a value that accumulates needs more. Both

@@ -45,7 +45,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
 
     /// <summary>The gap itself: a function the frame declared is a member of the frame's window.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameDeclaredFunction_IsReachableThroughFramesWindow()
     {
         WriteChild("<!DOCTYPE html><body><script>function reveal() {}</script></body>");
@@ -55,7 +55,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
 
     /// <summary>The same function through the other route onto the frame's global — a parent that
     /// holds the frame element rather than an index.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameDeclaredFunction_IsReachableThroughContentWindow()
     {
         WriteChild("<!DOCTYPE html><body><script>function reveal() {}</script></body>");
@@ -65,7 +65,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
     }
 
     /// <summary>A declared <c>var</c> is published as its value, not wrapped.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameDeclaredVariable_IsReachableThroughFramesWindow()
     {
         WriteChild("<!DOCTYPE html><body><script>var answer = 42;</script></body>");
@@ -77,7 +77,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
     /// Calling into the frame runs in the frame's realm: the function's <c>document</c> is the
     /// frame's document, so "my document" means the frame's, not the caller's.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CallingAFramesFunction_RunsAgainstTheFramesDocument()
     {
         WriteChild("""
@@ -97,7 +97,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
 
     /// <summary>And the caller's own document is untouched by that call — the realm swap is real,
     /// not a coincidence of both documents carrying the same ids.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CallingAFramesFunction_LeavesTheCallersDocumentAlone()
     {
         WriteChild("""
@@ -124,7 +124,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
 
     /// <summary>The bridge's own window members win: a frame declaring <c>document</c> does not
     /// overwrite the frame window's document.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FrameDeclaration_DoesNotOverwriteAWindowMember()
     {
         WriteChild("<!DOCTYPE html><body><script>var document = 7;</script></body>");
