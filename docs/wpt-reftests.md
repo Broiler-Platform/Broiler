@@ -1112,3 +1112,80 @@ absent because the script replaced the document element *before* EOF — not
 because head-only documents lack one. Passing them that way would be the same
 "both sides equally wrong" failure this document warns about elsewhere, bought
 at the price of a real regression.
+
+## A mirrored element painted nothing, and issue #1732's 0.0% list
+
+Issue #1732 ranks five reftests at a 0.0% match. Three of them are the ones the
+top-thirty triage above already names, and wpt.fyi settles them: **no shipping
+engine passes any of the three** on the aligned stable runs — Chrome, Edge,
+Firefox and Safari all fail `css/CSS2/box-display/root-box-003.xht`,
+`forced-colors-mode/forced-colors-mode-49.html` and
+`html/rendering/replaced-elements/images/abs-pos-transferred-max-width-from-percentage-max-height-in-auto-height-containing-block.html`.
+That is worth having on the record rather than re-derived each time the list
+regenerates: `root-box-003` asserts a `display: none` root propagating its
+background to the canvas, which every engine and this one deliberately decline
+(`PaintWalker.FindCanvasBackgroundAndImage`); `forced-colors-mode-49` is
+meaningful only when the run is in forced-colors mode, which neither this suite
+nor wpt.fyi's runs are; and the third names a bare 60×60 PNG as the `rel=match`
+of a full page that also carries a `<p>` of instructions. A fix for any of them
+would be a deviation, not a gain.
+
+The remaining two do pass in Chrome and Edge, and pulling on one of them found a
+bug much larger than the test:
+
+```sh
+dotnet run --project src/Broiler.Wpt -- --render /tmp/t.html   # <div style="transform:rotate(180deg);background:red">
+```
+
+**rendered a blank page.** So did `scaleX(-1)`, `scaleY(-1)` and `scale(-1)`:
+every axis-mirroring transform painted no pixels at all — background, borders,
+children and text alike — while `translate` and a positive `scale` were fine.
+
+The reason is one line deep. `GraphicsAdapter.SaveTransformLayer` prefers the
+raster canvas, which maps a point per axis as `p * scale + translation`, and
+`BCanvas.TrySaveTransform` accepts any matrix whose rotation/skew terms are zero
+— which a mirror is, and which `rotate(180deg)` becomes once its sine terms round
+away. But `BCanvas.Translate(RectangleF)` mapped a rectangle by scaling its
+*extent*, and a negative factor made that extent negative. Every primitive walks
+the rows and columns between `Left`/`Right` and `Top`/`Bottom`, so the rectangle
+spanned nothing. The transform was accepted, and then drew zero pixels; the
+compat backend that would otherwise have caught it is an inert stub here.
+
+That is why `css-break/transform-024-print` scored 0.0% rather than the partial
+score a mis-paginated five-page test would get: nothing inside the rotated
+container reached the canvas. It still fails — it is a `-print` test, so the
+default screen-mode run cannot measure what it was written to measure, and under
+`BROILER_WPT_PAGED_PRINT=1` it is at 10.0% — but it fails for its own reason now.
+
+The fix (submodule patch, subject *"Paint an element its transform mirrors"*)
+normalises the mapped rectangle and mirrors the primitives whose sampling reads
+*across* it rather than merely inside it — a bitmap, a tile phase, a gradient's
+endpoints, a radial or conic centre and sweep, a corner radius. Glyph outlines go
+through the per-point mapping and mirror on their own.
+
+**The scoreboard barely moves, and that is the point.** Across
+`css/css-transforms`, `css/compositing`, `css/css-backgrounds` and
+`css/css-images` — 2 020 reftests — it goes 1 242 → **1 243**. Three tests are
+gained (`transform-background-003`, `-004`, `ttwf-reftest-rotate`) and two are
+lost, both of which were passing for the wrong reason: a mirror on *each* side
+rendered nothing on *both*, so blank matched blank. `transform3d-scale-007` now
+shows the `rotateX(180deg)` its test side still does not support, and
+`animation/transform-interpolation-matrix` shows that its reference builds no
+boxes at all. This is the "both sides equally wrong" failure this document warns
+about elsewhere, caught in the act — and a reminder that a suite this narrow
+cannot score "a mirrored element renders at all", which is what actually changed.
+
+### `rotateX(180deg)` is exactly `scaleY(-1)`, and it was still not taken
+
+The obvious follow-on — reducing a half-turn about X or Y to the mirror it
+provably is, the same bargain `translate3d` and a 2D `matrix3d` already get in
+`PaintWalker.ParseCssTransformMatrix` — was written, measured and **reverted**.
+It gains `transform3d-scale-007` and `transform3d-sorting-002` and loses
+`backface-visibility-hidden-animated-001` and `-002`, because an element whose
+own transform is a half-turn about X or Y has its *back* face toward the viewer:
+with `backface-visibility: hidden` it must not be painted at all, and painting it
+mirrored is a new wrong answer where there was previously no answer. Deciding
+that needs the facing parity accumulated down each `preserve-3d` chain — the
+ancestor half-turn in those tests' references is exactly what cancels the
+element's own — which is the 3D pipeline this renderer does not have. The
+reduction is correct and worth taking *after* that, not before.

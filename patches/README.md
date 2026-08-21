@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Five patches are waiting on a maintainer.** See the index below.
+**Six patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -55,6 +55,7 @@ again with the one below.
 | `0003` | `Broiler.HTML` | Carry a block image's page name onto the box that replaces it |
 | `0004` | `Broiler.CSS` | Give `<legend>` the user-agent `display: block` it has in HTML |
 | `0005` | `Broiler.HTML` | The same, in the default style sheet |
+| `0006` | `Broiler.HTML` | Paint an element its transform mirrors |
 
 ### `0001` — `border: 72pt solid red` painted a thin black line
 
@@ -203,3 +204,44 @@ content in it and does not get there on the legend alone. `css/css-sizing` holds
 at 74 of 112 with both of its fieldset `aspect-ratio` tests at 100%, and
 `css/css-page` (paged and default), `css/CSS2`, `css/css-backgrounds` and
 `css/css-values` do not move.
+
+### `0006` — a mirrored element painted nothing at all
+
+The raster canvas maps a point per axis as `p * scale + translation`, so a
+*negative* factor is expressible on it and `TrySaveTransform` accepts one:
+`scaleX(-1)`, `scaleY(-1)`, `scale(-1)` and the half-turn `rotate(180deg)` —
+whose sine terms round to zero — all fold into `_scaleX`/`_scaleY` rather than
+falling back to the compat backend, which is an inert stub on a host with no OS
+backend.
+
+Expressible, but not drawn. `Translate(RectangleF)` mapped a rectangle by scaling
+its **extent**, which a negative factor made negative, and every primitive walks
+the rows and columns between `Left`/`Right` and `Top`/`Bottom`. A mirrored
+element therefore spanned nothing: background, borders, children and text all
+vanished. It is the same shape of failure as a stroke that misses the raster fast
+path — not coarser output, *absent* output — and it is why
+`css-break/transform-024-print` rendered a blank page where five coloured bands
+belong.
+
+The fix normalises the mapped rectangle and mirrors the primitives whose sampling
+reads *across* it rather than merely inside it: a bitmap and a tile phase are read
+from the far end, a linear gradient's endpoints are reflected in the rectangle, a
+radial or conic centre is measured from the opposite edge and the conic sweep runs
+the other way, and a corner radius travels to the corner the mirror moves it to.
+Glyph outlines already go through the per-point mapping, so they mirror on their
+own. Non-negative scale takes none of the new branches and its arithmetic is
+untouched.
+
+**Measured** across `css/css-transforms`, `css/compositing`, `css/css-backgrounds`
+and `css/css-images` — 2020 reftests — the suite goes 1242 → **1243** passing.
+The gains are `transform-background-003`, `-004` and `ttwf-reftest-rotate`; the
+two losses were passing for the wrong reason and now show the gap they always
+had, a mirror on each side having rendered nothing on both:
+`transform3d-scale-007` (an unsupported `rotateX(180deg)` on the test side) and
+`animation/transform-interpolation-matrix` (its reference builds no boxes).
+That small a net move understates it — what the patch buys is that a mirrored
+element renders *at all*, which no count of a suite this narrow shows.
+
+The main-repo half is `src/Broiler.Cli.Tests/MirroredTransformPaintTests.cs`,
+which feature-probes the pinned pointer and self-skips there. `scripts/apply-pending-wpt-patches.sh`
+lists this patch, so a WPT run exercises it.
