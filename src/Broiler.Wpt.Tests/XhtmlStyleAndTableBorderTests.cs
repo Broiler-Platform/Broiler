@@ -50,7 +50,7 @@ public class XhtmlStyleAndTableBorderTests : IDisposable
         return green;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CdataWrappedStyle_IsApplied()
     {
         // <style> wrapped in a CDATA section (the XHTML idiom). Before the fix
@@ -63,7 +63,7 @@ public class XhtmlStyleAndTableBorderTests : IDisposable
             "CDATA-wrapped <style> CSS was not applied (the stylesheet was dropped).");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TableCell_AuthorBorderShorthandColor_IsApplied()
     {
         // A <div> border has always honoured its colour; the <td> regressed to

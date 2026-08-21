@@ -29,7 +29,7 @@ public sealed class WptPageBoxTests
     private static string Page(string declarations) =>
         $"<!DOCTYPE html><html><head><style>@page {{ {declarations} }}</style></head><body></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_With_No_Page_Rule_Keeps_The_Default_Box_And_No_Margins()
     {
         var box = WptPageBox.Resolve("<!DOCTYPE html><html><body></body></html>", DefaultBox);
@@ -40,7 +40,7 @@ public sealed class WptPageBoxTests
 
     // The shape css/CSS2/pagination is built on: a 5in by 3in sheet with half-inch margins is a
     // four-by-two-inch page area. Getting this wrong is what cut those tests at 768px.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Size_And_Margin_Give_The_Page_Area()
     {
         var box = WptPageBox.Resolve(Page("size: 5in 3in; margin: 0.5in;"), DefaultBox);
@@ -81,7 +81,7 @@ public sealed class WptPageBoxTests
         Assert.Equal(height, box.BoxSize.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Size_Auto_Keeps_The_Default()
     {
         Assert.Equal(DefaultBox, WptPageBox.Resolve(Page("size: auto"), DefaultBox).BoxSize);
@@ -104,7 +104,7 @@ public sealed class WptPageBoxTests
         Assert.Equal(left, box.MarginLeft, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Margin_Longhands_Are_Read_And_Override_The_Shorthand()
     {
         var box = WptPageBox.Resolve(Page("margin: 10px; margin-left: 40px;"), DefaultBox);
@@ -133,7 +133,7 @@ public sealed class WptPageBoxTests
     // for the whole document puts one page's margins on every page.
     // page-name-unnamed-trailing-001 is the case: it uses exactly one *name*, but its flow starts
     // unnamed, so the guess gave it a 260px page area and a fourth page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Explicit_Page_Name_Replaces_The_Document_Wide_Guess()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -151,7 +151,7 @@ public sealed class WptPageBoxTests
     }
 
     // A name the document declares no rule for leaves the unconditional one standing.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unknown_Page_Name_Falls_Back_To_The_Unconditional_Rule()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -167,7 +167,7 @@ public sealed class WptPageBoxTests
     // does. `:first` describes exactly one page, so a surface that prints that page can carry it.
     // page-rule-specificity-print-portrait-ref states its whole geometry that way: one page, sized
     // by `@page :first { size: portrait }` alone.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void First_Page_Reads_The_First_Page_Rule()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -183,7 +183,7 @@ public sealed class WptPageBoxTests
     // `:first` is the most specific of the three, so it layers over the unconditional rule and over
     // the used named one — page-rule-specificity-002-print states `@page :first { size: portrait }`
     // beside `@page { size: landscape }` and expects the first page portrait.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_First_Page_Rule_Layers_Over_The_Unconditional_One()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -215,7 +215,7 @@ public sealed class WptPageBoxTests
     // flow starts on. page-name-table-001-print is the pair: a table on `page: square`, a
     // `@page square` sizing the sheet 5in, and a reference that spells the same page as the
     // unconditional rule. Reading only the unconditional rule scored it 0.0 %.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_One_Named_Page_The_Document_Uses_Is_Applied()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -226,7 +226,7 @@ public sealed class WptPageBoxTests
     }
 
     // The name can come from a style rule rather than a style attribute.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Name_From_A_Style_Rule_Counts_As_Used()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -238,7 +238,7 @@ public sealed class WptPageBoxTests
 
     // Two names need a per-page box, which one surface cannot carry, so neither is taken.
     // page-margin-auto-print names six pages and must stay exactly as it was.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Named_Pages_Leave_The_Unconditional_Box_Alone()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -251,7 +251,7 @@ public sealed class WptPageBoxTests
     }
 
     // `auto` is the initial value and names no page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Page_Auto_Names_No_Page()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -263,7 +263,7 @@ public sealed class WptPageBoxTests
 
     // A named rule the document never puts content on is still ignored — which is what keeps this
     // narrower than the earlier attempt that read every selectored rule.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Named_Page_Nothing_Uses_Is_Ignored()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -290,7 +290,7 @@ public sealed class WptPageBoxTests
 
     // A pseudo-class describes particular pages of a flow this model does not paginate, so it is
     // never read — even when the document uses exactly one named page beside it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Pseudo_Class_Selector_Is_Never_Read()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -301,7 +301,7 @@ public sealed class WptPageBoxTests
     }
 
     // ...but the unconditional rule in the same sheet still applies.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Unconditional_Rule_Applies_Alongside_Selectored_Ones()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -314,7 +314,7 @@ public sealed class WptPageBoxTests
         Assert.Equal(20, box.MarginTop, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Later_Page_Rules_Win()
     {
         const string html = "<!DOCTYPE html><html><head>"
@@ -326,7 +326,7 @@ public sealed class WptPageBoxTests
 
     // Margins can exceed the sheet in a malformed document; the area must still be usable rather
     // than zero or negative, because it is divided by to get a page count.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Over_Constrained_Margin_Leaves_A_Usable_Area()
     {
         var box = WptPageBox.Resolve(Page("size: 100px; margin: 200px;"), DefaultBox);
@@ -349,7 +349,7 @@ public sealed class WptPageBoxTests
         Assert.Equal(height, box.BoxSize.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Font_Size_On_The_Page_Is_What_Em_Resolves_Against()
     {
         var box = WptPageBox.Resolve(Page("font-size: 10px; size: 32em 28em;"), DefaultBox);
@@ -361,7 +361,7 @@ public sealed class WptPageBoxTests
     // `width` and `height` size the page *area* the way they size any other box's content, so the
     // sheet is that plus its margins. margin-boxes/dimensions-011 writes the same page both ways:
     // `width: 20em; height: 16em; margin: 6em` against `size: 32em 28em; margin: 0`.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Width_And_Height_Size_The_Page_Area_And_The_Margins_Are_Added()
     {
         var box = WptPageBox.Resolve(Page("margin: 6em; width: 20em; height: 16em;"), DefaultBox);
@@ -398,7 +398,7 @@ public sealed class WptPageBoxTests
 
     // The initial axes map block to vertical and inline to horizontal, so a document that states no
     // writing mode reads the flow-relative names as the physical ones they coincide with.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Logical_Margins_On_The_Initial_Axes_Are_The_Physical_Ones()
     {
         var box = WptPageBox.Resolve(
@@ -413,7 +413,7 @@ public sealed class WptPageBoxTests
     }
 
     // `direction: rtl` reverses the inline axis and leaves the block axis alone.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rtl_Swaps_The_Inline_Sides()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -428,7 +428,7 @@ public sealed class WptPageBoxTests
     }
 
     // A writing mode further down the tree styles a box inside the page, not the page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Only_The_Root_Elements_Writing_Mode_Turns_The_Page()
     {
         const string html = "<!DOCTYPE html><html><head><style>"
@@ -441,7 +441,7 @@ public sealed class WptPageBoxTests
 
     // A flow-relative longhand is a longhand: it overrides the shorthand it follows, and is
     // overridden by the physical longhand that follows it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Logical_And_Physical_Margins_Cascade_In_Source_Order()
     {
         var box = WptPageBox.Resolve(
@@ -459,7 +459,7 @@ public sealed class WptPageBoxTests
     // css-page-3 §3.2: with a `size` fixing the box and `width`/`height` fixing the area inside it,
     // the margins absorb the difference — so `auto` centres the page area. page-margin-auto-print
     // states exactly this page: 20em x 7em holding a 12em x 3em area.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Auto_Margin_Centres_The_Page_Area_In_Its_Box()
     {
         var box = WptPageBox.Resolve(
@@ -490,7 +490,7 @@ public sealed class WptPageBoxTests
     // The remainder is signed: an area larger than its box hangs off every edge rather than
     // clamping to zero. page-margin-auto-negative-print states a 300px page with a 340px area and
     // expects exactly -20 on each side.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Area_Larger_Than_Its_Box_Gives_Negative_Auto_Margins()
     {
         var box = WptPageBox.Resolve(
@@ -506,7 +506,7 @@ public sealed class WptPageBoxTests
 
     // With no area stated there is nothing for an `auto` margin to take, so it is zero — and the
     // page keeps the size it declared rather than collapsing to it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_With_No_Stated_Area_Is_Zero()
     {
         var box = WptPageBox.Resolve(Page("size: 300px; margin: auto;"), DefaultBox);
@@ -520,7 +520,7 @@ public sealed class WptPageBoxTests
     // gives way to it. page-size-013-print states this over-constrained resolution outright, and
     // its reference spells the answer out: `size: 500px; margin: 50px; width: 200px; height: 300px`
     // is the same page as `size: 300px 400px; margin: 50px`.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Over_Constrained_Axis_Resizes_The_Box_Around_Its_Area()
     {
         var box = WptPageBox.Resolve(
@@ -533,7 +533,7 @@ public sealed class WptPageBoxTests
 
     // `auto` inside the shorthand used to reject the whole declaration, leaving every margin at
     // zero; it expands like any other component.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Expands_Through_The_Shorthand()
     {
         var box = WptPageBox.Resolve(
@@ -548,7 +548,7 @@ public sealed class WptPageBoxTests
     // A declared `size` survives a declared area only when an `auto` margin is there to absorb the
     // difference — which is the one thing that separates page-margin-auto-print (keeps its 20em x
     // 7em sheet) from page-size-013-print (resized to 300x400).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Declared_Size_Survives_A_Declared_Area_Only_Under_Auto()
     {
         Assert.Equal(

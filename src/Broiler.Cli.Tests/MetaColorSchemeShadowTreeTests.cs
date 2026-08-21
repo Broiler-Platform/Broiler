@@ -26,7 +26,7 @@ public class MetaColorSchemeShadowTreeTests
         return (c.R, c.G, c.B);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MetaColorScheme_InShadowTree_DoesNotDarkenCanvas()
     {
         // Attach a shadow root and insert <meta name=color-scheme content=dark> into it. Per spec
@@ -44,7 +44,7 @@ public class MetaColorSchemeShadowTreeTests
         Assert.True((r, g, b) == (255, 255, 255), $"expected light canvas, was {r},{g},{b}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MetaColorScheme_InDocumentHead_DarkensCanvas()
     {
         // Control: the same meta in the document head DOES set a dark color scheme.

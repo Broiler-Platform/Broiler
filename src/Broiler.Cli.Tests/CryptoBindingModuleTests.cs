@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class CryptoBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Crypto_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(CryptoBinding);
@@ -24,7 +24,7 @@ public sealed class CryptoBindingModuleTests
         Assert.NotNull(moduleType.GetMethod("Build", BindingFlags.Public | BindingFlags.Static));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Crypto_GetRandomValues_And_RandomUUID_Work_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

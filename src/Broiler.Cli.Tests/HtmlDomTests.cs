@@ -10,7 +10,7 @@ public class HtmlDomTests
 {
     // ────────────────────── Test 49: Basic table accessors ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_CreateCaption_Creates_And_Returns_Caption()
     {
         var html = @"<!DOCTYPE html>
@@ -33,7 +33,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_CreateTHead_CreateTFoot_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -57,7 +57,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_TBodies_Returns_Empty_Collection()
     {
         var html = @"<!DOCTYPE html>
@@ -80,7 +80,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_Rows_Returns_Empty_Initially()
     {
         var html = @"<!DOCTYPE html>
@@ -99,7 +99,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_DeleteCaption_DeleteTHead_DeleteTFoot_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -130,7 +130,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 50: Table construction ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_TBodies_InsertRow_Creates_Row_In_Section()
     {
         var html = @"<!DOCTYPE html>
@@ -170,7 +170,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_Rows_Order_THead_TBodies_TFoot()
     {
         var html = @"<!DOCTYPE html>
@@ -207,7 +207,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 51: Row ordering ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_InsertRow_Complex_Ordering()
     {
         var html = @"<!DOCTYPE html>
@@ -249,7 +249,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 52: form.elements ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Form_Elements_Returns_Controls_Collection()
     {
         var html = @"<!DOCTYPE html>
@@ -272,7 +272,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 53: Dynamic input changes ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Name_ReadWrite_Syncs_With_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -300,7 +300,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Form_Elements_By_Name_Access()
     {
         var html = @"<!DOCTYPE html>
@@ -331,7 +331,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 54: Parsed input changes ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Type_Returns_Lowercase()
     {
         var html = @"<!DOCTYPE html>
@@ -353,7 +353,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Click_Dispatches_Submit_Event()
     {
         var html = @"<!DOCTYPE html>
@@ -380,7 +380,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_SetAttribute_Returns_String()
     {
         var html = @"<!DOCTYPE html>
@@ -404,7 +404,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 55: Moved checkboxes keep state ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Checkbox_State_Persists_After_Move()
     {
         var html = @"<!DOCTYPE html>
@@ -441,7 +441,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 56: Cloned radio buttons ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Radio_Button_Mutual_Exclusion_In_Form()
     {
         var html = @"<!DOCTYPE html>
@@ -472,7 +472,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Radio_Button_Different_Groups_Independent()
     {
         var html = @"<!DOCTYPE html>
@@ -510,7 +510,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 57: HTMLSelectElement.add() ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Select_Add_Appends_Option()
     {
         var html = @"<!DOCTYPE html>
@@ -536,7 +536,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 58: HTMLOptionElement.defaultSelected ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Option_DefaultSelected_Sets_SelectedIndex()
     {
         var html = @"<!DOCTYPE html>
@@ -563,7 +563,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 59: Button element attributes ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Button_Type_Default_Submit()
     {
         var html = @"<!DOCTYPE html>
@@ -585,7 +585,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Button_Value_Reflects_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -607,7 +607,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 60: className vs class ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassName_SetAttribute_Class_Syncs()
     {
         var html = @"<!DOCTYPE html>
@@ -631,7 +631,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 61: className space preservation ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassName_Preserves_Whitespace()
     {
         var html = @"<!DOCTYPE html>
@@ -663,7 +663,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 62: DOM attributes vs content attributes ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassName_Not_Same_As_Class_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -687,7 +687,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Label_HtmlFor_Maps_To_For_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -713,7 +713,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Meta_HttpEquiv_Maps_To_Http_Equiv_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -741,7 +741,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 63: Area element attributes ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Area_GetAttribute_Returns_Correct_Values()
     {
         var html = @"<!DOCTYPE html>
@@ -764,7 +764,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 64: Object.data URI resolution ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Resolves_Relative_URIs()
     {
         var html = @"<!DOCTYPE html>
@@ -785,7 +785,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Is_Absolute()
     {
         var html = @"<!DOCTYPE html>
@@ -804,7 +804,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nonexistent_Property_Returns_Undefined()
     {
         var html = @"<!DOCTYPE html>
@@ -827,7 +827,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Additional edge case tests ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Table_CreateCaption_Returns_Existing()
     {
         var html = @"<!DOCTYPE html>
@@ -848,7 +848,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Form_Elements_Length_Dynamic()
     {
         var html = @"<!DOCTYPE html>
@@ -872,7 +872,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Type_Change_And_Click_Submit()
     {
         var html = @"<!DOCTYPE html>
@@ -894,7 +894,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Anchor_Href_Property_ReadWrite()
     {
         var html = @"<!DOCTYPE html>

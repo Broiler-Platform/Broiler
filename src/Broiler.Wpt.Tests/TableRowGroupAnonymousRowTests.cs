@@ -38,7 +38,7 @@ public class TableRowGroupAnonymousRowTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonRowChildOfRowGroup_IsWrappedAndPainted()
     {
         // A tall hotpink block directly inside a table-row-group. It must paint, and its height
@@ -66,7 +66,7 @@ public class TableRowGroupAnonymousRowTests
             "the wrapped child's height.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ProperRowsInRowGroup_AreUnaffected()
     {
         // The ordinary shape must be untouched: real rows are not re-wrapped or reordered.

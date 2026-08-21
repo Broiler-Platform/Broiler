@@ -50,14 +50,14 @@ public sealed class ZoomLineHeightAndCalcTests
         return b;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteLineHeight_ScalesBy_EffectiveZoom()
     {
         var b = LineHeightBox("20px", "2");
         WithNativeZoom(() => Assert.Equal(40, b.ActualLineHeight, 3)); // 20px × 2
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteLineHeight_NestedZoom_Compounds()
     {
         var root = Box(null, new SizeF(1000, 1000), "static");
@@ -67,14 +67,14 @@ public sealed class ZoomLineHeightAndCalcTests
         WithNativeZoom(() => Assert.Equal(80, b.ActualLineHeight, 3)); // 20px × (2 × 2)
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteLineHeight_Disabled_IsUnscaled()
     {
         var b = LineHeightBox("20px", "2");
         Assert.Equal(20, b.ActualLineHeight, 3); // flag off — no zoom
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnitlessLineHeight_IsNotReScaled_ByZoomHelper()
     {
         // A unitless line-height rides the font size (16 in the fake environment, which does not itself
@@ -101,7 +101,7 @@ public sealed class ZoomLineHeightAndCalcTests
         return b;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CalcAbsoluteInset_ScalesBy_EffectiveZoom_ViaParserScope()
     {
         // calc(20px + 20px) = 40 absolute; under the calc-zoom scope the parser scales the absolute terms
@@ -117,7 +117,7 @@ public sealed class ZoomLineHeightAndCalcTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CalcInset_Disabled_IsUnscaled()
     {
         // Flag off: calc(20px + 20px) = 40, unscaled; margin = (300 - 40 - 100) / 2 = 80.

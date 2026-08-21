@@ -69,7 +69,7 @@ public class ViewTransitionOldCaptureScrollTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheOldCaptureFollowsAScrollTakenBeforeTheTransition()
     {
         // Scrolled to the end, the band is on screen, so its group must be too.
@@ -78,7 +78,7 @@ public class ViewTransitionOldCaptureScrollTests : IDisposable
         Assert.True(green > 0, "the old capture's group was placed off-screen — the page scroll was not subtracted");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WithNoScrollTheCaptureIsUnchanged()
     {
         // The conversion must be a no-op at scroll offset 0: the band sits past a 400vh spacer, so
@@ -88,7 +88,7 @@ public class ViewTransitionOldCaptureScrollTests : IDisposable
         Assert.Equal(0, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFixedPositionElementIsNotAdjusted()
     {
         // A fixed element does not move with the page, so its document coordinates are already

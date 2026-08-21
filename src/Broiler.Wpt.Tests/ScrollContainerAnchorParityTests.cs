@@ -83,7 +83,7 @@ public class ScrollContainerAnchorParityTests : IDisposable
         Assert.True(System.Math.Abs(native.y0 - expectY0) <= 2, $"native top={native.y0}, expected ~{expectY0}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollOffset_ShiftsNativePlacement_LikeBaked()
     {
         // Anchor at content (100,100) 40x40; scrollLeft=30, scrollTop=50 shift it to

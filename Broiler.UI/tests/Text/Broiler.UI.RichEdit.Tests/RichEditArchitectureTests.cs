@@ -12,7 +12,7 @@ public sealed class RichEditArchitectureTests
         "../../../Foundation/Broiler.UI/Broiler.UI.csproj",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RichEdit_Project_Targets_Net10_And_References_Only_DocumentsModel_Ui_And_Graphics()
     {
         XDocument project = XDocument.Load(RichEditProjectPath());
@@ -22,7 +22,7 @@ public sealed class RichEditArchitectureTests
         Assert.Equal(ExpectedReferences, ProjectReferences(project));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RichEdit_Project_Does_Not_Reference_Dom_Windows_Or_Backends()
     {
         string[] references = ProjectReferences(XDocument.Load(RichEditProjectPath()));
@@ -32,7 +32,7 @@ public sealed class RichEditArchitectureTests
         Assert.DoesNotContain(references, r => r.Contains("Direct2D", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UiRichEdit_Is_The_Only_Control_And_Is_Abstract()
     {
         Type[] controls = typeof(UiRichEdit).Assembly
@@ -45,7 +45,7 @@ public sealed class RichEditArchitectureTests
         Assert.Equal(typeof(UiElement), typeof(UiRichEdit).BaseType);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Public_Surface_Exposes_No_Native_Handles_Or_Windows_Types()
     {
         Assert.Empty(FindForbiddenSurface(typeof(UiRichEdit).Assembly.GetExportedTypes()));

@@ -5,7 +5,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class Acid3HtmlElementRegressionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test49_Table_CreateTHead()
     {
         var html = @"<!DOCTYPE html>
@@ -25,7 +25,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("thead|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test50_Table_CreateTFoot()
     {
         var html = @"<!DOCTYPE html>
@@ -46,7 +46,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("tfoot|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test51_Table_InsertRow()
     {
         var html = @"<!DOCTYPE html>
@@ -66,7 +66,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("tr|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test52_TableSection_InsertRow()
     {
         var html = @"<!DOCTYPE html>
@@ -89,7 +89,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("tr|1|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test53_TableRow_InsertCell()
     {
         var html = @"<!DOCTYPE html>
@@ -110,7 +110,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("td|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test54_Table_Rows_Ordering()
     {
         var html = @"<!DOCTYPE html>
@@ -137,7 +137,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("h,b,f", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test55_Table_DeleteRow()
     {
         var html = @"<!DOCTYPE html>
@@ -163,7 +163,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("2|a|c", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test56_Form_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -187,7 +187,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("3|x", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test57_Form_Elements_NamedItem()
     {
         var html = @"<!DOCTYPE html>
@@ -211,7 +211,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("alice|username", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test58_Input_Type_Lowercase()
     {
         var html = @"<!DOCTYPE html>
@@ -231,7 +231,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("text|checkbox", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test59_Select_Add_Option()
     {
         var html = @"<!DOCTYPE html>
@@ -256,7 +256,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("1|h|Hello", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test60_Select_SelectedIndex()
     {
         var html = @"<!DOCTYPE html>
@@ -281,7 +281,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("1|2|c", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test60b_Select_Value_Selects_Matching_Option()
     {
         var html = @"<!DOCTYPE html>
@@ -305,7 +305,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("1|b", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test61_Option_DefaultSelected()
     {
         var html = @"<!DOCTYPE html>
@@ -327,7 +327,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("false|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test62_Input_Checked_Persists_Across_DOM_Move()
     {
         var html = @"<!DOCTYPE html>
@@ -351,7 +351,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|true|d2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test63_Radio_Mutual_Exclusion()
     {
         var html = @"<!DOCTYPE html>

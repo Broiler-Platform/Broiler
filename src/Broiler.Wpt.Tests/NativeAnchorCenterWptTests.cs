@@ -73,7 +73,7 @@ public class NativeAnchorCenterWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_CentresBoxOnAnchor()
     {
         var red = Render(nativeAnchor: true);

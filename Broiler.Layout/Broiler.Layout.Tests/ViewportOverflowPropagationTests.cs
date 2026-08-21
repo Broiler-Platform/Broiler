@@ -61,7 +61,7 @@ public sealed class ViewportOverflowPropagationTests
         Assert.Equal("visible", root);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Root_That_Set_Its_Own_Overflow_Keeps_It_And_The_Body_Keeps_Its_Own()
     {
         var (body, root) = Propagate("scroll", ["hidden"], ["block"], 0);
@@ -70,14 +70,14 @@ public sealed class ViewportOverflowPropagationTests
         Assert.Equal("scroll", root);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Visible_Body_Has_Nothing_To_Propagate()
     {
         Assert.Equal("visible", Propagate("visible", ["visible"], ["block"], 0).Body);
     }
 
     // Two <body> elements: only the first propagates, so the second keeps its own clip.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Second_Body_Does_Not_Propagate()
     {
         var (body, _) = Propagate("visible", ["scroll", "hidden"], ["block", "block"], 1);
@@ -87,7 +87,7 @@ public sealed class ViewportOverflowPropagationTests
 
     // …and when the first generates no box, nothing propagates at all — the turn does not pass to
     // the second (overflow-body-propagation-016).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Display_None_First_Body_Does_Not_Hand_The_Turn_To_The_Second()
     {
         var (body, _) = Propagate("visible", ["scroll", "hidden"], ["none", "block"], 1);
@@ -95,7 +95,7 @@ public sealed class ViewportOverflowPropagationTests
         Assert.Equal("hidden", body);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Display_None_First_Body_Propagates_Nothing_Itself()
     {
         var (body, _) = Propagate("visible", ["scroll", "hidden"], ["none", "block"], 0);

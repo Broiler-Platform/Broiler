@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class FormSubmitBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormSubmit_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(FormSubmitBinding);
@@ -26,7 +26,7 @@ public sealed class FormSubmitBindingModuleTests
         Assert.True(typeof(IFormSubmitHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Submit_Fires_The_Submit_Listener_And_Honors_PreventDefault()
     {
         var html = @"<!DOCTYPE html>
@@ -58,7 +58,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Submit_On_A_Non_Form_Is_A_No_Op()
     {
         var html = @"<!DOCTYPE html>

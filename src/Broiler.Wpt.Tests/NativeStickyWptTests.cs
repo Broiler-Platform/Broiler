@@ -83,7 +83,7 @@ public class NativeStickyWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EnginePinsStickyBoxToScrollportEdge()
     {
         var red = Render(nativeAnchor: true);

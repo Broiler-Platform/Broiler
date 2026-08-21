@@ -76,7 +76,7 @@ public sealed class SubResourcePrefetcherTests
             return peak;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Prefetched_Requests_Overlap_Instead_Of_Running_One_At_A_Time()
     {
         // The whole point of the item: a page's sub-resources are on the wire together, so their
@@ -88,7 +88,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.True(peak >= 2, $"peak concurrency was {peak} — the prefetches are still serial");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Prefetched_Content_Reaches_The_Consumer_Unchanged()
     {
         var urls = Enumerable.Range(0, 6).Select(i => $"https://example.com/{i}.js").ToList();
@@ -99,7 +99,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.Equal(urls.Select(url => $"body of {url}").ToList(), urls.Select(prefetcher.Consume).ToList());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Resource_Is_Fetched_Once_However_Often_It_Is_Named()
     {
         var fetches = new ConcurrentBag<string>();
@@ -118,7 +118,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.Equal(1, prefetcher.RequestedCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Url_That_Was_Never_Prefetched_Is_Still_Fetched_On_Consume()
     {
         // What makes this safe to adopt one call site at a time: consuming works with or without
@@ -128,7 +128,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.Equal("body of https://example.com/late.js", prefetcher.Consume("https://example.com/late.js"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Concurrency_Is_Bounded_Per_Host()
     {
         // Twelve resources from one origin, allowance of three: an origin must never see more than
@@ -140,7 +140,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.True(peak <= 3, $"peak in-flight per host was {peak}, above the cap of 3");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Different_Hosts_Do_Not_Share_One_Hosts_Allowance()
     {
         // The cap is per host, so a page pulling from four origins is not serialized behind one.
@@ -151,7 +151,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.True(peak > 1, "four distinct hosts were serialized against each other");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Failed_Fetch_Is_Reported_As_No_Content_Rather_Than_Thrown()
     {
         // A dead sub-resource is not a dead page; the consumer applies whatever it already did
@@ -163,7 +163,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.Null(prefetcher.Consume("https://example.com/gone.js"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Failure_Is_Not_Retried_On_Every_Consume()
     {
         int attempts = 0;
@@ -180,7 +180,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.Equal(1, attempts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pending_Reports_Whether_A_Request_Was_Issued()
     {
         var prefetcher = new SubResourcePrefetcher(url => url);
@@ -191,7 +191,7 @@ public sealed class SubResourcePrefetcherTests
         Assert.False(prefetcher.IsPending("https://example.com/b.js"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Blank_Urls_Are_Not_Requested()
     {
         var prefetcher = new SubResourcePrefetcher(_ => throw new InvalidOperationException("should not fetch"));

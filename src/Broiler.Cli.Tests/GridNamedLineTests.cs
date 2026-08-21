@@ -48,7 +48,7 @@ public sealed class GridNamedLineTests
         Assert.Equal(w, got.w, 1); Assert.Equal(h, got.h, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NamedLines_ResolveInAllPlacementForms()
     {
         var r = Place(
@@ -63,7 +63,7 @@ public sealed class GridNamedLineTests
         Expect(r["div#c"], 86, 118, 35, 77);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnknownName_FallsBackToAutoPlacement()
     {
         // A name absent from the template resolves to auto — the item is auto-placed

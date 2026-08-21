@@ -24,7 +24,7 @@ public sealed class PreloadScanTests
 
     // ────────────── what it finds ──────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Finds_Each_Family_In_Document_Order()
     {
         var result = Scan("""
@@ -44,7 +44,7 @@ public sealed class PreloadScanTests
             result.Candidates.Select(c => (c.Kind, c.RawUrl)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Resolves_Every_Candidate_Against_The_Page_Url()
     {
         var result = Scan("""<link rel="stylesheet" href="a.css">""");
@@ -58,7 +58,7 @@ public sealed class PreloadScanTests
     /// just for what follows it — which is why the scan resolves after its pass rather than during
     /// it. A scanner that resolved as it went would get this one wrong.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Base_Href_Declared_After_A_Resource_Still_Applies_To_It()
     {
         var result = Scan("""
@@ -70,7 +70,7 @@ public sealed class PreloadScanTests
         Assert.Equal(["https://example.test/assets/a.css"], result.ResolvedUrls(PreloadKind.StyleSheet));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_First_Base_Href_Wins()
     {
         var result = Scan("""
@@ -82,7 +82,7 @@ public sealed class PreloadScanTests
         Assert.Equal(["https://example.test/first/a.png"], result.ResolvedUrls(PreloadKind.Image));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Url_Named_Twice_Is_One_Candidate()
     {
         var result = Scan("""
@@ -97,7 +97,7 @@ public sealed class PreloadScanTests
     /// Deduplication is per family: the same file linked as a stylesheet and preloaded as an image
     /// is two different requests to two different consume sites.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Url_In_Two_Families_Is_Two_Candidates()
     {
         var result = Scan("""
@@ -131,7 +131,7 @@ public sealed class PreloadScanTests
     public void A_Link_This_Engine_Has_No_Consume_Site_For_Is_Not_Speculated_On(string html) =>
         Assert.Empty(Scan(html).Candidates);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Is_An_Image_Only_When_Its_Type_Says_So()
     {
         Assert.Single(Scan("""<input type="image" src="submit.png">""").Candidates);
@@ -139,7 +139,7 @@ public sealed class PreloadScanTests
         Assert.Empty(Scan("""<input src="submit.png">""").Candidates);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_And_Embed_Src_Are_Frame_Resources()
     {
         Assert.Equal(PreloadKind.Frame, Assert.Single(Scan("""<object data="a.svg"></object>""").Candidates).Kind);
@@ -159,7 +159,7 @@ public sealed class PreloadScanTests
     public void Text_That_Merely_Looks_Like_A_Tag_Is_Not_A_Resource(string html) =>
         Assert.Empty(Scan(html).Candidates);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Quoted_Attribute_Containing_A_Close_Bracket_Does_Not_Truncate_The_Tag()
     {
         var candidate = Assert.Single(Scan("""<img alt="a > b" src="c.png">""").Candidates);
@@ -170,14 +170,14 @@ public sealed class PreloadScanTests
     /// Template contents are inert until something clones them, which is a script decision this
     /// scan cannot predict — so a template's resources are never fetched by the parse it overlaps.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Template_Contents_Are_Inert()
     {
         Assert.Empty(Scan("""<template><img src="a.png"></template>""").Candidates);
         Assert.Empty(Scan("""<template><template><img src="a.png"></template></template>""").Candidates);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Nested_Templates_End_Tag_Does_Not_Re_Open_The_Outer_One()
     {
         // The inner </template> closes only the inner one; `b.png` is still inert. A boolean
@@ -187,14 +187,14 @@ public sealed class PreloadScanTests
             """).Candidates);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Resources_After_A_Template_Are_Found()
     {
         var candidate = Assert.Single(Scan("""<template><img src="a.png"></template><img src="b.png">""").Candidates);
         Assert.Equal("b.png", candidate.RawUrl);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Noscript_Contents_Are_Inert_Because_This_Engine_Runs_Scripts() =>
         Assert.Empty(Scan("""<noscript><img src="a.png"></noscript>""").Candidates);
 
@@ -209,7 +209,7 @@ public sealed class PreloadScanTests
     public void A_Url_With_No_Round_Trip_To_Save_Is_Not_A_Candidate(string html) =>
         Assert.Empty(Scan(html).Candidates);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Iframe_With_Srcdoc_Carries_Its_Own_Content() =>
         Assert.Empty(Scan("""<iframe srcdoc="<p>hi" src="a.html"></iframe>""").Candidates);
 
@@ -219,7 +219,7 @@ public sealed class PreloadScanTests
     /// the wire for one image, so the documented boundary is that <c>srcset</c> is not scanned at
     /// all — and a bare <c>srcset</c> with no <c>src</c> therefore yields nothing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Srcset_Is_Not_Scanned()
     {
         Assert.Empty(Scan("""<img srcset="a.png 1x, b.png 2x">""").Candidates);
@@ -228,7 +228,7 @@ public sealed class PreloadScanTests
         Assert.Equal("a.png", candidate.RawUrl);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Relative_Url_With_No_Base_Resolves_To_Nothing_Rather_Than_To_Itself()
     {
         var result = PreloadScanner.Scan("""<link rel="stylesheet" href="a.css">""", pageUrl: null);
@@ -239,7 +239,7 @@ public sealed class PreloadScanTests
 
     // ────────────── the cheap pre-check ──────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_That_Names_No_Resource_Does_Not_Get_A_Tokenizer_Pass()
     {
         Assert.False(PreloadScanner.MightContainCandidates("<p>hello <b>world</b></p>"));
@@ -253,7 +253,7 @@ public sealed class PreloadScanTests
     /// with nothing in it costs a tokenizer pass on a pool thread; saying "no" about a document
     /// that does name a resource would silently switch the feature off for it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Pre_Check_Is_Over_Permissive_Never_Under()
     {
         Assert.True(PreloadScanner.MightContainCandidates("<p>the word script appears in <scriptish>"));

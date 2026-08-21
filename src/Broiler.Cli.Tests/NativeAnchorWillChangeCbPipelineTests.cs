@@ -72,7 +72,7 @@ public sealed class NativeAnchorWillChangeCbPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_ResolvesWillChangeCb_AndFillsInnerCell()
     {
         var box = LayoutTarget(nativeAnchor: true);

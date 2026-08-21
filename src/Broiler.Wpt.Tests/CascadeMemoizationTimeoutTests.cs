@@ -19,7 +19,7 @@ namespace Broiler.Wpt.Tests;
 /// </summary>
 public class CascadeMemoizationTimeoutTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task AnchorPositionWritingModes_ManyGetBoundingClientRect_RenderWellWithinRunnerTimeout()
     {
         var wptRoot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(),

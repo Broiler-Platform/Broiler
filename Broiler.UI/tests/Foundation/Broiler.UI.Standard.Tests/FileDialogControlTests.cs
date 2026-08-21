@@ -6,7 +6,7 @@ namespace Broiler.UI.Standard.Tests;
 
 public sealed class FileDialogControlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_File_Dialog_Filters_Files_Appends_Default_Extension_And_Navigates_Up()
     {
         using var temp = new TempDirectory();
@@ -34,7 +34,7 @@ public sealed class FileDialogControlTests
         Assert.Equal(temp.Path, dialog.CurrentDirectory);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_File_Dialog_Renders_Current_Directory_Line()
     {
         using var temp = new TempDirectory();
@@ -52,7 +52,7 @@ public sealed class FileDialogControlTests
         Assert.Contains(renderList.Commands.OfType<BRenderCommand.DrawText>(), command => command.Text.Text == temp.Path);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_File_Dialog_Cycles_Named_File_Type_Filters()
     {
         using var temp = new TempDirectory();
@@ -87,7 +87,7 @@ public sealed class FileDialogControlTests
         Assert.Equal(Path.Combine(temp.Path, "new.md"), dialog.SelectedPath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_File_Dialog_Shows_Places_And_Descriptive_Chrome()
     {
         var host = new TestHost();

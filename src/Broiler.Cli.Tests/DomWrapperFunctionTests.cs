@@ -31,7 +31,7 @@ public class DomWrapperFunctionTests
         return CaptureService.ExecuteScriptsWithDom(html, "https://example.com");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dom_Operations_Are_Not_Constructors_And_Have_No_Prototype()
     {
         var result = ExecJs(@"
@@ -50,7 +50,7 @@ public class DomWrapperFunctionTests
         Assert.Contains("newThrows:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dom_Operations_And_Accessors_Still_Work()
     {
         // The prototype is the only thing that goes away — calling and property access are unchanged.
@@ -71,7 +71,7 @@ public class DomWrapperFunctionTests
         Assert.Contains("1|abc|c1 c2|red|hi|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Interface_Objects_Remain_Constructable()
     {
         // `createPrototype: false` also makes a function non-constructable
@@ -98,7 +98,7 @@ public class DomWrapperFunctionTests
     /// directly. Without this, a new binding added the obvious way silently reintroduces a
     /// per-member prototype allocation on every node.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_Mints_Wrapper_Members_Through_DomFunction()
     {
         // These register interface objects — URL, Response, Request, Headers, FormData,

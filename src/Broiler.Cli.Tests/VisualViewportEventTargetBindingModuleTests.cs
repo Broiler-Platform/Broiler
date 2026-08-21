@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class VisualViewportEventTargetBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VisualViewportEventTarget_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(VisualViewportEventTargetBinding);
@@ -29,7 +29,7 @@ public sealed class VisualViewportEventTargetBindingModuleTests
         Assert.True(typeof(IVisualViewportEventTargetHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VisualViewport_Add_And_Remove_Are_Callable_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

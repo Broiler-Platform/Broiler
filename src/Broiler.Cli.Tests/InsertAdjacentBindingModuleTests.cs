@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class InsertAdjacentBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacent_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(InsertAdjacentBinding);
@@ -28,7 +28,7 @@ public sealed class InsertAdjacentBindingModuleTests
         Assert.True(typeof(IInsertAdjacentHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentElement_Places_Node_At_Each_Position()
     {
         var html = @"<!DOCTYPE html>
@@ -54,7 +54,7 @@ document.getElementById('result').textContent = 'host=' + hostIds + '|anchor=' +
         Assert.Contains(">host=bb,anchor,ae|anchor=ab,be<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacentText_And_Html_Insert_Content()
     {
         var html = @"<!DOCTYPE html>
@@ -76,7 +76,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertAdjacent_Invalid_Position_Throws_SyntaxError()
     {
         var html = @"<!DOCTYPE html>

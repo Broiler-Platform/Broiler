@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class WindowContextManagerTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowContext_Owner_Is_Internal_And_In_Runtime()
     {
         var ownerType = typeof(WindowContextManager);
@@ -25,7 +25,7 @@ public sealed class WindowContextManagerTests
         Assert.False(typeof(IWindowContextHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Owns_WindowContext_Through_The_Host_Contract()
     {
         Assert.True(typeof(IWindowContextHost).IsAssignableFrom(typeof(DomBridge)));

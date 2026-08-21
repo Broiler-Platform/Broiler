@@ -54,7 +54,7 @@ public sealed class DomRenderFidelityTests : IDisposable
 <script>document.body.replaceWith(document.getElementById('probe'));</script>
 </html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomRender_Keeps_A_Document_Whose_Script_Removed_The_Body()
     {
         WptTestRunner.DomRender = true;
@@ -73,7 +73,7 @@ public sealed class DomRenderFidelityTests : IDisposable
     /// canvas. Asserting the *wrong* answer here is deliberate — it is what makes the test above
     /// evidence of the round trip rather than of anything else.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StringRender_Resurrects_The_Body_The_Script_Removed()
     {
         WptTestRunner.DomRender = false;
@@ -88,7 +88,7 @@ public sealed class DomRenderFidelityTests : IDisposable
     /// Byte-for-byte, because "close enough" would hide exactly the kind of drift switching render
     /// entry points can introduce.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Both_Paths_Agree_On_An_Ordinary_Document()
     {
         const string html = @"<!DOCTYPE html>
@@ -123,7 +123,7 @@ public sealed class DomRenderFidelityTests : IDisposable
     /// string path's <c>HtmlPostProcessor</c> does — a <c>&lt;script&gt;</c> left in the tree
     /// carries its source as text.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomRender_Strips_Already_Executed_Scripts()
     {
         WptTestRunner.DomRender = true;

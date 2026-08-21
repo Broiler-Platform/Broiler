@@ -14,7 +14,7 @@ public sealed class HtmlArchitectureTests
         "../Broiler.Documents/Broiler.Documents.csproj",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html_Project_Targets_Net10_And_References_Documents_And_Dom()
     {
         XDocument project = XDocument.Load(HtmlProjectPath());
@@ -24,7 +24,7 @@ public sealed class HtmlArchitectureTests
         Assert.Equal(ExpectedReferences, ProjectReferences(project));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html_Project_Does_Not_Reference_Ui_Input_Or_Windows()
     {
         string[] references = ProjectReferences(XDocument.Load(HtmlProjectPath()));
@@ -34,7 +34,7 @@ public sealed class HtmlArchitectureTests
         Assert.DoesNotContain(references, reference => reference.Contains("Windows", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html_Codec_Has_No_Module_Initializer()
     {
         MethodInfo[] initializers = typeof(HtmlDocumentCodec).Assembly

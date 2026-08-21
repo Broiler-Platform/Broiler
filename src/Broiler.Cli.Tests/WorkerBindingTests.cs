@@ -63,7 +63,7 @@ public sealed class WorkerBindingTests : IDisposable
         return context.Eval(probe).BooleanValue;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_receives_a_message_and_replies()
     {
         var script = WriteWorker("echo.js", @"
@@ -90,7 +90,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// identity. If the reply aliased the worker's graph — or the sent object aliased the page's —
     /// a mutation on one side would show up on the other.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Messages_are_cloned_in_both_directions()
     {
         var script = WriteWorker("mutate.js", @"
@@ -132,7 +132,7 @@ public sealed class WorkerBindingTests : IDisposable
     }
 
     /// <summary>Richer clone types survive the crossing, not just plain objects.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Structured_clone_types_survive_the_crossing()
     {
         var script = WriteWorker("types.js", @"
@@ -178,7 +178,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// <em>thread</em> on its own; that is what <c>JSContextIsolationTests</c> and
     /// <c>--js-context-scaling</c> are for, and this file does not restate their claim.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_runs_on_its_own_thread_and_its_own_realm()
     {
         var script = WriteWorker("identity.js", @"
@@ -211,7 +211,7 @@ public sealed class WorkerBindingTests : IDisposable
     }
 
     /// <summary>A worker whose script cannot be found fires <c>error</c> rather than throwing.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Missing_worker_script_fires_error_without_throwing()
     {
         using var context = new JSContext();
@@ -232,7 +232,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// <c>terminate()</c> stops delivery, and — the part that matters for a headless host — bridge
     /// disposal joins worker threads instead of leaving them running past the document.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Terminate_stops_delivery_and_disposal_joins_the_thread()
     {
         var script = WriteWorker("chatty.js", @"
@@ -269,7 +269,7 @@ public sealed class WorkerBindingTests : IDisposable
     // ---------------------------------------------------------------- timers
 
     /// <summary>A worker's <c>setTimeout</c> fires, and its callback can post back.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_setTimeout_fires_and_can_post()
     {
         var script = WriteWorker("timeout.js", @"
@@ -296,7 +296,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// Deadline ordering, which is the property inherited from the page's loop: a later-registered
     /// shorter timeout runs before an earlier-registered longer one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_timers_fire_in_deadline_order()
     {
         var script = WriteWorker("order.js", @"
@@ -322,7 +322,7 @@ public sealed class WorkerBindingTests : IDisposable
     }
 
     /// <summary><c>setInterval</c> repeats, and <c>clearInterval</c> stops it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_setInterval_repeats_until_cleared()
     {
         var script = WriteWorker("interval.js", @"
@@ -354,7 +354,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// answers messages. This is the case a naive pump — one that drains timers until none are due
     /// before looking at the queue — gets wrong.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_running_interval_does_not_starve_incoming_messages()
     {
         var script = WriteWorker("busy.js", @"
@@ -381,7 +381,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// <c>clearTimeout</c> before the deadline cancels the callback, and the ids are interchangeable
     /// with <c>clearInterval</c> as the HTML spec requires.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_clearTimeout_cancels_and_ids_are_interchangeable()
     {
         var script = WriteWorker("cancel.js", @"
@@ -413,7 +413,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// A worker sitting on a repeating timer must still terminate promptly — the timer keeps the pump
     /// awake, so termination has to win over it rather than wait for it to go quiet.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Terminate_stops_a_worker_with_a_live_interval()
     {
         var script = WriteWorker("forever.js", @"
@@ -443,7 +443,7 @@ public sealed class WorkerBindingTests : IDisposable
     // ---------------------------------------------------------- importScripts
 
     /// <summary>Imported scripts run in the worker's own global, in order, before the call returns.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportScripts_runs_scripts_in_order_in_the_worker_global()
     {
         WriteWorker("lib-a.js", "var trail = 'a'; function fromA() { return 'A'; }");
@@ -478,7 +478,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// <em>different</em> file of the same name sits next to the page. Resolving against the page's
     /// base path would find the decoy and report the wrong marker rather than failing to load.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportScripts_resolves_against_the_workers_own_directory()
     {
         var sub = Directory.CreateDirectory(Path.Combine(_dir, "nested")).FullName;
@@ -509,7 +509,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// A specifier that cannot be loaded is a <c>NetworkError</c>, and it aborts the call — later
     /// specifiers in the same <c>importScripts</c> do not run.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportScripts_throws_NetworkError_and_aborts_the_rest_of_the_call()
     {
         WriteWorker("after.js", "loadedAfter = true;");
@@ -537,7 +537,7 @@ public sealed class WorkerBindingTests : IDisposable
     }
 
     /// <summary>An imported script that throws propagates to the importer rather than being swallowed.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_throwing_imported_script_propagates()
     {
         WriteWorker("boom.js", "throw new Error('from-import');");
@@ -562,7 +562,7 @@ public sealed class WorkerBindingTests : IDisposable
     }
 
     /// <summary><c>importScripts</c> is re-entrant: an imported script may import further scripts.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Imported_scripts_may_import_further_scripts()
     {
         WriteWorker("leaf.js", "var depth = 'leaf';");
@@ -593,7 +593,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// Both halves matter: the contents prove it was not lost, the detachment proves it was
     /// transferred rather than copied.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Transferred_buffer_arrives_and_detaches_the_sender()
     {
         var script = WriteWorker("xfer.js", @"
@@ -631,7 +631,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// sender's buffer stays usable. Without this, "detached" could just be what postMessage always
     /// does to a buffer.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_a_transfer_list_the_buffer_is_copied_and_stays_usable()
     {
         var script = WriteWorker("copy.js", @"
@@ -660,7 +660,7 @@ public sealed class WorkerBindingTests : IDisposable
     }
 
     /// <summary>Transfer works from the worker back to the page too, detaching the worker's buffer.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_can_transfer_a_buffer_back_to_the_page()
     {
         var script = WriteWorker("xfer-back.js", @"
@@ -714,7 +714,7 @@ public sealed class WorkerBindingTests : IDisposable
     /// Re-transferring an already-detached buffer is a <c>DataCloneError</c> rather than a silent
     /// send of nothing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Transferring_an_already_detached_buffer_is_a_DataCloneError()
     {
         var script = WriteWorker("idle2.js", "onmessage = function () { };");

@@ -59,7 +59,7 @@ public sealed class MarginCollapseBfcTests
         Assert.Equal(100, OffsetTop(html, "child")); // the margin is contained inside it
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VisibleParent_StillCollapsesFirstChildTopMargin()
     {
         // Control: a plain (overflow:visible) block does NOT establish a BFC, so the first

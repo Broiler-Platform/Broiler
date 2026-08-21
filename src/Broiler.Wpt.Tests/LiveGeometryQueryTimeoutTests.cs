@@ -21,7 +21,7 @@ namespace Broiler.Wpt.Tests;
 /// </summary>
 public class LiveGeometryQueryTimeoutTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task AlignContentTableCell_OffsetTopReads_RenderWellWithinRunnerTimeout()
     {
         var wptRoot = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(),

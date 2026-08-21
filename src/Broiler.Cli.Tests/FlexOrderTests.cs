@@ -49,7 +49,7 @@ public class FlexOrderTests
 </html>
 """;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Order_Reorders_Column_Flex_Items()
     {
         using var bitmap = Render(ColumnHtml);
@@ -59,7 +59,7 @@ public class FlexOrderTests
         AssertPixel(bitmap, 50, 75, 255, 0, 0, "the order:2 item on the second row");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Order_Reorders_Row_Flex_Items()
     {
         using var bitmap = Render(RowHtml);
@@ -68,7 +68,7 @@ public class FlexOrderTests
         AssertPixel(bitmap, 150, 25, 255, 0, 0, "the order:2 item in the second column");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Equal_Order_Keeps_Document_Order()
     {
         // The reorder must be stable: an ordinal group holds its document order, and a container
@@ -92,7 +92,7 @@ public class FlexOrderTests
         AssertPixel(bitmap, 50, 75, 0, 0, 255, "the second item in document order");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Order_Is_Ignored_Outside_A_Flex_Or_Grid_Container()
     {
         // `order` only applies to flex/grid items. In ordinary block flow it must do nothing.

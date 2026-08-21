@@ -2,7 +2,7 @@ namespace Broiler.Documents.Markdown.Tests;
 
 public sealed class MarkdownWriterTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_Deterministic_Markdown()
     {
         string markdown = Write(RichTextDocument.FromPlainText("hello\nworld"));
@@ -10,7 +10,7 @@ public sealed class MarkdownWriterTests
         Assert.Equal("hello\n\nworld\n", markdown);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_Inline_Styles_Links_Lists_And_Soft_Breaks()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(new[]
@@ -28,7 +28,7 @@ public sealed class MarkdownWriterTests
         Assert.Contains("  \n[link](https://example.test)", markdown);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Model_To_Markdown_To_Model_RoundTrips_Supported_Subset()
     {
         RichTextDocument expected = RichTextDocument.FromParagraphs(new[]
@@ -54,7 +54,7 @@ public sealed class MarkdownWriterTests
         DocumentAssert.Equivalent(expected, actual);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writing_Unsupported_Styles_Reports_Diagnostics()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(new[]
@@ -71,7 +71,7 @@ public sealed class MarkdownWriterTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "markdown.inline-style");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_An_Embedded_Image_As_A_Data_Uri()
     {
         var image = new InlineImage(new byte[] { 1, 2, 3 }, "image/png", 40, 20, "a logo");

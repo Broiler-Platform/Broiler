@@ -24,7 +24,7 @@ public class EngineModuleWiringTests
         "document.getElementById('x').setAttribute('data-msg', tag);" +
         "</script></head><body><div id=\"x\"></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractAll_Exposes_Module_Roots()
     {
         var extraction = ScriptExtractionService.ExtractAll(ModuleHtml, Url);
@@ -32,7 +32,7 @@ public class EngineModuleWiringTests
         Assert.All(extraction.ModuleRoots, r => Assert.False(string.IsNullOrEmpty(r.Source)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Module_Import_Binds_And_Touches_Dom_Via_Engine_Path()
     {
         var extraction = ScriptExtractionService.ExtractAll(ModuleHtml, Url);

@@ -4,7 +4,7 @@ namespace Broiler.UI.FormatCodeView.Tests;
 
 public sealed class UiFormatCodeViewTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Editable_Text_Raises_Typed_Intent_And_Code_Tokens_Stay_Atomic()
     {
         var view = new TestFormatCodeView
@@ -25,7 +25,7 @@ public sealed class UiFormatCodeViewTests
         Assert.False(view.RequestTextReplacement("bad"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Token_Delete_Requests_Its_Semantic_Removal_Intent()
     {
         var view = new TestFormatCodeView
@@ -41,7 +41,7 @@ public sealed class UiFormatCodeViewTests
         Assert.Equal(FormatCodeProperty.Bold, raised?.Token?.EditDescriptor?.Property);
         Assert.IsType<ApplyFormatCodeInlineIntent>(raised?.Intent);
     }
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Projection_Selection_Is_Directional_And_Clamped()
     {
         var view = new TestFormatCodeView { Projection = Project("abcdef") };
@@ -63,7 +63,7 @@ public sealed class UiFormatCodeViewTests
         Assert.Equal(1, view.SelectionFocus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Copy_Uses_Only_The_Selected_Canonical_Text()
     {
         var host = new TestHost();
@@ -77,7 +77,7 @@ public sealed class UiFormatCodeViewTests
         Assert.Equal("Hello", host.ClipboardText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Search_Is_Ordinal_Directional_And_Wrapping()
     {
         var view = new TestFormatCodeView { Projection = Project("One two ONE") };
@@ -93,7 +93,7 @@ public sealed class UiFormatCodeViewTests
         Assert.False(view.Find("missing"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Navigation_Uses_Typed_Projector_Mapping()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(
@@ -113,7 +113,7 @@ public sealed class UiFormatCodeViewTests
         Assert.NotNull(raised.Mapping.AffectedRange);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Semantics_Expose_ReadOnly_Text_Selection_And_Paragraph_State_Diagnostic()
     {
         ParagraphStyle style = ParagraphStyle.Default with { Alignment = TextAlignment.Center };
@@ -135,7 +135,7 @@ public sealed class UiFormatCodeViewTests
         Assert.False(node.TextInfo?.IsEditable);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pending_Formatting_Has_A_Distinct_Accessible_Description()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("x");

@@ -30,7 +30,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
 
     private const string HtmlBridgePrefix = "Broiler.HtmlBridge";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomElement_And_HtmlTreeBuilder_Adapter_Seam_Is_Removed_At_V2()
     {
         // htmlbridge-public-surface/v2 (RF-BRIDGE-1c Phase F4): the DomElement facade +
@@ -45,7 +45,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
         Assert.Null(domAssembly.GetType("Broiler.HtmlBridge.HtmlTreeBuilder"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssRules_Compatibility_Tuple_View_Is_Removed_At_V2()
     {
         // htmlbridge-public-surface/v2 (Milestone 1.1): the obsolete CssRules tuple
@@ -60,7 +60,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
         Assert.Null(cssRules);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CalculateSpecificity_Static_Shim_Is_Removed_At_V2()
     {
         // htmlbridge-public-surface/v2 (Milestone 1.1): the bridge-only
@@ -75,7 +75,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
         Assert.Null(calculate);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Split_Runtime_State_Remains_A_Bridge_Owned_Seam()
     {
         // The former catch-all ElementRuntimeState was split into concern-specific,
@@ -103,7 +103,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Canonical_Dom_Does_Not_Reference_The_JavaScript_Engine()
     {
         // Phase 0 guard: Broiler.Dom must not reference JavaScript-engine
@@ -118,7 +118,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
         Assert.Empty(javaScriptReferences);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Canonical_Dom_Public_Surface_Does_Not_Expose_JavaScript_Types()
     {
         var leaks = typeof(Broiler.Dom.DomDocument).Assembly
@@ -134,7 +134,7 @@ public sealed class HtmlBridgeOwnershipGuardTests
         Assert.Empty(leaks);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Canonical_CssDom_Does_Not_Reference_HtmlBridge()
     {
         // Phase 0 guard: Broiler.CSS.Dom owns selector matching, cascade, and

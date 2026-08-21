@@ -90,7 +90,7 @@ div {
 
     /// <summary>The control: a screenshot released from <c>ready</c>, with <c>finished</c> never
     /// touched, bakes the pseudo tree.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScreenshotFromReady_BakesThePseudoTree()
     {
         Assert.Equal(Green, RenderCentre("""
@@ -104,7 +104,7 @@ div {
     /// handler first, then <c>ready</c> takes the screenshot. Merely observing <c>finished</c> must
     /// not end the transition.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CleanupOnFinished_ThenScreenshotFromReady_StillBakes()
     {
         Assert.Equal(Green, RenderCentre("""
@@ -116,7 +116,7 @@ div {
 
     /// <summary>The same two handlers the other way round — the outcome must not depend on the
     /// order the page happens to attach them in.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScreenshotFromReady_ThenCleanupOnFinished_StillBakes()
     {
         Assert.Equal(Green, RenderCentre("""
@@ -128,7 +128,7 @@ div {
 
     /// <summary><c>finally</c> is the same observation as <c>then</c> and must behave the same.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CleanupInFinishedFinally_StillBakes()
     {
         Assert.Equal(Green, RenderCentre("""
@@ -143,7 +143,7 @@ div {
     /// the state after the transition, so the pseudo tree is gone and the page's own red div shows
     /// (WPT element-stops-grouping-after-animation).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScreenshotFromFinished_DoesNotBakeThePseudoTree()
     {
         Assert.Equal(Red, RenderCentre("""
@@ -155,7 +155,7 @@ div {
     /// <summary>A <c>ready</c> handler that does not release the screenshot leaves the decision to
     /// whatever does — here a later <c>finished</c> handler, which still ends the transition.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonReleasingReadyHandler_DoesNotPinTheTransitionOpen()
     {
         Assert.Equal(Red, RenderCentre("""

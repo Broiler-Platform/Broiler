@@ -44,7 +44,7 @@ public class StyleImportInliningTests : IDisposable
     private static bool IsGreenish(BColor c) => c.G > 100 && c.R < 80 && c.B < 80;
     private static bool IsWhite(BColor c) => c.R > 200 && c.G > 200 && c.B > 200;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUrlImport_AppliesImportedRules()
     {
         // @import of a data: URL must apply its rules — Chromium renders this red.
@@ -53,7 +53,7 @@ public class StyleImportInliningTests : IDisposable
         Assert.True(IsRed(color), $"data: @import should apply a red background; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeFileImport_AppliesImportedRules()
     {
         File.WriteAllText(Path.Combine(_tempDir, "imported.css"), ":root{background:red}");
@@ -62,7 +62,7 @@ public class StyleImportInliningTests : IDisposable
         Assert.True(IsRed(color), $"relative @import should apply a red background; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedImport_IsResolvedRecursively()
     {
         // a.css imports b.css, which sets the background — the whole chain must resolve.
@@ -73,7 +73,7 @@ public class StyleImportInliningTests : IDisposable
         Assert.True(IsRed(color), $"nested @import chain should apply a red background; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportCycle_DoesNotHang_AndAppliesReachableRules()
     {
         // a.css imports b.css and sets red; b.css imports a.css (a cycle). Resolution
@@ -85,7 +85,7 @@ public class StyleImportInliningTests : IDisposable
         Assert.True(IsRed(color), $"cyclic @import should terminate and apply red; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImportAfterStyleRule_IsIgnored()
     {
         // Per CSS syntax, an @import after a style rule is invalid and ignored. The
@@ -97,7 +97,7 @@ public class StyleImportInliningTests : IDisposable
             $"an @import after a style rule must be ignored (background stays green); got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NoImport_LeavesRenderingUnchanged()
     {
         // A stylesheet without @import must be untouched — no spurious rewrite.

@@ -1,0 +1,1846 @@
+From d6ac33b9dcfba9eb7cc3b8f058d69418637bf760 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 21 Aug 2026 10:02:29 +0000
+Subject: [PATCH] Add a Timeout to every xUnit [Fact] in the test projects
+
+Gives each plain `[Fact]` an explicit `Timeout` so a runaway test fails instead
+of stalling the run. Facts that already carry a deliberate Timeout are left
+alone, and the rewrite is a per-line byte substitution, so the CRLF and mixed
+CRLF/LF files here keep their exact line endings.
+
+Value: 600000 ms (10 minutes), matching the parent repository.
+
+xUnit v2 starts a test's timeout clock when the test is queued rather than when
+it starts running, so the budget has to clear a whole project's wall-clock or a
+queued test can trip it while merely waiting for a slot. The slowest project
+here runs about a minute, so 600000 ms leaves roughly ten times that.
+
+Facts in test projects referencing xunit 2.9 or newer are deliberately left
+untouched unless they are async: 2.9 fails a synchronous test that carries a
+Timeout outright ("Tests marked with Timeout are only supported for async
+tests"), where 2.5.3 ignores it and xunit.v3 honours it.
+---
+ .../CssCascadeRuleIndexTests.cs               |  32 ++---
+ .../CssComputedDefaultsTests.cs               |   6 +-
+ .../CssDeclarationValidatorTests.cs           |   6 +-
+ .../CssDomArchitectureTests.cs                |   6 +-
+ .../CssSelectorMatcherDirTests.cs             |  14 +-
+ .../CssSelectorMatcherTests.cs                |  16 +--
+ .../CssSelectorMatcherValidityTests.cs        |  10 +-
+ .../CssStyleEngineConcurrencyTests.cs         |   4 +-
+ .../CssStyleEngineContainerQueryTests.cs      |  44 +++----
+ Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs  | 122 +++++++++---------
+ .../CssStyleScopeBuilderTests.cs              |  18 +--
+ .../ShorthandLonghandOriginTests.cs           |   6 +-
+ Broiler.CSS.Tests/AnchorFunctionTests.cs      |   8 +-
+ Broiler.CSS.Tests/CssArchitectureTests.cs     |   8 +-
+ Broiler.CSS.Tests/CssContrastColorTests.cs    |  10 +-
+ Broiler.CSS.Tests/CssKernelTests.cs           |  14 +-
+ Broiler.CSS.Tests/CssLengthTests.cs           |   4 +-
+ Broiler.CSS.Tests/CssLengthZoomTests.cs       |  14 +-
+ Broiler.CSS.Tests/CssMetricsTests.cs          |   8 +-
+ Broiler.CSS.Tests/CssSystemColorsTests.cs     |   4 +-
+ Broiler.CSS.Tests/CssViewportUnitTests.cs     |   8 +-
+ .../Cssom/CssomRuleMetadataTests.cs           |   6 +-
+ Broiler.CSS.Tests/PositionTryRuleTests.cs     |  14 +-
+ 23 files changed, 191 insertions(+), 191 deletions(-)
+
+diff --git a/Broiler.CSS.Dom.Tests/CssCascadeRuleIndexTests.cs b/Broiler.CSS.Dom.Tests/CssCascadeRuleIndexTests.cs
+index daa93eb..fd2e9f4 100644
+--- a/Broiler.CSS.Dom.Tests/CssCascadeRuleIndexTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssCascadeRuleIndexTests.cs
+@@ -71,7 +71,7 @@ public sealed class CssCascadeRuleIndexTests
+         return element;
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Id_Class_And_Type_Keyed_Rules_Cascade_As_They_Did()
+     {
+         AssertCascadesAgree(
+@@ -92,7 +92,7 @@ public sealed class CssCascadeRuleIndexTests
+             });
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Source_Order_Still_Breaks_A_Specificity_Tie()
+     {
+         // The index visits only candidates, so if it visited them in bucket order rather than
+@@ -102,7 +102,7 @@ public sealed class CssCascadeRuleIndexTests
+             body => Add(body, "div", className: "c"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void A_Rule_Reachable_Through_Two_Keys_Is_Applied_Once()
+     {
+         AssertCascadesAgree(
+@@ -110,7 +110,7 @@ public sealed class CssCascadeRuleIndexTests
+             body => Add(body, "div", className: "a b"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Descendant_And_Child_Combinators_Key_On_The_Subject()
+     {
+         AssertCascadesAgree(
+@@ -151,7 +151,7 @@ public sealed class CssCascadeRuleIndexTests
+             });
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void A_Pseudo_Element_Rule_Keys_On_The_Element_It_Is_Attached_To()
+     {
+         AssertCascadesAgree(
+@@ -159,7 +159,7 @@ public sealed class CssCascadeRuleIndexTests
+             body => Add(body, "div", className: "c"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Rules_Inside_A_Matching_Media_Query_Are_Indexed()
+     {
+         AssertCascadesAgree(
+@@ -168,7 +168,7 @@ public sealed class CssCascadeRuleIndexTests
+             new CssEnvironment(800, 600));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Rules_Inside_A_Non_Matching_Media_Query_Are_Dropped()
+     {
+         AssertCascadesAgree(
+@@ -177,7 +177,7 @@ public sealed class CssCascadeRuleIndexTests
+             new CssEnvironment(800, 600));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Rules_Inside_A_Supports_Condition_Follow_The_Condition()
+     {
+         AssertCascadesAgree(
+@@ -188,7 +188,7 @@ public sealed class CssCascadeRuleIndexTests
+             body => Add(body, "div"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Nested_Conditional_Groups_Follow_Every_Enclosing_Condition()
+     {
+         AssertCascadesAgree(
+@@ -197,7 +197,7 @@ public sealed class CssCascadeRuleIndexTests
+             new CssEnvironment(800, 600));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void A_Sheet_Added_After_The_First_Cascade_Rebuilds_The_Index()
+     {
+         // The index is memoized against the sheet set; a stale one would silently ignore a sheet
+@@ -213,7 +213,7 @@ public sealed class CssCascadeRuleIndexTests
+         Assert.Equal("green", engine.GetCascadedStyle(div)["color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Clearing_The_Sheets_Empties_The_Index()
+     {
+         var (_, _, body) = NewDocument();
+@@ -227,7 +227,7 @@ public sealed class CssCascadeRuleIndexTests
+         Assert.False(engine.GetCascadedStyle(div).ContainsKey("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Changing_The_Viewport_Re_Resolves_Media_Queries()
+     {
+         var (_, _, body) = NewDocument();
+@@ -242,7 +242,7 @@ public sealed class CssCascadeRuleIndexTests
+         Assert.Equal("green", engine.GetCascadedStyle(div)["color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void The_Index_Agrees_With_The_Scan_Across_A_Generated_Sheet_And_Document()
+     {
+         // The shape the measurement used: many rules, few matches. Generated rather than
+@@ -271,7 +271,7 @@ public sealed class CssCascadeRuleIndexTests
+     private static string CultureInvariant(FormattableString text) =>
+         FormattableString.Invariant(text);
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void The_Index_Files_Keyed_Rules_Away_From_The_Universal_Bucket()
+     {
+         // The performance claim, stated as a property rather than a timing: of these six rules
+@@ -293,7 +293,7 @@ public sealed class CssCascadeRuleIndexTests
+         Assert.Equal(2, index.UniversalRuleCount);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void An_Element_Only_Sees_Rules_Its_Own_Keys_Reach()
+     {
+         var index = CssCascadeRuleIndex.Build(
+@@ -319,7 +319,7 @@ public sealed class CssCascadeRuleIndexTests
+         Assert.Equal([0, 1, 2], candidates);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Candidates_Come_Back_In_Document_Order()
+     {
+         var index = CssCascadeRuleIndex.Build(
+diff --git a/Broiler.CSS.Dom.Tests/CssComputedDefaultsTests.cs b/Broiler.CSS.Dom.Tests/CssComputedDefaultsTests.cs
+index 5654bbe..2cbada9 100644
+--- a/Broiler.CSS.Dom.Tests/CssComputedDefaultsTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssComputedDefaultsTests.cs
+@@ -15,7 +15,7 @@ public sealed class CssComputedDefaultsTests
+         Assert.Equal(expected, value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void InitialValues_Lookup_Is_Case_Insensitive()
+     {
+         Assert.True(CssComputedDefaults.InitialValues.TryGetValue("DISPLAY", out var value));
+@@ -54,7 +54,7 @@ public sealed class CssComputedDefaultsTests
+         }
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void ResolveLengthAttrFunctions_Substitutes_From_Element_Attributes()
+     {
+         var doc = new Broiler.Dom.DomDocument();
+@@ -74,7 +74,7 @@ public sealed class CssComputedDefaultsTests
+         Assert.Equal("40px", computed["height"]); // falls back when the attribute is absent
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Shared_Tables_Back_The_Engine_Computed_Style()
+     {
+         // The engine's getComputedStyle backfills unset properties from the same
+diff --git a/Broiler.CSS.Dom.Tests/CssDeclarationValidatorTests.cs b/Broiler.CSS.Dom.Tests/CssDeclarationValidatorTests.cs
+index 22ab4cb..533d395 100644
+--- a/Broiler.CSS.Dom.Tests/CssDeclarationValidatorTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssDeclarationValidatorTests.cs
+@@ -60,21 +60,21 @@ public sealed class CssDeclarationValidatorTests
+         Assert.Equal(expected, CssDeclarationValidator.IsAcceptableDeclarationValue(property, value));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void IsAcceptableDeclarationValue_Is_Case_Insensitive_On_Property_And_Value()
+     {
+         Assert.True(CssDeclarationValidator.IsAcceptableDeclarationValue("DISPLAY", "BLOCK"));
+         Assert.False(CssDeclarationValidator.IsAcceptableDeclarationValue("Display", "Bogus"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void IsAcceptableDeclarationValue_Rejects_Null_Property()
+     {
+         Assert.Throws<ArgumentNullException>(
+             () => CssDeclarationValidator.IsAcceptableDeclarationValue(null!, "block"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void IsAcceptableDeclarationValue_Treats_Null_Value_As_Unacceptable()
+     {
+         Assert.False(CssDeclarationValidator.IsAcceptableDeclarationValue("color", null!));
+diff --git a/Broiler.CSS.Dom.Tests/CssDomArchitectureTests.cs b/Broiler.CSS.Dom.Tests/CssDomArchitectureTests.cs
+index 9d157f0..5839e7f 100644
+--- a/Broiler.CSS.Dom.Tests/CssDomArchitectureTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssDomArchitectureTests.cs
+@@ -5,7 +5,7 @@ namespace Broiler.CSS.Dom.Tests;
+ 
+ public sealed class CssDomArchitectureTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Production_Project_References_Only_Css_And_Dom()
+     {
+         var project = XDocument.Load(FindProjectPath());
+@@ -19,7 +19,7 @@ public sealed class CssDomArchitectureTests
+         Assert.Empty(project.Descendants("PackageReference"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Public_Surface_Does_Not_Leak_Consumer_Types()
+     {
+         var assembly = typeof(CssSelectorMatcher).Assembly;
+@@ -37,7 +37,7 @@ public sealed class CssDomArchitectureTests
+         Assert.Empty(forbidden);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Public_Surface_Does_Not_Expose_Mutable_Collections()
+     {
+         var assembly = typeof(CssStyleEngine).Assembly;
+diff --git a/Broiler.CSS.Dom.Tests/CssSelectorMatcherDirTests.cs b/Broiler.CSS.Dom.Tests/CssSelectorMatcherDirTests.cs
+index a51cdea..d393b02 100644
+--- a/Broiler.CSS.Dom.Tests/CssSelectorMatcherDirTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssSelectorMatcherDirTests.cs
+@@ -22,7 +22,7 @@ public sealed class CssSelectorMatcherDirTests
+         return element;
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Dir_DefaultsToLtr_AndIsNotMatchedByRtl()
+     {
+         var document = new DomDocument();
+@@ -35,7 +35,7 @@ public sealed class CssSelectorMatcherDirTests
+         Assert.False(matcher.Matches(div, "div:dir(rtl)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Dir_ReadsTheNearestAncestorsDirAttribute()
+     {
+         var document = new DomDocument();
+@@ -53,7 +53,7 @@ public sealed class CssSelectorMatcherDirTests
+         Assert.True(matcher.Matches(deeper, ":dir(ltr)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Dir_IgnoresAnInvalidAttributeValue()
+     {
+         // `dir="sideways"` is not a valid value, so the element inherits rather than adopting it.
+@@ -67,7 +67,7 @@ public sealed class CssSelectorMatcherDirTests
+         Assert.True(matcher.Matches(bogus, ":dir(rtl)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Dir_Auto_ResolvesFromTheFirstStrongCharacter()
+     {
+         var document = new DomDocument();
+@@ -90,7 +90,7 @@ public sealed class CssSelectorMatcherDirTests
+         Assert.True(matcher.Matches(neutral, ":dir(ltr)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Dir_Auto_SkipsADescendantWithItsOwnDir()
+     {
+         // HTML's auto-directionality ignores text inside a descendant that declares its own
+@@ -108,7 +108,7 @@ public sealed class CssSelectorMatcherDirTests
+         Assert.True(matcher.Matches(paragraph, ":dir(ltr)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Dir_RejectsAnArgumentThatIsNeitherLtrNorRtl()
+     {
+         var document = new DomDocument();
+@@ -122,7 +122,7 @@ public sealed class CssSelectorMatcherDirTests
+         Assert.False(matcher.Matches(div, ":dir()"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Bdi_DefaultsToAutoDirectionality()
+     {
+         var document = new DomDocument();
+diff --git a/Broiler.CSS.Dom.Tests/CssSelectorMatcherTests.cs b/Broiler.CSS.Dom.Tests/CssSelectorMatcherTests.cs
+index 58d53d5..314bf75 100644
+--- a/Broiler.CSS.Dom.Tests/CssSelectorMatcherTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssSelectorMatcherTests.cs
+@@ -4,7 +4,7 @@ namespace Broiler.CSS.Dom.Tests;
+ 
+ public sealed class CssSelectorMatcherTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Matches_Compound_Combinator_And_Attribute_Selectors()
+     {
+         var tree = CreateTree();
+@@ -19,7 +19,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.False(matcher.Matches(tree.Second, "p:first-child"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Matches_Level_Four_Functional_Pseudo_Classes()
+     {
+         var tree = CreateTree();
+@@ -33,7 +33,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.True(matcher.Matches(tree.Second, "p:nth-last-child(1)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Matches_Not_With_Nested_Attribute_Selector()
+     {
+         // Regression: a nested attribute selector inside :not() (or :is()/:where()) must be
+@@ -73,7 +73,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.True(matcher.Matches(closed, "dialog:not([open])"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Unknown_PseudoClass_Invalidates_Selector_But_Recognized_Ones_Stay_Lenient()
+     {
+         var tree = CreateTree();
+@@ -96,7 +96,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.True(matcher.Matches(tree.First, "p:-webkit-anything"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Matches_Root_Scope_Empty_Language_And_Form_State()
+     {
+         var document = new DomDocument();
+@@ -121,7 +121,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.True(matcher.Matches(checkbox, "input:enabled:checked"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Has_Matches_Nth_Child_And_Nested_Functions()
+     {
+         var document = new DomDocument();
+@@ -141,7 +141,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.True(matcher.Matches(target, "#target:has(:is(.item + .item + .item))"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Nth_Child_Of_Selector_Requires_The_Element_To_Match_The_Filter()
+     {
+         // Regression for the WPT test css/selectors/nth-last-child-of-tagname.html.
+@@ -201,7 +201,7 @@ public sealed class CssSelectorMatcherTests
+         Assert.False(matcher.Matches(intro, ":nth-child(1 of webkit, fast)"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Specificity_Is_Owned_By_The_Css_Kernel()
+     {
+         Assert.Equal(
+diff --git a/Broiler.CSS.Dom.Tests/CssSelectorMatcherValidityTests.cs b/Broiler.CSS.Dom.Tests/CssSelectorMatcherValidityTests.cs
+index bac9a40..8848c7a 100644
+--- a/Broiler.CSS.Dom.Tests/CssSelectorMatcherValidityTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssSelectorMatcherValidityTests.cs
+@@ -99,7 +99,7 @@ public sealed class CssSelectorMatcherValidityTests
+     /// exact expectation <c>form-validation-validity-textarea-defaultValue</c> encodes when it
+     /// requires <c>&lt;textarea minlength=5 required&gt;a&lt;/textarea&gt;</c> to be valid.
+     /// </summary>
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void MinLength_DoesNotInvalidate_BecauseNothingWasUserEdited()
+     {
+         var (matcher, target, _) = Build((d, b) =>
+@@ -123,7 +123,7 @@ public sealed class CssSelectorMatcherValidityTests
+ 
+     /// <summary>A control inside a disabled <c>&lt;fieldset&gt;</c> is disabled too, so it is
+     /// barred even though it carries no <c>disabled</c> attribute of its own.</summary>
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void ControlInsideDisabledFieldset_IsBarred()
+     {
+         var (matcher, target, _) = Build((d, b) =>
+@@ -227,7 +227,7 @@ public sealed class CssSelectorMatcherValidityTests
+ 
+     /// <summary>A <c>pattern</c> is anchored at both ends: a value that merely contains a match
+     /// is still a mismatch.</summary>
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Pattern_IsAnchoredAtBothEnds()
+     {
+         var (matcher, target, _) = Build((d, b) => Add(d, b, "input", id: "x",
+@@ -255,7 +255,7 @@ public sealed class CssSelectorMatcherValidityTests
+         Assert.Equal(expected, State(matcher, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void MaxLength_DoesNotInvalidate()
+     {
+         var (matcher, target, _) = Build((d, b) =>
+@@ -285,7 +285,7 @@ public sealed class CssSelectorMatcherValidityTests
+         Assert.Equal(expected, State(matcher, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void EmptyForm_IsValid()
+     {
+         var (matcher, target, _) = Build((d, b) => Add(d, b, "form", id: "x"));
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleEngineConcurrencyTests.cs b/Broiler.CSS.Dom.Tests/CssStyleEngineConcurrencyTests.cs
+index 3f5f999..acea7ec 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleEngineConcurrencyTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleEngineConcurrencyTests.cs
+@@ -20,7 +20,7 @@ namespace Broiler.CSS.Dom.Tests;
+ /// </summary>
+ public sealed class CssStyleEngineConcurrencyTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Concurrent_Style_Queries_And_Invalidations_Do_Not_Corrupt_Caches()
+     {
+         var document = new DomDocument();
+@@ -97,7 +97,7 @@ public sealed class CssStyleEngineConcurrencyTests
+     /// with an identical sheet set is driven from every thread at once and compared property by
+     /// property.
+     /// </remarks>
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parallel_Cascade_Matches_The_Sequential_Cascade_Property_For_Property()
+     {
+         const string sheet =
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleEngineContainerQueryTests.cs b/Broiler.CSS.Dom.Tests/CssStyleEngineContainerQueryTests.cs
+index 335e0f1..434d7ab 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleEngineContainerQueryTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleEngineContainerQueryTests.cs
+@@ -32,7 +32,7 @@ public sealed class CssStyleEngineContainerQueryTests
+     private static string ColorOf(CssStyleEngine engine, DomElement element) =>
+         engine.GetComputedStyle(element).GetPropertyValue("color");
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Matching_Min_Width_Applies_The_Rule()
+     {
+         var (engine, target) = BuildScoped(
+@@ -42,7 +42,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(1, 2, 3)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Non_Matching_Min_Width_Does_Not_Apply()
+     {
+         var (engine, target) = BuildScoped(
+@@ -53,7 +53,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(9, 9, 9)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Range_Syntax_Is_Evaluated()
+     {
+         var (engine, target) = BuildScoped(
+@@ -63,7 +63,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(1, 2, 3)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Max_Width_Colon_Form_Is_Evaluated()
+     {
+         var (engine, target) = BuildScoped(
+@@ -73,7 +73,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(1, 2, 3)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Named_Container_Only_Matches_Its_Name()
+     {
+         var (engine, target) = BuildScoped(
+@@ -84,7 +84,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(9, 9, 9)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Height_Query_Against_Inline_Size_Container_Does_Not_Apply()
+     {
+         var (engine, target) = BuildScoped(
+@@ -95,7 +95,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(9, 9, 9)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Auto_Width_Container_Is_Unresolved_And_Does_Not_Apply()
+     {
+         var (engine, target) = BuildScoped(
+@@ -106,7 +106,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(9, 9, 9)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Backdrop_Pseudo_Display_None_Via_Container_On_The_Element_Itself()
+     {
+         // A pseudo-element's query container search includes its originating element, so a dialog that
+@@ -147,7 +147,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         return (engine, target);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Matches_A_Custom_Property()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -157,7 +157,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(1, 2, 3)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Does_Not_Match_A_Different_Value()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -167,7 +167,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(9, 9, 9)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Does_Not_Match_A_Missing_Property()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -179,7 +179,7 @@ public sealed class CssStyleEngineContainerQueryTests
+ 
+     // The case from the issue: a <color> property set to contrast-color(#000) computes to white,
+     // so `style(--contrast-color: white)` matches even though the tokens differ.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Matches_A_Resolved_Contrast_Color()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -191,7 +191,7 @@ public sealed class CssStyleEngineContainerQueryTests
+ 
+     // contrast-color(#fff) is BLACK, so the same query must not match — the discriminating half
+     // of the pair, without which "matches" could just mean "always true".
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Does_Not_Match_The_Opposite_Contrast_Color()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -202,7 +202,7 @@ public sealed class CssStyleEngineContainerQueryTests
+     }
+ 
+     // A <color> property compares as a colour, not as a token stream.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Compares_Colors_Not_Spelling()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -214,7 +214,7 @@ public sealed class CssStyleEngineContainerQueryTests
+ 
+     // `style` is a function, not a container name: reading it as one sent the lookup hunting for
+     // container-name: style, found nothing, and made every style query false.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Is_Not_Mistaken_For_A_Container_Name()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -224,7 +224,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(1, 2, 3)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Honours_A_Container_Name()
+     {
+         var document = new DomDocument();
+@@ -248,7 +248,7 @@ public sealed class CssStyleEngineContainerQueryTests
+     }
+ 
+     // Custom properties inherit, so a style query resolves through the ancestor chain.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Sees_An_Inherited_Custom_Property()
+     {
+         var document = new DomDocument();
+@@ -269,7 +269,7 @@ public sealed class CssStyleEngineContainerQueryTests
+ 
+     // A style query on a non-custom property is not supported; it must fall through to
+     // "not applied" rather than guess.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_On_A_Standard_Property_Does_Not_Apply()
+     {
+         var (engine, target) = BuildStyleScoped(
+@@ -286,7 +286,7 @@ public sealed class CssStyleEngineContainerQueryTests
+     // which is why one bug gated 68 tests. These cases must terminate — reaching the assertion at
+     // all is the substance of the guard.
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Value_Function_In_A_Range_Feature_Does_Not_Recurse()
+     {
+         var (engine, target) = BuildScoped(
+@@ -298,7 +298,7 @@ public sealed class CssStyleEngineContainerQueryTests
+         Assert.Equal("rgb(9, 9, 9)", ColorOf(engine, target));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Value_Function_In_A_Colon_Feature_Does_Not_Recurse()
+     {
+         var (engine, target) = BuildScoped(
+@@ -325,7 +325,7 @@ public sealed class CssStyleEngineContainerQueryTests
+     }
+ 
+     // A '(' that never closes is malformed, not nesting; it must degrade to "not applied".
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Unbalanced_Prelude_Does_Not_Apply()
+     {
+         var (engine, target) = BuildScoped(
+@@ -358,7 +358,7 @@ public sealed class CssStyleEngineContainerQueryTests
+     // A style() query grouped with a size query: the group's own parentheses are nesting, but
+     // style()'s are its argument list. Matching them by balance rather than by the last character
+     // is what keeps the two apart.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Style_Query_Combined_With_A_Size_Query_Evaluates_Both_Halves()
+     {
+         var document = new DomDocument();
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+index c16ccad..3ffc6bb 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+@@ -26,7 +26,7 @@ public sealed class CssStyleEngineTests
+     // A document being formatted for print is print media, and the `width`/`height` features then
+     // describe the page area rather than whatever surface the renderer allocated. Nothing pinned
+     // means continuous media, so every existing caller is unaffected.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void A_Paged_Context_Is_Print_Media_And_Sizes_By_The_Page_Area()
+     {
+         var screenSized = new CssEnvironment(1024, 768);
+@@ -55,7 +55,7 @@ public sealed class CssStyleEngineTests
+ 
+     // `not print` has to stay correct on both surfaces — it is the spelling a document uses to
+     // exclude itself from one of them.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Not_Print_Is_Correct_On_Either_Surface()
+     {
+         var environment = new CssEnvironment(800, 600);
+@@ -69,7 +69,7 @@ public sealed class CssStyleEngineTests
+     // A nested browsing context is its own formatting context: the embedder's page area is not the
+     // frame's viewport. css-page/media-queries-002-print and -003-print embed a 100 x 100 frame
+     // that asserts exactly this.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Suspending_Restores_The_Frames_Own_Viewport()
+     {
+         var frame = new CssEnvironment(100, 100);
+@@ -241,7 +241,7 @@ public sealed class CssStyleEngineTests
+         Assert.False(CssStyleEngine.MatchesMediaQuery(query, new CssEnvironment(800, 600)));
+ 
+     // Media Queries 5 §3: `@custom-media` names a query list that `(--name)` stands for.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void CustomMedia_Reference_Resolves_To_Its_Definition()
+     {
+         var (_, _, body) = NewDocument();
+@@ -255,7 +255,7 @@ public sealed class CssStyleEngineTests
+ 
+     // A definition is document-global, not order-dependent: it applies to a reference
+     // that appears above it.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void CustomMedia_Definition_Applies_To_An_Earlier_Reference()
+     {
+         var (_, _, body) = NewDocument();
+@@ -267,7 +267,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("lime", engine.GetComputedStyle(body).GetPropertyValue("background-color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void CustomMedia_Reference_That_Does_Not_Match_Applies_Nothing()
+     {
+         var (_, _, body) = NewDocument();
+@@ -316,7 +316,7 @@ public sealed class CssStyleEngineTests
+ 
+     // css/css-conditional/at-media-whitespace-optional-001: `@media{ … }` has an
+     // empty query list, so its rules cascade like any unconditional rule.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void MediaRule_With_Empty_Prelude_Applies()
+     {
+         var (_, _, body) = NewDocument();
+@@ -327,7 +327,7 @@ public sealed class CssStyleEngineTests
+ 
+     // css/mediaqueries/mq-invalid-media-type-layer-002: `@media not layer` is a
+     // syntax error, not a negated unknown media type, so its rules never apply.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void MediaRule_With_Layer_Media_Type_Never_Applies()
+     {
+         var (_, _, body) = NewDocument();
+@@ -382,7 +382,7 @@ public sealed class CssStyleEngineTests
+         return (document, html, body);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Cascade_Resolves_By_Specificity_Then_Source_Order()
+     {
+         var (_, _, body) = NewDocument();
+@@ -396,7 +396,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("blue", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Cascade_Later_Declaration_Wins_On_Specificity_Tie()
+     {
+         var (_, _, body) = NewDocument();
+@@ -409,7 +409,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Important_Declaration_Beats_Higher_Specificity_Normal()
+     {
+         var (_, _, body) = NewDocument();
+@@ -423,7 +423,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Inline_Style_Beats_Selector_Declarations()
+     {
+         var (_, _, body) = NewDocument();
+@@ -436,7 +436,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("orange", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Inherited_Property_Flows_To_Child_Without_Own_Declaration()
+     {
+         var (_, _, body) = NewDocument();
+@@ -451,7 +451,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("purple", engine.GetComputedStyle(child).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Non_Inherited_Property_Falls_Back_To_Initial_Value()
+     {
+         var (_, _, body) = NewDocument();
+@@ -466,7 +466,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("rgb(0, 0, 0)", style.GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Shorthand_Margin_Expands_To_Longhands()
+     {
+         var (_, _, body) = NewDocument();
+@@ -482,7 +482,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("20px", style.GetPropertyValue("margin-left"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Shorthand_Background_Single_Layer_Expands_To_Longhands()
+     {
+         var (_, _, body) = NewDocument();
+@@ -499,7 +499,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("50px 60px", style.GetPropertyValue("background-size"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Shorthand_Background_Preserves_All_Comma_Separated_Layers()
+     {
+         var (_, _, body) = NewDocument();
+@@ -527,7 +527,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("transparent", style.GetPropertyValue("background-color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Shorthand_Background_Does_Not_Override_Explicit_Attachment_Longhand()
+     {
+         var (_, _, body) = NewDocument();
+@@ -546,7 +546,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("scroll, fixed", style.GetPropertyValue("background-attachment"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Custom_Property_Is_Inherited_And_Var_Is_Resolved()
+     {
+         var (_, html, body) = NewDocument();
+@@ -559,7 +559,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("teal", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Var_Falls_Back_When_Custom_Property_Is_Missing()
+     {
+         var (_, _, body) = NewDocument();
+@@ -571,7 +571,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("crimson", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Env_Unknown_Name_Falls_Back_To_Provided_Default()
+     {
+         var (_, _, body) = NewDocument();
+@@ -586,7 +586,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("crimson", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Env_Unknown_Name_Resolves_Nested_Var_Fallback()
+     {
+         var (_, _, body) = NewDocument();
+@@ -601,7 +601,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("rgb(0, 128, 0)", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Env_Unknown_Name_Without_Fallback_Is_Invalid_And_Overrides_Previous()
+     {
+         var (_, _, body) = NewDocument();
+@@ -620,7 +620,7 @@ public sealed class CssStyleEngineTests
+         Assert.DoesNotContain("env(", bg);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Env_Reference_Is_A_Supported_Feature_Query()
+     {
+         var (_, _, body) = NewDocument();
+@@ -636,7 +636,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("rgb(0, 128, 0)", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Cyclic_Custom_Properties_Resolve_To_Invalid_Without_Exhausting_Memory()
+     {
+         var (_, html, body) = NewDocument();
+@@ -656,7 +656,7 @@ public sealed class CssStyleEngineTests
+         Assert.True(color.Length < 64);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Acyclic_Exponential_Custom_Property_Chain_Falls_Back_Without_Exhausting_Memory()
+     {
+         var (_, html, body) = NewDocument();
+@@ -680,7 +680,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", bg);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Self_Referential_Custom_Property_Does_Not_Recurse_Forever()
+     {
+         var (_, html, body) = NewDocument();
+@@ -695,7 +695,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("10px", width);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Media_Query_Applies_Only_When_Environment_Matches()
+     {
+         var (_, _, body) = NewDocument();
+@@ -708,7 +708,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", engine.GetComputedStyle(div, new CssEnvironment(800, 600)).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Pseudo_Element_Rules_Match_Only_For_That_Pseudo()
+     {
+         var (_, _, body) = NewDocument();
+@@ -721,7 +721,7 @@ public sealed class CssStyleEngineTests
+         Assert.NotEqual("\"hi\"", engine.GetComputedStyle(div).GetPropertyValue("content"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Relative_Font_Weight_Resolves_Against_Inherited_Weight()
+     {
+         var (_, _, body) = NewDocument();
+@@ -761,7 +761,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("Ahem", style.GetPropertyValue("font-family"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Font_Shorthand_Without_LineHeight_Keeps_Family()
+     {
+         var (_, _, body) = NewDocument();
+@@ -776,7 +776,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("Ahem", style.GetPropertyValue("font-family"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Computed_Style_Is_Recomputed_After_Attribute_Mutation()
+     {
+         var (_, _, body) = NewDocument();
+@@ -792,7 +792,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Adding_A_Stylesheet_Invalidates_Cached_Results()
+     {
+         var (_, _, body) = NewDocument();
+@@ -807,7 +807,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("blue", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Declared_Cascade_Is_Memoized_But_Invalidated_By_Mutation_And_Stylesheet_Changes()
+     {
+         // Guards the declared-cascade memo (CollectCascadedDeclarations cache): the
+@@ -833,7 +833,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("blue", engine.GetCascadedStyle(div)["color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Registered_Custom_Property_Honours_Inherits_False()
+     {
+         var (_, html, body) = NewDocument();
+@@ -848,14 +848,14 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("2px", style.GetPropertyValue("--g"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Missing_Element_Returns_Empty_Style()
+     {
+         var engine = EngineWith("div { color: red; }");
+         Assert.Same(CssComputedStyle.Empty, engine.GetComputedStyle(null!));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Invalid_Closed_Keyword_Value_Is_Discarded_Previous_Wins()
+     {
+         var (_, _, body) = NewDocument();
+@@ -934,7 +934,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal(whiteSpace, engine.GetComputedStyle(div).GetPropertyValue("white-space"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Invalid_Vendor_Color_Is_Rejected_But_Standard_Prefixes_Pass()
+     {
+         var (_, _, body) = NewDocument();
+@@ -948,7 +948,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("red", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Invalid_Inline_Declaration_Is_Discarded()
+     {
+         var (_, _, body) = NewDocument();
+@@ -962,7 +962,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("flex", engine.GetComputedStyle(div).GetPropertyValue("display"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Valid_Custom_Property_With_Closed_Keyword_Name_Is_Not_Validated()
+     {
+         var (_, _, body) = NewDocument();
+@@ -978,7 +978,7 @@ public sealed class CssStyleEngineTests
+ 
+     // ---- GetCascadedStyle (renderer projection view) ----------------------
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Returns_Cascaded_Value()
+     {
+         var (_, _, body) = NewDocument();
+@@ -991,7 +991,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("red", engine.GetCascadedStyle(div)["color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Does_Not_Backfill_Initials()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1009,7 +1009,7 @@ public sealed class CssStyleEngineTests
+         Assert.False(cascaded.ContainsKey("margin-top"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Expands_Shorthands()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1026,7 +1026,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("4px", cascaded["margin-left"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Excludes_Inline_Style()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1044,7 +1044,7 @@ public sealed class CssStyleEngineTests
+         Assert.False(cascaded.ContainsKey("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Can_Include_Inline_Style_In_The_Author_Cascade()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1061,7 +1061,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("9px", cascaded["margin-right"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Inline_Important_Beats_Author_Important()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1112,7 +1112,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("blue", cascaded["color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Expands_MultiValue_Pseudo_Element_Borders()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1129,7 +1129,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("solid", cascaded["border-left-style"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Folds_Inherit_To_Parent_Computed()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1148,7 +1148,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", cascaded["color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCascadedStyle_Border_Shorthand_Resets_Omitted_Color_To_Initial()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1167,7 +1167,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("rgb(0, 0, 0)", cascaded["border-top-color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void CssEngineDiagnostics_Reports_Dropped_Declarations_Only()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1228,7 +1228,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal(expected, CssStyleEngine.IsValidSupportsCondition(condition));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Supports_Rule_With_Invalid_Condition_Does_Not_Apply()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1243,7 +1243,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Supports_Rule_With_Valid_Condition_Applies()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1342,7 +1342,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal(value, engine.GetCascadedStyle(div)["text-align-last"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void TextAlignLast_Drops_Invalid_Value()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1353,7 +1353,7 @@ public sealed class CssStyleEngineTests
+         Assert.False(engine.GetCascadedStyle(div).ContainsKey("text-align-last"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void TextAlignLast_Is_Inherited()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1368,7 +1368,7 @@ public sealed class CssStyleEngineTests
+ 
+     // ---- GetSparseComputedStyle: computed pipeline without initial-value backfill ----
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_Omits_Undeclared_NonInherited_Property()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1398,7 +1398,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("inline", full.GetPropertyValue("display"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_Backfills_Inherited_Property_From_Parent()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1420,7 +1420,7 @@ public sealed class CssStyleEngineTests
+         Assert.False(engine.GetSparseComputedStyle(child).ContainsKey("display"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_Expands_Shorthands_Without_Initial_Longhands()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1441,7 +1441,7 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("0px", engine.GetComputedStyle(div).GetPropertyValue("padding-top"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_Is_A_Subset_Of_GetComputedStyle_Agreeing_On_Shared_Keys()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1463,14 +1463,14 @@ public sealed class CssStyleEngineTests
+         Assert.Equal("inline", full.GetPropertyValue("display"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_Returns_Empty_For_Null_Element()
+     {
+         var engine = EngineWith("div { color: red; }");
+         Assert.Empty(engine.GetSparseComputedStyle(null!));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_SparseInheritance_Omits_Nowhere_Declared_Inherited_Property()
+     {
+         var (_, _, body) = NewDocument();
+@@ -1500,7 +1500,7 @@ public sealed class CssStyleEngineTests
+         Assert.False(sparse.ContainsKey("display"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSparseComputedStyle_SparseInheritance_Propagates_Declared_Value_Down_Ancestor_Chain()
+     {
+         var (_, _, body) = NewDocument();
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleScopeBuilderTests.cs b/Broiler.CSS.Dom.Tests/CssStyleScopeBuilderTests.cs
+index b4d4b51..26985ab 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleScopeBuilderTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleScopeBuilderTests.cs
+@@ -21,7 +21,7 @@ public sealed class CssStyleScopeBuilderTests
+     private static CssStyleScopeBuilder.StyleSource Src(
+         string css, string? media = null, CssOrigin origin = CssOrigin.Author) => new(css, origin, media);
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Applies_Sheet_With_No_Media()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -29,7 +29,7 @@ public sealed class CssStyleScopeBuilderTests
+         Assert.Equal("red", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Excludes_Print_Media_On_Screen_Viewport()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -41,7 +41,7 @@ public sealed class CssStyleScopeBuilderTests
+         Assert.Equal("rgb(0, 0, 0)", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Includes_Screen_And_All_Media()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -53,7 +53,7 @@ public sealed class CssStyleScopeBuilderTests
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Filters_By_Viewport_Width_Media_Query_And_Resyncs()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -68,7 +68,7 @@ public sealed class CssStyleScopeBuilderTests
+         Assert.Equal("rgb(0, 0, 0)", narrow.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Preserves_Document_Order_Across_Separate_Sheets()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -79,7 +79,7 @@ public sealed class CssStyleScopeBuilderTests
+         Assert.Equal("blue", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Respects_Cascade_Origin()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -92,7 +92,7 @@ public sealed class CssStyleScopeBuilderTests
+         Assert.Equal("green", engine.GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Reflects_Changed_Source_Text()
+     {
+         var (_, div) = NewDocWithDiv();
+@@ -106,11 +106,11 @@ public sealed class CssStyleScopeBuilderTests
+             builder.Sync([Src("div { color: blue; }")], env).GetComputedStyle(div).GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sync_Null_Sources_Throws() =>
+         Assert.Throws<ArgumentNullException>(() => NewBuilder().Sync(null!, CssEnvironment.Headless));
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Constructor_Null_Engine_Throws() =>
+         Assert.Throws<ArgumentNullException>(() => new CssStyleScopeBuilder(null!));
+ }
+diff --git a/Broiler.CSS.Dom.Tests/ShorthandLonghandOriginTests.cs b/Broiler.CSS.Dom.Tests/ShorthandLonghandOriginTests.cs
+index 83980b4..f00dffe 100644
+--- a/Broiler.CSS.Dom.Tests/ShorthandLonghandOriginTests.cs
++++ b/Broiler.CSS.Dom.Tests/ShorthandLonghandOriginTests.cs
+@@ -24,7 +24,7 @@ public sealed class ShorthandLonghandOriginTests
+         return target;
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Author_Background_Shorthand_Beats_UA_BackgroundColor_Longhand()
+     {
+         var target = NewTarget();
+@@ -39,7 +39,7 @@ public sealed class ShorthandLonghandOriginTests
+         Assert.Equal("lime", engine.GetCascadedStyle(target)["background-color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Same_Origin_Later_BackgroundColor_Longhand_Still_Wins_Over_Earlier_Background_Shorthand()
+     {
+         // Seeding must not invert same-origin source order: a later background-color
+@@ -53,7 +53,7 @@ public sealed class ShorthandLonghandOriginTests
+         Assert.Equal("red", engine.GetCascadedStyle(target)["background-color"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void UA_Background_Shorthand_Still_Beaten_By_Author_Background_Shorthand()
+     {
+         // Control: shorthand-vs-shorthand already resolved correctly (competes at the
+diff --git a/Broiler.CSS.Tests/AnchorFunctionTests.cs b/Broiler.CSS.Tests/AnchorFunctionTests.cs
+index bbdecc7..8b3b0e7 100644
+--- a/Broiler.CSS.Tests/AnchorFunctionTests.cs
++++ b/Broiler.CSS.Tests/AnchorFunctionTests.cs
+@@ -42,14 +42,14 @@ public sealed class AnchorFunctionTests
+         Assert.Equal("X", result);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Rewrite_ReplacesEmbeddedFunctionOnly()
+     {
+         var result = AnchorFunction.Rewrite("calc(anchor(--a bottom) + 5px)", _ => "100px");
+         Assert.Equal("calc(100px + 5px)", result);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Rewrite_ReplacesEveryReference()
+     {
+         int n = 0;
+@@ -85,14 +85,14 @@ public sealed class AnchorFunctionTests
+         Assert.Equal("Y", result);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void RewriteSize_DoesNotMatchPlainAnchor()
+     {
+         var result = AnchorFunction.RewriteSize("anchor(--a top)", _ => "SHOULD_NOT_APPEAR");
+         Assert.Equal("anchor(--a top)", result);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void TryGetFirst_ReturnsFirstReference()
+     {
+         Assert.True(AnchorFunction.TryGetFirst("width: anchor(--a right) 0", out var r));
+diff --git a/Broiler.CSS.Tests/CssArchitectureTests.cs b/Broiler.CSS.Tests/CssArchitectureTests.cs
+index 06c0eda..1da2646 100644
+--- a/Broiler.CSS.Tests/CssArchitectureTests.cs
++++ b/Broiler.CSS.Tests/CssArchitectureTests.cs
+@@ -4,7 +4,7 @@ namespace Broiler.CSS.Tests;
+ 
+ public sealed class CssArchitectureTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Kernel_Has_No_NonFramework_Assembly_Dependencies()
+     {
+         var dependencies = typeof(CssParser).Assembly
+@@ -20,7 +20,7 @@ public sealed class CssArchitectureTests
+         Assert.Empty(dependencies);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Project_Has_No_Project_Or_Package_References()
+     {
+         var projectPath = FindProjectPath();
+@@ -30,7 +30,7 @@ public sealed class CssArchitectureTests
+         Assert.DoesNotContain("<PackageReference", projectText, StringComparison.Ordinal);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Public_Surface_Does_Not_Leak_Other_Broiler_Types()
+     {
+         var leaks = typeof(CssParser).Assembly
+@@ -52,7 +52,7 @@ public sealed class CssArchitectureTests
+         Assert.Empty(leaks);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Mutable_Collections_Are_Not_Publicly_Exposed()
+     {
+         var leaks = typeof(CssParser).Assembly
+diff --git a/Broiler.CSS.Tests/CssContrastColorTests.cs b/Broiler.CSS.Tests/CssContrastColorTests.cs
+index abb2dec..c260312 100644
+--- a/Broiler.CSS.Tests/CssContrastColorTests.cs
++++ b/Broiler.CSS.Tests/CssContrastColorTests.cs
+@@ -44,7 +44,7 @@ public sealed class CssContrastColorTests
+ 
+     // The threshold is where the two WCAG contrast ratios are equal, not luminance 0.5 —
+     // a mid grey is light enough that black contrasts better.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void The_Threshold_Is_The_Equal_Contrast_Luminance_Not_Mid_Grey()
+     {
+         Assert.True(CssValueParser.TryParseColor("#767676", out var justLight));
+@@ -54,7 +54,7 @@ public sealed class CssContrastColorTests
+         Assert.Equal(White, CssContrastColor.Pick(justDark));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Relative_Luminance_Spans_Zero_To_One()
+     {
+         Assert.Equal(0.0, CssContrastColor.RelativeLuminance(Black), 6);
+@@ -89,7 +89,7 @@ public sealed class CssContrastColorTests
+     }
+ 
+     // The function is a <color>, so the ordinary colour parser must accept it.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void TryParseColor_Accepts_The_Function()
+     {
+         Assert.True(CssValueParser.TryParseColor("contrast-color(#000)", out var color));
+@@ -100,7 +100,7 @@ public sealed class CssContrastColorTests
+     // to CssSystemColors. Asserted with Field/FieldText because those resolve both before and
+     // after patch 0036 fills in the rest of the CSS Color 4 §6 table (problem 28) — this test must
+     // not depend on whether that patch has been applied.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void TryParseColor_Routes_To_System_Colors()
+     {
+         Assert.True(CssValueParser.TryParseColor("Field", out var field));
+@@ -109,7 +109,7 @@ public sealed class CssContrastColorTests
+         Assert.Equal(Black, fieldText);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void ResolveFunctions_Rewrites_Occurrences_In_Place()
+     {
+         Assert.Equal(
+diff --git a/Broiler.CSS.Tests/CssKernelTests.cs b/Broiler.CSS.Tests/CssKernelTests.cs
+index 7a8213f..1c7fac3 100644
+--- a/Broiler.CSS.Tests/CssKernelTests.cs
++++ b/Broiler.CSS.Tests/CssKernelTests.cs
+@@ -2,7 +2,7 @@ namespace Broiler.CSS.Tests;
+ 
+ public sealed class CssKernelTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parser_Preserves_Rules_AtRules_And_Raw_Values()
+     {
+         const string css = """
+@@ -33,7 +33,7 @@ public sealed class CssKernelTests
+         Assert.Equal("RED", style.Declarations.GetPropertyValue("color"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Declaration_Parser_Recovers_And_Last_Declaration_Wins()
+     {
+         var declarations = new CssParser().ParseDeclarations(
+@@ -96,7 +96,7 @@ public sealed class CssKernelTests
+         Assert.Equal(new CssColor(red, green, blue, alpha), color);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Serialization_Is_Deterministic_And_RoundTrips()
+     {
+         const string source = """
+@@ -112,7 +112,7 @@ public sealed class CssKernelTests
+         Assert.Contains("color: RED !important;", first, StringComparison.Ordinal);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Individual_Rules_And_Declaration_Blocks_Can_Be_Serialized()
+     {
+         var parser = new CssParser();
+@@ -127,7 +127,7 @@ public sealed class CssKernelTests
+             CssSerializer.Serialize(styleRule.Declarations).ReplaceLineEndings("\n"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parser_Reports_Unterminated_And_Malformed_Input()
+     {
+         var sheet = new CssParser().ParseStyleSheet(
+@@ -138,7 +138,7 @@ public sealed class CssKernelTests
+         Assert.Equal(2, sheet.Rules.Count);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Unclosed_Parenthesis_In_Value_Swallows_Following_Braces_Until_Matched()
+     {
+         // CSS Syntax "consume a simple block": a } that sits inside an unclosed
+@@ -161,7 +161,7 @@ public sealed class CssKernelTests
+             static rule => rule.Selectors.Selectors.Any(static selector => selector.Text == "body"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Phase_Zero_Corpus_Parses_And_Serializes_Stably()
+     {
+         var corpusPath = FindCorpusPath();
+diff --git a/Broiler.CSS.Tests/CssLengthTests.cs b/Broiler.CSS.Tests/CssLengthTests.cs
+index df7b2ca..9b0dee2 100644
+--- a/Broiler.CSS.Tests/CssLengthTests.cs
++++ b/Broiler.CSS.Tests/CssLengthTests.cs
+@@ -37,7 +37,7 @@ public sealed class CssLengthTests
+         Assert.Equal(isRelative, len.IsRelative);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Percentage_Stores_Fraction_And_Flags_It()
+     {
+         var len = new CssLength("50%");
+@@ -86,7 +86,7 @@ public sealed class CssLengthTests
+         Assert.Equal(double.Parse(text, System.Globalization.CultureInfo.InvariantCulture), len.Number, 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void ConvertEmToPoints_Drives_The_FontSize_Path()
+     {
+         // Mirrors CssBoxProperties font-size resolution: an em length converts to
+diff --git a/Broiler.CSS.Tests/CssLengthZoomTests.cs b/Broiler.CSS.Tests/CssLengthZoomTests.cs
+index 0179459..d70332b 100644
+--- a/Broiler.CSS.Tests/CssLengthZoomTests.cs
++++ b/Broiler.CSS.Tests/CssLengthZoomTests.cs
+@@ -23,35 +23,35 @@ public sealed class CssLengthZoomTests
+         finally { CssLengthParser.SetElementZoom(1.0, 1.0); }
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Default_Factors_Leave_Calc_Unscaled()
+     {
+         // No opt-in (1.0, 1.0): byte-identical to the pre-zoom parser.
+         Assert.Equal(30, Parse("calc(10px + 20px)", 0, 16, 1.0, 1.0), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Calc_AbsoluteTerms_Scale_By_AbsoluteZoom()
+     {
+         // (10 + 20)px × 2 = 60.
+         Assert.Equal(60, Parse("calc(10px + 20px)", 0, 16, 2.0, 1.0), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Calc_Rem_Scales_By_AbsoluteZoom()
+     {
+         // rem is root-relative (16px default) and counts as absolute for element zoom: 2rem = 32 × 2 = 64.
+         Assert.Equal(64, Parse("calc(2rem)", 0, 16, 2.0, 1.0), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Calc_Percent_Scales_By_PercentZoom_And_Absolute_By_AbsoluteZoom()
+     {
+         // 50% of 200 = 100 × pctZoom 3 = 300; 10px × absZoom 2 = 20; total 320.
+         Assert.Equal(320, Parse("calc(50% + 10px)", 200, 16, 2.0, 3.0), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Calc_Em_Rides_The_Zoomed_Font_And_Is_Not_ReScaled()
+     {
+         // em uses the caller's emFactor (already zoomed by the engine); the absolute-zoom factor must
+@@ -59,7 +59,7 @@ public sealed class CssLengthZoomTests
+         Assert.Equal(32, Parse("calc(2em)", 0, 16, 2.0, 1.0), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Calc_Viewport_Units_Are_Unaffected_By_ElementZoom()
+     {
+         CssLengthParser.SetViewportSize(1000, 1000); // 1vw = 10px
+@@ -67,7 +67,7 @@ public sealed class CssLengthZoomTests
+         Assert.Equal(100, Parse("calc(10vw)", 0, 16, 2.0, 1.0), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Bare_Absolute_Length_Also_Honours_AbsoluteZoom()
+     {
+         // A non-calc length routes through the same evaluator, so the hook is uniform: 25px × 2 = 50.
+diff --git a/Broiler.CSS.Tests/CssMetricsTests.cs b/Broiler.CSS.Tests/CssMetricsTests.cs
+index c022090..4665856 100644
+--- a/Broiler.CSS.Tests/CssMetricsTests.cs
++++ b/Broiler.CSS.Tests/CssMetricsTests.cs
+@@ -13,7 +13,7 @@ public sealed class CssMetricsTests
+     // acknowledging the intentional precision improvement.
+     private const int LiteralPrecision = 6;
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Absolute_Factors_Match_Their_Definitions()
+     {
+         Assert.Equal(96.0, CssMetrics.Dpi);
+@@ -26,7 +26,7 @@ public sealed class CssMetricsTests
+         Assert.Equal(12.0 * CssMetrics.PtToPx, CssMetrics.PxPerPica);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Derived_Factors_Are_Internally_Consistent()
+     {
+         Assert.Equal(CssMetrics.PxPerMm * 10.0, CssMetrics.PxPerCm, 12);
+@@ -37,7 +37,7 @@ public sealed class CssMetricsTests
+         Assert.Equal(1.0, CssMetrics.PtToPx * CssMetrics.PxToPt, 12);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Factors_Match_The_Historical_Inline_Literals()
+     {
+         // These are the exact literals currently living in CssLengthParser.cs
+@@ -50,7 +50,7 @@ public sealed class CssMetricsTests
+         Assert.Equal(96.0 / 72.0, CssMetrics.PtToPx, LiteralPrecision);           // "1 point = 1/72 of inch"
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Font_And_LineHeight_Defaults_Match_Current_Constants()
+     {
+         Assert.Equal(CssConstants.FontSize, CssMetrics.DefaultFontSizePt);
+diff --git a/Broiler.CSS.Tests/CssSystemColorsTests.cs b/Broiler.CSS.Tests/CssSystemColorsTests.cs
+index 7e05a67..30a5de9 100644
+--- a/Broiler.CSS.Tests/CssSystemColorsTests.cs
++++ b/Broiler.CSS.Tests/CssSystemColorsTests.cs
+@@ -60,7 +60,7 @@ public sealed class CssSystemColorsTests
+         Assert.Equal(new CssColor(r, g, b), color);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Light_And_Dark_Disagree_On_Canvas()
+     {
+         Assert.True(CssSystemColors.TryResolve("Canvas", CssColorScheme.Light, out var light));
+@@ -116,7 +116,7 @@ public sealed class CssSystemColorsTests
+         Assert.False(CssSystemColors.IsSystemColor(name!));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void IsSystemColor_Recognises_Current_And_Deprecated_Keywords()
+     {
+         Assert.True(CssSystemColors.IsSystemColor("Canvas"));
+diff --git a/Broiler.CSS.Tests/CssViewportUnitTests.cs b/Broiler.CSS.Tests/CssViewportUnitTests.cs
+index 83d6262..bca77e4 100644
+--- a/Broiler.CSS.Tests/CssViewportUnitTests.cs
++++ b/Broiler.CSS.Tests/CssViewportUnitTests.cs
+@@ -64,7 +64,7 @@ public sealed class CssViewportUnitTests
+         Assert.Equal(600, Parse("100vi", writingMode), 6);  // inline axis = height
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Physical_Viewport_Units_Ignore_The_Writing_Mode()
+     {
+         Assert.Equal(800, Parse("100vw", "vertical-rl"), 6);
+@@ -93,7 +93,7 @@ public sealed class CssViewportUnitTests
+ 
+     // "svmin" must not be scanned as a stray 's' followed by "vmin" — that would
+     // leave "1s" as the number and fail to parse.
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Longest_Unit_Spelling_Wins()
+     {
+         Assert.Equal(600, Parse("100svmin"), 6);
+@@ -148,14 +148,14 @@ public sealed class CssViewportUnitTests
+         Assert.Equal(expected, CssLengthParser.ParseToPixels(value, 800, 600), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void ParseToPixels_Honours_The_Root_Writing_Mode()
+     {
+         Assert.Equal(800, CssLengthParser.ParseToPixels("100vb", 800, 600, "vertical-rl"), 6);
+         Assert.Equal(600, CssLengthParser.ParseToPixels("100vi", 800, 600, "vertical-rl"), 6);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Logical_Units_Compose_Inside_Calc()
+     {
+         Assert.Equal(310, Parse("calc(50vb + 10px)"), 6);
+diff --git a/Broiler.CSS.Tests/Cssom/CssomRuleMetadataTests.cs b/Broiler.CSS.Tests/Cssom/CssomRuleMetadataTests.cs
+index b33f8a6..f84ebcd 100644
+--- a/Broiler.CSS.Tests/Cssom/CssomRuleMetadataTests.cs
++++ b/Broiler.CSS.Tests/Cssom/CssomRuleMetadataTests.cs
+@@ -27,7 +27,7 @@ public sealed class CssomRuleMetadataTests
+         Assert.Equal((int)expected, CssomRuleMetadata.GetCssomTypeNumber(ParseSingleRule(css)));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetSelectorText_Joins_Selectors_Like_The_Serializer()
+     {
+         var rule = Assert.IsType<CssStyleRule>(ParseSingleRule(".card, #hero:hover { color: red }"));
+@@ -42,7 +42,7 @@ public sealed class CssomRuleMetadataTests
+         Assert.Equal(expected, CssomRuleMetadata.GetKeyframesName((CssAtRule)ParseSingleRule(css)));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GetCharsetEncoding_Unquotes()
+     {
+         Assert.Equal("utf-8", CssomRuleMetadata.GetCharsetEncoding((CssAtRule)ParseSingleRule("@charset \"utf-8\";")));
+@@ -69,7 +69,7 @@ public sealed class CssomRuleMetadataTests
+         Assert.Equal(uri, ns.Uri);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void At_Rule_Prelude_And_Declarations_Are_Model_Metadata()
+     {
+         // media/supports/layer/page/property/counter-style names are the trimmed
+diff --git a/Broiler.CSS.Tests/PositionTryRuleTests.cs b/Broiler.CSS.Tests/PositionTryRuleTests.cs
+index d33bad3..972ed96 100644
+--- a/Broiler.CSS.Tests/PositionTryRuleTests.cs
++++ b/Broiler.CSS.Tests/PositionTryRuleTests.cs
+@@ -12,7 +12,7 @@ namespace Broiler.CSS.Tests;
+ /// </summary>
+ public sealed class PositionTryRuleTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_SingleRule_ExtractsDeclarations()
+     {
+         var rules = PositionTryRule.Parse("@position-try --a { top: 10px; left: 20px }");
+@@ -21,7 +21,7 @@ public sealed class PositionTryRuleTests
+         Assert.Equal("20px", rules["--a"]["left"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_MultipleRules()
+     {
+         var rules = PositionTryRule.Parse(
+@@ -31,7 +31,7 @@ public sealed class PositionTryRuleTests
+         Assert.Equal("2px", rules["--b"]["bottom"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_StripsCommentsBeforeDeclarations()
+     {
+         // A comment inside the body contains ':' and ';' that would corrupt parsing.
+@@ -41,7 +41,7 @@ public sealed class PositionTryRuleTests
+         Assert.Equal("5px", rules["--a"]["right"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_DeclarationNamesAreCaseInsensitive()
+     {
+         var rules = PositionTryRule.Parse("@position-try --a { TOP: 3px }");
+@@ -49,7 +49,7 @@ public sealed class PositionTryRuleTests
+         Assert.Equal("3px", rules["--a"]["ToP"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_LastDuplicateRuleWins()
+     {
+         var rules = PositionTryRule.Parse(
+@@ -58,7 +58,7 @@ public sealed class PositionTryRuleTests
+         Assert.Equal("9px", rules["--a"]["top"]);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_RuleNamesAreCaseSensitive()
+     {
+         var rules = PositionTryRule.Parse(
+@@ -75,7 +75,7 @@ public sealed class PositionTryRuleTests
+         Assert.Empty(PositionTryRule.Parse(css));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Parse_SkipsBlankAndColonlessDeclarations()
+     {
+         var rules = PositionTryRule.Parse("@position-try --a { top: 1px; ; garbage; left: 2px }");
+-- 
+2.43.0
+

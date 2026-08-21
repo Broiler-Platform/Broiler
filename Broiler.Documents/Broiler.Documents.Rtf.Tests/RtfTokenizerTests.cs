@@ -8,7 +8,7 @@ public sealed class RtfTokenizerTests
 
     private static RtfTokenizeResult Tokenize(string s) => RtfTokenizer.Tokenize(Bytes(s));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Tokenizes_Groups_Control_Words_And_Text()
     {
         RtfTokenizeResult result = Tokenize("{\\rtf1\\b Hello}");
@@ -33,7 +33,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal(RtfTokenType.GroupEnd, result.Tokens[4].Type);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Trailing_Space_Is_The_Control_Word_Delimiter()
     {
         RtfTokenizeResult result = Tokenize("\\b Hello");
@@ -42,7 +42,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal("Hello", result.Tokens[1].Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Extra_Spaces_After_A_Control_Word_Are_Literal_Text()
     {
         RtfTokenizeResult result = Tokenize("\\b  Hello");
@@ -50,7 +50,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal(" Hello", result.Tokens[^1].Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Negative_Control_Word_Parameters_Are_Parsed()
     {
         RtfTokenizeResult result = Tokenize("\\u-1 x");
@@ -62,7 +62,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal("x", result.Tokens[1].Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Control_Symbols_Are_Recognized()
     {
         // Three escaped symbols: \\  \{  \}
@@ -75,7 +75,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal('}', result.Tokens[2].Symbol);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hex_Escapes_Decode_To_A_Byte_Value()
     {
         RtfTokenizeResult result = Tokenize("\\'41");
@@ -85,7 +85,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal(0x41, hex.Parameter);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Malformed_Hex_Is_Reported_Not_Thrown()
     {
         RtfTokenizeResult result = Tokenize("\\'zz");
@@ -93,7 +93,7 @@ public sealed class RtfTokenizerTests
         Assert.Contains(result.Diagnostics, d => d.Code == "rtf.hex");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stream_Line_Breaks_Are_Dropped()
     {
         RtfTokenizeResult result = Tokenize("a\r\nb");
@@ -102,7 +102,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal("ab", text.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Group_Depth_Limit_Stops_Tokenizing_Without_Throwing()
     {
         RtfTokenizeResult result = RtfTokenizer.Tokenize(Bytes("{{{}}}"), new DocumentLimits(maxGroupDepth: 2));
@@ -111,7 +111,7 @@ public sealed class RtfTokenizerTests
         Assert.Contains(result.Diagnostics, d => d.Code == "rtf.depth");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Size_Limit_Truncates_Input()
     {
         RtfTokenizeResult result = RtfTokenizer.Tokenize(Bytes("abcdefgh"), new DocumentLimits(maxDocumentBytes: 4));
@@ -121,7 +121,7 @@ public sealed class RtfTokenizerTests
         Assert.Equal("abcd", result.Tokens[0].Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Long_Runs_Are_Split_But_Preserved()
     {
         RtfTokenizeResult result = RtfTokenizer.Tokenize(Bytes("aaaaaaaaaa"), new DocumentLimits(maxRunLength: 4));
@@ -152,7 +152,7 @@ public sealed class RtfTokenizerTests
         Assert.NotNull(result.Tokens);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Random_Bytes_Never_Throw_And_Always_Make_Progress()
     {
         var random = new Random(20260705);

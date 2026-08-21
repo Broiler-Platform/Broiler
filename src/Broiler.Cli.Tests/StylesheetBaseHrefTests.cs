@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class StylesheetBaseHrefTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LinkedStylesheet_Href_ResolvesAgainstBaseHref()
     {
         var baseDir = System.IO.Path.Combine(

@@ -37,14 +37,14 @@ public sealed class FlowRootBlockFormattingContextTests
 {
     private static readonly Uri BaseUrl = new("file:///flow-root.html");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlowRoot_Is_Block_Level()
     {
         Assert.True(Leaf(display: "flow-root").IsBlock);
         Assert.False(Leaf(display: "flow-root").IsInline);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlowRoot_Establishes_A_Block_Formatting_Context() =>
         Assert.True(CssBoxHelper.EstablishesBfc(Leaf(display: "flow-root")));
 
@@ -86,7 +86,7 @@ public sealed class FlowRootBlockFormattingContextTests
 
     // CSS2.1 §10.6.7: a BFC root's auto height includes its descendant floats. This is the
     // behaviour the whole keyword exists for, and the one the reference files above rely on.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlowRoot_Auto_Height_Contains_A_Descendant_Float()
     {
         var (root, container) = TreeWithFloatedChild(display: "flow-root");
@@ -97,7 +97,7 @@ public sealed class FlowRootBlockFormattingContextTests
 
     // The control: a plain block does not root a BFC, so the same float escapes its height.
     // Without this, a change that made every block contain its floats would pass the case above.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Plain_Block_Does_Not_Contain_The_Same_Float()
     {
         var (root, container) = TreeWithFloatedChild(CssConstants.Block);
@@ -108,7 +108,7 @@ public sealed class FlowRootBlockFormattingContextTests
 
     // `overflow: hidden` is the other way to root a BFC and was the one that already worked;
     // flow-root has to reach the same height, not merely a non-zero one.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlowRoot_And_Overflow_Hidden_Reach_The_Same_Height()
     {
         var (flowRootTree, flowRoot) = TreeWithFloatedChild(display: "flow-root");

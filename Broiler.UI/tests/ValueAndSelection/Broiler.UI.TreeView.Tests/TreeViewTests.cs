@@ -73,7 +73,7 @@ public sealed class TreeViewTests
         return source;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Collapsed_Tree_Never_Enumerates_What_It_Does_Not_Show()
     {
         // A thousand files across ten projects, all collapsed.
@@ -90,7 +90,7 @@ public sealed class TreeViewTests
         Assert.All(rows, row => Assert.False(row.IsExpanded));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Expanding_One_Node_Adds_Only_Its_Children()
     {
         CountingTreeSource source = BuildSolution(projects: 10, filesPerProject: 100);
@@ -105,7 +105,7 @@ public sealed class TreeViewTests
         Assert.DoesNotContain(tree.Rows, row => row.Id.Value.StartsWith("/Project4/", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Semantics_Describe_Only_The_Visible_Window()
     {
         CountingTreeSource source = BuildSolution(projects: 1, filesPerProject: 1_000);
@@ -120,7 +120,7 @@ public sealed class TreeViewTests
         Assert.Contains("1001 items", node.Name);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Row_Announces_Its_Level_And_Position_Within_That_Level()
     {
         var source = new CountingTreeSource();
@@ -136,7 +136,7 @@ public sealed class TreeViewTests
         Assert.Contains(rows, row => row.Name.Contains("B, level 1, 2 of 2", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Expansion_And_Selection_Survive_A_Data_Source_Refresh()
     {
         CountingTreeSource source = BuildSolution(projects: 3, filesPerProject: 5);
@@ -151,7 +151,7 @@ public sealed class TreeViewTests
         Assert.Equal("/Project1/File2.cs", Assert.Single(tree.Selection).Value);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Collapsing_A_Subtree_Moves_Focus_Out_Of_It()
     {
         var source = new CountingTreeSource();
@@ -168,7 +168,7 @@ public sealed class TreeViewTests
         Assert.Equal("/A", tree.FocusedNode.Value);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Keyboard_Navigation_Walks_The_Expanded_Set()
     {
         CountingTreeSource source = BuildSolution(projects: 3, filesPerProject: 2);
@@ -187,7 +187,7 @@ public sealed class TreeViewTests
         Assert.False(tree.MoveFocus(1, extendSelection: false));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Type_Ahead_Finds_The_Next_Match_And_Wraps()
     {
         var source = new CountingTreeSource();
@@ -205,7 +205,7 @@ public sealed class TreeViewTests
         Assert.Equal("/Alpha", tree.FocusedNode.Value);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reveal_Expands_Every_Ancestor_And_Scrolls_The_Node_Into_View()
     {
         CountingTreeSource source = BuildSolution(projects: 5, filesPerProject: 40);
@@ -220,7 +220,7 @@ public sealed class TreeViewTests
         Assert.InRange(index, tree.FirstVisibleRow, tree.FirstVisibleRow + tree.VisibleRowCapacity - 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Single_Selection_Mode_Keeps_One_Node_Selected()
     {
         CountingTreeSource source = BuildSolution(projects: 3, filesPerProject: 1);

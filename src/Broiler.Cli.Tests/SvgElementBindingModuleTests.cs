@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class SvgElementBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Svg_Feature_Module_Is_Internal_Static_With_No_Host_Contract()
     {
         var moduleType = typeof(SvgElementBinding);
@@ -30,7 +30,7 @@ public sealed class SvgElementBindingModuleTests
                         && t.Name.StartsWith("ISvg", StringComparison.Ordinal)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Svg_AnimatedLength_Reflects_Dimensional_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -54,7 +54,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Svg_ViewBox_Parses_Into_AnimatedRect()
     {
         var html = @"<!DOCTYPE html>
@@ -78,7 +78,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Svg_Text_Metric_Stubs_Estimate_From_Content_And_FontSize()
     {
         var html = @"<!DOCTYPE html>
@@ -104,7 +104,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Svg_CurrentTime_Round_Trips_Through_The_Timeline()
     {
         var html = @"<!DOCTYPE html>

@@ -52,7 +52,7 @@ public sealed class DefaultDocumentTests : IDisposable
         return directory;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task An_Empty_Grant_Still_Opens_Something_Editable()
     {
         using Fixture fixture = Fixture.Create();
@@ -68,7 +68,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Equal("hello", fixture.Editor.Snapshot.GetText(0, 5));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task The_Default_Document_Is_Untitled_And_Named_So_In_The_Tab()
     {
         using Fixture fixture = Fixture.Create();
@@ -82,7 +82,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Equal("Untitled1.cs", fixture.Controls.Tabs.SelectedTab!.Header);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Grant_With_Sources_Opens_One_Rather_Than_An_Untitled_Buffer()
     {
         string directory = Grant("sources");
@@ -97,7 +97,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Equal("Alpha.cs", item.RelativePath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Bin_And_Obj_Are_Not_Walked()
     {
         string directory = Grant("built");
@@ -114,7 +114,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.NotNull(workspace.FindItem("Real.cs"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task New_Adds_A_Second_Untitled_Document_Without_Reusing_The_Name()
     {
         using Fixture fixture = Fixture.Create();
@@ -130,7 +130,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.False(fixture.Editor.IsReadOnly);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Saving_An_Untitled_Document_Asks_Where_And_Writes_There()
     {
         string elsewhere = Grant("elsewhere");
@@ -158,7 +158,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Single(fixture.Controls.Tabs.Tabs);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Save_As_Keeps_The_Documents_Identity_And_Undo_History()
     {
         string elsewhere = Grant("elsewhere");
@@ -178,7 +178,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Equal(0, fixture.Editor.Snapshot.Length);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Open_Reads_A_File_Outside_The_Workspace_Root()
     {
         string elsewhere = Grant("elsewhere");
@@ -198,7 +198,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Equal("Outside.cs", fixture.Controls.Tabs.SelectedTab!.Header);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_File_Opened_By_Grant_Saves_Back_To_Where_It_Came_From()
     {
         string elsewhere = Grant("elsewhere");
@@ -222,7 +222,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.StartsWith("// edited", await File.ReadAllTextAsync(file), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Two_Granted_Files_With_The_Same_Name_Stay_Two_Documents()
     {
         string first = Path.Combine(Grant("one"), "Program.cs");
@@ -245,7 +245,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.StartsWith("// two", fixture.Editor.Snapshot.GetText(0, 6), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Cancelling_The_Dialog_Changes_Nothing()
     {
         using Fixture fixture = Fixture.Create();
@@ -262,7 +262,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.True(fixture.Shell.Workspace!.HasUnsavedChanges);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Host_That_Cannot_Ask_Says_So_Rather_Than_Doing_Nothing()
     {
         using Fixture fixture = Fixture.Create();
@@ -283,7 +283,7 @@ public sealed class DefaultDocumentTests : IDisposable
         Assert.Contains("unavailable", entry.Text, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Save_All_Asks_For_A_Location_Instead_Of_Skipping_Untitled_Work()
     {
         string elsewhere = Grant("elsewhere");

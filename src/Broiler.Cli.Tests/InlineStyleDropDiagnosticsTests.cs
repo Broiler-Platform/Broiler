@@ -24,7 +24,7 @@ public sealed class InlineStyleDropDiagnosticsTests
     private const string Html =
         "<!DOCTYPE html><html><body><div id=\"t\"></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetAttribute_Style_With_Invalid_Value_Reports_The_Drop()
     {
         var rejected = RunWithDiagnostics(
@@ -35,7 +35,7 @@ public sealed class InlineStyleDropDiagnosticsTests
         Assert.DoesNotContain(rejected, e => e.Property == "color");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_CssText_With_Invalid_Value_Reports_The_Drop()
     {
         var rejected = RunWithDiagnostics(
@@ -45,7 +45,7 @@ public sealed class InlineStyleDropDiagnosticsTests
         Assert.DoesNotContain(rejected, e => e.Property == "width");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Assigning_Style_String_Reports_The_Drop()
     {
         var rejected = RunWithDiagnostics(
@@ -54,7 +54,7 @@ public sealed class InlineStyleDropDiagnosticsTests
         Assert.Contains(("position", "sideways"), rejected);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dropped_Inline_Declaration_Is_Silent_In_Serialized_Output()
     {
         // End-to-end: the dropped declaration must be absent from the serialized
@@ -71,7 +71,7 @@ public sealed class InlineStyleDropDiagnosticsTests
         Assert.Contains("color: red", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Modern_WhiteSpace_Shorthand_Is_Not_Dropped()
     {
         // CSS Text 4: white-space is a shorthand for white-space-collapse and
@@ -86,7 +86,7 @@ public sealed class InlineStyleDropDiagnosticsTests
         Assert.Contains(("white-space", "x-bogus"), rejected);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Modern_WhiteSpace_Value_Survives_Serialization()
     {
         using var context = new JSContext();

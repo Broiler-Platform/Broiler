@@ -74,21 +74,21 @@ public sealed class InlineRelativePositionTests
         return (mx - sx, my - sy);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Inline_Box_Offsets_Its_Words() =>
         Assert.Equal((60, 30), Shift(left: "60px", top: "30px"));
 
     // CSS2.1 §9.4.3: with `left` auto and `right` set, the box moves the other way.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Right_And_Bottom_Offset_The_Other_Way() =>
         Assert.Equal((-15, -5), Shift(right: "15px", bottom: "5px"));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Static_Inline_Box_Is_Left_Where_It_Was() =>
         Assert.Equal((0, 0), Shift());
 
     // Offsets compound: a relative box inside a relative box moves by both.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nested_Relative_Inline_Boxes_Compound()
     {
         var moved = Container();

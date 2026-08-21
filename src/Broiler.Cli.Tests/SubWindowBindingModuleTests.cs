@@ -24,7 +24,7 @@ public sealed class SubWindowBindingModuleTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubWindow_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(SubWindowBinding);
@@ -34,7 +34,7 @@ public sealed class SubWindowBindingModuleTests
         Assert.False(typeof(ISubWindowHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_SubWindow_Through_The_Host_Contract()
     {
         Assert.True(typeof(ISubWindowHost).IsAssignableFrom(typeof(DomBridge)));
@@ -43,7 +43,7 @@ public sealed class SubWindowBindingModuleTests
             static field => field.FieldType == typeof(SubWindowBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentWindow_Exposes_SubWindow_Surface_Through_The_Module()
     {
         const string html =

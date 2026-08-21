@@ -8,7 +8,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class StyleSheetDisabledTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheetDisabledSetter_RemovesRulesFromCascade_ButKeepsSheetInCollection()
     {
         var html = @"<!DOCTYPE html>
@@ -35,7 +35,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("rgb(0, 128, 0)|false|true|true|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheetDisabled_ReEnabling_RestoresTheCascade()
     {
         var html = @"<!DOCTYPE html>
@@ -60,7 +60,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("true|rgb(0, 128, 0)", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlLinkElementDisabled_ReflectsAndTogglesTheContentAttribute()
     {
         // HTMLLinkElement.disabled reflects the `disabled` content attribute: getting reads it,

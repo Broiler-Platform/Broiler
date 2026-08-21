@@ -97,7 +97,7 @@ public class NativeScrollParityWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineAppliesScrollOffset()
     {
         var red = Render(nativeAnchor: true);
@@ -110,7 +110,7 @@ public class NativeScrollParityWptTests : IDisposable
         Assert.True(System.Math.Abs(red.x1 - 119) <= 2, $"marker right={red.x1}, expected ~119.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_ClipsContentScrolledAboveTheTopEdge()
     {
         var red = Render(nativeAnchor: true, html: HtmlScrolledAbove);

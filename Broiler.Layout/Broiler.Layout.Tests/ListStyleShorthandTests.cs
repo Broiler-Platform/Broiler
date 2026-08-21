@@ -22,7 +22,7 @@ public sealed class ListStyleShorthandTests
         return box;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Bare_Type_Sets_The_Type_And_Resets_The_Rest()
     {
         var box = Apply("square");
@@ -32,7 +32,7 @@ public sealed class ListStyleShorthandTests
         Assert.Equal("none", box.ListStyleImage);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Bare_Position_Sets_The_Position_And_Resets_The_Rest()
     {
         var box = Apply("inside");
@@ -60,7 +60,7 @@ public sealed class ListStyleShorthandTests
     /// image, and the spec sets *both* from it. `list-style: none` is how every skin turns a
     /// navigation menu's bullets off.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_None_Clears_Both_The_Type_And_The_Image()
     {
         var box = Apply("none");
@@ -72,7 +72,7 @@ public sealed class ListStyleShorthandTests
 
     /// <summary>With a real image beside it, the `none` is the type — the image is already
     /// spoken for.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void None_Beside_An_Image_Is_The_Type()
     {
         var box = Apply("none url(bullet.png)");

@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class ScriptEngineExecuteTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Typed_Handoff_Renders_The_Mutated_Canonical_Document()
     {
         const string html = "<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>";
@@ -41,7 +41,7 @@ public class ScriptEngineExecuteTests
     //  Body onload event firing via DomBridge (matches ScriptEngine)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_FireWindowLoadEvent_Triggers_Body_Onload()
     {
         // Acid3 uses <body onload="update()"> to bootstrap the test runner.
@@ -77,7 +77,7 @@ function run() {
         Assert.Contains("onload-fired", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_FireWindowLoadEvent_Triggers_Body_Onload_Property_Assigned_By_Script()
     {
         const string html = """
@@ -101,7 +101,7 @@ function run() {
         Assert.Equal("body-property-load-fired", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_FireWindowLoadEvent_Triggers_Window_Load_Listeners_And_Honors_Removal()
     {
         const string html = """
@@ -130,7 +130,7 @@ function run() {
         Assert.Equal("kept", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_WindowFrames_Expose_SameOrigin_Iframe_Windows()
     {
         const string html = """
@@ -154,7 +154,7 @@ function run() {
         Assert.Equal("1|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_ScriptAssigned_Iframe_Srcdoc_Fragments_Populate_FramesDocument()
     {
         const string html = """
@@ -182,7 +182,7 @@ function run() {
         Assert.Equal("true|true|ok", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_ScriptAssigned_Iframe_Srcdoc_Rebuilds_Existing_Subdocument()
     {
         const string html = """
@@ -219,7 +219,7 @@ function run() {
     // boxes were left unpositioned (0,0,0,0). (position:fixed inside a subframe still
     // resolves against the main viewport — a separate sub-viewport follow-up — so it is
     // not exercised here.)
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SubframeElement_GetBoundingClientRect_Is_Composed_Into_Main_Frame()
     {
         const string html = """
@@ -247,7 +247,7 @@ function run() {
         Assert.Equal("130,340,50,50", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Fixed_Targets()
     {
         const string html = """
@@ -286,7 +286,7 @@ function run() {
         Assert.Equal("140|460|0|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_ScrollIntoView_Uses_Script_Assigned_Iframe_Position_For_Scrollable_Fixed_Targets()
     {
         const string html = """
@@ -328,7 +328,7 @@ function run() {
         Assert.Equal("130|440|0|0|300|300", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_FlushTimers_Executes_SetTimeout_Chains()
     {
         // Acid3 chains tests via setTimeout. ScriptEngine now calls
@@ -363,7 +363,7 @@ setTimeout(step, 10);");
         Assert.Contains("timer-count=3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Onload_Then_FlushTimers_Runs_Full_Chain()
     {
         // Simulates the complete Acid3 pattern: body onload starts the
@@ -409,7 +409,7 @@ function update() {
     //  URL passing to DomBridge (window.location)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Attach_With_Url_Sets_Window_Location()
     {
         // ScriptEngine now passes the URL to DomBridge.Attach so that
@@ -432,7 +432,7 @@ document.getElementById('out').appendChild(p);");
         Assert.Contains("href=https://example.com/page.html", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Attach_Without_Url_Still_Works()
     {
         // The 2-parameter Attach (without URL) should still work
@@ -462,7 +462,7 @@ document.getElementById('out').appendChild(p);");
     //  End-to-end via CaptureService (validates same pattern as App)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CaptureService_ExecuteScriptsWithDom_Matches_App_Pattern()
     {
         // This test validates the same pattern that ScriptEngine.Execute
@@ -494,7 +494,7 @@ function start() {
     //  the ScriptExtractor logic in Broiler.App)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUri_Scripts_Execute_In_Document_Order()
     {
         // Acid3 uses data: URI scripts (e.g. lines 153-157).
@@ -514,7 +514,7 @@ document.getElementById('out').textContent = result;
         Assert.Contains("AB", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataUri_Scripts_With_Mixed_Encodings()
     {
         // Verifies percent-encoded and base64 data: URI scripts produce
@@ -537,7 +537,7 @@ document.getElementById('out').textContent = d1 + ',' + d2;
     //  CurrentScriptIndex tracking for document.write()
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CurrentScriptIndex_Enables_DocumentWrite_Positioning()
     {
         // Verify that script element index tracking ensures document.write()
@@ -561,7 +561,7 @@ document.write('<p id=""injected"">written</p>');
     //  (aligns Broiler.App pipeline with CLI's ExecuteScriptsWithDom)
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractAll_Separates_Deferred_Scripts()
     {
         var html = @"<!DOCTYPE html>
@@ -581,7 +581,7 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("var b = 2;", result.DeferredScripts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractAll_No_Scripts_Returns_Empty_Lists()
     {
         var html = @"<!DOCTYPE html><html><body><p>Hello</p></body></html>";
@@ -592,7 +592,7 @@ document.write('<p id=""injected"">written</p>');
         Assert.Empty(result.DeferredScripts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractAll_DataUri_Scripts_Decoded()
     {
         var html = @"<!DOCTYPE html>
@@ -607,7 +607,7 @@ document.write('<p id=""injected"">written</p>');
         Assert.Empty(result.DeferredScripts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractAll_Deferred_DataUri_Script()
     {
         var html = @"<!DOCTYPE html>
@@ -622,7 +622,7 @@ document.write('<p id=""injected"">written</p>');
         Assert.Equal("var x = 1;", result.DeferredScripts[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractAll_External_File_Script()
     {
         // Create a temporary script file
@@ -650,7 +650,7 @@ document.write('<p id=""injected"">written</p>');
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Execute_With_Deferred_Scripts()
     {
         // Validate that ScriptEngine executes deferred scripts
@@ -674,7 +674,7 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("<html", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Execute_DeferredOnly_Returns_Html()
     {
         // When there are only deferred scripts (no regular scripts),
@@ -698,7 +698,7 @@ document.write('<p id=""injected"">written</p>');
         Assert.Contains("deferred-ok", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Execute_Runs_Async_Scripts_From_ExtractAll_Before_Deferred_Scripts()
     {
         const string html = """
@@ -722,7 +722,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("regular,async", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Execute_Runs_Microtasks_Between_Sequential_Scripts()
     {
         var engine = new ScriptEngine();
@@ -753,7 +753,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("data-order-before-script-2=\"script-1,micro\"", output);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Execute_Runs_Microtasks_Between_Deferred_Scripts()
     {
         var engine = new ScriptEngine();
@@ -796,7 +796,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("Callback must be a function", error.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptExtractor_FetchExternalScript_FileUrl()
     {
         var tmpDir = Path.Combine(Path.GetTempPath(), "broiler-test-" + Guid.NewGuid().ToString("N"));
@@ -816,14 +816,14 @@ document.getElementById('out').appendChild(p);
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptExtractor_FetchExternalScript_NonExistent_Returns_Null()
     {
         var result = ScriptExtractionService.FetchExternalScript("file:///nonexistent/script.js", null);
         Assert.Null(result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PageContent_DeferredScripts_Default_Empty()
     {
         var content = new PageContent("html", new List<string>(), "url");
@@ -831,7 +831,7 @@ document.getElementById('out').appendChild(p);
         Assert.Empty(content.DeferredScripts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PageContent_DeferredScripts_Stored()
     {
         var deferred = new List<string> { "console.log('deferred');" };
@@ -844,7 +844,7 @@ document.getElementById('out').appendChild(p);
     //  DomBridge.HasPendingTimers and FlushTimerStep
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_HasPendingTimers_False_When_No_Timers()
     {
         using var context = new JSContext();
@@ -853,7 +853,7 @@ document.getElementById('out').appendChild(p);
         Assert.False(bridge.HasPendingTimers);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_HasPendingTimers_True_After_SetTimeout()
     {
         using var context = new JSContext();
@@ -863,7 +863,7 @@ document.getElementById('out').appendChild(p);
         Assert.True(bridge.HasPendingTimers);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_FlushTimerStep_Executes_One_Batch()
     {
         var html = "<html><body><div id='out'></div></body></html>";
@@ -899,7 +899,7 @@ document.getElementById('out').appendChild(p);
         Assert.False(bridge.HasPendingTimers);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_FlushTimerStep_Returns_False_When_Empty()
     {
         using var context = new JSContext();
@@ -908,7 +908,7 @@ document.getElementById('out').appendChild(p);
         Assert.False(bridge.FlushTimerStep());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Scales_ExplicitInherited_Zoom_Properties()
     {
         const string html = """
@@ -968,7 +968,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("id=\"columns\" class=\"zoomed-columns\" style=\"width: 600px; height: 400px; column-width: 80px; column-height: 300px; column-gap: 20px\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Generates_Scaled_Zoomed_Pseudo_Element_Rules()
     {
         const string html = """
@@ -1013,7 +1013,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("border-left-width: 4px !important", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Scales_Zoomed_ScrollPadding_And_ScrollMargin_Properties()
     {
         const string html = """
@@ -1066,7 +1066,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("id=\"margin-explicit\" class=\"zoomed-margin-explicit\" style=\"width: 400px; height: 20px; scroll-margin-top: 40px\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Scales_Zoomed_Svg_Geometry_And_FontRelative_Lengths()
     {
         const string html = """
@@ -1118,7 +1118,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("id=\"label\" x=\"320\" y=\"240\" style=\"font-size: 40px\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Updates_Iframe_SrcDoc_After_Subdocument_Mutation()
     {
         const string html = """
@@ -1146,7 +1146,7 @@ document.getElementById('out').appendChild(p);
         Assert.DoesNotContain(">old<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_AnchorSize_Resolves_To_Sized_Ancestor_Not_Viewport_For_NoWidth_Anchor()
     {
         // Regression (css-anchor-position transform-005): an anchor with no explicit
@@ -1179,7 +1179,7 @@ document.getElementById('out').appendChild(p);
         Assert.Equal("137px", anchoredWidth);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Backdrop_Honors_Author_Geometry_And_PositionTry_Fallback()
     {
         // Regression (css-anchor-position position-try-backdrop): a modal
@@ -1224,7 +1224,7 @@ document.getElementById('out').appendChild(p);
         Assert.DoesNotContain("768px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Popover_ShowPopover_Promotes_To_Top_Layer_With_Backdrop()
     {
         // HTML §popover: showPopover() puts the element in the top layer, so it
@@ -1256,7 +1256,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("data-broiler-backdrop=\"rgb(1, 200, 3)\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Popover_HidePopover_Removes_Top_Layer_Promotion()
     {
         const string html = """
@@ -1281,7 +1281,7 @@ document.getElementById('out').appendChild(p);
         Assert.DoesNotContain("z-index: 2000000", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Popover_HidePopover_With_Overlay_Transition_Stays_In_Top_Layer()
     {
         // CSS Position §overlay: hiding while `overlay` transitions out with
@@ -1312,7 +1312,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("data-broiler-top-layer=", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
     {
         const string html = """
@@ -1341,7 +1341,7 @@ document.getElementById('out').appendChild(p);
         Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Persists_VisualViewport_Zoom_And_PageOffset_For_Fixed_ScrollIntoView()
     {
         const string html = """
@@ -1396,7 +1396,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("style=\"position: relative; top: -1151.2px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Iframe_Srcdoc_Executes_Async_Scripts_Before_Deferred_Scripts()
     {
         const string html = """
@@ -1420,7 +1420,7 @@ document.getElementById('result').textContent = doc.body.getAttribute('data-orde
     //  InteractiveSession
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InteractiveSession_Step_Returns_Intermediate_Html()
     {
         var engine = new ScriptEngine();
@@ -1456,7 +1456,7 @@ document.getElementById('result').textContent = doc.body.getAttribute('data-orde
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InteractiveSession_Returns_Null_When_No_Scripts()
     {
         var engine = new ScriptEngine();
@@ -1465,7 +1465,7 @@ document.getElementById('result').textContent = doc.body.getAttribute('data-orde
         Assert.Null(session);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InteractiveSession_Complete_Flushes_All_Timers()
     {
         var engine = new ScriptEngine();
@@ -1492,7 +1492,7 @@ document.getElementById('result').textContent = doc.body.getAttribute('data-orde
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InteractiveSession_Step_Runs_Microtasks_Between_Timer_Tasks()
     {
         var engine = new ScriptEngine();
@@ -1522,7 +1522,7 @@ document.getElementById('result').textContent = doc.body.getAttribute('data-orde
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InteractiveSession_CurrentHtml_Does_Not_Execute_Timers()
     {
         var engine = new ScriptEngine();
@@ -1549,7 +1549,7 @@ document.getElementById('result').textContent = doc.body.getAttribute('data-orde
         session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InteractiveSession_RAF_Callbacks_Stepped()
     {
         var engine = new ScriptEngine();

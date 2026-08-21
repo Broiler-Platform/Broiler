@@ -56,7 +56,7 @@ public sealed class NoscriptRenderingTests
     // own replaced box once the fallback is gone. A <noscript> paints nothing, so an empty
     // <noscript></noscript> left behind would be wrong (and would still take part in selector
     // matching on the render side).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheElementIsRemovedWholeRatherThanEmptied()
     {
         var result = HtmlPostProcessor.ProcessForBrowsing("<noscript><img src=\"a.png\"></noscript>");
@@ -66,7 +66,7 @@ public sealed class NoscriptRenderingTests
     }
 
     // Several on a page, and attributes on the tag, both of which real pages have.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryNoscriptGoes_IncludingOnesCarryingAttributes()
     {
         const string html =
@@ -83,7 +83,7 @@ public sealed class NoscriptRenderingTests
 
     // The fallback goes even when the scripts it stands in for did nothing visible — the trigger is
     // that scripting is ON, not that any particular script succeeded.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheFallbackGoesRegardlessOfWhatTheScriptsDid()
     {
         var result = HtmlPostProcessor.ProcessForBrowsing(
@@ -101,7 +101,7 @@ public sealed class NoscriptRenderingTests
     // skip is its own, and this covers it. The DOM side of inertness (the fallback parsing as raw
     // text rather than elements, so nothing inside it is even reachable) belongs to the HTML
     // tokenizer in the Broiler.DOM submodule and is covered there, by NoscriptRawTextTests.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AScriptInsideTheFallbackDoesNotRun()
     {
         const string html = @"<!DOCTYPE html>

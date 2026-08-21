@@ -48,7 +48,7 @@ public sealed class SvgImageRasterTests
     /// The shape the old image renderer dropped. A <c>&lt;polygon&gt;</c> must produce display items;
     /// producing none is what made the eleven WPT tests render a blank canvas.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Polygon_Produces_Display_Items()
     {
         var list = SvgImageRaster.BuildDisplayList(
@@ -62,7 +62,7 @@ public sealed class SvgImageRasterTests
     /// This is the exact pair that isolated the bug: `rect` painted and `polygon` did not, through the
     /// same code path, at the same size and position.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Polygon_And_Rect_Both_Draw_The_Same_Square()
     {
         var asRect = SvgImageRaster.BuildDisplayList(
@@ -78,7 +78,7 @@ public sealed class SvgImageRasterTests
     /// <c>&lt;polyline&gt;</c> is the other shape the old renderer had no arm for. It is covered so the
     /// fix is not read as being about one element.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Polyline_Produces_Display_Items()
     {
         var list = SvgImageRaster.BuildDisplayList(
@@ -120,7 +120,7 @@ public sealed class SvgImageRasterTests
     /// document is the case that shows it, since there the zoom seeds the user-unit scale instead of
     /// being overridden by a view-box-derived one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Effective_Zoom_Is_Forwarded()
     {
         const string svg =
@@ -182,7 +182,7 @@ public sealed class SvgImageRasterTests
     }
 
     /// <summary>The root element's own attributes take both styles too — the viewBox drives every coordinate.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Quoted_ViewBox_Establishes_The_Transform()
     {
         var doubleQuoted = SvgImageRaster.BuildDisplayList(
@@ -210,7 +210,7 @@ public sealed class SvgImageRasterTests
     /// sized in percentages. Before percentages resolved, both extents parsed as <c>0</c> and the
     /// document drew nothing at all.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_Extents_Resolve_Against_The_Bounds_When_There_Is_No_ViewBox()
     {
         var rect = SingleRect(
@@ -225,7 +225,7 @@ public sealed class SvgImageRasterTests
     /// A percentage offset resolves on the same basis as an extent, so the second band of the
     /// two-band SVG those tests use starts halfway down rather than at the origin.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_Offsets_Resolve_On_The_Same_Basis()
     {
         var items = SvgImageRaster.BuildDisplayList(
@@ -244,7 +244,7 @@ public sealed class SvgImageRasterTests
     /// the viewBox extent — in user units — and is then scaled to the box like any other coordinate.
     /// Here 50% of a 200-unit viewBox is 100 units, drawn into a 100px box at scale 0.5, so 50px.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_Resolves_Against_The_ViewBox_When_There_Is_One()
     {
         var rect = SingleRect(
@@ -261,7 +261,7 @@ public sealed class SvgImageRasterTests
     /// On a square viewport the two coincide, so the test uses a non-square one where they cannot:
     /// √(300² + 100²)/√2 ≈ 223.6, so 10% is ≈ 22.36 rather than 30.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Radius_Percentage_Uses_The_Normalised_Diagonal()
     {
         var circle = SvgImageRaster.BuildDisplayList(
@@ -289,7 +289,7 @@ public sealed class SvgImageRasterTests
     }
 
     /// <summary>A malformed percentage falls back to the attribute's default rather than throwing.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Malformed_Percentage_Falls_Back_To_The_Default()
     {
         var rect = SingleRect(
@@ -339,7 +339,7 @@ public sealed class SvgImageRasterTests
     }
 
     /// <summary><c>stroke-opacity</c> is the same rule on the other paint, and does not touch the fill.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stroke_Opacity_Applies_To_The_Stroke_Only()
     {
         var rect = Rect(
@@ -353,7 +353,7 @@ public sealed class SvgImageRasterTests
     /// A <c>style</c> declaration outranks the presentation attribute of the same name (SVG 1.1 §6.4).
     /// The reference this work came from writes both its opacity and its blend mode in <c>style</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Style_Declaration_Outranks_The_Presentation_Attribute()
     {
         var rect = Rect(
@@ -367,7 +367,7 @@ public sealed class SvgImageRasterTests
     /// value that is present and unparseable. Writing it the other way round painted every fill-less
     /// shape solid black and cost 104 reftests, almost all of `css-images/object-fit-*-svg-*`.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Absent_Paint_Is_No_Paint_Rather_Than_The_Default()
     {
         var noFill = Rect("<rect width='50' height='50' />");
@@ -380,7 +380,7 @@ public sealed class SvgImageRasterTests
     }
 
     /// <summary>The paint itself may come from <c>style</c> too, not only its opacity.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Fill_May_Come_From_The_Style_Declaration()
     {
         var viaStyle = Rect("<rect style='fill: blue' width='50' height='50' />");
@@ -394,7 +394,7 @@ public sealed class SvgImageRasterTests
     /// <c>mix-blend-mode</c> path emits, so the raster backend composites it with machinery it already
     /// has.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Mix_Blend_Mode_Wraps_The_Shape_In_A_Blend_Layer()
     {
         var items = SvgImageRaster.BuildDisplayList(
@@ -430,7 +430,7 @@ public sealed class SvgImageRasterTests
     // ─────────────────────────── the replay contract ───────────────────────────
 
     /// <summary>A document that draws something is replayed onto the caller's surface, once.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Render_Replays_The_List_Onto_The_Callers_Surface()
     {
         var backend = new RecordingBackend();
@@ -467,7 +467,7 @@ public sealed class SvgImageRasterTests
     }
 
     /// <summary>Null source is "draws nothing", not a throw — an unreadable image must not take the page down.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Null_Source_Draws_Nothing()
     {
         var backend = new RecordingBackend();
@@ -477,7 +477,7 @@ public sealed class SvgImageRasterTests
     }
 
     /// <summary>The two arguments the caller cannot sensibly omit are rejected rather than swallowed.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backend_And_Surface_Are_Required()
     {
         string svg = Doc("<rect fill='blue' x='0' y='0' width='10' height='10' />");

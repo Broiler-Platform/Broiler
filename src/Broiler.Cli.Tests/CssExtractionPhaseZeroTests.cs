@@ -9,7 +9,7 @@ namespace Broiler.Cli.Tests;
 
 public sealed class CssExtractionPhaseZeroTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase7_Legacy_Css_Project_Parser_And_Core_Models_Are_Removed()
     {
         var root = FindRepositoryRoot();
@@ -33,7 +33,7 @@ public sealed class CssExtractionPhaseZeroTests
 
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Specialized_Solutions_Do_Not_Reference_The_Legacy_Css_Project()
     {
         var solutionPaths = Directory.GetFiles(
@@ -48,7 +48,7 @@ public sealed class CssExtractionPhaseZeroTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase7_CssData_Is_Only_An_Obsolete_StyleSet_Wrapper()
     {
 #pragma warning disable CS0618
@@ -69,7 +69,7 @@ public sealed class CssExtractionPhaseZeroTests
             members);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlStyleSet_Preserves_UserAgent_And_Author_Origins()
     {
         var styleSet = HtmlStyleSet.Parse(".card { color: red; }", includeDefaults: true);
@@ -79,7 +79,7 @@ public sealed class CssExtractionPhaseZeroTests
         Assert.True(styleSet.StyleSheet.Rules.Count > styleSet.AuthorStyleSheet.Rules.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Public_Facades_Expose_StyleSet_And_Shared_Model_Parsing()
     {
         const string css = ".card { color: red; margin: 1px 2px; }";
@@ -107,7 +107,7 @@ public sealed class CssExtractionPhaseZeroTests
             typeof(HtmlStylesheetLoadEventArgs).GetProperty("SetStyleSheetModel")?.PropertyType);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase7_Layout_Friend_Surface_Contains_Only_Direct_BoxTree_Consumers()
     {
         var root = FindRepositoryRoot();
@@ -131,7 +131,7 @@ public sealed class CssExtractionPhaseZeroTests
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.Cli\"", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase7_Bridge_Has_No_Legacy_Cascade_Store_Or_Parser()
     {
         const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -143,7 +143,7 @@ public sealed class CssExtractionPhaseZeroTests
         Assert.Null(typeof(DomBridge).GetMethod("ParseAndApplyCssRules", PrivateInstance));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shared_Parser_Covers_Renderer_Declarations_AtRules_And_Lengths()
     {
         const string css = """
@@ -162,7 +162,7 @@ public sealed class CssExtractionPhaseZeroTests
         Assert.Equal(new CssColor(0, 255, 0), color);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Phase7_Renderer_Source_Has_No_Manual_Parser_Or_Selector_Cascade()
     {
         var root = FindRepositoryRoot();

@@ -26,7 +26,7 @@ public class VerticalAlignMaxBottomTests
     /// height is projected downward from the content edge to determine
     /// the block container's auto height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VerticalAlign_Raised_InlineBlock_Line_Box_Height_Projected_Downward()
     {
         // The .container div has an inline-block child raised by
@@ -96,7 +96,7 @@ body { margin: 0; background: white; }
     /// the raise amount.  A subsequent sibling with negative margin-top
     /// should be positioned correctly based on the full container height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Score_Position_With_Negative_Margin()
     {
         var html = @"<!DOCTYPE html>

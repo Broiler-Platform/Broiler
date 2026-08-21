@@ -2,7 +2,7 @@ namespace Broiler.UI.RichEdit.Tests;
 
 public sealed class RichTextDocumentTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Document_Has_One_Empty_Paragraph()
     {
         RichTextDocument document = RichTextDocument.Empty;
@@ -13,7 +13,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(0, 0), document.End);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertText_In_Middle_Keeps_Runs_Covering_Text()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("Hello");
@@ -25,7 +25,7 @@ public sealed class RichTextDocumentTests
         Doc.AssertNormalized(result.Document);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertText_With_Newlines_Splits_Into_Paragraphs()
     {
         RichTextDocument document = RichTextDocument.Empty;
@@ -37,7 +37,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(2, 5), result.Caret);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertText_Normalizes_Carriage_Returns()
     {
         RichTextDocument document = RichTextDocument.Empty;
@@ -48,7 +48,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal("a\nb\nc", result.Document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DeleteRange_Within_Paragraph_Removes_Text()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("Hello");
@@ -60,7 +60,7 @@ public sealed class RichTextDocumentTests
         Doc.AssertNormalized(result.Document);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DeleteRange_Across_Paragraphs_Merges_Boundary()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("abc\ndef\nghi");
@@ -72,7 +72,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(0, 1), result.Caret);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SplitParagraph_Creates_Two_Paragraphs()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("abcd");
@@ -85,7 +85,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(1, 0), result.Caret);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MergeParagraphs_Joins_Adjacent_Paragraphs()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("ab\ncd");
@@ -97,7 +97,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(0, 2), result.Caret);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MergeParagraphs_Out_Of_Range_Is_NoOp()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("ab\ncd");
@@ -108,7 +108,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal("ab\ncd", result.Document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PlainText_Round_Trips_Through_FromPlainText()
     {
         const string text = "first\nsecond\n\nfourth";
@@ -119,7 +119,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(text, document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClampPosition_Constrains_To_Document()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("ab\ncd");
@@ -130,7 +130,7 @@ public sealed class RichTextDocumentTests
         Assert.True(document.IsValid(Doc.Pos(0, 2)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Position_Comparison_Orders_By_Paragraph_Then_Offset()
     {
         Assert.True(Doc.Pos(0, 5) < Doc.Pos(1, 0));
@@ -139,7 +139,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(1, 1), Doc.Pos(1, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Movement_Crosses_Paragraph_Boundaries()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("ab\ncd");
@@ -150,7 +150,7 @@ public sealed class RichTextDocumentTests
         Assert.Equal(Doc.Pos(1, 2), document.PositionRightOf(Doc.Pos(1, 2)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Movement_Steps_Over_Surrogate_Pairs()
     {
         // "a" + U+1F600 (surrogate pair) + "b": string length is 4.

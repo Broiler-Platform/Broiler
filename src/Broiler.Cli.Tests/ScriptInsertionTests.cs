@@ -41,7 +41,7 @@ public sealed class ScriptInsertionTests
     /// <summary>A <c>data:</c> URI script source — a real external script with no network or disk.</summary>
     private static string DataUri(string source) => "data:text/javascript," + source;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptCreatedWithASrcIsFetchedAndExecuted()
     {
         var html = Run(
@@ -60,7 +60,7 @@ public sealed class ScriptInsertionTests
     /// halves have to work for it to terminate — the <c>src</c> assignment must reach the DOM, and the
     /// inserted element must be fetched and run.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PollWaitingOnAnInjectedScriptTerminatesInsteadOfExhaustingTheDrainBudget()
     {
         var warnings = new List<string>();
@@ -96,7 +96,7 @@ public sealed class ScriptInsertionTests
     /// An inline script-created script runs synchronously during the insertion, per spec — the line
     /// after the <c>appendChild</c> can already see what it defined. Deferring it would break that.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptCreatedWithInlineTextRunsDuringTheInsertion()
     {
         var html = Run(
@@ -109,7 +109,7 @@ public sealed class ScriptInsertionTests
     }
 
     /// <summary>The other order: append the element first, give it a <c>src</c> afterwards.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ASrcAssignedAfterInsertionStillStartsTheScript()
     {
         var html = Run(
@@ -126,7 +126,7 @@ public sealed class ScriptInsertionTests
     /// is the reason an external script's fetch is deferred to the event loop rather than run inside
     /// the insertion: fetching there would fire <c>load</c> at a handler that does not exist yet.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheLoadEventReachesAHandlerAssignedAfterTheAppend()
     {
         var html = Run(
@@ -143,7 +143,7 @@ public sealed class ScriptInsertionTests
     /// executes. It must stay that way now that insertion is watched — otherwise every framework that
     /// assigns markup containing a <c>&lt;script&gt;</c> would start executing it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AScriptFromInnerHtmlDoesNotRun()
     {
         var html = Run(
@@ -160,7 +160,7 @@ public sealed class ScriptInsertionTests
     /// same elements in the parsed tree and must not run them a second time — a doubled side effect
     /// is worse than the missing one this change fixes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AParserInsertedScriptIsNotRunASecondTime()
     {
         var html = Run(
@@ -194,7 +194,7 @@ public sealed class ScriptInsertionTests
     /// that names the script's URL set a plain JS property: the element serialized as a bare
     /// <c>&lt;script&gt;</c> and there was nothing to fetch.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptIdlAttributesReflectToContentAttributes()
     {
         var html = Run(
@@ -214,7 +214,7 @@ public sealed class ScriptInsertionTests
     /// <c>script.src</c> reads back as an absolute URL, as the IDL getter specifies, even though the
     /// content attribute stays exactly as written.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheSrcGetterResolvesAgainstThePageUrl()
     {
         var html = Run(
@@ -229,7 +229,7 @@ public sealed class ScriptInsertionTests
     /// A script that fails to load has to say so: a loader waiting on <c>onload</c>/<c>onerror</c>
     /// hangs forever on silence, which is the same failure mode from the other direction.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AScriptThatCannotBeLoadedFiresError()
     {
         var html = Run(

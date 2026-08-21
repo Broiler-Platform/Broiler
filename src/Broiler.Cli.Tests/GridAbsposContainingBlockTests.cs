@@ -24,7 +24,7 @@ public sealed class GridAbsposContainingBlockTests
         "display:grid;grid-template-columns:100px 200px;grid-template-rows:50px 150px;" +
         "padding:15px;position:relative;";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Grid_With_Only_Abspos_Children_Still_Resolves_Their_Grid_Areas()
     {
         // The whole test file is this shape: every grid holds abspos children and nothing
@@ -36,7 +36,7 @@ public sealed class GridAbsposContainingBlockTests
                 Item("grid-column:2/3;grid-row:2/3;width:100%;height:100%", x: 115, y: 65, w: 200, h: 150)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Auto_Grid_Line_Resolves_To_The_Padding_Edge()
     {
         // §9.2: `auto` is the container's padding edge, not a track line — so an auto/auto
@@ -48,7 +48,7 @@ public sealed class GridAbsposContainingBlockTests
                 Item("grid-column:2;grid-row:2;width:100%;height:100%", x: 115, y: 65, w: 415, h: 365)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Padding_Box_Uses_The_Containers_Definite_Height_Not_Its_Track_Sum()
     {
         // The tracks total 200px; the container is 400px tall. The block extent an `auto`
@@ -59,7 +59,7 @@ public sealed class GridAbsposContainingBlockTests
                 Item("width:100%;height:100%", x: 0, y: 0, w: 530, h: 430)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Percentage_Height_Container_Also_Sizes_The_Padding_Box()
     {
         // Same again where the height arrives as a percentage of a definite parent, which
@@ -70,7 +70,7 @@ public sealed class GridAbsposContainingBlockTests
                 Item("width:100%;height:100%", x: 0, y: 0, w: 530, h: 430)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Rtl_Item_Takes_The_Inline_Start_Edge_Of_Its_Area_As_Its_Static_Position()
     {
         // CSS2.1 §10.3.7: with both inline insets `auto` the used value is the static
@@ -83,7 +83,7 @@ public sealed class GridAbsposContainingBlockTests
                 Item("grid-column:2;grid-row:2;width:50px;height:20px", x: 365, y: 65, w: 50, h: 20)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Rtl_Item_With_A_Left_Inset_Is_Still_Placed_From_The_Left()
     {
         // The static-position rule applies only when both insets are `auto`; a specified
@@ -93,7 +93,7 @@ public sealed class GridAbsposContainingBlockTests
                 Item("grid-column:1/2;grid-row:1/2;left:5px;width:50px;height:20px", x: 420, y: 15, w: 50, h: 20)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_In_Flow_Item_Beside_An_Abspos_One_Is_Unaffected()
     {
         // The guard change must not alter a grid that already had in-flow items: the

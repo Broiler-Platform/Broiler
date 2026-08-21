@@ -40,7 +40,7 @@ public class HtmlBridgeArchitectureGuardTests
     }
 
     // The canonical kernel Broiler.Dom is dependency-free (no other Broiler assemblies).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Broiler_Dom_Kernel_Has_No_Broiler_Dependencies()
     {
         Assert.Empty(ReferencedBroilerAssemblies("Broiler.Dom"));
@@ -48,7 +48,7 @@ public class HtmlBridgeArchitectureGuardTests
 
     // Broiler.Dom.Html is the canonical HTML parser/serializer; it must depend only on
     // the canonical DOM kernel.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Broiler_Dom_Html_Depends_Only_On_Canonical_Dom()
     {
         Assert.Equal(["Broiler.Dom"], ReferencedBroilerAssemblies("Broiler.Dom.Html"));
@@ -57,7 +57,7 @@ public class HtmlBridgeArchitectureGuardTests
     // The bridge legitimately depends on the canonical DOM/CSS engines. This pins that
     // the canonical set is present so a future refactor cannot accidentally sever the
     // adapter from the shared engines and reintroduce a private DOM/CSS.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_Dom_Builds_On_The_Canonical_Dom_And_Css_Engines()
     {
         var references = ReferencedBroilerAssemblies("Broiler.HtmlBridge.Dom");
@@ -72,7 +72,7 @@ public class HtmlBridgeArchitectureGuardTests
     // now runs through the neutral ILayoutView contract, so no project in the bridge Dom's
     // transitive project graph may reach the image-rendering stack. Walk the csproj graph
     // (not just emitted assembly metadata, which never listed Image directly) to lock it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_Dom_Project_Graph_Does_Not_Reach_Html_Image()
     {
         var reachable = TransitiveProjectReferences("Broiler.HtmlBridge.Dom");
@@ -86,7 +86,7 @@ public class HtmlBridgeArchitectureGuardTests
 
     // The narrow layout read-model contract the bridge depends on lives in the canonical
     // Broiler.Layout, not in a bridge or renderer assembly.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Layout_Owns_The_LayoutView_Contract()
     {
         Assert.Equal("Broiler.Layout", typeof(Broiler.Layout.ILayoutView).Assembly.GetName().Name);
@@ -257,7 +257,7 @@ public class HtmlBridgeArchitectureGuardTests
         // split into the sibling partial AnimationResolver.Timing.cs, dropping it to 644 lines.
     };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_New_HtmlBridge_Production_File_Exceeds_The_Line_Limit()
     {
         var root = FindRepositoryRoot();

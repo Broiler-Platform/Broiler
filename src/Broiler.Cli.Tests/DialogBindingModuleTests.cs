@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DialogBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dialog_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(DialogBinding);
@@ -24,7 +24,7 @@ public sealed class DialogBindingModuleTests
         Assert.False(typeof(IDialogHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Dialog_Through_The_Host_Contract()
     {
         Assert.True(typeof(IDialogHost).IsAssignableFrom(typeof(DomBridge)));
@@ -33,7 +33,7 @@ public sealed class DialogBindingModuleTests
             static field => field.FieldType == typeof(DialogBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShowModal_Then_Close_Toggles_Open_And_Sets_ReturnValue_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -57,7 +57,7 @@ document.body.appendChild(out);
         Assert.Contains("show=true/true|close=false/false|rv=ok", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dialog_Open_Setter_Reflects_The_Attribute_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -81,7 +81,7 @@ document.body.appendChild(out);
         Assert.Contains("a=true|b=false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Details_Open_Property_Toggles_The_Attribute_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

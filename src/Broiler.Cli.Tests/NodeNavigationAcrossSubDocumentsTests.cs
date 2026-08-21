@@ -30,7 +30,7 @@ public sealed class NodeNavigationAcrossSubDocumentsTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Child_And_Sibling_Navigation_Round_Trips()
     {
         using var bridge = Attach(
@@ -54,7 +54,7 @@ public sealed class NodeNavigationAcrossSubDocumentsTests
         Assert.Equal("3|a|c|c|a", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Child_And_Sibling_Navigation_Round_Trips()
     {
         using var bridge = Attach(
@@ -79,7 +79,7 @@ public sealed class NodeNavigationAcrossSubDocumentsTests
         Assert.Equal("3|3|a|c|c|a", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetRootNode_Of_A_Connected_Element_Is_The_Document()
     {
         using var bridge = Attach(
@@ -90,7 +90,7 @@ public sealed class NodeNavigationAcrossSubDocumentsTests
         Assert.Equal("true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Host_Main_Document_Navigation_And_Serialization_Ignore_The_SubDocument()
     {
         using var bridge = Attach(
@@ -119,7 +119,7 @@ public sealed class NodeNavigationAcrossSubDocumentsTests
         Assert.DoesNotContain("subdoc", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_Collection_Applies_Across_An_Iframe_Host_Without_Leaking_The_SubDocument()
     {
         using var bridge = Attach(

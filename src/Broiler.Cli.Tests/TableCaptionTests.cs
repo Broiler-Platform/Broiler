@@ -53,7 +53,7 @@ public sealed class TableCaptionTests
             .ToDictionary(g => g.Key, g => g.ToDictionary(a => a.Property, a => a.Actual));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TopCaption_IsLaidOutAndPushesRowsDown()
     {
         var baseline = Layout(withCaption: false, captionStyle: "");
@@ -71,7 +71,7 @@ public sealed class TableCaptionTests
             $"top caption should push the cell down by ~{cap.h} (was {cellNoCap}, now {cellTopCap})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BottomCaption_IsLaidOutBelowRowsWithoutMovingThem()
     {
         var baseline = Layout(withCaption: false, captionStyle: "");

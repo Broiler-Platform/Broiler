@@ -21,7 +21,7 @@ public class RenderingPipelineTests
 {
     // ────────────────────── 10.1 text-shadow (computed style) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextShadow_Parsed_In_ComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -45,7 +45,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextShadow_Set_Via_Style()
     {
         var html = @"<!DOCTYPE html>
@@ -64,7 +64,7 @@ document.getElementById('result').textContent = d.style.getPropertyValue('text-s
 
     // ────────────────────── 10.2 @font-face (computed style) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontFace_ComputedStyle_Returns_FontFamily()
     {
         var html = @"<!DOCTYPE html>
@@ -88,7 +88,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('font-family
 
     // ────────────────────── 10.3 visibility:hidden (computed style) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Visibility_Hidden_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -111,7 +111,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('visibility'
 
     // ────────────────────── 10.4 display:inline-block (computed style) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlock_ComputedStyle_Display()
     {
         var html = @"<!DOCTYPE html>
@@ -134,7 +134,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('display');
 
     // ────────────────────── 10.5 position:fixed (computed style) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Position_Fixed_ComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -157,7 +157,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('position');
 
     // ────────────────────── 10.6 border-style (computed style) ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Border_Style_ComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -180,7 +180,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('border-styl
 
     // ────────────────────── 10.9 ::after pseudo-element ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoElement_After_Selector_Matched()
     {
         var html = @"<!DOCTYPE html>
@@ -202,7 +202,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('color');
         Assert.Contains("red", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PseudoElement_After_Content_Via_Style()
     {
         var html = @"<!DOCTYPE html>

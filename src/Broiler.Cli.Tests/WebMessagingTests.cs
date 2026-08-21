@@ -6,7 +6,7 @@ namespace Broiler.Cli.Tests;
 
 public class WebMessagingTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_From_Parent_To_Iframe_Uses_StructuredClone()
     {
         const string html = """
@@ -47,7 +47,7 @@ public class WebMessagingTests
         Assert.Equal("1|1", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_From_Iframe_To_Parent_Exposes_Source_And_Origin()
     {
         const string html = """
@@ -78,7 +78,7 @@ public class WebMessagingTests
         Assert.Equal("7|true|about:srcdoc|https://example.com", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Options_Object_Transfers_MessagePort()
     {
         const string html = """
@@ -136,7 +136,7 @@ public class WebMessagingTests
         Assert.Equal("hello|https://example.com|1||reply|true||0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Options_Object_Transfers_ArrayBuffer()
     {
         const string html = """
@@ -191,7 +191,7 @@ public class WebMessagingTests
         Assert.Equal("true||true|false|4|7|11", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Options_Object_TargetOrigin_Matches_NonDefault_Port()
     {
         const string html = """
@@ -228,7 +228,7 @@ public class WebMessagingTests
         Assert.Equal("port-check|https://example.com:8443", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Throws_DataCloneError_For_Invalid_Transferred_Value()
     {
         const string html = """
@@ -264,7 +264,7 @@ public class WebMessagingTests
         Assert.Equal("true|DataCloneError|25", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Throws_DataCloneError_For_Duplicate_Transferred_Port()
     {
         const string html = """
@@ -301,7 +301,7 @@ public class WebMessagingTests
         Assert.Equal("true|DataCloneError|25", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_PostMessage_Throws_DataCloneError_For_Uncloneable_Payload()
     {
         const string html = """
@@ -334,7 +334,7 @@ public class WebMessagingTests
         Assert.Equal("true|DataCloneError|25", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessageChannel_PostMessage_Delivers_Cloned_Data()
     {
         const string html = """
@@ -377,7 +377,7 @@ public class WebMessagingTests
         Assert.Equal("3|3|true|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessageChannel_AddEventListener_Queues_Until_Start()
     {
         const string html = """
@@ -416,7 +416,7 @@ public class WebMessagingTests
         Assert.Equal("queued|true|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessageChannel_OnMessage_Assignment_AutoStarts_Queued_Port()
     {
         const string html = """
@@ -454,7 +454,7 @@ public class WebMessagingTests
         Assert.Equal("auto-start|true|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessagePort_PostMessage_Options_Object_Transfers_MessagePort()
     {
         const string html = """
@@ -507,7 +507,7 @@ public class WebMessagingTests
         Assert.Equal("hello|true|1||reply|true|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessagePort_PostMessage_Options_Object_Transfers_ArrayBuffer_Alongside_MessagePort()
     {
         const string html = """
@@ -560,7 +560,7 @@ public class WebMessagingTests
         Assert.Equal("true||true|false|4|5|9|1", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessagePort_PostMessage_Throws_DataCloneError_For_Invalid_Transferred_Value()
     {
         const string html = """
@@ -593,7 +593,7 @@ public class WebMessagingTests
         Assert.Equal("true|DataCloneError|25", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MessagePort_PostMessage_Throws_DataCloneError_For_Duplicate_Transferred_Port()
     {
         const string html = """

@@ -51,7 +51,7 @@ public sealed class UrlPolyfillTests
     //  The reported call: a Location where a USVString is declared
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NewUrl_AcceptsLocation_AndExposesItsQuery()
     {
         var result = ExecJs("""
@@ -65,7 +65,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("PARAMS:uselang=de,banner=x", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NewUrl_StringifiesLocation_IntoItsComponents()
     {
         var result = ExecJs("""
@@ -81,7 +81,7 @@ public sealed class UrlPolyfillTests
             result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NewUrl_AcceptsALocationAsTheBase()
     {
         // CentralNotice's dispatcher URL: `new URL( dispatcherUrl, location )`.
@@ -92,7 +92,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("HREF:https://www.mediawiki.org/w/index.php?title=Special:BannerLoader", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NewUrl_AcceptsAnotherUrlAsEitherArgument()
     {
         var result = ExecJs("""
@@ -107,7 +107,7 @@ public sealed class UrlPolyfillTests
     //  Relative resolution
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SchemeRelativeReference_KeepsOnlyTheSchemeOfTheBase()
     {
         // The old parser prefixed the base's origin and produced
@@ -143,7 +143,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("HREF:" + expected, result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AReferenceWithNoBase_ThrowsTypeErrorAsTheConstructorDoes()
     {
         var result = ExecJs("show( 'HREF:' + new URL( '/w/index.php' ).href );");
@@ -155,7 +155,7 @@ public sealed class UrlPolyfillTests
     //  Opaque paths and non-special schemes
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnOpaquePath_KeepsItsBodyAndReportsANullOrigin()
     {
         var result = ExecJs("""
@@ -170,7 +170,7 @@ public sealed class UrlPolyfillTests
             result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFileUrl_HasNoAuthorityUnlessTwoSlashesGiveItOne()
     {
         var result = ExecJs("""
@@ -186,7 +186,7 @@ public sealed class UrlPolyfillTests
     //  Normalization
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ParsingNormalizesCase_DefaultPorts_DotSegmentsAndSpaces()
     {
         var result = ExecJs("""
@@ -206,7 +206,7 @@ public sealed class UrlPolyfillTests
     //  A URL is mutable, and its searchParams is the same object each read
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WritingThroughSearchParams_RewritesTheUrl()
     {
         var result = ExecJs("""
@@ -222,7 +222,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("WITH:https://a.example/p?a=1&b=2+3|EMPTY:https://a.example/p|SAME:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SettingAComponent_IsVisibleInHref()
     {
         var result = ExecJs("""
@@ -241,7 +241,7 @@ public sealed class UrlPolyfillTests
     //  URLSearchParams
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SearchParams_DecodesFormEncodingAndReEncodesIt()
     {
         var result = ExecJs("""
@@ -256,7 +256,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("Q:a b c|ALL:a b c;2|SIZE:3|ROUND:a=b+c&d=e%26f", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SearchParams_TakesTheInitializersTheStandardLists()
     {
         var result = ExecJs("""
@@ -270,7 +270,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("PAIRS:a=1&b=2|OBJECT:a=1&b=2|COPY:a=1&b=2|EMPTY:", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SearchParams_SortsStablyAndIterates()
     {
         var result = ExecJs("""
@@ -285,7 +285,7 @@ public sealed class UrlPolyfillTests
         Assert.Contains("SORTED:a=1&a=0&b=2&c=3|KEYS:a,a,b,c|ITER:a:1,a:0,b:2,c:3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SearchParams_KeepsAMalformedEscapeVerbatim()
     {
         // decodeURIComponent rejects a stray '%'; a page's query string still has to survive it.
@@ -301,7 +301,7 @@ public sealed class UrlPolyfillTests
     //  The non-throwing spellings a page feature-detects
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UrlParse_And_UrlCanParse_AnswerWithoutThrowing()
     {
         var result = ExecJs("""

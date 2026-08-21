@@ -10,7 +10,7 @@ namespace Broiler.Writer.FormatCodes.Tests;
 
 public sealed class WriterFormatCodesControllerTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Text_Edit_From_Pane_Is_Atomic_And_Undoable_From_Either_Pane()
     {
         var editor = new StandardRichEdit();
@@ -28,7 +28,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal("hio", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Deleting_A_Code_Removes_Formatting_Without_Deleting_Text()
     {
         StandardRichEdit editor = BoldEditor("hello");
@@ -43,7 +43,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal("[Bold ON]hello[Bold OFF]", view.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReadOnly_And_Unsafe_Link_Intents_Are_Rejected()
     {
         var editor = new StandardRichEdit();
@@ -61,7 +61,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal("hello", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Insert_Code_Palette_Applies_Validated_Formatting()
     {
         var editor = new StandardRichEdit();
@@ -75,7 +75,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.False(controller.ExecutePaletteEntry(FormatCodePaletteEntry.Link, "file:///secret"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Scalar_Code_Property_Can_Be_Edited_Without_Parsing_Its_Label()
     {
         var editor = new StandardRichEdit
@@ -97,7 +97,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Contains("https://new.example.test", view.Text, StringComparison.Ordinal);
         Assert.DoesNotContain("https://old.example.test", view.Text, StringComparison.Ordinal);
     }
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Initial_Projection_Uses_Canonical_Bracket_Text()
     {
         StandardRichEdit editor = BoldEditor("Hello World!");
@@ -109,7 +109,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.NotNull(controller.Projection);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_And_Caret_Edits_Update_The_View()
     {
         var editor = new StandardRichEdit();
@@ -124,7 +124,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal("Hello!", view.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Selection_Formatting_Is_Shown_As_Pending_Overlay()
     {
         var editor = new StandardRichEdit();
@@ -141,7 +141,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal("Hello", view.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moving_Caret_Clears_Stale_Pending_Overlay()
     {
         var editor = new StandardRichEdit();
@@ -157,7 +157,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Empty(controller.Projection!.PendingTokens);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Editor_Selection_Follows_Into_View_And_Preserves_Direction()
     {
         var editor = new StandardRichEdit();
@@ -173,7 +173,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal(0, view.SelectionFocus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void View_Selection_Maps_Back_Without_Reentrant_Event_Loop()
     {
         var editor = new StandardRichEdit();
@@ -193,7 +193,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal(1, viewEvents);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Code_Navigation_Highlights_Affected_Source_Without_Moving_Focus()
     {
         StandardRichEdit editor = BoldEditor("x");
@@ -212,7 +212,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.NotNull(editor.SecondarySelection);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Synchronization_Does_Not_Replace_Document_Or_Consume_Undo_History()
     {
         var editor = new StandardRichEdit();
@@ -232,7 +232,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Equal("Hello", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Replacement_Reuses_Controller_And_View()
     {
         var editor = new StandardRichEdit();
@@ -247,7 +247,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Same(controller.Projection, view.Projection);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Unsubscribes_And_Leaves_Last_Projection_Intact()
     {
         var editor = new StandardRichEdit();
@@ -262,7 +262,7 @@ public sealed class WriterFormatCodesControllerTests
         Assert.Throws<ObjectDisposedException>(() => controller.Refresh());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Superseded_Background_Result_Cannot_Overwrite_Newer_Document()
     {
         var editor = new StandardRichEdit();

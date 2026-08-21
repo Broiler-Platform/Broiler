@@ -1,10 +1,13 @@
 # Submodule patches waiting to be applied
 
-**Six patches are waiting on a maintainer.** See the index below.
+**Ten patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
-are git submodules with their own remotes. A session whose GitHub scope is this
-repository alone cannot push to them — the git proxy answers **403** — so a fix
+are git submodules with their own remotes — and `Broiler.JS` has submodules of its
+own (`Broiler.DateTime`, `Broiler.Regex`, `Broiler.Unicode`), so a patch can target
+a repository *nested* one level further down; `0010` is one. A session whose GitHub
+scope is this repository alone cannot push to any of them — the git proxy answers
+**403** — so a fix
 that belongs in a submodule is committed there, exported with
 `git format-patch`, and left here for a maintainer to apply. The submodule
 working tree is then reverted to its pinned commit and **the gitlink is not
@@ -56,6 +59,10 @@ again with the one below.
 | `0004` | `Broiler.CSS` | Give `<legend>` the user-agent `display: block` it has in HTML |
 | `0005` | `Broiler.HTML` | The same, in the default style sheet |
 | `0006` | `Broiler.HTML` | Paint an element its transform mirrors |
+| `0007` | `Broiler.CSS` | Add a Timeout to every xUnit `[Fact]` in the test projects |
+| `0008` | `Broiler.DOM` | The same, in `Broiler.DOM` |
+| `0009` | `Broiler.JS` | The same, in `Broiler.JS` |
+| `0010` | `Broiler.Regex` (nested under `Broiler.JS`) | The same, in `Broiler.Regex` |
 
 ### `0001` — `border: 72pt solid red` painted a thin black line
 
@@ -245,3 +252,82 @@ element renders *at all*, which no count of a suite this narrow shows.
 The main-repo half is `src/Broiler.Cli.Tests/MirroredTransformPaintTests.cs`,
 which feature-probes the pinned pointer and self-skips there. `scripts/apply-pending-wpt-patches.sh`
 lists this patch, so a WPT run exercises it.
+
+### `0007`–`0010` — every xUnit `[Fact]` gets an explicit `Timeout`
+
+The submodule half of the parent commit *"Add a Timeout to every xUnit `[Fact]`
+in the main-repo test projects"*. A fact with no `Timeout` cannot fail on time:
+a test that wedges stalls the whole run instead of failing, which is how
+`Broiler.Cli.Tests.SubDocumentEngineModuleTests.Iframe_Module_Runs_Through_Engine_Path_When_Parent_Is_ModuleContext`
+in the parent repository can hold a run open indefinitely.
+
+Four repositories, 4653 facts, one commit each:
+
+| patch | repository | apply in | facts | files |
+| --- | --- | --- | ---: | ---: |
+| `0007` | `Broiler.CSS` | `Broiler.CSS` | 191 | 23 |
+| `0008` | `Broiler.DOM` | `Broiler.DOM` | 107 | 11 |
+| `0009` | `Broiler.JS` | `Broiler.JS` | 4320 | 341 |
+| `0010` | `Broiler.Regex` | `Broiler.JS/Broiler.Regex` | 35 | 5 |
+
+`Broiler.DOM` is checked out twice — at `Broiler.DOM` and again at
+`Broiler.CSS/Broiler.DOM`, the same repository at the same commit — so `0008` is
+applied **once**, to the repository, and both gitlinks then move together.
+`Broiler.HTML` and `Broiler.Graphics` have no facts at all and get no patch.
+
+**Value: 600000 ms (10 minutes), matching the parent.** It looks enormous for
+suites whose slowest project runs about a minute, and it has to be. xUnit v2
+starts a test's timeout clock when the test is **queued**, not when it starts
+executing, so a budget below a project's total wall-clock can be spent by a test
+that is merely waiting for a slot. That is not hypothetical: at a first-pass
+120000 ms, two async capture tests in the parent's `Broiler.Cli.Tests` failed
+with *"Test execution timed out after 120000 milliseconds"* in a full-suite run
+while completing in 493 ms in isolation. The budget must clear the whole
+project, not the individual test.
+
+#### The xunit-version rule these patches follow
+
+The three `[Fact]` behaviours differ by runner version, which is why the patches
+do **not** simply cover every fact:
+
+| xunit | `Timeout` on a *synchronous* fact |
+| --- | --- |
+| `2.5.3` | silently ignored — inert, but harmless |
+| `2.9.x` | **run-time failure**: *"Tests marked with Timeout are only supported for async tests"* |
+| `xunit.v3` | honoured — the test is actually aborted |
+
+So facts in a test project referencing **xunit 2.9 or newer** are left untouched
+unless they are async. Applying the attribute blindly there is not a nit: it
+turned `Broiler.DateTime.Tests` from 0 failures into 63 and the two
+`Broiler.Unicode` test projects into 32 more, every one of them a synchronous
+fact. All 95 facts in those projects are synchronous, so **`Broiler.DateTime`
+and `Broiler.Unicode` get no patch at all** — there is nothing in them the
+attribute can legally go on.
+
+Only `Broiler.DOM`'s `Broiler.Dom.Html.Tests` is on `xunit.v3`, so it is the one
+project here where the attribute is enforced today; everything else is `2.5.3`,
+where it is inert for synchronous facts and live for async ones. That makes most
+of this change a declaration of intent that becomes load-bearing on a v3 upgrade
+— which is also the upgrade that would catch the wedged parent-repo test above.
+
+Facts that already carried a deliberate `Timeout` (33 at `60000` and one at
+`120000`, all in `Broiler.JS`) are left exactly as they were.
+
+**Line endings.** Several files in `Broiler.CSS`, `Broiler.DOM` and `Broiler.JS`
+are CRLF, and a few are mixed CRLF/LF within one file (37 CRLF and 10 mixed among
+the files touched). The rewrite is a per-line byte substitution rather than a
+whole-file rewrite, so each commit reports exactly as many insertions as
+deletions — 191/191, 107/107, 4320/4320, 35/35 — and no file is renormalised.
+
+**Verified** before the working trees were reverted: all 21 runnable test
+projects across the four repositories produce a failure set **identical** to the
+pre-patch baseline, with no `timed out` and no `only supported for async` result
+anywhere. `Broiler.DOM`'s `Broiler.Dom.Html.Tests` is excluded from that count
+because it already fails to compile against the pinned pointer (`CS0176` in
+`NoscriptRawTextTests.cs` — `HtmlDocumentParser.ParseDocument` is static now),
+which is unrelated to these patches; the parent's `Broiler.Browser.Core.Tests`
+fails to compile on `origin/main` for the same reason.
+
+Not listed in `scripts/apply-pending-wpt-patches.sh`: this touches test
+attributes only, moves no rendered pixel, and a WPT run neither builds nor
+exercises these test projects.

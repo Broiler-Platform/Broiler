@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ShadowDomBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShadowDom_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ShadowDomBinding);
@@ -27,7 +27,7 @@ public sealed class ShadowDomBindingModuleTests
         Assert.True(typeof(IShadowDomHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttachShadow_Open_Exposes_The_Root_And_Rejects_A_Second_Attach()
     {
         var html = @"<!DOCTYPE html>
@@ -52,7 +52,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains(">true,true,true,true<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttachShadow_Closed_Hides_The_Root_From_The_Getter()
     {
         var html = @"<!DOCTYPE html>

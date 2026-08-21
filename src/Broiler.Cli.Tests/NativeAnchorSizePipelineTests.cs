@@ -63,7 +63,7 @@ public sealed class NativeAnchorSizePipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_SizesBoxToAnchorDimensions()
     {
         var box = LayoutTarget(nativeAnchor: true);
@@ -71,7 +71,7 @@ public sealed class NativeAnchorSizePipelineTests
         Assert.Equal(70f, box.BorderBox.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_LeavesBoxUnsizedByAnchor()
     {
         // Flag off → the engine cannot parse anchor-size() as a length, so the box does not

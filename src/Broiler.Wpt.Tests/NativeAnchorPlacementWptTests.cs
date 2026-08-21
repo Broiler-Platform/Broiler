@@ -82,7 +82,7 @@ public class NativeAnchorPlacementWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EnginePlacesMvpPositionAreaBox_InBottomRightCell()
     {
         var red = Render(nativeAnchor: true);

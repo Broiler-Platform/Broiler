@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class TreeMutationBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeMutation_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(TreeMutationBinding);
@@ -30,7 +30,7 @@ public sealed class TreeMutationBindingModuleTests
         Assert.True(typeof(ITreeMutationHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AppendChild_Append_Prepend_And_InsertBefore_Position_Children()
     {
         var html = @"<!DOCTYPE html>
@@ -62,7 +62,7 @@ document.body.appendChild(out);
         Assert.Contains(">seq=PABC|n=4<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveChild_And_ReplaceChild_Mutate_The_Tree()
     {
         var html = @"<!DOCTYPE html>
@@ -95,7 +95,7 @@ document.body.appendChild(out);
         Assert.Contains(">seq=AZ|rm=B|old=C<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AppendChild_Rejects_A_Circular_Insertion()
     {
         var html = @"<!DOCTYPE html>

@@ -59,7 +59,7 @@ public sealed class CssColor4Tests
         Assert.NotEqual((0, 0, 0), (actual.R, actual.G, actual.B));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorInSrgbIsExact()
     {
         Assert.Equal((0, 128, 128, 1.0), Resolve("color(srgb 0 0.5 0.5)"));
@@ -69,7 +69,7 @@ public sealed class CssColor4Tests
 
     /// <summary>HWB's whiteness/blackness scale a fully saturated hue; at w+b ≥ 1 the hue drops out
     /// entirely and the result is the grey their ratio names (CSS Color 4 §7).</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HwbScalesTheHueAndCollapsesToGreyWhenSaturated()
     {
         Assert.Equal((0, 128, 128, 1.0), Resolve("hwb(180 0% 50%)"));
@@ -77,7 +77,7 @@ public sealed class CssColor4Tests
         Assert.Equal((191, 191, 191, 1.0), Resolve("hwb(0 75% 25%)"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LabAndLchAgreeWhenTheyNameTheSameColor()
     {
         // lch(50% 30 200) is lab(50%, 30·cos200°, 30·sin200°) by definition, so the two notations
@@ -87,7 +87,7 @@ public sealed class CssColor4Tests
         Assert.Equal(lab, lch);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OklabAndOklchAgreeWhenTheyNameTheSameColor()
     {
         var oklch = Resolve("oklch(0.6 0.12 200)");
@@ -100,7 +100,7 @@ public sealed class CssColor4Tests
     /// the out-of-range spelling and the in-range one must paint identically. Missing this made the
     /// two take different branches of the gamut mapper and paint different colours.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LightnessIsClampedToItsSpaceRange()
     {
         Assert.Equal(Resolve("oklab(1 0.5 0.2)"), Resolve("oklab(1.5 0.5 0.2)"));
@@ -115,7 +115,7 @@ public sealed class CssColor4Tests
     /// that test rendered a blank page against a blank reference and "passed" while painting none
     /// of what it asks for.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NoneComponentsResolveToZero()
     {
         Assert.Equal(Resolve("color(srgb 0 0.5 0.5)"), Resolve("color(srgb none 0.5 0.5)"));
@@ -130,7 +130,7 @@ public sealed class CssColor4Tests
     /// space-separated channels into one token and fails its own arity check — so the modern alpha
     /// spelling parsed as nothing and painted black, while the legacy comma form worked.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModernSlashAlphaIsRead()
     {
         Assert.Equal((0, 128, 128, 0.5), Resolve("rgb(0 128 128 / 50%)"));
@@ -140,7 +140,7 @@ public sealed class CssColor4Tests
 
     /// <summary>The legacy comma form is the base parser's business and must be left to it, so the
     /// two never disagree about the same value.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LegacyCommaFormIsDeclined()
     {
         Assert.False(CssColor4.TryParse("rgb(0, 128, 128)", out _));
@@ -150,7 +150,7 @@ public sealed class CssColor4Tests
 
     // ---------------------------------------------------------------- color-mix
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorMixInSrgbIsTheMidpoint()
     {
         Assert.Equal((128, 0, 128, 1.0), Resolve("color-mix(in srgb, red, blue)"));
@@ -158,7 +158,7 @@ public sealed class CssColor4Tests
     }
 
     /// <summary>CSS Color 5 §3.2: one stated percentage leaves the rest to the other colour.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorMixFillsInTheOmittedPercentage()
     {
         Assert.Equal(
@@ -168,7 +168,7 @@ public sealed class CssColor4Tests
 
     /// <summary>Percentages summing under 100% scale the *alpha* rather than the colours (§3.2), so
     /// the hue is the same as the full mix and only the transparency differs.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorMixUnderOneHundredPercentScalesAlpha()
     {
         var mixed = Resolve("color-mix(in srgb, red 25%, blue 25%)");
@@ -178,7 +178,7 @@ public sealed class CssColor4Tests
 
     /// <summary>A polar space mixes the hue round the circle, and which way round is a visible
     /// choice rather than a rounding one — <c>longer hue</c> takes the other arc.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorMixHonoursTheHueArc()
     {
         var shorter = Resolve("color-mix(in hsl, hsl(20 100% 50%), hsl(320 100% 50%))");
@@ -188,7 +188,7 @@ public sealed class CssColor4Tests
 
     /// <summary>Without a <c>currentcolor</c> the caller supplies, the mix is left unconverted
     /// rather than resolved against an invented black.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorMixWithCurrentColorNeedsTheCallerToSupplyIt()
     {
         Assert.False(CssColor4.TryParse("color-mix(in srgb, currentcolor, blue)", out _));
@@ -204,7 +204,7 @@ public sealed class CssColor4Tests
     /// CSS Color 5 §4. The channel keywords are bound in the <i>destination</i> space, so naming
     /// them straight through is an identity and re-ordering them permutes the colour.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeSyntaxRebindsTheOriginsChannels()
     {
         Assert.Equal((255, 0, 0, 1.0), Resolve("rgb(from red r g b)"));
@@ -212,7 +212,7 @@ public sealed class CssColor4Tests
         Assert.Equal((255, 255, 255, 1.0), Resolve("color(from lime srgb g g g)"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeSyntaxCarriesTheOriginsAlphaWhenNoneIsStated()
     {
         Assert.Equal(0.5, Resolve("rgb(from rgb(255 0 0 / 0.5) r g b)").A, 3);
@@ -220,7 +220,7 @@ public sealed class CssColor4Tests
     }
 
     /// <summary>A relative colour's components may be arithmetic over the bound keywords.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeSyntaxEvaluatesCalcOverTheChannels()
     {
         Assert.Equal((255, 0, 0, 0.3), Resolve("rgb(from rgb(255 0 0 / 0.5) r g b / calc(alpha - 0.2))"));
@@ -228,7 +228,7 @@ public sealed class CssColor4Tests
     }
 
     /// <summary>The origin may itself be any colour, including one this class had to resolve first.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RelativeSyntaxAcceptsAFunctionAsItsOrigin()
     {
         Assert.Equal(
@@ -264,7 +264,7 @@ public sealed class CssColor4Tests
     }
 
     /// <summary>An <c>xyz</c> relative colour names its channels <c>x y z</c>, not <c>r g b</c>.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XyzSpacesBindXyzChannelNames()
     {
         Assert.Equal(
@@ -281,7 +281,7 @@ public sealed class CssColor4Tests
     /// of <c>oklch(0.8 0.4 0)</c> is a flat <c>rgb(255, 0, 179)</c>, where reducing chroma keeps the
     /// hue and lands where a browser puts it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OutOfGamutColorsAreMappedRatherThanClipped()
     {
         var mapped = Resolve("oklch(0.8 0.4 0)");
@@ -291,7 +291,7 @@ public sealed class CssColor4Tests
 
     /// <summary>And nothing sRGB can already show may move, which is the property that makes the
     /// mapper safe to run on every conversion.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InGamutColorsAreUntouchedByTheMapper()
     {
         Assert.Equal((0, 128, 128, 1.0), Resolve("color(srgb 0 0.5 0.5)"));
@@ -315,7 +315,7 @@ public sealed class CssColor4Tests
 
     /// <summary>The rewrite works over a whole declaration, because the values that need it most
     /// are compound.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryColorInACompoundValueIsRewritten()
     {
         Assert.Equal(
@@ -330,7 +330,7 @@ public sealed class CssColor4Tests
 
     /// <summary>An unconvertible function is left exactly as written, and a later one in the same
     /// value is still converted — a value is not all-or-nothing.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnUnconvertibleFunctionIsLeftAloneWithoutStoppingTheScan()
     {
         Assert.Equal(
@@ -340,7 +340,7 @@ public sealed class CssColor4Tests
 
     /// <summary>The <c>lab</c> inside <c>oklab</c> is not a function of its own; reading it as one
     /// would rewrite half an identifier.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFunctionNameIsNotMatchedInsideALongerIdentifier()
     {
         var oklab = CssColor4.NormalizeColorFunctions("oklab(0.6 -0.1 -0.05)");

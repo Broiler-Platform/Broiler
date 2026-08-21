@@ -44,7 +44,7 @@ public sealed class PreloadScanOverlapTests : IDisposable
     /// The claim in the roadmap's own words — "overlaps network with parse". With the scan the
     /// sheet requests are on the wire before the parse finishes; without it they do not exist yet.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stylesheet_Requests_Are_In_Flight_While_The_Document_Is_Still_Parsing()
     {
         var html = Document(sheets: 3, scripts: 0);
@@ -68,7 +68,7 @@ public sealed class PreloadScanOverlapTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_The_Scan_No_Stylesheet_Request_Exists_When_The_Parse_Ends()
     {
         var html = Document(sheets: 3, scripts: 0);
@@ -95,7 +95,7 @@ public sealed class PreloadScanOverlapTests : IDisposable
     /// reached it, so its round trips were strictly serial — a call site item #2's split never
     /// reached. The scan supplies the URL set early enough to fix it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_Scripts_Are_Fetched_Concurrently_Rather_Than_One_At_A_Time()
     {
         var html = Document(sheets: 0, scripts: 4);
@@ -128,7 +128,7 @@ public sealed class PreloadScanOverlapTests : IDisposable
     /// second. A pair run back to back sees the same conditions, and the median of several pairs
     /// discards the one that did not.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serial_And_Overlapped_Wall_Clock_Are_Reported()
     {
         const int pairs = 5;

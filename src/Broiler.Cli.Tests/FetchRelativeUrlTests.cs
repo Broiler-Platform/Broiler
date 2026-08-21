@@ -86,7 +86,7 @@ public sealed class FetchRelativeUrlTests
     /// The reported failure end to end: google.com's own beacon call. <c>sendBeacon</c> reports
     /// <see langword="true"/> when it queued the request, and the URI error must not appear.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SendBeacon_ToARootRelativeTarget_DoesNotRaiseTheInvalidUriError()
     {
         var (context, bridge) = Attach();
@@ -104,7 +104,7 @@ public sealed class FetchRelativeUrlTests
     /// An <c>XMLHttpRequest</c> opened on a path reaches the same resolution — the polyfill's
     /// <c>send</c> calls <c>fetch(this._url)</c>, so this was the second way into the same throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Xhr_OpenedOnAPath_DoesNotRaiseTheInvalidUriError()
     {
         var (context, bridge) = Attach();
@@ -122,7 +122,7 @@ public sealed class FetchRelativeUrlTests
     /// reports an error <c>Response</c> the way it reports any other network failure. Throwing would
     /// abort the whole calling script over one beacon.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnUnresolvableTarget_YieldsAnErrorResponse_RatherThanThrowing()
     {
         var (context, bridge) = Attach(url: string.Empty);

@@ -41,14 +41,14 @@ public sealed class ZoomMultiColumnTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExplicitColumnGap_ScalesBy_EffectiveZoom()
     {
         var b = Column(Root(), "40px", "2");
         WithNativeZoom(() => Assert.Equal(80, b.ResolveColumnGap(), 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedZoom_Compounds_On_ColumnGap()
     {
         var outer = Column(Root(), "normal", "2");
@@ -56,7 +56,7 @@ public sealed class ZoomMultiColumnTests
         WithNativeZoom(() => Assert.Equal(30, inner.ResolveColumnGap(), 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_LeavesColumnGap_Unscaled()
     {
         var b = Column(Root(), "40px", "2");

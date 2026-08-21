@@ -17,7 +17,7 @@ public class ConsoleServiceTests : IDisposable
         RenderLogger.Clear();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetFilteredEntries_Returns_All_When_No_Filters()
     {
         using var service = new ConsoleService();
@@ -29,7 +29,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.True(entries.Count >= 2);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetFilteredEntries_Filters_By_Level()
     {
         using var service = new ConsoleService();
@@ -43,7 +43,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.True(entries.Count >= 2);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetFilteredEntries_Filters_By_Category()
     {
         using var service = new ConsoleService();
@@ -55,7 +55,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.All(entries, e => Assert.Equal(LogCategory.JavaScript, e.Category));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetFilteredEntries_Filters_By_SearchText()
     {
         using var service = new ConsoleService();
@@ -67,7 +67,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.All(entries, e => Assert.Contains("hello", e.Message, StringComparison.OrdinalIgnoreCase));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearEntries_Removes_All()
     {
         using var service = new ConsoleService();
@@ -79,7 +79,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.Empty(service.GetFilteredEntries());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BuildBoxTree_Creates_Correct_Structure()
     {
         var root = new CssBox(null, new HtmlTag("div", false), TestBaseUri);
@@ -100,7 +100,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.NotNull(tree.BoxModel);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BuildBoxTree_Captures_Id_And_Class()
     {
         var tag = new HtmlTag("div", false, new Dictionary<string, string>
@@ -116,7 +116,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.Equal("container wide", tree.CssClass);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BuildBoxTree_Handles_Anonymous_Box()
     {
         var root = new CssBox(null, null!, TestBaseUri);
@@ -126,7 +126,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.Null(tree.Id);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyles_Returns_Grouped_Properties()
     {
         var root = new CssBox(null, new HtmlTag("div", false), TestBaseUri);
@@ -146,7 +146,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.Contains(styles, s => s.Category == "Box Model");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetBoxModel_Returns_Zero_For_Uncomputed_Box()
     {
         var root = new CssBox(null, new HtmlTag("div", false), TestBaseUri);
@@ -159,7 +159,7 @@ public class ConsoleServiceTests : IDisposable
         Assert.Equal(0, model.Padding.Top);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EntryReceived_Event_Fires()
     {
         using var service = new ConsoleService();

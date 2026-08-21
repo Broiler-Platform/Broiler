@@ -11,7 +11,7 @@ public sealed class TabViewDocumentTests
 {
     private sealed class TestTabView : UiTabView;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Close_Is_A_Request_The_Control_Does_Not_Act_On()
     {
         using var tabs = new TestTabView();
@@ -30,7 +30,7 @@ public sealed class TabViewDocumentTests
         Assert.NotNull(tabs.FindTab("doc-1"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Removing_A_Tab_Moves_Focus_Deterministically()
     {
         using var tabs = new TestTabView();
@@ -55,7 +55,7 @@ public sealed class TabViewDocumentTests
         Assert.Equal(-1, tabs.SelectedIndex);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Dirty_Tab_Says_So_In_Its_Accessible_Description()
     {
         using var tabs = new TestTabView();
@@ -71,7 +71,7 @@ public sealed class TabViewDocumentTests
         Assert.Contains("unsaved changes", tabs.GetSemanticNode().Children[0].Name);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Renamed_Tab_Keeps_Its_Position_And_Identity()
     {
         using var tabs = new TestTabView();
@@ -90,7 +90,7 @@ public sealed class TabViewDocumentTests
         Assert.Equal("doc", tabs.SelectedTab!.Id);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reordering_Keeps_The_Selection_On_The_Same_Tab()
     {
         using var tabs = new TestTabView();
@@ -108,7 +108,7 @@ public sealed class TabViewDocumentTests
         Assert.Equal("a", tabs.SelectedTab!.Id);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Host_Can_Refuse_A_Reorder()
     {
         using var tabs = new TestTabView();
@@ -120,7 +120,7 @@ public sealed class TabViewDocumentTests
         Assert.Equal(["a", "b"], tabs.Tabs.Select(t => t.Id));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Overflow_Reports_What_Does_Not_Fit_And_Activation_Brings_It_Back()
     {
         using var tabs = new TestTabView { VisibleTabCapacity = 2 };
@@ -139,7 +139,7 @@ public sealed class TabViewDocumentTests
         Assert.DoesNotContain(tabs.OverflowTabs, t => t.Id == "c");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selecting_An_Unknown_Tab_Fails_Rather_Than_Guessing()
     {
         using var tabs = new TestTabView();

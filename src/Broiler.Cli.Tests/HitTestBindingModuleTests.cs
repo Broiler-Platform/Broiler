@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class HitTestBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HitTest_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(HitTestBinding);
@@ -26,7 +26,7 @@ public sealed class HitTestBindingModuleTests
         Assert.True(typeof(IHitTestHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementFromPoint_And_ElementsFromPoint_Hit_The_Box_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

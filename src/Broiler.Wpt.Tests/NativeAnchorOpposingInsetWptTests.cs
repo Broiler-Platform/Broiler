@@ -72,7 +72,7 @@ public class NativeAnchorOpposingInsetWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineSizesBoxToSpanAnchor()
     {
         var red = Render(nativeAnchor: true);

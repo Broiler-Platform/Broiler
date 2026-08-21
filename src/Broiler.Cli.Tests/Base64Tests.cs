@@ -26,7 +26,7 @@ public sealed class Base64Tests
     private static string Eval(JSContext context, string expression) =>
         context.Eval($"String({expression})").ToString();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BothAreReachable_QualifiedAndUnqualified()
     {
         var (context, bridge) = Attach();
@@ -60,7 +60,7 @@ public sealed class Base64Tests
     /// The pair moves bytes, not text: each code unit is one byte in and one byte out, which is what
     /// makes it usable for the binary payloads pages base64 around.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RoundTripsABinaryString()
     {
         var (context, bridge) = Attach();
@@ -72,7 +72,7 @@ public sealed class Base64Tests
     }
 
     /// <summary>A code point above U+00FF is not a byte, and the spec makes that an error rather than a truncation.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Btoa_RejectsBeyondLatin1()
     {
         var (context, bridge) = Attach();

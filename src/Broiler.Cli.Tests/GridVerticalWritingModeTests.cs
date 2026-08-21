@@ -48,7 +48,7 @@ public sealed class GridVerticalWritingModeTests
         Assert.Equal(w, got.w, 1); Assert.Equal(h, got.h, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DefiniteTracks_TransposeInlineToVerticalAndBlockToHorizontalRtl()
     {
         var c = Cells("grid-template-columns:60px 40px;grid-template-rows:100px 50px;");
@@ -59,7 +59,7 @@ public sealed class GridVerticalWritingModeTests
         Expect(c["div#c2r2"], 150, 60, 50, 40);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentDistribution_MapsToTransposedAxes()
     {
         // justify-content = inline axis = vertical; free 100 vertical.
@@ -81,7 +81,7 @@ public sealed class GridVerticalWritingModeTests
         Expect(asb["div#c1r2"], 0, 0, 50, 60);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelfAlignment_MapsToTransposedAxes()
     {
         // 400x300 grid, cols 100/100 (inline/vertical), rows 150/150 (block/horizontal); item 30x40 in cell c1r1.

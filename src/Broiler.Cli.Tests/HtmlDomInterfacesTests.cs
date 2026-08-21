@@ -10,7 +10,7 @@ public class HtmlDomInterfacesTests
 {
     // ────────────────────── 7.1: Form element state preservation ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Checkbox_Checked_State_Survives_RemoveChild_AppendChild()
     {
         var html = @"<!DOCTYPE html>
@@ -37,7 +37,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Radio_Checked_State_Survives_CloneNode()
     {
         var html = @"<!DOCTYPE html>
@@ -62,7 +62,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,radio", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Input_Value_And_Checked_Survive_CloneNode()
     {
         // Exercises the consolidated cloneNode bridge-runtime-state copy
@@ -95,7 +95,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 7.2: className whitespace preservation ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassName_Whitespace_Preserved_In_GetAttribute()
     {
         var html = @"<!DOCTYPE html>
@@ -116,7 +116,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InnerText_Returns_Descendant_Text_Content()
     {
         var html = @"<!DOCTYPE html>
@@ -133,7 +133,7 @@ document.getElementById('result').textContent = d.innerText;
         Assert.Contains("HelloWorld", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterText_Returns_Descendant_Text_Content()
     {
         var html = @"<!DOCTYPE html>
@@ -150,7 +150,7 @@ document.getElementById('result').textContent = d.outerText;
         Assert.Contains("HelloWorld", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterHtml_Returns_Serialized_Element_Markup()
     {
         var html = @"<!DOCTYPE html>
@@ -168,7 +168,7 @@ document.getElementById('result').textContent =
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterHtml_Setter_Replaces_Element_In_Parent()
     {
         var html = @"<!DOCTYPE html>
@@ -193,7 +193,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Append_Adds_Nodes_And_Text_In_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -217,7 +217,7 @@ document.getElementById('result').textContent =
         Assert.Contains("A|strong|C|3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Prepend_Adds_Nodes_Before_Existing_Children()
     {
         var html = @"<!DOCTYPE html>
@@ -241,7 +241,7 @@ document.getElementById('result').textContent =
         Assert.Contains("head|strong|span|3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Append_Unpacks_DocumentFragment_Children()
     {
         var html = @"<!DOCTYPE html>
@@ -272,7 +272,7 @@ document.getElementById('result').textContent =
 
     // ────────────────────── 7.3: Attribute node interface ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_Length_And_GetNamedItem()
     {
         var html = @"<!DOCTYPE html>
@@ -304,7 +304,7 @@ document.getElementById('result').textContent = r.join(',');
     /// <c>attributes.length</c> and <c>attributes.item(0)</c> both answered correctly — the
     /// obvious `for (i…) attributes[i].name` loop read a property of undefined and threw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_Are_Reachable_By_Numeric_Index()
     {
         var html = @"<!DOCTYPE html>
@@ -343,7 +343,7 @@ document.getElementById('result').textContent = r.join(',');
     /// literally named <c>foo&lt;bar</c> (the attribute-name state appends <c>&lt;</c> as an
     /// ordinary character), reached through <c>attributes[0]</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attribute_Name_Containing_LessThan_Is_Parsed_And_Indexable()
     {
         var html = @"<!DOCTYPE html>
@@ -364,7 +364,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_HasAttributes_Reflects_Attribute_Presence()
     {
         var html = @"<!DOCTYPE html>
@@ -386,7 +386,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_GetAttributeNames_Returns_All_Attribute_Names()
     {
         var html = @"<!DOCTYPE html>
@@ -410,7 +410,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_SetNamedItem_Adds_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -435,7 +435,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_RemoveNamedItem_Removes_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -459,7 +459,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attr_Node_OwnerElement_Points_Back()
     {
         var html = @"<!DOCTYPE html>
@@ -481,7 +481,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_CreateAttribute_Creates_Standalone_Attr_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -503,7 +503,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_CreateAttributeNS_Creates_Namespaced_Attr_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -525,7 +525,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_CreateAttribute_Can_Be_Attached_With_SetAttributeNode()
     {
         var html = @"<!DOCTYPE html>
@@ -551,7 +551,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_GetAttributeNodeNS_Returns_Namespaced_Attr_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -576,7 +576,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_SetAttributeNodeNS_Adds_And_Replaces_Namespaced_Attr()
     {
         var html = @"<!DOCTYPE html>
@@ -605,7 +605,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_RemoveAttributeNodeNS_Removes_And_Returns_Namespaced_Attr()
     {
         var html = @"<!DOCTYPE html>
@@ -630,7 +630,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NamedNodeMap_Namespace_Aware_Methods_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -661,7 +661,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_GetAttributeNode_Returns_Attr_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -684,7 +684,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_SetAttributeNode_Replaces_And_Returns_Old_Attr()
     {
         var html = @"<!DOCTYPE html>
@@ -709,7 +709,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_RemoveAttributeNode_Removes_And_Returns_Attr()
     {
         var html = @"<!DOCTYPE html>
@@ -732,7 +732,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attributes_Item_Returns_By_Index()
     {
         var html = @"<!DOCTYPE html>
@@ -756,7 +756,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ToggleAttribute_Adds_Then_Removes_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -779,7 +779,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ToggleAttribute_With_Force_True_Adds_Once_And_Returns_True()
     {
         var html = @"<!DOCTYPE html>
@@ -801,7 +801,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_ToggleAttribute_With_Force_False_Removes_And_Returns_False()
     {
         var html = @"<!DOCTYPE html>
@@ -823,7 +823,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_CompareDocumentPosition_Reports_Self_Ancestor_And_Sibling_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -850,7 +850,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_CompareDocumentPosition_Sets_Disconnected_Bit_For_Separate_Trees()
     {
         var html = @"<!DOCTYPE html>
@@ -870,7 +870,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_IsSameNode_Identifies_Identical_References()
     {
         var html = @"<!DOCTYPE html>
@@ -895,7 +895,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Normalize_Merges_Adjacent_Text_Nodes()
     {
         var html = @"<!DOCTYPE html>
@@ -920,7 +920,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Normalize_Removes_Empty_Text_Nodes()
     {
         var html = @"<!DOCTYPE html>
@@ -945,7 +945,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Normalize_Recursively_Normalizes_Descendants()
     {
         var html = @"<!DOCTYPE html>
@@ -970,7 +970,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_IsEqualNode_Matches_Equal_Structure()
     {
         var html = @"<!DOCTYPE html>
@@ -991,7 +991,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_IsEqualNode_Detects_Attribute_And_Text_Differences()
     {
         var html = @"<!DOCTYPE html>
@@ -1016,7 +1016,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_IsEqualNode_Detects_Nested_Descendant_Differences()
     {
         var html = @"<!DOCTYPE html>
@@ -1040,7 +1040,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_IsEqualNode_Returns_False_For_Null_And_True_For_Equal_Text_Nodes()
     {
         var html = @"<!DOCTYPE html>
@@ -1064,7 +1064,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── 7.4: <area> element properties ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Area_Element_Shape_Coords_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -1089,7 +1089,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Area_Element_Href_Property_With_Resolution()
     {
         var html = @"<!DOCTYPE html>
@@ -1110,7 +1110,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_Hidden_Property_Reflects_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -1136,7 +1136,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_Hidden_Property_Uses_Existing_Hidden_Attribute_And_Ua_Display_None()
     {
         var html = @"<!DOCTYPE html>
@@ -1162,7 +1162,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_TabIndex_Property_Reflects_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -1190,7 +1190,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_Lang_Property_Reflects_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -1218,7 +1218,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_AccessKey_Property_Reflects_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -1246,7 +1246,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_Dir_Property_Reflects_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>
@@ -1274,7 +1274,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HTMLElement_Draggable_Property_Reflects_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>

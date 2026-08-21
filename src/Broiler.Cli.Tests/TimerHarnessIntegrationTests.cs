@@ -11,7 +11,7 @@ public class TimerHarnessIntegrationTests
     //  3.1 — Timer pump: sequential test chaining via setTimeout
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_Chained_Tests_All_Execute_Sequentially()
     {
         // Simulates the Acid3 pattern: an array of tests executed
@@ -49,7 +49,7 @@ setTimeout(runNext, 10);
         Assert.Contains("DONE:test0,test1,test2,test3,test4", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_Large_Chain_Exceeds_Old_100_Limit()
     {
         // Verifies that >100 chained setTimeout calls all execute.
@@ -79,7 +79,7 @@ setTimeout(tick, 0);
         Assert.Contains("count=150", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_Callbacks_Fire_In_Registration_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -103,7 +103,7 @@ setTimeout(function() {
         Assert.Contains("A,B,C", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timer_IDs_Are_Unique_And_Clearable()
     {
         var html = @"<!DOCTYPE html>
@@ -135,7 +135,7 @@ document.getElementById('out').appendChild(p);
     //  3.2 — Error isolation: JS errors must not halt subsequent tests
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Error_In_Chained_Test_Does_Not_Halt_Subsequent_Tests()
     {
         // Simulates Acid3 pattern: try/catch around each test, continue on error
@@ -178,7 +178,7 @@ setTimeout(runNext, 0);
         Assert.Contains("score=3,errors=2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Errors_Catchable_By_Try_Catch()
     {
         // Verifies that DomBridge errors (e.g. invalid operations) are
@@ -215,7 +215,7 @@ document.getElementById('out').appendChild(p);
     //  3.3 — Body onload event fires and bootstraps test runner
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Onload_Fires_After_Script_Execution()
     {
         var html = @"<!DOCTYPE html>
@@ -238,7 +238,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("onload-fired", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Onload_Triggers_SetTimeout_Chain()
     {
         // Simulates the Acid3 pattern: body onload starts the test runner,
@@ -279,7 +279,7 @@ function update() {
     //  3.4 — End-to-end Acid3 harness simulation
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Harness_Simulation_Score_Greater_Than_Zero()
     {
         // Simplified Acid3 harness: 10 tests, chained via setTimeout,
@@ -339,7 +339,7 @@ function update() {
         Assert.Contains("zPPPPPPPPPP", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Harness_Simulation_With_Failing_Tests()
     {
         // Some tests pass, some fail — score should only count passes
@@ -389,7 +389,7 @@ function update() {
         Assert.Contains("done:score=4,errors=2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Score_Extraction_Via_QuerySelector()
     {
         // Verifies the exact pattern used by Acid3:

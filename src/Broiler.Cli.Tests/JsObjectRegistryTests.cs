@@ -20,7 +20,7 @@ public sealed class JsObjectRegistryTests
     //  Registry unit tests
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Set_Then_TryGet_Returns_Same_Wrapper()
     {
         var doc = new DomDocument();
@@ -34,7 +34,7 @@ public sealed class JsObjectRegistryTests
         Assert.Same(wrapper, got);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wrappers_Are_Keyed_By_Reference_Not_Value()
     {
         var doc = new DomDocument();
@@ -49,7 +49,7 @@ public sealed class JsObjectRegistryTests
         Assert.False(registry.TryGet(b, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Remove_Drops_The_Wrapper()
     {
         var doc = new DomDocument();
@@ -62,7 +62,7 @@ public sealed class JsObjectRegistryTests
         Assert.False(registry.Remove(node)); // idempotent
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryGetNode_Reverse_Lookup_By_Wrapper_Identity()
     {
         var doc = new DomDocument();
@@ -76,7 +76,7 @@ public sealed class JsObjectRegistryTests
         Assert.False(registry.TryGetNode(new JSObject(), out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_Wrappers_Are_A_Separate_Map()
     {
         var doc = new DomDocument();
@@ -92,7 +92,7 @@ public sealed class JsObjectRegistryTests
         Assert.False(registry.TryGet(root, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clear_Drops_Node_And_Document_Wrappers()
     {
         var doc = new DomDocument();
@@ -112,7 +112,7 @@ public sealed class JsObjectRegistryTests
     //  Wrapper identity through the bridge
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Same_Node_Yields_Stable_Wrapper_Identity()
     {
         using var ctx = new JSContext();
@@ -122,7 +122,7 @@ public sealed class JsObjectRegistryTests
         Assert.Equal("true", ctx.Eval("document.body === document.body").ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Node_Reached_By_Different_Paths_Is_The_Same_Wrapper()
     {
         using var ctx = new JSContext();
@@ -135,7 +135,7 @@ public sealed class JsObjectRegistryTests
             " return d === document.body.lastChild; })()").ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReAttach_Resets_Wrapper_Identity()
     {
         using var bridge = new DomBridge();

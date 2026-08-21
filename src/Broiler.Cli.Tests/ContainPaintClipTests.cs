@@ -92,7 +92,7 @@ public sealed class ContainPaintClipTests
     /// past the container. Guards the fix against over-clipping, and holds on both
     /// the pinned and patched engines (so it runs unconditionally).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LayoutContainmentAlone_DoesNotClip()
     {
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(Doc("contain:layout"), 300, 300);
@@ -115,7 +115,7 @@ public sealed class ContainPaintClipTests
     /// on the un-patched pinned engine, mirroring the other cases here.
     /// </para>
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OverflowClipMargin_ExpandsClipEdge()
     {
         const string style = "contain:paint;overflow-clip-margin:50px";

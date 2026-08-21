@@ -19,7 +19,7 @@ public sealed class ZoomSvgRenderTests
         SvgRenderer.RenderSvgContent(svg, new RectangleF(0, 0, 200, 200), zoom)
             .OfType<DrawSvgRectItem>().Single();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NoViewBox_RawGeometry_ScalesBy_EffectiveZoom()
     {
         const string svg = "<svg><rect x=\"10\" y=\"10\" width=\"20\" height=\"30\"/></svg>";
@@ -35,7 +35,7 @@ public sealed class ZoomSvgRenderTests
         Assert.Equal(60, zoomed.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ViewBox_ScaleFromBounds_DoesNotCompound_EffectiveZoom()
     {
         // A viewBox derives its scale from the (already-zoomed) bounds, so passing a larger effectiveZoom
@@ -53,7 +53,7 @@ public sealed class ZoomSvgRenderTests
         Assert.Equal(atOne.Height, atTwo.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Default_EffectiveZoom_IsOne_ByteIdentical()
     {
         const string svg = "<svg><rect x=\"5\" y=\"5\" width=\"15\" height=\"15\"/></svg>";

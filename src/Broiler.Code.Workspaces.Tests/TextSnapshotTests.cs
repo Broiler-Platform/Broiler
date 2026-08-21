@@ -70,7 +70,7 @@ public sealed class TextSnapshotTests
     /// starting the next are one line break, and which node holds which
     /// character depends on where the tree happens to have split.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Crlf_Split_Across_Nodes_Counts_As_One_Break()
     {
         // Long enough to be many leaves, so the CR and LF land in different ones.
@@ -90,7 +90,7 @@ public sealed class TextSnapshotTests
         Assert.Equal(4_001, buffer.Current.LineCount);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inserting_Between_Cr_And_Lf_Creates_A_Second_Line_Break()
     {
         var buffer = new SourceBuffer("a\r\nb");
@@ -105,7 +105,7 @@ public sealed class TextSnapshotTests
         Assert.Equal("b", buffer.Current.GetLineText(2));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Deleting_Between_Cr_And_Lf_Rejoins_Them_Into_One_Break()
     {
         var buffer = new SourceBuffer("a\rX\nb");
@@ -162,7 +162,7 @@ public sealed class TextSnapshotTests
         Assert.Equal(reference.ToString(), buffer.Current.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Get_Text_And_Copy_To_Agree_With_Substring_At_Every_Range()
     {
         string text = BuildSource(400);
@@ -182,7 +182,7 @@ public sealed class TextSnapshotTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void For_Each_Chunk_Visits_The_Range_In_Order_And_Exactly_Once()
     {
         string text = BuildSource(500);
@@ -208,7 +208,7 @@ public sealed class TextSnapshotTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Indexer_Agrees_With_The_String_At_Every_Position()
     {
         string text = BuildSource(200);
@@ -217,7 +217,7 @@ public sealed class TextSnapshotTests
             Assert.Equal(text[i], snapshot[i]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Caret_Movement_Does_Not_Split_Surrogate_Pairs_Or_Combining_Marks()
     {
         // Emoji with a skin-tone modifier, a combining acute accent, and a
@@ -260,7 +260,7 @@ public sealed class TextSnapshotTests
         Assert.Equal(stops, backwards);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Large_Document_Indexes_Without_Materializing_It()
     {
         string text = BuildSource(100_000);

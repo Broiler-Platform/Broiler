@@ -19,7 +19,7 @@ public sealed class EvdevInputRouterTests
 {
     private static readonly BSize Viewport = new(800, 600);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Pointer_Starts_Centred_And_Accumulates_Relative_Motion()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -34,7 +34,7 @@ public sealed class EvdevInputRouterTests
         Assert.Equal(280, router.PointerPosition.Y);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Motion_Is_Clamped_To_The_Viewport()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -51,7 +51,7 @@ public sealed class EvdevInputRouterTests
         Assert.Equal(0, router.PointerPosition.Y);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Move_Carries_The_Tracked_Position_Not_The_Delta()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -63,7 +63,7 @@ public sealed class EvdevInputRouterTests
         Assert.Equal(305, moved.Position.Y);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Button_Press_Reports_Where_The_Pointer_Is()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -78,7 +78,7 @@ public sealed class EvdevInputRouterTests
         Assert.Equal(350, pressed.Position.Y);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shrinking_The_Viewport_Clamps_Rather_Than_Recentres()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -93,7 +93,7 @@ public sealed class EvdevInputRouterTests
         Assert.Equal(500, router.PointerPosition.Y);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Absolute_Position_From_X11_Wins_And_Skips_Sub_Pixel_Noise()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -137,7 +137,7 @@ public sealed class EvdevInputRouterTests
         Assert.Equal(expected, text.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Shortcut_Produces_A_Key_But_No_Text()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -150,7 +150,7 @@ public sealed class EvdevInputRouterTests
         Assert.Null(text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Key_Release_Produces_No_Text()
     {
         var router = new EvdevInputRouter(Viewport);
@@ -162,7 +162,7 @@ public sealed class EvdevInputRouterTests
         Assert.Null(text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Key_With_No_Character_Produces_Only_A_Key()
     {
         var router = new EvdevInputRouter(Viewport);

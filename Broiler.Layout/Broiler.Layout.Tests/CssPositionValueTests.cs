@@ -81,7 +81,7 @@ public sealed class CssPositionValueTests
     /// <c>center right 25%</c> is the edge-offset one (a quarter of the free width in from the
     /// right). The same two tokens, read two ways.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Components_Are_Positional_Where_Three_Are_Edge_Offsets()
     {
         Assert.Equal(new PointF(80, 15), Resolve("right 25%"));
@@ -101,13 +101,13 @@ public sealed class CssPositionValueTests
     /// An object wider than its area has negative free space, and an offset from the far edge
     /// subtracts from that: 20px in from the right of a 100px area holding a 120px object is −40.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Offset_May_Leave_The_Area() =>
         Assert.Equal(new PointF(-40, 60), CssPositionValue.Resolve(
             "bottom right 20px", new SizeF(100, 100), new SizeF(120, 40), emSize: 16));
 
     /// <summary>An object larger than its area has negative free space, and centring halves it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Object_Larger_Than_Its_Area_Centres_Negatively() =>
         Assert.Equal(new PointF(-25, -25), CssPositionValue.Resolve(
             "center", new SizeF(100, 100), new SizeF(150, 150), emSize: 16));
@@ -121,7 +121,7 @@ public sealed class CssPositionValueTests
             position, new SizeF(100, 100), new SizeF(20, 40), emSize: 16));
 
     /// <summary>An offset in font-relative units resolves against the element's font size.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Em_Offset_Resolves_Against_The_Font_Size() =>
         Assert.Equal(new PointF(32, 30), CssPositionValue.Resolve(
             "2em center", new SizeF(100, 100), new SizeF(20, 40), emSize: 16));

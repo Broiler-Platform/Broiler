@@ -74,7 +74,7 @@ public class AnchorInlineContainingBlockTests : IDisposable
 </style>
 <div id=""outer""><span id=""ic""><span id=""spacer""></span><span id=""anchor""></span><div id=""tl"" class=""a""></div><div id=""tr"" class=""a""></div><div id=""bl"" class=""a""></div><div id=""br"" class=""a""></div></span></div>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionAreaCells_AroundAbsPosAnchorInInlineContainingBlock_LandAtCorners()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-inlinecb-" + System.Guid.NewGuid().ToString("N"));

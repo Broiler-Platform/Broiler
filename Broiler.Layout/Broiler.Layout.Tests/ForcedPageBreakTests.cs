@@ -66,7 +66,7 @@ public sealed class ForcedPageBreakTests
 
     // The control: with no break declared the second child follows the first, so a change that
     // simply pushed every box to a page boundary would not pass this.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Forced_Break_The_Box_Follows_Its_Sibling()
     {
         var (root, second) = TreeWithTwoChildren();
@@ -91,7 +91,7 @@ public sealed class ForcedPageBreakTests
     // A box already at the top of a page satisfies the break where it stands. Moving it would
     // insert an entirely blank page, which is the one way this can be wrong and still look right
     // on a test whose content happens to start at a boundary.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Box_Already_At_A_Page_Boundary_Does_Not_Move()
     {
         var (root, second) = TreeWithTwoChildren(firstHeight: PageHeight);
@@ -103,7 +103,7 @@ public sealed class ForcedPageBreakTests
 
     // Unpaginated is the default, and the whole reason this can be applied unconditionally: with
     // no page size there is no boundary, so a forced break is inert rather than wrong.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Page_Size_A_Forced_Break_Is_Inert()
     {
         var (root, second) = TreeWithTwoChildren(pageHeight: 99999);
@@ -115,7 +115,7 @@ public sealed class ForcedPageBreakTests
 
     // The moved box takes its subtree with it — a break that moved the box and left its content
     // behind would show as text on the wrong page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Moved_Box_Carries_Its_Descendants()
     {
         var (root, second) = TreeWithTwoChildren();
@@ -166,7 +166,7 @@ public sealed class ForcedPageBreakTests
 
     // The control: breakable content is left exactly where the flow put it, straddling the
     // boundary, because the next band renders its remainder.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Breakable_Box_Is_Left_Straddling_The_Boundary()
     {
         var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: 100);
@@ -176,7 +176,7 @@ public sealed class ForcedPageBreakTests
     }
 
     // A box that fits in what is left of the page is not moved — moving it would waste the page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unbreakable_Box_That_Still_Fits_Does_Not_Move()
     {
         var (root, second) = TreeWithTwoChildren(firstHeight: 100, secondHeight: 50);
@@ -188,7 +188,7 @@ public sealed class ForcedPageBreakTests
 
     // A box taller than the page has to be cut wherever it starts, so it stays put: pushing it
     // would leave a blank page and then overflow the next one anyway.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unbreakable_Box_Taller_Than_A_Page_Stays_Put()
     {
         var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: PageHeight + 50);
@@ -198,7 +198,7 @@ public sealed class ForcedPageBreakTests
         Assert.Equal(150, second.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Page_Size_An_Unbreakable_Box_Is_Not_Moved()
     {
         var (root, second) = TreeWithTwoChildren(firstHeight: 150, secondHeight: 100, pageHeight: 99999);
@@ -218,7 +218,7 @@ public sealed class ForcedPageBreakTests
     // OffsetTop -- which the break already did -- stretched every pushed box by the distance it was
     // pushed. Each following sibling then started lower than it should, and the document reported
     // more content than it had: this two-page reference paginated as five.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Forced_Break_Moves_The_Box_Without_Stretching_It()
     {
         var root = new CssBox(null, null, BaseUrl)

@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ElementReflectionBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementReflection_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ElementReflectionBinding);
@@ -27,7 +27,7 @@ public sealed class ElementReflectionBindingModuleTests
         Assert.True(typeof(IElementReflectionHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Href_Reflection_Resolves_And_Round_Trips_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>
@@ -58,7 +58,7 @@ document.body.appendChild(out);
     // .href, append — produced a bare <link> with no attributes. Nothing reached the cascade and the
     // page rendered unstyled. The serialized attributes are the substance: they are what the render
     // pass reads.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Link_Rel_And_Href_Set_Through_The_Idl_Reach_The_Content_Attributes()
     {
         var html = @"<!DOCTYPE html>
@@ -76,7 +76,7 @@ document.head.appendChild(link);
         Assert.Contains(@"<link rel=""stylesheet"" href=""sheet.css"">", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Link_Href_Getter_Resolves_Against_The_Page_Url()
     {
         var html = @"<!DOCTYPE html>
@@ -97,7 +97,7 @@ document.body.appendChild(out);
         Assert.Contains(">idl=file:///dir/deep/sheet.css|attr=deep/sheet.css|rel=stylesheet<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Link_Reflects_The_Remaining_Plain_String_Idl_Attributes()
     {
         var html = @"<!DOCTYPE html>
@@ -126,7 +126,7 @@ document.head.appendChild(link);
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Base_Href_Set_Through_The_Idl_Reaches_The_Content_Attribute()
     {
         var html = @"<!DOCTYPE html>

@@ -39,7 +39,7 @@ public sealed class StylesheetLinkLoadEventTests : IDisposable
 
     // The UIEvent.load.stylesheet shape exactly: the listener is registered from window.onload and
     // the href set immediately after, and the test's own check is on currentTarget.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Load_Event_Fires_When_A_Live_Link_Gets_An_Href()
     {
         var result = Run("""
@@ -63,7 +63,7 @@ window.onload = function() {
     // The negative half: a link pointed at a sheet that is not there fires `error`, not `load`.
     // Without this the test above would pass against an implementation that fired `load`
     // unconditionally, which is the easy wrong version of this feature.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Error_Event_Fires_When_The_Sheet_Is_Missing()
     {
         var result = Run("""
@@ -82,7 +82,7 @@ window.onload = function() {
         Assert.Contains(">error<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Load_Event_Fires_For_A_Link_Already_In_The_Markup()
     {
         var result = Run("""
@@ -100,7 +100,7 @@ document.getElementById('target').addEventListener('load', function(e) {
 
     // A link created and populated while detached has not fetched anything, so the event is due on
     // insertion — not on createElement, and not on the href write that preceded it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Detached_Link_Fires_On_Insertion_Not_Before()
     {
         var result = Run("""
@@ -124,7 +124,7 @@ window.onload = function() {
 
     // Once per fetch: re-writing the same href is not a new fetch and must stay silent, while
     // pointing the link at a different sheet is, and fires again.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Event_Fires_Once_Per_Href()
     {
         var result = Run("""
@@ -148,7 +148,7 @@ window.onload = function() {
     }
 
     // A link that is not a stylesheet is not a stylesheet fetch, so it fires nothing.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Non_Stylesheet_Link_Fires_Nothing()
     {
         var result = Run("""

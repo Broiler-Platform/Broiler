@@ -19,7 +19,7 @@ public sealed class PositionAreaGridTests
             anchorLeft: 40, anchorTop: 40, anchorRight: 60, anchorBottom: 60,
             new PositionAreaValue(block, inline));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_TopLeft_IsBeforeTheAnchorOnBothAxes()
     {
         // block=Start (row before anchor: 0..40), inline=Start (col before anchor: 0..40)
@@ -30,7 +30,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(40, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_BottomRight_IsAfterTheAnchorOnBothAxes()
     {
         // block=End (row 60..100), inline=End (col 60..100)
@@ -41,7 +41,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(40, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_CenterCenter_IsTheAnchorSpan()
     {
         var c = Cell(PositionAreaSpan.Center, PositionAreaSpan.Center);
@@ -51,7 +51,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(20, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_SpanStart_CoversStartCellThroughAnchor()
     {
         // inline SpanStart: gridLeft..anchorRight = 0..60 ; block SpanStart: gridTop..anchorBottom = 0..60
@@ -62,7 +62,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(60, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_SpanEnd_CoversAnchorThroughEndCell()
     {
         // inline SpanEnd: anchorLeft..gridRight = 40..100 ; block SpanEnd: anchorTop..gridBottom = 40..100
@@ -73,7 +73,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(60, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_SpanAll_CoversTheWholeGrid()
     {
         var c = Cell(PositionAreaSpan.SpanAll, PositionAreaSpan.SpanAll);
@@ -83,7 +83,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(100, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_MixedAxes_TopCenter()
     {
         // block=Start (row 0..40), inline=Center (col 40..60)
@@ -94,7 +94,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(40, c.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cell_GridExtendsToIncludeAnchorOutsideContainingBlock()
     {
         // Anchor to the right of and below the CB → grid edges extend to the anchor.
@@ -113,7 +113,7 @@ public sealed class PositionAreaGridTests
     private static readonly PositionAreaValue SpanBoth =
         new(PositionAreaSpan.SpanAll, PositionAreaSpan.SpanAll);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_NoInsetsNoSize_FillsTheCell()
     {
         var box = PositionAreaGrid.ResolveElementBox(
@@ -129,7 +129,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(20, box.Top);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_Insets_ShrinkTheImcb()
     {
         // insets top=10 right=20 bottom=30 left=40 on a 100×100 cell at origin.
@@ -143,7 +143,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(60, box.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_OverlargeInsets_ClampImcbToZero()
     {
         var box = PositionAreaGrid.ResolveElementBox(
@@ -152,7 +152,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(0, box.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_ExplicitWidth_ClampedToCellAndAligned()
     {
         // explicit width 30, inline Start → aligns to cell end: offset = 100 - 30 = 70.
@@ -164,7 +164,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(0, box.Top);   // block SpanAll → offset 0
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_ExplicitWidthLargerThanCell_ClampedToCell()
     {
         var box = PositionAreaGrid.ResolveElementBox(
@@ -172,7 +172,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(100, box.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_PercentSize_AgainstTheCell()
     {
         var box = PositionAreaGrid.ResolveElementBox(
@@ -181,7 +181,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(25, box.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_CenterAlignsExplicitSize()
     {
         // Center on both axes, explicit 40×40 in a 100×100 cell → offset (100-40)/2 = 30.
@@ -192,7 +192,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(30, box.Top);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveElementBox_PercentTakesPrecedenceOverExplicit()
     {
         // Both a percent and an explicit px supplied → percent wins (matches the bridge).
@@ -201,7 +201,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(60, box.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentSizeFillingImcb_SubtractsMarginBorderPadding()
     {
         // IMCB 100×80; margin 5 all sides, border 2 all sides, padding 3 all sides.
@@ -214,7 +214,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(80 - (5 + 5) - (2 + 2) - (3 + 3), h);  // 60
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentSizeFillingImcb_AsymmetricEdges()
     {
         var (w, h) = PositionAreaGrid.ContentSizeFillingImcb(
@@ -226,7 +226,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(100 - 1 - 3, h); // top + bottom
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContentSizeFillingImcb_ClampsToZero()
     {
         var (w, h) = PositionAreaGrid.ContentSizeFillingImcb(
@@ -238,7 +238,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(10, h);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderBoxToContentSize_SubtractsBorderAndPadding()
     {
         var (w, h) = PositionAreaGrid.BorderBoxToContentSize(
@@ -249,7 +249,7 @@ public sealed class PositionAreaGridTests
         Assert.Equal(50 - (2 + 2) - (1 + 1), h);  // 44
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderBoxToContentSize_ClampsToZero()
     {
         var (w, h) = PositionAreaGrid.BorderBoxToContentSize(

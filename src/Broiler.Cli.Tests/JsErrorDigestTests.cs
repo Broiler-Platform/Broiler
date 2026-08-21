@@ -7,7 +7,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class JsErrorDigestTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Defect_From_Different_Scripts_Is_One_Group()
     {
         var groups = JsErrorDigest.Group(
@@ -23,7 +23,7 @@ public sealed class JsErrorDigestTests
         Assert.Equal("Script inline-0 failed: foo is not defined", group.Example);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Groups_Are_Ranked_By_How_Often_They_Happened()
     {
         var groups = JsErrorDigest.Group(
@@ -37,7 +37,7 @@ public sealed class JsErrorDigestTests
         Assert.Equal(["common failure", "rare failure"], groups.Select(g => g.Example));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Equally_Frequent_Groups_Keep_First_Seen_Order()
     {
         // A digest that reshuffles between runs of the same page cannot be diffed, so the ordering
@@ -47,7 +47,7 @@ public sealed class JsErrorDigestTests
         Assert.Equal(["alpha failure", "beta failure", "gamma failure"], groups.Select(g => g.Example));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Group_Names_Where_It_Was_First_Seen()
     {
         var groups = JsErrorDigest.Group(
@@ -57,7 +57,7 @@ public sealed class JsErrorDigestTests
         Assert.Equal("CaptureService.ExecuteScriptsWithDom", Assert.Single(groups).FirstContext);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Distinct_Defects_Are_Not_Merged()
     {
         var groups = JsErrorDigest.Group(["foo is not defined", "bar is not defined"]);
@@ -85,7 +85,7 @@ public sealed class JsErrorDigestTests
         Assert.Equal(expectedKind, api.Kind);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Features_Are_Ranked_By_How_Often_They_Were_Blamed()
     {
         var apis = JsErrorDigest.MissingApis(
@@ -111,7 +111,7 @@ public sealed class JsErrorDigestTests
         Assert.Empty(JsErrorDigest.MissingApis([message]));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Message_Blaming_Nothing_Yields_Nothing()
     {
         Assert.Empty(JsErrorDigest.MissingApis(["Async work did not settle within 100 drain iterations"]));

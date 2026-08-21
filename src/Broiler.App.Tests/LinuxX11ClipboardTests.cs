@@ -13,7 +13,7 @@ namespace Broiler.App.Tests;
 /// </summary>
 public sealed class LinuxX11ClipboardTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Copied_Text_Comes_Back_From_The_Selection()
     {
         using LinuxX11Clipboard? clipboard = TryOpen();
@@ -32,7 +32,7 @@ public sealed class LinuxX11ClipboardTests
     /// is a real paste of what Broiler copied by something that is not Broiler —
     /// the thing a private in-process string cannot do.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Another_Client_Pastes_What_Broiler_Copied()
     {
         using LinuxX11Clipboard? broiler = TryOpen();
@@ -47,7 +47,7 @@ public sealed class LinuxX11ClipboardTests
         Assert.False(otherApplication.OwnsClipboard);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Text_Outside_Latin1_Survives_The_Round_Trip()
     {
         using LinuxX11Clipboard? broiler = TryOpen();
@@ -67,7 +67,7 @@ public sealed class LinuxX11ClipboardTests
     /// at one small property. Both ends here are this class, which answers in a
     /// single property; the chunked INCR path exists for owners that do not.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_Sized_Selection_Survives_The_Round_Trip()
     {
         using LinuxX11Clipboard? broiler = TryOpen();
@@ -83,7 +83,7 @@ public sealed class LinuxX11ClipboardTests
         Assert.Equal(original, text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Later_Copy_By_Another_Client_Takes_Ownership_Away()
     {
         using LinuxX11Clipboard? broiler = TryOpen();
@@ -103,7 +103,7 @@ public sealed class LinuxX11ClipboardTests
         Assert.Equal("second", text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Releasing_The_Connection_Gives_Up_Ownership()
     {
         using LinuxX11Clipboard? observer = TryOpen();
@@ -123,7 +123,7 @@ public sealed class LinuxX11ClipboardTests
         Assert.False(observer.TryGetText(out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Disposed_Clipboard_Reports_No_Text_Instead_Of_Throwing()
     {
         LinuxX11Clipboard? clipboard = TryOpen();

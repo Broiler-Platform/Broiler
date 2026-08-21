@@ -86,31 +86,31 @@ public class TextTransformTests : IDisposable
             $"text-transform:{transform} of \"{source}\" did not render identically to \"{expected}\".");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Uppercase_RendersAsUppercasedText()
         => AssertTransformMatchesLiteral("uppercase", "hello world", "HELLO WORLD");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Lowercase_RendersAsLowercasedText()
         => AssertTransformMatchesLiteral("lowercase", "HELLO WORLD", "hello world");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capitalize_TitlecasesEachWord()
         => AssertTransformMatchesLiteral("capitalize", "hello world", "Hello World");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capitalize_KeepsApostropheInsideWord()
         => AssertTransformMatchesLiteral("capitalize", "can't stop", "Can't Stop");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capitalize_TreatsHyphenAsWordBoundary()
         => AssertTransformMatchesLiteral("capitalize", "well-being", "Well-Being");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void None_LeavesTextUnchanged()
         => AssertTransformMatchesLiteral("none", "Mixed Case", "Mixed Case");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Uppercase_ChangesRenderingFromSource()
     {
         // Guards the oracle itself: transformed output must differ from the

@@ -47,7 +47,7 @@ public sealed class ShellFocusTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Caret_Without_Session_Focus_Receives_Nothing()
     {
         using Harness harness = await Harness.CreateAsync(_root);
@@ -62,7 +62,7 @@ public sealed class ShellFocusTests : IDisposable
         Assert.Equal(0, harness.Editor.Snapshot.Length);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Focusing_Through_The_Session_Delivers_Typed_Text()
     {
         using Harness harness = await Harness.CreateAsync(_root);
@@ -76,7 +76,7 @@ public sealed class ShellFocusTests : IDisposable
         Assert.Equal("ab", harness.Editor.Snapshot.GetText(0, 2));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Hit_In_The_Editor_Resolves_To_The_Editor()
     {
         using Harness harness = await Harness.CreateAsync(_root);
@@ -85,7 +85,7 @@ public sealed class ShellFocusTests : IDisposable
         Assert.Same(harness.Controls.Explorer, harness.Shell.ResolveFocusTarget(harness.Controls.Explorer));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Clicking_Chrome_Leaves_Focus_Where_It_Was()
     {
         using Harness harness = await Harness.CreateAsync(_root);

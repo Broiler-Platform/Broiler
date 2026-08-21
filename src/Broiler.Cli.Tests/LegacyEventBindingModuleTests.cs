@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class LegacyEventBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LegacyEvent_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(LegacyEventBinding);
@@ -24,7 +24,7 @@ public sealed class LegacyEventBindingModuleTests
         Assert.NotNull(moduleType.GetMethod("Create", BindingFlags.Public | BindingFlags.Static));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_Builds_An_Initializable_Event_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

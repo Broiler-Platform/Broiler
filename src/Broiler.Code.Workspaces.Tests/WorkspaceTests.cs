@@ -61,7 +61,7 @@ public sealed class WorkspaceTests : IDisposable
     public void Ordinary_Paths_Normalize(string input, string expected) =>
         Assert.Equal(expected, WorkspacePath.Normalize(input));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Traversal_Path_Never_Reaches_Storage()
     {
         // A real file outside the root, to prove the refusal is not just a
@@ -84,7 +84,7 @@ public sealed class WorkspaceTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task An_Item_Keeps_Its_Identity_Across_A_Rename()
     {
         Write("src/Original.cs", "class C { }\n");
@@ -109,7 +109,7 @@ public sealed class WorkspaceTests : IDisposable
         Assert.StartsWith("// edited", still.Buffer.Current.ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Opening_An_Already_Open_Document_Returns_The_Same_Buffer()
     {
         Write("src/A.cs", "class A { }\n");
@@ -124,7 +124,7 @@ public sealed class WorkspaceTests : IDisposable
         Assert.Same(first.Buffer, second.Buffer);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Dirty_Document_Refuses_To_Close_Until_Changes_Are_Handled()
     {
         Write("src/A.cs", "class A { }\n");
@@ -144,7 +144,7 @@ public sealed class WorkspaceTests : IDisposable
         Assert.True(workspace.CloseDocument(id));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Save_All_Reports_Every_Failure_And_Never_Drops_Text()
     {
         Write("src/Good.cs", "class Good { }\n");
@@ -180,7 +180,7 @@ public sealed class WorkspaceTests : IDisposable
         Assert.False(goodDocument.IsDirty);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task An_External_Change_Is_Detected_Before_It_Is_Overwritten()
     {
         Write("src/A.cs", "class A { }\n");
@@ -204,7 +204,7 @@ public sealed class WorkspaceTests : IDisposable
             (await workspace.SaveDocumentAsync(id, overwriteConflict: true)).Kind);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Save_Preserves_Encoding_And_Byte_Order_Mark()
     {
         string full = Path.Combine(_root, "bom.cs");
@@ -224,7 +224,7 @@ public sealed class WorkspaceTests : IDisposable
         Assert.Equal(0xBF, bytes[2]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paths_Differing_Only_In_Case_Are_Reported_On_A_Case_Insensitive_Provider()
     {
         var storage = new FileSystemWorkspaceStorage(_root);
@@ -246,7 +246,7 @@ public sealed class WorkspaceTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Item_Outside_The_Grant_Is_Refused_With_A_Diagnostic()
     {
         CodeWorkspace workspace = CreateWorkspace();

@@ -87,7 +87,7 @@ public class VerticalTableCaptionTests : IDisposable
           Col + Col + Col + Col + Col + Col +
         "</div>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VerticalLrCaption_DoesNotFillViewport()
     {
         // Before the containing-block fix the caption's children took the viewport
@@ -111,7 +111,7 @@ public class VerticalTableCaptionTests : IDisposable
             "inflated the block (width) axis; they belong on the inline (height) axis.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SidewaysLrCaption_CollapsesToBoundedRegion()
     {
         // sideways-lr shares vertical-lr's block flow (left→right); it takes the

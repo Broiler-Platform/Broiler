@@ -53,7 +53,7 @@ public sealed class DeclaredProjectTests
         Assert.Equal(original, project.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Solution_File_Also_Round_Trips_Unchanged()
     {
         string path = Path.Combine(FixtureRoot, "SampleReports.slnx");
@@ -68,7 +68,7 @@ public sealed class DeclaredProjectTests
         Assert.Contains(solution.Projects, p => p.Name == "SampleReports.Web");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Classic_Sln_Project_Guids_Are_Preserved_And_Folders_Are_Not_Projects()
     {
         const string text = """
@@ -95,7 +95,7 @@ public sealed class DeclaredProjectTests
         Assert.Equal("Solution Items", Assert.Single(solution.Folders));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Multi_Targeting_Conditional_And_Wildcard_Constructs_Are_Classified()
     {
         string text = File.ReadAllText(
@@ -122,7 +122,7 @@ public sealed class DeclaredProjectTests
                 item.Link == "Generated/BuildStamp.cs");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Adding_A_Project_Reference_Produces_A_Minimal_Diff()
     {
         string text = File.ReadAllText(
@@ -150,7 +150,7 @@ public sealed class DeclaredProjectTests
             reference => reference.EndsWith("Extra/Extra.csproj", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Duplicate_Project_Reference_Is_Refused()
     {
         string text = File.ReadAllText(
@@ -163,7 +163,7 @@ public sealed class DeclaredProjectTests
         Assert.Equal("BRW0102", result.Code);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Project_With_An_Unsupported_Construct_Refuses_Structural_Edits()
     {
         const string text = """
@@ -190,7 +190,7 @@ public sealed class DeclaredProjectTests
         Assert.Equal(text, project.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Custom_Target_Is_Unsupported()
     {
         const string text = """
@@ -206,7 +206,7 @@ public sealed class DeclaredProjectTests
             c.Description == "<Target> element" && c.Class == MutationClass.Unsupported);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Loading_The_Fixture_Reads_Only_What_Is_Declared()
     {
         var storage = new FileSystemWorkspaceStorage(FixtureRoot);

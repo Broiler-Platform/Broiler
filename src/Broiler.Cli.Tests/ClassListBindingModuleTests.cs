@@ -11,7 +11,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ClassListBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassList_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(ClassListBinding);
@@ -20,7 +20,7 @@ public sealed class ClassListBindingModuleTests
         Assert.False(moduleType.IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Add_Remove_Contains_Round_Trip_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -42,7 +42,7 @@ document.body.appendChild(out);
         Assert.Contains("has-a=true|has-b=false|class=a c d", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Toggle_With_And_Without_Force_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -65,7 +65,7 @@ document.body.appendChild(out);
         Assert.Contains("r=false,true,true|class=y z", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Replace_Swaps_A_Token_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

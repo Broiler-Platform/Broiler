@@ -39,7 +39,7 @@ public class InteractiveSessionLoadWindowTests
         return steps;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnIntervalSettlesTheLoadWindowButNeverThePendingQueue()
     {
         using InteractiveSession session = CreateSession(
@@ -58,7 +58,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.True(session.HasPendingWork);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WorkDueInsideTheWindowIsStillLoadWork()
     {
         using InteractiveSession session = CreateSession(
@@ -72,7 +72,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.False(session.HasWorkDueInLoadWindow);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChainedTimeoutsInsideTheWindowAllRunBeforeItSettles()
     {
         using InteractiveSession session = CreateSession("""
@@ -90,7 +90,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.Contains("step5", session.CurrentHtml());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WorkScheduledPastTheWindowIsNotLoadWork()
     {
         using InteractiveSession session = CreateSession(
@@ -102,7 +102,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.False(session.HasWorkDueInLoadWindow);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SettleLoadWindowRunsTheChainTheCallerWouldOtherwiseStep()
     {
         using InteractiveSession session = CreateSession("""
@@ -121,7 +121,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.False(session.HasWorkDueInLoadWindow);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SettleLoadWindowStopsAtTheHorizonRatherThanFollowingAnInterval()
     {
         using InteractiveSession session = CreateSession(
@@ -134,7 +134,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.NotEmpty(settled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SettleLoadWindowObservesCancellation()
     {
         using InteractiveSession session = CreateSession(
@@ -147,7 +147,7 @@ public class InteractiveSessionLoadWindowTests
         Assert.Throws<OperationCanceledException>(() => session.SettleLoadWindow(cancelled.Token));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ADisposedSessionReportsNoLoadWork()
     {
         InteractiveSession session = CreateSession("setTimeout(function () {}, 10);");

@@ -22,7 +22,7 @@ public sealed class DomImplementationDocumentCreationTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateDocument_Is_A_Document_With_DocumentElement_And_Doctype()
     {
         using var bridge = Attach(out var context);
@@ -41,7 +41,7 @@ public sealed class DomImplementationDocumentCreationTests
         Assert.Equal("9|html|true|10|html", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateHtmlDocument_Has_Structure_And_Title()
     {
         using var bridge = Attach(out var context);
@@ -58,7 +58,7 @@ public sealed class DomImplementationDocumentCreationTests
         Assert.Equal("9|html|body|head|Hello|10", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateHtmlDocument_Supports_Element_Creation_And_Lookup()
     {
         using var bridge = Attach(out var context);

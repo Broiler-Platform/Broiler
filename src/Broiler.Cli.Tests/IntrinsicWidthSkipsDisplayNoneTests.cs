@@ -52,7 +52,7 @@ public sealed class IntrinsicWidthSkipsDisplayNoneTests
         return width;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Hidden_Stylesheet_Does_Not_Widen_A_Shrink_To_Fit_Box()
     {
         using var bitmap = Render(
@@ -66,7 +66,7 @@ public sealed class IntrinsicWidthSkipsDisplayNoneTests
             $"the box painted {width}px wide — the hidden <style>'s text was measured into it");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Box_Without_The_Stylesheet_Is_The_Same_Width()
     {
         // The positive control: the guard must not have simply collapsed the box.
@@ -79,7 +79,7 @@ public sealed class IntrinsicWidthSkipsDisplayNoneTests
         Assert.Equal(PaintedWidth(without), PaintedWidth(withStyle));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Hidden_Script_Is_Not_Measured_Either()
     {
         // <script> is UA display:none and carries text too, so it takes the same path.

@@ -8,7 +8,7 @@ namespace Broiler.UI.Standard.Tests;
 
 public sealed class FontDialogControlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_Font_Dialog_Updates_Selected_Font_From_Controls()
     {
         var dialog = new StandardFontDialog();
@@ -25,7 +25,7 @@ public sealed class FontDialogControlTests
         Assert.Equal(BFontSlant.Italic, dialog.SelectedFont.Slant);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_Font_Dialog_Renders_Selected_Font_Preview()
     {
         var host = new TestHost();
@@ -50,7 +50,7 @@ public sealed class FontDialogControlTests
                 command.Text.Font.Slant == BFontSlant.Italic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_Font_Dialog_Adds_Selected_Custom_Family_To_List()
     {
         var dialog = new StandardFontDialog();
@@ -62,7 +62,7 @@ public sealed class FontDialogControlTests
         Assert.Equal("Custom Face", dialog.FamilyList.SelectedItemId);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Font_Dialog_Result_Value_Round_Trips_Fonts()
     {
         var font = new BFontStyle("Family|With\\Escapes", 13.5, BFontWeight.SemiBold, BFontSlant.Oblique);

@@ -20,26 +20,26 @@ public class TransformGeometryTests
             "[Math.round(b.left),Math.round(b.top),Math.round(b.width),Math.round(b.height)].join(',');").ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Transform_Returns_The_Layout_Box()
     {
         Assert.Equal("0,0,100,100", Rect("<div id=i style='width:100px;height:100px'></div>", "i"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Own_Scale_Shrinks_About_The_Center()
     {
         // scale(0.5) about the default center (50,50): a 100x100 box becomes 50x50 at (25,25).
         Assert.Equal("25,25,50,50", Rect("<div id=i style='width:100px;height:100px;transform:scale(0.5)'></div>", "i"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Own_Translate_Moves_The_Box()
     {
         Assert.Equal("50,30,100,100", Rect("<div id=i style='width:100px;height:100px;transform:translate(50px,30px)'></div>", "i"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ancestor_Scale_Applies_To_Descendant_Geometry()
     {
         // The 200x200 child, inside a scale(0.5) ancestor whose box centres at (512,100) (a full-width
@@ -54,7 +54,7 @@ public class TransformGeometryTests
     // percentage branch for scale at all, so "50%" failed to parse as a number and fell back to 0 —
     // the box collapsed instead of halving. (The paint path had the mirror-image bug: it resolved the
     // percentage against the box, so a 100px box came out 50x and filled the canvas.)
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_Scale_Is_A_Ratio_Not_A_Length()
     {
         // scale(50%, 75%) == scale(0.5, 0.75): a 100x100 box becomes 50x75, centred at (50,50).
@@ -62,7 +62,7 @@ public class TransformGeometryTests
             Rect("<div id=i style='width:100px;height:100px;transform:scale(50%, 75%)'></div>", "i"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_Scale_Matches_The_Equivalent_Number()
     {
         var asPercent = Rect("<div id=i style='width:100px;height:100px;transform:scale(50%)'></div>", "i");
@@ -71,7 +71,7 @@ public class TransformGeometryTests
         Assert.Equal(asNumber, asPercent);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_ScaleX_And_ScaleY_Are_Ratios()
     {
         Assert.Equal(
@@ -83,14 +83,14 @@ public class TransformGeometryTests
     }
 
     // A percentage still resolves against the box for translate — the two meanings must not be merged.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Percentage_Translate_Still_Resolves_Against_The_Box()
     {
         Assert.Equal("50,25,100,100",
             Rect("<div id=i style='width:100px;height:100px;transform:translate(50%, 25%)'></div>", "i"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Transform_Origin_Is_Honoured()
     {
         // scale(0.5) about the top-left keeps the origin fixed: a 100x100 box becomes 50x50 at (0,0).
@@ -98,7 +98,7 @@ public class TransformGeometryTests
             Rect("<div id=i style='width:100px;height:100px;transform:scale(0.5);transform-origin:top left'></div>", "i"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OffsetWidth_Stays_The_Untransformed_Layout_Box()
     {
         // Only getBoundingClientRect is transformed; offsetWidth/offsetHeight remain the layout box.

@@ -27,7 +27,7 @@ public sealed class DashedStrokeGeometryTests
         return total;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Solid_Style_Has_No_Pattern()
         => Assert.Empty(DashedStrokeGeometry.PatternFor(DashStyle.Solid, 3f));
 
@@ -44,7 +44,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.All(pattern, run => Assert.True(run > 0f));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pattern_Scales_With_Stroke_Width()
     {
         var thin = DashedStrokeGeometry.PatternFor(DashStyle.Dash, 1f);
@@ -54,7 +54,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.Equal(thin[0] * 4f, thick[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hairline_Widths_Do_Not_Collapse_The_Pattern()
     {
         // A sub-pixel border must still dash rather than degenerate to zero-length runs.
@@ -63,7 +63,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.All(pattern, run => Assert.True(run >= 1f));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Empty_Pattern_Paints_The_Whole_Stroke()
     {
         var segments = DashedStrokeGeometry.Segments(0f, 0f, 10f, 0f, []);
@@ -72,7 +72,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.Equal(new DashedStrokeGeometry.Segment(0f, 0f, 10f, 0f), only);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Dashed_Stroke_Paints_Less_Than_The_Whole_Line()
     {
         // The point of the whole exercise: gaps exist, and the line is not blank.
@@ -84,7 +84,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.True(painted < 60f, $"a dashed stroke must leave gaps, painted {painted} of 60");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Runs_Alternate_On_And_Off_Along_The_Line()
     {
         var segments = DashedStrokeGeometry.Segments(0f, 0f, 24f, 0f, [6f, 6f]);
@@ -94,7 +94,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.Equal(new DashedStrokeGeometry.Segment(12f, 0f, 18f, 0f), segments[1]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Last_Run_Is_Clipped_To_The_Stroke()
     {
         // 20px of a 6/6 pattern ends mid-dash: 0-6, 12-18, then 24-30 clipped to 20.
@@ -105,7 +105,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.Equal(18f, segments[^1].X2);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Stroke_Shorter_Than_One_Dash_Still_Paints()
     {
         // Short edges — a 4px-wide dashed border on a small box — must not vanish.
@@ -115,7 +115,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.Equal(3f, Length(only), 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dashes_Follow_A_Diagonal_Stroke()
     {
         var segments = DashedStrokeGeometry.Segments(0f, 0f, 6f, 8f, [5f, 5f]);
@@ -129,7 +129,7 @@ public sealed class DashedStrokeGeometryTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Vertical_Stroke_Dashes_Along_Y()
     {
         var segments = DashedStrokeGeometry.Segments(5f, 0f, 5f, 24f, [6f, 6f]);
@@ -143,11 +143,11 @@ public sealed class DashedStrokeGeometryTests
         Assert.Equal(new DashedStrokeGeometry.Segment(5f, 0f, 5f, 6f), segments[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Zero_Length_Stroke_Paints_Nothing()
         => Assert.Empty(DashedStrokeGeometry.Segments(4f, 4f, 4f, 4f, [6f, 6f]));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Degenerate_Pattern_Falls_Back_To_A_Solid_Run()
     {
         // All-zero and negative patterns must not spin or silently blank the stroke.
@@ -156,7 +156,7 @@ public sealed class DashedStrokeGeometryTests
         Assert.Single(DashedStrokeGeometry.Segments(0f, 0f, 10f, 0f, [float.NaN, 4f]));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Pattern_With_A_Zero_Gap_Still_Advances()
     {
         // [w, 0] is a solid line written as a dash; it must terminate and cover the stroke.

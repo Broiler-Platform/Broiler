@@ -28,7 +28,7 @@ public sealed class RetainedLayoutSnapshotTests
         return ctx.Eval(expr).ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inline_Style_Write_Between_Reads_Is_Observed()
     {
         // element.style writes land in the bridge's own inline-style store and never reach the
@@ -40,7 +40,7 @@ public sealed class RetainedLayoutSnapshotTests
             "a.style.width='250px';return before+'|'+a.offsetWidth;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetProperty_Between_Reads_Is_Observed()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";
@@ -49,7 +49,7 @@ public sealed class RetainedLayoutSnapshotTests
             "a.style.setProperty('height','90px');return before+'|'+a.offsetHeight;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Style_Attribute_Write_Between_Reads_Is_Observed()
     {
         var body = "<div id='a' style='width:100px;height:40px'></div>";
@@ -58,7 +58,7 @@ public sealed class RetainedLayoutSnapshotTests
             "a.setAttribute('style','width:175px;height:40px');return before+'|'+a.offsetWidth;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Class_Change_Between_Reads_Is_Observed()
     {
         // A cascade change with no inline style involved: the element's own declarations are
@@ -72,7 +72,7 @@ public sealed class RetainedLayoutSnapshotTests
             "a.className='wide';return before+'|'+a.offsetWidth;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dom_Insertion_Between_Reads_Is_Observed()
     {
         // The container is auto-height, so appending a child changes geometry the snapshot holds for
@@ -84,7 +84,7 @@ public sealed class RetainedLayoutSnapshotTests
             "return before+'|'+box.offsetHeight;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Text_Change_Between_Reads_Is_Observed()
     {
         var body = "<style>#a{width:60px;font:16px/20px monospace}</style><div id='a'>one</div>";
@@ -94,7 +94,7 @@ public sealed class RetainedLayoutSnapshotTests
             "a.textContent='one two three four five six';return a.offsetHeight>before;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stylesheet_Rule_Insertion_Between_Reads_Is_Observed()
     {
         // A CSSOM edit: the rule model is bridge-side runtime state that the DOM text never sees, so
@@ -108,7 +108,7 @@ public sealed class RetainedLayoutSnapshotTests
             "return before+'|'+a.offsetHeight;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Scroll_Write_Between_Reads_Leaves_Box_Geometry_Alone()
     {
         // The other side of the key: scroll offsets are deliberately excluded from it, because the
@@ -122,7 +122,7 @@ public sealed class RetainedLayoutSnapshotTests
             "var before=m();s.scrollTop=30;return before+'|'+m()+'|'+s.scrollTop;})()"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Repeated_Scroll_Writes_Clamp_To_The_Same_Bounds_As_The_First()
     {
         // Clamping reads four extents through the snapshot, so a scroll loop is exactly the workload

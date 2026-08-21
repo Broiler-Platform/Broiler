@@ -26,7 +26,7 @@ document.getElementById('result').textContent = r.join(',');
         return CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetContext_Returns_The_Same_Context_Every_Call()
     {
         // Not a nicety: a fresh context per call would hand back a fresh blank bitmap, so nothing a
@@ -40,7 +40,7 @@ r.push(c.getContext('2d').canvas === c);
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FillRect_Is_Readable_Through_GetImageData()
     {
         var result = Run(@"
@@ -58,7 +58,7 @@ r.push(outside[0] + '/' + outside[3]);
         Assert.Contains("10/20/30/255,0/0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearRect_Restores_Transparency()
     {
         var result = Run(@"
@@ -76,7 +76,7 @@ r.push(ctx.getImageData(1, 0, 1, 1).data[3]);
         Assert.Contains("255,0,255", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GlobalAlpha_Is_Composited_Into_The_Fill()
     {
         var result = Run(@"
@@ -92,7 +92,7 @@ r.push(a > 100 && a < 155);
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetImageData_Reads_Out_Of_Bounds_As_Transparent_Black()
     {
         var result = Run(@"
@@ -110,7 +110,7 @@ r.push(d.data[7]);   // outside -> transparent
         Assert.Contains("2x2,16,255,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PutImageData_Writes_Pixels_Back()
     {
         var result = Run(@"
@@ -129,7 +129,7 @@ r.push(ctx.getImageData(0, 0, 1, 1).data[3]);
         Assert.Contains("1x1/4,1/2/3/255,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImageData_Data_Is_A_Real_Uint8ClampedArray()
     {
         var result = Run(@"
@@ -144,7 +144,7 @@ d.data[1] = -5;  r.push(d.data[1]);
         Assert.Contains("true,[object Uint8ClampedArray],255,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Canvas_And_ImageData_Interfaces_Answer_Instanceof()
     {
         var result = Run(@"
@@ -161,7 +161,7 @@ r.push(new ImageData(2, 2).data.length);
         Assert.Contains("true,true,true,true,true,true,16", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToDataUrl_Encodes_Png_And_Jpeg_And_Falls_Back_For_Unsupported_Types()
     {
         // HTML: an image format the user agent does not support falls back to image/png rather than
@@ -185,7 +185,7 @@ r.push(c.toDataURL().length > 30);
             result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToDataUrl_On_A_Zero_Area_Canvas_Is_The_Empty_Data_Url()
     {
         var result = Run(@"
@@ -197,7 +197,7 @@ r.push(c.toDataURL('image/png'));
         Assert.Contains("data:,,data:,", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GlobalCompositeOperation_Rejects_An_Operator_It_Cannot_Composite()
     {
         // An unrecognised value must be ignored and the state keep its previous value. The context
@@ -214,7 +214,7 @@ r.push(ctx.globalCompositeOperation);
         Assert.Contains("source-over,screen,screen", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paths_And_Text_Put_Pixels_On_The_Bitmap()
     {
         // The point is not the exact coverage — it is that these are no longer empty bodies, so a
@@ -244,7 +244,7 @@ r.push(inked > 0);
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Width_And_Height_Default_And_Reflect_The_Content_Attribute()
     {
         var result = Run(@"
@@ -262,7 +262,7 @@ r.push(ctx.getImageData(39, 19, 1, 1).data[3]);
         Assert.Contains("300x150,40x20,40x20,255", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Assigning_Width_Resets_The_Bitmap_And_The_Drawing_State()
     {
         // `canvas.width = canvas.width` is the idiomatic way to clear a canvas: HTML resets the
@@ -286,7 +286,7 @@ r.push(c.getContext('2d') === ctx);             // still the same context object
         Assert.Contains("true,0,#000000,1,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Canvas_Members_Are_Not_Installed_On_Other_Elements()
     {
         // These names belong to HTMLCanvasElement. getContext used to be installed on every element
@@ -308,7 +308,7 @@ r.push(img.getAttribute('width'));
         Assert.Contains("false,false,undefined,true,true,12", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetContext_Answers_Null_For_A_Context_Type_This_Engine_Has_Not_Got()
     {
         var result = Run(@"
@@ -320,7 +320,7 @@ r.push(c.getContext('2d') !== null);
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FillText_Of_Enormous_Text_Is_Bounded_By_The_Canvas()
     {
         // The scratch surface a run is rasterised on is sized to the part of it the canvas can show,
@@ -340,7 +340,7 @@ catch (e) { r.push('threw: ' + e); }
         Assert.Contains("survived", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FillText_Starting_Off_The_Left_Edge_Still_Paints_What_Is_On_Canvas()
     {
         // Clipping the scratch to the visible region must move no glyph: the run's origin is shifted
@@ -360,7 +360,7 @@ r.push(inked > 0 ? 'painted' : 'blank');
         Assert.Contains("painted", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FillText_Entirely_Off_Canvas_Draws_Nothing_And_Does_Not_Throw()
     {
         var result = Run(@"
@@ -378,7 +378,7 @@ r.push(inked);
         Assert.Contains("0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetImageData_Refuses_A_Rectangle_Too_Large_To_Allocate()
     {
         // The rectangle is not clipped to the canvas, so its size comes from the arguments alone.
@@ -392,7 +392,7 @@ catch (e) { r.push('threw'); }
 
     // ---- the html5test probes, verbatim -----------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html5Test_Canvas_Blending_Probe_Completes()
     {
         // engine.js:3013-3041 (`canvas.blending`). Line 3030 is the getImageData that used to throw.
@@ -423,7 +423,7 @@ r.push(passed);
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html5Test_Canvas_Png_Probe_Passes()
     {
         // engine.js:3047-3064 (`canvas.png`). Line 3055 used to throw.
@@ -443,7 +443,7 @@ r.push(passed);
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html5Test_Canvas_Jpeg_Probe_Passes()
     {
         // engine.js:3066-3080 (`canvas.jpeg`). Line 3071 used to throw.
@@ -463,7 +463,7 @@ r.push(passed);
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Html5Test_Canvas_JpegXr_And_Webp_Probes_Still_Report_No()
     {
         // engine.js:3084-3112. There is no JPEG-XR or WebP encoder, so the PNG fallback is the right

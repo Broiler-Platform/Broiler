@@ -4,7 +4,7 @@ namespace Broiler.Cli.Tests;
 
 public sealed class CssExtractionPhaseThreeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_References_The_Shared_Canonical_Dom_Selector_Component()
     {
         var root = FindRepositoryRoot();
@@ -22,7 +22,7 @@ public sealed class CssExtractionPhaseThreeTests
         Assert.Contains(@"..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj", references);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_Selector_Surface_Is_A_Compatibility_Wrapper()
     {
         var root = FindRepositoryRoot();

@@ -16,7 +16,7 @@ public class NetworkAndHttpTests
 {
     // ────────────────── fetch() response headers ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Has_Headers_Object()
     {
         var html = @"<!DOCTYPE html>
@@ -39,7 +39,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("object", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Has_Status_And_StatusText()
     {
         var html = @"<!DOCTYPE html>
@@ -60,7 +60,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("number", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Has_Url_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -79,7 +79,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Has_Type_And_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -99,7 +99,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Headers_Get_Returns_Null_For_Missing()
     {
         var html = @"<!DOCTYPE html>
@@ -117,7 +117,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("null", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Has_Clone_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -136,7 +136,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Has_ArrayBuffer_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -155,7 +155,7 @@ fetch('http://example.com').then(function(response) {
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -181,7 +181,7 @@ response.arrayBuffer().then(function(buffer) {
         Assert.Contains("true|true|3|65|66|67", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Headers_Constructor_Supports_Common_Mutations()
     {
         var html = @"<!DOCTYPE html>
@@ -208,7 +208,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("text/plain|application/json|one, two|false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_FormData_Constructor_Supports_Common_Mutations()
     {
         var html = @"<!DOCTYPE html>
@@ -235,7 +235,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true|broiler|broiler,oven bird|false|name=broiler;name=oven+bird", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Constructor_Exposes_Url_Method_Headers_And_Body()
     {
         var html = @"<!DOCTYPE html>
@@ -263,7 +263,7 @@ request.text().then(function(text) {
         Assert.Contains("http://example.com/data|POST|application/json|payload", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Constructor_Exposes_Default_Request_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -287,7 +287,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("cors|same-origin|default|follow|about:client|", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Constructor_Exposes_Explicit_Request_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -318,7 +318,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("same-origin|include|no-store|manual|http://example.com/source|sha256-test", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Clone_Preserves_Request_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -355,7 +355,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("same-origin|include|reload|error|http://example.com/source|sha256-test|POST|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_ArrayBuffer_Returns_ArrayBuffer_Bytes_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -382,7 +382,7 @@ request.arrayBuffer().then(function(buffer) {
         Assert.Contains("true|true|3|65|66|67", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Body_Stream_Reads_Uint8Array_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -410,7 +410,7 @@ reader.read().then(function(result) {
         Assert.Contains("true|true|true|3|65|66|67", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Body_Stream_Lock_Blocks_Other_Body_Readers()
     {
         var html = @"<!DOCTYPE html>
@@ -433,7 +433,7 @@ try {
         Assert.Contains("body is already used", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -464,7 +464,7 @@ request.blob().then(function(blob) {
         Assert.Contains("true|true|7|application/json|broiler", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Clone_Preserves_Body_Without_Consuming_Original()
     {
         var html = @"<!DOCTYPE html>
@@ -494,7 +494,7 @@ clone.text().then(function(cloneText) {
         Assert.Contains("payload|payload|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Clone_Throws_After_Body_Is_Used()
     {
         var html = @"<!DOCTYPE html>
@@ -521,7 +521,7 @@ request.text().then(function() {
         Assert.Contains("body is already used", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_FormData_Parses_Body_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -550,7 +550,7 @@ request.formData().then(function(value) {
         Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Json_Parses_Body_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -576,7 +576,7 @@ request.json().then(function(value) {
         Assert.Contains("true|broiler|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Body_Readers_Throw_After_Body_Is_Used()
     {
         var html = @"<!DOCTYPE html>
@@ -603,7 +603,7 @@ request.text().then(function() {
         Assert.Contains("body is already used", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Body_Readers_Set_BodyUsed_Immediately_And_Block_Same_Turn_Double_Reads()
     {
         var html = @"<!DOCTYPE html>
@@ -635,7 +635,7 @@ firstRead.then(function(text) {
         Assert.Contains("true|Failed to execute body reader on 'Request': body is already used.|payload", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Constructor_Supports_Status_Headers_And_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -666,7 +666,7 @@ response.text().then(function(text) {
         Assert.Contains("true|201|Created|text/plain|true|created", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Json_Static_Creates_Json_Response_With_Init_And_ContentType()
     {
         var html = @"<!DOCTYPE html>
@@ -697,7 +697,7 @@ response.json().then(function(value) {
         Assert.Contains("true|201|Created|application/json|yes|broiler|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Error_Static_Creates_Error_Response()
     {
         var html = @"<!DOCTYPE html>
@@ -719,7 +719,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true|0|error|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Redirect_Static_Sets_Status_And_Location_Header()
     {
         var html = @"<!DOCTYPE html>
@@ -741,7 +741,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true|301|file:///next|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Redirect_Static_Rejects_Invalid_Status_Code()
     {
         var html = @"<!DOCTYPE html>
@@ -762,7 +762,7 @@ try {
         Assert.Contains("Invalid status code", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Clone_Preserves_Body_Without_Consuming_Original()
     {
         var html = @"<!DOCTYPE html>
@@ -791,7 +791,7 @@ clone.text().then(function(cloneText) {
         Assert.Contains("created|created|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Clone_Throws_After_Body_Is_Used()
     {
         var html = @"<!DOCTYPE html>
@@ -817,7 +817,7 @@ response.text().then(function() {
         Assert.Contains("body is already used", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Blob_Returns_Blob_Text_Type_Size_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -846,7 +846,7 @@ response.blob().then(function(blob) {
         Assert.Contains("true|true|7|text/plain|created", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Body_Stream_Reads_Once_Then_Completes()
     {
         var html = @"<!DOCTYPE html>
@@ -879,7 +879,7 @@ reader.read().then(function(first) {
         Assert.Contains("true|true|true|65|66|67|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Body_Stream_Lock_Blocks_Clone()
     {
         var html = @"<!DOCTYPE html>
@@ -904,7 +904,7 @@ try {
         Assert.Contains("body is already used", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_FormData_Parses_Body_And_Sets_BodyUsed()
     {
         var html = @"<!DOCTYPE html>
@@ -931,7 +931,7 @@ response.formData().then(function(value) {
         Assert.Contains("true|true|broiler|broiler,oven bird|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Body_Readers_Throw_After_Body_Is_Used()
     {
         var html = @"<!DOCTYPE html>
@@ -957,7 +957,7 @@ response.text().then(function() {
         Assert.Contains("body is already used", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Body_Readers_Set_BodyUsed_Immediately_And_Block_Same_Turn_Double_Reads()
     {
         var html = @"<!DOCTYPE html>
@@ -988,7 +988,7 @@ firstRead.then(function(text) {
         Assert.Contains("true|Failed to execute body reader on 'Response': body is already used.|", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Response_Json_InvalidJson_Throws_Clear_Error()
     {
         using var context = new JSContext();
@@ -1004,7 +1004,7 @@ firstRead.then(function(text) {
 
     // ────────────────── fetch() method support ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Supports_Options_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -1025,7 +1025,7 @@ try {
         Assert.Contains("POST_OK", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Catch_Does_Not_Throw()
     {
         var html = @"<!DOCTYPE html>
@@ -1047,7 +1047,7 @@ try {
         Assert.Contains("CATCH_OK", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Accepts_Request_Instance_And_Headers_Object()
     {
         var html = @"<!DOCTYPE html>
@@ -1073,7 +1073,7 @@ fetch(request).then(function(response) {
         Assert.Contains("true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Request_Constructor_Preserves_AbortSignal()
     {
         var html = @"<!DOCTYPE html>
@@ -1096,7 +1096,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_With_PreAborted_Signal_Rejects_With_AbortError()
     {
         var html = @"<!DOCTYPE html>
@@ -1123,7 +1123,7 @@ fetch('http://example.com/aborted', { signal: controller.signal })
         Assert.Contains("AbortError|The operation was aborted.", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_AbortSignal_Dispatches_Abort_Event_Once_And_Preserves_Custom_Reason()
     {
         var html = @"<!DOCTYPE html>
@@ -1154,7 +1154,7 @@ controller.abort('second-reason');
         Assert.Contains("abort|true|true|custom-reason|0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_AbortSignal_ThrowIfAborted_Throws_Custom_Reason()
     {
         var html = @"<!DOCTYPE html>
@@ -1179,7 +1179,7 @@ try {
 
     // ────────────────── XMLHttpRequest enhancements ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_GetResponseHeader_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -1197,7 +1197,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_GetAllResponseHeaders_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -1215,7 +1215,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_GetResponseHeader_Returns_Null_Before_Send()
     {
         var html = @"<!DOCTYPE html>
@@ -1233,7 +1233,7 @@ document.getElementById('result').textContent = String(v);
         Assert.Contains("null", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_OverrideMimeType_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -1251,7 +1251,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_Abort_Method()
     {
         var html = @"<!DOCTYPE html>
@@ -1269,7 +1269,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Abort_Resets_State()
     {
         var html = @"<!DOCTYPE html>
@@ -1291,7 +1291,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_ResponseType_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -1311,7 +1311,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_Event_Handler_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -1335,7 +1335,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_EventTarget_Methods()
     {
         var html = @"<!DOCTYPE html>
@@ -1355,7 +1355,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_Upload_EventTarget()
     {
         var html = @"<!DOCTYPE html>
@@ -1380,7 +1380,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Has_Static_State_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -1401,7 +1401,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Open_Fires_ReadyStateChange()
     {
         var html = @"<!DOCTYPE html>
@@ -1422,7 +1422,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Open_Resets_ResponseText()
     {
         var html = @"<!DOCTYPE html>
@@ -1443,7 +1443,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_WithCredentials_Default_False()
     {
         var html = @"<!DOCTYPE html>
@@ -1461,7 +1461,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_ReadyStateChange_Fires_For_Loading_State_Before_Done()
     {
         var html = @"<!DOCTYPE html>
@@ -1498,7 +1498,7 @@ document.getElementById('result').textContent = readyStates.join(',');
         Assert.Contains("1,2,3,4", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_AddEventListener_Dispatches_Lifecycle_And_Progress_Events()
     {
         var html = @"<!DOCTYPE html>
@@ -1554,7 +1554,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("loadend:true:7:7:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Load_Event_Preserves_Property_Handler_Alongside_Listeners()
     {
         var html = @"<!DOCTYPE html>
@@ -1592,7 +1592,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("property,listener", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Upload_AddEventListener_Dispatches_Upload_Progress_Events()
     {
         var html = @"<!DOCTYPE html>
@@ -1641,7 +1641,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("upload-loadend:true:7:7:true:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Upload_Load_Event_Preserves_Property_Handler_Alongside_Listeners()
     {
         var html = @"<!DOCTYPE html>
@@ -1679,7 +1679,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("property,listener", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Timeout_Fires_Event_And_LoadEnd_When_Request_Hangs()
     {
         var html = @"<!DOCTYPE html>
@@ -1722,7 +1722,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("timeout,loadend|true|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Success_Clears_Timeout_Timer()
     {
         var html = @"<!DOCTYPE html>
@@ -1770,7 +1770,7 @@ fetch = window.fetch = originalFetch;
 
     // ────────────────── Content-Type handling ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Non_HTML_Src_ContentDocument_Has_No_P_FAIL()
     {
         // Acid3 test 14: iframe with src="empty.png" should NOT have <p>FAIL</p> in contentDocument
@@ -1803,7 +1803,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.DoesNotContain("has-fail:true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Text_Plain_Src_ContentDocument_Has_No_P_FAIL()
     {
         // Acid3 test 15: iframe with src="empty.txt" should NOT have <p>FAIL</p> in contentDocument
@@ -1838,7 +1838,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── <object> element handling ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Property_Settable()
     {
         // Acid3 test 16: object.data should be settable without exception
@@ -1869,7 +1869,7 @@ try {
         Assert.Contains("PASS", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Type_Property_ReadWrite()
     {
         var html = @"<!DOCTYPE html>
@@ -1889,7 +1889,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Nested_With_Data_No_Exception()
     {
         var html = @"<!DOCTYPE html>
@@ -1916,7 +1916,7 @@ try {
         Assert.Contains("PASS", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Data_Change_Invalidates_SubDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -1942,7 +1942,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── Same-origin policy ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_CrossOrigin_ContentDocument_Returns_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -1960,7 +1960,7 @@ document.getElementById('result').textContent = String(doc);
         Assert.Contains("null", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_SameOrigin_ContentDocument_Returns_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -1980,7 +1980,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_FileScheme_ContentDocument_Is_SameOrigin()
     {
         var html = @"<!DOCTYPE html>
@@ -2000,7 +2000,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_CrossOrigin_ContentWindow_Returns_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -2020,7 +2020,7 @@ document.getElementById('result').textContent = String(win);
 
     // ────────────────── iframe src property ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Src_Property_ReadWrite()
     {
         var html = @"<!DOCTYPE html>
@@ -2043,7 +2043,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── Notifications (Acid3 cross-file test) ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Notifications_Object_Not_Set_For_PNG_Iframe()
     {
         // Acid3 test 14 pattern: notifications['empty.png'] should be falsy
@@ -2064,7 +2064,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Notifications_Object_Not_Set_For_TXT_Iframe()
     {
         // Acid3 test 15 pattern: notifications['empty.txt'] should be falsy
@@ -2087,7 +2087,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────── Error handling ──────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Error_Response_Has_Headers_Object()
     {
         // When fetch fails, the error response should still have a headers object
@@ -2109,7 +2109,7 @@ fetch('http://nonexistent.invalid.domain.test/page').then(function(response) {
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_GetAllResponseHeaders_Returns_String_Before_Send()
     {
         var html = @"<!DOCTYPE html>
@@ -2129,7 +2129,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_OverrideMimeType_Populates_ResponseXml_For_Default_Text_Response()
     {
         var html = @"<!DOCTYPE html>
@@ -2171,7 +2171,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|true|true|true|OK", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_OverrideMimeType_Leaves_ResponseXml_Null_For_Plain_Text_Override()
     {
         var html = @"<!DOCTYPE html>
@@ -2210,7 +2210,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|plain text payload|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_ArrayBuffer_ResponseType_Uses_Fetch_ArrayBuffer_Result()
     {
         var html = @"<!DOCTYPE html>
@@ -2251,7 +2251,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|true|65|66", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Blob_ResponseType_Uses_Fetch_Blob_Result()
     {
         var html = @"<!DOCTYPE html>
@@ -2294,7 +2294,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|2|application/octet-stream|true|AB", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Json_ResponseType_Uses_Fetch_Json_Result()
     {
         var html = @"<!DOCTYPE html>
@@ -2333,7 +2333,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|2|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Json_ResponseType_Invalid_Json_Yields_Null_And_Completes_Load()
     {
         var html = @"<!DOCTYPE html>
@@ -2382,7 +2382,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|false|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Rejected_Fetch_Triggers_Error_And_LoadEnd()
     {
         var html = @"<!DOCTYPE html>
@@ -2425,7 +2425,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("false|true|true|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Rejected_BodyReader_Triggers_Error_And_LoadEnd()
     {
         var html = @"<!DOCTYPE html>
@@ -2484,7 +2484,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("false|true|2,4|true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Document_ResponseType_Uses_Fetch_Text_Result_As_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -2527,7 +2527,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|true|true|true|OK", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Document_ResponseType_Stays_Null_For_NonDocument_MimeType()
     {
         var html = @"<!DOCTYPE html>
@@ -2566,7 +2566,7 @@ fetch = window.fetch = originalFetch;
         Assert.Contains("true|true|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XHR_Document_ResponseType_Uses_OverrideMimeType_For_Text_Response()
     {
         var html = @"<!DOCTYPE html>

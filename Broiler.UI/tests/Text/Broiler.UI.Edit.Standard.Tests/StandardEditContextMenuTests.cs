@@ -8,7 +8,7 @@ namespace Broiler.UI.Edit.Standard.Tests;
 
 public sealed class StandardEditContextMenuTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Right_Click_Opens_The_Menu_Focuses_The_Field_And_Captures_Input()
     {
         EditScene scene = Create("Hello world");
@@ -24,7 +24,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(scene.Edit.IsContextMenuOpen);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Right_Click_Outside_The_Selection_Moves_The_Caret_And_Drops_The_Selection()
     {
         EditScene scene = Create("Hello world");
@@ -37,7 +37,7 @@ public sealed class StandardEditContextMenuTests
         Assert.False(FindItem(scene.Edit, StandardEditContextMenuCommand.Copy).IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Right_Click_Inside_The_Selection_Keeps_It_So_Copy_Acts_On_It()
     {
         EditScene scene = Create("Hello world");
@@ -50,7 +50,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(FindItem(scene.Edit, StandardEditContextMenuCommand.Copy).IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clicking_Copy_Copies_The_Selection_And_Closes_The_Menu()
     {
         EditScene scene = Create("Hello world");
@@ -65,7 +65,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Null(scene.Session.CapturedElement);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clicking_Cut_Then_Paste_Moves_Text_Through_The_Clipboard()
     {
         EditScene scene = Create("Hello world");
@@ -83,7 +83,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal("worldHello ", scene.Edit.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clicking_Delete_Removes_The_Selection_Without_Touching_The_Clipboard()
     {
         EditScene scene = Create("Hello world", clipboardText: "untouched");
@@ -96,7 +96,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal("untouched", scene.Host.ClipboardText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clicking_Select_All_Selects_The_Whole_Field()
     {
         EditScene scene = Create("Hello world");
@@ -108,7 +108,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal(11, scene.Edit.SelectionLength);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Disabled_Row_Neither_Runs_Nor_Closes_The_Menu()
     {
         EditScene scene = Create("Hello world");
@@ -121,7 +121,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(scene.Edit.IsContextMenuOpen);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Enablement_Reflects_Selection_Clipboard_And_Undo_State()
     {
         EditScene scene = Create("Hello world");
@@ -148,7 +148,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(FindItem(scene.Edit, StandardEditContextMenuCommand.Delete).IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Password_Field_Offers_Paste_But_Not_Cut_Or_Copy()
     {
         EditScene scene = Create("secret", clipboardText: "ready");
@@ -162,7 +162,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(FindItem(scene.Edit, StandardEditContextMenuCommand.Delete).IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Read_Only_Field_Offers_Only_Copy_And_Select_All()
     {
         EditScene scene = Create("Hello world", clipboardText: "ready");
@@ -177,7 +177,7 @@ public sealed class StandardEditContextMenuTests
         Assert.False(FindItem(scene.Edit, StandardEditContextMenuCommand.Delete).IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Paste_Stays_Disabled_When_The_Clipboard_Holds_Nothing_Insertable()
     {
         EditScene scene = Create("Hello", clipboardText: "\r\n\t");
@@ -186,7 +186,7 @@ public sealed class StandardEditContextMenuTests
         Assert.False(FindItem(scene.Edit, StandardEditContextMenuCommand.Paste).IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Menu_Key_And_Shift_F10_Open_The_Menu_Below_The_Caret()
     {
         EditScene scene = Create("Hello world");
@@ -203,7 +203,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(scene.Edit.IsContextMenuOpen);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Arrow_Keys_Skip_Separators_And_Disabled_Rows_Before_Enter_Runs_The_Row()
     {
         EditScene scene = Create("Hello world");
@@ -225,7 +225,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal(" world", scene.Edit.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void End_Highlights_The_Last_Runnable_Row()
     {
         EditScene scene = Create("Hello world");
@@ -236,7 +236,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal(StandardEditContextMenuCommand.SelectAll, scene.Edit.ContextMenuItems[scene.Edit.ContextMenuHighlightedIndex].Command);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typing_A_Row_Letter_Cycles_Between_Rows_That_Share_It()
     {
         EditScene scene = Create("Hello world", clipboardText: "ready");
@@ -250,7 +250,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal(StandardEditContextMenuCommand.Copy, scene.Edit.ContextMenuItems[scene.Edit.ContextMenuHighlightedIndex].Command);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hovering_A_Row_Highlights_It()
     {
         EditScene scene = Create("Hello world");
@@ -262,7 +262,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal(StandardEditContextMenuCommand.SelectAll, scene.Edit.ContextMenuItems[scene.Edit.ContextMenuHighlightedIndex].Command);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typing_While_The_Menu_Is_Open_Does_Not_Reach_The_Field()
     {
         EditScene scene = Create("Hello");
@@ -274,7 +274,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Equal("Hello", scene.Edit.Text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Click_Outside_The_Menu_Dismisses_It_Without_Editing()
     {
         EditScene scene = Create("Hello world");
@@ -289,7 +289,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Null(scene.Host.ClipboardText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Menu_Stays_Inside_The_Viewport_When_Opened_At_A_Corner()
     {
         EditScene scene = Create("Hello world", viewportSize: new BSize(300, 120));
@@ -303,7 +303,7 @@ public sealed class StandardEditContextMenuTests
         Assert.True(menu.Bottom <= 120);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Open_Menu_Paints_Over_Later_Siblings_And_Appears_In_The_Semantic_Tree()
     {
         EditScene scene = Create("Hello world");
@@ -326,7 +326,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Empty(scene.Edit.GetSemanticNode().Children);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Detaching_The_Field_Closes_The_Menu_And_Releases_The_Capture()
     {
         EditScene scene = Create("Hello world");
@@ -338,7 +338,7 @@ public sealed class StandardEditContextMenuTests
         Assert.Null(scene.Session.CapturedElement);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Disabled_Field_Dismisses_The_Menu_And_Refuses_To_Open_One()
     {
         EditScene scene = Create("Hello world");
@@ -352,7 +352,7 @@ public sealed class StandardEditContextMenuTests
     }
 
     /// <summary>A host-driven menu runs the same commands as the drawn one.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Commands_Can_Be_Invoked_Without_Opening_The_Drawn_Menu()
     {
         EditScene scene = Create("Hello world");

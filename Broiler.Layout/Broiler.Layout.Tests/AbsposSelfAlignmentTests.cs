@@ -69,7 +69,7 @@ public sealed class AbsposSelfAlignmentTests
         Assert.Equal(expectedX, JustifySelfX("center", left, right, boxWidth, itemRtl: true, cbRtl: false), 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExplicitUnsafe_AlignsWithoutClamping()
     {
         // unsafe center of a 120px box in IMCB [20,90]: (70-120)/2 = -25 → x = -5,
@@ -77,7 +77,7 @@ public sealed class AbsposSelfAlignmentTests
         Assert.Equal(-5, JustifySelfX("unsafe center", 20, 10, 120, itemRtl: false, cbRtl: false), 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExplicitSafe_FallsBackToImcbStartOnOverflow()
     {
         // safe center of a 120px box in IMCB [20,90]: overflow → start of the

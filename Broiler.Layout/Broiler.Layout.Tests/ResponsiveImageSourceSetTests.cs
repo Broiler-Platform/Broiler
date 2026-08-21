@@ -57,7 +57,7 @@ public sealed class ResponsiveImageSourceSetTests
 
     // ── no srcset ────────────────────────────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Element_Without_A_Srcset_Is_Not_Responsive()
     {
         // Null, not "the src at 1x": the caller keeps its existing `src`/`data` fallback chain,
@@ -80,19 +80,19 @@ public sealed class ResponsiveImageSourceSetTests
     // HTML's "rules for parsing floating-point number values" have no upper bound; a magnitude past
     // double's range converges to an infinity, and the element then has a zero natural size rather
     // than a broken image. WPT current-pixel-density/basic asserts exactly this shape.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unrepresentably_Large_Density_Is_Infinite_Rather_Than_A_Parse_Error()
     {
         Assert.Equal(double.PositiveInfinity, DensityOf("a.png 9e99999999999999999999999x"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Smallest_Candidate_That_Covers_The_Display_Density_Wins()
     {
         Assert.Equal("b.png", UrlOf("c.png 4x, b.png 1x, d.png 2x"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void With_Every_Candidate_Below_The_Display_Density_The_Densest_Wins()
     {
         Assert.Equal("c.png", UrlOf("a.png 0.25x, c.png 0.75x, b.png 0.5x"));
@@ -100,7 +100,7 @@ public sealed class ResponsiveImageSourceSetTests
 
     // The `src` of an all-`x` srcset is a 1x candidate of its own, so a page that ships a plain
     // image plus a retina one still has something to show at 1x.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Src_Joins_An_All_Density_Srcset_As_A_1x_Candidate()
     {
         var selection = Select(("src", "plain.png"), ("srcset", "retina.png 2x"));
@@ -110,7 +110,7 @@ public sealed class ResponsiveImageSourceSetTests
     }
 
     // …but a srcset that states widths describes the whole set, and `src` is not part of it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Src_Does_Not_Join_A_Width_Srcset()
     {
         Assert.Equal("wide.png", UrlOf2(("src", "plain.png"), ("srcset", "wide.png 500w"), ("sizes", "500px")));
@@ -174,7 +174,7 @@ public sealed class ResponsiveImageSourceSetTests
         return map;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_First_Matching_Source_Supplies_The_Candidate_List()
     {
         var selection = SelectInPicture(
@@ -199,7 +199,7 @@ public sealed class ResponsiveImageSourceSetTests
         Assert.Equal("own.png", selection?.Url);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Source_Without_A_Srcset_Is_Not_A_Source_Set()
     {
         var selection = SelectInPicture(
@@ -211,7 +211,7 @@ public sealed class ResponsiveImageSourceSetTests
 
     // `src` is the fallback for when no <source> matched; it is not a 1x candidate inside a set
     // that one of them supplied.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Imgs_Src_Does_Not_Join_A_Sources_Candidate_List()
     {
         var selection = SelectInPicture(
@@ -249,7 +249,7 @@ public sealed class ResponsiveImageSourceSetTests
 
     // `sizes` exists to turn a width descriptor into a density; with no width descriptor there is
     // nothing for it to divide, so it is inert. (WPT sizes/implicit-sizes-ignores-width.)
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Sizes_Is_Ignored_When_No_Candidate_States_A_Width()
     {
         Assert.Equal(2, DensityOf("a.png 2x", "400px"), 6);
@@ -257,7 +257,7 @@ public sealed class ResponsiveImageSourceSetTests
 
     // The default source size is the viewport, not the replaced element's default object size: an
     // <img> with a `w` srcset and no `sizes` is asking to be as wide as the page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Absent_Sizes_Defaults_To_100vw()
     {
         Assert.Equal(500 / ViewportWidth, DensityOf("a.png 500w"), 6);
@@ -365,7 +365,7 @@ public sealed class ResponsiveImageSourceSetTests
         Assert.Equal(expected, UrlOf(srcset));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Srcset_Of_Nothing_But_Errors_Selects_Nothing()
     {
         Assert.Null(Select(("srcset", "a.png 0w, b.png -1x")));
@@ -375,7 +375,7 @@ public sealed class ResponsiveImageSourceSetTests
     // separator — `srcset="a.png,b.png 2x"` names one candidate whose URL contains a comma. Only a
     // *trailing* comma ends a candidate, which is what makes `a.png,` a candidate with no
     // descriptor. Written down because it reads like a typo either way.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unspaced_Comma_Is_Part_Of_The_Url_Rather_Than_A_Separator()
     {
         Assert.Equal("a.png,b.png", UrlOf("a.png,b.png 2x"));

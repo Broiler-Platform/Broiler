@@ -22,7 +22,7 @@ public sealed class EventTargetRegistryTests
     //  Node listeners
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeListeners_Returns_A_Stable_Store_Per_Node()
     {
         var reg = new EventTargetRegistry();
@@ -33,7 +33,7 @@ public sealed class EventTargetRegistryTests
         Assert.NotSame(reg.NodeListeners(a), reg.NodeListeners(b)); // distinct nodes → distinct stores
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeListeners_Are_Keyed_Case_Insensitively_By_Type()
     {
         var reg = new EventTargetRegistry();
@@ -47,7 +47,7 @@ public sealed class EventTargetRegistryTests
     //  Window listeners
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowListeners_Create_On_Add_And_Are_Found_Case_Insensitively()
     {
         var reg = new EventTargetRegistry();
@@ -64,7 +64,7 @@ public sealed class EventTargetRegistryTests
     //  Generic-target listeners & owner windows
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TargetListeners_Are_Reference_Keyed()
     {
         var reg = new EventTargetRegistry();
@@ -77,7 +77,7 @@ public sealed class EventTargetRegistryTests
         Assert.False(reg.TryGetTargetListeners(other, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OwnerWindow_Set_And_Get()
     {
         var reg = new EventTargetRegistry();
@@ -94,7 +94,7 @@ public sealed class EventTargetRegistryTests
     //  Visual-viewport scroll listeners
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VisualViewportScrollListeners_Add_Is_Deduped_And_Removable()
     {
         var reg = new EventTargetRegistry();
@@ -112,7 +112,7 @@ public sealed class EventTargetRegistryTests
     //  Clear
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clear_Drops_Every_Store()
     {
         var reg = new EventTargetRegistry();
@@ -137,7 +137,7 @@ public sealed class EventTargetRegistryTests
     //  Characterization through the bridge
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Listener_Fires_On_Dispatch()
     {
         using var ctx = new JSContext();
@@ -157,7 +157,7 @@ public sealed class EventTargetRegistryTests
         Assert.Equal("1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_Listener_Fires_On_Dispatch()
     {
         using var ctx = new JSContext();

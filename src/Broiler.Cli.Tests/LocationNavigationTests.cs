@@ -37,7 +37,7 @@ public sealed class LocationNavigationTests
     }
 
     /// <summary>The reported failure, run as the bootstrap spells it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheReportedShape_DoesNotThrow()
     {
         var (context, bridge) = Attach();
@@ -73,7 +73,7 @@ public sealed class LocationNavigationTests
     /// The document did not change, so neither did its URL. A `pathname` answering for a document
     /// nobody loaded is harder to debug than one answering for the document in hand.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ANavigationRequest_LeavesTheUrlAlone()
     {
         var (context, bridge) = Attach();
@@ -93,7 +93,7 @@ public sealed class LocationNavigationTests
     /// left, the capture never knew it had been asked, and the URL then disagreed with the document
     /// still in hand.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AssigningHref_DoesNotThrow_AndLeavesTheUrlAlone()
     {
         var (context, bridge) = Attach();
@@ -108,7 +108,7 @@ public sealed class LocationNavigationTests
     }
 
     /// <summary>Through the document's spelling of the same object, and in a frame.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AssigningHref_BehavesTheSameThroughDocumentLocation()
     {
         var (context, bridge) = Attach();
@@ -125,7 +125,7 @@ public sealed class LocationNavigationTests
     /// A `location.href` read is still a plain string read — the accessor must not change what the
     /// property answers, only what writing to it does.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReadingHref_IsUnchanged()
     {
         var (context, bridge) = Attach();
@@ -177,7 +177,7 @@ public sealed class LocationNavigationTests
     /// `document.location` is the same object, so it is the same functions — not a second set that
     /// could drift.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentLocation_CarriesTheSameMethods()
     {
         var (context, bridge) = Attach();
@@ -192,7 +192,7 @@ public sealed class LocationNavigationTests
     /// A framed page calls `location.replace()` as readily as a top-level one, and its Location is
     /// built separately — so it needs the methods separately too.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AFramesLocation_CarriesTheMethodsToo()
     {
         var context = new JSContext();

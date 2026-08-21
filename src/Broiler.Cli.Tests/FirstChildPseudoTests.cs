@@ -8,7 +8,7 @@ public class FirstChildPseudoTests
     private readonly ITestOutputHelper _output;
     public FirstChildPseudoTests(ITestOutputHelper output) => _output = output;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FirstChild_Rule_Sets_Display_InlineBlock()
     {
         // The :first-child rule should set display:inline-block on matching p elements.
@@ -39,7 +39,7 @@ body { background: white; }
         Assert.True(limePixels > 100, $"Expected lime pixels from :first-child rule, got {limePixels}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LastChild_Rule_Applied_To_Terminal()
     {
         // h1:last-child or #id:last-child should set properties
@@ -66,7 +66,7 @@ p:last-child { background: red; }
         Assert.True(redPixels > 100, $"Expected red pixels from :last-child rule, got {redPixels}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void H1_FirstChild_Rule_Applied()
     {
         // h1:first-child should match the h1 element
@@ -94,7 +94,7 @@ h1:first-child { background: blue; }
         Assert.True(bluePixels > 100, $"Expected blue pixels from h1:first-child rule, got {bluePixels}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Bucket_Gets_InlineBlock_From_FirstChild_Rule()
     {
         // The exact Acid3 pattern: :first-child + * .buckets p should now apply

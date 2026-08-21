@@ -23,7 +23,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class FlexOutOfFlowAndColumnSizingTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Abspos_Child_Of_A_Row_Flex_Container_Is_Laid_Out()
     {
         AssertCheckLayout(
@@ -34,7 +34,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Abspos_Child_With_All_Auto_Insets_Takes_The_Content_Box_Start_Corner()
     {
         // §4.1: the static position is the container's content-box start corner, so the
@@ -48,7 +48,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Abspos_Child_Of_A_Flex_Container_Matches_The_Same_Markup_Without_Flex()
     {
         // The regression that started this: `display: flex` must not change where an
@@ -62,7 +62,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
         AssertCheckLayout("<div style=\"display:flex;position:relative;width:400px;height:200px\">" + child + "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Flex_Grow_Fills_A_Definite_Column_Containers_Main_Axis()
     {
         AssertCheckLayout(
@@ -71,7 +71,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Grow_Factors_Share_A_Column_Containers_Free_Space()
     {
         AssertCheckLayout(
@@ -81,7 +81,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Fixed_Size_Sibling_Keeps_Its_Size_While_The_Grower_Takes_The_Rest()
     {
         AssertCheckLayout(
@@ -91,7 +91,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Percentage_Height_Child_Resolves_Against_The_Flexed_Item()
     {
         // The reason a grown item is laid out again rather than resized in place: this is
@@ -104,7 +104,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Min_Height_Clamps_A_Zero_Height_Column_Containers_Main_Size()
     {
         // §9.2: `height: 0` is a definite main size, then clamped by `min-height` — so the
@@ -117,7 +117,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Min_Height_Alone_Leaves_The_Main_Size_Content_Based()
     {
         // The other half of the same rule, and the half that is easy to get wrong: with
@@ -131,7 +131,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Column_Container_Without_Grow_Factors_Is_Left_Alone()
     {
         AssertCheckLayout(
@@ -141,7 +141,7 @@ public sealed class FlexOutOfFlowAndColumnSizingTests
             "</div>");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Row_Containers_Items_Do_Not_Grow_Along_The_Block_Axis()
     {
         // Guards the direction check: the new pass must not touch a row container, whose

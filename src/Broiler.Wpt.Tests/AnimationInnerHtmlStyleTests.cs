@@ -23,7 +23,7 @@ public sealed class AnimationInnerHtmlStyleTests
         return null;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Keyframes_AreCollected_From_StyleElement_TextContent()
     {
         // Inline animation on the target; @keyframes only reachable via the <style> element's CSS.
@@ -49,7 +49,7 @@ public sealed class AnimationInnerHtmlStyleTests
             $"Expected margin-left:200px from @keyframes in <style>, got [{string.Join(", ", style.Select(kv => $"{kv.Key}:{kv.Value}"))}]");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StylesheetAnimationProperty_IsCollected_From_StyleElement_TextContent()
     {
         // Animation declared by a stylesheet RULE (not inline) plus @keyframes — both from the

@@ -46,21 +46,21 @@ public sealed class GridPlacementShorthandTests
         Assert.Equal(w, got.w, 1); Assert.Equal(h, got.h, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridArea_TwoValue_PlacesRowStartColStart()
     {
         var r = Place(("a", "grid-area:3 / 3;"));   // row-start 3 / col-start 3 (ends auto → span 1)
         Expect(r["div#a"], 86, 118, 35, 77);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridArea_FourValue_SpansToEndLines()
     {
         var r = Place(("a", "grid-area:1 / 1 / 3 / 3;"));  // rows 1..3, cols 1..3 → tracks 1&2
         Expect(r["div#a"], 0, 0, 63, 106);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StartEndLonghands_ComposeIntoPlacement()
     {
         var r = Place(

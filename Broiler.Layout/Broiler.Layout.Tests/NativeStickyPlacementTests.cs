@@ -54,7 +54,7 @@ public sealed class NativeStickyPlacementTests
         return root;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TopInset_PinsToScrollportTop_WhenScrolledPast()
     {
         // Scrollport 0..200. Tall CB scrolled up to (0,-350). Sticky (50×30) at (0,-50) —
@@ -69,7 +69,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(0, sticky.Location.X, 3);  // no horizontal inset → unchanged
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TopInset_NoPin_WhenStillBelowInsetLine()
     {
         // Sticky at (0,100) — 100px below the scrollport top, still past top:10 → no shift.
@@ -83,7 +83,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(0, sticky.Location.X, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BottomInset_PinsToScrollportBottom_WhenScrolledPast()
     {
         // Sticky (50×30) at (0,300) is below the visible scrollport; bottom:10 pins its
@@ -97,7 +97,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(160, sticky.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LeftInset_PinsHorizontally()
     {
         // Wide CB scrolled left. Sticky (30×50) at (-50,0); left:10 pins to x=10.
@@ -111,7 +111,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(0, sticky.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PercentInset_ResolvesAgainstScrollportSize()
     {
         // top:5% of the 200px scrollport = 10px → same pin as the 10px case.
@@ -124,7 +124,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(10, sticky.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clamp_KeepsBoxWithinContainingBlock()
     {
         // Short CB: content box (0,-50)..(0,10), only 60 tall. Sticky at the CB top (0,-50),
@@ -140,7 +140,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(-20, sticky.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NoClipContainer_PinsAgainstViewport_WhenScrolledAbove()
     {
         // No clipping ancestor → the box's scroll container is the viewport (document scroll).
@@ -157,7 +157,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(10, sticky.Location.Y, 3); // pinned 10px below the viewport top
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ViewportSticky_NoPin_WhenWithinViewportPastInset()
     {
         // Viewport-anchored sticky whose (post-scroll) position is comfortably inside the
@@ -173,7 +173,7 @@ public sealed class NativeStickyPlacementTests
         Assert.Equal(200, sticky.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonStickyBox_IsIgnored()
     {
         var root = Fixture(out var sticky, new PointF(0, -50), new SizeF(50, 30),

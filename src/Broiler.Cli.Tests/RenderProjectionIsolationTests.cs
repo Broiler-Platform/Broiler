@@ -15,7 +15,7 @@ public sealed class RenderProjectionIsolationTests
         "<input id='field'><!--render-only removal--><progress id='progress' value='1' max='2'></progress>" +
         "</body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetRenderDocument_Reflects_Runtime_State_Without_Mutating_Live_Dom()
     {
         using var context = new JSContext();
@@ -44,7 +44,7 @@ public sealed class RenderProjectionIsolationTests
         Assert.DoesNotContain(projection.Body!.ChildNodes, static node => node is DomComment);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialization_And_Repeated_Projections_Are_Isolated()
     {
         using var context = new JSContext();

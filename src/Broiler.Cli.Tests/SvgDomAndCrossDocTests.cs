@@ -11,7 +11,7 @@ public class SvgDomAndCrossDocTests
 {
     // ────────────────────── Test 66: localName property ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LocalName_TextNode_Returns_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -29,7 +29,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LocalName_Element_Returns_Lowercase_Tag()
     {
         var html = @"<!DOCTYPE html>
@@ -49,7 +49,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LocalName_CreateElementNS_Returns_LocalName()
     {
         var html = @"<!DOCTYPE html>
@@ -71,7 +71,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 68: UTF-16 surrogate pairs ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Surrogate_Pairs_In_Input_Value_Handled()
     {
         var html = @"<!DOCTYPE html>
@@ -107,7 +107,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Iframe contentDocument ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentDocument_Is_Not_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -127,7 +127,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentDocument_Has_DocumentElement()
     {
         var html = @"<!DOCTYPE html>
@@ -149,7 +149,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentDocument_Has_DOM_Methods()
     {
         var html = @"<!DOCTYPE html>
@@ -175,7 +175,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentDocument_Same_Reference()
     {
         var html = @"<!DOCTYPE html>
@@ -195,7 +195,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Object element contentDocument ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_ContentDocument_Is_Not_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -216,7 +216,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 74: getSVGDocument() ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_GetSVGDocument_Returns_ContentDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -236,7 +236,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_GetSVGDocument_Returns_ContentDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -258,7 +258,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 71: document.open/write/close ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Open_Write_Close_Creates_DOM()
     {
         var html = @"<!DOCTYPE html>
@@ -280,7 +280,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Write_DOCTYPE_Has_Name_And_PublicId()
     {
         var html = @"<!DOCTYPE html>
@@ -303,7 +303,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Write_DOCTYPE_With_SystemId()
     {
         var html = @"<!DOCTYPE html>
@@ -327,7 +327,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Write_Creates_Proper_Head_Body()
     {
         var html = @"<!DOCTYPE html>
@@ -352,7 +352,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_InternalSubset_Is_Null()
     {
         var html = @"<!DOCTYPE html>
@@ -377,7 +377,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 72: document.styleSheets ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_StyleSheets_Is_Available()
     {
         var html = @"<!DOCTYPE html>
@@ -401,7 +401,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_StyleSheet_OwnerNode_Is_Style_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -425,7 +425,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_StyleSheet_Href_Is_Null_For_Inline()
     {
         var html = @"<!DOCTYPE html>
@@ -447,7 +447,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_StyleSheet_CssRules_Has_Correct_Length()
     {
         var html = @"<!DOCTYPE html>
@@ -470,7 +470,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_StyleSheet_InsertRule_Increases_CssRules_Length()
     {
         var html = @"<!DOCTYPE html>
@@ -494,7 +494,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Main_Doc_StyleSheets_Href_Null_For_Inline()
     {
         var html = @"<!DOCTYPE html>
@@ -515,7 +515,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 73: Nested event dispatch ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Nested_Event_Dispatch()
     {
         var html = @"<!DOCTYPE html>
@@ -548,7 +548,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateEvent_CustomEvent_Has_InitCustomEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -573,7 +573,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("function,0|build,true,false,payload", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateEvent_KeyboardEvents_Has_Repeat_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -598,7 +598,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("boolean,false|true,13,0,13", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateEvent_Event_Has_IsTrusted_False()
     {
         var html = @"<!DOCTYPE html>
@@ -619,7 +619,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("boolean,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateEvent_Event_Has_TimeStamp()
     {
         var html = @"<!DOCTYPE html>
@@ -640,7 +640,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("number,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateEvent_Event_Has_Legacy_Alias_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -663,7 +663,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("object,true,false,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Event_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -687,7 +687,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("test,true,false,boolean,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CustomEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -712,7 +712,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("build,true,false,payload,number,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_UIEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -737,7 +737,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("build,true,false,true,6,number", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_MouseEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -763,7 +763,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("click,true,true,30,40,2,2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_FocusEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -787,7 +787,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("focusin,true,7,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_KeyboardEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -813,7 +813,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("keydown,true,Enter,1,true,13,13", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_WheelEvent_Constructor_Uses_SubWindow_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -841,7 +841,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 75: SVG rect element ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_Rect_Width_Is_Truthy()
     {
         var html = @"<!DOCTYPE html>
@@ -864,7 +864,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_Rect_Width_Has_BaseVal_AnimVal()
     {
         var html = @"<!DOCTYPE html>
@@ -890,7 +890,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 76: SVG getElementById ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_GetElementById_Finds_SVG_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -918,7 +918,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 77: SVG text getNumberOfChars ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_Text_GetNumberOfChars_Returns_Length()
     {
         var html = @"<!DOCTYPE html>
@@ -941,7 +941,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 79: Sub-document manipulation ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_HasChildNodes_And_RemoveChild()
     {
         var html = @"<!DOCTYPE html>
@@ -963,7 +963,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_AppendChild_Creates_New_Root()
     {
         var html = @"<!DOCTYPE html>
@@ -990,7 +990,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── document.images ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_Images_Returns_Img_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -1016,7 +1016,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── document.links ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Main_Doc_Links_Returns_Anchor_Elements_With_Href()
     {
         var html = @"<!DOCTYPE html>
@@ -1039,7 +1039,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── ContentWindow ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentWindow_Has_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -1060,7 +1060,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Sub-document createElement and DOM ops ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateElement_And_AppendChild()
     {
         var html = @"<!DOCTYPE html>
@@ -1083,7 +1083,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_CreateElementNS_With_SVG_Namespace()
     {
         var html = @"<!DOCTYPE html>
@@ -1109,7 +1109,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Sub-document getElementsByTagName ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDoc_GetElementsByTagName()
     {
         var html = @"<!DOCTYPE html>
@@ -1135,7 +1135,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── document.open/close ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Main_Doc_Open_Close_Are_Available()
     {
         var html = @"<!DOCTYPE html>
@@ -1155,7 +1155,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── NamespaceURI ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_NamespaceURI_Default_Is_XHTML()
     {
         var html = @"<!DOCTYPE html>
@@ -1175,7 +1175,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── DOCTYPE nodeType ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocType_NodeType_Is_10()
     {
         var html = @"<!DOCTYPE html>

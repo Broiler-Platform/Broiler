@@ -16,7 +16,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class TraversalBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Traversal_Feature_Module_Is_Co_Located_In_The_Bridge_Assembly()
     {
         var moduleType = typeof(TraversalBinding);
@@ -26,7 +26,7 @@ public sealed class TraversalBindingModuleTests
         Assert.False(moduleType.IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Traversal_Through_The_Narrow_Host_Contract()
     {
         // The bridge implements the host seam explicitly (so it adds no public members) and holds
@@ -40,7 +40,7 @@ public sealed class TraversalBindingModuleTests
         Assert.False(typeof(ITraversalHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Traversal_Scoped_State_Is_Owned_By_The_Module_Not_The_Bridge()
     {
         // The active-range and active-node-iterator registries are now owned by the feature module;
@@ -60,7 +60,7 @@ public sealed class TraversalBindingModuleTests
             element.GetGenericArguments()[0] == typeof(T);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_SetStart_SetEnd_ToString_Round_Trips_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -83,7 +83,7 @@ document.body.appendChild(out);
         Assert.Contains("toString=brave|collapsed=false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateTreeWalker_Walks_Element_Children_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -107,7 +107,7 @@ document.body.appendChild(out);
         Assert.Contains("walked=a,b,c", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateComment_Creates_A_Comment_Node_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

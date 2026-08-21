@@ -44,7 +44,7 @@ public sealed class GridItemFlexRelayoutTests : IDisposable
         + "<div></div><div></div><div></div><div></div><div></div><div></div><div></div>"
         + "</div>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Flex_Strip_In_A_Grid_Row_Stretches_Its_Items_To_The_Track()
     {
         using var rendered = Render(GridOfFlexStrips);
@@ -62,7 +62,7 @@ public sealed class GridItemFlexRelayoutTests : IDisposable
     // be put back in its area, and the document's running extent is what a paged render counts
     // pages with — so leaking the intermediate position doubles the page count of every reference
     // built this way.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Relayout_Does_Not_Grow_The_Documents_Extent()
     {
         using var rendered = Render(GridOfFlexStrips + "<div style=\"height:10px\"></div>");
@@ -75,7 +75,7 @@ public sealed class GridItemFlexRelayoutTests : IDisposable
 
     // The control: an item that states its own height keeps it, so this cannot have become
     // "stretch everything to its track".
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Item_With_A_Height_Of_Its_Own_Keeps_It()
     {
         using var rendered = Render(GridOfFlexStrips.Replace(

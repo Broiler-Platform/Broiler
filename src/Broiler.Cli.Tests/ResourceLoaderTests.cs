@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 [Xunit.Collection("SharedGeometryStatics")]
 public sealed class ResourceLoaderTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LocalBasePath_Defaults_Null_And_Round_Trips()
     {
         var loader = new ResourceLoader();
@@ -22,7 +22,7 @@ public sealed class ResourceLoaderTests
         Assert.Equal("/tmp/site", loader.LocalBasePath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LoadText_Reads_A_File_Url_From_Disk()
     {
         // Phase 7 item 4: the file/http dispatch lives in the loader. Deterministic (no network).
@@ -39,7 +39,7 @@ public sealed class ResourceLoaderTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LoadText_Returns_Null_For_Missing_File_Relative_And_Unsupported_Scheme()
     {
         var loader = new ResourceLoader();
@@ -48,7 +48,7 @@ public sealed class ResourceLoaderTests
         Assert.Null(loader.LoadText("ftp://example.com/x")); // unsupported scheme
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LoadLocalResource_Reads_Text_Returns_Null_For_Missing_And_Skips_Binary()
     {
         // Phase 7 item 4 (P7.8): the sub-resource file existence + binary/text read policy lives in the
@@ -88,7 +88,7 @@ public sealed class ResourceLoaderTests
     public void IsBinaryMime_Classifies_Content_Types(string mime, bool expected)
         => Assert.Equal(expected, ResourceLoader.IsBinaryMime(mime));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bridge_SetLocalBasePath_Does_Not_Throw_And_Attach_Still_Works()
     {
         // Characterization: SetLocalBasePath now configures the loader; a subsequent attach + query

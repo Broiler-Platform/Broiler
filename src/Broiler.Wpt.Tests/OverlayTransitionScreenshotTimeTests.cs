@@ -80,7 +80,7 @@ public class OverlayTransitionScreenshotTimeTests : IDisposable
     private static string Case(string wait, string listener) =>
         Markup.Replace("{{WAIT}}", wait).Replace("{{LISTENER}}", listener);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APageWaitingOnTransitionEnd_RendersThePopoverInTheTopLayer()
     {
         var (red, green, pink) = Render(Case(
@@ -94,7 +94,7 @@ public class OverlayTransitionScreenshotTimeTests : IDisposable
         Assert.Equal(200 * 200, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WithNoTransitionEndGate_ThePopoverStaysOutOfTheTopLayer()
     {
         // The same page without the gate is `overlay-transition-in-rendering`'s shape: the screenshot
@@ -107,7 +107,7 @@ public class OverlayTransitionScreenshotTimeTests : IDisposable
         Assert.Equal(0, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptStillObservesTheTransitionAsRunning()
     {
         // The paint-time move must not reach getComputedStyle: a page that gates on `transitionend`
@@ -122,7 +122,7 @@ public class OverlayTransitionScreenshotTimeTests : IDisposable
         Assert.Equal(0, pink);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AListenerOnAnAncestorAlsoCounts()
     {
         // `transitionend` bubbles, so a listener on the document is as good a gate as one on the

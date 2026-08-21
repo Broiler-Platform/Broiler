@@ -24,7 +24,7 @@ public sealed class SharedScrollOverflowTests
             "return [e.clientWidth,e.clientHeight,e.scrollWidth,e.scrollHeight].join(',');})()").ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollExtent_Reflects_Overflowing_Child_From_Shared_Geometry()
     {
         // Default flag state (UseSharedLayoutGeometry = true). A 100×100 overflow:auto
@@ -39,7 +39,7 @@ public sealed class SharedScrollOverflowTests
         Assert.Equal("100,100,250,300", EvalScroll(html, "c"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollExtent_Includes_Container_End_Padding()
     {
         // padding:10px 20px → clientWidth 100+40=140, clientHeight 100+20=120. A child

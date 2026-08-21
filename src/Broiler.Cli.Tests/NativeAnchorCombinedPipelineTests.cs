@@ -66,7 +66,7 @@ public sealed class NativeAnchorCombinedPipelineTests
         return geometry[target!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_SizesAndPlacesCombinedBox()
     {
         var box = LayoutTarget(nativeAnchor: true);
@@ -78,7 +78,7 @@ public sealed class NativeAnchorCombinedPipelineTests
         Assert.Equal(110f, box.BorderBox.Y, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_LeavesCombinedBoxUnresolved()
     {
         // Flag off → the engine cannot parse anchor()/anchor-size(), so the box is neither

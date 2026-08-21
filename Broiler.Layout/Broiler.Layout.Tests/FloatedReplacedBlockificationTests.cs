@@ -44,13 +44,13 @@ public sealed class FloatedReplacedBlockificationTests
     public void A_Floated_Image_Is_Blockified(string side) =>
         Assert.True(ImageBox(float_: side).IsBlockifiedFloatedReplaced);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unfloated_Image_Is_Not() =>
         Assert.False(ImageBox(float_: CssConstants.None).IsBlockifiedFloatedReplaced);
 
     /// <summary>A <c>&lt;canvas&gt;</c> or <c>&lt;video&gt;</c> is replaced without carrying an image
     /// word — its intrinsic size is what says so, and it fails the same way.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Floated_Box_With_An_Intrinsic_Replaced_Size_Is_Blockified()
     {
         var box = Leaf();
@@ -64,7 +64,7 @@ public sealed class FloatedReplacedBlockificationTests
     /// its words today and does render, so it must keep taking the inline path. Blockifying every
     /// float is what §9.7 actually asks for, but it is a separate change with its own evidence.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Floated_Non_Replaced_Inline_Is_Left_On_The_Inline_Path()
     {
         var box = Leaf();
@@ -75,7 +75,7 @@ public sealed class FloatedReplacedBlockificationTests
 
     /// <summary>A zero intrinsic size is what an undecoded or broken replaced element reports, and it
     /// is not evidence of anything — the rule must not claim a box on it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Zero_Intrinsic_Replaced_Size_Does_Not_Count()
     {
         var box = Leaf();
@@ -127,7 +127,7 @@ public sealed class FloatedReplacedBlockificationTests
     /// the natural size. The shape is the common one: an <c>&lt;img&gt;</c> floated by CSS that
     /// states no dimensions at all.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Floated_Image_With_No_Stated_Size_Takes_Its_Intrinsic_One()
     {
         var (root, image) = PageWithAnImage(CssConstants.Left, width: null, height: null);
@@ -141,7 +141,7 @@ public sealed class FloatedReplacedBlockificationTests
     /// <summary>The control for that guard: a floating <em>non</em>-replaced box must still
     /// shrink-to-fit rather than fill its containing block, which is the one thing exempting
     /// replaced boxes from §10.3.5 could plausibly have broken.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Floated_Non_Replaced_Box_Still_Shrinks_To_Fit()
     {
         var environment = new StubLayoutEnvironment();
@@ -170,7 +170,7 @@ public sealed class FloatedReplacedBlockificationTests
     /// image has to end up left of centre for <c>float: left</c> and right of it for
     /// <c>float: right</c> — a box merely sized but never positioned would sit at the origin for both.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Right_Float_Ends_Up_On_The_Right()
     {
         var (leftRoot, leftImage) = PageWithAnImage(float_: CssConstants.Left, width: "64px", height: "64px");

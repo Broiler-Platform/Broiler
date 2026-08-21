@@ -31,7 +31,7 @@ public sealed class GridTrackPaintTests
     /// background. Before the fix the item's stale full-size inline rect painted
     /// red across the whole container.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridItem_PaintsOnlyItsCell_NotStaleInlineSize()
     {
         const string html =
@@ -65,7 +65,7 @@ public sealed class GridTrackPaintTests
     /// before the fix the container collapsed to the single occupied row (50px) and
     /// that point fell through to the white canvas.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridContainer_SpansAllExplicitRowTracks()
     {
         const string html =
@@ -104,7 +104,7 @@ public sealed class GridTrackPaintTests
     /// (WPT css-grid/grid-items/whitespace-in-grid-item-001). The grid must instead
     /// collapse, leaving the canvas below its top edge white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridItem_PercentHeight_InAutoHeightGrid_CollapsesInsteadOfFillingViewport()
     {
         const string html =

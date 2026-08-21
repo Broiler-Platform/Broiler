@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class DocumentWriteBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentWrite_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(DocumentWriteBinding);
@@ -29,7 +29,7 @@ public sealed class DocumentWriteBindingModuleTests
         Assert.True(typeof(IDocumentWriteHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Write_And_Writeln_Insert_Queryable_Nodes_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

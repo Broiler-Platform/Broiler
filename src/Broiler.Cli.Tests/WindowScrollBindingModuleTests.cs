@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class WindowScrollBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowScroll_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(WindowScrollBinding);
@@ -27,7 +27,7 @@ public sealed class WindowScrollBindingModuleTests
         Assert.True(typeof(IWindowScrollHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScrollTo_ScrollBy_And_Scroll_Update_The_Offset_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

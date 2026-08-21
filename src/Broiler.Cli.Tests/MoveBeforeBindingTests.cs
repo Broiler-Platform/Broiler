@@ -33,14 +33,14 @@ public sealed class MoveBeforeBindingTests
     private const string ThreeDivs =
         "<!DOCTYPE html><html><body><div id=\"x\"></div><div id=\"y\"></div><div id=\"z\"></div></body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MoveBefore_Is_Exposed_On_Element()
     {
         var result = Eval(ThreeDivs, "typeof document.body.moveBefore");
         Assert.Equal("function", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moves_A_Child_Within_Its_Parent()
     {
         var result = Eval(ThreeDivs, """
@@ -56,7 +56,7 @@ public sealed class MoveBeforeBindingTests
 
     // Removing first shifts later indices down, so a forward move needs a correction.
     // Without it the node lands one slot too far right.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moves_A_Child_Forward_Within_Its_Parent()
     {
         var result = Eval(ThreeDivs, """
@@ -70,7 +70,7 @@ public sealed class MoveBeforeBindingTests
         Assert.Equal("y,x,z", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moving_Before_Null_Appends()
     {
         var result = Eval(ThreeDivs, """
@@ -84,7 +84,7 @@ public sealed class MoveBeforeBindingTests
         Assert.Equal("y,z,x", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moves_A_Child_Across_Parents()
     {
         const string html =
@@ -103,7 +103,7 @@ public sealed class MoveBeforeBindingTests
     }
 
     // Per spec the reference collapses to the node's next sibling, so this is a no-op.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Moving_A_Node_Before_Itself_Is_A_No_Op()
     {
         var result = Eval(ThreeDivs, """
@@ -119,7 +119,7 @@ public sealed class MoveBeforeBindingTests
     }
 
     // The case the WPT test is about: a moved <style> keeps its rules and stays connected.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Moved_Style_Element_Keeps_Its_Content_And_Connection()
     {
         const string html =
@@ -139,7 +139,7 @@ public sealed class MoveBeforeBindingTests
 
     // A move has nothing to preserve for a node that was never in the tree, so the spec
     // rejects it rather than quietly behaving like insertBefore.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rejects_A_Node_That_Is_Not_Already_In_The_Tree()
     {
         var result = Eval(ThreeDivs, """
@@ -154,7 +154,7 @@ public sealed class MoveBeforeBindingTests
         Assert.Equal("threw", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rejects_A_Reference_That_Is_Not_A_Child()
     {
         const string html =
@@ -173,7 +173,7 @@ public sealed class MoveBeforeBindingTests
         Assert.Equal("threw", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rejects_Moving_A_Node_Into_Its_Own_Descendant()
     {
         const string html =

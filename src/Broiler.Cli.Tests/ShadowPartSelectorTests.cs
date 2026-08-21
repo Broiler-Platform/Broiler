@@ -34,7 +34,7 @@ public class ShadowPartSelectorTests
     private static readonly (int R, int G, int B) Yellow = (255, 255, 0);
     private static readonly (int R, int G, int B) White = (255, 255, 255);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PartRule_StylesTheShadowPart()
     {
         using var bitmap = Render("""
@@ -56,7 +56,7 @@ public class ShadowPartSelectorTests
     /// reason the rewrite stamps only elements inside a shadow root rather than matching
     /// <c>[part~=…]</c> directly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PartRule_DoesNotReachALightDomPartAttribute()
     {
         using var bitmap = Render("""
@@ -72,7 +72,7 @@ public class ShadowPartSelectorTests
     }
 
     /// <summary>Only the named part is selected; a sibling exposing a different name is not.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PartRule_SelectsByName()
     {
         using var bitmap = Render("""
@@ -97,7 +97,7 @@ public class ShadowPartSelectorTests
     /// <c>::part(a b)</c> takes an ident list and matches only a part carrying <em>every</em> one of
     /// them (CSS Shadow Parts <c>&lt;ident&gt;+</c>).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PartRule_WithSeveralIdents_RequiresAllOfThem()
     {
         using var bitmap = Render("""
@@ -122,7 +122,7 @@ public class ShadowPartSelectorTests
     /// A host prefix restricts the rule to that host's parts, and needs a descendant combinator
     /// inserting where the author wrote none.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PartRule_WithAHostPrefix_OnlyReachesThatHostsParts()
     {
         using var bitmap = Render("""
@@ -148,7 +148,7 @@ public class ShadowPartSelectorTests
     /// <c>::part</c> text inside a string is a value, not a selector, and must survive the rewrite
     /// untouched.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PartTextInsideAString_IsNotRewritten()
     {
         using var bitmap = Render("""

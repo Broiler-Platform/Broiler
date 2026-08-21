@@ -23,7 +23,7 @@ public sealed class StyleSheetBindingModuleTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSheet_Feature_Module_Is_Co_Located_And_Internal_Static()
     {
         var moduleType = typeof(StyleSheetBinding);
@@ -33,7 +33,7 @@ public sealed class StyleSheetBindingModuleTests
         Assert.True(moduleType is { IsAbstract: true, IsSealed: true }); // C# static class
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleRule_SelectorText_Style_And_CssText_Are_Built_By_The_Module()
     {
         using var bridge = Attach(out var context,
@@ -55,7 +55,7 @@ public sealed class StyleSheetBindingModuleTests
         Assert.Equal("1|1|#a|red|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertRule_And_DeleteRule_Mutate_The_Live_CssRules_Collection()
     {
         using var bridge = Attach(out var context,
@@ -79,7 +79,7 @@ public sealed class StyleSheetBindingModuleTests
         Assert.Equal("1|1|2|#b|1|#b", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AtRule_Media_And_Keyframes_CssText_Are_Built_By_The_Module()
     {
         using var bridge = Attach(out var context,

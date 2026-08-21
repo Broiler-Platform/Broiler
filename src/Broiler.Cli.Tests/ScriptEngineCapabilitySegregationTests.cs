@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class ScriptEngineCapabilitySegregationTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IScriptEngine_Aggregates_The_Four_Capabilities()
     {
         var inherited = typeof(IScriptEngine).GetInterfaces();
@@ -23,7 +23,7 @@ public class ScriptEngineCapabilitySegregationTests
         Assert.Contains(typeof(IScriptEventLoop), inherited);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Implements_Each_Segregated_Capability()
     {
         var engine = new ScriptEngine();
@@ -34,7 +34,7 @@ public class ScriptEngineCapabilitySegregationTests
         Assert.IsAssignableFrom<IScriptEngine>(engine);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NarrowConsumer_CanDependOnJustTheExecutorCapability()
     {
         // A consumer that only needs execution can accept the narrow capability and still run scripts.
@@ -43,7 +43,7 @@ public class ScriptEngineCapabilitySegregationTests
         Assert.True(executor.Execute(Array.Empty<string>()), "empty script batch executes successfully.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NarrowConsumer_CanDependOnJustTheEventLoopCapability()
     {
         IScriptEventLoop loop = new ScriptEngine();

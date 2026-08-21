@@ -92,7 +92,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// The bug this fixes, in its simplest form: a light frame in a light-scheme
     /// <c>&lt;iframe&gt;</c> on a red page shows the red page, not a white box.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Matching_Light_Frame_Is_Transparent()
     {
         if (!FrameCanvasCanBeTransparent())
@@ -109,7 +109,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// <c>&lt;iframe&gt;</c> on a light page stays transparent, so the light page shows through
     /// rather than the UA dark backdrop.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Matching_Dark_Frame_Is_Transparent()
     {
         if (!FrameCanvasCanBeTransparent())
@@ -126,7 +126,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// <c>color-scheme</c> is what counts, not the document's. A light <c>&lt;iframe&gt;</c> under a
     /// dark root, holding a light frame, agrees with its frame — so the dark page shows through.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Comparison_Is_Against_The_Embedding_Element_Not_The_Document()
     {
         if (!FrameCanvasCanBeTransparent())
@@ -144,7 +144,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// WPT <c>…-mismatch-opaque</c>: a dark frame in a light <c>&lt;iframe&gt;</c> gets the UA dark
     /// backdrop, so the red page does *not* show through.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Dark_Frame_In_A_Light_Element_Gets_The_Dark_Backdrop()
     {
         WriteFrame("frame.html", FrameDocument("dark"));
@@ -159,7 +159,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// <c>color-scheme</c> inheritance decides — the iframe declares nothing and takes <c>dark</c>
     /// from the root.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Light_Frame_Under_An_Inherited_Dark_Scheme_Gets_An_Opaque_White_Canvas()
     {
         WriteFrame("frame.html", FrameDocument("light"));
@@ -172,7 +172,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// A frame that propagates a background of its own paints it whether the canvas is transparent
     /// or not — only the UA's backdrop is dropped, never the document's own painting.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Frames_Own_Background_Still_Paints_When_The_Canvas_Is_Transparent()
     {
         if (!FrameCanvasCanBeTransparent())
@@ -189,7 +189,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// A frame that never loaded has no canvas at all, so the embedder shows through — the empty
     /// box behaviour an unresolvable <c>src</c> has always had.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unloadable_Frame_Leaves_The_Page_Showing()
     {
         Assert.Equal(Red, RenderFrameCentre("red", rootColorScheme: null,
@@ -236,7 +236,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// which inherits nothing, so its absence from the inherited set went unnoticed until an
     /// <c>&lt;iframe&gt;</c> had to be asked for its own used scheme.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorScheme_Inherits_To_Descendants()
     {
         const string html = """
@@ -249,7 +249,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     }
 
     /// <summary>A descendant's own declaration still wins over the inherited value.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Descendants_Own_ColorScheme_Overrides_The_Inherited_One()
     {
         const string html = """
@@ -261,7 +261,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     }
 
     /// <summary>With nothing declared anywhere the computed value stays the initial one.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ColorScheme_Defaults_To_Normal()
     {
         Assert.Equal("normal", ComputedColorScheme("<!DOCTYPE html><div>x</div>", "div"));
@@ -273,7 +273,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
     /// A document that is not embedded always paints its backdrop, so nothing about a top-level
     /// render changes: this is what keeps the lever inert everywhere it is not pinned.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_That_Is_Not_Embedded_Always_Paints_Its_Backdrop()
     {
         Assert.True(EmbeddedCanvas.PaintsOpaqueBackdrop("dark"));
@@ -281,7 +281,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
         Assert.True(EmbeddedCanvas.PaintsOpaqueBackdrop(null));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Backdrop_Is_Painted_Exactly_When_The_Used_Schemes_Differ()
     {
         using (EmbeddedCanvas.Pin("dark"))
@@ -321,7 +321,7 @@ public class EmbeddedCanvasColorSchemeTests : IDisposable
         Assert.Equal(expected, EmbeddedCanvas.UsesDarkColorScheme(value));
 
     /// <summary>Nesting restores, so sibling frames do not inherit one another's embedder.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pinning_Nests_And_Restores()
     {
         Assert.False(EmbeddedCanvas.IsEmbedded);

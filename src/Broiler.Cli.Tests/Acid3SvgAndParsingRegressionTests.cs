@@ -8,7 +8,7 @@ public class Acid3SvgAndParsingRegressionTests
 {
     // ────────────────────── Test 65: createElementNS with SVG namespace ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test65_CreateElementNS_SVG_Namespace()
     {
         var html = @"<!DOCTYPE html>
@@ -33,7 +33,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 66: localName property ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test66_LocalName_Elements_TextNodes_Comments()
     {
         var html = @"<!DOCTYPE html>
@@ -59,7 +59,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 67: SVG element getAttribute/setAttribute ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test67_SVG_Element_GetAttribute_SetAttribute()
     {
         var html = @"<!DOCTYPE html>
@@ -87,7 +87,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 68: SVG viewBox baseVal has width/height ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test68_SVG_ViewBox_BaseVal_Width_Height()
     {
         var html = @"<!DOCTYPE html>
@@ -114,7 +114,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 69: getElementById in SVG context ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test69_GetElementById_In_SVG_Context()
     {
         var html = @"<!DOCTYPE html>
@@ -143,7 +143,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 70: SVG rect width is truthy, has baseVal/animVal ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test70_SVG_Rect_Width_Truthy_BaseVal_AnimVal()
     {
         var html = @"<!DOCTYPE html>
@@ -169,7 +169,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 71: SVG text getNumberOfChars ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test71_SVG_Text_GetNumberOfChars()
     {
         var html = @"<!DOCTYPE html>
@@ -195,7 +195,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 73: XML declaration in document.write ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test73_XML_Declaration_No_Element_Nodes()
     {
         var html = @"<!DOCTYPE html>
@@ -227,7 +227,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 74: HTML parser auto-closes elements ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test74_Parser_AutoCloses_P_Inside_P()
     {
         var html = @"<!DOCTYPE html>
@@ -253,7 +253,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test74_Parser_AutoCloses_TD_After_TD()
     {
         var html = @"<!DOCTYPE html>
@@ -277,7 +277,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 76: SVG getComputedTextLength ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test76_SVG_GetComputedTextLength_Numeric()
     {
         var html = @"<!DOCTYPE html>
@@ -302,7 +302,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 78: SVGLength type constants ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test78_SVGLength_Type_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -332,7 +332,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 79: SVGAnimatedLength baseVal.unitType ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test79_SVGAnimatedLength_BaseVal_UnitType()
     {
         var html = @"<!DOCTYPE html>
@@ -359,7 +359,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ────────────────────── Test 80: HTML form elements collection ──────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test80_Form_Elements_Collection_Dynamic()
     {
         var html = @"<!DOCTYPE html>

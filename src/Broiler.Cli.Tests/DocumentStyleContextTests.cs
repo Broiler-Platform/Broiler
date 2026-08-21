@@ -27,7 +27,7 @@ public sealed class DocumentStyleContextTests
     //  GetComputedProps memo
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ComputedProps_Set_Then_TryGet_Returns_Same_Map()
     {
         var ctx = new DocumentStyleContext();
@@ -40,7 +40,7 @@ public sealed class DocumentStyleContextTests
         Assert.Same(props, got);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InvalidateComputedStyle_Clears_The_Memo()
     {
         var ctx = new DocumentStyleContext();
@@ -52,7 +52,7 @@ public sealed class DocumentStyleContextTests
         Assert.False(ctx.TryGetComputedProps(el, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InProgress_Map_Set_Get_Remove()
     {
         var ctx = new DocumentStyleContext();
@@ -71,7 +71,7 @@ public sealed class DocumentStyleContextTests
     //  Engine scopes
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetOrCreateEngineScope_Creates_Once_And_Caches()
     {
         var ctx = new DocumentStyleContext();
@@ -85,7 +85,7 @@ public sealed class DocumentStyleContextTests
         Assert.Same(first, second);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResetEngines_Drops_Cached_Scopes()
     {
         var ctx = new DocumentStyleContext();
@@ -103,7 +103,7 @@ public sealed class DocumentStyleContextTests
     //  Invalidation batching
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryDeferRoot_Defers_Only_While_Batching()
     {
         var ctx = new DocumentStyleContext();
@@ -115,7 +115,7 @@ public sealed class DocumentStyleContextTests
         Assert.True(ctx.TryDeferRoot(root)); // batch open → deferred
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EndBatch_Flushes_Only_When_Outermost_Closes()
     {
         var ctx = new DocumentStyleContext();
@@ -128,7 +128,7 @@ public sealed class DocumentStyleContextTests
         Assert.True(ctx.EndBatchShouldFlush());  // outer closes → flush
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DrainPendingRoots_Returns_Deferred_Roots_Then_Clears()
     {
         var ctx = new DocumentStyleContext();
@@ -151,7 +151,7 @@ public sealed class DocumentStyleContextTests
     //  Invalidation route through the bridge (end-to-end)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClassChange_Invalidates_ComputedStyle_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><head><style>.h{display:none}</style></head>" +

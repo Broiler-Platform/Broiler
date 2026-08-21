@@ -39,7 +39,7 @@ public class ViewTransitionRenderTests
         return HtmlRender.RenderToImageWithStyleSet(serialized, 200, 200);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StartViewTransition_Is_Defined()
     {
         using var context = new JSContext();
@@ -50,7 +50,7 @@ public class ViewTransitionRenderTests
         Assert.Equal("function", typeofResult);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ActiveTypeTransition_Paints_New_Snapshot_On_The_Backdrop()
     {
         using var bitmap = Render(GreenSquareTransition,
@@ -69,7 +69,7 @@ public class ViewTransitionRenderTests
     // is active — with no `types` argument, unlike :active-view-transition-type(). Here it turns
     // #target green and names it, so it is captured and its snapshot paints a green square on the
     // lightpink backdrop. Reference is one green square.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BareActiveViewTransition_PseudoClass_Applies_During_Any_Transition()
     {
         const string html = """
@@ -101,7 +101,7 @@ public class ViewTransitionRenderTests
     // can never match. The implementation used to strip the pseudo out and re-match what was left,
     // which turned `main:active-view-transition #target` — a selector written precisely to assert
     // that it never matches — into `main #target`, and styled the target red.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ActiveViewTransition_PseudoClass_Does_Not_Match_A_Non_Root_Element()
     {
         const string html = """
@@ -126,7 +126,7 @@ public class ViewTransitionRenderTests
 
     // The control for the case above: the same rule on the root element *does* match, so a change
     // that simply stopped applying either pseudo-class would not pass both.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ActiveViewTransition_PseudoClass_Still_Matches_The_Root()
     {
         const string html = """
@@ -149,7 +149,7 @@ public class ViewTransitionRenderTests
         Assert.True(square is { R: 0, G: 128, B: 0 }, $"square was {square.R},{square.G},{square.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ready_Promise_Resolves_So_The_Screenshot_Fires()
     {
         using var context = new JSContext();
@@ -163,7 +163,7 @@ public class ViewTransitionRenderTests
         Assert.Contains("ready-fired", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UpdateCallback_Runs_And_Mutates_The_Dom()
     {
         using var context = new JSContext();
@@ -177,7 +177,7 @@ public class ViewTransitionRenderTests
         Assert.Contains("updated", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Group_Sits_At_The_Old_Elements_Geometry()
     {
         // WPT old-content-is-empty-div: the "shared" name moves from #empty (left:50px) to #target
@@ -219,7 +219,7 @@ public class ViewTransitionRenderTests
     // the ::view-transition tree is gone and the DOM is back to its plain final state — so the
     // screenshot must show the final DOM (a green square on white), not the pseudo tree's pink
     // backdrop. Realizing the finished thenable clears the active transition so the bake is skipped.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Finished_Promise_Renders_The_Final_Dom_Not_The_Pseudo_Tree()
     {
         const string html = """
@@ -254,7 +254,7 @@ public class ViewTransitionRenderTests
     // group is green; its `::view-transition-group-children` wrapper and the nested test group both
     // `background: inherit`, so the whole thing resolves to green (the reference is an all-green page).
     // Without nesting the test group inherits the red overlay and paints red on top.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedGroup_Nearest_InheritsThroughParentGroup()
     {
         const string html = """
@@ -289,7 +289,7 @@ public class ViewTransitionRenderTests
     // to fall back on. This exercises the `background: inherit` shorthand (Broiler.CSS patch 0024) and
     // the chained-inherit resolution together, so it feature-probes and self-skips on the un-patched
     // engine (where `background: inherit` stays transparent and the red root shows through).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedGroup_Normal_InheritsTheOverlayBackground()
     {
         const string html = """
@@ -325,7 +325,7 @@ public class ViewTransitionRenderTests
     // the group under itself threw "a node cannot be inserted into itself or one of its descendants".
     // Rendering to completion is the crash regression; the green result additionally needs patch 0024
     // (the flat group inherits the green overlay), so that assertion feature-probes and self-skips.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NestedGroup_SelfReference_DoesNotRecurse_AndFallsBackToFlat()
     {
         const string html = """
@@ -352,7 +352,7 @@ public class ViewTransitionRenderTests
         Assert.True(px is { R: 0, G: 128, B: 0 }, $"self-ref group should fall back to flat and inherit green, got {px.R},{px.G},{px.B}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Transition_Leaves_The_Page_Untouched()
     {
         // Without a transition the pseudo tree is never baked, so nothing paints a backdrop.
@@ -366,7 +366,7 @@ public class ViewTransitionRenderTests
     // `view-transition-name: none` and no other element is named), but the author pins the
     // ::view-transition root open with `animation: no-op 300s`, so its blue overlay fills the
     // viewport over the red body. Reference is an all-blue page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Transition_With_Kept_Alive_Root_Paints_The_Overlay()
     {
         const string html = """
@@ -392,7 +392,7 @@ public class ViewTransitionRenderTests
     // WPT css/css-view-transitions/new-content-captures-*: the ::view-transition-new snapshot shows
     // the captured element's actual content, not a blank fill. Here the named element holds a child
     // box; the new snapshot must paint both the element's background and the cloned child.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void New_Snapshot_Captures_The_Elements_Content()
     {
         const string html = """
@@ -426,7 +426,7 @@ public class ViewTransitionRenderTests
     // WPT css/css-view-transitions/new-content-captures-spans + inline-element-size: text content is
     // captured and painted with the element's baked font/color, not dropped. Uses a colour scan so
     // it does not depend on exact font metrics.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Snapshot_Captures_Text_With_The_Elements_Font_And_Color()
     {
         const string html = """
@@ -464,7 +464,7 @@ public class ViewTransitionRenderTests
     // WPT css/css-view-transitions/new-content-captures-opacity: the captured element's own opacity
     // rides on the snapshot content, so it composites over the backdrop rather than over an opaque
     // snapshot fill — a half-opaque red box reads as pink over white, never solid red.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Snapshot_Composites_The_Elements_Opacity_Over_The_Backdrop()
     {
         const string html = """
@@ -496,7 +496,7 @@ public class ViewTransitionRenderTests
     // per element (css-view-transitions-2), so an auto-named element IS captured rather than treated
     // as `none`. The callback swaps the two items' positions; the snapshots freeze at the old
     // geometry over the author backdrop, which is only present because the elements were captured.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Name_Elements_Are_Captured()
     {
         const string html = """
@@ -535,7 +535,7 @@ public class ViewTransitionRenderTests
     // WPT css/css-view-transitions/nothing-captured: like the above, nothing is captured, but there
     // is NO keep-alive animation on the root pseudo, so the empty transition finishes before the
     // screenshot and `::view-transition { background: red }` must never paint — the page stays as-is.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Empty_Transition_Without_Kept_Alive_Root_Stays_Hidden()
     {
         const string html = """
@@ -563,7 +563,7 @@ public class ViewTransitionRenderTests
     // applies top:-100px, so the green snapshot must land back at the top (net 0), not at -100px
     // (off-screen). Before the fix the captured top was written to the group's own `top`, which
     // the author rule overrode outright — pushing the snapshot off-screen.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Author_Group_Offset_Composes_With_The_Captured_Position()
     {
         const string html = """
@@ -597,7 +597,7 @@ public class ViewTransitionRenderTests
     // materialised as real <div>s, so an ordinary page-level `div` rule matched them — including the
     // viewport-sized overlay root that paints above everything. That test's `div { background: red }`
     // turned the whole canvas red.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Level_Div_Rule_Does_Not_Paint_The_Transition_Overlay()
     {
         const string html = """
@@ -626,7 +626,7 @@ public class ViewTransitionRenderTests
     // `::view-transition { background: … }` must still paint. The reset is written as longhands and
     // this is a shorthand, so layering them puts the reset last and cancels the author's colour —
     // the reset has to stand aside entirely when the author paints the box.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Author_Overlay_Background_Still_Paints_Over_The_Reset()
     {
         const string html = """

@@ -50,7 +50,7 @@ public sealed class InlineBlockWhitespaceWidthTests
         return maxX < 0 ? (0, 0) : (maxX - minX + 1, maxY - minY + 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Space_Between_Inline_Blocks_Does_Not_Push_The_Second_Onto_A_New_Line()
     {
         var spaced = RowBox(Render("<div class=\"row\"><span>A</span> <span>B</span></div>"));
@@ -63,7 +63,7 @@ public sealed class InlineBlockWhitespaceWidthTests
             $"the space should widen the row ({tight.Width}px tight vs {spaced.Width}px spaced)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Collapsible_Space_Counts_The_Same_As_A_Non_Breaking_One()
     {
         // &nbsp; is not collapsible, so it always counted — it is the reference for how wide the
@@ -75,7 +75,7 @@ public sealed class InlineBlockWhitespaceWidthTests
         Assert.Equal(nbsp.Height, spaced.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Indented_Markup_Lays_Out_As_One_Line()
     {
         // The shape every component's template has: newline + indentation between the children.

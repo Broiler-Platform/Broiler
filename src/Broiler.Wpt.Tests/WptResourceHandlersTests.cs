@@ -60,7 +60,7 @@ public sealed class WptResourceHandlersTests : IDisposable
         Assert.Null(args.SetSrc);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stylesheet_ServesARootRelativeHrefFromTheCheckout()
     {
         var onDisk = Path.Combine(_tempDir, "style.css");
@@ -88,7 +88,7 @@ public sealed class WptResourceHandlersTests : IDisposable
         Assert.Null(args.SetSrc);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Install_RegistersThePolicyWithBothLoadersNoContainerEventReaches()
     {
         // The module initializer has already run — Install is idempotent, and calling it again is

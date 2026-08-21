@@ -10,7 +10,7 @@ namespace Broiler.Code.Core.Tests;
 /// </summary>
 public sealed class CodeEditorArchitectureTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Abstraction_References_Only_Ui_And_Graphics()
     {
         string[] references = References(
@@ -25,7 +25,7 @@ public sealed class CodeEditorArchitectureTests
             references);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Abstraction_Depends_On_No_Package_And_No_Product_Assembly()
     {
         XDocument project = Load(
@@ -47,7 +47,7 @@ public sealed class CodeEditorArchitectureTests
     /// model, so it must stay free of UI and of a language service. A reference
     /// added here would reach every host.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Text_Layer_Has_No_Dependencies_At_All()
     {
         XDocument project = Load("src", "Broiler.Code.Workspaces", "Broiler.Code.Workspaces.csproj");
@@ -63,7 +63,7 @@ public sealed class CodeEditorArchitectureTests
     /// and never a platform head. A reference to either would make the shell
     /// impossible to host anywhere the implementation does not exist.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Core_Composes_Only_Abstractions_And_The_Workspace()
     {
         string[] references = References("src", "Broiler.Code.Core", "Broiler.Code.Core.csproj");

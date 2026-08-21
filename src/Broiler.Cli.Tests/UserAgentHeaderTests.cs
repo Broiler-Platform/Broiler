@@ -39,7 +39,7 @@ public sealed class UserAgentHeaderTests : IDisposable
     /// The reported bug exactly: the top-level document. This is the request that answered 403
     /// before Broiler had parsed a single byte.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task The_Document_Request_Is_Identified()
     {
         _origin.Serve("page.html", "text/html", "<!DOCTYPE html><html><body>hi</body></html>");
@@ -65,7 +65,7 @@ public sealed class UserAgentHeaderTests : IDisposable
     /// The sub-resource half. mediawiki.org served the document once the header was on that one
     /// client and still refused these, which is what left the page unstyled and its modules unloaded.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Stylesheet_And_Script_Requests_Are_Identified()
     {
         _origin.Serve("sheet.css", "text/css", "body { color: red }");
@@ -108,7 +108,7 @@ public sealed class UserAgentHeaderTests : IDisposable
     /// A page that reads <c>navigator.userAgent</c> and a server that reads the header are asking
     /// the same question, so they get the same answer. Two literals is how they drift apart.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void What_Script_Is_Told_Is_What_The_Network_Is_Told()
     {
         const string Html = """<!DOCTYPE html><html><body><div id="out"></div></body></html>""";

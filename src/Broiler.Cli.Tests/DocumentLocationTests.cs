@@ -35,7 +35,7 @@ public sealed class DocumentLocationTests
     }
 
     /// <summary>The One-Google-bar origin helper, run as the bundle spells it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentLocation_YieldsAnOrigin_TheWayTheOneGoogleBarBuildsIt()
     {
         var (context, bridge) = Attach();
@@ -57,7 +57,7 @@ public sealed class DocumentLocationTests
     /// Identity, not a copy: pages compare the two, and a second Location object would drift from
     /// the first the moment either grew a mutable member.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentLocation_IsTheSameObjectAsWindowLocation()
     {
         var (context, bridge) = Attach();
@@ -93,7 +93,7 @@ public sealed class DocumentLocationTests
     /// not throw there either. A <c>srcdoc</c> frame is used because it is the frame that actually
     /// gets a browsing context with no network: its document URL is <c>about:srcdoc</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubDocumentLocation_IsTheFramesOwnLocation()
     {
         var context = new JSContext();

@@ -40,7 +40,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// top-level window is its own <c>parent</c>; it used to be the bare global object instead,
     /// which is what let <c>GetWindowOrigin</c>'s parent walk terminate by accident.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_IsTheGlobalObject()
     {
         var (context, bridge) = Attach();
@@ -67,7 +67,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// <c>ReferenceError: top is not defined</c> and registered none of its listeners.
     /// </para>
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Top_ResolvesUnqualified_AndIsTheSameWindow()
     {
         var (context, bridge) = Attach();
@@ -92,7 +92,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// <c>top</c> reaches globals the page defined, the same way <c>parent</c> does — the
     /// reason both are bound to the global object rather than to a bare stand-in window.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Top_ReachesPageGlobals()
     {
         var (context, bridge) = Attach();
@@ -113,7 +113,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// main document's <c>top</c> was therefore wrong in the quieter way — no longer a
     /// <c>ReferenceError</c>, just not the window.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Top_FromInsideAFrame_IsTheMainWindow_AndSurvivesTheContextSwitch()
     {
         const string html = """
@@ -142,7 +142,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// published through <c>window</c> and consumed unqualified in the same script. No host runs
     /// between the two, so no amount of window→global syncing could have made this work.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleBootstrapShape_WithinOneScript_DoesNotThrow()
     {
         var (context, bridge) = Attach();
@@ -164,7 +164,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// open with a bare <c>google.kEXPI=…</c>. This half a between-scripts sync could reach, but
     /// only if every host remembered to call one; sharing the object removes the requirement.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleBootstrapShape_AcrossScripts_DoesNotThrow()
     {
         var (context, bridge) = Attach();
@@ -179,7 +179,7 @@ public sealed class WindowIsTheGlobalObjectTests
     }
 
     /// <summary>Both spellings name one property, in both directions, with no sync in between.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WindowAndGlobal_AreOneNamespace()
     {
         var (context, bridge) = Attach();
@@ -204,7 +204,7 @@ public sealed class WindowIsTheGlobalObjectTests
     /// which had no <c>location</c> to recurse on. A regression here is a stack overflow, which
     /// takes the test host down rather than failing this assertion.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TopLevelAboutBlank_CanPostMessage_WithoutRecursingForever()
     {
         var (context, bridge) = Attach("about:blank");

@@ -22,7 +22,7 @@ public sealed class DiagnosticSessionTests
     private static string NewDirectory() =>
         Path.Combine(Path.GetTempPath(), "broiler-diag-" + Guid.NewGuid().ToString("N"));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Arguments_Starts_Nothing()
     {
         var options = Program.ResolveDiagnosticOptions(directory: null, logPath: null);
@@ -31,7 +31,7 @@ public sealed class DiagnosticSessionTests
         Assert.Null(DiagnosticSession.Start(options));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Directory_Puts_The_Log_Inside_It()
     {
         var options = Program.ResolveDiagnosticOptions("/tmp/bundle", logPath: null);
@@ -40,7 +40,7 @@ public sealed class DiagnosticSessionTests
         Assert.Equal(Path.Combine("/tmp/bundle", "javascript-errors.log"), options.LogPath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Explicit_Log_Path_Wins_Over_The_Default()
     {
         var options = Program.ResolveDiagnosticOptions("/tmp/bundle", "/var/log/js.log");
@@ -48,7 +48,7 @@ public sealed class DiagnosticSessionTests
         Assert.Equal("/var/log/js.log", options.LogPath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Log_Alone_Archives_Nothing()
     {
         var options = Program.ResolveDiagnosticOptions(directory: null, logPath: "/tmp/js.log");
@@ -57,7 +57,7 @@ public sealed class DiagnosticSessionTests
         Assert.Null(options.Directory);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nothing_Listens_When_No_Session_Is_Running()
     {
         // The guarantee every traced fetch site depends on: with no host asking for a trace, the
@@ -65,7 +65,7 @@ public sealed class DiagnosticSessionTests
         Assert.False(ResourceTrace.IsActive);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Failures_Reach_The_Log_Before_The_Session_Ends()
     {
         var directory = NewDirectory();
@@ -93,7 +93,7 @@ public sealed class DiagnosticSessionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Console_Output_Is_Kept_Apart_From_Failures()
     {
         var directory = NewDirectory();
@@ -121,7 +121,7 @@ public sealed class DiagnosticSessionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Resource_Is_Archived_With_A_Manifest_Row()
     {
         var directory = NewDirectory();
@@ -153,7 +153,7 @@ public sealed class DiagnosticSessionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Identical_Bytes_Are_Stored_Once_And_Map_The_Label_To_Its_Url()
     {
         var directory = NewDirectory();
@@ -183,7 +183,7 @@ public sealed class DiagnosticSessionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Failed_Fetch_Is_Recorded_As_A_Failure()
     {
         var directory = NewDirectory();
@@ -206,7 +206,7 @@ public sealed class DiagnosticSessionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Summary_Ranks_Failures_And_Names_The_Missing_Features()
     {
         var directory = NewDirectory();
@@ -239,7 +239,7 @@ public sealed class DiagnosticSessionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disposing_Unsubscribes_So_A_Later_Run_Is_Not_Recorded()
     {
         var directory = NewDirectory();

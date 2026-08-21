@@ -86,7 +86,7 @@ div {
     // nest under the "green" group and inherit its background. Each case pins that nesting a different
     // way; all must resolve to green even though the styling arrives via a linked stylesheet.
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExplicitGroupName_FromLinkedStylesheet_NestsUnderNamedParent()
     {
         var (r, g, b) = RenderCenterWithLinkedCss(
@@ -94,7 +94,7 @@ div {
         Assert.True((r, g, b) == (0, 128, 0), $"expected green, was {r},{g},{b}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ContainGroup_FromLinkedStylesheet_NestsDescendantUnderContainer()
     {
         var (r, g, b) = RenderCenterWithLinkedCss(
@@ -102,7 +102,7 @@ div {
         Assert.True((r, g, b) == (0, 128, 0), $"expected green, was {r},{g},{b}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NearestGroup_FromLinkedStylesheet_NestsUnderNearestNamedAncestor()
     {
         var (r, g, b) = RenderCenterWithLinkedCss(

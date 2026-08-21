@@ -18,7 +18,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class NodeRelationshipsBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeRelationships_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(NodeRelationshipsBinding);
@@ -30,7 +30,7 @@ public sealed class NodeRelationshipsBindingModuleTests
         Assert.True(typeof(INodeRelationshipsHost).IsAssignableFrom(typeof(DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeRelationships_Flow_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body>" +

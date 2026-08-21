@@ -47,7 +47,7 @@ public class AnonymousTableBoxParentTests
             $"({x},{y}) was rgb({actual.R},{actual.G},{actual.B}), expected rgb({r},{g},{b}) — {because}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RowWithoutATable_IsWrappedAndPainted()
     {
         // A table-row whose parent is a plain block. §17.2.1 generates an anonymous table
@@ -67,7 +67,7 @@ public class AnonymousTableBoxParentTests
         AssertPixel(bmp, 90, 30, 255, 255, 0, "the misparented row's second cell did not paint");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RowGroupWithoutATable_IsWrappedAndPainted()
     {
         // The shape WPT's table-anonymous-objects family is built from: bare row groups
@@ -85,7 +85,7 @@ public class AnonymousTableBoxParentTests
         AssertPixel(bmp, 30, 30, 255, 105, 180, "the misparented row group's cell did not paint");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CellWithoutARow_IsWrappedAndPainted()
     {
         // A table-cell needs a table-row parent (rule 1) before the generated row needs a
@@ -101,7 +101,7 @@ public class AnonymousTableBoxParentTests
         AssertPixel(bmp, 30, 30, 255, 105, 180, "the misparented cell did not paint");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ConsecutiveRowGroups_ShareOneAnonymousTable()
     {
         // §17.2.1 wraps a *run* of consecutive proper table children in ONE anonymous table,
@@ -131,7 +131,7 @@ public class AnonymousTableBoxParentTests
             "the second row group started its own table instead of joining the first's");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RowInsideARowGroup_IsNotRewrapped()
     {
         // Well-parented content must be left exactly as it is: a row inside a row group inside
@@ -155,7 +155,7 @@ public class AnonymousTableBoxParentTests
         AssertPixel(bmp, 30, 75, 255, 255, 0, "the second row moved");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonTableContentAroundARun_KeepsItsPlace()
     {
         // The generated table replaces only the run itself; siblings before and after it stay

@@ -44,7 +44,7 @@ public class DeclarativeShadowDomTests
             $"{what} at ({x},{y}) was {actual.R},{actual.G},{actual.B}, expected {r},{g},{b}");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Declarative_Shadow_Root_Content_Renders()
     {
         const string html = """
@@ -58,7 +58,7 @@ public class DeclarativeShadowDomTests
         AssertPixel(bitmap, 50, 25, 255, 0, 0, "the declarative shadow tree's content");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Declarative_Shadow_Root_Is_A_Real_Shadow_Root()
     {
         // The template becomes a shadow root on its parent and is itself gone from the tree —
@@ -81,7 +81,7 @@ document.getElementById('out').textContent =
         Assert.Contains("templates=0", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Closed_Declarative_Root_Still_Renders_But_Is_Not_Exposed()
     {
         var html = Eval("""
@@ -93,7 +93,7 @@ document.getElementById('out').textContent =
         Assert.Contains("root=no", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Template_Without_Shadowrootmode_Stays_An_Inert_Template()
     {
         // Ordinary <template> content must keep generating no boxes.
@@ -108,7 +108,7 @@ document.getElementById('out').textContent =
         AssertPixel(bitmap, 50, 25, 255, 255, 255, "nothing — a plain template does not render");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Outer_Part_Rules_Reach_Into_The_Shadow_Tree()
     {
         // ::part() is the sanctioned way for the outer tree to style a shadow tree's exposed
@@ -134,7 +134,7 @@ document.getElementById('out').textContent = 'w=' + getComputedStyle(part).getPr
         Assert.Contains("w=100px", serialized);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unexposed_Shadow_Element_Is_Not_Reachable_By_Part()
     {
         // Encapsulation still holds for everything the shadow tree does not expose: an outer rule

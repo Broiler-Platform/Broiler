@@ -10,7 +10,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class OriginTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Of_Serializes_Scheme_Host_And_Omits_Default_Port()
     {
         Assert.Equal("https://a.test", Origin.Of(new Uri("https://a.test/page.html")));
@@ -18,14 +18,14 @@ public sealed class OriginTests
         Assert.Equal("https://a.test:8443", Origin.Of(new Uri("https://a.test:8443/x"))); // non-default kept
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostOf_Returns_Host_With_Optional_Port()
     {
         Assert.Equal("a.test", Origin.HostOf(new Uri("https://a.test/x")));
         Assert.Equal("a.test:8443", Origin.HostOf(new Uri("https://a.test:8443/x")));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SchemeHostPortEquals_Compares_All_Three_Components()
     {
         var a = new Uri("https://a.test:443/x");
@@ -35,7 +35,7 @@ public sealed class OriginTests
         Assert.False(Origin.SchemeHostPortEquals(a, new Uri("https://a.test:8443/y"))); // port
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SchemeHostPortEquals_Is_Case_Insensitive_On_Scheme_And_Host()
     {
         Assert.True(Origin.SchemeHostPortEquals(

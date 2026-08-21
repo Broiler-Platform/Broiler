@@ -14,7 +14,7 @@ namespace Broiler.Layout.Tests;
 /// </summary>
 public sealed class LayoutArchitectureTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Production_Project_References_Only_Css_Dom_And_Graphics_Primitives()
     {
         var project = XDocument.Load(FindProjectPath());
@@ -35,7 +35,7 @@ public sealed class LayoutArchitectureTests
         Assert.Empty(project.Descendants("PackageReference"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Internal_Consumers_Are_Explicit_And_Minimal()
     {
         var project = XDocument.Load(FindProjectPath());
@@ -75,7 +75,7 @@ public sealed class LayoutArchitectureTests
             friends);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Public_Surface_Does_Not_Leak_Consumer_Types()
     {
         var assembly = typeof(ILayoutEnvironment).Assembly;
@@ -96,7 +96,7 @@ public sealed class LayoutArchitectureTests
         Assert.Empty(forbidden);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Public_Surface_Does_Not_Expose_Mutable_Collections()
     {
         var assembly = typeof(ILayoutEnvironment).Assembly;

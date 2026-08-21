@@ -39,7 +39,7 @@ public class FormControlAlignmentTests
     /// Regression: ApplyCenterAlignment returned early when line.Words was
     /// empty, skipping inline-block rectangles entirely.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CenteredSubmitButton_IsCentered()
     {
         var html = @"<html><body style='margin:0'>
@@ -57,7 +57,7 @@ public class FormControlAlignmentTests
     /// <summary>
     /// text-align:center with the &lt;center&gt; tag must center inputs.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CenterTag_CentersTextInput()
     {
         var html = @"<html><body style='margin:0'>
@@ -77,7 +77,7 @@ public class FormControlAlignmentTests
     /// text-align:right must right-align an inline-block button element.
     /// Regression: ApplyRightAlignment had the same early-return bug.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RightAlignedButton_IsOnRight()
     {
         var html = @"<html><body style='margin:0'>
@@ -95,7 +95,7 @@ public class FormControlAlignmentTests
     /// <summary>
     /// Inline-block controls should NOT span full container width.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlockInput_WidthIsConstrained()
     {
         var html = @"<html><body style='margin:0'>
@@ -136,7 +136,7 @@ public class FormControlAlignmentTests
     /// <summary>
     /// Google-like form with centered controls should center properly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLikeForm_ControlsAreCentered()
     {
         var html = @"<html><body style='margin:0'>

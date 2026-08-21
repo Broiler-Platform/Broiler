@@ -14,7 +14,7 @@ public sealed class MutationObserverHubTests
     private static DomNode NewNode() => new DomDocument().CreateElement("div");
     private static DomMutationObserverOptions ChildListOptions() => new() { ChildList = true };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Register_Adds_An_Observer()
     {
         var hub = new MutationObserverHub();
@@ -30,7 +30,7 @@ public sealed class MutationObserverHubTests
         Assert.Same(target, snapshot[0].Target);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Re_Observe_Same_Observer_And_Target_Replaces_Options()
     {
         var hub = new MutationObserverHub();
@@ -45,7 +45,7 @@ public sealed class MutationObserverHubTests
         Assert.Same(newOptions, hub.Snapshot()[0].Options);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Same_Observer_Different_Targets_Are_Distinct_Registrations()
     {
         var hub = new MutationObserverHub();
@@ -57,7 +57,7 @@ public sealed class MutationObserverHubTests
         Assert.Equal(2, hub.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unregister_Removes_All_Registrations_For_An_Observer()
     {
         var hub = new MutationObserverHub();
@@ -70,7 +70,7 @@ public sealed class MutationObserverHubTests
         Assert.Equal(0, hub.Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clear_Drops_Every_Observer()
     {
         var hub = new MutationObserverHub();

@@ -29,35 +29,35 @@ public class WmAbsPosGeometryTests
             "[Math.round(b.left),Math.round(b.top),Math.round(b.width),Math.round(b.height)].join(',');").ToString();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Right_Inset_Resolves_Against_Physical_Width()
     {
         // right:0 -> the box's right edge meets the CB's physical right (x=300): left = 300-50 = 250.
         Assert.Equal("250,0,50,30", Rect("writing-mode:vertical-rl", "right:0"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bottom_Inset_Resolves_Against_Physical_Height()
     {
         // bottom:0 -> the box's bottom meets the CB's physical bottom (y=200): top = 200-30 = 170.
         Assert.Equal("0,170,50,30", Rect("writing-mode:vertical-rl", "bottom:0"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Height_Between_Top_And_Bottom_Fills_Physical_Height()
     {
         // top:0; bottom:0; height auto -> height = CB physical height 200 (not the width 300).
         Assert.Equal("0,0,50,200", Rect("writing-mode:vertical-rl", "top:0;bottom:0"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Width_Between_Left_And_Right_Fills_Physical_Width()
     {
         // left:0; right:0; width auto -> width = CB physical width 300 (not the height 200).
         Assert.Equal("0,0,300,30", Rect("writing-mode:vertical-rl", "left:0;right:0"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Vertical_Lr_Also_Resolves_Physical_Axes()
     {
         // vertical-lr has the same axis mapping (only the block direction differs): right:0 -> 250.
@@ -65,7 +65,7 @@ public class WmAbsPosGeometryTests
         Assert.Equal("0,170,50,30", Rect("writing-mode:vertical-lr", "bottom:0"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Horizontal_Containing_Block_Is_Unaffected()
     {
         // Regression guard: a horizontal CB keeps its existing behaviour.

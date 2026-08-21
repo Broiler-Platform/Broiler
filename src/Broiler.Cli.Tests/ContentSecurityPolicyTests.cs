@@ -8,7 +8,7 @@ namespace Broiler.Cli.Tests;
 
 public class ContentSecurityPolicyTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Blocks_Inline_Script_Without_UnsafeInline()
     {
         const string html = """
@@ -28,7 +28,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("data-inline=\"ran\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_DefaultSrc_Falls_Back_For_Inline_Scripts()
     {
         const string html = """
@@ -48,7 +48,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("data-inline=\"ran\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Allows_Inline_Script_With_Matching_Nonce()
     {
         const string html = """
@@ -68,7 +68,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("data-inline=\"ran\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_ScriptSrcElem_Takes_Precedence_Over_ScriptSrc_For_Inline_Scripts()
     {
         const string html = """
@@ -88,7 +88,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("data-inline=\"blocked\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Blocks_Inline_Event_Handler_When_ScriptSrcAttr_Disallows_It()
     {
         const string html = """
@@ -109,7 +109,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("data-attr=\"blocked\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Allows_Inline_Event_Handler_When_ScriptSrc_Falls_Back_To_UnsafeInline()
     {
         const string html = """
@@ -130,7 +130,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("data-attr=\"ran\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Allows_Inline_Event_Handler_With_Matching_Hash_When_UnsafeHashes_Is_Present()
     {
         const string handler = "document.body.setAttribute('data-attr', 'hashed');";
@@ -153,7 +153,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("data-attr=\"hashed\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Blocks_Hashed_Inline_Event_Handler_Without_UnsafeHashes()
     {
         const string handler = "document.body.setAttribute('data-attr', 'hashed');";
@@ -176,7 +176,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("data-attr=\"hashed\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Blocks_Data_Script_When_Policy_Is_Self_Only()
     {
         const string html = """
@@ -196,7 +196,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("data-external=\"ran\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Allows_SameOrigin_File_Script_When_Policy_Is_Self()
     {
         var tempDirectory = Path.Combine(Path.GetTempPath(), "broiler-csp-" + Guid.NewGuid().ToString("N"));
@@ -230,7 +230,7 @@ public class ContentSecurityPolicyTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Blocks_External_Script_When_StrictDynamic_Ignores_Static_Allowlist()
     {
         var tempDirectory = Path.Combine(Path.GetTempPath(), "broiler-csp-" + Guid.NewGuid().ToString("N"));
@@ -264,7 +264,7 @@ public class ContentSecurityPolicyTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExecuteScriptsWithDom_Allows_Nonce_Matching_External_Script_When_StrictDynamic_Is_Present()
     {
         var tempDirectory = Path.Combine(Path.GetTempPath(), "broiler-csp-" + Guid.NewGuid().ToString("N"));
@@ -298,7 +298,7 @@ public class ContentSecurityPolicyTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptExtractor_ExtractAll_Skips_Inline_Scripts_Blocked_By_MetaCsp()
     {
         const string html = """
@@ -320,7 +320,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("var allowed = true;", result.Scripts);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptEngine_Execute_Blocks_Eval_When_MetaCsp_Disallows_UnsafeEval()
     {
         const string html = """
@@ -351,7 +351,7 @@ public class ContentSecurityPolicyTests
 
     // --- style-src family (issue #1302 CSP style-src* WPT tests) ----------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSrcAttr_None_Strips_Inline_Style_Attribute()
     {
         const string html = """
@@ -369,7 +369,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("style=", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSrcElem_None_Removes_Style_Element()
     {
         const string html = """
@@ -389,7 +389,7 @@ public class ContentSecurityPolicyTests
 
     // --- Phase 7 item 5: style CSP is a host decision enforced during Attach ----
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attach_Enforces_Style_Csp_On_The_Bridge_Itself()
     {
         // The bridge authorises styles as the final step of Attach when a policy is configured, so every
@@ -411,7 +411,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("background: green", bridge.SerializeToHtml());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Attach_Leaves_Inline_Style_When_No_Csp_Configured()
     {
         const string html = """
@@ -425,7 +425,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("background: green", bridge.SerializeToHtml());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSrcElem_Allowed_Attr_Blocked_Keeps_Element_Strips_Attribute()
     {
         const string html = """
@@ -445,7 +445,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("<style", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleSrc_UnsafeInline_Keeps_Inline_Style_Attribute()
     {
         const string html = """
@@ -462,7 +462,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("background: green", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Csp_Keeps_Inline_Styles()
     {
         const string html = """
@@ -482,7 +482,7 @@ public class ContentSecurityPolicyTests
     // AllowsExternalScript, applied at the FetchExternalStylesheet call site so DOM/CSS never fetch or
     // apply a style-src-blocked external stylesheet.
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AllowsExternalStyle_None_Blocks_Every_External_Stylesheet()
     {
         var csp = new ContentSecurityPolicy();
@@ -492,7 +492,7 @@ public class ContentSecurityPolicyTests
         Assert.False(csp.AllowsExternalStyle("a.css", "https://a.test/page.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AllowsExternalStyle_Self_Allows_SameOrigin_And_Blocks_CrossOrigin()
     {
         var csp = new ContentSecurityPolicy();
@@ -502,7 +502,7 @@ public class ContentSecurityPolicyTests
         Assert.False(csp.AllowsExternalStyle("https://cdn.test/theme.css", "https://a.test/page.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AllowsExternalStyle_Honours_Host_Scheme_And_Nonce_Sources()
     {
         var host = new ContentSecurityPolicy();
@@ -521,7 +521,7 @@ public class ContentSecurityPolicyTests
         Assert.False(nonce.AllowsExternalStyle("https://cdn.test/a.css", "https://a.test/page.html", "wrong"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AllowsExternalStyle_StyleSrcElem_Takes_Precedence_And_Falls_Back_To_DefaultSrc()
     {
         // style-src-elem wins over style-src for a <link>.
@@ -543,7 +543,7 @@ public class ContentSecurityPolicyTests
 
     // --- CSP §"Processing a `meta` element": a meta policy is not retroactive ------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Meta_Csp_Does_Not_Block_A_Style_Attribute_Parsed_Before_It()
     {
         // WPT content-security-policy/style-src/inline-style-attribute-on-html: the style attribute
@@ -563,7 +563,7 @@ public class ContentSecurityPolicyTests
         Assert.Contains("background-color: blue", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Meta_Csp_Still_Blocks_A_Style_Attribute_That_Follows_It()
     {
         // The other half of the ordering rule: everything from the meta onwards is enforced, so the
@@ -582,7 +582,7 @@ public class ContentSecurityPolicyTests
         Assert.DoesNotContain("color: red", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Meta_Csp_Blocks_A_Style_Element_After_It_But_Not_One_Before_It()
     {
         // Same ordering rule for <style> elements, and it must hold across the head/body boundary:

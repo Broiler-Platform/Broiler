@@ -18,7 +18,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ElementTraversalBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementTraversal_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ElementTraversalBinding);
@@ -30,7 +30,7 @@ public sealed class ElementTraversalBindingModuleTests
         Assert.True(typeof(IElementTraversalHost).IsAssignableFrom(typeof(DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Traversal_Flows_Through_The_Bridge()
     {
         // Interleave text and comment nodes so the element-only traversal must skip them.

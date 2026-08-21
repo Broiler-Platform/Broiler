@@ -11,7 +11,7 @@ public class Acid3RegressionTests
     /// Verifies that the Acid3 test harness bootstrap code (creating iframes,
     /// setting up the test runner) can execute without fatal errors.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Harness_Bootstrap_Executes_Without_Fatal_Error()
     {
         // Minimal version of the Acid3 harness setup
@@ -52,7 +52,7 @@ result.textContent = score + '/100';
     /// Tests the getTestDocument() pattern used throughout Acid3 bucket 1.
     /// Creates a new document via DOMImplementation and verifies basic operations.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_GetTestDocument_Pattern_Works()
     {
         var html = @"<!DOCTYPE html>
@@ -79,7 +79,7 @@ try {
     /// Tests Acid3 test 1 pattern: NodeFilter exception propagation from
     /// createNodeIterator callbacks.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test1_NodeFilter_Exception_Propagation()
     {
         var html = @"<!DOCTYPE html>
@@ -123,7 +123,7 @@ try {
     /// <summary>
     /// Tests Acid3 test 25 pattern: createDocumentType and createDocument.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test25_CreateDocumentType_And_CreateDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -162,7 +162,7 @@ try {
     /// Tests Acid3 tests 22-23 pattern: createElement with invalid names
     /// must throw DOMException.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test22_23_CreateElement_Invalid_Names_Throw()
     {
         var html = @"<!DOCTYPE html>
@@ -204,7 +204,7 @@ try {
     /// Tests Acid3 test 19 pattern: Node type constants on Node constructor
     /// and prototype.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test19_Node_Type_Constants()
     {
         var html = @"<!DOCTYPE html>
@@ -237,7 +237,7 @@ try {
     /// <summary>
     /// Tests Acid3 test 21 pattern: namespace-aware attribute methods.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test21_Namespace_Attribute_Methods()
     {
         var html = @"<!DOCTYPE html>
@@ -273,7 +273,7 @@ try {
     /// Tests Acid3 bucket 6 pattern: ECMAScript operations that the
     /// JS engine must handle correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Bucket6_ECMAScript_Array_And_String()
     {
         var html = @"<!DOCTYPE html>
@@ -312,7 +312,7 @@ try {
     /// Tests the Acid3 score display update pattern: modifying DOM elements
     /// to show test results.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Score_Display_Update_Pattern()
     {
         var html = @"<!DOCTYPE html>
@@ -366,7 +366,7 @@ result.textContent = '' + score;
     /// Tests CSS selector matching needed for Acid3 bucket coloring:
     /// the complex selector patterns used by the test page.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Bucket_Selector_Class_Update()
     {
         var html = @"<!DOCTYPE html>
@@ -411,7 +411,7 @@ r.textContent = b1.className + '|' + (bg.indexOf('red') >= 0 || bg.indexOf('255'
     /// and returns the computed value for a matching selector.
     /// Phase 1, Task 1.1: CSS cascade from style elements.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Applies_Style_Rules_From_Style_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -438,7 +438,7 @@ document.getElementById('result').textContent = cs.whiteSpace;
     /// After removing the last child, the new last child should match :last-child.
     /// Phase 1, Task 1.2: Dynamic cascade invalidation.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_LastChild_Recomputes_After_RemoveChild()
     {
         var html = @"<!DOCTYPE html>
@@ -488,7 +488,7 @@ document.getElementById('result').textContent = r.join('|');
     /// after removing the last sibling element.
     /// Phase 1, Task 1.3: Acid3 test 0 verification.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test0_WhiteSpace_LastChild_After_Removal()
     {
         var html = @"<!DOCTYPE html>
@@ -526,7 +526,7 @@ document.getElementById('result').textContent = 'WS=' + cs.getPropertyValue('whi
     /// the second value being invalid, the first valid value is preserved.
     /// Phase 1, Task 1.1: CSS cascade with error recovery.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_CssErrorRecovery_InvalidValue_Ignored()
     {
         var html = @"<!DOCTYPE html>
@@ -552,7 +552,7 @@ document.getElementById('result').textContent = 'D=' + cs.getPropertyValue('disp
     /// ID selectors which override class selectors which override type selectors.
     /// Phase 1, Task 1.1: Specificity-based cascade.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Specificity_Cascade_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -583,7 +583,7 @@ document.getElementById('result').textContent = cs.zIndex;
     /// getElementById can find deeply nested children (e.g., iframe with id
     /// inside a map element, matching the Acid3 script 9 pattern).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentWrite_Registers_Nested_Elements()
     {
         var html = @"<!DOCTYPE html>
@@ -621,7 +621,7 @@ r.textContent = results.join(',');
     /// Verifies that the Acid3 update() loop executes through setTimeout
     /// chaining, processing multiple tests and producing a score > 0.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Update_Loop_Produces_Score_Via_SetTimeout()
     {
         var html = @"<!DOCTYPE html>
@@ -663,7 +663,7 @@ update();
     /// Verifies that the update() loop continues executing when some tests
     /// throw errors (error-resilient execution).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Update_Loop_Continues_After_Test_Errors()
     {
         var html = @"<!DOCTYPE html>
@@ -706,7 +706,7 @@ update();
     /// Verifies that body onload fires and triggers the update() function,
     /// matching the Acid3 pattern: &lt;body onload="update()"&gt;.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Onload_Triggers_Update_Function()
     {
         var html = @"<!DOCTYPE html>
@@ -731,7 +731,7 @@ function update() {
     /// Verifies body onload + setTimeout chaining works together,
     /// simulating the full Acid3 execution flow.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Body_Onload_With_SetTimeout_Chain()
     {
         var html = @"<!DOCTYPE html>
@@ -769,7 +769,7 @@ function update() {
     /// End-to-end test that loads the actual Acid3 test page and verifies
     /// the test harness executes to produce a score greater than 0.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_EndToEnd_Score_GreaterThan_Zero()
     {
         // Navigate from bin/Debug/net8.0 up to the repo root, then into acid/acid3/
@@ -796,7 +796,7 @@ function update() {
     /// causes getComputedStyle to pick up the new CSS rules. This tests the
     /// dynamic stylesheet invalidation mechanism.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DynamicStyle_TextContent_Updates_GetComputedStyle()
     {
         var html = @"<!DOCTYPE html>
@@ -827,7 +827,7 @@ document.getElementById('result').textContent = before + '|' + after;
     /// CSS content from style elements whose textContent was changed via JS,
     /// and that the CSS is not HTML-encoded (raw text elements).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DynamicStyle_TextContent_Serialized_Correctly()
     {
         var html = @"<!DOCTYPE html>
@@ -858,7 +858,7 @@ document.getElementById('result').textContent = 'done';
     /// Phase 2, Task 2.1: Verifies that cssRules getter picks up
     /// new rules after textContent is changed on a style element.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DynamicStyle_CssRules_Reflect_TextContent_Change()
     {
         var html = @"<!DOCTYPE html>
@@ -889,7 +889,7 @@ document.getElementById('result').textContent = r.join(',');
     /// after DOM mutations that affect which CSS selectors match.
     /// Uses :last-child re-evaluation (same pattern as Acid3 test 0).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssCascade_After_Dom_Mutation_RemoveChild()
     {
         var html = @"<!DOCTYPE html>
@@ -929,7 +929,7 @@ document.getElementById('result').textContent = before + '|' + after;
     /// Phase 2 score validation: Verifies the Acid3 score after Phase 2
     /// dynamic stylesheet fixes. The score should be higher than Phase 1's 56.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase2_Score_Validation()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -954,7 +954,7 @@ document.getElementById('result').textContent = before + '|' + after;
 
 public class Acid3Phase4Diagnostics
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test7_Range_Basic()
     {
         var html = @"<!DOCTYPE html>
@@ -994,7 +994,7 @@ document.body.appendChild(out);
 
 public class Acid3Phase4RangeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Test8_MovingBoundaryPoints()
     {
         var html = @"<!DOCTYPE html>
@@ -1080,7 +1080,7 @@ document.body.appendChild(out);
 /// </summary>
 public class Acid3Phase5Tests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetNumberOfChars_Returns_TextLength()
     {
         var html = @"<!DOCTYPE html>
@@ -1106,7 +1106,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetComputedTextLength_Returns_Number()
     {
         var html = @"<!DOCTYPE html>
@@ -1132,7 +1132,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetSubStringLength_Returns_Number()
     {
         var html = @"<!DOCTYPE html>
@@ -1159,7 +1159,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetStartPositionOfChar_Returns_Point()
     {
         var html = @"<!DOCTYPE html>
@@ -1186,7 +1186,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetEndPositionOfChar_Returns_Point()
     {
         var html = @"<!DOCTYPE html>
@@ -1212,7 +1212,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetRotationOfChar_Returns_Zero()
     {
         var html = @"<!DOCTYPE html>
@@ -1237,7 +1237,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_GetRotationOfChar_Throws_INDEX_SIZE_ERR()
     {
         var html = @"<!DOCTYPE html>
@@ -1270,7 +1270,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("threw,threw", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_SetCurrentTime_GetCurrentTime()
     {
         var html = @"<!DOCTYPE html>
@@ -1294,7 +1294,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_SMIL_BeginElement_Exists()
     {
         var html = @"<!DOCTYPE html>
@@ -1325,7 +1325,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,ok", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVGLength_Constants_Exist()
     {
         var html = @"<!DOCTYPE html>
@@ -1346,7 +1346,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SVG_AnimatedLength_UnitType_Number()
     {
         var html = @"<!DOCTYPE html>
@@ -1373,7 +1373,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test75_SVG_Rect_Width_And_GetAttribute()
     {
         // Mirrors the actual (uncommented) Acid3 test 75 code
@@ -1401,7 +1401,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("has-width,attr-ok", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test77_SVG_Text_GetNumberOfChars()
     {
         // Mirrors the actual (uncommented) Acid3 test 77 code
@@ -1434,7 +1434,7 @@ document.getElementById('result').textContent = r.join(',');
     /// Phase 5 score validation: Verifies the Acid3 score remains stable
     /// after Phase 5 SVG competition test stubs.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase5_Score_Validation()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -1456,7 +1456,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.True(score >= 75, $"Acid3 score: {score} (expected >= 75, Phase 5 baseline)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase6_Score_Validation()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -1483,7 +1483,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.True(score > 75, $"Acid3 score: {score} (expected > 75, Phase 6 should improve beyond Phase 5)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_SubmitButton_Click_Triggers_Form_Onsubmit()
     {
         var js = @"
@@ -1512,7 +1512,7 @@ document.getElementById('out').textContent = '' + called;
     /// Verifies that .z { visibility: hidden } does NOT persist in inline
     /// styles after className changes from "z" to "zPPPP...".
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase3_Bucket_Visibility_Not_Stale_After_Class_Change()
     {
         var html = @"<!DOCTYPE html>
@@ -1557,7 +1557,7 @@ document.getElementById('out').textContent = b1.className + ',' + b2.className;
     /// Validates that after full Acid3 execution, bucket elements are
     /// serialized without stale CSS inline styles.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase3_Full_Harness_Buckets_No_Stale_Styles()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -1596,7 +1596,7 @@ document.getElementById('out').textContent = b1.className + ',' + b2.className;
 /// Phase 4: Verifies that whatToShow=0xFFFFFFFF doesn't overflow and
 /// NodeIterator correctly iterates all node types.
 /// </summary>
-[Fact]
+[Fact(Timeout = 600000)]
 public void Acid3_Phase4_NodeIterator_ShowAll_0xFFFFFFFF()
 {
     var html = @"<!DOCTYPE html>
@@ -1621,7 +1621,7 @@ document.getElementById('out').textContent = r.join(',');
 /// Phase 4: CSS selector backtracking — complex selector with descendant
 /// + adjacent sibling + child combinators.
 /// </summary>
-[Fact]
+[Fact(Timeout = 600000)]
 public void Acid3_Phase4_Selector_Backtracking()
 {
     var html = @"<!DOCTYPE html>
@@ -1649,7 +1649,7 @@ document.getElementById('out').textContent = 'z=' + z;
 /// <summary>
 /// Phase 4: Implicit tbody creation and table cloning.
 /// </summary>
-[Fact]
+[Fact(Timeout = 600000)]
 public void Acid3_Phase4_Implicit_Tbody_Cloning()
 {
     var html = @"<!DOCTYPE html>
@@ -1678,7 +1678,7 @@ document.getElementById('out').textContent = r.join('|');
 /// <summary>
 /// Phase 4: document.write inserts at script position, not end of body.
 /// </summary>
-[Fact]
+[Fact(Timeout = 600000)]
 public void Acid3_Phase4_DocumentWrite_Insertion_Position()
 {
     var html = @"<!DOCTYPE html>
@@ -1709,7 +1709,7 @@ document.getElementById('out').textContent = r.join('|');
 /// <summary>
 /// Phase 4: Validates Acid3 harness score is at least 81.
 /// </summary>
-[Fact]
+[Fact(Timeout = 600000)]
 public void Acid3_Phase4_Score_At_Least_81()
 {
     var acid3Path = Path.GetFullPath(Path.Combine(
@@ -1734,7 +1734,7 @@ public void Acid3_Phase4_Score_At_Least_81()
     /// T3.1: (-0).toExponential(4) must format as "0.0000e+0", not "-0.0000e+0".
     /// ECMAScript specifies that negative zero formats as positive zero.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseA_NegativeZero_ToExponential_Formats_As_Positive()
     {
         var html = @"<!DOCTYPE html>
@@ -1756,7 +1756,7 @@ document.getElementById('result').textContent = r.join(',');
     /// :last-child and getComputedStyle returns the correct CSS value.
     /// CSS value validation rejects unknown values (x-bogus).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseA_LastChild_CSS_ReEvaluation_After_DOM_Removal()
     {
         var html = @"<!DOCTYPE html>
@@ -1791,7 +1791,7 @@ document.getElementById('score').textContent = ws;
     /// negative zero toExponential (fixes test 84). Phase A should improve
     /// score by at least 2 points over the Phase 4b baseline of 83.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseA_Score_Validation()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -1821,7 +1821,7 @@ document.getElementById('score').textContent = ws;
     /// When a node is removed that is the reference node, the iterator must
     /// advance per DOM spec §7.2 "NodeIterator pre-removing steps".
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseC_NodeIterator_PreRemoval_Steps()
     {
         var html = @"<!DOCTYPE html>
@@ -1872,7 +1872,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// Test 2 full scenario: NodeIterator with DOM mutations during filter callbacks.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseC_NodeIterator_Removal_During_Filter()
     {
         var html = @"<!DOCTYPE html>
@@ -1934,7 +1934,7 @@ document.getElementById('result').textContent = r.join('|');
     /// style changes the viewport for media query evaluation in the sub-document.
     /// </summary>
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseB_ForIn_Main_Document()
     {
         // Simplest possible for...in test
@@ -1953,7 +1953,7 @@ document.getElementById('result').textContent = r;
         Assert.Contains("ab", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseB_ForIn_SubDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -1980,7 +1980,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("a|b|c|d", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseC_Media_Queries_Viewport_Dimensions()
     {
         var html = @"<!DOCTYPE html>
@@ -2053,7 +2053,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// Test 72: Dynamic style in sub-documents — img.height reflects CSS-computed value.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseC_SubDocument_Dynamic_Style_And_Image_Height()
     {
         var html = @"<!DOCTYPE html>
@@ -2116,7 +2116,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Tests 4-5: Object identity — NodeIterator/TreeWalker nodes must be === to
     /// nodes returned by getElementsByTagName, getElementById, etc.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseC_NodeIterator_Object_Identity()
     {
         // Simulate the Acid3 test 4 structure with h1, divs, etc.
@@ -2165,7 +2165,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Tests 4-5: Object identity with document.write() elements — ensure elements
     /// created by document.write() maintain identity across getElementsByTagName and NodeIterator.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseC_NodeIterator_Identity_With_DocumentWrite()
     {
         var html = @"<!DOCTYPE html>
@@ -2216,7 +2216,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// Test 88: Unicode escape \u002b (='+') in identifier must throw SyntaxError.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseD_UnicodeEscapeInIdentifier_ThrowsSyntaxError()
     {
         var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
@@ -2238,7 +2238,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// Test 89: Empty character class [] matches nothing; /TA[])]/ is a SyntaxError.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseD_RegexEmptyCharacterClass()
     {
         var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
@@ -2267,7 +2267,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// Test 90: Forward backreferences match empty string; \0 is NUL escape.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseD_RegexForwardBackreferences()
     {
         var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
@@ -2291,7 +2291,7 @@ document.getElementById('result').textContent = r.join('|');
     /// <summary>
     /// Test 93: Named function expression name is read-only and local to body.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseD_NamedFunctionExpressionScope()
     {
         var html = @"<!DOCTYPE html><html><body><div id=""result""></div><script>
@@ -2320,7 +2320,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Verifies that iframe fallback content is stripped from capture output
     /// so that HtmlRenderer does not render "FAIL" text inside iframes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StripIframeContent_Removes_Fallback_Text()
     {
         var html = @"<html><body>
@@ -2338,7 +2338,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Verifies that object fallback content is stripped from capture output
     /// so that HtmlRenderer does not render "FAIL" text inside objects.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StripObjectContent_Removes_Fallback_Text()
     {
         var html = @"<html><body>
@@ -2355,7 +2355,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Validates that the full Acid3 rendered output contains a visible
     /// score and that the score is at least 88 (Phase 5 baseline).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase5_Score_At_Least_88()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -2382,7 +2382,7 @@ document.getElementById('result').textContent = r.join('|');
     /// The only acceptable remaining FAIL is inside the document.write div
     /// with id=" " which is below the viewport.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase5_No_Visible_Fail_Text_After_Stripping()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -2419,7 +2419,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Verifies that StripHiddenTestArtifacts removes the linktest anchor
     /// text content while preserving the element structure.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StripHiddenTestArtifacts_Removes_Linktest_Text()
     {
         var html = @"<html><body>
@@ -2437,7 +2437,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Verifies that StripHiddenTestArtifacts removes the FAIL div
     /// test artifact (div with id=" ").
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StripHiddenTestArtifacts_Removes_Fail_Div()
     {
         var html = @"<html><body>
@@ -2453,7 +2453,7 @@ document.getElementById('result').textContent = r.join('|');
     /// Validates that the full stripping pipeline (including Phase 6 fixes)
     /// produces zero visible FAIL text and no linktest leakage.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Phase6_No_Visible_Fail_Or_Linktest_After_Full_Pipeline()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -2484,7 +2484,7 @@ document.getElementById('result').textContent = r.join('|');
     /// document order so that getElementsByTagName, document.links, etc.
     /// return elements in the same order as DOM tree traversal (NodeIterator).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseD_DocumentWrite_Elements_In_Document_Order()
     {
         // map/area is inserted BEFORE instructions by document.write()
@@ -2544,7 +2544,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// <summary>
     /// Phase D regression: Full Acid3 score should be at least 97.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseD_Acid3_Score_At_Least_97()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -2567,7 +2567,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// Phase E: Verify that iframe contentDocument is accessible and SVG
     /// elements can be found via getElementsByTagName after loading svg.xml.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseE_Iframe_SubDocument_Loading()
     {
         var html = @"
@@ -2599,7 +2599,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// Phase E: Verify that insertRule works with live cssRules on a sub-document
     /// (test 72 prerequisite).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseE_InsertRule_And_Live_CssRules()
     {
         var html = @"
@@ -2637,7 +2637,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// <summary>
     /// Phase E: Verify that iframe onload handler fires and can modify DOM.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseE_Linktest_Onload_Fires()
     {
         var html = @"
@@ -2668,7 +2668,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// <summary>
     /// Phase E regression: Full Acid3 score should be at least 100.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseE_Acid3_Score_At_Least_100()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -2689,7 +2689,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// v7 infrastructure: Validates that the pixel comparison script exists
     /// and that reference images are present for comparison.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Pixel_Comparison_Infrastructure_Exists()
     {
         var repoRoot = Path.GetFullPath(Path.Combine(
@@ -2709,7 +2709,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// v7 infrastructure: Validates that the Acid3 render produces a valid PNG
     /// image via the CaptureService image rendering pipeline.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Acid3_Image_Capture_Produces_Valid_Output()
     {
         var acid3Path = Path.GetFullPath(Path.Combine(
@@ -2744,7 +2744,7 @@ document.getElementById('diag').textContent = r.join('|');
     /// HtmlRenderer must look up "#id.class" keys in CssData so the rule
     /// applies when an element has both the given id and class.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Compound_IdClass_Selector_Applied_By_Renderer()
     {
         var html = @"<!DOCTYPE html>
@@ -2769,7 +2769,7 @@ document.getElementById('result').textContent = cs.color;
     /// v7 §4.2.2: Compound selector #id.class must NOT match when the
     /// element has the id but a different class.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Compound_IdClass_Selector_No_Match_Wrong_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -2795,7 +2795,7 @@ document.getElementById('result').textContent = 'COMPUTED:' + cs.color;
     /// v7 §4.2.2: Compound selector with ancestor — "#parent #child.cls".
     /// Tests MatchesSelectorItem handling of #id.class in ancestor chains.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Compound_IdClass_Selector_In_Descendant_Chain()
     {
         var html = @"<!DOCTYPE html>
@@ -2823,7 +2823,7 @@ document.getElementById('result').textContent = cs.color;
     /// — the second declaration must override the first, rendering black not red.
     /// Verifies hsla() works in the CSS cascade for HtmlRenderer's CssValueParser.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Hsla_Overrides_Red_In_Acid3_Slash()
     {
         var html = @"<!DOCTYPE html>
@@ -2857,7 +2857,7 @@ document.getElementById('result').textContent = cs.color;
     ///   .bucket { display: inline-block; width: 2em; height: 1em; }
     /// Verifies the rendering engine processes inline-block without error.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_InlineBlock_With_Explicit_Size_Renders()
     {
         var html = @"<!DOCTYPE html>
@@ -2889,7 +2889,7 @@ document.getElementById('result').textContent = 'display=' + cs.display;
     /// on the same line, like inline replaced elements.  Verifies that
     /// the DOM correctly reflects multiple sibling inline-block spans.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_InlineBlock_Multiple_Elements_In_Flow()
     {
         var html = @"<!DOCTYPE html>
@@ -2920,7 +2920,7 @@ document.getElementById('result').textContent = 'count=' + children.length;
     /// within the inline-block's own block formatting context, not in
     /// the parent's inline flow.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_InlineBlock_With_Child_Content_Renders()
     {
         var html = @"<!DOCTYPE html>
@@ -2950,7 +2950,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: Inline-block elements with auto width should use
     /// shrink-to-fit sizing.  Verify rendering does not crash.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_InlineBlock_Auto_Width_Shrink_To_Fit()
     {
         var html = @"<!DOCTYPE html>
@@ -2978,7 +2978,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: vertical-align: top should align the top of the box with
     /// the top of the line box.  Verify it does not crash or produce errors.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_VerticalAlign_Top_Renders()
     {
         var html = @"<!DOCTYPE html>
@@ -3004,7 +3004,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: vertical-align: bottom should align the bottom of the box
     /// with the bottom of the line box.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_VerticalAlign_Bottom_Renders()
     {
         var html = @"<!DOCTYPE html>
@@ -3030,7 +3030,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: vertical-align: middle should align the vertical midpoint
     /// of the box with the parent baseline + half x-height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_VerticalAlign_Middle_Renders()
     {
         var html = @"<!DOCTYPE html>
@@ -3056,7 +3056,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: vertical-align with inline-block elements — the Acid3
     /// bucket bars use inline-block + vertical-align together.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_VerticalAlign_With_InlineBlock()
     {
         var html = @"<!DOCTYPE html>
@@ -3098,7 +3098,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: Absolutely positioned element with explicit top/left inside
     /// a position:relative container should render without crashing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_AbsolutePosition_In_Relative_Container()
     {
         var html = @"<!DOCTYPE html>
@@ -3129,7 +3129,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: Absolutely positioned element with bottom/right offsets
     /// should render without crashing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_AbsolutePosition_Bottom_Right()
     {
         var html = @"<!DOCTYPE html>
@@ -3162,7 +3162,7 @@ document.getElementById('result').textContent =
     /// another absolute element should resolve its containing block
     /// correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_AbsolutePosition_Nested()
     {
         var html = @"<!DOCTYPE html>
@@ -3198,7 +3198,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: white-space: pre-wrap should preserve multiple spaces
     /// in the rendered output.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_PreWrap_Preserves_Multiple_Spaces()
     {
         var html = @"<!DOCTYPE html>
@@ -3225,7 +3225,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: white-space: pre-wrap should preserve newlines
     /// and multiple spaces across lines.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_PreWrap_Preserves_Newlines()
     {
         var html = @"<!DOCTYPE html>
@@ -3252,7 +3252,7 @@ document.getElementById('result').textContent = 'lines=' + lines.length;
     /// v7 §4.2: white-space: pre should preserve all whitespace
     /// without wrapping.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Pre_Preserves_Spaces()
     {
         var html = @"<!DOCTYPE html>
@@ -3281,7 +3281,7 @@ document.getElementById('result').textContent =
     /// v7 §4.2: em unit computation should use the element's own
     /// computed font-size, not a stale or default value.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Em_Width_Uses_Element_FontSize()
     {
         var html = @"<!DOCTYPE html>
@@ -3309,7 +3309,7 @@ document.getElementById('result').textContent =
     /// through the hierarchy.  Verify the raw CSS value is applied
     /// and rendering does not crash.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Em_FontSize_Cascades_From_Parent()
     {
         var html = @"<!DOCTYPE html>
@@ -3343,7 +3343,7 @@ document.getElementById('result').textContent =
     /// correctly through the font-size cascade.  Verify rendering
     /// does not crash and elements are present.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void V7_Em_FontSize_Deep_Nesting()
     {
         var html = @"<!DOCTYPE html>
@@ -3386,7 +3386,7 @@ document.getElementById('result').textContent =
     /// Acid3 test 28 pattern: getElementById() must not match on the 'name'
     /// attribute, and must handle space-character IDs correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test28_GetElementById_Does_Not_Match_Name()
     {
         var html = @"<!DOCTYPE html>
@@ -3428,7 +3428,7 @@ try {
     /// Acid3 test 30 pattern: dispatchEvent with UIEvents, addEventListener,
     /// and removeEventListener.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test30_DispatchEvent_AddRemoveListener()
     {
         var html = @"<!DOCTYPE html>
@@ -3475,7 +3475,7 @@ try {
     /// Acid3 test 86 pattern: Date.setMilliseconds() with no arguments
     /// should produce NaN.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test86_Date_SetMilliseconds_NoArgs_ProducesNaN()
     {
         var html = @"<!DOCTYPE html>
@@ -3505,7 +3505,7 @@ try {
     /// Acid3 test 87 pattern: Date.UTC() and new Date() with fractional
     /// two-digit year values perform proper 1900-year offsetting.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test87_Date_TwoDigitYear_Offsetting()
     {
         var html = @"<!DOCTYPE html>
@@ -3537,7 +3537,7 @@ try {
     /// enumerable, including shadow properties like 'constructor', 'toString',
     /// 'valueOf', 'hasOwnProperty', etc.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test91_Properties_Enumerable_Including_Shadow()
     {
         var html = @"<!DOCTYPE html>
@@ -3570,7 +3570,7 @@ try {
     /// Acid3 test 92 pattern: Function.prototype.constructor is writable
     /// and deletable, but not enumerable.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test92_Function_Constructor_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -3608,7 +3608,7 @@ try {
     /// Acid3 test 94 pattern: catch block variable scope must not
     /// poison the outer scope.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test94_Exception_Catch_Scope_Isolation()
     {
         var html = @"<!DOCTYPE html>
@@ -3638,7 +3638,7 @@ try {
     /// Acid3 test 95 pattern: typeof the result of assignment to
     /// array length property preserves the string type.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test95_Typeof_Assignment_Result()
     {
         var html = @"<!DOCTYPE html>
@@ -3664,7 +3664,7 @@ try {
     /// Acid3 test 96 pattern: encodeURIComponent must encode null bytes
     /// (U+0000) as '%00'.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test96_EncodeURIComponent_NullByte()
     {
         var html = @"<!DOCTYPE html>
@@ -3690,7 +3690,7 @@ try {
     /// <summary>
     /// Acid3 test 85 pattern: String.substr() with negative start index.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PhaseF_Test85_Substr_Negative_Start()
     {
         var html = @"<!DOCTYPE html>

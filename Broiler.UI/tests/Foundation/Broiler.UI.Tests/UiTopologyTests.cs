@@ -14,7 +14,7 @@ public sealed class UiTopologyTests
         "ValueAndSelection",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Project_Directories_Match_Their_Roles()
     {
         string[] violations = UiProjects()
@@ -27,7 +27,7 @@ public sealed class UiTopologyTests
         Assert.Empty(violations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_Implementation_Projects_Mirror_Matching_Abstractions()
     {
         string componentRoot = FindComponentRoot();
@@ -50,7 +50,7 @@ public sealed class UiTopologyTests
         Assert.Empty(violations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Abstraction_Projects_Do_Not_Reference_Standard_Implementations()
     {
         string[] violations = UiProjects()
@@ -64,7 +64,7 @@ public sealed class UiTopologyTests
         Assert.Empty(violations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Runtime_Ui_Projects_Do_Not_Reference_Windows_Specific_Assemblies()
     {
         string[] violations = UiProjects()

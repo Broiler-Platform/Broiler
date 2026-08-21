@@ -24,7 +24,7 @@ public sealed class RecoveryJournalTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Unsaved_Text_Survives_A_Process_That_Never_Saved()
     {
         string workspaceRoot = Path.Combine(_root, "workspace");
@@ -56,7 +56,7 @@ public sealed class RecoveryJournalTests : IDisposable
         Assert.False(entry.ConflictsWith(document.Item.ExternalRevision));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Recovery_Data_Never_Lands_Inside_The_Workspace()
     {
         string workspaceRoot = Path.Combine(_root, "workspace");
@@ -83,7 +83,7 @@ public sealed class RecoveryJournalTests : IDisposable
         Assert.NotEmpty(await journal.ReadAllAsync());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Stale_Entry_Reports_A_Conflict_Rather_Than_Restoring_Over_A_Newer_File()
     {
         RecoveryJournal journal = RecoveryJournal.ForWorkspace(
@@ -106,7 +106,7 @@ public sealed class RecoveryJournalTests : IDisposable
         Assert.True(entry.ConflictsWith("someone-else-saved-since"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Malformed_Entry_Does_Not_Cost_The_Others()
     {
         RecoveryJournal journal = RecoveryJournal.ForWorkspace(
@@ -133,7 +133,7 @@ public sealed class RecoveryJournalTests : IDisposable
         Assert.Equal("Good.cs", entry.RelativePath);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Saving_Forgets_The_Entry()
     {
         RecoveryJournal journal = RecoveryJournal.ForWorkspace(

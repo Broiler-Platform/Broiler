@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class Phase5SharedCascadeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetCascadedStyle_Applies_Author_Rule()
     {
         const string html = @"<!DOCTYPE html><html><head>
@@ -29,7 +29,7 @@ public sealed class Phase5SharedCascadeTests
         Assert.Equal("block", cascaded["display"]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetCascadedStyle_Uses_UserAgent_Sheet_For_Block_Elements()
     {
         const string html = @"<!DOCTYPE html><html><body><div id=""d"">x</div></body></html>";
@@ -41,7 +41,7 @@ public sealed class Phase5SharedCascadeTests
         Assert.Equal("block", engine.GetCascadedStyle(div.SourceElement)["display"]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetCascadedStyle_Does_Not_Backfill_Initials_For_Unmatched_Property()
     {
         const string html = @"<!DOCTYPE html><html><head>
@@ -59,7 +59,7 @@ public sealed class Phase5SharedCascadeTests
         Assert.False(cascaded.ContainsKey("display"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ProjectCascadedStyle_Sets_Box_Property()
     {
         const string html = @"<!DOCTYPE html><html><head>

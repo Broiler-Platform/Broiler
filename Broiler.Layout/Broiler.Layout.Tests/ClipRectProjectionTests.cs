@@ -36,14 +36,14 @@ public sealed class ClipRectProjectionTests
             LayoutEnvironment = new FakeLayoutEnvironment(),
         };
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clip_RoundTrips_Through_The_Cascade_Mapping()
     {
         var box = NewBox("rect(0px, 1px, 1px, 0px)");
         Assert.Equal("rect(0px, 1px, 1px, 0px)", CssUtils.GetPropertyValue(box, "clip"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Initial_Value_Is_Auto_And_Projects_Nothing()
     {
         var box = Bare();
@@ -52,7 +52,7 @@ public sealed class ClipRectProjectionTests
     }
 
     // rect(top, right, bottom, left) → inset(top, width - right, height - bottom, left).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Rect_Becomes_The_Inset_Of_The_Same_Rectangle()
     {
         Assert.True(ClipRect.TryProjectAsInset(NewBox("rect(10px, 25px, 50px, 10px)", size: 100), out var inset));
@@ -89,14 +89,14 @@ public sealed class ClipRectProjectionTests
 
     // `auto` is the border edge on that side: no inset from top or left, and the full extent to
     // right and bottom.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Sides_Are_The_Border_Edges()
     {
         Assert.True(ClipRect.TryProjectAsInset(NewBox("rect(auto, auto, auto, auto)"), out var inset));
         Assert.Equal("inset(0px 0px 0px 0px)", inset);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Clip_Larger_Than_The_Box_Insets_Negatively()
     {
         Assert.True(ClipRect.TryProjectAsInset(NewBox("rect(-50px, auto, auto, -50px)"), out var inset));
@@ -122,7 +122,7 @@ public sealed class ClipRectProjectionTests
     public void Clip_Does_Not_Apply_To_A_Box_That_Is_Not_Absolutely_Positioned(string position) =>
         Assert.False(ClipRect.TryProjectAsInset(NewBox("rect(0, 0, 0, 0)", position: position), out _));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clip_Applies_To_A_Fixed_Box_Too() =>
         Assert.True(ClipRect.TryProjectAsInset(NewBox("rect(0, 0, 0, 0)", position: "fixed"), out _));
 
@@ -139,7 +139,7 @@ public sealed class ClipRectProjectionTests
         Assert.False(ClipRect.TryProjectAsInset(NewBox(clip), out _));
 
     // CSS Masking 1 §7: a real clip-path supersedes clip, so the box paints with its own.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Clip_Path_Wins_Over_Clip()
     {
         var box = NewBox("rect(0, 0, 0, 0)");
@@ -147,14 +147,14 @@ public sealed class ClipRectProjectionTests
         Assert.Equal("circle(50%)", ClipRect.EffectiveClipPath(box));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clip_Is_Projected_When_Clip_Path_Says_None()
     {
         var box = NewBox("rect(0, 0, 0, 0)");
         Assert.Equal("inset(0px 96px 96px 0px)", ClipRect.EffectiveClipPath(box));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Box_With_Neither_Keeps_Its_Own_Clip_Path()
     {
         var box = Bare();

@@ -9,7 +9,7 @@ namespace Broiler.UI.Toolbar.Tests;
 
 public sealed class ToggleButtonControlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pointer_Click_Leaves_Button_Checked_Until_The_Next_Click()
     {
         var host = new TestHost(new BSize(120, 50));

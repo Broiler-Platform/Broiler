@@ -50,7 +50,7 @@ public sealed class VectorSkinLayoutTests
     }
 
     /// <summary>And it becomes an item like any other, so it is blockified too.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Floated_Flex_Item_Is_Blockified()
     {
         var (root, container) = ContainerWithChild("flex", CssConstants.Left, CssConstants.None);
@@ -61,7 +61,7 @@ public sealed class VectorSkinLayoutTests
     }
 
     /// <summary>The control: a float in an ordinary block container is still a float.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Floated_Child_Of_A_Block_Container_Is_Left_Alone()
     {
         var (root, container) = ContainerWithChild(CssConstants.Block, CssConstants.Left, "both");
@@ -76,7 +76,7 @@ public sealed class VectorSkinLayoutTests
     /// <summary>An absolutely positioned child is not an item, so its float is not the item rule's
     /// to clear (its own out-of-flow rules already say <c>float</c> computes to <c>none</c>).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Abspos_Child_Of_A_Flex_Container_Is_Not_An_Item()
     {
         var (root, container) = ContainerWithChild("flex", CssConstants.Left, CssConstants.None);
@@ -96,7 +96,7 @@ public sealed class VectorSkinLayoutTests
     /// with a box), and without the record its collapse-through landed on top of the margin already
     /// applied and pushed the whole article down.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Empty_First_Child_Does_Not_Spend_Its_Collapsed_Margin_Twice()
     {
         var (root, container) = PageWithContainer(containerMarginTop: "16px");
@@ -119,7 +119,7 @@ public sealed class VectorSkinLayoutTests
     /// The same record is what makes the collapse transitive: a margin two levels down is adjoining
     /// the grandparent's, so a wrapper <c>&lt;div&gt;</c> between them must not turn it into a gap.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Margin_Under_A_Wrapper_Still_Collapses_With_The_Grandparent()
     {
         var (root, container) = PageWithContainer(containerMarginTop: "24px");
@@ -136,7 +136,7 @@ public sealed class VectorSkinLayoutTests
 
     /// <summary>The control: a top border on the wrapper separates the margins, and the 10px is a
     /// real gap inside it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Border_On_The_Wrapper_Stops_The_Collapse()
     {
         var (root, container) = PageWithContainer(containerMarginTop: "24px");
@@ -160,7 +160,7 @@ public sealed class VectorSkinLayoutTests
     /// <c>.vector-column-start</c> holds two <c>display: none</c> pinned containers with
     /// <c>margin-bottom: 32px</c>, and that 32px was pushing the whole article down.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Hidden_Childs_Margin_Does_Not_Collapse_Through_Its_Empty_Parent()
     {
         var (root, container) = PageWithContainer(containerMarginTop: null);
@@ -184,7 +184,7 @@ public sealed class VectorSkinLayoutTests
 
     /// <summary>The control: the same margin on a <em>visible</em> empty box does collapse
     /// through it and does separate the siblings.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Visible_Empty_Boxs_Margin_Still_Collapses_Through()
     {
         var (root, container) = PageWithContainer(containerMarginTop: null);
@@ -211,7 +211,7 @@ public sealed class VectorSkinLayoutTests
     /// box above its own parent's content edge. MediaWiki's site notice was drawn 18px above the
     /// box that owns it for exactly this reason.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Collapse_Through_Never_Yields_A_Negative_Margin()
     {
         var (root, container) = PageWithContainer(containerMarginTop: "24px");
@@ -238,7 +238,7 @@ public sealed class VectorSkinLayoutTests
     /// made the figure 6px narrower than the image needs, and <c>max-width</c> then scaled the photo
     /// down to fit a box that should have fitted it exactly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Inline_Childs_Horizontal_Margins_Count_Toward_Max_Content()
     {
         double withMargins = MaxContentOfBlockHoldingInline(marginPx: 3);
@@ -254,7 +254,7 @@ public sealed class VectorSkinLayoutTests
     /// the line, and its bottom margin has to keep the line open below it. Neither happened, so a
     /// thumbnail sat flush with the top of a wrapper 6px too short for it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Inline_Images_Vertical_Margins_Are_Part_Of_Its_Line()
     {
         var (plainRoot, plainImage, plainWrapper) = PageWithAnInlineImage(margin: null);

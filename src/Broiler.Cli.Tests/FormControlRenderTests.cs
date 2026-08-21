@@ -60,7 +60,7 @@ public class FormControlRenderTests
         return (minX, maxX, minY, maxY, count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputSubmit_Renders_Visible()
     {
         var html = @"<html><body><input type='submit' value='Search'></body></html>";
@@ -69,7 +69,7 @@ public class FormControlRenderTests
             "Submit button should render visible pixels (border + text)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputText_Renders_Visible()
     {
         var html = @"<html><body><input type='text' value='Hello'></body></html>";
@@ -78,7 +78,7 @@ public class FormControlRenderTests
             "Text input should render visible pixels (border + text)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Button_Element_Renders_Visible()
     {
         var html = @"<html><body><button>Click Me</button></body></html>";
@@ -87,7 +87,7 @@ public class FormControlRenderTests
             "Button element should render visible pixels");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Select_Element_Renders_Visible()
     {
         var html = @"<html><body><select><option>One</option></select></body></html>";
@@ -96,7 +96,7 @@ public class FormControlRenderTests
             "Select element should render visible pixels (border)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Textarea_Element_Renders_Visible()
     {
         var html = @"<html><body><textarea>Some text</textarea></body></html>";
@@ -110,7 +110,7 @@ public class FormControlRenderTests
     /// Previously, StripHiddenTestArtifacts removed all &lt;form&gt; elements
     /// which made form controls inside &lt;form&gt; tags invisible.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormWrapped_Controls_Not_Stripped()
     {
         var html = @"<html><body>
@@ -132,7 +132,7 @@ public class FormControlRenderTests
     /// Regression: Controls inside a form tag must render visibly after
     /// HtmlPostProcessor.Process.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormWrapped_Controls_Render_Visible()
     {
         var html = @"<html><body>
@@ -152,7 +152,7 @@ public class FormControlRenderTests
     /// Hidden inputs must render as invisible (display:none).
     /// Previously they rendered as visible 173px-wide inline-block boxes.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InputHidden_Renders_Invisible()
     {
         var html = @"<html><body style='margin:0'><input type='hidden' name='x'></body></html>";
@@ -168,7 +168,7 @@ public class FormControlRenderTests
     /// <see cref="Broiler.HTML.Core.Core.Entities.CssBlock.EqualsSelector"/>
     /// fix that prevents merging blocks with different attribute conditions.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AuthorCss_Does_Not_Break_InputVisibility()
     {
         var html = @"<html><body>
@@ -185,7 +185,7 @@ public class FormControlRenderTests
     /// Author CSS attribute selectors (e.g. <c>input[type="submit"]</c>)
     /// must still apply correctly when combined with UA stylesheet.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AuthorAttrSelector_Applies_To_MatchingInputs()
     {
         var html = @"<html><body>
@@ -204,7 +204,7 @@ public class FormControlRenderTests
     /// Compound class + attribute selector (e.g. <c>.buttons input[type="submit"]</c>)
     /// must apply correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CompoundClassAndAttrSelector_Applies()
     {
         var html = @"<html><body>
@@ -225,7 +225,7 @@ public class FormControlRenderTests
             "Compound class + attribute selector buttons must be visible");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormControls_ComputedLogicalSizes_Follow_WritingMode()
     {
         var html = @"<!DOCTYPE html>
@@ -260,7 +260,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DateInput_ComputedLogicalSizes_Follow_WritingMode()
     {
         var html = @"<!DOCTYPE html>
@@ -291,7 +291,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RangeInput_InlineSizeZero_Uses_Final_WritingMode()
     {
         var html = @"<!DOCTYPE html>
@@ -325,7 +325,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("s=16px|0|0|16px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ButtonLikeControls_MultilineComputedSizes_Follow_WritingMode()
     {
         var html = @"<!DOCTYPE html>
@@ -372,7 +372,7 @@ document.getElementById('result').textContent = [
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SelectListBox_SizingAndScrolling_Follow_WritingMode()
     {
         var html = @"<!DOCTYPE html>

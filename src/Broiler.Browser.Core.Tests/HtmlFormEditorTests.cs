@@ -71,7 +71,7 @@ public class HtmlFormEditorTests
     /// keyboard entry point is select-all / copy, so a page's fields stay at their
     /// parsed value no matter what is typed.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormControlsAreNotEditableByTheRendererAlone()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -82,7 +82,7 @@ public class HtmlFormEditorTests
         Assert.Contains("value=\"hello\"", container.GetHtml());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClickingATextFieldHostsAnEditorSeededWithItsValue()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -97,7 +97,7 @@ public class HtmlFormEditorTests
         Assert.False(editor.Editor.IsPassword);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClickingOutsideAnyFieldDoesNotStartEditing()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -109,7 +109,7 @@ public class HtmlFormEditorTests
         Assert.Equal(UiVisibility.Collapsed, editor.Editor.Visibility);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PasswordFieldsAreMasked()
     {
         using HtmlContainer container = LayOut(
@@ -132,7 +132,7 @@ public class HtmlFormEditorTests
     /// pointer the control is simply not reported, so this asserts the full
     /// behaviour once it is and the graceful degradation until then.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TextAreasAreEditableAndCarryTheirTextContentAsTheValue()
     {
         using HtmlContainer container = LayOut(
@@ -164,7 +164,7 @@ public class HtmlFormEditorTests
         Assert.Contains("broiler", container.GetHtml());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CommitWritesTheTypedTextBackIntoTheDocument()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -185,7 +185,7 @@ public class HtmlFormEditorTests
         Assert.Contains(">broiler browser<", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CommitRaisesCommittedSoTheViewportCanRelayout()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -200,7 +200,7 @@ public class HtmlFormEditorTests
         Assert.Equal(1, committed);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CancelDiscardsTheTypedText()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -215,7 +215,7 @@ public class HtmlFormEditorTests
         Assert.DoesNotContain("discarded", container.GetHtml());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MovingToAnotherFieldCommitsThePreviousOne()
     {
         using HtmlContainer container = LayOut(
@@ -250,7 +250,7 @@ public class HtmlFormEditorTests
         throw new InvalidOperationException("No second editable input found.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedEditorIsPlacedOverTheFieldAndFollowsScrolling()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -271,7 +271,7 @@ public class HtmlFormEditorTests
         Assert.Equal(placed.Top - 10, editor.Editor.Bounds.Top, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HostedEditorIsHiddenWhenItsFieldScrollsOutOfView()
     {
         using HtmlContainer container = LayOut(SearchPage);
@@ -288,7 +288,7 @@ public class HtmlFormEditorTests
     /// and delivering a text-input event types into the page's field, which is the
     /// behaviour the browser was missing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TypingThroughTheSessionEditsThePageField()
     {
         using HtmlContainer container = LayOut(SearchPage);

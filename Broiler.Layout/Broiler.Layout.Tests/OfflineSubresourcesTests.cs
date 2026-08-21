@@ -31,7 +31,7 @@ public sealed class OfflineSubresourcesTests : IDisposable
         Assert.False(OfflineSubresources.Denies(url), url ?? "(null)");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DeniesExactlyWhatThePolicyDeclines()
     {
         OfflineSubresources.FetchPolicy = url => url != "http://example.com/x.png";

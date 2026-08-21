@@ -14,7 +14,7 @@ public class AudioPlaybackTests
     private static Func<MediaInput> WavFactory(byte[] bytes) =>
         () => new MediaInput(new MemoryStream(bytes), leaveOpen: false);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task OpenAsync_Wav_DecodesEndToEnd_IntoRealOutput()
     {
         byte[] wav = WavTestData.Pcm16Mono(SampleRate, Frames);
@@ -35,7 +35,7 @@ public class AudioPlaybackTests
         Assert.Null(output.Failure);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Play_Advance_ReachesEnded_AndRaisesEvents()
     {
         var session = (AudioPlaybackSession)await CreatePlayer().OpenAsync(WavFactory(WavTestData.Pcm16Mono(SampleRate, Frames)), new TestOutputProvider());
@@ -56,7 +56,7 @@ public class AudioPlaybackTests
         Assert.Contains(MediaPlaybackEventKind.Ended, events);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Pause_HaltsClock()
     {
         var session = (AudioPlaybackSession)await CreatePlayer().OpenAsync(WavFactory(WavTestData.Pcm16Mono(SampleRate, Frames)), new TestOutputProvider());
@@ -73,7 +73,7 @@ public class AudioPlaybackTests
         Assert.Equal(MediaPlaybackState.Paused, session.State);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Seek_Repositions_AndClampsToDuration()
     {
         var session = (AudioPlaybackSession)await CreatePlayer().OpenAsync(WavFactory(WavTestData.Pcm16Mono(SampleRate, Frames)), new TestOutputProvider());
@@ -86,7 +86,7 @@ public class AudioPlaybackTests
         Assert.Equal(session.Duration, session.Position);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Play_AfterEnded_RestartsFromZero()
     {
         var session = (AudioPlaybackSession)await CreatePlayer().OpenAsync(WavFactory(WavTestData.Pcm16Mono(SampleRate, Frames)), new TestOutputProvider());
@@ -101,7 +101,7 @@ public class AudioPlaybackTests
         Assert.Equal(MediaPlaybackState.Playing, session.State);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Dispose_IsIdempotent_AndBlocksTransport()
     {
         var session = (AudioPlaybackSession)await CreatePlayer().OpenAsync(WavFactory(WavTestData.Pcm16Mono(SampleRate, Frames)), new TestOutputProvider());
@@ -113,7 +113,7 @@ public class AudioPlaybackTests
         await Assert.ThrowsAsync<ObjectDisposedException>(async () => await session.PlayAsync());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Unsupported_Bytes_Throw_DeterministicCapabilityError()
     {
         byte[] garbage = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];

@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ChildNodeBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildNode_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ChildNodeBinding);
@@ -27,7 +27,7 @@ public sealed class ChildNodeBindingModuleTests
         Assert.True(typeof(IChildNodeHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildNode_Mixin_Flows_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

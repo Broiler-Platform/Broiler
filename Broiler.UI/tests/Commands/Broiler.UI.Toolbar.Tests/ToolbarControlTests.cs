@@ -9,7 +9,7 @@ namespace Broiler.UI.Toolbar.Tests;
 
 public sealed class ToolbarControlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Toolbar_Arranges_Children_Separators_And_Semantics()
     {
         var host = new TestHost(new BSize(360, 64));
@@ -40,7 +40,7 @@ public sealed class ToolbarControlTests
         Assert.Equal([UiSemanticRole.Button, UiSemanticRole.Button, UiSemanticRole.Button], semantic.Children.Select(static child => child.Role));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Toolbar_Keyboard_Navigation_Moves_Focus_Across_Visible_Children()
     {
         var host = new TestHost(new BSize(360, 64));
@@ -69,7 +69,7 @@ public sealed class ToolbarControlTests
         Assert.Same(first, session.FocusedElement);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Toolbar_Vertical_Orientation_Stacks_Items_And_Uses_Vertical_Keys()
     {
         var host = new TestHost(new BSize(96, 180));

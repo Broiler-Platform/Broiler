@@ -32,7 +32,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
 
     // ────────────── the worker ──────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Started_Scan_Reports_What_It_Found()
     {
         var scan = SpeculativePreloadScan.Start("""<link rel="stylesheet" href="a.css">""", PageUrl);
@@ -46,11 +46,11 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// thread — so a document that plainly names no resource returns no scan at all rather than an
     /// empty one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Document_Naming_No_Resource_Starts_No_Worker() =>
         Assert.Null(SpeculativePreloadScan.Start("<p>hello</p>", PageUrl));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Feature_Switch_Stops_The_Scan_Entirely()
     {
         var wasEnabled = SpeculativePreloadScan.Enabled;
@@ -69,7 +69,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// The sink is the whole point of the worker: it is what starts the requests while the parse is
     /// still running. It runs on the worker, before the result is published.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Sink_Receives_The_Result_On_The_Worker()
     {
         int? sinkThread = null;
@@ -97,7 +97,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// document whose consume sites each fetch inline. A throwing sink is the one failure this can
     /// actually be provoked into, since the scan itself is a pure function.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Throwing_Sink_Does_Not_Take_The_Document_With_It()
     {
         var scan = SpeculativePreloadScan.Start(
@@ -112,7 +112,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
 
     // ────────────── the policy filter ──────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Script_The_Configured_Policy_Blocks_Is_Not_Requested()
     {
         var csp = new ContentSecurityPolicy();
@@ -131,7 +131,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// The meta policy is checked even when the host configured none of its own: the request itself
     /// is what the policy stops, so "we fetched it but did not run it" is not a defensible reading.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Meta_Policy_Blocks_A_Prefetch_With_No_Configured_Policy()
     {
         var scan = SpeculativePreloadScan.Start(
@@ -150,7 +150,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// <c>script-src 'nonce-…'</c> would refuse every prefetch, and the scan would silently do
     /// nothing on exactly the pages that declare one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Nonced_Script_Is_Requested_Under_A_Nonce_Policy()
     {
         var csp = new ContentSecurityPolicy();
@@ -174,7 +174,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// than a hole opened here — but it is the assertion that turns into a filter the day those
     /// directives are enforced anywhere.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Families_This_Engine_Does_Not_Police_Are_Not_Policed_Here_Either()
     {
         var csp = new ContentSecurityPolicy();
@@ -198,7 +198,7 @@ public sealed class SpeculativePreloadScanTests : IDisposable
     /// it the request is made after the sheet list is collected, and the rendered result is the
     /// same because the scan changes only when a request starts.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Linked_Stylesheet_Applies_Identically_With_And_Without_The_Scan()
     {
         var sheet = Path.Combine(_dir, "sheet.css");

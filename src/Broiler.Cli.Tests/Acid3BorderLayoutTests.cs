@@ -24,7 +24,7 @@ public class Acid3BorderLayoutTests
     /// ignored …)."  A position:absolute child must not increase the
     /// parent's auto height.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsoluteChild_DoesNot_Inflate_Parent_AutoHeight()
     {
         var html = @"<!DOCTYPE html>
@@ -56,7 +56,7 @@ body { margin: 0; }
     /// <summary>
     /// Same as above but for position:fixed children.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FixedChild_DoesNot_Inflate_Parent_AutoHeight()
     {
         var html = @"<!DOCTYPE html>
@@ -91,7 +91,7 @@ body { margin: 0; }
     /// the initial value "none" is used.  <c>border: 1px blue</c> should
     /// produce an invisible border because style defaults to "none".
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Border_Shorthand_Omitted_Style_Produces_No_Visible_Border()
     {
         var html = @"<!DOCTYPE html>
@@ -125,7 +125,7 @@ div { width: 60px; height: 40px; background: lime; }
     /// <c>border: 1px solid !important</c> sets color to initial ("black"),
     /// not the blue from the universal rule.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Important_Border_Override_Eliminates_Blue()
     {
         // Mirrors the Acid3 CSS pattern:
@@ -161,7 +161,7 @@ p { border: 1px solid !important; width: 60px; height: 40px; }
     /// actual border width.  CSS 2.1 §8.5.3: style "none" forces the
     /// computed width to zero.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BorderStyle_Change_Invalidates_Cached_Width()
     {
         // Rule 1 sets visible border (solid), rule 2 overrides style to none.

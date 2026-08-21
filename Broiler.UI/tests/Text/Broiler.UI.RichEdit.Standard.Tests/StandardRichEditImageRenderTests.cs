@@ -28,7 +28,7 @@ public sealed class StandardRichEditImageRenderTests
     private static IEnumerable<BRenderCommand.DrawImage> DrawnImages(BRenderList list) =>
         list.Commands.OfType<BRenderCommand.DrawImage>();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Draws_An_Inline_Image_At_Its_Display_Size()
     {
         RichEditScene scene = WithImage(Image(60, 40));
@@ -42,7 +42,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Uploads_An_Image_Once_However_Many_Frames_Are_Drawn()
     {
         RichEditScene scene = WithImage(Image());
@@ -55,7 +55,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Image_Takes_Its_Width_In_The_Line()
     {
         RichEditScene scene = WithImage(Image(60, 40), before: "ab", after: "cd");
@@ -71,7 +71,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Image_Makes_Its_Line_Tall_Enough_To_Show_It()
     {
         RichEditScene tall = WithImage(Image(60, 120), before: "ab");
@@ -100,7 +100,7 @@ public sealed class StandardRichEditImageRenderTests
             .First(c => c.Text.Text == text)
             .Origin;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Falls_Back_To_An_Outline_When_The_Image_Cannot_Be_Decoded()
     {
         RichEditScene scene = WithImage(Image());
@@ -113,7 +113,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Image_With_No_Stated_Size_Uses_Its_Decoded_Pixel_Size()
     {
         RichEditScene scene = WithImage(new InlineImage(Bytes, "image/png", 0, 0));
@@ -126,7 +126,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_Images_On_One_Line_Are_Both_Drawn()
     {
         RichEditScene scene = Create(new BSize(400, 200));
@@ -141,7 +141,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Releases_The_Handles_Of_A_Document_That_Was_Replaced()
     {
         RichEditScene scene = WithImage(Image());
@@ -157,7 +157,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Keeps_An_Image_Uploaded_While_The_Document_Is_Edited_Around_It()
     {
         RichEditScene scene = WithImage(Image(), before: "ab");
@@ -174,7 +174,7 @@ public sealed class StandardRichEditImageRenderTests
         scene.Session.Dispose();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Releases_Its_Image_Handles_When_Detached()
     {
         RichEditScene scene = WithImage(Image());

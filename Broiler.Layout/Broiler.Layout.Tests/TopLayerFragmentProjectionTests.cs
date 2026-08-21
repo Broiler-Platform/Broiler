@@ -32,7 +32,7 @@ public sealed class TopLayerFragmentProjectionTests
 
     private static Fragment FirstChild(Fragment root) => root.Children[0];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnmarkedBox_HasNoTopLayerOrder()
     {
         var root = Box(null, new PointF(0, 0), new SizeF(300, 300));
@@ -75,7 +75,7 @@ public sealed class TopLayerFragmentProjectionTests
         Assert.Null(FirstChild(frag).TopLayerOrder);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OrderPersistsIndependentOfStackLevel()
     {
         // A marked box with no z-index still carries its top-layer order; the two channels are

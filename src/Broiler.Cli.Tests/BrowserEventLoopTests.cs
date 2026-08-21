@@ -21,7 +21,7 @@ public sealed class BrowserEventLoopTests
     //  Timeouts
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Runs_Once_Then_Is_Removed()
     {
         var loop = new BrowserEventLoop();
@@ -37,7 +37,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(1, runs);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timeouts_Fire_In_Deadline_Order_Not_Registration_Order()
     {
         // Genuine event-loop timer ordering: an earlier-deadline timer fires first even when registered
@@ -53,7 +53,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(new[] { "early", "mid", "late" }, order);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timeouts_With_Equal_Delay_Fire_In_Registration_Order_Fifo()
     {
         // Equal deadlines keep FIFO (registration) order — the tiebreak the HTML spec requires.
@@ -68,7 +68,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(new[] { "first", "second", "third" }, order);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Allocates_An_Id_Even_Without_A_Callback()
     {
         var loop = new BrowserEventLoop();
@@ -79,7 +79,7 @@ public sealed class BrowserEventLoopTests
         Assert.False(loop.HasPendingWork); // nothing stored for a null callback
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearTimeout_Drops_Pending_Work()
     {
         var loop = new BrowserEventLoop();
@@ -97,7 +97,7 @@ public sealed class BrowserEventLoopTests
     //  Intervals
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetInterval_Ticks_Once_Per_Step_And_Stays_Registered()
     {
         var loop = new BrowserEventLoop();
@@ -109,7 +109,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(2, runs); // still registered after the first tick
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearInterval_Stops_Ticking()
     {
         var loop = new BrowserEventLoop();
@@ -123,7 +123,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(1, runs);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fast_Interval_Ticks_By_Period_Before_A_Slower_Timeout()
     {
         // Genuine ordering: a setInterval(10) ticks at 10, 20, 30 before a setTimeout(35) fires — the
@@ -142,7 +142,7 @@ public sealed class BrowserEventLoopTests
     //  Animation frames & frame actions
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestAnimationFrame_Runs_Once()
     {
         var loop = new BrowserEventLoop();
@@ -154,7 +154,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(1, runs);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CancelAnimationFrame_Drops_The_Callback()
     {
         var loop = new BrowserEventLoop();
@@ -167,7 +167,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(0, runs);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void QueueFrameAction_Runs_On_Next_Step()
     {
         var loop = new BrowserEventLoop();
@@ -183,11 +183,11 @@ public sealed class BrowserEventLoopTests
     //  Drain semantics
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DrainStep_Returns_False_When_Empty() =>
         Assert.False(new BrowserEventLoop().DrainStep(null));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DrainAll_Runs_Chained_Timeouts_To_Completion()
     {
         var loop = new BrowserEventLoop();
@@ -207,7 +207,7 @@ public sealed class BrowserEventLoopTests
         Assert.False(loop.HasPendingWork);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DrainStep_Runs_TaskCheckpoint_After_Each_Task()
     {
         var loop = new BrowserEventLoop();
@@ -220,7 +220,7 @@ public sealed class BrowserEventLoopTests
         Assert.Equal(2, checkpoints);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DrainStep_Isolates_A_Throwing_Callback()
     {
         var loop = new BrowserEventLoop();
@@ -234,7 +234,7 @@ public sealed class BrowserEventLoopTests
         Assert.True(goodRan); // a throwing task does not abort the batch
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clear_Drops_Pending_Work_Without_Running_It()
     {
         var loop = new BrowserEventLoop();
@@ -254,7 +254,7 @@ public sealed class BrowserEventLoopTests
     //  Characterization through the bridge
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timers_Flush_Through_The_Bridge()
     {
         using var ctx = new JSContext();

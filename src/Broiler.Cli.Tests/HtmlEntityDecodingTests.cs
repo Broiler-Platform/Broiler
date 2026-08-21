@@ -48,7 +48,7 @@ public sealed class HtmlEntityDecodingTests
         Assert.Equal(expected, TextContent(html, "t"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NbspSurvivesSerializeRoundTrip_NotDoubleEncoded()
     {
         using var context = new JSContext();
@@ -68,7 +68,7 @@ public sealed class HtmlEntityDecodingTests
         Assert.Equal("  X", text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptContentIsNotEntityDecoded()
     {
         // Raw-text element content must stay verbatim: a "&amp;&amp;" in JS must not become "&&".
@@ -92,7 +92,7 @@ public sealed class HtmlEntityDecodingTests
 
     /// <summary>The shape the gap was found through: an escaped query separator, so the URL the DOM
     /// reports is the URL the page meant.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetAttributeReturnsTheDecodedValue()
     {
         Assert.Equal("?a=1&b=2",
@@ -114,7 +114,7 @@ public sealed class HtmlEntityDecodingTests
     }
 
     /// <summary>An attribute selector matches the value, not its spelling.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttributeSelectorMatchesTheDecodedValue()
     {
         Assert.Equal("1",
@@ -126,7 +126,7 @@ public sealed class HtmlEntityDecodingTests
     /// removed, so re-parsing the output gives the same value rather than one more
     /// <c>&amp;amp;</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AttributeValueSurvivesSerializeRoundTrip_NotDoubleEncoded()
     {
         var once = Evaluate("<i id='t' data-x='a&amp;b'></i>", "document.getElementById('t').outerHTML");
@@ -139,7 +139,7 @@ public sealed class HtmlEntityDecodingTests
     /// The renderer reads the same one level of escaping. It is the other consumer of these values
     /// and it used to decode them itself; this pins that it no longer does.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheRendererReadsTheSameDecodedValue()
     {
         // The attribute is spelled `&amp;amp;`, so one decode leaves the five-character value

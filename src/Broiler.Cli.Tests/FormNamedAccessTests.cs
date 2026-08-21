@@ -41,7 +41,7 @@ public sealed class FormNamedAccessTests
     private static string Eval(JSContext context, string expression) => context.Eval(expression).ToString();
 
     /// <summary>The homepage's own sequence: find the form by name, then take its q control.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormNamedAccess_YieldsTheControl_TheWayTheHomepageTakesIt()
     {
         var (context, bridge) = Attach();
@@ -80,7 +80,7 @@ public sealed class FormNamedAccessTests
     /// the object does not already answer, so a control named <c>action</c> must not displace the
     /// form's own <c>action</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormNamedAccess_DoesNotShadowTheFormsOwnMembers()
     {
         var (context, bridge) = Attach();
@@ -97,7 +97,7 @@ public sealed class FormNamedAccessTests
     /// returning null instead would change what <c>typeof</c> reports and break feature detection.
     /// The controls collection keeps its own contract, where a miss is null.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormNamedAccess_WithNoSuchName_IsUndefined()
     {
         var (context, bridge) = Attach();
@@ -127,7 +127,7 @@ public sealed class FormNamedAccessTests
     /// in Broiler — HTML would also expose it by id, which this pins as a known limit rather than
     /// leaving it to be discovered.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormNamedAccess_MatchesTheNameAttribute()
     {
         var (context, bridge) = Attach();

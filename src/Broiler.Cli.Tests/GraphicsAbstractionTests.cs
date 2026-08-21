@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 
 public class GraphicsAbstractionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToPng_With_BColor_Background_Fills_Empty_Canvas()
     {
         var png = HtmlRender.RenderToPngWithStyleSet(string.Empty, 2, 2, new BColor(12, 34, 56, 255));
@@ -28,7 +28,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToImage_With_BColor_Background_Returns_BBitmap()
     {
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(string.Empty, 2, 2, backgroundColor: new BColor(12, 34, 56, 255));
@@ -40,7 +40,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToImage_With_Defaultable_BColor_Background_Returns_BBitmap()
     {
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(string.Empty, 2, 2, backgroundColor: new BColor(12, 34, 56, 255));
@@ -72,7 +72,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(expectedAlpha, parsed.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToFile_With_BImageFormat_Jpeg_Writes_Jpeg_File()
     {
         var outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.jpg");
@@ -93,7 +93,7 @@ public class GraphicsAbstractionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToFileAutoSized_With_BImageFormat_Png_Writes_Png_File()
     {
         var outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.png");
@@ -116,7 +116,7 @@ public class GraphicsAbstractionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToImageAutoSized_With_BColor_Background_Returns_BBitmap()
     {
         const string html = "<html><body style='margin:0'><div style='width:40px;height:30px;background:#123456'></div></body></html>";
@@ -127,7 +127,7 @@ public class GraphicsAbstractionTests
         Assert.True(bitmap.Height >= 30);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToImageAtAnchor_With_BColor_Background_Returns_Anchored_BBitmap()
     {
         const string html = """
@@ -147,7 +147,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)0xFF, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToImageAtAnchor_With_Missing_Anchor_Returns_Null()
     {
         using var bitmap = HtmlRender.RenderToImageAtAnchorWithStyleSet("<html><body>test</body></html>", "missing", 20, 20, backgroundColor: BColor.White);
@@ -155,7 +155,7 @@ public class GraphicsAbstractionTests
         Assert.Null(bitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task CaptureImageAsync_With_Fragment_Renders_Anchored_Viewport()
     {
         var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");
@@ -197,7 +197,7 @@ public class GraphicsAbstractionTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformLayout_Without_Explicit_Skia_Surface_Builds_FragmentTree()
     {
         using var container = new HtmlContainer();
@@ -212,7 +212,7 @@ public class GraphicsAbstractionTests
         Assert.NotNull(container.GetElementRectangle("target"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_Typed_And_Serialized_Paths_Produce_Equivalent_Fragment_Trees()
     {
         const string html = "<html><body style='margin:0'><div id='target' style='width:20px;height:10px'>value</div></body></html>";
@@ -233,7 +233,7 @@ public class GraphicsAbstractionTests
             FragmentJsonDumper.ToJson(typed.LatestFragmentTree!));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_Typed_Path_Rebuilds_After_Canonical_Dom_Mutation()
     {
         var document = HtmlDocumentParser
@@ -255,7 +255,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(35, after!.Value.Width);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Content()
     {
         using var container = new HtmlContainer();
@@ -278,7 +278,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)0xFF, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Translation_Helper_Renders_Offset_Content()
     {
         using var container = new HtmlContainer();
@@ -304,7 +304,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)0xFF, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_With_BBitmap_Returns_BackendNeutral_DiffBitmap()
     {
         using var actual = new BBitmap(1, 1);
@@ -322,7 +322,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_ResizeNearest_Scales_Source_Pixels_Without_Skia_Surface_Access()
     {
         using var source = new BBitmap(2, 1);
@@ -337,7 +337,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, resized.GetPixel(3, 0).B);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_Copy_And_EncodeDecode_Roundtrip_Preserve_Pixels()
     {
         using var source = new BBitmap(2, 2);
@@ -355,7 +355,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(source.GetPixel(1, 1), roundTripped.GetPixel(1, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_EncodeDecode_Jpeg_Roundtrip_Preserves_Size_Without_Skia_Codec()
     {
         using var source = new BBitmap(2, 2);
@@ -373,7 +373,7 @@ public class GraphicsAbstractionTests
         Assert.InRange(pixel.B, byte.MinValue, (byte)120);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Raster_Stream_Image_Load_Uses_BackendNeutral_Bitmap_Without_Materializing_Skia_Compat_Bitmap()
     {
         using var source = new BBitmap(2, 2);
@@ -401,7 +401,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(255, 255, 0, 255), target.GetPixel(3, 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Invalid_Raster_Stream_Image_Load_Returns_Null()
     {
         using var stream = new MemoryStream([0x01, 0x02, 0x03, 0x04]);
@@ -409,7 +409,7 @@ public class GraphicsAbstractionTests
         Assert.Null(StubImageAdapter.Instance.ImageFromStream(stream));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RasterCapable_Solid_Brush_And_Pen_Drawing_Do_Not_Materialize_Skia_Paint()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -436,7 +436,7 @@ public class GraphicsAbstractionTests
         Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RasterCapable_Texture_Brush_Drawing_Does_Not_Materialize_Skia_Paint()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -462,7 +462,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 255, 0, 255), bitmap.GetPixel(2, 2));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Linear_Gradient_Brush_Creation_Defers_Skia_Paint_Until_Draw()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -478,7 +478,7 @@ public class GraphicsAbstractionTests
         Assert.False(brush.HasMaterializedPaint);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FontAdapter_Compat_Font_Work_Delegates_Through_Font_Compat_Seam()
     {
         var compatFactory = new RecordingFontCompatFactory();
@@ -507,7 +507,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(["CreateFont:12", "GetMetrics", $"CreateFont:{12 * (96f / 72f):0.####}"], compatFactory.Calls);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GraphicsAdapter_Text_Operations_Delegate_Through_Text_Shaper_Seam()
     {
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
@@ -542,7 +542,7 @@ public class GraphicsAbstractionTests
         Assert.False(font.HasMaterializedRenderFont);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_Compatibility_Surface_Operations_Delegate_Through_Bitmap_Compat_Seam()
     {
         using var compatSurface = new RecordingBitmapCompatSurface(4, 4);
@@ -566,7 +566,7 @@ public class GraphicsAbstractionTests
             compatSurface.Calls);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StubCanvas_Exposes_Save_Restore_Translate_Invoked_By_Compat_Reflection()
     {
         // Regression guard (WPT css-anchor-position/transform-*): CompatCanvasOperations
@@ -587,7 +587,7 @@ public class GraphicsAbstractionTests
         Assert.Null(exception);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_Default_Compat_Surface_Comes_From_Skia_Compat_Provider()
     {
         var provider = new RecordingCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
@@ -601,7 +601,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(["SetPixel", "Clear"], provider.BitmapCompatSurface!.Calls);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StubImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
     {
         var provider = new RecordingCompatProvider();
@@ -625,7 +625,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(["CreatePenPaint", "CreateSolidBrushPaint", "CreateLinearGradientBrushPaint"], provider.PaintCompatFactory.Calls);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StubImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
     {
         var resolver = new RecordingFontTypefaceResolver();
@@ -663,7 +663,7 @@ public class GraphicsAbstractionTests
             resolver.Calls);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SkiaTextShaper_NonAhem_Measurement_Delegates_Through_Text_Metrics_Compat_Seam()
     {
         var textMetricsCompat = new RecordingTextMetricsCompat();
@@ -689,7 +689,7 @@ public class GraphicsAbstractionTests
         Assert.False(font.HasMaterializedRenderFont);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SkiaTextShaper_Fallback_Draw_Operations_Delegate_Through_Text_Canvas_Compat_Seam()
     {
         using var surface = SKSurface.Create(new SKImageInfo(32, 32));
@@ -717,7 +717,7 @@ public class GraphicsAbstractionTests
         Assert.False(font.HasMaterializedLayoutFont);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StubImageAdapter_Paint_Operations_Delegate_Through_Paint_Compat_Seam()
     {
         var paintCompat = new RecordingPaintCompatFactory();
@@ -757,7 +757,7 @@ public class GraphicsAbstractionTests
             paintCompat.PenUpdates);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GraphicsPathAdapter_Path_Operations_Delegate_Through_Path_Compat_Seam()
     {
         var pathCompat = new RecordingPathCompat();
@@ -780,7 +780,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(["CreatePath", "MoveTo", "LineTo", "ArcTo", "Reset", "MoveTo"], pathCompat.Calls);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RasterCapable_Path_Drawing_Does_Not_Materialize_Skia_Path()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -803,7 +803,7 @@ public class GraphicsAbstractionTests
         Assert.False(graphics.HasMaterializedCanvas);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RasterCapable_OpenGraphics_With_Translation_And_Clip_Does_Not_Materialize_Skia_Compatibility_Surface()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -825,7 +825,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(0, 0));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_FillRect_Respects_Translation_And_Clip()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -842,7 +842,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(5, 5));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_PushClipExclude_Skips_Excluded_Pixels()
     {
         using var bitmap = new BBitmap(5, 5);
@@ -858,7 +858,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(3, 3));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_DrawLine_Renders_Stroke_Without_Skia_Canvas()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -872,7 +872,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(0, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveOpacityLayer_Composites_With_Opacity()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -890,7 +890,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveBlendLayer_Multiply_Composites_Into_Base_Bitmap()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -908,7 +908,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveBlendLayer_Screen_Composites_Into_Base_Bitmap()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -926,7 +926,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveBlendLayer_Darken_Composites_Into_Base_Bitmap()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -941,7 +941,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(128, 0, 0, 255), pixel);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveBlendLayer_Lighten_Composites_Into_Base_Bitmap()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -956,7 +956,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(255, 128, 128, 255), pixel);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveBlendLayer_Overlay_Composites_Into_Base_Bitmap()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -974,7 +974,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BCanvas_SaveBlendLayer_Difference_Composites_Into_Base_Bitmap()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -992,7 +992,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Hinted_Opacity_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -1012,7 +1012,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, pixel.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Hinted_Darken_Blend_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -1030,7 +1030,7 @@ public class GraphicsAbstractionTests
         Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Hinted_Lighten_Blend_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -1048,7 +1048,7 @@ public class GraphicsAbstractionTests
         Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Hinted_Overlay_Blend_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -1067,7 +1067,7 @@ public class GraphicsAbstractionTests
         Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Hinted_Difference_Blend_Layer_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(4, 4);
@@ -1089,7 +1089,7 @@ public class GraphicsAbstractionTests
         Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Solid_Fills_And_Strokes_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(6, 6);
@@ -1107,7 +1107,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(0, 0));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Solid_Border_And_Fill()
     {
         using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.BroilerRasterId);
@@ -1133,7 +1133,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(255, 0, 0, 255), bitmap.GetPixel(7, 7));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Image_Blit_Through_Backend_Neutral_Primitives()
     {
         using var source = new BBitmap(2, 1);
@@ -1153,7 +1153,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 0, 255, 255), dest.GetPixel(3, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Background_Image()
     {
         using var source = new BBitmap(2, 1);
@@ -1184,7 +1184,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Texture_Brush_Rectangles_Through_Backend_Neutral_Primitives()
     {
         using var source = new BBitmap(2, 1);
@@ -1205,7 +1205,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 0, 255, 255), dest.GetPixel(3, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Repeating_Background_Image()
     {
         using var source = new BBitmap(2, 1);
@@ -1236,7 +1236,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 0, 255, 255), bitmap.GetPixel(3, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Repeating_Gradient_Background()
     {
         using var container = new HtmlContainer();
@@ -1260,7 +1260,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 255, 0, 255), bitmap.GetPixel(3, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Creates_Linear_Gradient_Tile_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(1, 1);
@@ -1279,7 +1279,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, right.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_NonUniform_Gradient_Background()
     {
         using var container = new HtmlContainer();
@@ -1310,7 +1310,7 @@ public class GraphicsAbstractionTests
         Assert.Equal((byte)255, bottom.A);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Inline_Svg_Ellipse_As_Shape_Not_Rectangle()
     {
         using var container = new HtmlContainer();
@@ -1339,7 +1339,7 @@ public class GraphicsAbstractionTests
     private static string GetRepoRoot() => Path.GetFullPath(Path.Combine(
         AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", ".."));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Simple_Path_Strokes_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -1367,7 +1367,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(new BColor(0, 0, 0, 255), bitmap.GetPixel(4, 1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BBitmap_OpenGraphics_Routes_Solid_Path_Fills_Through_Backend_Neutral_Primitives()
     {
         using var bitmap = new BBitmap(7, 7);
@@ -1386,7 +1386,7 @@ public class GraphicsAbstractionTests
         Assert.Equal(BColor.White, bitmap.GetPixel(6, 6));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_LayoutDominant_NonText_Fixture()
     {
         const string html = """
@@ -1411,7 +1411,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_ShapeHeavy_NonText_Fixture()
     {
         const string html = """
@@ -1434,7 +1434,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_Clipped_NonText_Opacity_Fixture()
     {
         const string html = """
@@ -1458,7 +1458,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Opacity_Fixture()
     {
         const string html = """
@@ -1480,7 +1480,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Multiply_Blend_Fixture()
     {
         const string html = """
@@ -1502,7 +1502,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Screen_Blend_Fixture()
     {
         const string html = """
@@ -1524,7 +1524,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Darken_Blend_Fixture()
     {
         const string html = """
@@ -1546,7 +1546,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Lighten_Blend_Fixture()
     {
         const string html = """
@@ -1568,7 +1568,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Overlay_Blend_Fixture()
     {
         const string html = """
@@ -1590,7 +1590,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PixelDiffRunner_Compare_Matches_NonText_Difference_Blend_Fixture()
     {
         const string html = """
@@ -1612,7 +1612,7 @@ public class GraphicsAbstractionTests
         Assert.Null(diff.DiffBitmap);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Rounded_Border_Path()
     {
         using var container = new HtmlContainer();

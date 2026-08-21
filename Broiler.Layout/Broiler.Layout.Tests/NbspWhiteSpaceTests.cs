@@ -31,7 +31,7 @@ public sealed class NbspWhiteSpaceTests
         return box.Words.Select(w => w.Text).ToArray();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nbsp_Only_Run_Survives_Collapsing_As_A_Word()
     {
         // The sole content is nbsp: it must still produce a word (hence an inline
@@ -39,7 +39,7 @@ public sealed class NbspWhiteSpaceTests
         Assert.Equal(new[] { Nbsp + Nbsp + Nbsp }, Words(Nbsp + Nbsp + Nbsp));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nbsp_Joins_Neighbours_Into_One_Word()
     {
         // nbsp is a non-breaking space: it neither collapses nor introduces a
@@ -47,7 +47,7 @@ public sealed class NbspWhiteSpaceTests
         Assert.Equal(new[] { "A" + Nbsp + Nbsp + "B" }, Words("A" + Nbsp + Nbsp + "B"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ascii_Space_Runs_Still_Collapse()
     {
         // Control: ordinary U+0020 runs remain collapsible word separators, so the

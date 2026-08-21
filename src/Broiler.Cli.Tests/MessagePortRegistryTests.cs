@@ -10,7 +10,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class MessagePortRegistryTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Link_Entangles_Both_Ends()
     {
         var reg = new MessagePortRegistry();
@@ -27,7 +27,7 @@ public sealed class MessagePortRegistryTests
         Assert.Same(a, peerOfB);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unlinked_Port_Has_No_Peer()
     {
         var reg = new MessagePortRegistry();
@@ -35,7 +35,7 @@ public sealed class MessagePortRegistryTests
         Assert.False(reg.TryGetPeer(new JSObject(), out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Close_Marks_Closed_And_Drops_Queued_Messages()
     {
         var reg = new MessagePortRegistry();
@@ -48,7 +48,7 @@ public sealed class MessagePortRegistryTests
         Assert.Null(reg.TakeQueued(port)); // queued messages dropped on close
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Start_Marks_Started()
     {
         var reg = new MessagePortRegistry();
@@ -59,7 +59,7 @@ public sealed class MessagePortRegistryTests
         Assert.True(reg.IsStarted(port));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Enqueue_Then_TakeQueued_Returns_Messages_In_Order_Then_Clears()
     {
         var reg = new MessagePortRegistry();
@@ -76,11 +76,11 @@ public sealed class MessagePortRegistryTests
         Assert.Null(reg.TakeQueued(port)); // drained
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TakeQueued_Returns_Null_When_Empty() =>
         Assert.Null(new MessagePortRegistry().TakeQueued(new JSObject()));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clear_Drops_All_Port_State()
     {
         var reg = new MessagePortRegistry();

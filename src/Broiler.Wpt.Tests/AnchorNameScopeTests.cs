@@ -67,7 +67,7 @@ public class AnchorNameScopeTests : IDisposable
   <div class=""anc"" style=""left:80px; top:80px;""></div>
 </div>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchoredElement_BindsToAnchorInItsOwnScope_NotGlobalLastWins()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-scope-" + System.Guid.NewGuid().ToString("N"));

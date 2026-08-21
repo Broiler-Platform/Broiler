@@ -45,7 +45,7 @@ public sealed class ZoomWordSpacingTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WordSpacing_Advance_Scales_By_EffectiveZoom()
     {
         // The EchoFont reports a zero whitespace-glyph width, so ActualWordSpacing is purely the
@@ -58,7 +58,7 @@ public sealed class ZoomWordSpacingTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmWordSpacing_Rides_The_Zoomed_Font_Once()
     {
         // An em word-spacing scales through the zoomed font (GetEmHeight), not a second time: the zoomed
@@ -71,7 +71,7 @@ public sealed class ZoomWordSpacingTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Disabled_LeavesWordSpacing_Unscaled()
     {
         // Flag off: a zoomed box measures the same word-spacing as an un-zoomed one — byte-identical.

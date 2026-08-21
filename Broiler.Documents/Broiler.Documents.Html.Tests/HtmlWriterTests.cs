@@ -5,7 +5,7 @@ namespace Broiler.Documents.Html.Tests;
 
 public sealed class HtmlWriterTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_A_Deterministic_Html_Document()
     {
         string html = Write(RichTextDocument.FromPlainText("hello"));
@@ -15,7 +15,7 @@ public sealed class HtmlWriterTests
         Assert.Contains("<p>hello</p>", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_Inline_Styles_Links_And_Soft_Breaks()
     {
         RichTextDocument document = SingleParagraph(
@@ -46,7 +46,7 @@ public sealed class HtmlWriterTests
         Assert.Contains("<a href=\"https://example.test\">link</a>", html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Model_To_Html_To_Model_RoundTrips_Supported_Subset()
     {
         RichTextDocument expected = RichTextDocument.FromParagraphs(new[]
@@ -81,7 +81,7 @@ public sealed class HtmlWriterTests
         DocumentAssert.Equivalent(expected, actual);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writing_ListKind_Reports_A_Predictable_Diagnostic()
     {
         RichTextDocument document = RichTextDocument.FromParagraphs(new[]
@@ -95,7 +95,7 @@ public sealed class HtmlWriterTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "html.list");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Writes_An_Embedded_Image_As_A_Data_Uri()
     {
         var image = new InlineImage(new byte[] { 1, 2, 3 }, "image/png", 40, 20, "a logo");

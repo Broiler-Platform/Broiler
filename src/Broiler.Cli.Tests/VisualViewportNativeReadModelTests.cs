@@ -37,7 +37,7 @@ public sealed class VisualViewportNativeReadModelTests
         return (offset, rect);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PinchZoom_NativeReadModel_OffsetUnaffected_GbcrScaled()
     {
         var (offset, rect) = Read();

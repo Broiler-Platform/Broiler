@@ -10,7 +10,7 @@ namespace Broiler.Browser.Core.Tests;
 /// </summary>
 public sealed class BrowserUiHostClipboardTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Host_With_No_Platform_Clipboard_Reports_No_Text()
     {
         using BrowserUiHost host = CreateHost(null, null);
@@ -21,7 +21,7 @@ public sealed class BrowserUiHostClipboardTests
         Assert.Empty(text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Copy_Reaches_The_Platform_Clipboard()
     {
         string? written = null;
@@ -34,7 +34,7 @@ public sealed class BrowserUiHostClipboardTests
         Assert.Equal("copied", text);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Paste_Reads_The_Platform_Clipboard_Every_Time()
     {
         string? platform = "first";
@@ -51,7 +51,7 @@ public sealed class BrowserUiHostClipboardTests
         Assert.Equal("second", after);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Empty_Platform_Clipboard_Reports_No_Text()
     {
         using BrowserUiHost host = CreateHost(static () => string.Empty, static _ => { });

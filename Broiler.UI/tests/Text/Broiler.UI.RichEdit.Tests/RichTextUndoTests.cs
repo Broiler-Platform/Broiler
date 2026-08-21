@@ -2,7 +2,7 @@ namespace Broiler.UI.RichEdit.Tests;
 
 public sealed class RichTextUndoTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Undo_Restores_Document_And_Selection()
     {
         var editor = new RichTextEditor();
@@ -17,7 +17,7 @@ public sealed class RichTextUndoTests
         Assert.Equal(Doc.Range(0, 1, 0, 4), editor.Selection);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Redo_Reapplies_An_Undone_Edit()
     {
         var editor = new RichTextEditor();
@@ -32,7 +32,7 @@ public sealed class RichTextUndoTests
         Assert.Equal(Doc.Pos(0, 2), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_New_Edit_Clears_The_Redo_Stack()
     {
         var editor = new RichTextEditor();
@@ -48,7 +48,7 @@ public sealed class RichTextUndoTests
         Assert.Equal("ac", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Undo_On_Empty_History_Returns_False()
     {
         var editor = new RichTextEditor();
@@ -57,7 +57,7 @@ public sealed class RichTextUndoTests
         Assert.False(editor.Redo());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void History_Is_Bounded_By_Max_Depth()
     {
         var editor = new RichTextEditor(maxHistoryDepth: 3);
@@ -75,7 +75,7 @@ public sealed class RichTextUndoTests
         Assert.Equal("ab", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Each_User_Action_Records_One_Transaction_With_Operations()
     {
         var editor = new RichTextEditor();
@@ -89,7 +89,7 @@ public sealed class RichTextUndoTests
         Assert.Equal(Doc.Pos(0, 0), insert.At);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Replacing_A_Selection_Records_Delete_Then_Insert()
     {
         var editor = new RichTextEditor();
@@ -104,7 +104,7 @@ public sealed class RichTextUndoTests
         Assert.IsType<InsertTextOperation>(transaction.Operations[1]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LoadPlainText_Resets_History()
     {
         var editor = new RichTextEditor();
@@ -117,7 +117,7 @@ public sealed class RichTextUndoTests
         Assert.Equal("fresh", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Undo_Then_Redo_Round_Trips_Formatting()
     {
         var editor = new RichTextEditor();

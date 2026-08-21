@@ -44,7 +44,7 @@ public class ViewTransitionRootCaptureTests
     // The root's captured name comes from its own `view-transition-name`; the UA sheet's `root` is
     // only the default. Renaming it must move the group out from under every `(root)` rule — which
     // is what root-captured-as-different-tag asserts by painting `::view-transition-group(root)` red.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenamedRoot_Is_Captured_Under_Its_Own_Name()
     {
         const string html = """
@@ -75,7 +75,7 @@ public class ViewTransitionRootCaptureTests
 
     // With the overlay painted, the page cannot show through, so the old root snapshot has to
     // reproduce it — including content the callback has since changed (WPT old-content-captures-root).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Painted_Overlay_Makes_The_Old_Root_Snapshot_Reproduce_The_Page()
     {
         const string html = """
@@ -107,7 +107,7 @@ public class ViewTransitionRootCaptureTests
     // live page is pixel-exact where a clone is only close. With no author background on
     // ::view-transition, and both snapshots left visible, the snapshot must stay content-less and
     // let the page through.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Transparent_Overlay_Leaves_The_Root_Snapshot_Content_Less()
     {
         const string html = """
@@ -135,7 +135,7 @@ public class ViewTransitionRootCaptureTests
     // snapshot. An effect on the snapshot re-renders its pixels, and the page beneath is not
     // affected by it — so a transparent snapshot over a perfectly visible page shows the wrong
     // thing. WPT {old,new}-content-root-scrollbar-with-fixed-background invert the captured page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Filter_On_The_Old_Snapshot_Makes_It_Reproduce_The_Page()
     {
         const string html = """
@@ -167,7 +167,7 @@ public class ViewTransitionRootCaptureTests
     // it. A flat `opacity: 0` on the other side is a different question entirely — that hides the
     // other snapshot, and the pair of tests at the end of this file covers it.
     // </para>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Opacity_Alone_Leaves_The_Snapshot_Content_Less()
     {
         const string html = """
@@ -191,7 +191,7 @@ public class ViewTransitionRootCaptureTests
 
     // ::view-transition-image-pair is the box the spec puts between a group and its old/new pair, so
     // a rule can address both at once. old-content-captures-root hides an entire group with it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImagePair_Visibility_Hidden_Hides_The_Whole_Group()
     {
         const string html = """
@@ -219,7 +219,7 @@ public class ViewTransitionRootCaptureTests
 
     // Without a visible image-pair rule the same group paints — the negative half of the test above,
     // which is what makes it meaningful (an always-blank group would pass it too).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImagePair_Without_The_Hidden_Rule_Still_Paints_Its_Snapshot()
     {
         const string html = """
@@ -248,7 +248,7 @@ public class ViewTransitionRootCaptureTests
     // Leaving it content-less painted a flat viewport-sized rectangle of the captured root
     // background instead, which is how WPT {new,old}-content-has-scrollbars rendered a plain
     // lightpink canvas where their references show the page.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Hiding_The_New_Root_Snapshot_Makes_The_Old_One_Reproduce_The_Page()
     {
         const string html = """
@@ -282,7 +282,7 @@ public class ViewTransitionRootCaptureTests
     // with the captured root background, opaquely. With `html { background: lightpink }` this
     // renders flat pink whether the gate fires or not, and would assert nothing.
     // </para>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Visible_New_Root_Snapshot_Leaves_The_Old_One_Content_Less()
     {
         const string html = """

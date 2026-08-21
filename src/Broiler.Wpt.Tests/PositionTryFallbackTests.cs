@@ -43,7 +43,7 @@ public class PositionTryFallbackTests : IDisposable
         return (x0, y0, x1, y1, count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry002_CommentedFallbackBody_SelectsRightOfAnchor()
     {
         string wptRoot = Path.GetFullPath(Path.Combine(

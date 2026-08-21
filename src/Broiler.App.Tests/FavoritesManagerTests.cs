@@ -23,7 +23,7 @@ public class FavoritesManagerTests : IDisposable
             Directory.Delete(_tempDir, recursive: true);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Add_ReturnsTrue_WhenUrlIsNew()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -32,7 +32,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Equal("https://example.com", mgr.Favorites[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Add_ReturnsFalse_WhenUrlAlreadyExists()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -41,7 +41,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Single(mgr.Favorites);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Add_ReturnsFalse_ForNullOrWhitespace()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -50,7 +50,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Empty(mgr.Favorites);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Remove_ReturnsTrue_WhenUrlExists()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -59,14 +59,14 @@ public class FavoritesManagerTests : IDisposable
         Assert.Empty(mgr.Favorites);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Remove_ReturnsFalse_WhenUrlNotFound()
     {
         var mgr = new FavoritesManager(_filePath);
         Assert.False(mgr.Remove("https://example.com"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Contains_ReturnsCorrectResult()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -75,7 +75,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.False(mgr.Contains("https://other.com"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SaveAndLoad_RoundTrips()
     {
         var mgr1 = new FavoritesManager(_filePath);
@@ -91,7 +91,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Equal("https://other.com", mgr2.Favorites[1]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Load_WithNoFile_StartsEmpty()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -99,7 +99,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Empty(mgr.Favorites);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Load_WithCorruptFile_StartsEmpty()
     {
         File.WriteAllText(_filePath, "this is not json");
@@ -108,7 +108,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Empty(mgr.Favorites);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Load_ClearsPreviousFavorites()
     {
         var mgr = new FavoritesManager(_filePath);
@@ -122,7 +122,7 @@ public class FavoritesManagerTests : IDisposable
         Assert.Equal("https://new.com", mgr.Favorites[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Save_CreatesDirectoryIfNeeded()
     {
         var deepPath = Path.Combine(_tempDir, "sub", "dir", "favorites.json");

@@ -1,0 +1,359 @@
+From 191d2e0575578c72a14b9b479ee02fa48f3e958b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 21 Aug 2026 10:02:31 +0000
+Subject: [PATCH] Add a Timeout to every xUnit [Fact] in the test projects
+
+Gives each plain `[Fact]` an explicit `Timeout` so a runaway test fails instead
+of stalling the run. Facts that already carry a deliberate Timeout are left
+alone, and the rewrite is a per-line byte substitution, so the CRLF and mixed
+CRLF/LF files here keep their exact line endings.
+
+Value: 600000 ms (10 minutes), matching the parent repository.
+
+xUnit v2 starts a test's timeout clock when the test is queued rather than when
+it starts running, so the budget has to clear a whole project's wall-clock or a
+queued test can trip it while merely waiting for a slot. The slowest project
+here runs about a minute, so 600000 ms leaves roughly ten times that.
+
+Facts in test projects referencing xunit 2.9 or newer are deliberately left
+untouched unless they are async: 2.9 fails a synchronous test that carries a
+Timeout outright ("Tests marked with Timeout are only supported for async
+tests"), where 2.5.3 ignores it and xunit.v3 honours it.
+---
+ Broiler.Regex.Tests/AstralCaseFoldingTests.cs |  4 +--
+ Broiler.Regex.Tests/CoreTests.cs              | 30 +++++++++----------
+ Broiler.Regex.Tests/GapCaseTests.cs           | 20 ++++++-------
+ Broiler.Regex.Tests/NulCharacterTests.cs      | 14 ++++-----
+ Broiler.Regex.Tests/SyntaxTests.cs            |  2 +-
+ 5 files changed, 35 insertions(+), 35 deletions(-)
+
+diff --git a/Broiler.Regex.Tests/AstralCaseFoldingTests.cs b/Broiler.Regex.Tests/AstralCaseFoldingTests.cs
+index 473f133..9d28457 100644
+--- a/Broiler.Regex.Tests/AstralCaseFoldingTests.cs
++++ b/Broiler.Regex.Tests/AstralCaseFoldingTests.cs
+@@ -45,7 +45,7 @@ public class AstralCaseFoldingTests
+         Assert.Equal(member + equivalent, m.Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void AstralAtom_DoesNotFoldWithoutIgnoreCase()
+     {
+         var re = new BroilerRegex(DeseretCapitalLongI, RegexFlags.Unicode);
+@@ -53,7 +53,7 @@ public class AstralCaseFoldingTests
+         Assert.True(re.Match(DeseretCapitalLongI).Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void AstralAtom_DoesNotFoldAcrossUnrelatedCodePoints()
+     {
+         var re = new BroilerRegex(DeseretCapitalLongI, RegexFlags.IgnoreCase | RegexFlags.Unicode);
+diff --git a/Broiler.Regex.Tests/CoreTests.cs b/Broiler.Regex.Tests/CoreTests.cs
+index 4b8730e..30c626c 100644
+--- a/Broiler.Regex.Tests/CoreTests.cs
++++ b/Broiler.Regex.Tests/CoreTests.cs
+@@ -3,7 +3,7 @@ namespace Broiler.Regex.Tests;
+ /// <summary>Baseline coverage of the common ECMAScript regex grammar.</summary>
+ public class CoreTests
+ {
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Literal_FindsFirstOccurrence()
+     {
+         var m = new BroilerRegex("cat").Match("a cat sat");
+@@ -12,20 +12,20 @@ public class CoreTests
+         Assert.Equal("cat", m.Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Alternation()
+     {
+         Assert.Equal("b", new BroilerRegex("a|b").Match("zb").Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void CharacterClass_RangeAndNegation()
+     {
+         Assert.Equal("abc", new BroilerRegex("[a-c]+").Match("xabcy").Value);
+         Assert.Equal("x", new BroilerRegex("[^a-c]").Match("abcx").Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Quantifiers_Greedy_Lazy_Bounds()
+     {
+         Assert.Equal("123", new BroilerRegex("\\d{2,3}").Match("12345").Value);
+@@ -34,14 +34,14 @@ public class CoreTests
+         Assert.Equal("color", new BroilerRegex("colou?r").Match("color").Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Anchors()
+     {
+         Assert.True(new BroilerRegex("^abc$").Match("abc").Success);
+         Assert.False(new BroilerRegex("^abc$").Match("xabc").Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Multiline_AnchorsMatchAtLineBreaks()
+     {
+         var m = new BroilerRegex("^b", "m").Match("a\nb");
+@@ -49,14 +49,14 @@ public class CoreTests
+         Assert.Equal(2, m.Index);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void DotAll_DotMatchesNewline()
+     {
+         Assert.True(new BroilerRegex("a.b", "s").Match("a\nb").Success);
+         Assert.False(new BroilerRegex("a.b").Match("a\nb").Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void WordBoundary()
+     {
+         var m = new BroilerRegex("\\bword\\b").Match("a word here");
+@@ -65,7 +65,7 @@ public class CoreTests
+         Assert.False(new BroilerRegex("\\bword\\b").Match("password").Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NamedGroups_ExposedByName()
+     {
+         var re = new BroilerRegex("(?<year>\\d{4})-(?<month>\\d{2})");
+@@ -76,7 +76,7 @@ public class CoreTests
+         Assert.Equal(2, re.CaptureCount);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Lookahead_PositiveAndNegative()
+     {
+         Assert.True(new BroilerRegex("a(?=b)").Match("ab").Success);
+@@ -84,20 +84,20 @@ public class CoreTests
+         Assert.True(new BroilerRegex("a(?!b)").Match("ac").Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Sticky_AnchorsAtStart()
+     {
+         Assert.False(new BroilerRegex("a", "y").Match("ba").Success);
+         Assert.True(new BroilerRegex("a", "y").Match("ab").Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void IgnoreCase_Ascii()
+     {
+         Assert.True(new BroilerRegex("abc", "i").Match("ABC").Success);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Global_EnumeratesAllMatches()
+     {
+         var matches = new List<string>();
+@@ -106,7 +106,7 @@ public class CoreTests
+         Assert.Equal(new[] { "a", "a" }, matches);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void EmptyPattern_MatchesEmpty()
+     {
+         var m = new BroilerRegex("").Match("abc");
+@@ -114,7 +114,7 @@ public class CoreTests
+         Assert.Equal(0, m.Length);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void InlineModifier_IgnoreCaseRegion()
+     {
+         // (?i:b) is case-insensitive; the surrounding 'a' is not.
+diff --git a/Broiler.Regex.Tests/GapCaseTests.cs b/Broiler.Regex.Tests/GapCaseTests.cs
+index 94df755..1c174b0 100644
+--- a/Broiler.Regex.Tests/GapCaseTests.cs
++++ b/Broiler.Regex.Tests/GapCaseTests.cs
+@@ -9,7 +9,7 @@ public class GapCaseTests
+ {
+     // ----- #8 Nullable quantifier (RepeatMatcher empty-iteration guard) -------
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NullableQuantifier_Terminates_AndMatchesGreedily()
+     {
+         // Without the empty-match guard this either loops forever or matches short.
+@@ -19,7 +19,7 @@ public class GapCaseTests
+         Assert.Equal("aaa", m.Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NullableQuantifier_EmptyAlternative_Terminates()
+     {
+         var re = new BroilerRegex("(a|)*");
+@@ -28,7 +28,7 @@ public class GapCaseTests
+         Assert.Equal("aa", m.Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NullableQuantifier_OptionalGroup_DoesNotInfiniteLoop()
+     {
+         var re = new BroilerRegex("(?:a?)*b");
+@@ -39,7 +39,7 @@ public class GapCaseTests
+ 
+     // ----- #3 / #4 Look-behind with captures and back-references --------------
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Lookbehind_PreservesSourceCaptureOrder()
+     {
+         // Matched right-to-left, but group 1 = "a", group 2 = "b" (source order).
+@@ -51,7 +51,7 @@ public class GapCaseTests
+         Assert.Equal("b", m.Groups[2].Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Lookbehind_BackreferenceToCapture_MatchesJsSemantics()
+     {
+         // Inside a look-behind terms run right-to-left, so \1 (still unset) matches
+@@ -64,7 +64,7 @@ public class GapCaseTests
+         Assert.Equal("ab", m.Groups[1].Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Lookbehind_Negative()
+     {
+         var re = new BroilerRegex("(?<!a)b");
+@@ -74,7 +74,7 @@ public class GapCaseTests
+ 
+     // ----- #6 Unicode (code-point) back-references ----------------------------
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Backreference_AstralCodePoint()
+     {
+         var re = new BroilerRegex("(\\u{1F438})\\1", "u");
+@@ -83,7 +83,7 @@ public class GapCaseTests
+         Assert.Equal("\U0001F438", m.Groups[1].Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void Backreference_CaseFolded()
+     {
+         var re = new BroilerRegex("(?<x>a)\\k<x>", "i");
+@@ -94,7 +94,7 @@ public class GapCaseTests
+ 
+     // ----- #7 Braced Unicode escape as a single astral atom -------------------
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void BracedUnicodeEscape_MatchesAstralCharacter()
+     {
+         var re = new BroilerRegex("^\\u{1F438}$", "u");
+@@ -103,7 +103,7 @@ public class GapCaseTests
+         Assert.Equal("\U0001F438", m.Value);
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void AstralAtom_WithQuantifier_IsOneCodePoint()
+     {
+         // The pair is a single atom, so {2} requires two frogs, not four units.
+diff --git a/Broiler.Regex.Tests/NulCharacterTests.cs b/Broiler.Regex.Tests/NulCharacterTests.cs
+index 9f9efd1..bccce05 100644
+--- a/Broiler.Regex.Tests/NulCharacterTests.cs
++++ b/Broiler.Regex.Tests/NulCharacterTests.cs
+@@ -42,7 +42,7 @@ public class NulCharacterTests
+         "\u2000-⯿" +   // U+2000 … U+2BFF
+         "]*$";
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GoogleNoLetterClass_Compiles_AndMatchesOnlyNonLetters()
+     {
+         var re = new BroilerRegex(GoogleNoLetterClass);
+@@ -70,7 +70,7 @@ public class NulCharacterTests
+         Assert.False(re.IsMatch("a"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NulInsideClass_IsAMember_NotTheEndOfTheClass()
+     {
+         var re = new BroilerRegex("[a\u0000b]");
+@@ -80,7 +80,7 @@ public class NulCharacterTests
+         Assert.False(re.IsMatch("c"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NulAsRangeEnd_IsARange_NotTheEndOfTheClass()
+     {
+         // '-' before a NUL is a range operator like any other: [\0-\0] is the
+@@ -89,7 +89,7 @@ public class NulCharacterTests
+         Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("[a-\u0000]"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NulAsAtom_IsMatchedLiterally_AndDoesNotTruncateThePattern()
+     {
+         var re = new BroilerRegex("a\u0000b");
+@@ -102,7 +102,7 @@ public class NulCharacterTests
+         Assert.False(quantified.IsMatch("a\u0000"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NulSurvivesAlternationAndQuantifiers()
+     {
+         var re = new BroilerRegex("^(x\u0000|y)*$");
+@@ -112,7 +112,7 @@ public class NulCharacterTests
+         Assert.True(new BroilerRegex("^\u0000*$").IsMatch("\u0000\u0000"));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void NulInAGroupName_IsPartOfTheName()
+     {
+         var re = new BroilerRegex("(?<a\u0000b>x)");
+@@ -136,7 +136,7 @@ public class NulCharacterTests
+         Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("[a\\", flags));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void GenuinelyUnterminatedConstructs_AreStillReported()
+     {
+         // The end-of-pattern rewrite must not soften these: each really does end
+diff --git a/Broiler.Regex.Tests/SyntaxTests.cs b/Broiler.Regex.Tests/SyntaxTests.cs
+index b7e00ef..dfdeaae 100644
+--- a/Broiler.Regex.Tests/SyntaxTests.cs
++++ b/Broiler.Regex.Tests/SyntaxTests.cs
+@@ -21,7 +21,7 @@ public class SyntaxTests
+         Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("a", flags));
+     }
+ 
+-    [Fact]
++    [Fact(Timeout = 600000)]
+     public void ValidFlags_AreParsed()
+     {
+         var re = new BroilerRegex("a", "gimsuyd");
+-- 
+2.43.0
+

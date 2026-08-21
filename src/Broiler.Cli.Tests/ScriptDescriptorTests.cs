@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ScriptDescriptorTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Captures_Kind_Order_And_Content_For_Inline_And_DataUri_Scripts()
     {
         // data:text/javascript,var%20b%3D2 decodes to "var b=2".
@@ -35,7 +35,7 @@ public sealed class ScriptDescriptorTests
         Assert.Equal("var b=2", d[1].Content);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Captures_Async_Defer_And_Nonce_Flags()
     {
         const string html =
@@ -51,7 +51,7 @@ public sealed class ScriptDescriptorTests
         Assert.False(d[1].IsDefer);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Records_Module_Scripts_In_Descriptors_But_Not_In_Execution_Buckets()
     {
         const string html =
@@ -69,7 +69,7 @@ public sealed class ScriptDescriptorTests
         Assert.DoesNotContain(result.Scripts, s => s.Contains("import"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Captures_External_Src_Kind_And_Url()
     {
         const string html = "<script src=\"app.js\"></script>";

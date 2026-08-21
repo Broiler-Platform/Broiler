@@ -15,7 +15,7 @@ public sealed class LayoutPassCounterTests
     /// <c>HtmlContainerInt.PerformLayout</c> free. A counter that defaulted on would put a static
     /// write on the hottest path in the engine and nothing would report it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Records_nothing_while_disabled()
     {
         LayoutPassCounter.Enabled = false;
@@ -29,7 +29,7 @@ public sealed class LayoutPassCounterTests
         Assert.Equal(0, LayoutPassCounter.Passes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Counts_calls_and_passes_separately_while_enabled()
     {
         try
@@ -51,7 +51,7 @@ public sealed class LayoutPassCounterTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reset_clears_both_counters()
     {
         try
@@ -83,7 +83,7 @@ public sealed class LayoutPassCounterTests
     /// thread's counters and fail — which is the property under test doing its job, reported as a
     /// test failure. The counters are thread-affine, so the assertions have to stay on their thread.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Counts_are_per_thread()
     {
         try

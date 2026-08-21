@@ -15,7 +15,7 @@ public class GoogleRealStructureTest
     /// .lsbb { display:block; background:#f3f5f6; border:solid 1px; height:30px }
     /// .lsb { background:... height:30px }
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleButtonStructure_InlineBlockDs()
     {
         var html = @"<html><head><style>
@@ -76,7 +76,7 @@ public class GoogleRealStructureTest
     /// and footer.  Verifies that buttons are visible and not full-width.
     /// This more closely matches the real Google.de page structure.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleFullPage_ButtonsVisibleAndSized()
     {
         var html = @"<!doctype html>
@@ -183,7 +183,7 @@ a{color:#4b11a8;text-decoration:none}
     /// constrained to the inline-block width, not expanding to full width.
     /// This tests the inline-block BFC containment.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineBlock_BlockChild_Constrained()
     {
         var html = @"<html><body style='margin:0'>
@@ -224,7 +224,7 @@ a{color:#4b11a8;text-decoration:none}
     /// instead of the classic &lt;input type="submit"&gt; structure.
     /// Test both structures to ensure both render.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleModern_FlexButtons_Visible()
     {
         // Modern Google uses: div.FPdoLc > center > input[type=submit]
@@ -293,7 +293,7 @@ a{color:#4b11a8;text-decoration:none}
     /// <summary>
     /// Test modern Google.de structure with &lt;button&gt; elements in flex container.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleModern_ButtonElement_InFlex()
     {
         var html = @"<html><head><style>
@@ -329,7 +329,7 @@ a{color:#4b11a8;text-decoration:none}
     /// Test with the ACTUAL Google.de HTML structure including hidden inputs
     /// in the same td cell as the button spans. Hidden inputs must be display:none.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleRealHtml_HiddenInputsAndButtons()
     {
         // Exact structure from live Google.de page (simplified CSS)
@@ -443,7 +443,7 @@ input{font-family:inherit}
     /// hidden input display:none UA rule. Google.de has input{font-family:inherit}
     /// which could trigger attribute condition loss during CSS merging.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AuthorInputCss_DoesNotBreak_HiddenInputDisplayNone()
     {
         var html = @"<html><body style='margin:0'>
@@ -486,7 +486,7 @@ input{font-family:inherit}
     /// Test footer link spacing with Google's actual footer structure.
     /// No whitespace between a tags means no gap.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleFooter_LinksWithoutWhitespace()
     {
         var html = @"<html><body style='margin:0; font-size:10pt;'>

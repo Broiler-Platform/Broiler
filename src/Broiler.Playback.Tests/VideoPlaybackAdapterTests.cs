@@ -5,7 +5,7 @@ namespace Broiler.Playback.Tests;
 
 public class VideoPlaybackAdapterTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Adapter_MapsState_AndForwardsControls()
     {
         var fake = new FakeVideoSession();
@@ -39,7 +39,7 @@ public class VideoPlaybackAdapterTests
         Assert.Contains(MediaPlaybackEventKind.Ended, events);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Adapter_MapsReadyToCanPlay_AndTargetLostToError()
     {
         var fake = new FakeVideoSession(VideoSessionState.Loading);
@@ -54,7 +54,7 @@ public class VideoPlaybackAdapterTests
         Assert.Contains(MediaPlaybackEventKind.Error, events);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Adapter_Dispose_DisposesInnerSession_Once()
     {
         var fake = new FakeVideoSession();

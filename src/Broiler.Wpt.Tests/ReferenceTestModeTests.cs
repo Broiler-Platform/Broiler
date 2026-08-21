@@ -57,7 +57,7 @@ public class ReferenceTestModeTests : IDisposable
 
     // ── Reference-link extraction ───────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractReferenceLinks_Reads_Match_And_Mismatch_In_Document_Order()
     {
         var links = WptTestRunner.ExtractReferenceLinks(
@@ -79,7 +79,7 @@ public class ReferenceTestModeTests : IDisposable
             });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractReferenceLinks_Does_Not_Read_Mismatch_As_Match()
     {
         // "mismatch" contains "match": a naive substring test would classify this
@@ -91,7 +91,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.False(link.IsMatch);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExtractReferenceLinks_Is_Empty_For_A_Test_That_Declares_No_Reference()
     {
         Assert.Empty(WptTestRunner.ExtractReferenceLinks(Page("<p>no reference here</p>")));
@@ -112,7 +112,7 @@ public class ReferenceTestModeTests : IDisposable
             resolved);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveReferenceHref_Maps_A_Root_Relative_Href_Under_The_Wpt_Root()
     {
         var testPath = Path.Combine(_tempDir, "css", "suite", "foo.html");
@@ -121,7 +121,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Equal(Path.Combine(_tempDir, "common", "blank.html"), resolved);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryResolveReferenceHref_Rejects_An_Empty_Href()
     {
         var testPath = Path.Combine(_tempDir, "foo.html");
@@ -132,7 +132,7 @@ public class ReferenceTestModeTests : IDisposable
 
     // ── Suite membership ────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FilterToReferenceTests_Keeps_Only_Tests_Whose_Reference_Exists()
     {
         var withReference = WriteFile("with-reference.html", PageWithLink("match", "with-reference-ref.html", ""));
@@ -150,7 +150,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Equal([withReference], kept);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FilterToReferenceTests_Keeps_A_Test_Whose_Reference_Is_An_Image()
     {
         var test = WriteFile("image-ref-test.html", PageWithLink("match", "expected.png", ""));
@@ -174,7 +174,7 @@ public class ReferenceTestModeTests : IDisposable
 
     // ── Deciding a reftest ──────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Passes_When_The_Render_Reproduces_Its_Match_Reference()
     {
         var test = WriteFile(
@@ -189,7 +189,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Equal(100, result.MatchPercent!.Value, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Fails_When_The_Render_Differs_From_Its_Match_Reference()
     {
         var test = WriteFile(
@@ -208,7 +208,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Contains("differs-ref.html", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Passes_When_A_Mismatch_Reference_Renders_Differently()
     {
         var test = WriteFile(
@@ -221,7 +221,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.True(result.Passed, result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Fails_When_A_Mismatch_Reference_Renders_Identically()
     {
         var body = "<div style=\"width:200px;height:200px;background:red\"></div>";
@@ -235,7 +235,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Contains("rel=mismatch", result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Passes_When_A_Mismatch_Reference_Differs_By_Less_Than_The_Pass_Threshold()
     {
         // The assertion a rel=mismatch test makes is "these are not the same picture",
@@ -259,7 +259,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.True(result.Passed, result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Passes_On_The_Second_Match_Reference_When_The_First_Differs()
     {
         // WPT's own rule for several rel=match links: the test passes if it
@@ -279,7 +279,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.True(result.Passed, result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Compares_Against_A_Reference_Image_Without_Rendering_It()
     {
         var test = WriteFile(
@@ -292,7 +292,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.True(result.Passed, result.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Skips_A_Test_That_Declares_No_Reference()
     {
         var test = WriteFile("plain.html", Page("<p>nothing declared</p>"));
@@ -304,7 +304,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Equal(SkipReason.NoReferenceDeclared, result.SkipReason);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunReferenceTest_Reports_A_Missing_Test_File_As_FileIO()
     {
         var result = CreateRunner().RunReferenceTest(Path.Combine(_tempDir, "absent.html"), _tempDir);
@@ -313,7 +313,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.Equal(FailureCategory.FileIO, result.Category);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Routes_To_Reference_Mode_And_Never_Reads_The_Reference_Directory()
     {
         var test = WriteFile(
@@ -330,7 +330,7 @@ public class ReferenceTestModeTests : IDisposable
         Assert.NotEqual(SkipReason.MissingReferenceImage, result.SkipReason);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunTest_Without_Reference_Mode_Still_Skips_On_A_Missing_Reference_Image()
     {
         var test = WriteFile(

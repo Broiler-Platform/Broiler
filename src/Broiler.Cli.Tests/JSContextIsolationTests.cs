@@ -127,7 +127,7 @@ public sealed class JSContextIsolationTests
     /// Globals do not leak between contexts, which is the property the whole feature rests on: a
     /// worker that could see the page's globals is not a worker.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Globals_do_not_leak_between_concurrent_contexts()
     {
         OnEachThread((index, context) =>
@@ -151,7 +151,7 @@ public sealed class JSContextIsolationTests
     /// objects with the <em>same</em> property names, which is what forces them onto the same
     /// interned keys and the same shape transitions.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Shared_property_names_and_shapes_stay_correct_across_threads()
     {
         OnEachThread((index, context) =>
@@ -180,7 +180,7 @@ public sealed class JSContextIsolationTests
     /// <em>identical</em> source, so any cross-context reuse of compiled code is exercised at
     /// maximum contention.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Identical_sources_compile_and_run_correctly_on_all_threads()
     {
         const string Source = @"
@@ -204,7 +204,7 @@ public sealed class JSContextIsolationTests
     /// process reaches it; item #18 would put several there at once, so this is the case that says
     /// whether that change is worker-ready or is a worker blocker of its own making.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Process_shared_code_cache_is_safe_under_concurrent_contexts()
     {
         const string Source = @"
@@ -235,7 +235,7 @@ public sealed class JSContextIsolationTests
     /// for the first time at once, which is the window in which a static constructor is still
     /// running.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Builtins_behave_identically_on_every_thread()
     {
         OnEachThread((_, context) =>

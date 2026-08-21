@@ -87,7 +87,7 @@ public sealed class VisibilityHiddenOverflowClipTests
     /// that suppressed the visible descendant altogether would pass the assertion above and be
     /// wrong, so this pins the content that must survive.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AHiddenClippingBox_StillPaintsItsVisibleChildInside()
     {
         var inside = PixelAt("overflow: scroll; visibility: hidden", 50, 50);
@@ -99,7 +99,7 @@ public sealed class VisibilityHiddenOverflowClipTests
     /// The control: a hidden box that does <em>not</em> clip must not start clipping. Holds on both
     /// engines, so it runs unconditionally — this is what the fix must not over-reach into.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AHiddenNonClippingBox_DoesNotClip()
     {
         var outside = PixelAt("overflow: visible; visibility: hidden", 200, 200);
@@ -111,7 +111,7 @@ public sealed class VisibilityHiddenOverflowClipTests
     /// The visible scroller clips at 100x100 whether or not the patch is applied — it always took
     /// the visible path. Holds on both engines and guards against the fix disturbing it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AVisibleScroller_ClipsAsItAlwaysDid()
     {
         var outside = PixelAt("overflow: scroll", 200, 200);

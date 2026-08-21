@@ -14,7 +14,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class FormBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Form_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(FormBinding);
@@ -24,7 +24,7 @@ public sealed class FormBindingModuleTests
         Assert.False(typeof(IFormHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Form_Through_The_Host_Contract()
     {
         Assert.True(typeof(IFormHost).IsAssignableFrom(typeof(DomBridge)));
@@ -33,7 +33,7 @@ public sealed class FormBindingModuleTests
             static field => field.FieldType == typeof(FormBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Elements_Collection_Indexed_Named_And_Length_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ document.body.appendChild(out);
         Assert.Contains("len=3|formLen=3|i0=input|named=select|missing=true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Action_Getter_And_Setter_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>
@@ -83,7 +83,7 @@ document.body.appendChild(out);
         Assert.Contains("before=/submit|after=/other", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CheckValidity_Reflects_Required_Controls_Through_The_Module()
     {
         var html = @"<!DOCTYPE html>

@@ -11,7 +11,7 @@ public class TimerAndAsyncTests
     //  11.1 — setTimeout / clearTimeout
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Callback_Executes_On_Flush()
     {
         var html = @"<!DOCTYPE html>
@@ -31,7 +31,7 @@ setTimeout(function() {
         Assert.Contains("timeout-fired", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Returns_Numeric_Id()
     {
         var html = @"<!DOCTYPE html>
@@ -50,7 +50,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("id-num", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearTimeout_Prevents_Callback_Execution()
     {
         var html = @"<!DOCTYPE html>
@@ -71,7 +71,7 @@ clearTimeout(id);
         Assert.DoesNotContain("<p>cleared-cb</p>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Nested_Callbacks_Flush_Iteratively()
     {
         var html = @"<!DOCTYPE html>
@@ -99,7 +99,7 @@ setTimeout(function() {
         Assert.Contains("first", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_With_Zero_Delay_Is_Deferred()
     {
         var html = @"<!DOCTYPE html>
@@ -123,7 +123,7 @@ document.getElementById('out').appendChild(p);
         Assert.DoesNotContain("async", result.Split("sync,after")[0]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Callback_Error_Does_Not_Block_Others()
     {
         var html = @"<!DOCTYPE html>
@@ -144,7 +144,7 @@ setTimeout(function() {
         Assert.Contains("survived", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void QueueMicrotask_Runs_After_Current_Script_Completes()
     {
         var html = @"<!DOCTYPE html>
@@ -168,7 +168,7 @@ document.getElementById('out').setAttribute('data-before-microtask', order.join(
         Assert.Contains(">sync,after,micro<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void QueueMicrotask_From_Timeout_Runs_Before_Next_Timer_Task()
     {
         var html = @"<!DOCTYPE html>
@@ -196,7 +196,7 @@ setTimeout(function() {
     //  11.2 — setInterval / clearInterval
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetInterval_Callback_Executes_On_Flush()
     {
         var html = @"<!DOCTYPE html>
@@ -222,7 +222,7 @@ setTimeout(function() {
         Assert.Contains("count-", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ClearInterval_Stops_Callback()
     {
         var html = @"<!DOCTYPE html>
@@ -243,7 +243,7 @@ clearInterval(id);
         Assert.DoesNotContain("<p>interval-cleared</p>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetInterval_Returns_Unique_Id()
     {
         var html = @"<!DOCTYPE html>
@@ -269,7 +269,7 @@ document.getElementById('out').appendChild(p);
     //  11.3 — requestAnimationFrame / cancelAnimationFrame
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestAnimationFrame_Callback_Executes_On_Flush()
     {
         var html = @"<!DOCTYPE html>
@@ -289,7 +289,7 @@ requestAnimationFrame(function() {
         Assert.Contains("raf-fired", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestAnimationFrame_Returns_Numeric_Id()
     {
         var html = @"<!DOCTYPE html>
@@ -308,7 +308,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("raf-id-num", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CancelAnimationFrame_Prevents_Callback()
     {
         var html = @"<!DOCTYPE html>
@@ -329,7 +329,7 @@ cancelAnimationFrame(id);
         Assert.DoesNotContain("<p>raf-cancelled</p>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestAnimationFrame_Receives_Timestamp_Argument()
     {
         var html = @"<!DOCTYPE html>
@@ -349,7 +349,7 @@ requestAnimationFrame(function(ts) {
         Assert.Contains("ts-num", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestAnimationFrame_And_SetTimeout_Both_Flush()
     {
         var html = @"<!DOCTYPE html>
@@ -377,7 +377,7 @@ setTimeout(function() {
     //  11.4 — Script defer / async execution ordering
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Defer_Script_Executes_After_Regular_Scripts()
     {
         var html = @"<!DOCTYPE html>
@@ -399,7 +399,7 @@ window.__regular = 'done';
         Assert.Contains("deferred-done", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Multiple_Defer_Scripts_Preserve_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -420,7 +420,7 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("d1,d2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Async_Script_Executes_With_Regular_Scripts()
     {
         // Async scripts in our model execute in the regular script batch (not deferred)
@@ -443,7 +443,7 @@ document.getElementById('out').appendChild(p);
     //  Integration scenarios
     // ---------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timers_From_Multiple_Scripts_All_Flush()
     {
         var html = @"<!DOCTYPE html>
@@ -471,7 +471,7 @@ setTimeout(function() {
         Assert.Contains("from-script2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_Timers_Or_Callbacks_Returns_Normal_Html()
     {
         var html = @"<!DOCTYPE html>
@@ -490,7 +490,7 @@ document.body.appendChild(p);
         Assert.Contains("inline", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetTimeout_Modifies_Dom_Before_Capture()
     {
         var html = @"<!DOCTYPE html>
@@ -508,7 +508,7 @@ setTimeout(function() {
         Assert.Contains("modified", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Window_And_Global_Timer_Functions_Are_Equivalent()
     {
         var html = @"<!DOCTYPE html>
@@ -536,7 +536,7 @@ setTimeout(function() {
         Assert.Contains("gr", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cleared_Timeout_Inside_Another_Timeout_Is_Skipped()
     {
         // clearTimeout from a nested setTimeout (different flush iteration)
@@ -563,7 +563,7 @@ id2 = setTimeout(function() {
         Assert.DoesNotContain("<p>nested-cleared</p>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Defer_Script_With_Timer_Flushes_After_All_Scripts()
     {
         var html = @"<!DOCTYPE html>

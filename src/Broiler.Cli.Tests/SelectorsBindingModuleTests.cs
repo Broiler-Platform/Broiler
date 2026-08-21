@@ -18,7 +18,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class SelectorsBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selectors_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(SelectorsBinding);
@@ -30,7 +30,7 @@ public sealed class SelectorsBindingModuleTests
         Assert.True(typeof(ISelectorsHost).IsAssignableFrom(typeof(DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selector_API_Flows_Through_The_Bridge()
     {
         const string html = "<!DOCTYPE html><html><body>" +

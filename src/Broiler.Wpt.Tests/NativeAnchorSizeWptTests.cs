@@ -78,7 +78,7 @@ public class NativeAnchorSizeWptTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeLeverOn_EngineSizesAnchorSizeBox_ToAnchorDimensions()
     {
         var red = Render(nativeAnchor: true);

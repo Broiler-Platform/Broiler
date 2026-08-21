@@ -42,7 +42,7 @@ public class NestedAbsposStaticPositionRenderTests : IDisposable
         return (minY, maxY, count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbsposAfterInlineText_TakesParentContentTop_NotPageTop()
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-nested-abspos-" + System.Guid.NewGuid().ToString("N"));

@@ -38,7 +38,7 @@ public sealed class GridIntrinsicWidthTests
 
     private const string Base = "display:grid;position:relative;grid-template-rows:10px;";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MaxContentGrid_SumsColumnTracks()
     {
         Assert.Equal(200, ContainerWidth(Base + "width:max-content;grid-template-columns:100px 100px;"), 1);
@@ -47,7 +47,7 @@ public sealed class GridIntrinsicWidthTests
         Assert.Equal(50, ContainerWidth(Base + "width:max-content;grid-template-columns:minmax(10px,50px);"), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MinContentGrid_UsesMinTrackSides()
     {
         // minmax(): min-content uses the min side.
@@ -55,7 +55,7 @@ public sealed class GridIntrinsicWidthTests
         Assert.Equal(200, ContainerWidth(Base + "width:min-content;grid-template-columns:100px 100px;"), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FixedTrackShrinkToFit_SizesToTracksPlusGapsAndBorder()
     {
         // fit-content and float with fixed tracks (min-content == max-content).
@@ -67,7 +67,7 @@ public sealed class GridIntrinsicWidthTests
         Assert.Equal(220, ContainerWidth(Base + "width:fit-content;grid-template-columns:100px 100px;padding:0 5px;border:5px solid;"), 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonFixedTracks_DeclineAndKeepPriorBehaviour()
     {
         // auto-fill / fr / auto need the real track pass, so the intrinsic-width

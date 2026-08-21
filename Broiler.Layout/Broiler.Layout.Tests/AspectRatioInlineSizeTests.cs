@@ -53,7 +53,7 @@ public sealed class AspectRatioInlineSizeTests
     /// <summary>The control, and the behaviour that was already right: with no block size to
     /// transfer, the auto width still fills the containing block and the ratio gives the
     /// height.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Auto_Height_Still_Stretches_And_Transfers_The_Other_Way()
     {
         var box = BlockIn(Page(), height: null, aspectRatio: "1/1");
@@ -64,7 +64,7 @@ public sealed class AspectRatioInlineSizeTests
     }
 
     /// <summary>A stated width is a stated width — the ratio never overrules one.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Specified_Width_Wins_Over_The_Ratio()
     {
         var box = BlockIn(Page(), height: "100px", aspectRatio: "1/1");
@@ -133,7 +133,7 @@ public sealed class AspectRatioInlineSizeTests
     /// <summary>And so does the inline-axis clamp, which is why a padded <c>content-box</c> box
     /// ends up wider than its own <c>max-width</c>: the bound caps the content box, and the
     /// padding is added to the result.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Inline_Clamp_Caps_The_Same_Box_The_Ratio_Sized()
     {
         var box = BlockIn(Page(), height: "100px", aspectRatio: "1/1");
@@ -148,7 +148,7 @@ public sealed class AspectRatioInlineSizeTests
 
     /// <summary>CSS2.1 §10.3.3: the free space a ratio-derived width leaves is still free space,
     /// so <c>margin: 0 auto</c> centres such a box exactly as it centres a stated one.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Auto_Margins_Centre_A_Ratio_Derived_Width()
     {
         var page = Page();
@@ -165,7 +165,7 @@ public sealed class AspectRatioInlineSizeTests
     /// <summary>A percentage height counts only when it has something definite to resolve
     /// against (CSS2.1 §10.5); against an auto-height containing block it computes to
     /// <c>auto</c> and there is nothing to transfer.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Percentage_Height_Transfers_Against_A_Definite_Containing_Block()
     {
         var page = Page();
@@ -178,7 +178,7 @@ public sealed class AspectRatioInlineSizeTests
         Assert.Equal(150, box.Size.Width, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Percentage_Height_Against_An_Auto_Height_Container_Does_Not()
     {
         var box = BlockIn(Page(), height: "50%", aspectRatio: "1/1");
@@ -189,7 +189,7 @@ public sealed class AspectRatioInlineSizeTests
     }
 
     /// <summary>A box with no ratio is untouched — the whole rule is gated on one.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Ratio_An_Auto_Width_Still_Fills_The_Containing_Block()
     {
         var box = BlockIn(Page(), height: "100px", aspectRatio: null);
@@ -202,7 +202,7 @@ public sealed class AspectRatioInlineSizeTests
     /// <summary>An absolutely positioned box takes the ratio over the §10.3.7 inset equation:
     /// the equation answers "how wide is a box with no width of its own?", and a ratio plus a
     /// definite height is such a width.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Out_Of_Flow_Box_Takes_The_Ratio_Over_Its_Insets()
     {
         var page = Page();
@@ -253,7 +253,7 @@ public sealed class AspectRatioInlineSizeTests
     }
 
     /// <summary>The end-to-end consequence of the two spellings agreeing.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Spaced_Ratio_Sizes_The_Inline_Axis_Like_An_Unspaced_One()
     {
         var spaced = BlockIn(Page(), height: "100px", aspectRatio: "1 / 2");

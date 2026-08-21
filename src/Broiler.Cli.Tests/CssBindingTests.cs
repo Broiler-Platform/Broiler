@@ -32,7 +32,7 @@ public sealed class CssBindingTests
         context.Eval($"String({expression})").ToString();
 
     /// <summary>The reported failure: the name has to resolve, on the global and on window.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheNamespaceObjectExists()
     {
         var (context, bridge) = Attach();
@@ -100,7 +100,7 @@ public sealed class CssBindingTests
     /// its own parentheses — <c>linear(0, 1)</c>, which is exactly what google.com asks about —
     /// would otherwise close the query early and be answered on a truncated string.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheTwoArgumentFormAcceptsAValueContainingParentheses()
     {
         var (context, bridge) = Attach();
@@ -138,7 +138,7 @@ public sealed class CssBindingTests
     }
 
     /// <summary>NULL is replaced, not escaped — the one substitution in the algorithm.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EscapeReplacesNull()
     {
         var (context, bridge) = Attach();

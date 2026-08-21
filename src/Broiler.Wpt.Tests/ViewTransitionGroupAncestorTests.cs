@@ -69,7 +69,7 @@ public class ViewTransitionGroupAncestorTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ASiblingsNameDoesNotNestTheGroup()
     {
         // The regression itself (compute-explicit-name-non-ancestor): `anchor` is a sibling, so the
@@ -80,7 +80,7 @@ public class ViewTransitionGroupAncestorTests : IDisposable
         Assert.Equal(200 * 200, blue);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnAncestorsNameDoesNestTheGroup()
     {
         // The positive direction (compute-explicit-name-direct), so the fix cannot be "never nest".
@@ -90,7 +90,7 @@ public class ViewTransitionGroupAncestorTests : IDisposable
         Assert.Equal(200 * 200, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AGrandparentsNameDoesNestTheGroup()
     {
         // compute-explicit-name-nested: the whole ancestor chain counts, not just the parent.
@@ -101,7 +101,7 @@ public class ViewTransitionGroupAncestorTests : IDisposable
         Assert.Equal(200 * 200, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ANonExistentNameDoesNotNestTheGroup()
     {
         // compute-explicit-name-non-existent: nothing carries `anchor` at all.

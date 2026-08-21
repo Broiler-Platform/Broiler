@@ -55,7 +55,7 @@ public class NativeAnchorSizeZoomWptTests : IDisposable
         return (minX, minY, maxX, maxY, count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSizeUnderZoom_GreenCoversRed_NoDoubleZoom()
     {
         WptTestRunner.NativeAnchorPlacement = true;

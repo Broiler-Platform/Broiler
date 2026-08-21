@@ -31,7 +31,7 @@ public class AsyncContinuationThreadingTests
         return CaptureService.ExecuteScriptsWithDom(html, "https://example.com");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Geometry_Query_After_Await_Completes_Before_The_Page_Is_Read()
     {
         var result = Exec("""
@@ -51,7 +51,7 @@ public class AsyncContinuationThreadingTests
         Assert.DoesNotContain("h=0|", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Rest_Of_An_Async_Function_Runs_After_A_Geometry_Query()
     {
         // The specific shape that broke: the statements after the measurement, and the try/finally
@@ -71,7 +71,7 @@ public class AsyncContinuationThreadingTests
         Assert.Contains("measured|finally|tail", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Await_Continuations_Keep_Microtask_Ordering()
     {
         // Running reactions as microtasks on the driving thread — rather than whenever a pool thread
@@ -94,7 +94,7 @@ public class AsyncContinuationThreadingTests
         Assert.Matches(@"a1\|sync\|(a2\|p1|p1\|a2)\|timeout", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Scroll_Awaited_Through_Its_Event_Is_Observed()
     {
         // The pattern the WPT scroll tests use: set a scroll offset, await the resulting event, then

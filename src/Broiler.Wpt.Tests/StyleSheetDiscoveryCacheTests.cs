@@ -62,7 +62,7 @@ public class StyleSheetDiscoveryCacheTests : IDisposable
             $"{what}: expected the box to be green, got rgb({pixel.R},{pixel.G},{pixel.B}). " +
             "Red means the stylesheet-discovery cache served a stale sheet set.");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleElementAppended_AfterFirstResolve_IsSeen()
     {
         // getComputedStyle first, so the (empty) sheet set is cached; then add a sheet.
@@ -76,7 +76,7 @@ public class StyleSheetDiscoveryCacheTests : IDisposable
         AssertGreen(pixel, "a <style> appended after the first computed-style resolution");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleElementRemoved_AfterFirstResolve_IsSeen()
     {
         // The sheet paints the box red-overriding-green; removing it must restore green.
@@ -91,7 +91,7 @@ public class StyleSheetDiscoveryCacheTests : IDisposable
         AssertGreen(pixel, "a <style> removed after the first computed-style resolution");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleElementTextRewritten_AfterFirstResolve_IsSeen()
     {
         // Sheet text is re-read on every call rather than cached, so a rewrite needs no

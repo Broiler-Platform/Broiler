@@ -11,7 +11,7 @@ public class DomEventsTests
 {
     // ──────────────────────── createEvent / initEvent ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_Returns_Event_With_InitEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -33,7 +33,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("test,true,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_Event_Has_IsTrusted_False()
     {
         var html = @"<!DOCTYPE html>
@@ -53,7 +53,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("boolean,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_Event_Has_TimeStamp()
     {
         var html = @"<!DOCTYPE html>
@@ -73,7 +73,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("number,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_Event_Has_Legacy_Alias_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -95,7 +95,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("object,true,false,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_UIEvents_Has_InitUIEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -118,7 +118,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("test,true,false,6", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_MouseEvents_Has_InitMouseEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -152,7 +152,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("click,true,true,true,4,10,20,30,40,true,false,true,false,2,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_MouseEvents_Has_Alias_Properties_And_Default_Button_State()
     {
         var html = @"<!DOCTYPE html>
@@ -179,7 +179,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("0,0,0,true|30,40,true,true,2,2,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_FocusEvents_Has_InitFocusEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -207,7 +207,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("0,true|focusin,true,false,true,7,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_KeyboardEvents_Has_InitKeyboardEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -240,7 +240,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains(",0,0,0,0|keydown,true,false,true,Enter,1,true,false,true,false,13,0,13", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_KeyboardEvents_Has_Repeat_Property()
     {
         var html = @"<!DOCTYPE html>
@@ -264,7 +264,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("boolean,false|true,13,0,13", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_WheelEvents_Has_InitWheelEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -301,7 +301,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("0,0,0,0|wheel,true,true,true,4,30,40,30,40,true,false,true,false,1.5,-2.5,0,1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CreateEvent_CustomEvent_Has_InitCustomEvent()
     {
         var html = @"<!DOCTYPE html>
@@ -325,7 +325,7 @@ document.getElementById('result').textContent = before + '|' + after.join(',');
         Assert.Contains("function,0|build,true,false,payload", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Event_Constructor_Seeds_Init_Dictionary()
     {
         var html = @"<!DOCTYPE html>
@@ -348,7 +348,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("test,true,false,boolean,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CustomEvent_Constructor_Reuses_CreateEvent_Surface()
     {
         var html = @"<!DOCTYPE html>
@@ -372,7 +372,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("build,true,false,payload,number,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MouseEvent_Constructor_Seeds_Options()
     {
         var html = @"<!DOCTYPE html>
@@ -401,7 +401,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("click,true,true,4,30,40,30,40,true,2,2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FocusEvent_Constructor_Seeds_Options()
     {
         var html = @"<!DOCTYPE html>
@@ -426,7 +426,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("focusin,true,false,7,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void KeyboardEvent_Constructor_Seeds_Options()
     {
         var html = @"<!DOCTYPE html>
@@ -454,7 +454,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("keydown,true,false,Enter,1,true,true,true,13,13", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WheelEvent_Constructor_Seeds_Options()
     {
         var html = @"<!DOCTYPE html>
@@ -483,7 +483,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("wheel,true,true,4,30,40,true,true,1.5,-2.5,1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UIEvent_Constructor_Seeds_Options()
     {
         var html = @"<!DOCTYPE html>
@@ -509,7 +509,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────────── addEventListener / removeEventListener ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddEventListener_And_DispatchEvent_Basic()
     {
         var html = @"<!DOCTYPE html>
@@ -533,7 +533,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">2<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveEventListener_Prevents_Further_Calls()
     {
         var html = @"<!DOCTYPE html>
@@ -561,7 +561,7 @@ document.getElementById('result').textContent = count;
 
     // ──────────────────────── Event bubbling ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Event_Bubbles_To_Parent()
     {
         var html = @"<!DOCTYPE html>
@@ -588,7 +588,7 @@ document.getElementById('result').textContent = phases.join(',');
         Assert.Contains("parent-bubble-phase3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonBubbling_Event_Does_Not_Bubble()
     {
         var html = @"<!DOCTYPE html>
@@ -615,7 +615,7 @@ document.getElementById('result').textContent = count;
 
     // ──────────────────────── Capture phase ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_Listener_Fires_In_Capture_Phase()
     {
         var html = @"<!DOCTYPE html>
@@ -645,7 +645,7 @@ document.getElementById('result').textContent = phases.join(',');
         Assert.Contains("capture-phase1,bubble-phase3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Capture_Listener_Not_Fired_During_Bubble()
     {
         var html = @"<!DOCTYPE html>
@@ -672,7 +672,7 @@ document.getElementById('result').textContent = captureCount;
 
     // ──────────────────────── stopPropagation ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StopPropagation_Prevents_Bubble_But_Fires_All_Current_Node_Listeners()
     {
         // This mirrors Acid3 test 31: stopPropagation on a capture handler
@@ -712,7 +712,7 @@ document.getElementById('result').textContent = captureCount + ',' + bubbleCount
         Assert.Contains("2,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StopImmediatePropagation_Stops_Remaining_Listeners_On_Same_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -744,7 +744,7 @@ document.getElementById('result').textContent = count;
 
     // ──────────────────────── preventDefault ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PreventDefault_Sets_DefaultPrevented_And_Returns_False()
     {
         var html = @"<!DOCTYPE html>
@@ -768,7 +768,7 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         Assert.Contains("false,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PreventDefault_On_NonCancelable_Event_Does_Not_Set_DefaultPrevented()
     {
         var html = @"<!DOCTYPE html>
@@ -792,7 +792,7 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         Assert.Contains("true,false,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReturnValue_False_On_NonCancelable_Event_Does_Not_Cancel_Dispatched_Event()
     {
         var html = @"<!DOCTYPE html>
@@ -816,7 +816,7 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         Assert.Contains("true,false,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PreventDefault_Before_Dispatch_Preserves_Canceled_State()
     {
         var html = @"<!DOCTYPE html>
@@ -838,7 +838,7 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         Assert.Contains("false,true,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReturnValue_False_Before_Dispatch_Preserves_Canceled_State()
     {
         var html = @"<!DOCTYPE html>
@@ -860,7 +860,7 @@ document.getElementById('result').textContent = returned + ',' + evt.defaultPrev
         Assert.Contains("false,true,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Legacy_Event_Aliases_Track_Dispatch_State()
     {
         var html = @"<!DOCTYPE html>
@@ -904,7 +904,7 @@ document.getElementById('result').textContent = [
 
     // ──────────────────────── element.click() ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Click_Dispatches_Click_Event()
     {
         var html = @"<!DOCTYPE html>
@@ -927,7 +927,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Click_Bubbles_And_Has_Correct_Properties()
     {
         var html = @"<!DOCTYPE html>
@@ -954,7 +954,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("click,true,true,3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Focus_Dispatches_Focus_Event()
     {
         var html = @"<!DOCTYPE html>
@@ -981,7 +981,7 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("focus,false,false,2,number", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Blur_Dispatches_Blur_Event()
     {
         var html = @"<!DOCTYPE html>
@@ -1010,7 +1010,7 @@ document.getElementById('result').textContent = r.join(',');
 
     // ──────────────────────── on* inline handler properties ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Onclick_Property_Fires_On_Click()
     {
         var html = @"<!DOCTYPE html>
@@ -1031,7 +1031,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Onclick_Null_Removes_Handler()
     {
         var html = @"<!DOCTYPE html>
@@ -1054,7 +1054,7 @@ document.getElementById('result').textContent = count;
         Assert.Contains(">1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Onclick_Property_Getter_Returns_Handler()
     {
         var html = @"<!DOCTYPE html>
@@ -1078,7 +1078,7 @@ document.getElementById('result').textContent = (before === null) + ',' + (after
 
     // ──────────────────── Acid3-style event dispatch tests ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test30_DispatchEvent_Bubbles_And_RemoveListener()
     {
         // Mirrors Acid3 test 30: addEventListener + createEvent + initUIEvent +
@@ -1112,7 +1112,7 @@ document.getElementById('out').textContent = count + ',' + ok + ',' + r1 + ',' +
         Assert.Contains("2,true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test31_StopPropagation_And_Capture()
     {
         // Mirrors Acid3 test 31: capture phase listeners, stopPropagation,
@@ -1158,7 +1158,7 @@ document.getElementById('result').textContent = captureCount + ',' + ok;
         Assert.Contains("2,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test32_Bubbling_Through_Body()
     {
         // Mirrors Acid3 test 32: event bubbling through body with eventPhase=3
@@ -1192,7 +1192,7 @@ document.getElementById('result').textContent = count + ',' + ok;
         Assert.Contains("1,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nested_Event_Dispatch_Recursive()
     {
         // Mirrors Acid3 test 73: nested/recursive event dispatch
@@ -1228,7 +1228,7 @@ document.getElementById('result').textContent = up + ',' + down;
 
     // ──────────────────── Target phase fires all listeners ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Target_Phase_Fires_Both_Capture_And_Bubble_Listeners()
     {
         var html = @"<!DOCTYPE html>
@@ -1259,7 +1259,7 @@ document.getElementById('result').textContent = order.join(',');
 
     // ──────────────────── Event target property ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Event_Target_Is_The_Dispatch_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -1287,7 +1287,7 @@ document.getElementById('result').textContent = targetId;
 
     // ──────────────────── dispatchEvent return value ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DispatchEvent_Returns_True_When_Not_Prevented()
     {
         var html = @"<!DOCTYPE html>
@@ -1310,7 +1310,7 @@ document.getElementById('result').textContent = '' + r;
 
     // ──────────────────── Event handler attribute (getAttribute) ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetAttribute_Returns_Event_Handler_String()
     {
         // Mirrors Acid3 test 24: getAttribute('onload') returns the attribute string
@@ -1330,7 +1330,7 @@ document.getElementById('result').textContent = val;
 
     // ──────────────────── Load lifecycle on the global object ────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bare_AddEventListener_Registers_On_The_Window()
     {
         // In a browser `window` IS the global object, so the idiomatic bare
@@ -1355,7 +1355,7 @@ document.getElementById('result').textContent = 'script-completed';
         Assert.DoesNotContain("never-ran", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bare_And_Window_Listener_Registrations_Share_One_Store()
     {
         // The same JSFunction instances back both objects, so a listener added bare must be
@@ -1376,7 +1376,7 @@ window.removeEventListener('load', handler);
         Assert.Contains("not-fired", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomContentLoaded_Fires_On_Document_And_Window()
     {
         // Nothing dispatched DOMContentLoaded at all, so both spellings silently never ran.
@@ -1398,7 +1398,7 @@ addEventListener('load', function() {
         Assert.Contains("document,window", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentElement_Remove_Clears_The_Rendered_Document()
     {
         // .remove() resolved the parent as an element, and the document element's parent is

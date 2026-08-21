@@ -30,7 +30,7 @@ public class BorderBevelTests
     public void IsBevelled_Covers_The_Four_3D_Styles(string? style, bool expected) =>
         Assert.Equal(expected, BorderBevel.IsBevelled(style));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Style_That_Does_Not_Bevel_Passes_Its_Colour_Through()
     {
         var color = Rgb(200, 100, 50);
@@ -97,7 +97,7 @@ public class BorderBevelTests
     /// four rows of <c>rgb(44,44,44)</c> then four of <c>rgb(128,128,128)</c>, and its right as the
     /// reverse.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Groove_Is_Inset_Outside_And_Outset_Inside()
     {
         var grey = Rgb(128, 128, 128);
@@ -108,7 +108,7 @@ public class BorderBevelTests
     }
 
     /// <summary>A ridge stands proud of the canvas, so it is the groove the other way round.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ridge_Is_Outset_Outside_And_Inset_Inside()
     {
         var grey = Rgb(128, 128, 128);
@@ -175,7 +175,7 @@ public class BorderBevelTests
     /// <c>inset</c> sinks the box: the top and left are in shadow, the bottom and right catch the
     /// light. Measured on Chromium as <c>rgb(44,44,44)</c> / <c>rgb(128,128,128)</c> for a grey.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inset_Darkens_The_Top_And_Left()
     {
         var grey = Rgb(128, 128, 128);
@@ -184,7 +184,7 @@ public class BorderBevelTests
     }
 
     /// <summary><c>outset</c> raises it, so the shading is the other way round.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Outset_Darkens_The_Bottom_And_Right()
     {
         var grey = Rgb(128, 128, 128);
@@ -198,7 +198,7 @@ public class BorderBevelTests
     /// <c>#EEEEEE</c> pair every browser paints. This pair is what
     /// <c>css/css-color-adjust/…/color-scheme-iframe-background</c> is scored against.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Ua_Bevel_Base_Produces_The_Default_Frame_Border()
     {
         var basis = Rgb(0xEE, 0xEE, 0xEE);
@@ -207,7 +207,7 @@ public class BorderBevelTests
     }
 
     /// <summary>An explicitly black bevel keeps Chromium's black / <c>#545454</c> pair.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Explicitly_Black_Bevel_Lightens_Rather_Than_Darkens()
     {
         var black = Rgb(0, 0, 0);
@@ -216,7 +216,7 @@ public class BorderBevelTests
     }
 
     /// <summary>Alpha rides through both shades, so a translucent bevel stays translucent.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Alpha_Is_Preserved()
     {
         var translucent = BColor.FromArgb(128, 200, 100, 50);

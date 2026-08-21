@@ -11,7 +11,7 @@ public class HttpSubResourceTests
     //  3.1 iframe content loading
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_AboutBlank_Has_ContentDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -34,7 +34,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("true|true|true|about:blank", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Srcdoc_DefaultView_And_WindowScroll_Use_Subdocument_Root()
     {
         var html = @"<!DOCTYPE html>
@@ -67,7 +67,7 @@ document.getElementById('out').textContent = [
         Assert.Contains("true|true|true|true|true|about:srcdoc|50,65|50,65|50,65", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Srcdoc_Load_Event_Fires_After_Listener_Registration()
     {
         var html = @"<!DOCTYPE html>
@@ -88,7 +88,7 @@ fr.addEventListener('load', function () {
         Assert.Contains("true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ScriptAssigned_Srcdoc_Loads_ContentDocument_Through_Frames()
     {
         var html = @"<!DOCTYPE html>
@@ -115,7 +115,7 @@ fr.srcdoc = '<!DOCTYPE html><html><body><div id=""target""></div></body></html>'
         Assert.Contains("true|true|1|true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Nested_Subdocument_Scripts_Resolve_Relative_Iframe_Sources()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-nested-iframe-{Guid.NewGuid():N}");
@@ -171,7 +171,7 @@ window.onload = function () {
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Wpt_CrossOrigin_Template_Src_Loads_From_Local_Wpt_Root_But_Stays_CrossOrigin()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"broiler-wpt-cross-origin-{Guid.NewGuid():N}");
@@ -214,7 +214,7 @@ window.onload = function () {
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_NonHtml_Src_Gets_Minimal_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -240,7 +240,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_TextPlain_Src_Gets_Minimal_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -269,7 +269,7 @@ document.getElementById('out').textContent = r.join(',');
     //  3.2 <object> element handling
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_ContentDocument_Accessible_With_SameOrigin_Data()
     {
         var html = @"<!DOCTYPE html>
@@ -294,7 +294,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("|text/html", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Object_Without_Data_Has_ContentDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -319,7 +319,7 @@ document.getElementById('out').textContent = r.join(',');
     //  3.3 Dynamic resource injection
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dynamic_Iframe_Has_ContentDocument()
     {
         var html = @"<!DOCTYPE html>
@@ -341,7 +341,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dynamic_Iframe_Src_Change_Resets_Document()
     {
         var html = @"<!DOCTYPE html>
@@ -367,7 +367,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dynamic_Iframe_AboutBlank_Initial()
     {
         var html = @"<!DOCTYPE html>
@@ -395,7 +395,7 @@ document.getElementById('out').textContent = r.join('|');
     //  3.4 External script loading
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_DataUri_Script_Executes()
     {
         var html = @"<!DOCTYPE html>
@@ -409,7 +409,7 @@ document.getElementById('out').textContent = r.join('|');
         Assert.Contains("LOADED", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void External_Script_Ordering_Preserved()
     {
         var html = @"<!DOCTYPE html>
@@ -429,7 +429,7 @@ document.getElementById('out').textContent = r.join('|');
     //  3.5 Content-Type based handling
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_ContentDocument_DocumentWrite_Works()
     {
         var html = @"<!DOCTYPE html>
@@ -454,7 +454,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Contains("true,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FetchExternalScript_Returns_Empty_For_Invalid_Url()
     {
         // Test that FetchExternalScript handles invalid URLs gracefully
@@ -462,7 +462,7 @@ document.getElementById('out').textContent = r.join(',');
         Assert.Equal(string.Empty, result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FetchExternalScript_Resolves_Relative_Urls()
     {
         // Test that FetchExternalScript resolves relative URLs against base URL

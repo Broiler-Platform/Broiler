@@ -14,7 +14,7 @@ public class ErrorOverlayServiceTests : IDisposable
         RenderLogger.Clear();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Captures_Error_Level_Entries()
     {
         using var service = new ErrorOverlayService();
@@ -28,7 +28,7 @@ public class ErrorOverlayServiceTests : IDisposable
         Assert.NotNull(errors[0].Exception);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ignores_Below_Error_Level()
     {
         using var service = new ErrorOverlayService();
@@ -40,7 +40,7 @@ public class ErrorOverlayServiceTests : IDisposable
         Assert.Empty(service.GetErrors());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ErrorCaptured_Event_Fires()
     {
         using var service = new ErrorOverlayService();
@@ -53,7 +53,7 @@ public class ErrorOverlayServiceTests : IDisposable
         Assert.Equal("fail", captured[0].Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clear_Removes_All_Errors()
     {
         using var service = new ErrorOverlayService();
@@ -65,7 +65,7 @@ public class ErrorOverlayServiceTests : IDisposable
         Assert.Empty(service.GetErrors());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Dispose_Stops_Capturing()
     {
         var service = new ErrorOverlayService();
@@ -76,7 +76,7 @@ public class ErrorOverlayServiceTests : IDisposable
         Assert.Empty(service.GetErrors());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToString_Formats_Correctly()
     {
         var error = new RenderErrorInfo

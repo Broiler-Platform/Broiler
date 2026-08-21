@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class HtmlSerializerIterativeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialize_ProducesCorrectlyNestedAndOrderedOutput()
     {
         var doc = new DomDocument();
@@ -39,7 +39,7 @@ public sealed class HtmlSerializerIterativeTests
             html);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialize_DeepChain_DoesNotThrowOrOverflow()
     {
         var doc = new DomDocument();

@@ -33,7 +33,7 @@ document.getElementById('result').textContent =
 </script>
 </body></html>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EmptyRelativeSpan_AnchorsAbsposDescendant_ToItsLine_WithoutAddingStrut()
     {
         var result = CaptureService.ExecuteScriptsWithDom(Html, "file:///test.html");

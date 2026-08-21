@@ -14,7 +14,7 @@ public class RenderLoggerEventTests : IDisposable
         RenderLogger.Clear();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EntryLogged_Fires_When_Entry_Is_Logged()
     {
         var received = new List<RenderLogEntry>();
@@ -37,7 +37,7 @@ public class RenderLoggerEventTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EntryLogged_Not_Fired_When_Below_Minimum_Level()
     {
         var originalLevel = RenderLogger.MinimumLevel;

@@ -36,7 +36,7 @@ public sealed class CanonicalChildContentTests
     //  Invariant proof: raw-text content lives in a canonical DomText child
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleElement_Content_Is_A_DomText_Child_After_Attach()
     {
         const string html = @"<!DOCTYPE html><html><head>
@@ -54,7 +54,7 @@ public sealed class CanonicalChildContentTests
         Assert.Contains("color: red", TextChildData(sheet!));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleElement_Keeps_A_DomText_Child_Through_The_Anchor_Resolve_Pipeline()
     {
         // The anchor pipeline neutralises unsupported CSS by rewriting the <style> text node in
@@ -84,7 +84,7 @@ public sealed class CanonicalChildContentTests
         Assert.False(string.IsNullOrEmpty(TextChildData(sheet!)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScriptElement_Content_Is_A_DomText_Child_After_Attach()
     {
         const string html = @"<!DOCTYPE html><html><head>
@@ -105,7 +105,7 @@ public sealed class CanonicalChildContentTests
     //  Behaviours the removal must preserve
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StyleElement_Cascade_Resolves_Through_GetComputedStyle()
     {
         // Proves the <style> CSS source is read from canonical DomText children end-to-end
@@ -125,7 +125,7 @@ document.getElementById('result').textContent = cs.getPropertyValue('color');
         Assert.Contains("rgb(1, 2, 3)", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InnerHtml_Getter_Serialises_Canonical_Children()
     {
         const string html = @"<!DOCTYPE html><html><body>
@@ -140,7 +140,7 @@ document.getElementById('result').textContent = document.getElementById('host').
         Assert.Contains("<span>a</span><b>c</b>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InnerHtml_Setter_Parses_And_Replaces_Canonical_Children()
     {
         const string html = @"<!DOCTYPE html><html><body>
@@ -158,7 +158,7 @@ document.getElementById('result').textContent =
         Assert.Contains("1:new", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ChildlessElement_TextContent_Is_Empty()
     {
         const string html = @"<!DOCTYPE html><html><body>
@@ -174,7 +174,7 @@ document.getElementById('result').textContent = '[' + v + ']';
         Assert.Contains("[]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CloneNode_Deep_Copies_Style_Source_Via_DomText_Child()
     {
         const string html = @"<!DOCTYPE html><html><body>
@@ -191,7 +191,7 @@ document.getElementById('result').textContent = clone.textContent;
         Assert.Contains(".x { color: green; }", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialization_Reads_Style_And_Script_From_Canonical_Children()
     {
         // A script mutates the DOM so serialization is exercised (no-script HTML round-trips raw).

@@ -20,7 +20,7 @@ public sealed class HtmlPostProcessorProfileTests
         "<a id=\"linktest\" class=\"x\">bleedthrough</a>" +
         "<div id=\" \">FAIL</div></div>";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ProcessForBrowsing_Preserves_Valid_Content_The_Harness_Strips()
     {
         var browsing = HtmlPostProcessor.ProcessForBrowsing(ArtifactHtml);
@@ -32,7 +32,7 @@ public sealed class HtmlPostProcessorProfileTests
         Assert.Contains("FAIL", browsing, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Process_TestHarness_Still_Applies_Artifact_Cleanup()
     {
         var harness = HtmlPostProcessor.Process(ArtifactHtml);

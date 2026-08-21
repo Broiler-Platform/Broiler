@@ -35,7 +35,7 @@ public sealed class TrailingForcedBreakLineTests
 
     // "Line 1\n" is one line, not two — the case every browser agrees on and
     // the engine got wrong.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Trailing_Newline_Adds_No_Line()
     {
         Assert.Equal(LineCount("Line 1"), LineCount("Line 1\n"));
@@ -65,7 +65,7 @@ public sealed class TrailingForcedBreakLineTests
     // separate pre-existing difference, not this rule — what this pins is that
     // the trailing-break removal does not reach a block with nothing in front of
     // the break and collapse it to nothing.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Block_Holding_Only_A_Newline_Keeps_Its_Height()
     {
         Assert.True(Height("\n") > 0);

@@ -39,7 +39,7 @@ public class FullscreenRenderTests
     /// <c>fullscreen/rendering/backdrop-inherit</c> is the end-to-end case for that resolution, and
     /// it passes; the two pixel cases below cover the painting this layer does decide.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FullscreenElement_StampsTopLayerBackdropAndUAGeometry()
     {
         const string html = """
@@ -76,7 +76,7 @@ public class FullscreenRenderTests
     /// With no author <c>::backdrop</c> rule, the Fullscreen UA default applies: an opaque black
     /// backdrop, not the modal dialog's grey scrim and not a popover's transparent one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FullscreenElement_DefaultsToBlackBackdrop()
     {
         const string html = """
@@ -103,7 +103,7 @@ public class FullscreenRenderTests
     /// painting and the page shows through again. The control for the two cases above: without it,
     /// an implementation that never cleared the flag would pass both.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ExitFullscreen_RemovesTheBackdrop()
     {
         const string html = """
@@ -130,7 +130,7 @@ public class FullscreenRenderTests
     /// <c>document.fullscreenElement</c> tracks the flag in both directions, and is <c>null</c>
     /// rather than undefined when nothing is fullscreen — the WPT tests branch on it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FullscreenElement_ReflectsTheCurrentState()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"target\"></div></body></html>";
@@ -151,7 +151,7 @@ public class FullscreenRenderTests
     /// <c>fullscreenchange</c> fires at the element and bubbles, which is how the WPT reftests
     /// know to drop their <c>reftest-wait</c> class — they listen on the document, not the element.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RequestFullscreen_FiresBubblingFullscreenChange()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"target\"></div></body></html>";

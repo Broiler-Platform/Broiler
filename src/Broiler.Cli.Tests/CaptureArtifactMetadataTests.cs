@@ -5,7 +5,7 @@ namespace Broiler.Cli.Tests;
 
 public class CaptureArtifactMetadataTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Program_CaptureImage_Writes_Backend_Metadata_Sidecar()
     {
         var htmlPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.html");

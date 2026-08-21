@@ -53,7 +53,7 @@ public sealed class AmbientRenderStateTests
     }
 
 #if DEBUG
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnUnestablishedReadOnAWorkerThreadAssertsWhenEnforcementIsOn()
     {
         var thrown = OnAFreshArmedThread(() => _ = DocumentModeContext.CurrentQuirksMode);
@@ -62,7 +62,7 @@ public sealed class AmbientRenderStateTests
         Assert.Contains(nameof(DocumentModeContext.CurrentQuirksMode), failure.Message, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EstablishSatisfiesEverySlotOnTheThreadThatCallsIt()
     {
         var established = AmbientRenderState.Slots.None;
@@ -82,7 +82,7 @@ public sealed class AmbientRenderStateTests
         Assert.Equal(AmbientRenderState.Slots.All, established);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OneSlotDoesNotVouchForAnother()
     {
         // The reason the record is per-slot rather than a single "ready" bit: a thread that reset
@@ -98,7 +98,7 @@ public sealed class AmbientRenderStateTests
     }
 #endif
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EnforcementIsOffByDefaultSoTheSingleThreadedPathIsUnchanged()
     {
         // Not a formality. `DocumentModeContext.CurrentQuirksMode` is never written on the

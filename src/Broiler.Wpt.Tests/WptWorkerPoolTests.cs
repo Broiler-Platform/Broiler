@@ -49,7 +49,7 @@ public sealed class WptWorkerPoolTests
     private static List<string> TestPaths(int count) =>
         Enumerable.Range(0, count).Select(i => Path.Combine(Path.GetTempPath(), $"test-{i:D3}.html")).ToList();
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Results_Are_In_Discovery_Order_Even_When_Tests_Finish_Out_Of_Order()
     {
         // The pool's whole safety argument: a slot writes its result into the index it
@@ -67,7 +67,7 @@ public sealed class WptWorkerPoolTests
         Assert.Equal(tests, results.Select(r => r.TestPath).ToList());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Classification_Is_Identical_At_One_And_Many_Workers()
     {
         var tests = TestPaths(30);
@@ -91,7 +91,7 @@ public sealed class WptWorkerPoolTests
             parallel.Select(r => (r.TestPath, r.Passed, r.Skipped, r.MatchPercent)).ToList());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Test_Runs_Exactly_Once_Across_The_Pool()
     {
         var tests = TestPaths(50);
@@ -107,7 +107,7 @@ public sealed class WptWorkerPoolTests
         Assert.Equal(tests.OrderBy(p => p, StringComparer.Ordinal), seen.OrderBy(p => p, StringComparer.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Empty_Test_Set_Runs_No_Slots()
     {
         var results = RunQueue([], workerCount: 8, _ => throw new InvalidOperationException("should not run"));
@@ -115,7 +115,7 @@ public sealed class WptWorkerPoolTests
         Assert.Empty(results);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pool_Is_Sized_By_Memory_When_Memory_Is_Scarcer_Than_Cores()
     {
         // 16 cores but 4 GiB free: 1.5 GiB per worker allows 2, and RAM is the binding
@@ -129,7 +129,7 @@ public sealed class WptWorkerPoolTests
                 availableMemoryBytes: 4 * OneGibibyte));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pool_Is_Sized_By_Cores_When_Memory_Is_Plentiful()
     {
         Assert.Equal(
@@ -141,7 +141,7 @@ public sealed class WptWorkerPoolTests
                 availableMemoryBytes: 64 * OneGibibyte));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pool_Never_Drops_Below_One_Worker()
     {
         Assert.Equal(
@@ -153,7 +153,7 @@ public sealed class WptWorkerPoolTests
                 availableMemoryBytes: 256L * 1024 * 1024));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unknown_Available_Memory_Does_Not_Parallelize()
     {
         // Guessing high on an unreadable memory figure is how a runner OOM-kills a CI box,
@@ -167,7 +167,7 @@ public sealed class WptWorkerPoolTests
                 availableMemoryBytes: 0));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Explicit_Worker_Count_Overrides_The_Automatic_Sizing()
     {
         Assert.Equal(
@@ -179,7 +179,7 @@ public sealed class WptWorkerPoolTests
                 availableMemoryBytes: 2 * OneGibibyte));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void In_Process_Mode_Is_Always_One_Worker()
     {
         // The engine is single-threaded by design; two documents in one process would race
@@ -202,7 +202,7 @@ public sealed class WptWorkerPoolTests
         Assert.Equal(expected, parsed);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Worker_Count_Accepts_Auto_As_No_Explicit_Request()
     {
         Assert.True(Program.TryParseWorkerCount("auto", out var parsed));
@@ -219,7 +219,7 @@ public sealed class WptWorkerPoolTests
         Assert.False(Program.TryParseWorkerCount(value, out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Available_Memory_Is_Reported_As_A_Usable_Figure()
     {
         // Either source may be missing on a given platform, but both returning nothing
@@ -227,7 +227,7 @@ public sealed class WptWorkerPoolTests
         Assert.True(Program.GetAvailableMemoryBytes() > 0);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Termination_Diagnostics_Name_Every_In_Flight_Test()
     {
         var progress = new Program.WptRunProgress(totalTests: 100);
@@ -244,7 +244,7 @@ public sealed class WptWorkerPoolTests
         Assert.Contains("(43/100) css/c.html [pid 333", diagnostics);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Completed_Slot_Leaves_The_In_Flight_List()
     {
         var progress = new Program.WptRunProgress(totalTests: 10);
@@ -306,7 +306,7 @@ public sealed class WptWorkerPoolTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Explicit_Render_Thread_Setting_Is_Left_Alone()
     {
         var previousRaster = Environment.GetEnvironmentVariable("BROILER_RASTER_THREADS");

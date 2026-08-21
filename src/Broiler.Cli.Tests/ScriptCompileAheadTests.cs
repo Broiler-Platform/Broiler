@@ -104,7 +104,7 @@ public sealed class ScriptCompileAheadTests : IDisposable
     /// The guard. Without it every equality above could be comparing two runs that both did nothing
     /// — a document with one script, or a budget that never took effect.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Compile_Ahead_Actually_Ran_For_Every_Document()
     {
         foreach (var (name, html) in Documents)
@@ -138,7 +138,7 @@ public sealed class ScriptCompileAheadTests : IDisposable
     /// the worker and observable, because "the compile-ahead silently succeeded on a broken script"
     /// and "the compile-ahead never ran" look the same from the output.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Source_That_Cannot_Compile_Is_Left_To_The_Consume_Site()
     {
         ScriptCompileAhead.ResetDiagnostics();
@@ -172,7 +172,7 @@ public sealed class ScriptCompileAheadTests : IDisposable
     /// legitimately move. This is what makes the oracle above the pre-change path rather than a
     /// narrow configuration of the new one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Budget_Of_One_Starts_No_Worker()
     {
         using var context = new JSContext();
@@ -189,7 +189,7 @@ public sealed class ScriptCompileAheadTests : IDisposable
     /// One source is one compile plus a handoff: the consuming <c>Eval</c> is the very next thing
     /// the host does with it, so there is nothing left to overlap it with.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Single_Source_Starts_No_Worker()
     {
         using var context = new JSContext();
@@ -206,7 +206,7 @@ public sealed class ScriptCompileAheadTests : IDisposable
     /// output — it costs a second compile and nothing else, which is exactly item #17's lesson
     /// about a prefetch filed where nobody looks.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Compiled_Ahead_Source_Is_A_Cache_Hit_At_The_Consume_Site()
     {
         using var context = new JSContext();

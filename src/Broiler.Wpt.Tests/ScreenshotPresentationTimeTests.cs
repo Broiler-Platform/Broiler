@@ -9,7 +9,7 @@ namespace Broiler.Wpt.Tests;
 /// </summary>
 public class ScreenshotPresentationTimeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReadsTheDelayFromTakeScreenshotDelayed()
     {
         Assert.Equal(
@@ -51,14 +51,14 @@ public class ScreenshotPresentationTimeTests
     public void FallsBackToZeroWhenThereIsNoLiteralDelay(string html)
         => Assert.Equal(TimeSpan.Zero, WptTestRunner.ScreenshotPresentationTime(html));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreatsMissingMarkupAsZero()
     {
         Assert.Equal(TimeSpan.Zero, WptTestRunner.ScreenshotPresentationTime(null));
         Assert.Equal(TimeSpan.Zero, WptTestRunner.ScreenshotPresentationTime(string.Empty));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TakesTheFirstDelayWhenATestSchedulesMoreThanOne()
         => Assert.Equal(
             TimeSpan.FromMilliseconds(100),
@@ -72,7 +72,7 @@ public class ScreenshotPresentationTimeTests
     /// green frame occupies 100 ms — which still puts 300 ms squarely on red, the colour
     /// Chromium's reference shows.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolvesTheImageAnimationReftestsToTheirSecondFrame()
     {
         TimeSpan presentationTime = WptTestRunner.ScreenshotPresentationTime(

@@ -18,7 +18,7 @@ public sealed class SvgTransformTests
         Assert.Equal(expectedY, mapped.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Absent_Or_Unparseable_List_Is_The_Identity()
     {
         Assert.True(SvgTransform.Parse(null).IsIdentity);
@@ -26,7 +26,7 @@ public sealed class SvgTransformTests
         Assert.True(SvgTransform.Parse("wobble(3)").IsIdentity);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Translate_Scale_And_Matrix_Parse()
     {
         AssertMaps(SvgTransform.Parse("translate(40 60)"), 1, 2, 41, 62);
@@ -36,14 +36,14 @@ public sealed class SvgTransformTests
         AssertMaps(SvgTransform.Parse("matrix(1 0 0 1 5 7)"), 1, 2, 6, 9);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Rotate_Turns_The_Axes_And_Honours_A_Centre()
     {
         AssertMaps(SvgTransform.Parse("rotate(90)"), 1, 0, 0, 1);
         AssertMaps(SvgTransform.Parse("rotate(90 1 1)"), 1, 0, 2, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_List_Applies_Left_To_Right()
     {
         // SVG 1.1 §7.6: the leftmost function is the outermost, so the rightmost acts first.
@@ -51,7 +51,7 @@ public sealed class SvgTransformTests
         AssertMaps(SvgTransform.Parse("scale(2) translate(10 0)"), 1, 0, 22, 0);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inverse_Undoes_The_Transform()
     {
         var transform = SvgTransform.Parse("translate(40 60) rotate(30) scale(2)");
@@ -60,13 +60,13 @@ public sealed class SvgTransformTests
         AssertMaps(round, 3, 5, 3, 5);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Singular_Matrix_Inverts_To_The_Identity_Rather_Than_Infinities()
     {
         Assert.True(SvgTransform.Parse("scale(0)").Inverse().IsIdentity);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MapBounds_Is_The_Axis_Aligned_Box_Of_The_Mapped_Rectangle()
     {
         var mapped = SvgTransform.Parse("rotate(45)").MapBounds(new RectangleF(0, 0, 10, 10));
@@ -77,7 +77,7 @@ public sealed class SvgTransformTests
         Assert.Equal(-7.071f, mapped.Left, 2);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsAxisAligned_Separates_The_Transforms_A_Rectangle_Survives()
     {
         Assert.True(SvgTransform.Parse("translate(4 5) scale(2 3)").IsAxisAligned);
@@ -85,7 +85,7 @@ public sealed class SvgTransformTests
         Assert.False(SvgTransform.Parse("skewX(20)").IsAxisAligned);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToPageSpace_Applies_The_User_Space_Transform_To_A_Page_Coordinate()
     {
         // A view box scaled 2× whose user-space origin sits at page (100, 50). A user-space
@@ -96,7 +96,7 @@ public sealed class SvgTransformTests
         AssertMaps(page, 140, 90, 160, 90);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ToPageSpace_Rotates_About_The_User_Space_Origin()
     {
         var page = SvgTransform.Parse("rotate(90)").ToPageSpace(2, 2, 100, 50);

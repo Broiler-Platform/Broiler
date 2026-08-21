@@ -61,7 +61,7 @@ public sealed class AspectRatioLayoutTests
     /// width, then the aspect ratio makes it that tall: a 240px-wide parent yields
     /// a 240×80 box at 3/1.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Block_AspectRatio_AutoWidthFillsContainingBlockThenTransfers()
     {
         string html =

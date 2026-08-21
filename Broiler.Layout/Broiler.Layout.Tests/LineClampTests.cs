@@ -33,7 +33,7 @@ public sealed class LineClampTests
 
     // The plain shorthand: any block container, no opt-in needed
     // (css/css-overflow/line-clamp/line-clamp-001).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void LineClamp_Clamps_A_Plain_Block()
     {
         var box = Block();
@@ -44,7 +44,7 @@ public sealed class LineClampTests
 
     // `max-lines` alone clamps but implies no ellipsis — only the `line-clamp`
     // shorthand sets `block-ellipsis: auto`.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MaxLines_Alone_Clamps_Without_An_Ellipsis()
     {
         var box = Block();
@@ -71,7 +71,7 @@ public sealed class LineClampTests
 
     // -webkit-line-clamp on something that is not a legacy box does nothing
     // (webkit-line-clamp-001: a plain block, expecting all five of its lines).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WebkitLineClamp_Does_Not_Clamp_A_Plain_Block()
     {
         var box = Block();
@@ -81,7 +81,7 @@ public sealed class LineClampTests
     }
 
     // ...nor on a legacy box laid out along the inline axis (webkit-line-clamp-015).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WebkitLineClamp_Does_Not_Clamp_A_Horizontal_Legacy_Box()
     {
         var box = Block();
@@ -111,7 +111,7 @@ public sealed class LineClampTests
     // declared only `-webkit-line-clamp` is handed both properties with the same
     // value. The legacy rules must still be the ones that decide, or every such
     // document clamps a box that must not be clamped.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Aliased_WebkitLineClamp_Does_Not_Become_A_Plain_Clamp()
     {
         var box = Block();
@@ -124,7 +124,7 @@ public sealed class LineClampTests
     // line-clamp-034: both spellings, value 4, on a plain block — expects no
     // clamping at all, because -webkit-line-clamp's `continue: -webkit-discard`
     // is `auto` outside a legacy box and overrides the shorthand's `discard`.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WebkitLineClamp_Suppresses_LineClamp_On_A_Plain_Block()
     {
         var box = Block();
@@ -136,7 +136,7 @@ public sealed class LineClampTests
 
     // line-clamp-019: `line-clamp: 2` then `-webkit-line-clamp: 4` on a vertical
     // legacy box — expects four lines, the legacy property's count.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WebkitLineClamp_Wins_On_A_Legacy_Box()
     {
         var box = Block();
@@ -221,7 +221,7 @@ public sealed class LineClampTests
     // The orientation usually arrives after `display` in author order, so the
     // mapping has to be redone when it does — otherwise every legacy box is
     // mapped as horizontal, which is the one orientation that does not clamp.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Setting_The_Orientation_Remaps_An_Already_Applied_Legacy_Display()
     {
         var box = Block();
@@ -235,7 +235,7 @@ public sealed class LineClampTests
 
     // A later non-legacy `display` has to clear the record, or the box stays
     // eligible for a legacy clamp it no longer opts into.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Later_Plain_Display_Clears_The_Legacy_Record()
     {
         var box = Block();
@@ -249,7 +249,7 @@ public sealed class LineClampTests
 
     // Four lines of one-word text in a container clamped to two: the last two
     // line boxes are discarded and the container is sized to the two it kept.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clamping_Discards_The_Lines_Past_The_Limit_And_Shrinks_The_Container()
     {
         var (root, clamp) = TreeWithLines(lines: 4);
@@ -266,7 +266,7 @@ public sealed class LineClampTests
 
     // The control: the same tree with no clamp keeps all four. Without it, a
     // change that dropped every line but the first would pass the case above.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unclamped_Container_Keeps_Every_Line()
     {
         var (root, clamp) = TreeWithLines(lines: 4);
@@ -286,7 +286,7 @@ public sealed class LineClampTests
 
     // A limit at or above the line count changes nothing — in particular it must
     // not place an ellipsis, because nothing was discarded.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Limit_The_Content_Does_Not_Reach_Changes_Nothing()
     {
         var (root, clamp) = TreeWithLines(lines: 3);
@@ -301,7 +301,7 @@ public sealed class LineClampTests
     // container's* root inline box, so it is owned by that container and takes
     // its font and colour — block-ellipsis-002 clamps a teal bold italic
     // container and expects a teal bold italic ellipsis.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Ellipsis_Is_Owned_By_The_Clamped_Container()
     {
         var (root, clamp) = TreeWithLines(lines: 4);
@@ -314,7 +314,7 @@ public sealed class LineClampTests
 
     // `continue: discard` drops the box, not just its text: a child left with no
     // line of its own must not paint its background or borders either.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Child_Left_With_Nothing_Is_Flagged_Away_From_The_Fragment_Tree()
     {
         var (root, clamp) = TreeWithLines(lines: 4);

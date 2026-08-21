@@ -15,7 +15,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class ComputedStyleBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ComputedStyle_Feature_Module_And_Host_Contract_Are_Internal()
     {
         var moduleType = typeof(ComputedStyleBinding);
@@ -27,7 +27,7 @@ public sealed class ComputedStyleBindingModuleTests
         Assert.True(typeof(IComputedStyleHost).IsAssignableFrom(typeof(Broiler.HtmlBridge.DomBridge)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Img_Width_Height_Report_Used_Dimension_With_Attribute_Fallback()
     {
         var html = @"<!DOCTYPE html>
@@ -52,7 +52,7 @@ document.body.appendChild(out);
         Assert.Contains(">w=120|h=90|wnum=number|hnum=number<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Resolves_Used_Values_Through_The_Bridge()
     {
         var html = @"<!DOCTYPE html>

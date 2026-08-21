@@ -35,7 +35,7 @@ public sealed class NamedPageTests
 
     // The property reaches the box through the ordinary cascade entry point, which is the only way
     // an author's `page: a` ever arrives.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Page_Property_Reaches_The_Box()
     {
         var root = Root();
@@ -46,7 +46,7 @@ public sealed class NamedPageTests
         Assert.Equal("chapter", CssUtils.GetPropertyValue(box, "page"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Change_Of_Page_Name_Breaks_Between_Two_Siblings()
     {
         var root = Root();
@@ -58,7 +58,7 @@ public sealed class NamedPageTests
         Assert.Equal(PageHeight, second.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Same_Page_Name_Breaks_Nothing()
     {
         var root = Root();
@@ -72,7 +72,7 @@ public sealed class NamedPageTests
 
     // `page` is not inherited, but `auto` resolves to the nearest ancestor's used value — so a
     // child that declares nothing is on its parent's page, not on the unnamed one.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unnamed_Box_Is_On_Its_Ancestors_Page()
     {
         var root = Root();
@@ -85,7 +85,7 @@ public sealed class NamedPageTests
         Assert.Equal(ChildHeight, second.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Explicit_Auto_Resolves_The_Same_Way_As_No_Declaration()
     {
         var root = Root();
@@ -101,7 +101,7 @@ public sealed class NamedPageTests
     // Propagation, from css-page/page-name-propagated-001: the page a wrapper starts is the one its
     // innermost first descendant names, not the one the wrapper itself does. Reading the outermost
     // name here would break between the two siblings; the test's reference has no break at all.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Wrappers_Start_Takes_The_Name_Of_Its_First_Descendant()
     {
         var root = Root();
@@ -117,7 +117,7 @@ public sealed class NamedPageTests
     }
 
     // ...and symmetrically its end, which is the name the *next* sibling is compared against.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Wrappers_End_Takes_The_Name_Of_Its_Last_Descendant()
     {
         var root = Root();
@@ -135,7 +135,7 @@ public sealed class NamedPageTests
     // A box that puts nothing on a page carries a used page name all the same — its ancestor's.
     // Reading it would break wherever the markup is indented, since the collapsed whitespace
     // between two elements is such a box (css-page/page-name-img-003).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Box_That_Generates_Nothing_Is_Not_What_The_Name_Is_Compared_Against()
     {
         var root = Root();
@@ -151,7 +151,7 @@ public sealed class NamedPageTests
 
     // `page` names the page a block-level box is laid out on. An inline-level box shares its
     // parent's line, and so its parent's page, so a name on it names nothing (page-name-img-001).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Inline_Level_Boxs_Own_Page_Name_Is_Ignored()
     {
         var root = Root();
@@ -182,7 +182,7 @@ public sealed class NamedPageTests
 
     // ...but a name on the container itself still breaks: the container is in its parent's flow
     // however it lays its own children out (css-page/page-name-flex-003).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Name_On_A_Flex_Container_Still_Breaks()
     {
         var root = Root();
@@ -211,7 +211,7 @@ public sealed class NamedPageTests
 
     // A box whose block axis is not the page's stacks its children sideways, where a page boundary
     // does not fall (css-page/page-name-orthogonal-writing-003).
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Page_Name_In_An_Orthogonal_Writing_Mode_Breaks_Nothing()
     {
         AssertNamesChangeNothing((container, first, second) =>
@@ -222,7 +222,7 @@ public sealed class NamedPageTests
 
     // Unpaginated is the default, and the reason all of this can be applied unconditionally: with
     // no page size there is no boundary, so a page name is inert rather than wrong.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Page_Size_A_Change_Of_Page_Name_Moves_Nothing()
     {
         var root = Root(pageHeight: 99999);

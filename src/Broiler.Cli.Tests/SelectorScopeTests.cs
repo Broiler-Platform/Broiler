@@ -2,7 +2,7 @@ namespace Broiler.Cli.Tests;
 
 public class SelectorScopeTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_QuerySelectorAll_Scope_Child_Combinator_Finds_Direct_Children()
     {
         const string html = """
@@ -27,7 +27,7 @@ public class SelectorScopeTests
         Assert.Contains("data-result=\"1|direct|direct\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_QuerySelector_Scope_Can_Match_Self()
     {
         const string html = """
@@ -48,7 +48,7 @@ public class SelectorScopeTests
         Assert.Contains("data-result=\"host\"", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Matches_And_Closest_Support_Scope()
     {
         const string html = """

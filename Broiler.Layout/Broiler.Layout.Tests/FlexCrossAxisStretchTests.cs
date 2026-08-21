@@ -34,7 +34,7 @@ public sealed class FlexCrossAxisStretchTests
     private const double ContainerHeight = 100;
     private const double ItemWidth = 40;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Item_With_No_Height_Fills_A_Definite_Container()
     {
         var (root, item) = RowContainer();
@@ -43,7 +43,7 @@ public sealed class FlexCrossAxisStretchTests
         Assert.Equal(ContainerHeight, item.Size.Height, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Item_With_A_Height_Of_Its_Own_Is_Left_Alone()
     {
         var (root, item) = RowContainer();
@@ -84,7 +84,7 @@ public sealed class FlexCrossAxisStretchTests
             $"align-items: {alignItems} should place the item, not size it");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Align_Self_Overrides_The_Containers_Align_Items()
     {
         var (root, item) = RowContainer();
@@ -114,7 +114,7 @@ public sealed class FlexCrossAxisStretchTests
 
     // With no definite container height the line is as tall as its tallest item, and the shorter
     // ones stretch to that rather than to nothing.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Without_A_Definite_Container_The_Line_Is_Its_Tallest_Item()
     {
         var root = Container(height: null);

@@ -69,6 +69,12 @@ set -euo pipefail
 #   * 0130 (Broiler.JS, test parallelization) — upstream. It was never listed:
 #     it changes only how `Broiler.JavaScript.BuiltIns.Tests` schedules its own
 #     cases, and the WPT run never builds that assembly.
+#   * The four "Add a Timeout to every xUnit [Fact]" patches (Broiler.CSS,
+#     Broiler.DOM, Broiler.JS and the nested Broiler.Regex) — for the same reason
+#     0130 was never listed, only more so: they add an attribute argument to test
+#     methods and touch no production code at all, so nothing they change can
+#     move a pixel, and the WPT run neither builds nor runs the assemblies they
+#     belong to.
 #
 # Listed below, and deliberately so: 0132 decides whether the render tree is
 # rebuilt after a DOM mutation, so a wrong classification is a *stale page* —

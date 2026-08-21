@@ -33,14 +33,14 @@ public class BorderAntialiasingTests
 
     // ── Wholly inside and wholly outside ─────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Pixel_Well_Inside_Is_Fully_Covered()
     {
         Assert.Equal(1f, BorderAntialiasing.Coverage(Square(), 5, 5));
         Assert.Equal(1f, BorderAntialiasing.Coverage(SquareReversed(), 5, 5));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Pixel_Well_Outside_Is_Not_Covered()
     {
         Assert.Equal(0f, BorderAntialiasing.Coverage(Square(), 20, 20));
@@ -49,7 +49,7 @@ public class BorderAntialiasingTests
     }
 
     /// <summary>A pixel exactly on an axis-aligned boundary is in or out, never partial.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Axis_Aligned_Edge_Needs_No_Blending()
     {
         Assert.Equal(1f, BorderAntialiasing.Coverage(Square(), 0, 0));
@@ -65,7 +65,7 @@ public class BorderAntialiasingTests
     /// own edges are not blended, only its mitres. Feathering them would turn a 1px border sitting
     /// on a half-pixel into two grey rows instead of one solid one.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Mid_Pixel_Axis_Aligned_Edge_Is_Not_Blended()
     {
         PointF[] halfSquare = [new(0, 0), new(5.8f, 0), new(5.8f, 10), new(0, 10)];
@@ -74,7 +74,7 @@ public class BorderAntialiasingTests
     }
 
     /// <summary>A slanted edge through the middle of a pixel covers half of it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Half_Covered_Pixel_Reads_One_Half()
     {
         // A triangle whose hypotenuse runs corner to corner through pixel (5,5).
@@ -107,7 +107,7 @@ public class BorderAntialiasingTests
     /// miter takes three rows to cross a pixel and the coverages step 1/6, 1/2, 5/6 — which is what
     /// Chromium shades (measured 0.158, 0.503, 0.842 of the way between the two colours).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unequal_Miter_Steps_Three_Rows_Per_Pixel()
     {
         // Top 12px, left 4px: the miter runs (0,0) → (4,12).
@@ -125,7 +125,7 @@ public class BorderAntialiasingTests
     }
 
     /// <summary>Winding order is not part of the answer.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Coverage_Does_Not_Depend_On_Winding()
     {
         var top = TopTrapezoid();
@@ -140,7 +140,7 @@ public class BorderAntialiasingTests
     }
 
     /// <summary>Coverage over a whole side sums to its area, so nothing is gained or lost.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Coverage_Sums_To_The_Trapezoids_Area()
     {
         var top = TopTrapezoid(width: 40, top: 8, left: 8, right: 8);
@@ -153,7 +153,7 @@ public class BorderAntialiasingTests
         Assert.Equal(256f, total, 1);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Degenerate_Polygon_Covers_Nothing()
     {
         Assert.Equal(0f, BorderAntialiasing.Coverage(null!, 0, 0));
@@ -162,7 +162,7 @@ public class BorderAntialiasingTests
 
     // ── The lever ────────────────────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Anti_Aliasing_Is_Off_Unless_Pinned()
     {
         Assert.False(BorderAntialiasing.Active);

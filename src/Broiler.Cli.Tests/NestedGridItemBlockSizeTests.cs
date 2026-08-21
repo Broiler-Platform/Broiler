@@ -47,7 +47,7 @@ public sealed class NestedGridItemBlockSizeTests
         "<img id=\"img\" src=\"support/colors-8x16.png\" "
         + "data-offset-x=\"0\" data-offset-y=\"0\" data-expected-width=\"0\" data-expected-height=\"0\">";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ImgWithDefiniteBlockSize_NestedInGrid_KeepsHeight_LikeBlockFlow()
     {
         // Reference: the same image directly in a plain (block) list item.

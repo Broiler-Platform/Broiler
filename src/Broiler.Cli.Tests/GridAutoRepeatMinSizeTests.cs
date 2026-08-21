@@ -65,7 +65,7 @@ public sealed class GridAutoRepeatMinSizeTests
         new("g12", "grid border borderBox", "width:max-content;height:max-content;", 320, 220, 200, 150),
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ShrinkToFitAutoFillGrid_HonoursMinSizeAndIntrinsicWidthKeywords()
     {
         var body = new System.Text.StringBuilder();

@@ -36,7 +36,7 @@ public sealed class FieldsetLegendRenderTests : IDisposable
 
     // The rendered legend's margin box is centred on the block-start border, so a legend taller
     // than that border stands above the fieldset's border box rather than sitting inside it.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Rendered_Legend_Stands_On_The_Fieldsets_Block_Start_Border()
     {
         using var rendered = Render(
@@ -58,7 +58,7 @@ public sealed class FieldsetLegendRenderTests : IDisposable
     }
 
     // A second legend is an ordinary block and stays in the content — HTML names only the first.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Only_The_First_Legend_Is_The_Rendered_One()
     {
         using var rendered = Render(
@@ -74,7 +74,7 @@ public sealed class FieldsetLegendRenderTests : IDisposable
 
     // An inline legend is not a rendered legend, and nothing moves for it. That is what keeps the
     // placement inert while the user-agent patches wait.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Inline_Legend_Is_Left_Where_The_Flow_Put_It()
     {
         using var rendered = Render(
@@ -93,7 +93,7 @@ public sealed class FieldsetLegendRenderTests : IDisposable
     // CSS Sizing 4 §5.1: a preferred aspect ratio does not make a box shorter than its own content,
     // because `min-height: auto` resolves to the content-based minimum — and `max-height` caps that
     // minimum in turn. `css-sizing/aspect-ratio/fieldset-element-001` and `-002` are the pair.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Aspect_Ratio_Does_Not_Size_A_Box_Below_Its_Content()
     {
         using var rendered = Render(
@@ -104,7 +104,7 @@ public sealed class FieldsetLegendRenderTests : IDisposable
         Assert.True(IsGreen(rendered, 100, 50), "the content-based minimum keeps the box open");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Maximum_Block_Size_Caps_That_Minimum()
     {
         using var rendered = Render(

@@ -43,7 +43,7 @@ public class StyleAdoptedSheetsTests : IDisposable
     private static bool IsBlue(BColor c) => c.B > 200 && c.R < 80 && c.G < 80;
     private static bool IsWhite(BColor c) => c.R > 200 && c.G > 200 && c.B > 200;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertRule_AdoptedViaPush_Applies()
     {
         var color = RenderCenterPixel(
@@ -55,7 +55,7 @@ public class StyleAdoptedSheetsTests : IDisposable
         Assert.True(IsRed(color), $"adopted constructed sheet (insertRule + push) should apply red; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReplaceSync_AdoptedByAssignment_Applies()
     {
         var color = RenderCenterPixel(
@@ -67,7 +67,7 @@ public class StyleAdoptedSheetsTests : IDisposable
         Assert.True(IsRed(color), $"replaceSync + adoptedStyleSheets assignment should apply red; got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AdoptedSheet_AppliesAfterAuthorStyles()
     {
         // Adopted sheets come after the document's own stylesheets in cascade order, so the
@@ -81,7 +81,7 @@ public class StyleAdoptedSheetsTests : IDisposable
         Assert.True(IsRed(color), $"adopted sheet should cascade after author styles (red over blue); got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DisabledAdoptedSheet_DoesNotApply()
     {
         // A disabled adopted sheet contributes nothing, so the author blue shows.
@@ -95,7 +95,7 @@ public class StyleAdoptedSheetsTests : IDisposable
         Assert.True(IsBlue(color), $"a disabled adopted sheet must not apply (blue author style wins); got {color.R},{color.G},{color.B}.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NoAdoptedSheets_LeavesRenderingUnchanged()
     {
         // Never touching adoptedStyleSheets must be a no-op — the transform only runs when a

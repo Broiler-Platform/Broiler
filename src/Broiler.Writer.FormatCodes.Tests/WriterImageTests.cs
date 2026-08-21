@@ -20,7 +20,7 @@ public sealed class WriterImageTests
         0x00,
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Inserts_A_Picture_As_One_Character_At_Its_Pixel_Size()
     {
         using WriterApp app = CreateApp();
@@ -48,7 +48,7 @@ public sealed class WriterImageTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Refuses_A_File_That_Is_Not_An_Image()
     {
         using WriterApp app = CreateApp();
@@ -65,7 +65,7 @@ public sealed class WriterImageTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Round_Trips_An_Inserted_Picture_Through_Docx()
     {
         using WriterApp app = CreateApp();
@@ -94,7 +94,7 @@ public sealed class WriterImageTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Scales_A_Wide_Picture_Down_And_Keeps_Its_Aspect_Ratio()
     {
         // 2000x1000 in the IHDR; the Writer caps an inserted picture's width.
@@ -108,7 +108,7 @@ public sealed class WriterImageTests
         Assert.Equal(210, size.Height);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Reads_The_Pixel_Size_Of_A_Gif_And_A_Bmp()
     {
         byte[] gif = [.."GIF89a"u8, 0x0A, 0x00, 0x05, 0x00];

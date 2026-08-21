@@ -6,7 +6,7 @@ namespace Broiler.UI.Tests;
 
 public sealed class UiSessionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AddRoot_Attaches_Tree_And_Rejects_Duplicate_Parents_And_Cycles()
     {
         using UiSession session = CreateSession(out _);
@@ -27,7 +27,7 @@ public sealed class UiSessionTests
         Assert.Throws<InvalidOperationException>(() => child.AddChild(root));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fake_Element_Can_Attach_Layout_Render_Receive_Input_And_Dispose_Deterministically()
     {
         using UiSession session = CreateSession(out RecordingUiHost host);
@@ -58,7 +58,7 @@ public sealed class UiSessionTests
         Assert.True(child.IsDisposed);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Invalidation_Reaches_Host_And_Is_Cleared_After_Render()
     {
         using UiSession session = CreateSession(out RecordingUiHost host);
@@ -75,7 +75,7 @@ public sealed class UiSessionTests
         Assert.Empty(session.Invalidations);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Factory_Set_Rejects_Duplicate_Contracts()
     {
         Assert.Throws<InvalidOperationException>(() =>

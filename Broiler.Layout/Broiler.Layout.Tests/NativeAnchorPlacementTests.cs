@@ -27,7 +27,7 @@ public sealed class NativeAnchorPlacementTests
         return b;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BuildAnchorRegistry_CollectsNamedAnchorsWithBorderBox()
     {
         var root = Box(null, new PointF(0, 0), new SizeF(300, 300));
@@ -58,7 +58,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(expected, CssBox.ResolveInset(value, basis));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_RepositionsPositionAreaBox_AgainstAnchor_WhenFlagOn()
     {
         // Containing block = a relative wrapper at the origin, 200×200.
@@ -99,7 +99,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_FillsCell_WhenAutoWidthChildlessBox()
     {
         var (root, cb) = FillCellFixture(out var target);
@@ -119,7 +119,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(140, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_ResolvesPercentSize_AgainstCell()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -136,7 +136,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(70, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_AddsPaddingAndBorder_ToContentSize_ForBorderBox()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -156,7 +156,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(20, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_KeepsLaidOutSize_WhenBoxHasChildren()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -176,7 +176,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_BorderBox_TreatsResolvedSizeAsBorderBox()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -198,7 +198,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(50, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_BorderBox_FillsCell_AsBorderBox()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -218,7 +218,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(140, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_PercentMargin_StretchesMarginBoxToImcb()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -239,7 +239,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal("14px", target.MarginLeft);    // resolved px written back
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_PercentPadding_ResolvedAgainstCell_FillsImcb()
     {
         var (root, _) = FillCellFixture(out var target);
@@ -260,7 +260,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal("14px", target.PaddingRight);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_PercentBoxProps_ResolveAgainstCellHeight_ForVerticalContainingBlock()
     {
         // A non-square cell in a vertical-writing-mode CB: percentage margins/padding must
@@ -294,7 +294,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal("4px", target.MarginLeft);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_SharedAnchorName_BindsWithinOwnContainingBlockScope()
     {
         // Two sibling relative containers each declare anchor-name --a and hold a
@@ -368,7 +368,7 @@ public sealed class NativeAnchorPlacementTests
         finally { NativeAnchorPlacement.Enabled = false; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_LeftTop_PlacesMarginEdgeAtAnchorEdges()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -381,7 +381,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_RightBottom_PlacesFarMarginEdgeAtAnchorEdges()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -394,7 +394,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(10, target.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_MixedAnchorAndPlainLength_ResolvesEach()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -405,7 +405,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(15, target.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_ImplicitAnchor_UsesPositionAnchor()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -417,7 +417,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(60, target.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_UnregisteredAnchor_LeavesBoxPut()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -433,7 +433,7 @@ public sealed class NativeAnchorPlacementTests
     // opposing-inset sizing (P5.8d.2b)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_OpposingLeftRight_SizesBoxBetweenInsets()
     {
         var (root, _) = AnchorInsetFixture(out var target);  // anchor --a: left 40, right 60
@@ -445,7 +445,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(20, target.Size.Width, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_OpposingTopBottom_SizesBoxBetweenInsets()
     {
         var (root, _) = AnchorInsetFixture(out var target);  // anchor --a: top 40, bottom 60
@@ -456,7 +456,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(20, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_OpposingWithMargins_ShrinksBorderBox()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -470,7 +470,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(12, target.Size.Width, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_OpposingButExplicitWidth_KeepsWidth()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -482,7 +482,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Width, 3);  // size kept
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorInset_OpposingButChildful_KeepsSize()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -497,7 +497,7 @@ public sealed class NativeAnchorPlacementTests
     // anchor-size() sizing (P5.8d.2b anchor-size() expansion)
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_WidthAndHeight_SizeBoxToAnchorDimensions()
     {
         var (root, _) = AnchorInsetFixture(out var target);  // anchor --a is 20×20
@@ -508,7 +508,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(20, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_OnlyWidth_KeepsLaidOutHeight()
     {
         var (root, _) = AnchorInsetFixture(out var target);  // laid-out 30×30
@@ -518,7 +518,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Height, 3);  // height untouched
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_ContentBox_AddsPaddingAndBorder()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -529,7 +529,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Width, 3);   // 20 + 5 + 5 border box
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_BorderBox_UsesResolvedAsBorderBox()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -541,7 +541,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(20, target.Size.Width, 3);   // border box = resolved 20 (padding not added)
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_ImplicitAnchor_UsesPositionAnchor()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -551,7 +551,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(20, target.Size.Width, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorSize_ChildfulBox_KeepsLaidOutSize()
     {
         var (root, _) = AnchorInsetFixture(out var target);
@@ -567,7 +567,7 @@ public sealed class NativeAnchorPlacementTests
     // anchor and positions against it resolves both natively in one post-pass.
     // ------------------------------------------------------------------
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Combined_AnchorSizeThenLeftTopInset_SizesThenPlaces()
     {
         var (root, _) = AnchorInsetFixture(out var target); // anchor --a 20×20 at (40,40)
@@ -582,7 +582,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(60, target.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Combined_AnchorSizeThenRightBottomInset_PlacesFarEdgeUsingResolvedSize()
     {
         var (root, _) = AnchorInsetFixture(out var target); // anchor --a 20×20 at (40,40)
@@ -629,7 +629,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(pct, p);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_LeavesBoxUnmoved_WhenAnchorNotRegistered()
     {
         var root = Box(null, new PointF(0, 0), new SizeF(1000, 1000));
@@ -713,7 +713,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(140, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pass_PlainStaticCb_ClimbsToRoot_NotRecognizedAsContainingBlock()
     {
         // Control: a plain static block (no transform, no containment) does NOT establish an
@@ -810,7 +810,7 @@ public sealed class NativeAnchorPlacementTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_BaseOverflows_AppliesFirstFittingFallback()
     {
         var (root, _) = PositionTryFixture(out var target);
@@ -832,7 +832,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_BaseFits_NoFallbackApplied()
     {
         var (root, _) = PositionTryFixture(out var target);
@@ -850,7 +850,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(70, target.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_NoRules_LeavesBaseInPlace()
     {
         var (root, _) = PositionTryFixture(out var target);
@@ -862,7 +862,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(90, target.Location.Y, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_InsetAuto_ResetsBaseInsetsNotSetByFallback()
     {
         var (root, _) = PositionTryFixture(out var target);
@@ -879,7 +879,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(0, target.Location.Y, 3);  // top reset to auto → 0, not 10
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_PicksFirstFittingFallback_SkippingOverflowing()
     {
         var (root, _) = PositionTryFixture(out var target);
@@ -917,7 +917,7 @@ public sealed class NativeAnchorPlacementTests
         return (root, target);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_OpposingInsetAutoBase_Overflows_AppliesFallback()
     {
         // Anchor at (10,75) → right 30, bottom 95. Base: opposing-inset width 65 at x=30; top at
@@ -935,7 +935,7 @@ public sealed class NativeAnchorPlacementTests
         Assert.Equal(30, target.Size.Height, 3);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PositionTry_OpposingInsetAutoBase_Fits_NoFallbackApplied()
     {
         // Anchor at (10,20) → bottom 40. Base top at the anchor bottom (40), height 30 → y 40..70

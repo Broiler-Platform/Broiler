@@ -14,7 +14,7 @@ namespace Broiler.Browser.Core.Tests;
 /// </remarks>
 public class BrowserPageClientUserAgentTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Page_Client_Sends_A_User_Agent()
     {
         using var client = BrowserApp.CreatePageHttpClient();

@@ -19,7 +19,7 @@ public sealed class AnchorPropertyProjectionTests
 
     private static CssBox NewBox() => new(null, null, BaseUrl);
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InitialValues_AreTheAnchorDefaults()
     {
         var box = NewBox();
@@ -43,7 +43,7 @@ public sealed class AnchorPropertyProjectionTests
         Assert.Equal(value, CssUtils.GetPropertyValue(box, property));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetPropertyValue_PopulatesEachNamedField()
     {
         var box = NewBox();

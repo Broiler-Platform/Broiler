@@ -18,7 +18,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class FetchBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Fetch_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(FetchBinding);
@@ -28,7 +28,7 @@ public sealed class FetchBindingModuleTests
         Assert.False(typeof(IFetchHost).IsPublic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DomBridge_Consumes_Fetch_Through_The_Host_Contract()
     {
         Assert.True(typeof(IFetchHost).IsAssignableFrom(typeof(DomBridge)));
@@ -37,7 +37,7 @@ public sealed class FetchBindingModuleTests
             static field => field.FieldType == typeof(FetchBinding));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FetchBinding_Loads_Through_The_Injected_ResourceLoader()
     {
         // Networking host I/O is the ResourceLoader seam, not an ad-hoc HttpClient in the module.
@@ -46,7 +46,7 @@ public sealed class FetchBindingModuleTests
             static field => field.FieldType == typeof(ResourceLoader));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Response_Constructor_And_Json_Factory_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body></body></html>";
@@ -66,7 +66,7 @@ public sealed class FetchBindingModuleTests
         Assert.Equal("201|Created|application/json", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Headers_And_FormData_Objects_Through_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body></body></html>";
@@ -89,7 +89,7 @@ public sealed class FetchBindingModuleTests
         Assert.Equal("a, b|2|1", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void XMLHttpRequest_Polyfill_Is_Installed_By_The_Module()
     {
         const string html = "<!DOCTYPE html><html><body></body></html>";
@@ -102,7 +102,7 @@ public sealed class FetchBindingModuleTests
         Assert.Equal("function|0", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Relocated_MessageChannel_And_GetComputedStyle_Still_Install()
     {
         const string html = "<!DOCTYPE html><html><body></body></html>";

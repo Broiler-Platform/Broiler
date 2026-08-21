@@ -10,7 +10,7 @@ namespace Broiler.UI.Standard.Tests;
 
 public sealed class ScrollViewControlTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_ScrollView_Reserves_Content_Bounds_For_Auto_Scrollbars()
     {
         var scrollView = new StandardScrollView
@@ -35,7 +35,7 @@ public sealed class ScrollViewControlTests
         Assert.Equal(new BRect(-25, -40, 140, 180), content.Bounds);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_ScrollView_Renders_Tracks_Thumbs_And_Corner()
     {
         var scrollView = new StandardScrollView
@@ -53,7 +53,7 @@ public sealed class ScrollViewControlTests
         Assert.Contains(renderList.Commands.OfType<BRenderCommand.FillRect>(), command => command.Rect == new BRect(90, 90, 10, 10) && command.Color == scrollView.ScrollbarTrack);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_ScrollView_Dragging_Vertical_Thumb_Updates_Offset_And_Captures_Input()
     {
         var scrollView = new StandardScrollView
@@ -77,7 +77,7 @@ public sealed class ScrollViewControlTests
         Assert.Null(session.CapturedElement);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_ScrollView_Clicking_Vertical_Track_Pages_Content()
     {
         var scrollView = new StandardScrollView
@@ -94,7 +94,7 @@ public sealed class ScrollViewControlTests
         Assert.Equal(85, scrollView.VerticalOffset);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_ScrollView_HitTesting_Routes_Scrollbar_Track_Ahead_Of_Overflowing_Content()
     {
         var scrollView = new StandardScrollView
@@ -113,7 +113,7 @@ public sealed class ScrollViewControlTests
         Assert.Equal(76.5, scrollView.VerticalOffset);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Standard_ScrollView_Pans_Content_From_A_Touch_Drag()
     {
         var scrollView = new StandardScrollView
@@ -130,7 +130,7 @@ public sealed class ScrollViewControlTests
         Assert.True(scrollView.DispatchInput(Touch(50, 30, 3, TouchContactState.Released)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Touch_Scroll_Cancels_The_Pointer_Fallback_Without_Clicking_A_Child_Button()
     {
         var scrollView = new StandardScrollView

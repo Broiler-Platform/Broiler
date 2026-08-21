@@ -43,7 +43,7 @@ public sealed class ElementGetElementsByClassNameTests
     private static string Eval(JSContext context, string expression) => context.Eval(expression).ToString();
 
     /// <summary>The One-Google-bar lookup, run as the bundle spells it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementGetElementsByClassName_ScopesTheLookup_TheWayTheOneGoogleBarDoes()
     {
         var (context, bridge) = Attach();
@@ -63,7 +63,7 @@ public sealed class ElementGetElementsByClassNameTests
     /// Descendants only, in document order — the element itself carries the class and must not be in
     /// its own result, and an element outside the subtree is out of scope.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ElementGetElementsByClassName_ReturnsDescendantsInDocumentOrder()
     {
         var (context, bridge) = Attach();
@@ -114,7 +114,7 @@ public sealed class ElementGetElementsByClassNameTests
     /// outside all carry the class). Rooting at <c>#root</c> is what narrows it, and that is the
     /// difference the element half exists to express.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DocumentAndElementHalvesAgree()
     {
         var (context, bridge) = Attach();
@@ -187,7 +187,7 @@ public sealed class ElementGetElementsByClassNameTests
     }
 
     /// <summary>It is a function on every element wrapper, not only on the one the page happened to ask.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryElementCarriesTheMethod()
     {
         var (context, bridge) = Attach();

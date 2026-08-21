@@ -5,7 +5,7 @@ namespace Broiler.Cli.Tests;
 
 public class SelectorsLevel4SpecificityTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Is_Uses_MostSpecific_Argument()
     {
         var html = """
@@ -29,7 +29,7 @@ document.getElementById('result').textContent =
         Assert.Contains(">2<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Where_Has_Zero_Specificity()
     {
         var html = """
@@ -53,7 +53,7 @@ document.getElementById('result').textContent =
         Assert.Contains(">1<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Has_Uses_Argument_Specificity()
     {
         var html = """
@@ -77,7 +77,7 @@ document.getElementById('result').textContent =
         Assert.Contains(">2<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_NthChild_OfSelector_Adds_Filter_Specificity()
     {
         var html = """
@@ -104,7 +104,7 @@ document.getElementById('result').textContent =
         Assert.Contains(">2<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssParser_DoesNotSplit_Commas_Inside_Is()
     {
         // Was a characterization test over the obsolete DomBridge.CssRules tuple

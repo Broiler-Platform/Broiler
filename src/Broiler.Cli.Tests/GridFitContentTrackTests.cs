@@ -23,7 +23,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class GridFitContentTrackTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FitContentAndIntrinsicTracks_SizeToItemContentContributions()
     {
         const string style =

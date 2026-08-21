@@ -27,7 +27,7 @@ public class CascadeInvalidationSetTests
         return CascadeInvalidationSet.Build(sheets);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attribute_no_selector_mentions_does_not_affect_style()
     {
         var set = Set(".a{color:red}div p{margin:0}");
@@ -36,7 +36,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.AffectsStyle("data-probe", null, "1"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attribute_a_selector_filters_on_does()
     {
         var set = Set("[data-k=\"3\"]{color:red}");
@@ -48,7 +48,7 @@ public class CascadeInvalidationSetTests
         Assert.True(set.AffectsStyle("data-k", "8", "9"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attribute_only_a_declaration_reads_does()
     {
         // attr() is the case with no selector to find: nothing in this sheet mentions data-label as
@@ -59,7 +59,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.AffectsStyle("data-other", null, "x"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attr_with_a_type_argument_is_read_the_same_way()
     {
         var set = Set("img{width:attr(data-w type(<length>), 100px)}");
@@ -85,7 +85,7 @@ public class CascadeInvalidationSetTests
         Assert.True(set.AffectsStyle("class", "", "target"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_class_write_is_answered_by_the_tokens_that_changed()
     {
         var set = Set(".styled{color:red}");
@@ -103,7 +103,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.AffectsStyle("class", "styled a", "a styled"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attribute_selector_on_class_defeats_the_token_test()
     {
         // `[class*="btn"]` cannot be answered token by token, so filing the *name* has to
@@ -113,7 +113,7 @@ public class CascadeInvalidationSetTests
         Assert.True(set.AffectsStyle("class", "", "btn-primary"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_id_write_is_answered_by_the_value()
     {
         var set = Set("#main{color:red}");
@@ -123,7 +123,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.AffectsStyle("id", "other", "another"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Case_is_ignored_which_over_approximates_in_the_safe_direction()
     {
         var set = Set(".Row{color:red}[Data-K]{color:blue}");
@@ -164,7 +164,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.IsConservative);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_attr_whose_argument_cannot_be_read_does_too()
     {
         var set = Set("p::before{content:attr()}");
@@ -172,7 +172,7 @@ public class CascadeInvalidationSetTests
         Assert.True(set.IsConservative);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Quoted_text_files_nothing()
     {
         // The scan is flat, so a '.' or a '#' inside a string is the way it could file a class or an
@@ -186,7 +186,7 @@ public class CascadeInvalidationSetTests
         Assert.True(set.AffectsStyle("title", null, "x"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void No_sheets_offered_is_not_no_sheets_exist()
     {
         Assert.True(CascadeInvalidationSet.Build(null).IsConservative);
@@ -195,7 +195,7 @@ public class CascadeInvalidationSetTests
         Assert.True(CascadeInvalidationSet.Everything.AffectsStyle("data-probe", null, "1"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_empty_sheet_is_scannable_and_names_nothing()
     {
         var set = Set(string.Empty);
@@ -205,7 +205,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.AffectsStyle("class", "", "anything"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_sheet_in_the_set_is_scanned()
     {
         // The user-agent sheet and the author sheet are separate objects in the container, and a
@@ -217,7 +217,7 @@ public class CascadeInvalidationSetTests
         Assert.False(set.AffectsStyle("data-probe", null, "1"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_missing_attribute_name_is_never_elidable()
     {
         var set = Set(".a{color:red}");

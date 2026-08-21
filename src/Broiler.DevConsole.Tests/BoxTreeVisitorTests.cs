@@ -4,7 +4,7 @@ namespace Broiler.DevConsole.Tests;
 
 public class BoxTreeVisitorTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Walk_Visits_All_Boxes()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
@@ -23,7 +23,7 @@ public class BoxTreeVisitorTests
         Assert.Equal((child2, 1), visited[3]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Walk_Skips_Subtree_When_Visitor_Returns_False()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
@@ -42,7 +42,7 @@ public class BoxTreeVisitorTests
         Assert.Equal((child2, 1), visited[2]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Flatten_Returns_All_Boxes_Depth_First()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));
@@ -59,7 +59,7 @@ public class BoxTreeVisitorTests
         Assert.Same(child2, flat[3]);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Flatten_Single_Box_Returns_One()
     {
         var root = new CssBox(null, new HtmlTag("div", false), new Uri("/"));

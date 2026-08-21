@@ -17,7 +17,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class NodeConstructionRoundTripTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Creation_And_Insertion_Round_Trip()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"host\"></div></body></html>";
@@ -41,7 +41,7 @@ public sealed class NodeConstructionRoundTripTests
         Assert.Equal("hi|true|1", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CloneNode_Comment_And_Fragment_Construction_Round_Trip()
     {
         const string html = "<!DOCTYPE html><html><body><ul id=\"list\"><li class=\"row\">a</li></ul></body></html>";
@@ -77,7 +77,7 @@ public sealed class NodeConstructionRoundTripTests
         Assert.Equal("a,b,c|4|8", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InnerHtml_Parse_Replace_Round_Trip()
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"box\"></div></body></html>";

@@ -62,14 +62,14 @@ public class ListItemMarkerRenderTests : IDisposable
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ListItem_PaintsMarkerInGutter()
     {
         Assert.True(RenderGutterInk(MarkerHtml) > 0,
             "no marker ink painted in the gutter for a display:list-item element.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ListStyleNone_PaintsNoMarker()
     {
         Assert.True(RenderGutterInk(NoMarkerHtml) == 0,

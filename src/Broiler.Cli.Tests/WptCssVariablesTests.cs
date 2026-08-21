@@ -2,7 +2,7 @@ namespace Broiler.Cli.Tests;
 
 public class WptCssVariablesTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VariableSubstitution_Shorthands_Resolve_From_Same_Block()
     {
         var html = @"<!DOCTYPE html>
@@ -39,7 +39,7 @@ document.getElementById('result').textContent =
         Assert.Contains("MARGIN=3px|5px|7px|11px", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VariableSubstitution_FirstLine_PseudoElement_ComputedStyle_Resolves()
     {
         var html = @"<!DOCTYPE html>
@@ -92,7 +92,7 @@ document.getElementById('result').textContent = r.join(';');
         Assert.Contains("div4=rgb(0, 0, 0)|16px|normal|static", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VariableSubstitution_FirstLetter_PseudoElement_ComputedStyle_Resolves()
     {
         var html = @"<!DOCTYPE html>
@@ -145,7 +145,7 @@ document.getElementById('result').textContent = r.join(';');
         Assert.Contains("div4=rgb(0, 0, 0)|16px|normal|static", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VariableSubstitution_MissingClosingNestedFallback_ComputedStyle_Resolves()
     {
         var html = @"<!DOCTYPE html>
@@ -176,7 +176,7 @@ document.getElementById('result').textContent =
         Assert.Contains("PASS", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VariableSubstitution_CssWideKeywords_On_CustomProperties_Resolve()
     {
         var html = @"<!DOCTYPE html>
@@ -257,7 +257,7 @@ document.getElementById('result').textContent = checks.every(Boolean) ? 'PASS' :
         Assert.Contains("PASS", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void VariableSubstitution_CssWideKeywords_After_Nested_Var_Substitution_Resolve()
     {
         var html = @"<!DOCTYPE html>

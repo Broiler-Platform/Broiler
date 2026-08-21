@@ -15,7 +15,7 @@ public sealed class AnchorRegistryTests
     private static AnchorRegistry WithAnchor(string name = "--a") =>
         new AnchorRegistry().Also(r => r.Register(name, new AnchorRect(40, 50, 80, 40)));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RegisterAndLookup()
     {
         var r = new AnchorRegistry();
@@ -27,7 +27,7 @@ public sealed class AnchorRegistryTests
         Assert.False(r.TryGet("--b", out _));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Register_LastWins_AndNamesAreCaseSensitive()
     {
         var r = new AnchorRegistry();
@@ -39,7 +39,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(new AnchorRect(9, 9, 9, 9), a);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnchorRect_ExposesRightAndBottom()
     {
         var rect = new AnchorRect(40, 50, 80, 40);
@@ -47,7 +47,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(90, rect.Bottom);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolvePositionAreaCell_MatchesPrimitive()
     {
         var r = WithAnchor();
@@ -57,7 +57,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(direct, viaRegistry);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveAnchorEdge_MatchesPrimitive()
     {
         var r = WithAnchor();
@@ -66,7 +66,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(direct, viaRegistry);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ResolveAnchorSize_MatchesPrimitive()
     {
         var r = WithAnchor();
@@ -74,7 +74,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(40, r.ResolveAnchorSize("--a", AnchorSizeDimension.Height));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScopedResolve_BindsToLastInScopeCandidate_ElseLastWins()
     {
         var scopeA = new object();
@@ -92,7 +92,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(20, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ScopedResolve_SingleCandidate_IgnoresScopePredicate()
     {
         var r = new AnchorRegistry();
@@ -102,7 +102,7 @@ public sealed class AnchorRegistryTests
         Assert.Equal(10, r.ResolveAnchorSize("--a", AnchorSizeDimension.Width, _ => false));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void UnknownAnchor_ReturnsNull()
     {
         var r = WithAnchor();

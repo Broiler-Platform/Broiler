@@ -30,7 +30,7 @@ public sealed class EffectiveZoomTests
         finally { NativeZoom.Enabled = prev; }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EffectiveZoom_Compounds_Down_The_Tree_When_Enabled()
     {
         var root = Box(null, "normal");
@@ -45,7 +45,7 @@ public sealed class EffectiveZoomTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EffectiveZoom_Is_One_Everywhere_When_Disabled()
     {
         var root = Box(null, "3");

@@ -24,7 +24,7 @@ public sealed class ScriptNameInStackTraceTests
     /// script, not the two before it that ran cleanly. The exception the host logs carries the
     /// trace, so this asserts what a report pasted out of a debugger or a log would actually show.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AThrowingScript_NamesItselfInTheTrace()
     {
         var logged = new List<Exception>();
@@ -63,7 +63,7 @@ public sealed class ScriptNameInStackTraceTests
     /// The label the trace carries is the one the profiler and the error log already used, so a
     /// report that quotes any of the three can be matched against the other two.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheTraceLabel_IsTheProfilingLabel()
     {
         var engine = new ScriptEngine { Profiler = new ScriptProfilingHook() };
@@ -90,7 +90,7 @@ public sealed class ScriptNameInStackTraceTests
     public void DeferredLabels_AreDocumentOrderWithinTheirBucket(int index, string expected) =>
         Assert.Equal(expected, ScriptLabel.Deferred(index));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModuleLabels_AreKeyedByModuleId() =>
         Assert.Equal("module-https://example.com/m.js", ScriptLabel.Module("https://example.com/m.js"));
 }

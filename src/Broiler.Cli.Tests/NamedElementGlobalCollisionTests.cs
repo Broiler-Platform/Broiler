@@ -19,7 +19,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class NamedElementGlobalCollisionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RegisterNamedElementGlobals_DoesNotThrow_WhenIdCollidesWithConst()
     {
         using var ctx = new JSContext();
@@ -37,7 +37,7 @@ public sealed class NamedElementGlobalCollisionTests
         Assert.Equal("42", ctx.Eval("String(img)").ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RegisterNamedElementGlobals_DoesNotThrow_WhenIdCollidesWithClass()
     {
         using var ctx = new JSContext();
@@ -50,7 +50,7 @@ public sealed class NamedElementGlobalCollisionTests
         Assert.Equal("function", ctx.Eval("typeof Widget").ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RegisterNamedElementGlobals_StillExposesUndeclaredIdAsGlobal()
     {
         using var ctx = new JSContext();

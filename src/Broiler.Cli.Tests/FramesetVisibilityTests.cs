@@ -25,7 +25,7 @@ public class FramesetVisibilityTests
     /// <c>visibility: hidden</c> on the frameset hides the frame content: the
     /// canvas stays white where the red frame would otherwise paint.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frameset_Visibility_Hidden_Suppresses_Frame_Content()
     {
         var html = $@"<!DOCTYPE html>
@@ -46,7 +46,7 @@ public class FramesetVisibilityTests
     /// content, proving the frame path is exercised and the guard is specific
     /// to the hidden case.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Frameset_Visible_Paints_Frame_Content()
     {
         var html = $@"<!DOCTYPE html>

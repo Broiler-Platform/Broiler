@@ -26,7 +26,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
 {
     private static readonly Uri BaseUrl = new("file:///quirk.html");
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Table_Takes_The_Bodys_Colour_Rather_Than_Its_Parents()
     {
         InQuirksMode(() =>
@@ -46,7 +46,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
 
     // The colour that is actually painted belongs to the cell, which inherited the table's before
     // the quirk moved it — so the new value has to be pushed down the subtree.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_New_Colour_Reaches_The_Cells_Inside_The_Table()
     {
         InQuirksMode(() =>
@@ -65,7 +65,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
     // The case the whole design is shaped around: the body element is the *document's*, so a table
     // that is not inside it — and here is laid out before it — still takes its colour. Reading the
     // body during the top-down cascade could not answer this, because body has not cascaded yet.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Table_Before_The_Body_In_Document_Order_Still_Takes_Its_Colour()
     {
         InQuirksMode(() =>
@@ -82,7 +82,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
 
     // With no body element the quirk resolves to the initial colour — NOT to the parent's, which
     // is what plain inheritance would have given and what makes this more than a redirect.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void With_No_Body_Element_A_Table_Takes_The_Initial_Colour()
     {
         InQuirksMode(() =>
@@ -97,7 +97,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Table_That_Declares_Its_Own_Colour_Keeps_It()
     {
         InQuirksMode(() =>
@@ -114,7 +114,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
 
     // A descendant that declared its own colour keeps it, and so does everything below it — the
     // push-down must stop at that branch rather than flatten the subtree.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Declared_Colour_Inside_The_Table_Survives_The_Push_Down()
     {
         InQuirksMode(() =>
@@ -134,7 +134,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
         });
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Nothing_Happens_In_Standards_Mode()
     {
         var previous = DocumentModeContext.CurrentQuirksMode;
@@ -158,7 +158,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Non_Table_Elements_Are_Untouched()
     {
         InQuirksMode(() =>
@@ -177,7 +177,7 @@ public sealed class TablesInheritColorFromBodyQuirkTests
 
     // The quirk resolves per table element, so a table nested inside another one takes the body's
     // colour directly rather than whatever the outer table settled on.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Nested_Table_Resolves_Against_The_Body_Too()
     {
         InQuirksMode(() =>

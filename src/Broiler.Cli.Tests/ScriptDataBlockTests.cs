@@ -70,7 +70,7 @@ public sealed class ScriptDataBlockTests
     /// Modules keep their own route: they stay out of the classic buckets (they always did) and are
     /// collected as module roots — the executable check must not drop them on the way.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ModuleScripts_AreStillCollectedAsRoots()
     {
         const string html = "<script type=\"module\">export const a = 1;</script>";
@@ -86,7 +86,7 @@ public sealed class ScriptDataBlockTests
     /// A data block's <c>src</c> is never fetched by the extraction walk, so the prefetcher must not
     /// request it either — otherwise the page makes a round trip a browser would not.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void DataBlockSources_AreNotPrefetched()
     {
         const string html =

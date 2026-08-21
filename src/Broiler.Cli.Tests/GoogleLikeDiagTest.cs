@@ -45,7 +45,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
     /// display:flex container should behave like display:block for layout.
     /// Its inline-block children should be properly contained.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FlexContainer_BehavesLikeBlock()
     {
         var html = @"<html><body style='margin:0'>
@@ -70,7 +70,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
     /// <summary>
     /// display:inline-flex should behave like display:inline-block for layout.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InlineFlexContainer_BehavesLikeInlineBlock()
     {
         var html = @"<html><body style='margin:0'>
@@ -92,7 +92,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
     /// Submit buttons should NOT have min-width:173px (that's for text inputs).
     /// They should shrink to fit their text content.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubmitButton_NoMinWidth173()
     {
         var html = @"<html><body style='margin:0'>
@@ -114,7 +114,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         Assert.True(width < 150, $"Submit 'OK' should be narrower than 173px (width={width})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_SubmitButtonsHaveText()
     {
         var html = @"<html><body style='margin:0'>
@@ -131,7 +131,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
         Assert.True(totalDark > 20, $"Submit button should have visible text (dark={totalDark})");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_SubmitButtonWithNoValue_ShowsDefault()
     {
         var html = @"<html><body style='margin:0'>
@@ -152,7 +152,7 @@ public class GoogleLikeDiagTest(ITestOutputHelper output)
     /// Regression: buttons inside display:flex container with text-align:center
     /// should have visible text and be sized to content (not full width).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GoogleLike_FlexCenteredButtons_NotFullWidth()
     {
         var html = @"<html><body style='margin:0'>
@@ -192,7 +192,7 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
     /// computed display value. This was the core bug from the Google Search
     /// screenshot where buttons rendered as full-width gray bars.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SubmitButtons_InFlexRow_DoNotStretchToContainerWidth()
     {
         var html = @"<html><body style='margin:0'>
@@ -227,7 +227,7 @@ input[type=""submit""] { background:#f8f9fa; border:1px solid #f8f9fa;
     /// <summary>
     /// display:grid container children should also use shrink-to-fit sizing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GridChild_SubmitButton_UsesContentSizing()
     {
         var html = @"<html><body style='margin:0'>

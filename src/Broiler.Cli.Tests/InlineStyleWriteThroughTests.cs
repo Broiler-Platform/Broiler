@@ -28,35 +28,35 @@ function mark(v) {{ document.getElementById('result').textContent = 'MARK=[' + (
         return CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CamelCase_Set_Reflects_Live_In_GetAttribute()
     {
         var result = Run("t.style.backgroundColor = 'blue'; mark(t.getAttribute('style'));");
         Assert.Contains("MARK=[color: red; background-color: blue]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SetProperty_Reflects_Live_In_GetAttribute()
     {
         var result = Run("t.style.setProperty('margin-top', '5px'); mark(t.getAttribute('style'));");
         Assert.Contains("margin-top: 5px]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CssText_Set_Reflects_Live_In_GetAttribute()
     {
         var result = Run("t.style.cssText = 'width: 10px'; mark(t.getAttribute('style'));");
         Assert.Contains("MARK=[width: 10px]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WholeStyle_Assign_Reflects_Live_In_GetAttribute()
     {
         var result = Run("t.style = 'height: 20px'; mark(t.getAttribute('style'));");
         Assert.Contains("MARK=[height: 20px]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RemoveProperty_Reflects_Live_In_GetAttribute()
     {
         // Removing the only property empties the declaration → getAttribute("style") is null/empty live.
@@ -64,14 +64,14 @@ function mark(v) {{ document.getElementById('result').textContent = 'MARK=[' + (
         Assert.Contains("MARK=[]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Emptying_All_Properties_Removes_The_Style_Attribute_Live()
     {
         var result = Run("t.style.removeProperty('color'); mark(t.hasAttribute('style'));");
         Assert.Contains("MARK=[false]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unmutated_Element_Returns_Raw_Author_String_Live()
     {
         // No style mutation: getAttribute returns the exact author string (no normalization/seeding).
@@ -79,7 +79,7 @@ function mark(v) {{ document.getElementById('result').textContent = 'MARK=[' + (
         Assert.Contains("MARK=[color: red]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void GetComputedStyle_Observes_The_Same_State_After_Mutation()
     {
         var result = Run(
@@ -89,7 +89,7 @@ function mark(v) {{ document.getElementById('result').textContent = 'MARK=[' + (
         Assert.Contains("MARK=[rgb(1, 2, 3)]", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serialization_Reflects_Mutated_Inline_Style()
     {
         var result = Run("t.style.setProperty('padding', '3px'); mark('done');");

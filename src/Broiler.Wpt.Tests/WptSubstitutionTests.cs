@@ -31,7 +31,7 @@ public class WptSubstitutionTests : IDisposable
     public void IsSubstitutionFile_Follows_The_Naming_Rule(string path, bool expected) =>
         Assert.Equal(expected, WptSubstitution.IsSubstitutionFile(path));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void IsSubstitutionFile_Tolerates_Empty_Input()
     {
         Assert.False(WptSubstitution.IsSubstitutionFile(null));
@@ -40,7 +40,7 @@ public class WptSubstitutionTests : IDisposable
 
     // ── The fields a file on disk can answer ─────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Host_And_Alternate_Host_Are_WPTs_Defaults()
     {
         Assert.Equal("web-platform.test", WptSubstitution.Apply("{{host}}"));
@@ -48,7 +48,7 @@ public class WptSubstitutionTests : IDisposable
         Assert.Equal("web-platform.test", WptSubstitution.Apply("{{hosts[][]}}"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Domains_Index_The_Primary_Hosts_Subdomains()
     {
         Assert.Equal("www.web-platform.test", WptSubstitution.Apply("{{domains[www]}}"));
@@ -58,20 +58,20 @@ public class WptSubstitutionTests : IDisposable
     }
 
     /// <summary>WPT closes its subdomain set under two-deep products (`_make_subdomains_product`).</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Two_Deep_Subdomain_Product_Resolves()
     {
         Assert.Equal("www.www1.web-platform.test", WptSubstitution.Apply("{{domains[www.www1]}}"));
     }
 
     /// <summary>Non-ASCII labels are IDNA-encoded, exactly as <c>_get_domains</c> encodes them.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Non_Ascii_Subdomain_Is_Idna_Encoded()
     {
         Assert.Equal("xn--lve-6lad.web-platform.test", WptSubstitution.Apply("{{domains[élève]}}"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Ports_Are_Indexed_Per_Protocol()
     {
         Assert.Equal("8000", WptSubstitution.Apply("{{ports[http][0]}}"));
@@ -79,11 +79,11 @@ public class WptSubstitutionTests : IDisposable
         Assert.Equal("8443", WptSubstitution.Apply("{{ports[https][0]}}"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Out_Of_Range_Port_Index_Is_Left_Alone() =>
         Assert.Equal("{{ports[http][9]}}", WptSubstitution.Apply("{{ports[http][9]}}"));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Location_Reports_The_Documents_Own_Url()
     {
         const string path = "/css/x/y.sub.html";
@@ -96,7 +96,7 @@ public class WptSubstitutionTests : IDisposable
     }
 
     /// <summary>Without a known path the document has no URL to report, so the field is left alone.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Location_Without_A_Path_Is_Left_Alone() =>
         Assert.Equal("{{location[host]}}", WptSubstitution.Apply("{{location[host]}}"));
 
@@ -122,17 +122,17 @@ public class WptSubstitutionTests : IDisposable
     /// <c>not_domains</c> names a host that is *meant* not to resolve. Substituting it would hand a
     /// load-failure test a working URL and turn it into a test of something else.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Not_Domains_Is_Left_Verbatim() =>
         Assert.Equal("{{not_domains[nonexistent]}}", WptSubstitution.Apply("{{not_domains[nonexistent]}}"));
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void An_Unknown_Field_Is_Left_Verbatim() =>
         Assert.Equal("{{nonsense[1]}}", WptSubstitution.Apply("{{nonsense[1]}}"));
 
     // ── Whole-document behaviour ─────────────────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Frame_Url_Is_Expanded_In_Place()
     {
         const string markup =
@@ -143,7 +143,7 @@ public class WptSubstitutionTests : IDisposable
             WptSubstitution.Apply(markup));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Content_Without_Placeholders_Is_Returned_Unchanged()
     {
         const string markup = "<!doctype html><p>nothing to expand</p>";
@@ -151,7 +151,7 @@ public class WptSubstitutionTests : IDisposable
     }
 
     /// <summary>Only a template is expanded; an ordinary document keeps any braces it contains.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReadDocument_Expands_Only_A_Substitution_File()
     {
         var template = Path.Combine(_root, "a.sub.html");
@@ -163,7 +163,7 @@ public class WptSubstitutionTests : IDisposable
         Assert.Equal("<p>{{host}}</p>", WptSubstitution.ReadDocument(plain, _root));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ReadDocument_Anchors_Location_At_The_Checkout()
     {
         var nested = Path.Combine(_root, "css", "x");
@@ -176,7 +176,7 @@ public class WptSubstitutionTests : IDisposable
 
     // ── The document root a path is reported against ─────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryRootRelativePath_Is_Relative_To_The_Checkout()
     {
         var path = Path.Combine(_root, "css", "x.sub.html");
@@ -187,7 +187,7 @@ public class WptSubstitutionTests : IDisposable
     /// The separator matters: a sibling directory whose name merely starts with the root's is
     /// outside it.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TryRootRelativePath_Rejects_A_Path_Outside_The_Checkout()
     {
         Assert.Null(WptSubstitution.TryRootRelativePath(_root + "-sibling/x.sub.html", _root));
@@ -196,7 +196,7 @@ public class WptSubstitutionTests : IDisposable
 
     // ── The hosts served from the checkout ───────────────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Served_Origin_Is_Stripped_To_Its_Path()
     {
         Assert.Equal("/css/a.html",
@@ -207,7 +207,7 @@ public class WptSubstitutionTests : IDisposable
             WptSubstitution.TryStripServedOrigin("https://www.web-platform.test:8443/css/a.html"));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Served_Origin_Keeps_Its_Query()
     {
         Assert.Equal("/css/a.html?pipe=trickle(d1)",
@@ -233,7 +233,7 @@ public class WptSubstitutionTests : IDisposable
     /// Every host the substitution can produce is a host the runner serves — otherwise a URL it
     /// wrote itself would be one it then refuses to resolve.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Substitutable_Host_Is_Served()
     {
         foreach (var placeholder in new[]
@@ -251,7 +251,7 @@ public class WptSubstitutionTests : IDisposable
     /// The runner's own resource loaders take the same view: a substituted absolute URL names the
     /// same file as the root-relative one it was built from.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void The_Resource_Resolver_Accepts_A_Served_Origin()
     {
         var dir = Path.Combine(_root, "images");

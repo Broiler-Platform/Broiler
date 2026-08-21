@@ -45,7 +45,7 @@ public sealed class NestedInsetAbsoluteSizingTests
 
     // A non-anchored (top only, bottom auto) absolute descendant must NOT be stretched by the fix —
     // it stays content-sized (0 height for an empty box), so the fix is scoped to top+bottom anchors.
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TopOnlyAbsolute_InInsetSizedContainingBlock_IsNotStretched()
     {
         const string html =

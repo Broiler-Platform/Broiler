@@ -57,7 +57,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
     /// compiled none of them. With it off, no worker exists and the loop compiles all of them
     /// exactly where it used to.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Source_Is_Compiled_By_A_Worker_When_The_Budget_Is_On()
     {
         var html = CompileHeavyDocument();
@@ -110,7 +110,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
     /// evaluation.
     /// </para>
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Compile_Stage_Scaling_Is_Reported()
     {
         const int pairs = 5;
@@ -153,7 +153,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
     /// stage measurement above is bounded by, and it is printed with its spread because on this
     /// host the spread is the point.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Serial_And_Overlapped_Wall_Clock_Are_Reported()
     {
         const int pairs = 5;
@@ -227,7 +227,7 @@ public sealed class ScriptCompileAheadOverlapTests : IDisposable
     /// published figure is bounded by what a document actually contains rather than by the
     /// fixture's ceiling.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Wall_Clock_On_A_Modestly_Scripted_Page_Is_Reported()
     {
         const int pairs = 5;

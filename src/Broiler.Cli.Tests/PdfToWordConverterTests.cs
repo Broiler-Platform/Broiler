@@ -4,7 +4,7 @@ namespace Broiler.Cli.Tests;
 
 public class PdfToWordConverterTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Program_Main_ConvertPdf_Creates_Default_Output_File()
     {
         var tempDirectory = CreateTempDirectory();
@@ -25,7 +25,7 @@ public class PdfToWordConverterTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Program_Main_ConvertPdf_Missing_File_Returns_Error()
     {
         var tempDirectory = CreateTempDirectory();
@@ -44,7 +44,7 @@ public class PdfToWordConverterTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task Program_Main_ConvertPdf_WithPreserveLayout_Creates_AltChunk_Output()
     {
         var tempDirectory = CreateTempDirectory();

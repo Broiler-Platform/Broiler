@@ -16,7 +16,7 @@ public sealed class DocumentsArchitectureTests
         "../Broiler.Documents.Model/Broiler.Documents.Model.csproj",
     ];
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Documents_Project_Targets_Net10_And_References_Only_The_Model()
     {
         XDocument project = XDocument.Load(DocumentsProjectPath());
@@ -26,7 +26,7 @@ public sealed class DocumentsArchitectureTests
         Assert.Equal(ExpectedReferences, ProjectReferences(project));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Documents_Project_Does_Not_Reference_Ui_Dom_Input_Or_Windows()
     {
         string[] references = ProjectReferences(XDocument.Load(DocumentsProjectPath()));
@@ -37,7 +37,7 @@ public sealed class DocumentsArchitectureTests
         Assert.DoesNotContain(references, r => r.Contains("Windows", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Catalog_Requires_Explicit_Codec_Registration()
     {
         // No parameterless constructor: codecs must be supplied by the caller.
@@ -46,7 +46,7 @@ public sealed class DocumentsArchitectureTests
             constructor => constructor.GetParameters().Length == 0);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Framework_Has_No_Module_Initializer()
     {
         MethodInfo[] initializers = typeof(DocumentCodec).Assembly

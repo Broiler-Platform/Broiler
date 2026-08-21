@@ -56,7 +56,7 @@ public class HitTestAndRafBudgetTimeoutTests : IDisposable
     /// over a fragmented multicol table — that was >300s and 4.4 GB against a 30s budget; it is
     /// 15s now. The walk opens one pass for the whole query instead.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task ElementFromPoint_OverManyElements_DoesNotLayOutOncePerElement()
     {
         var boxes = string.Concat(Enumerable.Range(0, 120).Select(i =>
@@ -97,7 +97,7 @@ public class HitTestAndRafBudgetTimeoutTests : IDisposable
     /// test is slow because every level also re-reads layout, which a reduced fixture does not
     /// reproduce. Counting frames pins the invariant directly and deterministically.
     /// </remarks>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NonConvergingRequestAnimationFrameLoop_StopsAtTheFrameBudget()
     {
         // The exit condition is never true, so the loop only ends when the stub refuses to

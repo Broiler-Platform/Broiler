@@ -66,7 +66,7 @@ public sealed class AtomicInlineContainingBlockTests
     /// non-replaced <c>display: inline</c> box is not a block container and establishes no
     /// containing block, so the walk still passes straight through it to the block above.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APlainInlineIsStillTransparentToTheWalk()
     {
         var (wrapper, child) = PageWithAWrapper(CssConstants.Inline);

@@ -22,7 +22,7 @@ public sealed class EvaluationTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task An_Untrusted_Workspace_Is_Never_Evaluated()
     {
         var evaluator = new DesignTimeEvaluator(FixtureRoot);
@@ -36,7 +36,7 @@ public sealed class EvaluationTests
         Assert.Equal(GraphUnavailableReason.WorkspaceNotTrusted, unavailable!.Reason);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Project_Outside_The_Workspace_Is_Refused()
     {
         var evaluator = new DesignTimeEvaluator(FixtureRoot) { Trust = WorkspaceTrust.Trusted };
@@ -48,7 +48,7 @@ public sealed class EvaluationTests
         Assert.Equal(GraphUnavailableReason.UnsupportedProject, unavailable!.Reason);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task A_Trusted_Evaluation_Produces_The_Graph_The_Service_Needs()
     {
         var evaluator = new DesignTimeEvaluator(FixtureRoot) { Trust = WorkspaceTrust.Trusted };
@@ -69,7 +69,7 @@ public sealed class EvaluationTests
         Assert.Equal("net10.0", graph.TargetFramework);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public async Task The_Evaluated_Graph_Drives_Real_Semantic_Diagnostics()
     {
         var evaluator = new DesignTimeEvaluator(FixtureRoot) { Trust = WorkspaceTrust.Trusted };
@@ -92,7 +92,7 @@ public sealed class EvaluationTests
         Assert.Contains(result.Diagnostics, d => d.Code == "CS7036");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Generated_Compile_Inputs_Are_Separated_From_The_Users_Files()
     {
         // Backslashes escaped, as MSBuild emits them on Windows. A worker on
@@ -127,7 +127,7 @@ public sealed class EvaluationTests
         Assert.Equal("enable", graph.NullableContext);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Cached_Source_Keeps_One_Graph_Per_Target_Framework()
     {
         var graphs = new CachedGraphSource();

@@ -15,7 +15,7 @@ public class CssImportantCascadeTests
     /// A low-specificity <c>!important</c> background-color must beat a
     /// higher-specificity normal declaration.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Important_Low_Specificity_Beats_Normal_High_Specificity()
     {
         var html = @"<!DOCTYPE html>
@@ -38,7 +38,7 @@ public class CssImportantCascadeTests
     /// When both declarations are <c>!important</c>, normal specificity
     /// ordering resumes: the higher-specificity rule wins.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Both_Important_Higher_Specificity_Wins()
     {
         var html = @"<!DOCTYPE html>
@@ -61,7 +61,7 @@ public class CssImportantCascadeTests
     /// <c>!important</c> on a shorthand property (border) must propagate
     /// to all longhand sub-properties.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Important_Shorthand_Propagates_To_Longhands()
     {
         // The universal rule sets blue borders; the p rule overrides with
@@ -90,7 +90,7 @@ p { border: 2px solid !important; }
     /// Without <c>!important</c>, higher specificity wins normally.
     /// This is a baseline sanity check.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Normal_Cascade_Higher_Specificity_Wins()
     {
         var html = @"<!DOCTYPE html>
@@ -113,7 +113,7 @@ p { border: 2px solid !important; }
     /// Acid3-style pattern: <c>* { border: 1px blue }</c> should be
     /// overridden by <c>!important</c> on a descendant-combinator rule.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Important_Border_Override_Pattern()
     {
         var html = @"<!DOCTYPE html>

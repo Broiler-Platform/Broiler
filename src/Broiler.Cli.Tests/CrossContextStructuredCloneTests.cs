@@ -68,7 +68,7 @@ public sealed class CrossContextStructuredCloneTests
     /// <summary>
     /// The core property: the receiver gets the <em>values</em>, and no object identity crosses.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Clone_into_another_context_copies_values_and_shares_no_identity()
     {
         using var sender = new JSContext();
@@ -94,7 +94,7 @@ public sealed class CrossContextStructuredCloneTests
     /// A clone that aliased the sender's graph would pass the value checks above and fail here.
     /// This is the assertion that makes the previous test mean something.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Mutating_the_sender_after_cloning_does_not_reach_the_receiver()
     {
         using var sender = new JSContext();
@@ -126,7 +126,7 @@ public sealed class CrossContextStructuredCloneTests
     /// clone, and that test would assert nothing — while the sharing itself would be a far worse
     /// finding than the one it was looking for.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Two_contexts_have_distinct_intrinsics()
     {
         using var a = new JSContext();
@@ -153,7 +153,7 @@ public sealed class CrossContextStructuredCloneTests
     /// A worker that received objects whose prototype chain pointed into the page's realm would leak
     /// the page's globals through <c>constructor</c>, which is the classic cross-realm escape.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Cloned_objects_belong_to_the_receiving_realm()
     {
         using var sender = new JSContext();
@@ -177,7 +177,7 @@ public sealed class CrossContextStructuredCloneTests
     /// the supported types survive and the unsupported ones are refused rather than silently
     /// aliased. A function crossing a realm boundary would be the worst possible leak.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Supported_types_survive_and_functions_are_refused()
     {
         using var sender = new JSContext();
@@ -196,7 +196,7 @@ public sealed class CrossContextStructuredCloneTests
     }
 
     /// <summary>Circular graphs must not hang or overflow when the clone crosses contexts.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Circular_graphs_clone_across_contexts()
     {
         using var sender = new JSContext();

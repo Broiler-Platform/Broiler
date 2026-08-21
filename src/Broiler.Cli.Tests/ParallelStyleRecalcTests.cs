@@ -102,7 +102,7 @@ public class ParallelStyleRecalcTests
     /// path whatever the budget, so a suite made only of small documents would compare the
     /// sequential render with itself and pass no matter what the warm pass did.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Every_Document_Is_Large_Enough_For_The_Warm_Pass_To_Run()
     {
         foreach ((string name, string html) in Documents)
@@ -122,7 +122,7 @@ public class ParallelStyleRecalcTests
     /// A budget of one is the code that shipped before this item, not a one-thread walk through the
     /// new one: <c>Warm</c> returns before collecting anything.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Budget_Of_One_Renders_Identically_To_The_Default_Budget()
     {
         var one = Render(Documents["many rules"], threads: 1);

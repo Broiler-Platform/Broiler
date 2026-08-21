@@ -41,7 +41,7 @@ public sealed class ImagePrefetchWorkerContractTests
     /// Every load runs on a thread that has established all three slots, and none of them runs on a
     /// thread that has only inherited the caller's.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void EveryPrefetchWorkerEstablishesTheAmbientState()
     {
         var established = new ConcurrentBag<AmbientRenderState.Slots>();
@@ -56,7 +56,7 @@ public sealed class ImagePrefetchWorkerContractTests
     /// last rendered. This is the failure the assertion exists to catch, so it is worth checking that
     /// the values are right and not merely that a record was written.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APrefetchWorkerSeesThisDocumentsViewportAndDocumentMode()
     {
         var quirks = DocumentModeContext.CurrentQuirksMode;
@@ -91,7 +91,7 @@ public sealed class ImagePrefetchWorkerContractTests
     /// A worker leaves the enforcement switch as it found it, so a pooled thread returning to the
     /// pool does not arm an assertion for whatever runs on it next.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APrefetchWorkerLeavesTheEnforcementSwitchAsItFoundIt()
     {
         var threads = new ConcurrentDictionary<int, byte>();
@@ -127,7 +127,7 @@ public sealed class ImagePrefetchWorkerContractTests
     /// A worker clears its record, so the next document's loads cannot be satisfied by state this
     /// document established.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void APrefetchWorkerClearsItsRecordOnTheWayOut()
     {
         RunAll(4, () => { });
@@ -143,7 +143,7 @@ public sealed class ImagePrefetchWorkerContractTests
     /// A budget of one runs the loads inline on the calling thread — the pre-change path — so it
     /// neither establishes nor arms anything.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ABudgetOfOneRunsInlineAndTouchesNoAmbientState()
     {
         var previous = ImagePrefetch.MaxDegreeOfParallelism;
@@ -179,7 +179,7 @@ public sealed class ImagePrefetchWorkerContractTests
     /// Every load runs exactly once, and the call does not return until all of them have. The join is
     /// what makes a replaced box's intrinsic size independent of scheduling.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RunAllRunsEveryLoadExactlyOnceAndJoins()
     {
         var counts = new int[16];

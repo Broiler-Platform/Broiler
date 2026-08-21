@@ -25,7 +25,7 @@ public class WptCompositingTests
     /// Must not throw.  The CSS3 background shorthand with 'local',
     /// 'content-box', 'space', and '/ size' tokens must be accepted.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bgblend_Root_Change_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -48,7 +48,7 @@ body { background-color: green; }
     /// discarded as invalid.  When the shorthand is accepted it resets
     /// background-color to transparent.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bgblend_Root_Change_CSS3_Background_Shorthand_Accepted()
     {
         var html = @"<!DOCTYPE html>
@@ -74,7 +74,7 @@ body { background-color: green; }
     /// like an unsupported value, so Broiler must fall back to
     /// <c>background-clip: border-box</c> for screenshot parity.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundClip_BorderArea_FallsBackToBorderBoxLikeChromium()
     {
         const string bluePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
@@ -113,7 +113,7 @@ body {{ margin: 0; background: white; }}
     /// Regression: wrapped inline-block rows must honor vertical margins so
     /// successive WPT background-clip boxes line up like Chromium.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundClip_BorderArea_InlineBlockRows_HonorVerticalMargins()
     {
         const string bluePixelPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYPj/HwADAgH/5ncLrgAAAABJRU5ErkJggg==";
@@ -159,7 +159,7 @@ body {{ margin: 8px; background: white; }}
     /// width/height before background painting so WPT background-clip boxes
     /// match Chromium's 300×150 border-box sizing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundClip_BorderArea_BorderBoxSizing_UsesSpecifiedBorderBoxDimensions()
     {
         var html = @"<!DOCTYPE html>
@@ -191,7 +191,7 @@ document.getElementById('result').textContent =
     /// Regression: Chromium paints the body's <c>background-clip:border-area</c>
     /// across the viewport, so Broiler must not leave the body interior white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundClip_BorderArea_OnBody_FillsViewportLikeChromium()
     {
         var html = @"<!DOCTYPE html>
@@ -227,7 +227,7 @@ There should be a 20px green border around the edge of the viewport.";
     /// A crash test with contain: layout, visibility: hidden, and background-image.
     /// Must not throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Contain_Hidden_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -251,7 +251,7 @@ Test
     /// A crash test with filter: sepia(1) and background-clip: text on all elements.
     /// Must not throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Filter_BackgroundClip_Text_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -271,7 +271,7 @@ Test
     /// extreme CSS values (position: sticky, very large box-shadow, Q unit,
     /// complex background shorthand). Must not throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bgblend_Root_Change_Exact_WPT_HTML_Does_Not_Crash()
     {
         // Exact CSS from the WPT file (scripts stripped — they add a MathML
@@ -296,7 +296,7 @@ Test
     /// including contain: layout, *:first-child selector, and object element.
     /// Must not throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Contain_Hidden_Exact_WPT_HTML_Does_Not_Crash()
     {
         var html = @"<style>
@@ -320,7 +320,7 @@ Test
     /// including filter: sepia(1), background-clip: text, and object element.
     /// Must not throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Filter_BackgroundClip_Text_Exact_WPT_HTML_Does_Not_Crash()
     {
         var html = @"<!doctype html>
@@ -342,7 +342,7 @@ Test
     /// A test with filter: invert(1) on the root element.
     /// The root background (#000) should be inverted to white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Filter_Invert_Canvas_Background()
     {
         var html = @"<!DOCTYPE html>
@@ -371,7 +371,7 @@ Test
     /// Per CSS spec, the canvas is painted as the root background (#BBB)
     /// at 50% opacity over white, yielding approximately rgb(221, 221, 221).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Opacity_Blends_With_White_Canvas()
     {
         var html = @"<!DOCTYPE html>
@@ -397,7 +397,7 @@ Test
     /// The root element has background: rgba(45, 45, 45, 0.5).
     /// Compositing over white: 45*0.5 + 255*0.5 = 150.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Transparency_Composites_Over_White()
     {
         var html = @"<!DOCTYPE html>
@@ -421,7 +421,7 @@ Test
     /// Reference: root with background: rgb(150, 150, 150).
     /// This verifies the reference renders the expected solid color.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Transparency_Ref_Is_Solid()
     {
         var html = @"<!DOCTYPE html>
@@ -445,7 +445,7 @@ Test
     /// with opacity: 0.5 and green background.  Now that non-root opacity is
     /// rendered via SaveLayer, verify the composited color.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Margin_Opacity_Ref_Renders_SemiTransparent()
     {
         var html = @"<!DOCTYPE html>
@@ -473,7 +473,7 @@ Test
     /// canvas and rendered at 50% opacity over white.
     /// Uses a base64-encoded data: URI SVG to avoid file-system dependencies.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Image_With_Opacity_Propagates_To_Canvas()
     {
         // 10x10 green SVG as base64 data URI.
@@ -509,7 +509,7 @@ body {{ margin: 0; }}
     /// the image should tile across the entire canvas (not just the
     /// element's box).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Image_Covers_Full_Canvas()
     {
         // 10x10 red SVG as base64 data URI.
@@ -540,7 +540,7 @@ body {{ margin: 0; }}
     /// Validates that the baseUrl parameter in HtmlRender.RenderToImage
     /// enables relative sub-resource (image) resolution.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RenderToImage_BaseUrl_Enables_Relative_Image_Resolution()
     {
         // Create a temporary SVG file to act as a relative resource.
@@ -586,7 +586,7 @@ body { margin: 0; }
     /// WPT: css/compositing/mix-blend-mode/mix-blend-mode-plus-lighter-basic.html
     /// Uses mix-blend-mode: plus-lighter with opacity. Must not crash.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_PlusLighter_Basic_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -619,7 +619,7 @@ body { margin: 0; }
     /// WPT: css/compositing/mix-blend-mode/mix-blend-mode-rotated-clip.html
     /// Uses mix-blend-mode: overlay with CSS transforms. Must not crash.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Rotated_Clip_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -644,7 +644,7 @@ body { margin: 0; }
     /// Uses mix-blend-mode: difference with parent border-radius.
     /// Verifies rendering produces content and a lightgray background.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Parent_With_BorderRadius_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -673,7 +673,7 @@ body { background: lightgray; }
     /// Uses mix-blend-mode: difference with negative margin.
     /// Verifies rendering produces content and a lightgray background.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Parent_With_Text_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -704,7 +704,7 @@ body { background: lightgray; }
     /// Uses mix-blend-mode: difference on an overflowing child.
     /// Verifies rendering produces content and a lightgray background.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Overflowing_Child_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -736,7 +736,7 @@ body { background: lightgray; }
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-rotated-clip-ref.html
     /// Simple green div — must render correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Rotated_Clip_Ref_Renders_Green()
     {
         var html = @"<!DOCTYPE html>
@@ -755,7 +755,7 @@ body { background: lightgray; }
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-parent-with-border-radius-ref.html
     /// Yellow square with green circle — verifies lightgray background and yellow parent.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Parent_With_BorderRadius_Ref_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -783,7 +783,7 @@ body { background: lightgray; }
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-parent-with-text-ref.html
     /// Yellow square with green text — verifies lightgray background and yellow container.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Parent_With_Text_Ref_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -818,7 +818,7 @@ body { background: lightgray; }
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-overflowing-child-ref.html
     /// Green squares with black intersection — verifies lightgray background and green container.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Overflowing_Child_Ref_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -848,7 +848,7 @@ body { background: lightgray; }
     /// WPT: css/compositing/mix-blend-mode/reference/mix-blend-mode-plus-lighter-basic-ref.html
     /// Reference with overlapping color boxes — must not crash.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_PlusLighter_Basic_Ref_Does_Not_Crash()
     {
         var html = @"<!DOCTYPE html>
@@ -881,7 +881,7 @@ body { background: lightgray; }
     /// Verifies that mix-blend-mode values are accepted by the CSS parser
     /// and stored on the computed style.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Property_Is_Parsed_And_Stored()
     {
         var html = @"<!DOCTYPE html>
@@ -908,7 +908,7 @@ document.getElementById('result').textContent =
     /// Verifies that isolation: isolate is accepted and creates a stacking
     /// context (positioned children are constrained).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Isolation_Isolate_Creates_Stacking_Context()
     {
         var html = @"<!DOCTYPE html>
@@ -934,7 +934,7 @@ document.getElementById('result').textContent =
     /// <summary>
     /// Verifies that background-blend-mode is accepted without crashing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundBlendMode_Property_Accepted()
     {
         var html = @"<!DOCTYPE html>
@@ -951,7 +951,7 @@ body { background-color: green; background-blend-mode: overlay; }
     /// <summary>
     /// Verifies that filter property is accepted without crashing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Filter_Property_Accepted()
     {
         var html = @"<!DOCTYPE html>
@@ -973,7 +973,7 @@ div { filter: blur(5px); width: 100px; height: 100px; background: red; }
     /// 'difference' should produce (|FF-FF|, |00-FF|, |00-00|) = (0, FF, 0)
     /// i.e. green output, not just the unblended foreground color.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Difference_Produces_Blended_Output()
     {
         var html = @"<!DOCTYPE html>
@@ -1006,7 +1006,7 @@ body { margin: 0; }
     /// remain green (white * green = green). A gray element should produce
     /// darker green.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Multiply_Produces_Darker_Output()
     {
         var html = @"<!DOCTYPE html>
@@ -1038,7 +1038,7 @@ body { margin: 0; }
     /// Screen blending of blue (#0000FF) over red (#FF0000) should
     /// produce magenta (FF, 00, FF).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Screen_Produces_Lighter_Output()
     {
         var html = @"<!DOCTYPE html>
@@ -1067,7 +1067,7 @@ body { margin: 0; }
     /// Verifies that mix-blend-mode: darken chooses the darker component
     /// from the backdrop and source for each channel.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Darken_Produces_Darker_Output()
     {
         var html = @"<!DOCTYPE html>
@@ -1095,7 +1095,7 @@ body { margin: 0; }
     /// Verifies that mix-blend-mode: lighten chooses the lighter component
     /// from the backdrop and source for each channel.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Lighten_Produces_Lighter_Output()
     {
         var html = @"<!DOCTYPE html>
@@ -1124,7 +1124,7 @@ body { margin: 0; }
     /// produces the expected lime-colored output (overlay of red on lime
     /// results in lime because the backdrop is > 0.5 in the green channel).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void MixBlendMode_Overlay_Rotated_Clip_Produces_Green()
     {
         var html = @"<!DOCTYPE html>
@@ -1160,7 +1160,7 @@ body { margin: 0; }
     /// composited at the specified opacity over the white canvas — while
     /// pixels outside the element remain white.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_Background_Margin_Opacity_Gradient_Renders_Correctly()
     {
         // Exact WPT test HTML (simplified, no external resources)
@@ -1209,7 +1209,7 @@ html {
     /// viewport unit support, the height resolves to 0 and the background
     /// image is not rendered.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Height_100vh_Fills_Full_Height()
     {
         var html = @"<!DOCTYPE html>
@@ -1238,7 +1238,7 @@ body { margin: 0; background-color: green; height: 100vh; }
     /// <summary>
     /// Verifies <c>width: 50vw</c> resolves to half the viewport width.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Width_50vw_Resolves_Correctly()
     {
         var html = @"<!DOCTYPE html>
@@ -1267,7 +1267,7 @@ div { width: 50vw; height: 100px; background-color: red; }
     /// Verifies <c>vmin</c> and <c>vmax</c> resolve correctly: vmin uses the
     /// smaller viewport dimension, vmax uses the larger.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Viewport_Vmin_Vmax_Resolve_Correctly()
     {
         // 400×200 viewport → vmin=200, vmax=400
@@ -1314,7 +1314,7 @@ body { margin: 0; }
     /// Verifies that a <c>&lt;video&gt;</c> element is replaced by a box of the
     /// default 300×150 object size.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Video_Element_Renders_As_Default_Sized_Replaced_Box()
     {
         var html = @"<!DOCTYPE html>
@@ -1349,7 +1349,7 @@ video { background-color: black; }
     /// Verifies that explicit width/height on <c>&lt;video&gt;</c> is
     /// respected in the replaced box's dimensions.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Video_Element_Respects_Explicit_Dimensions()
     {
         var html = @"<!DOCTYPE html>
@@ -1382,7 +1382,7 @@ video { background-color: black; }
     /// Verifies that fallback text inside <c>&lt;video&gt;</c> is not visible
     /// (browsers that support video hide fallback content).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Video_Element_Hides_Fallback_Content()
     {
         var html = @"<!DOCTYPE html>
@@ -1416,7 +1416,7 @@ body { margin: 0; background-color: white; font-size: 20px; }
     /// HTML rendering §15.4.7: <c>audio:not([controls])</c> is <c>display: none</c>,
     /// so a source-less <c>&lt;audio&gt;</c> occupies no space and paints nothing.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Audio_Element_Without_Controls_Is_Not_Rendered()
     {
         var html = @"<!DOCTYPE html>
@@ -1450,7 +1450,7 @@ body { margin: 0; background-color: white; }
     /// should blend only with its parent's background, not with content
     /// outside the isolation group.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Isolation_Isolate_Prevents_Blend_Bleed_Through()
     {
         var html = @"<!DOCTYPE html>
@@ -1483,7 +1483,7 @@ body { margin: 0; }
     /// CSS Transforms §6.1: any transform other than 'none' creates a
     /// stacking context.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Transform_Creates_Stacking_Context()
     {
         // A div with transform and z-index should be treated as a stacking context.
@@ -1513,7 +1513,7 @@ body { margin: 0; }
     /// when compositing with the canvas backdrop.
     /// CSS Compositing §3.1: root element uses normal blending.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Root_Element_MixBlendMode_Ignored_With_Canvas()
     {
         var html = @"<!DOCTYPE html>
@@ -1540,7 +1540,7 @@ body { margin: 0; background: green; }
     /// the background color.  A green background-color with a red image
     /// using background-blend-mode: screen should produce a lighter result.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BackgroundBlendMode_Applies_To_Image()
     {
         // We test with a data: URI 1×1 red pixel image.

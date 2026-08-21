@@ -47,7 +47,7 @@ public class CollapsedBorderConflictTests : IDisposable
         return (red, green);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HiddenBorder_SuppressesAdjacentConflictingBorders()
     {
         // Mirrors border-conflict-w-001: a centre cell with a `hidden` border;
@@ -73,7 +73,7 @@ td { border: 5px solid green; height: 2em; width: 40px; }
         Assert.Equal(0, red);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TieBreak_IsDirectionAware_RtlFavoursRightCell()
     {
         // CSS2.1 §17.6.2.1: with equal width and style, the shared edge is won
@@ -93,7 +93,7 @@ td{{border:5px solid black;width:40px;height:30px;}}
         Assert.True(ltrRed > 0, "ltr: the left cell wins the tie, so its red border shows");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterEdge_HiddenTableBorder_SuppressesCellPerimeter()
     {
         // §17.6.2.1: a cell's perimeter edge collapses with the table's own
@@ -107,7 +107,7 @@ td{border:4px solid red;}
         Assert.Equal(0, red);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OuterEdge_WiderTableBorder_WinsOverCellPerimeter()
     {
         // A wider table border wins the perimeter over the cell's thin red one,
@@ -121,7 +121,7 @@ td{border:2px solid red;}
         Assert.True(green > 0, "the wider green table border should win the perimeter");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void WiderBorder_WinsAtSharedEdge()
     {
         // Two cells sharing one edge: the right cell's wider green border must

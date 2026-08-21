@@ -30,7 +30,7 @@ public sealed class OwnerDocumentResolutionTests
         return bridge;
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OwnerDocument_Of_Main_Document_Nodes_Is_The_Main_Document()
     {
         using var bridge = Attach(
@@ -47,7 +47,7 @@ public sealed class OwnerDocumentResolutionTests
         Assert.Equal("true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OwnerDocument_Of_Programmatic_SubDocument_Nodes_Is_That_SubDocument()
     {
         using var bridge = Attach("<!DOCTYPE html><html><body></body></html>", out var context);
@@ -67,7 +67,7 @@ public sealed class OwnerDocumentResolutionTests
         Assert.Equal("true|true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void OwnerDocument_Of_Iframe_Content_Nodes_Is_The_Content_Document()
     {
         using var bridge = Attach(
@@ -86,7 +86,7 @@ public sealed class OwnerDocumentResolutionTests
         Assert.Equal("true|true", result.ToString());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Content_HitTesting_Still_Resolves_A_Viewport()
     {
         // Regression guard for the old null-OwnerDocRoot heuristic: an iframe content document renders

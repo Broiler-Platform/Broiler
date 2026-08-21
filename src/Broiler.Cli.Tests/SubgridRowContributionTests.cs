@@ -22,7 +22,7 @@ public sealed class SubgridRowContributionTests
     private static double OffsetY(string id, System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<string, double>> by)
         => by.TryGetValue(id, out var m) && m.TryGetValue("offset-y", out var v) ? v : double.NaN;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RowSubgrid_SizesParentRowsPerTrack_NotAveraged()
     {
         string html =

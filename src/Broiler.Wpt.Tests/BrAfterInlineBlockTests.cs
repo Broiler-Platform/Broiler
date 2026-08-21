@@ -73,7 +73,7 @@ public class BrAfterInlineBlockTests : IDisposable
         return tops.ToArray();
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BrAfterInlineBlock_AdvancesLikeNaturalWrap_NoSpuriousEmptyLine()
     {
         const string box = "<div class=\"c\"></div>";
@@ -104,7 +104,7 @@ public class BrAfterInlineBlockTests : IDisposable
             $"dropped inline-block margin regressed.");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void BrAfterInlineBlock_ConsecutiveRows_AdvanceUniformly()
     {
         const string box = "<div class=\"c\"></div>";

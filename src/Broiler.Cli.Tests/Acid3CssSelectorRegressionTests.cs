@@ -6,7 +6,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public class Acid3CssSelectorRegressionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test33_Class_Selector_Matches_Element()
     {
         var html = @"<!DOCTYPE html>
@@ -31,7 +31,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("33|330|1|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test34_Attribute_Selectors_Match()
     {
         var html = @"<!DOCTYPE html>
@@ -65,7 +65,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("2|3|4|2|2|1|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test35_FirstChild_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -88,7 +88,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test36_LastChild_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -111,7 +111,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test37_NthChild_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -135,7 +135,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test38_NthChild_Odd_Even()
     {
         var html = @"<!DOCTYPE html>
@@ -163,7 +163,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("1|2|1|2|2|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test39_OnlyChild_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -187,7 +187,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test40_Empty_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -211,7 +211,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test41_Not_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -235,7 +235,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test42_Child_Combinator()
     {
         var html = @"<!DOCTYPE html>
@@ -258,7 +258,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test43_Adjacent_Sibling_Combinator()
     {
         var html = @"<!DOCTYPE html>
@@ -281,7 +281,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test44_General_Sibling_Combinator()
     {
         var html = @"<!DOCTYPE html>
@@ -303,7 +303,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("44|44|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test45_FirstOfType_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -326,7 +326,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test46_LastOfType_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -349,7 +349,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test47_NthOfType_Pseudo_Class()
     {
         var html = @"<!DOCTYPE html>
@@ -373,7 +373,7 @@ document.getElementById('result').textContent = r.join('|');
         Assert.Contains("|1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test48_Universal_And_Descendant_Combinator()
     {
         var html = @"<!DOCTYPE html>

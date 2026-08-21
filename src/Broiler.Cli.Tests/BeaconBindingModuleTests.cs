@@ -13,7 +13,7 @@ namespace Broiler.Cli.Tests;
 /// </summary>
 public sealed class BeaconBindingModuleTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Beacon_Feature_Module_Is_Co_Located_And_Internal()
     {
         var moduleType = typeof(BeaconBinding);
@@ -23,7 +23,7 @@ public sealed class BeaconBindingModuleTests
         Assert.NotNull(moduleType.GetMethod("Send", BindingFlags.Public | BindingFlags.Static));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SendBeacon_Delegates_To_Fetch_As_KeepAlive_Post_And_Honours_The_No_Data_Contract()
     {
         var html = @"<!DOCTYPE html>

@@ -4,7 +4,7 @@ namespace Broiler.UI.RichEdit.Tests;
 
 public sealed class RichTextEditorTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Explicit_Range_Replacement_Is_One_Undo_Unit_With_Selections()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("abcdef");
@@ -32,7 +32,7 @@ public sealed class RichTextEditorTests
             position = document.PositionRightOf(position);
         return position;
     }
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void New_Editor_Starts_Empty_With_Caret_At_Start()
     {
         var editor = new RichTextEditor();
@@ -43,7 +43,7 @@ public sealed class RichTextEditorTests
         Assert.False(editor.CanUndo);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typing_Inserts_At_Caret_And_Advances_It()
     {
         var editor = new RichTextEditor();
@@ -55,7 +55,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(Doc.Pos(0, 11), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Typing_Replaces_The_Selection()
     {
         var editor = new RichTextEditor();
@@ -68,7 +68,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(Doc.Pos(0, 2), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Enter_Splits_The_Paragraph_At_The_Caret()
     {
         var editor = new RichTextEditor();
@@ -81,7 +81,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(Doc.Pos(1, 0), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_At_Paragraph_Start_Merges_With_Previous()
     {
         var editor = new RichTextEditor();
@@ -94,7 +94,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(Doc.Pos(0, 2), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_Removes_The_Character_Before_The_Caret()
     {
         var editor = new RichTextEditor();
@@ -106,7 +106,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(Doc.Pos(0, 2), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Delete_At_Paragraph_End_Merges_With_Next()
     {
         var editor = new RichTextEditor();
@@ -119,7 +119,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(Doc.Pos(0, 2), editor.Selection.Focus);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Backspace_Removes_A_Whole_Surrogate_Pair()
     {
         var editor = new RichTextEditor();
@@ -132,7 +132,7 @@ public sealed class RichTextEditorTests
         Assert.Equal("a", editor.GetPlainText());
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Selection_Extends_And_Collapses_Predictably()
     {
         var editor = new RichTextEditor();
@@ -149,7 +149,7 @@ public sealed class RichTextEditorTests
         Assert.True(editor.Selection.IsEmpty);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Applying_Style_To_Empty_Selection_Formats_The_Next_Typed_Text()
     {
         var editor = new RichTextEditor();
@@ -163,7 +163,7 @@ public sealed class RichTextEditorTests
         Assert.Null(editor.PendingInlineStyle);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Pending_Styles_Compose_Before_Typing()
     {
         var editor = new RichTextEditor();
@@ -177,7 +177,7 @@ public sealed class RichTextEditorTests
         Assert.True(style.Italic);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Bold_On_A_Selection_Keeps_The_Selection()
     {
         var editor = new RichTextEditor();
@@ -190,7 +190,7 @@ public sealed class RichTextEditorTests
         Assert.True(editor.Document.Paragraphs[0].Runs[1].Style.Bold);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Foreground_Color_Applies_To_The_Selection()
     {
         var editor = new RichTextEditor();
@@ -202,7 +202,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(BColor.Red, editor.Document.Paragraphs[0].Runs[0].Style.Foreground);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Indent_And_Outdent_Adjust_The_Caret_Paragraph()
     {
         var editor = new RichTextEditor();
@@ -216,7 +216,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(0, editor.Document.Paragraphs[0].Style.IndentLevel);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Alignment_Applies_To_The_Caret_Paragraph_Without_A_Selection()
     {
         var editor = new RichTextEditor();
@@ -229,7 +229,7 @@ public sealed class RichTextEditorTests
         Assert.Equal(TextAlignment.Right, editor.Document.Paragraphs[1].Style.Alignment);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertLineBreak_Stays_Within_One_Paragraph()
     {
         var editor = new RichTextEditor();

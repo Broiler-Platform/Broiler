@@ -8,7 +8,7 @@ public class DomTraversalAndRangeTests
 {
     // ──────────────────────── NodeFilter constants ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeFilter_Constants_Are_Available()
     {
         var html = @"<!DOCTYPE html>
@@ -37,7 +37,7 @@ document.body.appendChild(out);
 
     // ──────────────────────── Basic DOM properties ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeType_And_NodeName_Are_Correct()
     {
         var html = @"<!DOCTYPE html>
@@ -64,7 +64,7 @@ document.body.appendChild(out);
         Assert.Contains("1,DIV,3,#text", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PreviousSibling_Works()
     {
         var html = @"<!DOCTYPE html>
@@ -87,7 +87,7 @@ document.body.appendChild(out);
         Assert.Contains("has-prev", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HasChildNodes_And_Contains_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -113,7 +113,7 @@ document.body.appendChild(out);
         Assert.Contains("true,true,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CloneNode_Deep_Works()
     {
         var html = @"<!DOCTYPE html>
@@ -133,7 +133,7 @@ document.body.appendChild(clone);
         Assert.Contains("<span>inside</span>", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertBefore_Works()
     {
         var html = @"<!DOCTYPE html>
@@ -157,7 +157,7 @@ container.insertBefore(newEl, existing);
         Assert.True(pIdx < spanIdx, "Inserted element should appear before existing element");
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void HasAttribute_And_RemoveAttribute_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -185,7 +185,7 @@ document.body.appendChild(out);
 
     // ──────────────────────── TreeWalker ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeWalker_BasicTraversal()
     {
         var html = @"<!DOCTYPE html>
@@ -214,7 +214,7 @@ document.body.appendChild(out);
         Assert.Contains("P,P", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeWalker_ShowText_Only()
     {
         var html = @"<!DOCTYPE html>
@@ -240,7 +240,7 @@ document.body.appendChild(out);
         Assert.Contains("hello|world", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeWalker_FirstChild_And_NextSibling()
     {
         var html = @"<!DOCTYPE html>
@@ -273,7 +273,7 @@ document.body.appendChild(out);
         Assert.Contains("p1,p2,p3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeWalker_ParentNode()
     {
         var html = @"<!DOCTYPE html>
@@ -296,7 +296,7 @@ document.body.appendChild(out);
         Assert.Contains("root", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeWalker_WithFilter()
     {
         var html = @"<!DOCTYPE html>
@@ -332,7 +332,7 @@ document.body.appendChild(out);
 
     // ──────────────────────── NodeIterator ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeIterator_BasicIteration()
     {
         var html = @"<!DOCTYPE html>
@@ -359,7 +359,7 @@ document.body.appendChild(out);
         Assert.Contains("DIV,P,P", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeIterator_PreviousNode()
     {
         var html = @"<!DOCTYPE html>
@@ -384,7 +384,7 @@ document.body.appendChild(out);
         Assert.Contains("p2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeIterator_Detach()
     {
         var html = @"<!DOCTYPE html>
@@ -408,7 +408,7 @@ document.body.appendChild(out);
         Assert.Contains("detached", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeIterator_ShowText()
     {
         var html = @"<!DOCTYPE html>
@@ -437,7 +437,7 @@ document.body.appendChild(out);
 
     // ──────────────────────── Range ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_CreateRange_Returns_Collapsed()
     {
         var html = @"<!DOCTYPE html>
@@ -456,7 +456,7 @@ document.body.appendChild(out);
         Assert.Contains("collapsed", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_SelectNodeContents()
     {
         var html = @"<!DOCTYPE html>
@@ -483,7 +483,7 @@ document.body.appendChild(out);
         Assert.Contains("0,2,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_CloneContents()
     {
         var html = @"<!DOCTYPE html>
@@ -506,7 +506,7 @@ document.body.appendChild(out);
         Assert.Contains(">2<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_ExtractContents()
     {
         var html = @"<!DOCTYPE html>
@@ -533,7 +533,7 @@ document.body.appendChild(out);
         Assert.Contains("2,0,true", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_Collapse()
     {
         var html = @"<!DOCTYPE html>
@@ -560,7 +560,7 @@ document.body.appendChild(out);
         Assert.Contains("true,0,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_InsertNode()
     {
         var html = @"<!DOCTYPE html>
@@ -587,7 +587,7 @@ document.body.appendChild(out);
         Assert.Contains("INSERTED", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_DeleteContents()
     {
         var html = @"<!DOCTYPE html>
@@ -610,7 +610,7 @@ document.body.appendChild(out);
         Assert.Contains(">0<", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_SelectNode()
     {
         var html = @"<!DOCTYPE html>
@@ -637,7 +637,7 @@ document.body.appendChild(out);
         Assert.Contains("0,1,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_CloneRange()
     {
         var html = @"<!DOCTYPE html>
@@ -664,7 +664,7 @@ document.body.appendChild(out);
         Assert.Contains("0,2,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_CompareBoundaryPoints_Same_Text_Node_Returns_Signed_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -695,7 +695,7 @@ document.body.appendChild(out);
         Assert.Contains("-1,-1,-1,1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_CompareBoundaryPoints_Cross_Containers_Uses_Document_Order()
     {
         var html = @"<!DOCTYPE html>
@@ -725,7 +725,7 @@ document.body.appendChild(out);
         Assert.Contains("-1,1,0", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_CompareBoundaryPoints_Handles_Ancestor_And_Descendant_Boundaries()
     {
         var html = @"<!DOCTYPE html>
@@ -756,7 +756,7 @@ document.body.appendChild(out);
         Assert.Contains("-1,1,-1", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_ToString()
     {
         var html = @"<!DOCTYPE html>
@@ -784,7 +784,7 @@ document.body.appendChild(out);
     /// delegated to canonical <c>Broiler.Dom.DomRange.ToString</c>). The former bridge copy
     /// omitted the end node's head, a non-spec bug this pins as fixed.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_ToString_Across_Text_Nodes_Includes_End_Container_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -811,7 +811,7 @@ document.body.appendChild(out);
 
     // ──────────────────────── Document API additions ────────────────────────
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Document_CreateComment_Works()
     {
         var html = @"<!DOCTYPE html>
@@ -830,7 +830,7 @@ document.body.appendChild(out);
         Assert.Contains("8,test comment", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Element_Navigation_Properties_Work()
     {
         var html = @"<!DOCTYPE html>
@@ -869,7 +869,7 @@ document.body.appendChild(out);
 
     // ─── 2.1 NodeFilter exception propagation ───
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeFilter_Exception_Propagates_From_Iterator()
     {
         var html = @"<!DOCTYPE html>
@@ -903,7 +903,7 @@ document.body.appendChild(out);
         Assert.Contains("caught:filter-bomb", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeFilter_Exception_Propagates_From_TreeWalker()
     {
         var html = @"<!DOCTYPE html>
@@ -938,7 +938,7 @@ document.body.appendChild(out);
 
     // ─── 2.2 Iterator/Walker mutation handling ───
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NodeIterator_Survives_Node_Removal_During_Iteration()
     {
         var html = @"<!DOCTYPE html>
@@ -969,7 +969,7 @@ document.body.appendChild(out);
         Assert.Contains("p3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TreeWalker_Survives_Current_Node_Removal()
     {
         var html = @"<!DOCTYPE html>
@@ -998,7 +998,7 @@ document.body.appendChild(out);
 
     // ─── 2.3 Range operations on comment nodes ───
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_On_Comment_Node()
     {
         var html = @"<!DOCTYPE html>
@@ -1029,7 +1029,7 @@ document.body.appendChild(out);
         Assert.Contains("|3|8|", result); // startOffset=3, endOffset=8
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_SelectNodeContents_On_Comment()
     {
         var html = @"<!DOCTYPE html>
@@ -1054,7 +1054,7 @@ document.body.appendChild(out);
         Assert.Contains("0,9,false", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_SelectNodeContents_On_TextNode()
     {
         var html = @"<!DOCTYPE html>
@@ -1083,7 +1083,7 @@ document.body.appendChild(out);
 
     // ─── 2.5 Text node splitText() ───
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SplitText_Basic()
     {
         var html = @"<!DOCTYPE html>
@@ -1112,7 +1112,7 @@ document.body.appendChild(out);
         Assert.Contains("hello| world|5|6|2|3", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SplitText_At_Beginning()
     {
         var html = @"<!DOCTYPE html>
@@ -1138,7 +1138,7 @@ document.body.appendChild(out);
         Assert.Contains("|abcdef|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void SplitText_At_End()
     {
         var html = @"<!DOCTYPE html>
@@ -1166,7 +1166,7 @@ document.body.appendChild(out);
 
     // ─── 2.4 Range mutation awareness (splitText updates Range boundaries) ───
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_Boundary_On_Text_Node_Character_Offset()
     {
         var html = @"<!DOCTYPE html>
@@ -1194,7 +1194,7 @@ document.body.appendChild(out);
         Assert.Contains("2|7|llo w", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_DeleteContents_Updates_Boundaries()
     {
         var html = @"<!DOCTYPE html>
@@ -1224,7 +1224,7 @@ document.body.appendChild(out);
 
     // ─── CharacterData methods ───
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void CharacterData_Methods_On_Comment()
     {
         var html = @"<!DOCTYPE html>
@@ -1261,7 +1261,7 @@ document.body.appendChild(out);
     /// T1.2: extractContents() across nested elements with partial text node
     /// splitting — Acid3 test 9 scenario.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_ExtractContents_Cross_Node_Partial_Text()
     {
         var html = @"<!DOCTYPE html>
@@ -1310,7 +1310,7 @@ document.body.appendChild(out);
     /// T1.5: insertNode() into a text node updates range boundaries after split.
     /// Acid3 test 12 scenario.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_InsertNode_Updates_Boundaries_After_TextSplit()
     {
         var html = @"<!DOCTYPE html>
@@ -1356,7 +1356,7 @@ document.body.appendChild(out);
     /// T1.9: Range boundary-point adjustment when ancestor is removed via
     /// removeChild(). Acid3 test 13 scenario.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_Collapses_When_Ancestor_Removed()
     {
         var html = @"<!DOCTYPE html>
@@ -1398,7 +1398,7 @@ document.body.appendChild(out);
     /// Acid3 Test 2: Removing a node during NodeIterator iteration.
     /// The iterator must skip the removed node and continue with the next sibling.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test2_NodeIterator_Continues_After_Mid_Iteration_Removal()
     {
         var html = @"<!DOCTYPE html>
@@ -1437,7 +1437,7 @@ document.body.appendChild(out);
     /// Acid3 Test 3: NodeIterator with SHOW_ALL on a deeply nested tree
     /// completes in finite steps (no infinite loop).
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test3_NodeIterator_Finite_On_Deep_Tree()
     {
         var html = @"<!DOCTYPE html>
@@ -1480,7 +1480,7 @@ document.body.appendChild(out);
     /// Acid3 Test 5: TreeWalker with SHOW_TEXT visits whitespace-only text nodes
     /// between elements.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test5_TreeWalker_ShowText_Visits_Whitespace_Nodes()
     {
         var html = @"<!DOCTYPE html>
@@ -1525,7 +1525,7 @@ document.body.appendChild(out);
     /// Acid3 Test 6: TreeWalker rooted at a subtree — parentNode() returns null
     /// when at the walker root, not the document root.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test6_TreeWalker_ParentNode_Null_At_Walker_Root()
     {
         var html = @"<!DOCTYPE html>
@@ -1563,7 +1563,7 @@ document.body.appendChild(out);
     /// Acid3 Test 9: extractContents() across sibling elements — extracted fragment
     /// has correct structure and original DOM is modified.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test9_ExtractContents_Across_Siblings()
     {
         var html = @"<!DOCTYPE html>
@@ -1611,7 +1611,7 @@ document.body.appendChild(out);
     /// Acid3 Test 10: Range with Attribute nodes as boundary points.
     /// Per DOM4 spec, setting a range boundary to an Attr node should throw.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test10_Range_With_Attribute_Node_Boundary()
     {
         var html = @"<!DOCTYPE html>
@@ -1655,7 +1655,7 @@ document.body.appendChild(out);
     /// Acid3 Test 11: Range boundaries inside Comment nodes — extract
     /// splits comment text correctly.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test11_Range_Inside_Comment_Nodes()
     {
         var html = @"<!DOCTYPE html>
@@ -1698,7 +1698,7 @@ document.body.appendChild(out);
     /// Acid3 Test 12: Range boundary adjustment after node insertion.
     /// Using range.insertNode() to insert a node inside a range updates boundaries.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test12_Range_Boundaries_Update_On_Insertion()
     {
         var html = @"<!DOCTYPE html>
@@ -1745,7 +1745,7 @@ document.body.appendChild(out);
     /// Acid3 Test 13: Range boundary adjustment after node deletion.
     /// Deleting a node that overlaps the range causes it to adjust/collapse.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Acid3_Test13_Range_Adjusts_On_Overlapping_Deletion()
     {
         var html = @"<!DOCTYPE html>
@@ -1783,7 +1783,7 @@ document.body.appendChild(out);
         Assert.Contains("true|1|true|2", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Range_GetBoundingClientRect_Includes_DisplayContents_Descendants()
     {
         var html = """

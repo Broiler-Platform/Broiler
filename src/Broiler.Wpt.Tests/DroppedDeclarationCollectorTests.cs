@@ -2,7 +2,7 @@ namespace Broiler.Wpt.Tests;
 
 public sealed class DroppedDeclarationCollectorTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Aggregates_Counts_And_Orders_By_Frequency()
     {
         var collector = new DroppedDeclarationCollector();
@@ -20,7 +20,7 @@ public sealed class DroppedDeclarationCollectorTests
         Assert.Equal(1, top[1].Count);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Top_Respects_Limit()
     {
         var collector = new DroppedDeclarationCollector();
@@ -31,7 +31,7 @@ public sealed class DroppedDeclarationCollectorTests
         Assert.Single(collector.Top(1));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FormatKey_Lowercases_Property_And_Caps_Value_Length()
     {
         Assert.Equal("text-align: -webkit-right",

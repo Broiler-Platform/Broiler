@@ -35,7 +35,7 @@ public sealed class SubDocumentEngineModuleTests
     private const string ReadSubDocMarker =
         "document.getElementById('fr').contentDocument.getElementById('t').getAttribute('data-m')";
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Module_Runs_Through_Engine_Path_When_Parent_Is_ModuleContext()
     {
         Assert.True(EngineModuleSupport.Available,
@@ -51,7 +51,7 @@ public sealed class SubDocumentEngineModuleTests
         Assert.Equal("eng", context.Eval(ReadSubDocMarker).StringValue);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Iframe_Module_Not_Run_Under_Plain_Context_Parent()
     {
         // With the EsModuleLinker fallback retired, an iframe module needs an engine-driven (JSModuleContext)

@@ -29,7 +29,7 @@ public sealed class AbortSignalTests
         context.Eval($"String({expression})").ToString();
 
     /// <summary>The reported failure: the name has to resolve at all.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void TheInterfaceExists()
     {
         var (context, bridge) = Attach();
@@ -44,7 +44,7 @@ public sealed class AbortSignalTests
     /// A controller's signal is a real <c>AbortSignal</c>, and an <c>EventTarget</c> — the checks a
     /// feature-detecting script makes, and the ones an object literal could never pass.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AControllersSignal_IsAnAbortSignal()
     {
         var (context, bridge) = Attach();
@@ -56,7 +56,7 @@ public sealed class AbortSignalTests
     }
 
     /// <summary>The interface has no public constructor: a signal only ever comes from elsewhere.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ItCannotBeConstructedDirectly()
     {
         var (context, bridge) = Attach();
@@ -68,7 +68,7 @@ public sealed class AbortSignalTests
     }
 
     /// <summary>Aborting sets the state the host reads off the signal, and the default reason is an AbortError.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbortingSetsAbortedAndReason()
     {
         var (context, bridge) = Attach();
@@ -82,7 +82,7 @@ public sealed class AbortSignalTests
     }
 
     /// <summary>A listener fires once however many times abort is called — aborting twice is a no-op.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AbortFiresListenersExactlyOnce()
     {
         var (context, bridge) = Attach();
@@ -96,7 +96,7 @@ public sealed class AbortSignalTests
     }
 
     /// <summary><c>throwIfAborted</c> is silent before the abort and throws the reason after it.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ThrowIfAbortedThrowsOnlyAfterAborting()
     {
         var (context, bridge) = Attach();
@@ -110,7 +110,7 @@ public sealed class AbortSignalTests
     }
 
     /// <summary><c>AbortSignal.abort()</c> — a signal that is already aborted when handed out.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StaticAbort_ReturnsAnAlreadyAbortedSignal()
     {
         var (context, bridge) = Attach();
@@ -127,7 +127,7 @@ public sealed class AbortSignalTests
     /// <c>AbortSignal.any</c> is already aborted when one of its inputs is, so composing signals
     /// cannot miss an abort that happened first.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StaticAny_FollowsAnAlreadyAbortedInput()
     {
         var (context, bridge) = Attach();
@@ -140,7 +140,7 @@ public sealed class AbortSignalTests
     }
 
     /// <summary>And it follows one that aborts later, taking that signal's reason.</summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StaticAny_FollowsALaterAbort()
     {
         var (context, bridge) = Attach();
@@ -155,7 +155,7 @@ public sealed class AbortSignalTests
     /// <c>AbortSignal.timeout</c> exists and its abort is a <c>TimeoutError</c>, deliberately not an
     /// <c>AbortError</c> — code that tells "cancelled" from "took too long" reads <c>reason.name</c>.
     /// </summary>
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void StaticTimeout_ExistsAndIsNotAbortedYet()
     {
         var (context, bridge) = Attach();

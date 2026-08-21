@@ -7,14 +7,14 @@ namespace Broiler.Documents.Model.Tests;
 /// </summary>
 public sealed class ModelPromotionTests
 {
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void RichTextDocument_Lives_In_The_Promoted_Namespace_And_Assembly()
     {
         Assert.Equal("Broiler.Documents.Model", typeof(RichTextDocument).Namespace);
         Assert.Equal("Broiler.Documents.Model", typeof(RichTextDocument).Assembly.GetName().Name);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void FromPlainText_Splits_Paragraphs_And_Round_Trips()
     {
         RichTextDocument document = RichTextDocument.FromPlainText("alpha\nbeta\ngamma");
@@ -23,7 +23,7 @@ public sealed class ModelPromotionTests
         Assert.Equal("alpha\nbeta\ngamma", document.PlainText);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void InsertText_Then_ApplyBold_Produces_A_Styled_Run()
     {
         RichTextDocument document = RichTextDocument.Empty;

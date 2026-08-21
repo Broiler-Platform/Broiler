@@ -53,7 +53,7 @@ public class AnimatePseudoElementTests : IDisposable
         return at(4, 4);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnimatingBackdropMatchesTheEquivalentStyleRule()
     {
         // backdrop-animate-002 against its own reference, reduced to the two colours that decide it.
@@ -72,7 +72,7 @@ public class AnimatePseudoElementTests : IDisposable
         Assert.Equal((229, 242, 229), animated);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void PropertyIndexedKeyframesAreParsed()
     {
         // The array-of-keyframes form was the only one understood, so this shape resolved to zero
@@ -86,7 +86,7 @@ public class AnimatePseudoElementTests : IDisposable
         Assert.Equal((0, 128, 0), at(50, 50));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void ASinglePropertyValueIsTheFinalKeyframe()
     {
         // Web Animations distributes a property's values evenly and treats a list of one as the
@@ -99,7 +99,7 @@ public class AnimatePseudoElementTests : IDisposable
         Assert.Equal((0, 128, 0), at(50, 50));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnAnimationWithNoPseudoElementStillTargetsTheElement()
     {
         // The pseudo branch must not capture the ordinary case: without the option the values still
@@ -112,7 +112,7 @@ public class AnimatePseudoElementTests : IDisposable
         Assert.Equal((0, 128, 0), at(50, 50));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void AnimatingOneElementsBackdropDoesNotReachAnother()
     {
         // The bake is keyed per element and per pseudo; a second dialog's backdrop keeps the UA

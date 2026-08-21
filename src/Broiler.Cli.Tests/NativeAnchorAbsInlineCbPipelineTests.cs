@@ -85,7 +85,7 @@ public sealed class NativeAnchorAbsInlineCbPipelineTests
         return g[el!];
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOn_PlacesAbsInlineCbPositionAreaBoxes_AtGridCorners()
     {
         var g = Layout(nativeAnchor: true, out var doc);
@@ -117,7 +117,7 @@ public sealed class NativeAnchorAbsInlineCbPipelineTests
         AssertCorner("br", 300f, 75f);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void NativeFlagOff_DoesNotPlaceBoxesAtAnchorCorners()
     {
         // Flag off → the engine ignores position-area (and the bridge's baked estimator

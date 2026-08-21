@@ -23,7 +23,7 @@ public sealed class WptMemoryGuardTests
     /// <summary>A task that never completes, standing in for a runaway render.</summary>
     private static Task<string> NeverCompletes() => new TaskCompletionSource<string>().Task;
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Returns_Result_When_Test_Stays_Under_The_Limit()
     {
         var guard = new WptMemoryGuard(
@@ -37,7 +37,7 @@ public sealed class WptMemoryGuardTests
         Assert.True(guard.IsEnabled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Aborts_When_A_Test_Grows_Past_The_Limit()
     {
         var guard = new WptMemoryGuard(
@@ -58,7 +58,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal(1500 * OneMebibyte, guard.PeakBytes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Large_Baseline_Left_Behind_By_Earlier_Tests_Is_Not_Charged_To_This_One()
     {
         // A worker that earlier tests grew to 1.8 GiB — or a harness process that cannot
@@ -74,7 +74,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal("rendered", result);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Unreadable_Samples_Never_Abort_A_Test()
     {
         // -1 means "the resident set could not be read" (the process exited, or the
@@ -90,7 +90,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal(-1, guard.PeakBytes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Sampler_Failures_Are_Treated_As_Unreadable()
     {
         var guard = new WptMemoryGuard(
@@ -101,7 +101,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal("rendered", guard.Wait(Task.Delay(40).ContinueWith(_ => "rendered"), TimeSpan.FromSeconds(10)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Disabled_Limit_Never_Samples()
     {
         var sampled = false;
@@ -115,7 +115,7 @@ public sealed class WptMemoryGuardTests
         Assert.False(sampled);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Timeout_Still_Wins_When_Memory_Stays_Under_The_Limit()
     {
         var guard = new WptMemoryGuard(
@@ -127,7 +127,7 @@ public sealed class WptMemoryGuardTests
             () => guard.Wait(NeverCompletes(), TimeSpan.FromMilliseconds(50)));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void A_Faulted_Render_Surfaces_Its_Original_Exception()
     {
         var guard = new WptMemoryGuard(
@@ -144,7 +144,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal("bad reference png", error.Message);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Process_Samplers_Report_A_Live_Resident_Set()
     {
         using var process = Process.GetCurrentProcess();
@@ -164,7 +164,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal(expected, WptMemoryGuard.FormatMebibytes(bytes));
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Memory_Limit_Defaults_To_One_Gibibyte()
     {
         Assert.True(Program.TryResolveRunTestMemoryLimit(null, out var limitBytes, out var error));
@@ -172,7 +172,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal(1024 * OneMebibyte, limitBytes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Command_Line_Memory_Limit_Wins_And_Zero_Disables_The_Guard()
     {
         Assert.True(Program.TryResolveRunTestMemoryLimit(2048, out var limitBytes, out _));
@@ -182,7 +182,7 @@ public sealed class WptMemoryGuardTests
         Assert.Equal(0, disabledBytes);
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Aborts_A_Test_Whose_Render_Balloons_In_Process()
     {
         var testPath = Path.Combine(Path.GetTempPath(), "memory-guard-abort.html");
@@ -227,7 +227,7 @@ public sealed class WptMemoryGuardTests
         }
     }
 
-    [Fact]
+    [Fact(Timeout = 600000)]
     public void Leaves_A_Well_Behaved_Test_Alone()
     {
         Program.RunTestExecutor = static (runner, path, referenceDir, wptPath) =>
