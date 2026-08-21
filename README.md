@@ -167,7 +167,9 @@ The [real-world website render suite](docs/real-world-render-tests.md) complemen
 standards tests with visual comparisons against a small allowlist of public websites, and
 the [privacy test page suite](docs/privacy-test-pages.md) tracks how much of the DuckDuckGo
 privacy test corpus — storage, request paths, fingerprinting surface, HTTPS upgrades —
-Broiler is able to carry out at all.
+Broiler is able to carry out at all, running each page in Chromium as well so that every
+probe Broiler misses is reported beside the answer a shipping engine gives for it
+([the gaps that found](docs/privacy-test-page-gaps.md)).
 
 ## Repository layout
 
