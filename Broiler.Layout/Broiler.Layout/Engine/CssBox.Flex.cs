@@ -376,6 +376,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     borderBoxWidth = minBorderBoxWidth;
             }
         }
+        else if (TryResolveIntrinsicMinWidth(child, containerContentWidth, out double intrinsicMinWidth))
+        {
+            if (borderBoxWidth < intrinsicMinWidth)
+                borderBoxWidth = intrinsicMinWidth;
+        }
         else if (!string.IsNullOrEmpty(child.MinWidth) && !child.MinWidth.Equals("0", StringComparison.OrdinalIgnoreCase))
         {
             double length = ParseFlexLengthOrZero(child, child.MinWidth, containerContentWidth);
@@ -386,6 +391,57 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
 
         return Math.Max(0, borderBoxWidth);
+    }
+
+    /// <summary>
+    /// CSS Sizing 3 §5: resolves a <c>min-width</c> written as an intrinsic keyword —
+    /// <c>min-content</c>, <c>max-content</c> or <c>fit-content</c>, including the
+    /// <c>-webkit-</c>/<c>-moz-</c> spellings a component library still ships — to a used
+    /// border-box length for the flex item's minimum.
+    /// </summary>
+    /// <remarks>
+    /// Such a value is not a length, so the length parse below it returned 0 and the item was left
+    /// with no minimum at all — the opposite of what the one spelling that exists to stop an item
+    /// collapsing under its own content asks for. <c>min-width: fit-content</c> paired with
+    /// <c>overflow: hidden</c> is how a chip or pill that must not clip its own label is written,
+    /// and duckduckgo.com's search/Ask-AI mode chips are declared exactly that way (a later rule
+    /// in their cascade then pins the width to a variable, so this is not what clips them; the
+    /// same declaration on its own shrank to nothing and clipped in Broiler where it does not in
+    /// Chromium).
+    /// </remarks>
+    private static bool TryResolveIntrinsicMinWidth(CssBox child, double containerContentWidth, out double borderBoxWidth)
+    {
+        borderBoxWidth = 0;
+
+        var minWidth = child.MinWidth?.Trim();
+        if (string.IsNullOrEmpty(minWidth))
+            return false;
+
+        bool isMinContent = minWidth.Equals("min-content", StringComparison.OrdinalIgnoreCase);
+        bool isMaxContent = minWidth.Equals("max-content", StringComparison.OrdinalIgnoreCase);
+        bool isFitContent = minWidth.Equals("fit-content", StringComparison.OrdinalIgnoreCase)
+            || minWidth.Equals("-webkit-fit-content", StringComparison.OrdinalIgnoreCase)
+            || minWidth.Equals("-moz-fit-content", StringComparison.OrdinalIgnoreCase);
+
+        if (!isMinContent && !isMaxContent && !isFitContent)
+            return false;
+
+        child.GetMinMaxWidth(out double minContent, out double maxContent);
+
+        if (double.IsNaN(minContent) || minContent < 0)
+            minContent = 0;
+        if (double.IsNaN(maxContent) || maxContent < minContent)
+            maxContent = minContent;
+
+        // fit-content(available) = min(max-content, max(min-content, available)), CSS Sizing 3 §5.1.
+        double used = isMinContent
+            ? minContent
+            : isMaxContent
+                ? maxContent
+                : Math.Min(maxContent, Math.Max(minContent, containerContentWidth));
+
+        borderBoxWidth = used + child.ActualBorderLeftWidth + child.ActualBorderRightWidth;
+        return true;
     }
 
     private static void ResolveFlexLineWidths(FlexLineLayout line, double contentWidth, double columnGap)
