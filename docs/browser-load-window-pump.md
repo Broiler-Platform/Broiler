@@ -78,6 +78,59 @@ load and the UI thread runs no script at all. `HasPendingWork` keeps its meaning
 it is simply not a load-completion signal. `InteractiveSessionLoadWindowTests`
 covers both predicates, the settle, and its cancellation.
 
+## Settling silently cost every intermediate frame
+
+Moving the load window off the UI thread was right. Running it **silently** was
+not, and it took the browser's animated rendering with it.
+
+Acid3 advances its score one test per `setTimeout`, and the whole chain — about
+150 ms of page time for 100 tests — is inside the load window. The viewport used
+to step it one batch per 16 ms tick, so the score counted up on screen; once the
+settle ran the batches to a fixed point before the first paint, the page arrived
+with its final score and none of the count. Every page that animates while
+loading lost the same way, and a heavy page showed nothing at all until it was
+finished: mediawiki.org's first paint moved to the end of a 33 s load.
+
+`SettleLoadWindow` now takes an `Action<Func<string>>` and calls it after every
+batch. `BrowserApp.LoadProgress` is what the browser passes:
+
+- **The parse stays on the worker.** A frame is a serialise plus
+  `BrowserViewport.CreateContentContainer`; the UI thread is posted a finished
+  container and only swaps it in and lays it out. It still runs no script.
+- **One frame is in flight at a time**, released in `BrowserApp.RenderFrame` once
+  it has actually been painted. That self-paces: a document that lays out in
+  milliseconds gets a frame per batch and animates; one that costs a second a
+  frame simply gets fewer, instead of queueing work the UI thread cannot finish.
+- **Frame work is capped at a quarter of the settle's own running time.** The
+  document is offered as a thunk precisely so a skipped frame costs nothing to
+  decline. This matters because a parse re-fetches the document's stylesheets and
+  web fonts every time (see below): unbudgeted, mediawiki.org went from 33 s to
+  86 s — it appeared sooner but finished much later.
+
+Measured (Linux, CPU renderer, `BrowserApp`'s own load path):
+
+| Page | Paints during load, before | after | Load time, before | after | First paint, after |
+| --- | --- | --- | --- | --- | --- |
+| Acid3 (local) | 0 | 57 | 18.9 s | 17.5 s | during the count |
+| www.google.com | 0 | 3 | 29.9 s | 29.6 s | 16.9 s |
+| www.mediawiki.org | 0 | 2 | 33 s | 41.2 s | 16.6 s |
+
+`BrowserLoadProgressTests` drives the whole loop a windowed host runs against a
+local page that counts inside its load window, and asserts the count reached the
+screen.
+
+## A `file://` navigation ran the whole load on the UI thread
+
+`LoadUrl` started the load with a bare `_ = LoadUrlInBackgroundAsync(…)`, and an
+async method runs on the calling thread until it first suspends. The load only
+suspends if the fetch does — so for `file://`, which reads the page without ever
+yielding, the fetch, the scripts *and* the entire load-window settle ran inside
+the UI thread's call to `NavigateTo`. That is the freeze this document is about,
+still present for local pages, and it also swallowed the intermediate frames:
+the thread that was supposed to paint them was the one doing the settling. The
+load now starts with `Task.Run`, so it leaves the UI thread whatever the fetch
+does.
+
 ## What this does not fix
 
 - **A self-rescheduling `requestAnimationFrame` loop still has no horizon.**
@@ -93,7 +146,9 @@ covers both predicates, the settle, and its cancellation.
   `<link rel=stylesheet>` is fetched synchronously again (5 s timeout each), and
   `HtmlContainerInt.TryLoadRemoteFont` re-downloads each `@font-face` on a new
   `HttpClient` (10 s each). Nothing caches between parses. Both live in
-  `Broiler.HTML`, so a fix there ships as a patch under `patches/`.
+  `Broiler.HTML`, so a fix there ships as a patch under `patches/`. This is what
+  makes an intermediate frame expensive, and so what `LoadProgress`'s quarter-of-
+  the-settle budget is really rationing; a parse cache would buy the frames back.
 - **`ExecuteScriptsInteractive` still leaves timer work undrained by design.**
   Settling is now the host's call, which is right for a host that also wants to
   animate — but every future host has to know to make it.

@@ -282,6 +282,33 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- The desktop browser paints a page's load window while it runs, instead of only
+  its final state. Settling the load window on the load worker took the page's
+  callbacks out of the message pump, which is what stopped www.google.com hanging
+  the window — but it settled *silently*, and every intermediate frame went with
+  it. Acid3 advances its score one test per `setTimeout`, all of it inside the
+  load window, so it stopped counting up and arrived already finished; a heavy
+  page showed nothing at all until it was done, which for mediawiki.org meant a
+  blank window for the whole 33 s load.
+  - `InteractiveSession.SettleLoadWindow` now reports the document after every
+    batch, as a thunk rather than a string, so a host still painting the previous
+    frame declines this one for free.
+  - The browser keeps one frame in flight, releases it only once it has actually
+    been painted, and holds frame work to a quarter of the settle's running time.
+    The parse — the expensive half, because it re-fetches the document's
+    stylesheets and web fonts every time — stays on the load worker; the UI thread
+    swaps in a finished container and lays it out, and still runs no script. So a
+    cheap document animates (Acid3: 57 paints during load, where there had been
+    none) and an expensive one buys a few early frames rather than a hundred
+    (mediawiki.org first paints at 16.6 s of a 41 s load; www.google.com is
+    unchanged at 29.6 s and paints three times on the way).
+  - A `file://` navigation no longer runs on the UI thread. `LoadUrl` started the
+    load with a bare call, and an async method runs on the calling thread until it
+    first suspends — which the load only does if the fetch does. Reading a local
+    file never yields, so the fetch, the scripts and the whole settle ran inside
+    the UI thread's `NavigateTo`: the exact freeze the settle exists to avoid,
+    still there for local pages. It starts with `Task.Run` now.
+
 - Work a frame defers runs in the frame's browsing context. Every document shares
   one JavaScript context here and the queue drain runs from C# with no context
   pushed, so a callback woke up in the **main** one: a frame's `setTimeout`,

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Drawing;
 using Broiler.App;
 using Broiler.App.Rendering;
@@ -50,6 +51,8 @@ internal sealed class BrowserApp : IDisposable
     private bool _isShuttingDown;
     private long _navigationGeneration;
     private CancellationTokenSource? _navigationCancellation;
+    // The load whose intermediate document is on screen but not yet painted; RenderFrame releases it.
+    private LoadProgress? _progressAwaitingPaint;
 
     public BrowserApp(
         BrowserUiHost host,
@@ -137,7 +140,30 @@ internal sealed class BrowserApp : IDisposable
 
     public string Status => _status.Text;
 
-    public BRenderList RenderFrame() => _session.RenderFrame();
+    /// <summary>
+    /// Paints a frame, and lets a load in flight publish its next one.
+    /// </summary>
+    /// <remarks>
+    /// The load worker holds one intermediate document at a time (see <see cref="LoadProgress"/>),
+    /// and this is where that hold is released — after the frame it produced has actually been
+    /// painted, not merely queued. Pacing the settle on the paint is what keeps the two ends
+    /// honest: a page whose document lays out in milliseconds gets a frame per batch and animates,
+    /// while one that costs a second a frame gets the next batch only when the last is on screen,
+    /// so the UI thread is never handed work faster than it can finish.
+    /// </remarks>
+    public BRenderList RenderFrame()
+    {
+        BRenderList frame = _session.RenderFrame();
+
+        LoadProgress? painted = _progressAwaitingPaint;
+        if (painted is not null)
+        {
+            _progressAwaitingPaint = null;
+            painted.FramePainted();
+        }
+
+        return frame;
+    }
 
     public void Dispatch(UiInputEvent input)
     {
@@ -401,7 +427,16 @@ internal sealed class BrowserApp : IDisposable
 
         var cancellation = new CancellationTokenSource();
         _navigationCancellation = cancellation;
-        _ = LoadUrlInBackgroundAsync(navigationGeneration, request, cancellation);
+
+        // Task.Run, not a bare call: an async method runs on the calling thread until it first
+        // suspends, and the load only suspends if the fetch does. A file:// navigation reads the
+        // page without ever yielding, so calling it here ran the fetch, the scripts and the whole
+        // load-window settle on the UI thread — the freeze the settle was moved off it to avoid,
+        // reappearing for local pages, and with it the intermediate frames, since the thread that
+        // was supposed to paint them was the one doing the settling.
+        _ = Task.Run(
+            () => LoadUrlInBackgroundAsync(navigationGeneration, request, new LoadProgress(this, navigationGeneration), cancellation),
+            CancellationToken.None);
     }
 
     private long BeginNavigation()
@@ -415,12 +450,13 @@ internal sealed class BrowserApp : IDisposable
     private async Task LoadUrlInBackgroundAsync(
         long navigationGeneration,
         PageRequest request,
+        LoadProgress progress,
         CancellationTokenSource cancellation)
     {
         NavigationLoadResult? result = null;
         try
         {
-            result = await LoadUrlOnWorkerAsync(request, cancellation.Token).ConfigureAwait(false);
+            result = await LoadUrlOnWorkerAsync(request, progress, cancellation.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -471,7 +507,7 @@ internal sealed class BrowserApp : IDisposable
         return BroilerUserAgent.Apply(new HttpClient(handler));
     }
 
-    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(PageRequest request, CancellationToken cancellationToken)
+    private static async Task<NavigationLoadResult> LoadUrlOnWorkerAsync(PageRequest request, LoadProgress progress, CancellationToken cancellationToken)
     {
         using var pipeline = new RenderingPipeline(
             new PageLoader(PageHttpClient),
@@ -495,7 +531,14 @@ internal sealed class BrowserApp : IDisposable
                 // callback batch per animation tick, and a batch of a page like google.com is
                 // measured in seconds. That is the freeze; the CLI never had it because its drain
                 // runs bounded and off any message pump. See docs/browser-load-window-pump.md.
-                string initial = session.SettleLoadWindow(cancellationToken);
+                //
+                // The settle reports each batch to `progress`, which paints what it can keep up
+                // with. Settling silently is what made a page that animates while loading arrive
+                // already finished: Acid3 advances its score one test per setTimeout, so the whole
+                // count ran here, before the first paint, and the browser showed only the total.
+                string initial = session.SettleLoadWindow(
+                    serialize => progress.PublishFrame(serialize, normalisedUrl),
+                    cancellationToken);
                 if (!string.IsNullOrWhiteSpace(initial))
                     html = PrepareForBrowsing(initial);
 
@@ -552,6 +595,140 @@ internal sealed class BrowserApp : IDisposable
         {
             cancellation.Dispose();
         }
+    }
+
+    /// <summary>
+    /// Publishes the load window's intermediate documents from the load worker to the UI thread,
+    /// one at a time.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The settle runs off the UI thread precisely so the page's callbacks are not paid inside the
+    /// message pump (<c>docs/browser-load-window-pump.md</c>), and that must stay true: this class
+    /// does the parse — <see cref="BrowserViewport.CreateContentContainer"/> is the expensive half —
+    /// on the worker as well, and posts the finished container across. The UI thread swaps it in
+    /// and lays it out; it runs no script.
+    /// </para>
+    /// <para>
+    /// One frame is in flight at a time, released only once it has been painted
+    /// (<see cref="BrowserApp.RenderFrame"/>). That self-paces: the settle is never further ahead
+    /// of the screen than one frame, so a cheap page animates and an expensive one simply publishes
+    /// fewer frames instead of queueing work the UI thread cannot keep up with. A frame the host
+    /// refuses to post, or one that arrives for a navigation that has been superseded, releases the
+    /// hold too — a dropped frame must not stop the settle from reporting the next one.
+    /// </para>
+    /// </remarks>
+    private sealed class LoadProgress(BrowserApp app, long navigationGeneration)
+    {
+        /// <summary>
+        /// The share of the settle's own running time that may go on producing frames.
+        /// </summary>
+        /// <remarks>
+        /// A frame costs a serialise and a full parse, and a parse re-fetches the document's
+        /// stylesheets and web fonts every time (<c>docs/browser-load-window-pump.md</c>, "what this
+        /// does not fix"), which on a page carrying several is seconds. Paying that per batch took
+        /// mediawiki.org from 33 s to 86 s — the page arrived sooner but finished much later.
+        /// Holding frame work to a quarter of the settle bounds the whole cost at a third: a
+        /// document that is cheap to parse still gets a frame per batch and animates, while an
+        /// expensive one buys a few frames instead of a hundred.
+        /// </remarks>
+        private const double FrameWorkBudget = 0.25;
+
+        private const int Idle = 0;
+        private const int InFlight = 1;
+
+        // Only _state crosses threads; the rest belong to the settling thread, which is the sole
+        // caller of PublishFrame.
+        private int _state = Idle;
+        private readonly Stopwatch _settling = new();
+        private TimeSpan _frameWork;
+        private string? _lastPublishedHtml;
+
+        /// <summary>
+        /// Offers the document reached after one batch of the load window. Called on the load
+        /// worker; returns without serialising when the previous frame has not been painted yet or
+        /// when frames have used up their share of the settle.
+        /// </summary>
+        public void PublishFrame(Func<string> serialize, string url)
+        {
+            if (Interlocked.CompareExchange(ref _state, InFlight, Idle) != Idle)
+                return;
+
+            // The first frame is what replaces "Loading..." with the page, so it is always worth
+            // its cost; the budget governs the ones after it.
+            if (!_settling.IsRunning)
+            {
+                _settling.Start();
+            }
+            else if (_frameWork > _settling.Elapsed * FrameWorkBudget)
+            {
+                Volatile.Write(ref _state, Idle);
+                return;
+            }
+
+            TimeSpan startedAt = _settling.Elapsed;
+            HtmlContainer container;
+            try
+            {
+                string html = serialize();
+
+                // A batch that ran callbacks without touching the DOM — a timer that only reads,
+                // measures or reschedules, which busy pages run many of — leaves the document
+                // exactly as the last frame had it, and re-parsing it would buy nothing.
+                if (string.IsNullOrWhiteSpace(html) || string.Equals(html, _lastPublishedHtml, StringComparison.Ordinal))
+                {
+                    Volatile.Write(ref _state, Idle);
+                    return;
+                }
+
+                _lastPublishedHtml = html;
+                container = BrowserViewport.CreateContentContainer(PrepareForBrowsing(html), url);
+            }
+            catch
+            {
+                // An intermediate frame is a courtesy; a page whose half-built document does not
+                // serialise or parse must still finish loading.
+                Volatile.Write(ref _state, Idle);
+                return;
+            }
+            finally
+            {
+                _frameWork += _settling.Elapsed - startedAt;
+            }
+
+            if (!app._host.Post(() => app.ApplyLoadProgress(navigationGeneration, container, url, this)))
+            {
+                container.Dispose();
+                Volatile.Write(ref _state, Idle);
+            }
+        }
+
+        /// <summary>Releases the hold once the published frame has been painted.</summary>
+        public void FramePainted() => Volatile.Write(ref _state, Idle);
+    }
+
+    /// <summary>
+    /// Shows one of a load's intermediate documents. Runs on the UI thread; the container was
+    /// already parsed on the load worker, so this is a swap and a layout, never script.
+    /// </summary>
+    private void ApplyLoadProgress(long navigationGeneration, HtmlContainer container, string url, LoadProgress progress)
+    {
+        if (_isShuttingDown || navigationGeneration != _navigationGeneration)
+        {
+            container.Dispose();
+            progress.FramePainted();
+            return;
+        }
+
+        // No session: the settle owns the page's JavaScript until it finishes, and handing the
+        // viewport one here would let the animation tick step a context the worker is running.
+        _viewport.ReplacePage(container, null, url);
+
+        // A frame from a load that has since been superseded may still be waiting on a paint that
+        // is never coming; release it rather than leaving that settle held forever.
+        _progressAwaitingPaint?.FramePainted();
+        _progressAwaitingPaint = progress;
+        _host.RequestInvalidate();
     }
 
     private void ApplyLoadedPage(NavigationLoadResult result)

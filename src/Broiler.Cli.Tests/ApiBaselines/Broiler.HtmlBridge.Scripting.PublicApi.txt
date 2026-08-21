@@ -25,6 +25,7 @@ TYPE Broiler.HtmlBridge.InteractiveSession : System.IDisposable
   method Broiler.Dom.DomDocument StepDocument()
   method System.String Complete()
   method System.String CurrentHtml()
+  method System.String SettleLoadWindow(System.Action<System.Func<System.String>>, System.Threading.CancellationToken)
   method System.String SettleLoadWindow(System.Threading.CancellationToken)
   method System.String Step()
   method System.Void Dispose()

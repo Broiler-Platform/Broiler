@@ -83,7 +83,27 @@ public sealed class InteractiveSession : IDisposable
     /// thread pays each callback batch there, and one batch of a heavy page is measured in seconds.
     /// </para>
     /// </remarks>
-    public string SettleLoadWindow(CancellationToken cancellationToken = default)
+    public string SettleLoadWindow(CancellationToken cancellationToken = default) =>
+        SettleLoadWindow(onIntermediateDocument: null, cancellationToken);
+
+    /// <summary>
+    /// As <see cref="SettleLoadWindow(CancellationToken)"/>, reporting the document after every
+    /// batch so a host can paint the load window as it runs instead of only its final state.
+    /// </summary>
+    /// <param name="onIntermediateDocument">
+    /// Called after each batch with a thunk that serialises the current document. A settle that
+    /// reports nothing is the whole reason a page which animates while loading — Acid3 counting its
+    /// score up, one test per <c>setTimeout</c> — arrives on screen already finished: the batches
+    /// all ran before the first paint. The document is passed as a thunk rather than a string
+    /// because serialising is not free and a host that is still painting the previous frame wants
+    /// to skip this one; it pays only for the frames it actually shows.
+    /// </param>
+    /// <param name="cancellationToken">Stops the settle; the caller's Stop, in a browser.</param>
+    /// <remarks>
+    /// The callback runs on the settling thread, between batches, so it must not run the page's
+    /// script or touch the DOM — read the document it is handed and return.
+    /// </remarks>
+    public string SettleLoadWindow(Action<Func<string>>? onIntermediateDocument, CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -107,6 +127,8 @@ public sealed class InteractiveSession : IDisposable
 
             if (!hadWork)
                 break;
+
+            onIntermediateDocument?.Invoke(_bridge.SerializeToHtml);
         }
 
         return _bridge.SerializeToHtml();
