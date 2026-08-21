@@ -1,23 +1,21 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7191,
+    "failed": 7169,
     "skipped": 0,
-    "total": 7191
+    "total": 7169
   },
   "shardCount": 8,
   "problemLimit": 10,
   "incompleteShards": [],
-  "retriedShards": [
-    2
-  ],
+  "retriedShards": [],
   "topProblems": [
     {
       "key": "PixelMismatch:MissingContent",
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5119,
+      "count": 5106,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -53,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 395,
+      "count": 394,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-backgrounds/background-size-029.html",
@@ -65,7 +63,7 @@
       "label": "PixelMismatch / SubpixelAntiAliasing",
       "category": "PixelMismatch",
       "subCategory": "SubpixelAntiAliasing",
-      "count": 44,
+      "count": 43,
       "examples": [
         "css/css-anchor-position/anchor-center-safe-rtl.html",
         "css/css-images/gradient/css-color-4-colors-default-to-oklab-gradient.html",
@@ -77,11 +75,11 @@
       "label": "Timeout",
       "category": "Timeout",
       "subCategory": null,
-      "count": 10,
+      "count": 3,
       "examples": [
-        "upgrade-insecure-requests/gen/top.http-rp/upgrade/iframe-tag.https.html",
-        "visual-viewport/page-and-offset-in-iframe.html",
-        "wasm/core/float_misc.wast.js.html"
+        "conformance-checkers/html/elements/iframe/src-isvalid.html",
+        "conformance-checkers/html/elements/object/data-isvalid.html",
+        "common/dispatcher/executor.html"
       ]
     }
   ],
@@ -116,7 +114,7 @@
     ],
     [
       "css/css-overflow",
-      198
+      195
     ],
     [
       "html/canvas",
@@ -130,11 +128,11 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      6832
+      6817
     ],
     [
       "Timeout",
-      10
+      3
     ]
   ],
   "droppedDeclarations": [],
@@ -299,7 +297,7 @@
     }
   ],
   "timeoutLimit": 10,
-  "timeoutCount": 10,
+  "timeoutCount": 3,
   "timeouts": [
     {
       "relativeTestPath": "common/dispatcher/executor.html",
@@ -307,55 +305,6 @@
       "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/common/dispatcher/executor.html",
       "fileSizeBytes": 309,
       "severity": "critical"
-    },
-    {
-      "relativeTestPath": "wasm/core/float_misc.wast.js.html",
-      "directory": "wasm/core",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/wasm/core/float_misc.wast.js.html",
-      "fileSizeBytes": 428,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "wasm/core/gc/binary-gc.wast.js.html",
-      "directory": "wasm/core/gc",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/wasm/core/gc/binary-gc.wast.js.html",
-      "fileSizeBytes": 432,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "uievents/order-of-events/mouse-events/wheel-multiple-sources-deadlock.html",
-      "directory": "uievents/order-of-events/mouse-events",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/uievents/order-of-events/mouse-events/wheel-multiple-sources-deadlock.html",
-      "fileSizeBytes": 1432,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "svg/path/interfaces/setPathData-during-animation.html",
-      "directory": "svg/path/interfaces",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/svg/path/interfaces/setPathData-during-animation.html",
-      "fileSizeBytes": 1644,
-      "severity": "critical"
-    },
-    {
-      "relativeTestPath": "upgrade-insecure-requests/gen/top.http-rp/upgrade/iframe-tag.https.html",
-      "directory": "upgrade-insecure-requests/gen/top.http-rp/upgrade",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/upgrade-insecure-requests/gen/top.http-rp/upgrade/iframe-tag.https.html",
-      "fileSizeBytes": 3514,
-      "severity": "high"
-    },
-    {
-      "relativeTestPath": "visual-viewport/page-and-offset-in-iframe.html",
-      "directory": "visual-viewport",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/visual-viewport/page-and-offset-in-iframe.html",
-      "fileSizeBytes": 3652,
-      "severity": "high"
-    },
-    {
-      "relativeTestPath": "upgrade-insecure-requests/gen/iframe-blank-inherit.meta/upgrade/sharedworker-import.https.html",
-      "directory": "upgrade-insecure-requests/gen/iframe-blank-inherit.meta/upgrade",
-      "message": "Test timed out after 30 second(s): /home/runner/work/Broiler/Broiler/tests/wpt/checkout/upgrade-insecure-requests/gen/iframe-blank-inherit.meta/upgrade/sharedworker-import.https.html",
-      "fileSizeBytes": 4528,
-      "severity": "high"
     },
     {
       "relativeTestPath": "conformance-checkers/html/elements/iframe/src-isvalid.html",
@@ -374,39 +323,11 @@
   ],
   "timeoutDirectories": [
     [
-      "wasm/core",
-      1
-    ],
-    [
-      "wasm/core/gc",
-      1
-    ],
-    [
-      "upgrade-insecure-requests/gen/top.http-rp/upgrade",
-      1
-    ],
-    [
-      "visual-viewport",
-      1
-    ],
-    [
       "conformance-checkers/html/elements/iframe",
       1
     ],
     [
       "conformance-checkers/html/elements/object",
-      1
-    ],
-    [
-      "uievents/order-of-events/mouse-events",
-      1
-    ],
-    [
-      "svg/path/interfaces",
-      1
-    ],
-    [
-      "upgrade-insecure-requests/gen/iframe-blank-inherit.meta/upgrade",
       1
     ],
     [
@@ -488,13 +409,6 @@
     {
       "relativeTestPath": "fullscreen/rendering/backdrop-object.html",
       "matchPercent": 1.076253255208337,
-      "referenceMatchPercent": 100.0,
-      "cleared": true,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/auto-name.html",
-      "matchPercent": 1.271565755208337,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -682,18 +596,18 @@
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
-      "relativeTestPath": "css/css-ruby/block-ruby-003.html",
-      "matchPercent": 69.10031636555989,
-      "referenceMatchPercent": 98.65315755208334,
-      "cleared": true,
-      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (98.7%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
-    },
-    {
       "relativeTestPath": "css/css-grid/alignment/grid-item-mixed-baseline-002.html",
       "matchPercent": 69.70113118489583,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
+      "relativeTestPath": "css/css-ruby/block-ruby-003.html",
+      "matchPercent": 71.71719868977864,
+      "referenceMatchPercent": 98.68876139322916,
+      "cleared": true,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (98.7%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
       "relativeTestPath": "css/css-contain/contain-html-t-o-001.html",
@@ -738,6 +652,13 @@
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
     },
     {
+      "relativeTestPath": "html/semantics/permission-element/geolocation-element/bounded-css-properties-reftest.tentative.html",
+      "matchPercent": 78.37638854980469,
+      "referenceMatchPercent": 100.0,
+      "cleared": true,
+      "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
+    },
+    {
       "relativeTestPath": "css/css-view-transitions/massive-element-right-of-viewport-offscreen-new.html",
       "matchPercent": 78.83249918619791,
       "referenceMatchPercent": 98.64616394042969,
@@ -753,7 +674,7 @@
     },
     {
       "relativeTestPath": "svg/path/reftests/path-zoom.html",
-      "matchPercent": 79.3908437093099,
+      "matchPercent": 79.3755849202474,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -12910,13 +12831,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-animations/missing-values-last-keyframe.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-animations/parsing/animation-name-edge-cases.html",
       "passed": false,
       "skipped": false,
@@ -16402,13 +16316,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-display/display-contents-blockify-dynamic.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-display/display-contents-dynamic-fieldset-legend-001.html",
       "passed": false,
       "skipped": false,
@@ -16417,13 +16324,6 @@
     },
     {
       "relativeTestPath": "css/css-display/display-contents-fieldset-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-display/display-contents-table-003.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -22986,7 +22886,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/subgrid/grid-subgridded-to-grid-lanes/track-sizing/column-subgrid-auto-fill-001.html",
@@ -23497,7 +23397,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-grid/subgrid/auto-track-sizing-002.html",
@@ -27659,13 +27559,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-overflow/line-clamp/webkit-line-clamp-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-overflow/line-clamp/webkit-line-clamp-008.html",
       "passed": false,
       "skipped": false,
@@ -27701,13 +27594,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-overflow/line-clamp/webkit-line-clamp-026.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-overflow/line-clamp/webkit-line-clamp-027.html",
       "passed": false,
       "skipped": false,
@@ -27723,13 +27609,6 @@
     },
     {
       "relativeTestPath": "css/css-overflow/line-clamp/webkit-line-clamp-039.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-overflow/line-clamp/webkit-line-clamp-046.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -29216,7 +29095,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-ruby/br-clear-all-000.html",
@@ -29706,7 +29585,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -37023,20 +36902,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-view-transitions/auto-name-from-id-shadow.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-view-transitions/auto-name.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-view-transitions/break-inside-avoid-child.html",
       "passed": false,
       "skipped": false,
@@ -37562,25 +37427,11 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-viewport/zoom/explicit-inherit/border-radius.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-viewport/zoom/explicit-inherit/column.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-viewport/zoom/explicit-inherit/webkit-border-radius.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "LayoutShift"
     },
     {
       "relativeTestPath": "css/css-viewport/zoom/filters-blur.html",
@@ -39761,13 +39612,6 @@
     },
     {
       "relativeTestPath": "css/cssom-view/negativeMargins.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/cssom-view/range-bounding-client-rect-with-display-contents.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -46551,7 +46395,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "html/rendering/non-replaced-elements/the-fieldset-and-legend-elements/legend-display-rendering.html",
@@ -46562,20 +46406,6 @@
     },
     {
       "relativeTestPath": "html/rendering/non-replaced-elements/the-fieldset-and-legend-elements/legend-grid-flex-multicol.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/rendering/non-replaced-elements/the-fieldset-and-legend-elements/legend-margin-inline.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "html/rendering/non-replaced-elements/the-fieldset-and-legend-elements/legend-position-relative.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -49587,13 +49417,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "quirks/tables-inherit-color-from-body-quirk-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
       "relativeTestPath": "quirks/tables-inherit-color-from-body-quirk-004.html",
       "passed": false,
       "skipped": false,
@@ -49789,18 +49612,11 @@
       "subCategory": "SubpixelAntiAliasing"
     },
     {
-      "relativeTestPath": "shadow-dom/focus-navigation/reading-flow/tentative/grid-order-across-scopes.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "shadow-dom/focus-navigation/reading-flow/tentative/grid-order-pseudo-elements.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "SubpixelAntiAliasing"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "shadow-dom/focus-navigation/reading-flow/tentative/grid-order-with-display-contents.html",
@@ -49933,7 +49749,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ColorShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-14-t-drt.html",
@@ -49982,7 +49798,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "svg/animations/non-additive-type-by-animation.html",
@@ -50144,12 +49960,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "svg/path/interfaces/setPathData-during-animation.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
     },
     {
       "relativeTestPath": "svg/path/reftests/path-zoom.html",
@@ -50800,29 +50610,11 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "uievents/order-of-events/mouse-events/wheel-multiple-sources-deadlock.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "uievents/order-of-events/mouse-events/wheel-scrolling.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "upgrade-insecure-requests/gen/iframe-blank-inherit.meta/upgrade/sharedworker-import.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "upgrade-insecure-requests/gen/top.http-rp/upgrade/iframe-tag.https.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
     },
     {
       "relativeTestPath": "user-timing/measure.html",
@@ -50846,12 +50638,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "visual-viewport/page-and-offset-in-iframe.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
       "relativeTestPath": "visual-viewport/viewport-unscaled-scroll-iframe.html",
       "passed": false,
       "skipped": false,
@@ -50871,18 +50657,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "wasm/core/float_misc.wast.js.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
-    },
-    {
-      "relativeTestPath": "wasm/core/gc/binary-gc.wast.js.html",
-      "passed": false,
-      "skipped": false,
-      "category": "Timeout"
     },
     {
       "relativeTestPath": "web-animations/animation-model/side-effects-of-animations-current.html",
