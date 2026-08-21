@@ -1,83 +1,59 @@
-# Submodule patches waiting to be applied
+# Submodule patches
 
-**Two patches are waiting on a maintainer.** See the index below.
+Changes that belong in a submodule but could not be pushed to its remote: the
+session's git proxy only injects a credential for repositories in the session's
+GitHub scope, and `Broiler-Platform/Broiler.*` is outside it, so
+`git push origin HEAD` from inside a submodule returns **403**. Per
+`CLAUDE.md` → "Submodules: modify them; push if allowed, otherwise deliver as a
+PATCH", the change is exported here instead and **no gitlink is bumped** — CI
+clones each submodule by pointer, and a pointer moved to a commit that was never
+pushed would break it.
 
-`Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
-are git submodules with their own remotes — and `Broiler.JS` has submodules of its
-own (`Broiler.DateTime`, `Broiler.Regex`, `Broiler.Unicode`), so a patch can target
-a repository *nested* one level further down. A session whose GitHub scope is this
-repository alone cannot push to any of them — the git proxy answers **403** — so a
-fix that belongs in a submodule is committed there, exported with
-`git format-patch`, and left here for a maintainer to apply. The submodule
-working tree is then reverted to its pinned commit and **the gitlink is not
-bumped**: CI clones a submodule by pointer, and a pointer to a commit that was
-never pushed would break the build.
-
-Applying one:
+Apply one with `git am` from inside the submodule it names, then bump the
+pointer in the parent:
 
 ```sh
 cd <Submodule>
-git checkout -b <branch> && git am ../patches/NNNN-<slug>.patch
-git push origin HEAD
-cd .. && git add <Submodule>      # bump the pointer only once the push succeeds
+git am ../patches/NNNN-<slug>.patch
+git push origin HEAD          # from a session/CI with the broader scope
+cd ..
+git add <Submodule> && git commit -m "Update submodules"
 ```
 
-## This directory is a backlog, not an archive
-
-A patch is deleted from here the moment its fix is upstream and the submodule
-pointer is bumped, because from then on it reaches CI through the pointer and a
-file that can only ever be skipped is noise. `scripts/apply-pending-wpt-patches.sh`
-holds the matching list — the subset whose fix can move rendered pixels, so a
-WPT run exercises it rather than testing against the un-fixed pointer — and is
-idempotent, so a patch already contained in the pinned pointer is skipped rather
-than re-applied.
-
-**Check the pointer, not this file, before concluding a fix is pending.** The
-numbering is *recycled*: numbers are assigned from `0001` against whatever the
-directory holds at the time, so a patch number in an older commit message, code
-comment or document does **not** identify the same change as today's patch of
-that number. Prose that names a patch by number alone is evidence about the past
-only. To decide whether a submodule fix is live, look for its commit:
+This directory is a backlog, not an archive: a patch is deleted once its fix is
+upstream and the numbering restarts from `0001` against whatever is left. A
+`patches/NNNN` reference in an older commit message or document is therefore
+almost always dangling — name the **commit subject** instead. To check whether a
+fix is already live:
 
 ```sh
-git -C <Submodule> log --oneline --grep '<the commit subject>'
-git -C <Submodule> merge-base --is-ancestor <sha> HEAD && echo "live on CI"
+git -C <Submodule> log --oneline --grep '<subject>'
 ```
 
-The directory was emptied by the previous submodule bump, so the numbering
-restarts at `0001` with the two below.
+`scripts/apply-pending-wpt-patches.sh` holds a matching list — the subset whose
+fix can move rendered pixels, so a WPT run exercises it rather than testing
+against the un-fixed pointer. It is idempotent: a patch already contained in the
+pinned pointer reverse-applies and is skipped rather than re-applied.
 
-## The index
+## Index
 
-| # | submodule | subject |
-| --- | --- | --- |
-| `0001` | `Broiler.CSS` | Keep a CSS escape from ending a rule, and drop three invalid declarations |
-| `0002` | `Broiler.HTML` | Correct the box tree inside a float, and publish the document mode to the cascade |
+| Patch | Submodule | Commit subject | Why |
+| --- | --- | --- | --- |
+| `0001-js-method-repository-site-lifetime.patch` | `Broiler.JS` | Address a compiled site by its index, not by a GCHandle never freed | `MethodRepository` used the address of a never-freed `GCHandle` as a compiled site's id, so every inner-lambda site a compilation registered stayed rooted for the life of the process — a `DynamicMethod` for an eagerly generated site, and the whole un-emitted expression tree for a deferred one that is never called. ~86 KB retained per compiled function, linear. Addressing sites by index inside the repository gives them the lifetime of the code that can reach them: `Broiler.Cli.Tests`' `ScriptCompileAhead` collection drops from a peak of 8.7 GB to 1.5 GB, bounded, with the same 49 tests passing in the same time. |
+| `0002-keep-a-css-escape-from-ending-a-rule.patch` | `Broiler.CSS` | Keep a CSS escape from ending a rule, and drop three invalid declarations | The scanners that find a rule's closing brace tracked strings and comments but not escapes, so the `\}` in `error: \};` closed the rule it sits in and every rule after it re-parsed one token out of phase and was dropped — a whole-stylesheet failure on any sheet containing one. In Acid2 that was every rule from `ul { display: table }` on, i.e. the last line of the face. Three narrower error-recovery fixes ride along (a stray top-level `;`, a leftover `!`, and two invalid values), plus border-shorthand reset semantics: `border: solid 1em black; border-top: 0` now erases the top border instead of keeping it, which is what drew a black bar across Acid2's face. Adds the thread-static `CssDocumentMode` that `0003` publishes into. |
+| `0003-correct-the-box-tree-inside-a-float.patch` | `Broiler.HTML` | Correct the box tree inside a float, and publish the document mode to the cascade | `ContainsInlinesOnly` counts a float as inline-compatible (CSS2.1 §9.5), so a box whose children are all floats answers true — and both box-tree correction passes only recurse when it answers false, while `ContainsInlinesOnlyDeep` skips floats outright. A float's subtree was therefore never visited by either pass. Acid1's `<ul>` holds nothing but floated `<li>`s, and the `display: inline` `<form>` two levels down needed both passes; it got neither, so its whole subtree — both radio-button lines — laid out at zero size and painted nothing. Also mirrors the document's quirks-mode flag into `Broiler.CSS.CssDocumentMode` so the cascade can tell a quirks-mode unitless length from an invalid one. |
 
-Both come out of the Acid1/Acid2 rendering work and both move rendered pixels,
-so both are listed in `scripts/apply-pending-wpt-patches.sh`.
-
-**Apply `0001` before `0002`, and do not land `0002` alone.** `0002` calls
-`Broiler.CSS.CssDocumentMode`, which `0001` adds, so Broiler.HTML does not
-compile with only the second of the two. The apply script keeps them in order;
+**Apply `0002` before `0003`, and do not land `0003` alone.** `0003` calls
+`Broiler.CSS.CssDocumentMode`, which `0002` adds, so Broiler.HTML does not
+compile with only the second of the pair. The apply script keeps them in order;
 a maintainer landing them upstream should push the Broiler.CSS commit and bump
 that pointer first.
 
-`0001` is the larger of the two: four error-recovery fixes plus two value-level
-ones. The escape fix is the load-bearing one — an escaped `\}` inside a
-declaration value closed the rule it sat in, and every rule after it was dropped;
-in Acid2 that was everything from `ul { display: table }` on. It also adds
-`Broiler.CSS.CssDocumentMode`, a thread-static the cascade reads to tell quirks
-mode from standards mode.
+Until `0001` is applied and the pointer bumped, `docs/xunit-suite-status.md`
+describes the retention as fixed — which it is in this tree only once the patch
+is applied. Nothing in the main repo depends on it to build or pass.
 
-`0002` lets both box-tree correction passes descend into a float. Acid1's
-`<form>` sits inside a floated `<li>`, and neither pass ever reached it, so both
-of its radio-button lines laid out at zero size and painted nothing. It also
-publishes the quirks flag `0001` reads: the flag's home is
-`Broiler.Layout.DocumentModeContext` in this repository, but Broiler.CSS.Dom
-cannot reference Broiler.Layout, and mirroring from Broiler.HTML rather than from
-that setter is what keeps the type Broiler.CSS owns out of the main repository —
-which has to build against the pinned pointers.
-
-There is no main-repo fallback for either: the fixes are wholly inside the
-submodules, and the pinned pointers still render Acid1 and Acid2 without them.
+`0002` and `0003` are the same: the main repo builds and its tests pass against
+the pinned pointers without them. What the pinned pointers do *not* do is render
+Acid1 and Acid2 correctly — that needs both, which is why both are listed in the
+apply script.

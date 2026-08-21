@@ -134,13 +134,27 @@ failed in one full run and passed in the next and in isolation.
   engine-only module path and is listed above. With that unblocked the project
   runs end to end for the first time — 3 485 tests in 5.3 minutes.
 * **`ScriptCompileAheadOverlapTests` is a benchmark, not a unit test.** Its
-  collection takes the test host from nothing to ~8.7 GB in 140 seconds — it
-  compiles ~60 000 functions across its repetitions, and the memory is
-  *reachable*, not garbage (an aggressive blocking compacting `GC.Collect`
-  after every test in the class recovers almost none of it). All 49 tests pass,
-  and a retention that size in the script-compile path is worth a look on its
-  own account. Filter the collection out when running the project for a quick
-  answer.
+  collection compiles ~60 000 functions across its repetitions and takes a
+  couple of minutes; filter it out when running the project for a quick answer.
+
+  It used to take the test host from nothing to **8.7 GB in 140 seconds**, and
+  the memory was *reachable*, not garbage — an aggressive blocking compacting
+  `GC.Collect` after every test in the class recovered almost none of it. That
+  was not the benchmark's doing. `MethodRepository` addressed each compiled
+  inner-lambda site by the address of a `GCHandle` it never freed, so every site
+  a compilation registered was rooted for the life of the process: a
+  `DynamicMethod` for an eagerly generated site, and for a deferred one the
+  whole un-emitted expression tree — and a function that is compiled and never
+  called never reaches `DeferredMethod.Force`, which is what would have released
+  it. It measured ~86 KB retained per compiled function, linear, on any path
+  that compiles (the ahead compile, the serial compile and the full capture all
+  showed it; a bare `JSContext` showed none).
+
+  A site is addressed by its index in the repository now, so the sites live and
+  die with the compiled code that can still reach them. Same 49 tests, same
+  runtime, ~1 KB retained per function instead of ~86 KB, and the collection's
+  peak is ~1.5 GB and bounded rather than 8.7 GB and climbing. The fix is in
+  `Broiler.JS` — see `patches/` if the pointer has not been bumped yet.
 * Some `Wpt_*_MatchesReference` tests and the PDF conversion tests can fail in a
   bare container for environmental reasons. Baseline before attributing a
   failure to your change.
