@@ -208,7 +208,9 @@ public sealed partial class DomBridge
     /// promise the module was resolving, and every module waiting on that one stayed unresolved —
     /// which is how a page can lose behaviour that has nothing to do with performance timing.
     /// <c>requestIdleCallback</c> runs its callback on a timer instead of dropping it, because
-    /// what pages defer to idle is often the work that produces visible content.
+    /// what pages defer to idle is often the work that produces visible content — and it hands that
+    /// callback a real <c>IdleDeadline</c> (see <c>TimerBinding.RequestIdleCallback</c>), because a
+    /// callback that receives no deadline throws on the first thing it does with the parameter.
     /// </remarks>
     private void RegisterObservationStubs(JSContext context, JSObject window)
     {
@@ -240,11 +242,11 @@ public sealed partial class DomBridge
 
         if (window[(KeyString)"requestIdleCallback"] is JSUndefined)
         {
-            var requestIdle = new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "requestIdleCallback", 1);
+            var requestIdle = new DomFunction((in a) => Dom.Features.TimerBinding.RequestIdleCallback(_eventLoop, in a), "requestIdleCallback", 1);
             window.FastAddValue((KeyString)"requestIdleCallback", requestIdle, JSPropertyAttributes.EnumerableConfigurableValue);
             context["requestIdleCallback"] = requestIdle;
 
-            var cancelIdle = new DomFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "cancelIdleCallback", 1);
+            var cancelIdle = new DomFunction((in a) => Dom.Features.TimerBinding.CancelIdleCallback(_eventLoop, in a), "cancelIdleCallback", 1);
             window.FastAddValue((KeyString)"cancelIdleCallback", cancelIdle, JSPropertyAttributes.EnumerableConfigurableValue);
             context["cancelIdleCallback"] = cancelIdle;
         }

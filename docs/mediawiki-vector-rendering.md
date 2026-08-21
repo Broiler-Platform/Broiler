@@ -125,6 +125,15 @@ rest of what the skin needs turned up in order:
   stayed in the page column (~130px of displacement) and the site notice never appeared.
 * `history.pushState`/`replaceState`/`state`/`scrollRestoration`, `PerformanceObserver` and
   `requestIdleCallback` were missing, and each threw out of a module the skin loads.
+* `requestIdleCallback` then existed but was a bare alias of `setTimeout`, which invokes its callback
+  with no arguments — so the `IdleDeadline` parameter was `undefined` and `deadline.timeRemaining()`
+  threw. ResourceLoader **evaluates its module implementations** inside an idle callback
+  (`asyncEvalTask` loops until `timeRemaining() <= 0`) and the storage store walks `localStorage` in
+  another, so this was the last two failures on the page. The callback now gets a real deadline: a
+  50ms budget (Background Tasks §2.2's cap) measured from the moment it is entered, and a
+  `didTimeout` that is true when the page passed `{ timeout }` — there being no idle period here for
+  the callback to have run in earlier. The options dictionary was also being read as if it were
+  `setTimeout`'s delay, so it came out `NaN` and the page's timeout was discarded.
 * `MediaQueryList` had no `addEventListener`/`removeEventListener`/`onchange`, which is how the
   skin watches its own breakpoints.
 * `sessionStorage` did not exist — only `localStorage` did. `window` **is** the global object here,

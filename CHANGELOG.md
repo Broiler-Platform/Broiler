@@ -214,6 +214,27 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- An idle callback is handed an `IdleDeadline`. `requestIdleCallback` was a bare
+  alias of `setTimeout`, which invokes its callback with no arguments at all, so
+  the parameter every caller destructures was `undefined` and the first thing they
+  do with it — `deadline.timeRemaining()` — threw. That is not a peripheral API:
+  MediaWiki's ResourceLoader *evaluates its module implementations* inside an idle
+  callback, looping until `timeRemaining()` reaches 0, and its key-value store
+  walks `localStorage` in another.
+  - `timeRemaining()` reports a 50 ms budget — Background Tasks §2.2's cap —
+    measured from the moment the callback is entered, so a page draining a queue
+    makes progress and then yields. A budget pinned at 0 would be worse than the
+    throw for the common `while (deadline.timeRemaining() > n) { … }` loop: it
+    reschedules for ever without shifting a single item.
+  - `didTimeout` is true when the page passed a `{ timeout }`, because a headless
+    drain has no idle period the callback could have been run in earlier — it is
+    running because that deadline arrived.
+  - The second argument is an options dictionary, not a delay. Read through the
+    `setTimeout` adapter it came out `NaN` and was clamped to 0, so a page's
+    timeout was silently discarded; it is read out of the dictionary now.
+  - `cancelIdleCallback` still cancels: the handle comes from the timer id space,
+    which is what makes it the same thing `clearTimeout` acts on.
+
 - `img.src` is a string. `HTMLImageElement` carried nothing but `width`/`height`,
   so every other IDL attribute in the interface read back as `undefined` — not the
   empty string a missing content attribute reflects as — and the first string

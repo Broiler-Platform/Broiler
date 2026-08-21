@@ -134,6 +134,131 @@ document.body.appendChild(el);
     }
 
     /// <summary>
+    /// Background Tasks §2.3 hands the callback an <c>IdleDeadline</c>. <c>requestIdleCallback</c>
+    /// was a bare alias of <c>setTimeout</c>, which invokes its callback with no arguments at all, so
+    /// the parameter was <c>undefined</c> and the first thing every caller does with it —
+    /// <c>deadline.timeRemaining()</c> — threw "Cannot get property timeRemaining of undefined".
+    /// mediawiki.org reported it twice per load.
+    /// </summary>
+    [Fact]
+    public void An_Idle_Callback_Is_Handed_A_Deadline_It_Can_Read()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<div id="result"></div>
+<script>
+requestIdleCallback(function (deadline) {
+  var text;
+  try {
+    text = 'type=' + typeof deadline.timeRemaining +
+           '|budget=' + (deadline.timeRemaining() > 0 && deadline.timeRemaining() <= 50) +
+           '|didTimeout=' + deadline.didTimeout;
+  } catch (e) {
+    text = 'threw=' + e.message;
+  }
+  document.getElementById('result').textContent = text;
+});
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///idle.html");
+
+        Assert.Contains(">type=function|budget=true|didTimeout=false<", result);
+    }
+
+    /// <summary>
+    /// The shape the deadline actually exists for, and the one MediaWiki runs its module evaluation
+    /// through: a loop that drains a queue while the budget lasts and reschedules itself when it does
+    /// not. It has to both make progress and terminate — a <c>timeRemaining()</c> stuck at 0 would
+    /// reschedule for ever without shifting a single item.
+    /// </summary>
+    [Fact]
+    public void A_Queue_Draining_Idle_Loop_Makes_Progress_And_Terminates()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<div id="result"></div>
+<script>
+var queue = [1, 2, 3, 4, 5, 6, 7, 8], done = [], rounds = 0;
+function drain(deadline) {
+  rounds++;
+  while (queue.length && deadline.timeRemaining() > 3) {
+    done.push(queue.shift());
+  }
+  if (queue.length) {
+    requestIdleCallback(drain);
+  } else {
+    document.getElementById('result').textContent =
+        'done=' + done.join(',') + '|left=' + queue.length + '|rounded=' + (rounds >= 1);
+  }
+}
+requestIdleCallback(drain);
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///idle-drain.html");
+
+        Assert.Contains(">done=1,2,3,4,5,6,7,8|left=0|rounded=true<", result);
+    }
+
+    /// <summary>
+    /// The second argument is an options dictionary, not a delay. Routed through the
+    /// <c>setTimeout</c> adapter it was read as a number, came out <c>NaN</c> and was clamped to 0,
+    /// so a page's timeout was silently discarded. A callback that carries one is running because
+    /// that deadline arrived — there is no idle period here it could have been run in earlier — which
+    /// is what <c>didTimeout</c> reports.
+    /// </summary>
+    [Fact]
+    public void An_Idle_Callback_Given_A_Timeout_Reports_That_It_Timed_Out()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<div id="result"></div>
+<script>
+requestIdleCallback(function (deadline) {
+  document.getElementById('result').textContent = 'didTimeout=' + deadline.didTimeout;
+}, { timeout: 50 });
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///idle-timeout.html");
+
+        Assert.Contains(">didTimeout=true<", result);
+    }
+
+    /// <summary>
+    /// The handle is cancellable. It comes out of the same id space <c>clearTimeout</c> acts on, so a
+    /// cancelled callback has to stay uncalled rather than run anyway.
+    /// </summary>
+    [Fact]
+    public void A_Cancelled_Idle_Callback_Does_Not_Run()
+    {
+        const string html = """
+<!DOCTYPE html>
+<html><body>
+<div id="result">not-run</div>
+<script>
+var handle = requestIdleCallback(function () {
+  document.getElementById('result').textContent = 'ran';
+});
+cancelIdleCallback(handle);
+</script>
+</body></html>
+""";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///idle-cancel.html");
+
+        Assert.Contains(">not-run<", result);
+        Assert.DoesNotContain(">ran<", result);
+    }
+
+    /// <summary>
     /// CSSOM View §4.2: a <c>MediaQueryList</c> is an <c>EventTarget</c>. The skin watches its own
     /// breakpoints through one, and <c>addListener</c> alone (the deprecated spelling, which did
     /// exist) is not what current code calls.
