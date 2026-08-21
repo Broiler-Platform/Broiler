@@ -147,6 +147,79 @@ public class InteractiveSessionLoadWindowTests
         Assert.Throws<OperationCanceledException>(() => session.SettleLoadWindow(cancelled.Token));
     }
 
+    /// <summary>
+    /// The settle reports the document after every batch, so a host can paint the load window as it
+    /// runs. Without this a page that animates while loading — Acid3 advancing its score one test
+    /// per <c>setTimeout</c> — arrives on screen already finished, because every batch ran before
+    /// the first paint.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void SettleLoadWindowReportsTheDocumentAfterEachBatch()
+    {
+        using InteractiveSession session = CreateSession("""
+            var n = 0;
+            (function chain() {
+                if (++n > 5) return;
+                document.getElementById('out').textContent = 'step' + n;
+                setTimeout(chain, 100);
+            })();
+            """);
+
+        List<string> reported = [];
+        string settled = session.SettleLoadWindow(serialize => reported.Add(serialize()));
+
+        // Every state the settle passes through, in order. `step1` is not among them: the chain's
+        // first turn runs synchronously with the page's scripts, so it is already on the document
+        // the settle starts from — the load window covers the turns after it.
+        List<string> states = reported
+            .Select(static html => html.Contains("step", StringComparison.Ordinal)
+                ? html[(html.IndexOf("step", StringComparison.Ordinal))..][..5]
+                : string.Empty)
+            .Where(static state => state.Length > 0)
+            .Distinct()
+            .ToList();
+
+        Assert.Equal(["step2", "step3", "step4", "step5"], states);
+        Assert.Contains("step5", settled);
+    }
+
+    /// <summary>
+    /// The document is reported as a thunk, so a host still painting the previous frame skips this
+    /// one without paying to serialise it — and skipping must not disturb the settle.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void AnIgnoredIntermediateDocumentCostsTheSettleNothing()
+    {
+        using InteractiveSession session = CreateSession("""
+            var n = 0;
+            (function chain() {
+                if (++n > 5) return;
+                document.getElementById('out').textContent = 'step' + n;
+                setTimeout(chain, 100);
+            })();
+            """);
+
+        int offered = 0;
+        string settled = session.SettleLoadWindow(_ => offered++);
+
+        Assert.True(offered >= 5, $"only {offered} batches were reported");
+        Assert.Contains("step5", settled);
+        Assert.False(session.HasWorkDueInLoadWindow);
+    }
+
+    /// <summary>A page with nothing due reports no frames — there is no batch to report.</summary>
+    [Fact(Timeout = 600000)]
+    public void ASettleWithNothingDueReportsNoDocument()
+    {
+        using InteractiveSession session = CreateSession(
+            $"setTimeout(function () {{ document.getElementById('out').textContent = 'late'; }}, {DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs + 1000});");
+
+        int offered = 0;
+        session.SettleLoadWindow(_ => offered++);
+
+        Assert.Equal(0, offered);
+    }
+
     [Fact(Timeout = 600000)]
     public void ADisposedSessionReportsNoLoadWork()
     {
