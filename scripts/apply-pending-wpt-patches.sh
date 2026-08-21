@@ -253,7 +253,16 @@ set -euo pipefail
 # was being dropped — `page-name-img-003`/`-004` broke a page their references do not. It only
 # moves pixels under BROILER_WPT_PAGED_PRINT=1, where the page name is read at all; the default
 # unpaginated render is unchanged.
+# 0006 paints an element its transform mirrors. Without it a `scaleX(-1)`, `scale(-1)` or
+# `rotate(180deg)` box paints *nothing at all* — the raster canvas mapped its rectangle to a
+# negative extent, which spans no rows or columns — and the compat backend it would otherwise
+# fall back to is an inert stub on a host with no OS backend. That is the same failure mode as
+# the dashed-stroke and anonymous-table entries above: not slower or coarser output, but absent
+# output. Its geometry is unit-tested in the main repo (MirroredTransformPaintTests), which
+# feature-probes and self-skips until this is applied; only the pixel suite can say a mirrored
+# element reached the canvas.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0006-paint-an-element-its-transform-mirrors.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
