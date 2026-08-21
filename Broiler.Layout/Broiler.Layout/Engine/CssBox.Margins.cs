@@ -192,17 +192,27 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // every in-flow sibling down with it. A page whose first child is a fixed backdrop or an
         // abspos panel therefore laid its real content out at the wrong offset.
         else if (_parentBox != null && Position is not (CssConstants.Absolute or CssConstants.Fixed)
+            // CSS2.1 §8.3.1 again, for the other kind of out-of-flow box: "margins of floating
+            // boxes do not collapse". A float's margin was propagating into its parent's position
+            // exactly as an abspos child's used to, so a block whose first child is a floated
+            // element was drawn at the float's margin rather than its own — which is what left
+            // css-flexbox/flexbox_item-bottom-float's *reference* an em below its test.
+            && Float == CssConstants.None
             && _parentBox.ActualPaddingTop < 0.1 && _parentBox.ActualPaddingBottom < 0.1 && _parentBox.ActualBorderTopWidth < 0.1 && _parentBox.ActualBorderBottomWidth < 0.1
-            // CSS Box Alignment §5.4: align-content != normal establishes
-            // a BFC, which prevents parent–child margin collapsing.
-            && (_parentBox.AlignContent == null || _parentBox.AlignContent == "normal")
-            // CSS2.1 §8.3.1: margins do not collapse across a block-formatting-context
-            // boundary; overflow != visible establishes a BFC (§9.4.1), so the parent
-            // contains its first in-flow child's top margin instead of collapsing with it
-            // (a bare overflow:auto/hidden/scroll container — e.g. css-anchor-position
-            // anchor-center-scroll-001's scroller — otherwise gets shifted down by the
-            // child's margin via the propagation below).
-            && (_parentBox.Overflow == null || _parentBox.Overflow == CssConstants.Visible))
+            // CSS2.1 §8.3.1: "margins of elements that establish new block formatting contexts
+            // do not collapse with their in-flow children" — so a parent that establishes one
+            // contains its first child's top margin instead of taking it as its own. The two
+            // triggers spelled out here before, `overflow` other than `visible` (§9.4.1, e.g.
+            // css-anchor-position anchor-center-scroll-001's scroller) and CSS Box Alignment
+            // §5.4's `align-content`, are two of the set `EstablishesBfc` already answers for;
+            // the ones it adds are what the rest of this run needed. A **float** parent: the
+            // reference of css-flexbox/flex-lines/multi-line-wrap-with-column-reverse is three
+            // floated columns of `margin-top: 10px` paragraphs, and each float was drawn at its
+            // first paragraph's margin — then the next float below that, so the three columns
+            // stepped 10px further down each. And a **flex or grid container**, which CSS
+            // Flexbox §3 / CSS Grid §6 make an independent formatting context: that test itself
+            // drew its whole flex container 10px below where it belongs.
+            && !CssBoxHelper.EstablishesBfc(_parentBox))
         {
             double parentEffective = Math.Max(_parentBox.ActualMarginTop, _parentBox.CollapsedMarginTop);
 
@@ -249,16 +259,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         {
             value = ActualMarginTop;
 
-            // When the parent establishes a BFC (e.g. via align-content),
-            // the first child's margin is fully consumed for positioning.
-            // Record it so that an empty-collapsible sibling can subtract
+            // When the parent establishes a BFC, the first child's margin is fully consumed for
+            // positioning. Record it so that an empty-collapsible sibling can subtract
             // the already-consumed portion during its own collapse.
-            if (_parentBox != null
-                && _parentBox.AlignContent != null
-                && _parentBox.AlignContent != "normal")
-            {
+            if (_parentBox != null && CssBoxHelper.EstablishesBfc(_parentBox))
                 CollapsedMarginTop = value;
-            }
         }
 
         // fix for hr tag

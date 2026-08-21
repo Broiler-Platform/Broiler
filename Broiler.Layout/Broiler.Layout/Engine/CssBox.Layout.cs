@@ -1456,8 +1456,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 // CSS Box Alignment §6.2: distribute flex/grid items along
                 // the block (cross) axis per align-items / align-self.
                 ApplyFlexGridCrossAxisAlignment();
-                ApplyFlexColumnInlineAxisAlignment(g);
-                ApplyFlexColumnMainAxisSizing(g);
+
+                // CSS Flexbox §9.3/§9.5: a wrapping or reversed column flex container needs its
+                // items broken into lines and packed from the main-start, neither of which a
+                // post-pass over the single block-flow stack below can express. It takes the
+                // placement over when it applies; the one case it declines — a single line in
+                // ordinary `column` order — is what those two passes already handle.
+                if (!PerformFlexColumnLineLayout(g))
+                {
+                    ApplyFlexColumnInlineAxisAlignment(g);
+                    ApplyFlexColumnMainAxisSizing(g);
+                }
             }
             else if (Boxes.Count > 0)
             {
