@@ -139,12 +139,47 @@ public sealed partial class DomBridge
         performanceObj.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
         performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceTimeOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // performance.getEntriesByType() — stub returning empty array
+        // The Performance Timeline getters (Performance Timeline §3). A capture records no
+        // performance entries, so all three answer with an empty list — which is a buffer that holds
+        // nothing, the same answer a browser gives before anything has been recorded, and not the
+        // same thing as the method being absent.
+        //
+        // getEntriesByName was the one of the three missing, and a page does not reach it behind a
+        // feature test: performance and PerformanceObserver both existing is the guard it writes, and
+        // this call comes after it. duckduckgo.com's first-contentful-paint pixel opens with
+        // `performance.getEntriesByName('first-contentful-paint')` on exactly that guard, which threw
+        // "undefined is not a function" — taking the PerformanceObserver fallback in the same try
+        // block with it, so the page never observed the paint it was asking about either.
+        performanceObj.FastAddValue((KeyString)"getEntries", new DomFunction((in _) => new JSArray(), "getEntries", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         performanceObj.FastAddValue((KeyString)"getEntriesByType", new DomFunction((in _) => new JSArray(), "getEntriesByType", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"getEntriesByName", new DomFunction((in _) => new JSArray(), "getEntriesByName", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // performance.mark() / performance.measure() — no-op stubs
         performanceObj.FastAddValue((KeyString)"mark", UndefinedFunction("mark", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         performanceObj.FastAddValue((KeyString)"measure", UndefinedFunction("measure", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // The clear/resize counterparts to mark, measure and the resource buffer. Nothing is recorded
+        // for them to clear, but a page that marks commonly clears in the same breath, and the throw
+        // would land on the clear rather than on the mark it pairs with.
+        performanceObj.FastAddValue((KeyString)"clearMarks", UndefinedFunction("clearMarks", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"clearMeasures", UndefinedFunction("clearMeasures", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"clearResourceTimings", UndefinedFunction("clearResourceTimings", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"setResourceTimingBufferSize", UndefinedFunction("setResourceTimingBufferSize", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // toJSON is how the interface serialises, and telemetry that ships timings reaches it through
+        // JSON.stringify(performance) as often as by name.
+        performanceObj.FastAddValue(
+            (KeyString)"toJSON",
+            new DomFunction(
+                (in _) =>
+                {
+                    var json = new JSObject();
+                    json.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
+                    return json;
+                },
+                "toJSON",
+                0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
 
         window.FastAddValue((KeyString)"performance", performanceObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["performance"] = performanceObj;

@@ -26,9 +26,62 @@ internal static class FragmentTreeBuilder
         // Publish the host's font services for the pass: SvgRenderer has no box to ask for a font,
         // and a DrawSvgTextItem without one is dropped by the raster backend (see SvgTextEnvironment).
         SvgTextEnvironment.Reset(root.LayoutEnvironment);
-        var tree = BuildFragment(root, parentHasTransform: false, isRoot: true);
+        var tree = BuildFragment(root, parentHasTransform: false, isRoot: true,
+            isolationObservable: DocumentHasBlending(root));
         CollectSvgDefinitions(tree);
         return tree;
+    }
+
+    /// <summary>
+    /// Whether any box in the document blends with its backdrop — i.e. carries a
+    /// <c>mix-blend-mode</c> other than <c>normal</c>. One pass over the tree, before the fragments
+    /// are built, because the answer is the same for every box in the pass.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what decides whether <c>isolation: isolate</c> is worth honouring at paint time.
+    /// CSS Compositing §2.2 gives an isolation group exactly one job: to stop a <em>descendant's</em>
+    /// blending from reaching the backdrop outside the group. With nothing in the document blending
+    /// at all, the group has no job to do, and compositing its contents through a
+    /// <c>normal</c>-blend layer produces the very same pixels as drawing them straight onto the
+    /// surface. So dropping it is not an approximation — it is the same picture, one layer cheaper.
+    /// </para>
+    /// <para>
+    /// <c>background-blend-mode</c> is deliberately not consulted: it blends an element's own
+    /// background layers with each other, never with the backdrop behind the element, so no ancestor's
+    /// isolation can be observed through it.
+    /// </para>
+    /// <para>
+    /// The isolation group still <em>creates a stacking context</em> either way — see
+    /// <see cref="IsStackingContext"/>, which reads the box and is untouched by this. Only the paint
+    /// layer goes away, so paint order is unchanged.
+    /// </para>
+    /// <para>
+    /// <b>This also stands in for a renderer fix that cannot land here.</b> A compositing group
+    /// whose contents are not raster-compatible — one transformed descendant is enough — used to be
+    /// routed to a stub compat backend that dropped the group's entire subtree, so an isolation
+    /// group over a page with a transform under it rendered as an empty viewport. That belongs in
+    /// <c>Broiler.HTML</c>'s <c>GraphicsAdapter</c> and ships as the <c>patches/</c> entry
+    /// "Keep a compositing group's contents when the group cannot use the raster canvas"; until that
+    /// is applied, not emitting the unobservable group is what keeps such a page visible.
+    /// <c>duckduckgo.com</c>'s start page is the case: all of its content sits under
+    /// <c>#__next { isolation: isolate }</c>, it has transforms beneath that, and it uses no blend
+    /// mode anywhere.
+    /// </para>
+    /// </remarks>
+    private static bool DocumentHasBlending(CssBox box)
+    {
+        if (!string.IsNullOrEmpty(box.MixBlendMode)
+            && !box.MixBlendMode.Equals("normal", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        foreach (var child in box.Boxes)
+        {
+            if (DocumentHasBlending(child))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>Walks the fragment tree and registers every modelled SVG filter (see
@@ -75,7 +128,8 @@ internal static class FragmentTreeBuilder
     /// references state the same layout with one absolutely-positioned copy per page.
     /// </para>
     /// </remarks>
-    private static List<Fragment> RepeatedFixedFragments(CssBox root, bool hasTransformAncestor)
+    private static List<Fragment> RepeatedFixedFragments(CssBox root, bool hasTransformAncestor,
+        bool isolationObservable)
     {
         var repeats = new List<Fragment>();
 
@@ -101,7 +155,8 @@ internal static class FragmentTreeBuilder
             for (int page = 1; page < pages; page++)
             {
                 box.OffsetTop(pageHeight);
-                repeats.Add(BuildFragment(box, hasTransformAncestor));
+                repeats.Add(BuildFragment(box, hasTransformAncestor,
+                    isolationObservable: isolationObservable));
             }
 
             // Put it back where layout left it: the fragment already built for page one refers to
@@ -136,9 +191,10 @@ internal static class FragmentTreeBuilder
     /// </summary>
     private const double UnpaginatedPageExtent = 90000;
 
-    private static Fragment BuildFragment(CssBox box, bool parentHasTransform, bool isRoot = false)
+    private static Fragment BuildFragment(CssBox box, bool parentHasTransform, bool isRoot = false,
+        bool isolationObservable = true)
     {
-        var style = ComputedStyleBuilder.FromBox(box, box.HtmlTag?.Name);
+        var style = ComputedStyleBuilder.FromBox(box, box.HtmlTag?.Name, isolationObservable);
         bool hasTransformAncestor = parentHasTransform
             || (!string.IsNullOrEmpty(style.Transform)
             && !style.Transform.Equals("none", StringComparison.OrdinalIgnoreCase));
@@ -168,7 +224,8 @@ internal static class FragmentTreeBuilder
                 // and not its own background or borders either.
                 if (child.ClampedAway)
                     continue;
-                children.Add(BuildFragment(child, hasTransformAncestor));
+                children.Add(BuildFragment(child, hasTransformAncestor,
+                    isolationObservable: isolationObservable));
             }
         }
 
@@ -177,7 +234,7 @@ internal static class FragmentTreeBuilder
         // where its containing block is; the rest of its appearances are copies of that subtree,
         // one page further down each time.
         if (isRoot && !contentHidden)
-            children.AddRange(RepeatedFixedFragments(box, hasTransformAncestor));
+            children.AddRange(RepeatedFixedFragments(box, hasTransformAncestor, isolationObservable));
 
         List<LineFragment>? lines = null;
         if (!contentHidden && box.LineBoxes.Count > 0)
