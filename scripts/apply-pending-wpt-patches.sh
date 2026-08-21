@@ -257,6 +257,8 @@ PENDING_PATCHES=(
   "Broiler.CSS|patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch"
   "Broiler.CSS|patches/0002-give-a-media-query-a-paged-formatting-context.patch"
   "Broiler.HTML|patches/0003-carry-a-block-images-page-name-onto-the-box-that-replaces-it.patch"
+  "Broiler.CSS|patches/0004-give-legend-the-user-agent-display-block-it-has-in-html.patch"
+  "Broiler.HTML|patches/0005-give-legend-the-user-agent-display-block-in-the-default-sheet.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

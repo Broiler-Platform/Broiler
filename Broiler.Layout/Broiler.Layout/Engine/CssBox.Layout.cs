@@ -213,6 +213,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         // resolved, so the container is sized to the lines it kept.
         ApplyLineClamp(g);
 
+        // HTML §15.5.13: a fieldset's rendered legend belongs to the block-start border, not to the
+        // content. Before the column pass and the height, so both see the flow the legend leaves.
+        ApplyFieldsetLegendPlacement();
+
         ApplyMultiColumnPostLayout();
         ResolveUsedBlockHeight();
         ApplyMinMaxHeightConstraints();
@@ -1623,7 +1627,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (CanTransferAspectRatioToBlockHeight
             && TryResolveAspectRatioBlockHeight(out double aspectRatioBorderBoxHeight))
         {
+            double contentBottom = ActualBottom;
             ActualBottom = Location.Y + aspectRatioBorderBoxHeight;
+
+            // CSS Sizing 4 §5.1: the automatic minimum size of a box with a preferred aspect ratio
+            // is its content-based minimum, so a ratio that would make the box shorter than its own
+            // content does not — the ratio gives way. `min-height` says otherwise the moment it is
+            // given a value, and a scroll container's content does not push its box out at all.
+            if (AutomaticMinimumSizeApplies && contentBottom > ActualBottom)
+                ActualBottom = contentBottom;
         }
 
         // Quirks-mode "the body element fills the html element" / "the html

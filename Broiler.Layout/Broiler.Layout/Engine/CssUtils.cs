@@ -76,6 +76,10 @@ internal static partial class CssUtils
             "min-width" => cssBox.MinWidth,
             "height" => cssBox.Height,
             "block-size" => cssBox.BlockSize,
+            "min-block-size" => cssBox.MinBlockSize,
+            "max-block-size" => cssBox.MaxBlockSize,
+            "min-inline-size" => cssBox.MinInlineSize,
+            "max-inline-size" => cssBox.MaxInlineSize,
             "max-height" => cssBox.MaxHeight,
             "min-height" => cssBox.MinHeight,
             "background-color" => cssBox.BackgroundColor,
@@ -639,6 +643,18 @@ internal static partial class CssUtils
                 break;
             case "block-size":
                 cssBox.BlockSize = value;
+                break;
+            case "min-block-size":
+                cssBox.MinBlockSize = value;
+                break;
+            case "max-block-size":
+                cssBox.MaxBlockSize = value;
+                break;
+            case "min-inline-size":
+                cssBox.MinInlineSize = value;
+                break;
+            case "max-inline-size":
+                cssBox.MaxInlineSize = value;
                 break;
             case "max-height":
                 cssBox.MaxHeight = value;

@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**Three patches are waiting on a maintainer.** See the index below.
+**Five patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -53,6 +53,8 @@ again with the one below.
 | `0001` | `Broiler.CSS` | Resolve the absolute length units in ParseToPixels |
 | `0002` | `Broiler.CSS` | Give a media query a paged formatting context |
 | `0003` | `Broiler.HTML` | Carry a block image's page name onto the box that replaces it |
+| `0004` | `Broiler.CSS` | Give `<legend>` the user-agent `display: block` it has in HTML |
+| `0005` | `Broiler.HTML` | The same, in the default style sheet |
 
 ### `0001` — `border: 72pt solid red` painted a thin black line
 
@@ -167,3 +169,37 @@ Under `BROILER_WPT_PAGED_PRINT=1`, `css/css-page` goes 132 → **134** of 224 wi
 the average 76.45% → **77.36%**, `css/css-break` unmoved, none lost. There is no
 main-repo half and nothing in this repository references anything new, so the
 build is unaffected while the patch waits.
+
+### `0004` and `0005` — `<legend>` was an inline box
+
+HTML's rendering section makes a `<legend>` a block box. Neither of the two
+user-agent sources this engine reads said so: `Broiler.CSS`'s
+`CssUserAgentDefaults.DisplayValues` table lists `fieldset` and every other
+block-level element and not `legend`, and `Broiler.HTML`'s default style sheet
+has the same omission in its `display: block` rule. Left at the CSS initial
+value a legend is **inline**, so its `width`, `height` and `padding` do nothing
+at all.
+
+A four-way render pins it: a `<legend>`, the same legend with `display: block`,
+a `<span>` and a `<div>`, each given `width: 100px; height: 19px; padding: 10px
+7px 20px 3px`. The `<div>` and the explicit `display: block` legend occupy 49px;
+the bare legend and the `<span>` occupy 19px — the legend was behaving as an
+inline box exactly.
+
+**Two patches for one rule**, because the two sources feed different paths into
+layout and a document reaching layout through either one needs it.
+
+`css-break/fieldset-001`, `-003` and `-004` are written on a sized legend. The
+main-repo half of the change — the rendered legend's placement on the fieldset's
+block-start border (`CssBox.Fieldset`) — is inert without these: it only acts on
+a block-level legend, so against the pinned pointers the repository renders
+exactly as it did.
+
+**Measured** on top of the main-repo half, under `BROILER_WPT_PAGED_PRINT=1`:
+`css/css-break` holds at 92 of 204 with the average 87.45% → **87.47%** —
+`fieldset-004` 84.4% → **88.5%** and `fieldset-003` 91.3% → **92.1%**, against
+`fieldset-001` 78.0% → 77.7%, which needs its column set to cut a box that has
+content in it and does not get there on the legend alone. `css/css-sizing` holds
+at 74 of 112 with both of its fieldset `aspect-ratio` tests at 100%, and
+`css/css-page` (paged and default), `css/CSS2`, `css/css-backgrounds` and
+`css/css-values` do not move.

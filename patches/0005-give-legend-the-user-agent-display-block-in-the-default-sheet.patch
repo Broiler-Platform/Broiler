@@ -1,0 +1,36 @@
+From d9b94fd53e50beafc8abec39349ed1fff828bb96 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 21 Aug 2026 05:29:59 +0000
+Subject: [PATCH] Give <legend> the user-agent display: block it has in HTML
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The default style sheet's block-level rule lists fieldset and every other
+block-level element, and not legend. Left at the CSS initial value it is
+inline, so a legend's width, height and padding do nothing: WPT's
+css-break/fieldset-001 sizes its legend 100x19 with 10px/20px padding and
+got a bare line box instead.
+
+The companion to the same one-line addition in Broiler.CSS's
+CssUserAgentDefaults table — the two paths into layout read different
+sources, so both need it.
+---
+ Source/Broiler.HTML.Core/CssDefaults.cs | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Source/Broiler.HTML.Core/CssDefaults.cs b/Source/Broiler.HTML.Core/CssDefaults.cs
+index 7d89db6..1410523 100644
+--- a/Source/Broiler.HTML.Core/CssDefaults.cs
++++ b/Source/Broiler.HTML.Core/CssDefaults.cs
+@@ -13,6 +13,7 @@ internal static class CssDefaults
+         ol, p, ul, center,
+         dir, menu, pre   { display: block }
+         li              { display: list-item }
++        legend          { display: block }
+         head            { display: none }
+         table           { display: table }
+         tr              { display: table-row }
+-- 
+2.43.0
+

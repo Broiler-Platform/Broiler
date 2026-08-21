@@ -214,6 +214,38 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Broiler.Layout` (with **pending patches** `0004`/`0005` for `Broiler.CSS` and
+  `Broiler.HTML`) — a `<legend>` is a block box, a fieldset's first one is
+  rendered on the fieldset's block-start border, an `aspect-ratio` no longer sizes
+  a box below its own content, and the flow-relative minimum and maximum sizes
+  reach layout. HTML's rendering section makes a legend a block box and neither
+  user-agent source said so, so a legend's `width`, `height` and `padding` did
+  nothing at all — that is the one-line core, and it needs a patch in each
+  submodule because the two sources feed different paths into layout. This
+  repository's half is the placement: a fieldset's first legend is not laid out in
+  its content (HTML §15.5.13) but belongs to the block-start border, its margin
+  box centred on it, so a legend taller than the border stands proud of the border
+  box and the content begins below it. The placement acts on a block-level legend
+  only, so it is inert against the pinned pointers. Making the legend a block
+  exposed two adjacent gaps the same tests rest on, and both are fixed here: CSS
+  Sizing 4 §5.1's automatic content-based minimum, which stops a preferred aspect
+  ratio from sizing a box shorter than its content (the transferred ratio height
+  was overwriting the content height outright); and `min-block-size`,
+  `max-block-size` and their inline counterparts, which parsed and were then
+  dropped by layout, so the physical `min-`/`max-` longhands now consult whichever
+  flow-relative longhand names the same axis under the box's writing mode.
+  Measured with the submodules at their pinned pointers, under
+  `BROILER_WPT_PAGED_PRINT=1`: `css/css-break` holds at 92 of 204 with the average
+  87.38% → 87.45% and `break-inside-avoid-min-block-size-1` 82.0% → 96.3%;
+  `css/css-sizing` holds at 74 of 112 with both `aspect-ratio/fieldset-element-*`
+  tests reaching exactly 100%; `css/css-page` (135 paged, 142 default),
+  `css/CSS2`, `css/css-backgrounds` and `css/css-values` are unchanged
+  test-for-test. With the patches applied, `fieldset-004` 84.4% → 88.5% and
+  `fieldset-003` 91.3% → 92.1%. `fieldset-001` goes 78.0% → 77.7% and still fails:
+  its column set has to cut a box with content in it, and the column pass walks
+  into the fieldset and redistributes its children — stopping that descent is the
+  right rule and costs four tests (measured 92 → 88), so it stays.
+
 - `Broiler.Layout` — a box taller than a column set continues in the next column
   instead of staying whole in the first one. The engine filled a column set by
   moving whole boxes into it, which covers a column set made of several blocks and

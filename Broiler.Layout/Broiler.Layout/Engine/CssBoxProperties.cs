@@ -565,12 +565,12 @@ internal abstract partial class CssBoxProperties
     }
     public string MaxWidth
     {
-        get => _maxWidth;
+        get => ResolvePhysicalBound(_maxWidth, MaxInlineSize, MaxBlockSize, "none");
         set { _maxWidth = value; _actualMaxWidth = double.NaN; }
     }
     public string MinWidth
     {
-        get => _minWidth;
+        get => ResolvePhysicalBound(_minWidth, MinInlineSize, MinBlockSize, "0");
         set { _minWidth = value; _actualMinWidth = double.NaN; }
     }
     internal bool IsMinWidthSpecified { get; set; }
@@ -663,8 +663,58 @@ internal abstract partial class CssBoxProperties
         }
     }
 
-    public string MaxHeight { get; set; } = "none";
-    public string MinHeight { get; set; } = "0";
+    public string MaxHeight
+    {
+        get => ResolvePhysicalBound(_maxHeight, MaxBlockSize, MaxInlineSize, "none");
+        set => _maxHeight = value;
+    }
+
+    public string MinHeight
+    {
+        get => ResolvePhysicalBound(_minHeight, MinBlockSize, MinInlineSize, "0");
+        set => _minHeight = value;
+    }
+
+    private string _maxHeight = "none";
+    private string _minHeight = "0";
+
+    /// <summary>
+    /// CSS Logical 1 §4: the flow-relative minimum and maximum sizes. Stored on their own rather
+    /// than folded into the physical longhands, for the same reason
+    /// <see cref="BlockSize"/> is: which physical axis each names depends on the box's writing
+    /// mode, and the mode is not settled while the cascade is applying declarations.
+    /// </summary>
+    public string MinBlockSize
+    {
+        get => _minBlockSize;
+        set { _minBlockSize = value; _actualMinWidth = double.NaN; }
+    }
+
+    /// <inheritdoc cref="MinBlockSize"/>
+    public string MaxBlockSize
+    {
+        get => _maxBlockSize;
+        set { _maxBlockSize = value; _actualMaxWidth = double.NaN; }
+    }
+
+    /// <inheritdoc cref="MinBlockSize"/>
+    public string MinInlineSize
+    {
+        get => _minInlineSize;
+        set { _minInlineSize = value; _actualMinWidth = double.NaN; }
+    }
+
+    /// <inheritdoc cref="MinBlockSize"/>
+    public string MaxInlineSize
+    {
+        get => _maxInlineSize;
+        set { _maxInlineSize = value; _actualMaxWidth = double.NaN; }
+    }
+
+    private string _minBlockSize = string.Empty;
+    private string _maxBlockSize = string.Empty;
+    private string _minInlineSize = string.Empty;
+    private string _maxInlineSize = string.Empty;
 
     /// <summary>CSS Sizing 4 <c>aspect-ratio</c> (raw value, e.g. <c>1 / 1</c>).
     /// Honoured for in-flow block-level boxes with an auto block size, which
@@ -1916,6 +1966,26 @@ internal abstract partial class CssBoxProperties
         }
     }
 
+    /// <summary>
+    /// The physical minimum or maximum size a box uses: its own physical longhand when that has
+    /// been given a value, and otherwise whichever flow-relative longhand names the same axis under
+    /// the box's writing mode. <paramref name="horizontalTb"/> is the logical property that is
+    /// physical in <c>horizontal-tb</c> and <paramref name="vertical"/> the one that takes over in a
+    /// vertical mode, so the caller states the mapping once and this only picks between them.
+    /// </summary>
+    private string ResolvePhysicalBound(
+        string physical, string horizontalTb, string vertical, string initial)
+    {
+        if (!string.IsNullOrEmpty(physical)
+            && !physical.Equals(initial, StringComparison.OrdinalIgnoreCase))
+        {
+            return physical;
+        }
+
+        var logical = IsVerticalWritingMode(WritingMode) ? vertical : horizontalTb;
+        return string.IsNullOrEmpty(logical) ? physical : logical;
+    }
+
     private string ResolvePhysicalSize(string explicitPhysicalValue, bool isWidth)
     {
         // PROTOTYPE (BROILER_VERTICAL_FLOW): a vertical-writing-mode box that
@@ -2839,6 +2909,10 @@ internal abstract partial class CssBoxProperties
         Display = p.Display;
         Float = p.Float;
         BlockSize = p.BlockSize;
+        MinBlockSize = p.MinBlockSize;
+        MaxBlockSize = p.MaxBlockSize;
+        MinInlineSize = p.MinInlineSize;
+        MaxInlineSize = p.MaxInlineSize;
         Height = p.Height;
         InlineSize = p.InlineSize;
         MarginBottom = p.MarginBottom;

@@ -1641,7 +1641,11 @@ the test that exposed it.
   That is an argument about what these two scores were worth, not a defence of
   losing them.
 - **`fieldset-001` (79.6% → 78.0%) and `break-inside-avoid-min-block-size-1`/`-2`
-  (83.7% → 82.0%) also slip**, and are not diagnosed.
+  (83.7% → 82.0%) also slip**, and are not diagnosed. (Both were diagnosed
+  afterwards, in [the entry below](#legend-was-an-inline-box-and-two-things-behind-it):
+  `break-inside-avoid-min-block-size-1` recovers to 96.3% once `min-block-size`
+  reaches layout at all, and `fieldset-001` is waiting on the column set cutting a
+  box that has content in it.)
 - **Verified:** four render tests in `MultiColumnFragmentationTests` — the cut
   itself, a block that fits staying put, `break-inside: avoid` keeping a box
   whole, and the border being drawn only at the run's two ends; two of the four
@@ -1654,6 +1658,84 @@ the test that exposed it.
   whitespace between two elements as a fragment — moved no test on its own, and is
   kept because it is what makes the single-child rule mean what it says rather
   than depend on how the markup is indented.
+
+### `<legend>` was an inline box, and two things behind it
+
+- **Tests:** `css-break/break-inside-avoid-min-block-size-1` **82.0% → 96.3%** and
+  both `css-sizing/aspect-ratio/fieldset-element-001` and `-002` to **exactly
+  100%** (from 99.0% and 99.9%) — all three from this repository alone. With
+  `patches/0004` and `0005` applied, `css-break/fieldset-004` 84.4% → **88.5%**
+  and `fieldset-003` 91.3% → **92.1%**. **No test changes state**, and
+  `fieldset-001` — the test this started from — goes 78.0% → 77.7% and still
+  fails; why is below.
+- **Owner:** `Broiler.Layout` (`CssBox.Fieldset`, `CssBox.Layout`,
+  `CssBoxProperties`, `CssUtils`) plus a one-line user-agent addition in each of
+  `Broiler.CSS` and `Broiler.HTML` — **pending patches**, because the push to
+  either submodule answers 403.
+- **The core, and it is one line twice over.** HTML's rendering section makes a
+  `<legend>` a block box. Neither user-agent source said so: `Broiler.CSS`'s
+  `CssUserAgentDefaults.DisplayValues` lists `fieldset` and every other
+  block-level element and not `legend`, and `Broiler.HTML`'s default style sheet
+  has the same omission. Left at the CSS initial value a legend is **inline**, so
+  its `width`, `height` and `padding` do nothing at all. A four-way render pins
+  it — a `<legend>`, the same legend with `display: block`, a `<span>` and a
+  `<div>`, each given `width: 100px; height: 19px; padding: 10px 7px 20px 3px`:
+  the `<div>` and the block legend occupy 49px, the bare legend and the `<span>`
+  occupy 19px.
+- **The main-repo half is the rendered legend's placement.** A fieldset's first
+  legend is not laid out in its content (HTML §15.5.13): it belongs to the
+  block-start border, its margin box centred on that border, so a legend taller
+  than the border stands proud of the border box and the content begins below it
+  rather than below the border. The rule was read back out of
+  `fieldset-001`'s own reference, which states the same layout with a `<p>`, a
+  `margin-top` making room for the part standing above, and an absolutely
+  positioned legend at a negative `top`: a 49px legend margin box on a 6px border
+  sits at `6/2 − 49/2 = −21.5`, and the content starts at `6/2 + 49/2 = 27.5`.
+  It acts on a block-level legend and nothing else, so against the pinned pointers
+  it is inert.
+- **Making the legend a block exposed two more gaps, and the same tests rest on
+  both.** Neither is about fieldsets:
+  - **A preferred aspect ratio sized a box below its own content.** CSS Sizing 4
+    §5.1 makes `min-height: auto` resolve to the content-based minimum, so a ratio
+    that would make the box shorter than its content gives way. The transferred
+    ratio height was overwriting the content height outright, which is how
+    `fieldset-element-001`'s 200px-wide `aspect-ratio: 20/1` fieldset came out
+    10px tall against a reference 57px tall. Once the legend was a block, the
+    black legend covered that whole 10px strip and the test went from wrong to
+    visibly wrong.
+  - **The flow-relative minimum and maximum sizes never reached layout.**
+    `min-block-size`, `max-block-size` and their inline counterparts parse in
+    `Broiler.CSS` and were dropped on the floor by `CssUtils` — there was nowhere
+    to put them. They now have their own properties and the physical `min-`/`max-`
+    longhands consult whichever names the same axis under the box's writing mode,
+    the way `Height` already consults `BlockSize`. That is what caps the
+    content-based minimum in `fieldset-element-002`, and it is also the whole of
+    `break-inside-avoid-min-block-size-1`, which is written on `min-block-size`
+    and had nothing to read — the 14-point jump above.
+- **Why `fieldset-001` still fails, stated plainly.** Two reasons, and the legend
+  is neither. Its column set has to cut a box with *content* in it, which is the
+  general fragmentation
+  [the entry above](#a-box-taller-than-a-column-set-stayed-in-the-first-column)
+  deliberately does not do. And the column pass walks *into* the fieldset — the
+  single-child descent that exists for `html` → `body` — and redistributes the
+  fieldset's own children over the three columns, which throws the legend
+  placement away for this test while the fieldset's border stays drawn once,
+  around the first column. Stopping that descent at a box that paints its own
+  decoration is the right rule and was measured: `css/css-break` 92 → **88**. It
+  is not worth four tests to be right about, so the descent stays and this is
+  filed here rather than pretended away.
+- **Verified:** five tests in `Broiler.Layout.Tests/LogicalMinMaxSizeTests` for
+  the flow-relative bounds including the vertical-writing-mode swap and the
+  physical longhand still winning, and five render tests in
+  `Broiler.Wpt.Tests/FieldsetLegendRenderTests` for the placement, the second
+  legend staying content, an inline legend not moving, and the two aspect-ratio
+  cases. Measured with the submodules at their pinned pointers: paged
+  `css/css-break` holds at 92 of 204 with the average 87.38% → **87.45%**,
+  `css/css-sizing` at 74 of 112, and paged `css/css-page` (135), default
+  `css/css-page` (142), `css/CSS2` (96), `css/css-backgrounds` (424) and
+  `css/css-values` (104) are byte-identical test-for-test. With the two patches
+  applied the css-break average reaches 87.47% and the three `fieldset-*` moves
+  above appear; nothing else changes.
 
 ---
 
