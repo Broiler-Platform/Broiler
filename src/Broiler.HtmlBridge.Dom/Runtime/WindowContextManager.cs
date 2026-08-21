@@ -32,6 +32,15 @@ internal sealed class WindowContextManager(
     public JSObject? ResolveCurrentWindow()
         => GetCanonicalWindow(_browsingContexts.CurrentWindowOverride ?? _host.GetGlobal("window") as JSObject ?? _host.WindowJSObject);
 
+    /// <summary>
+    /// The sub-window whose browsing context is current, or <c>null</c> when that is the main window
+    /// (or there is no window at all). What a caller registering deferred work needs in order to ask
+    /// "was this handed to me by a frame?" — the main-window answer being the one it can ignore,
+    /// since the main context is the one everything already runs in.
+    /// </summary>
+    public JSObject? ResolveCurrentSubWindow()
+        => ResolveCurrentWindow() is { } current && _browsingContexts.IsSubWindow(current) ? current : null;
+
     public JSObject? ResolveOwnerWindow(JSObject target)
         => _eventTargets.TryGetOwnerWindow(target, out var ownerWindow) ? GetCanonicalWindow(ownerWindow) : ResolveCurrentWindow();
 

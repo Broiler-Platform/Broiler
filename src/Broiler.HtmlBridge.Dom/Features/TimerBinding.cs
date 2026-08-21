@@ -16,14 +16,16 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// module (Phase 3). Each entry point is a thin adapter that
 /// unwraps the JS arguments and delegates to the P2.4 <see cref="BrowserEventLoop"/> task-queue
 /// owner. It holds no state of its own, so it takes the owner as a parameter rather than through a
-/// host contract. Previously the bridge's
+/// host contract — and, for the three that register a callback, the P3.18
+/// <see cref="WindowContextManager"/> as well, because deferred work has to remember which browsing
+/// context handed it over. Previously the bridge's
 /// <c>JsRegistrationSetTimeout070Core</c>..<c>CancelAnimationFrame075Core</c> in the shared
 /// JsFunctionCallbacks/Registration.cs grab-bag.
 /// </summary>
 internal static class TimerBinding
 {
-    public static JSValue SetTimeout(BrowserEventLoop loop, in Arguments a) =>
-        new JSNumber(loop.SetTimeout(a.Length > 0 ? a[0] as JSFunction : null, ReadDelayMs(a)));
+    public static JSValue SetTimeout(BrowserEventLoop loop, WindowContextManager windows, in Arguments a) =>
+        new JSNumber(loop.SetTimeout(BindToRegisteringContext(windows, a.Length > 0 ? a[0] as JSFunction : null), ReadDelayMs(a)));
 
     // The delay argument (a[1]) in ms; absent / NaN / negative are treated as 0 (the event loop clamps too).
     private static double ReadDelayMs(in Arguments a) => a.Length > 1 ? a[1].DoubleValue : 0;
@@ -36,8 +38,8 @@ internal static class TimerBinding
         return JSUndefined.Value;
     }
 
-    public static JSValue SetInterval(BrowserEventLoop loop, in Arguments a) =>
-        new JSNumber(loop.SetInterval(a.Length > 0 ? a[0] as JSFunction : null, ReadDelayMs(a)));
+    public static JSValue SetInterval(BrowserEventLoop loop, WindowContextManager windows, in Arguments a) =>
+        new JSNumber(loop.SetInterval(BindToRegisteringContext(windows, a.Length > 0 ? a[0] as JSFunction : null), ReadDelayMs(a)));
 
     public static JSValue ClearInterval(BrowserEventLoop loop, in Arguments a)
     {
@@ -47,8 +49,8 @@ internal static class TimerBinding
         return JSUndefined.Value;
     }
 
-    public static JSValue RequestAnimationFrame(BrowserEventLoop loop, in Arguments a) =>
-        new JSNumber(loop.RequestAnimationFrame(a.Length > 0 ? a[0] as JSFunction : null));
+    public static JSValue RequestAnimationFrame(BrowserEventLoop loop, WindowContextManager windows, in Arguments a) =>
+        new JSNumber(loop.RequestAnimationFrame(BindToRegisteringContext(windows, a.Length > 0 ? a[0] as JSFunction : null)));
 
     public static JSValue CancelAnimationFrame(BrowserEventLoop loop, in Arguments a)
     {
@@ -56,6 +58,52 @@ internal static class TimerBinding
             loop.CancelAnimationFrame((int)a[0].DoubleValue);
 
         return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// Ties a callback to the browsing context that registered it, so that when the queue drains it
+    /// runs against its own <c>document</c>/<c>location</c>/<c>window</c> rather than against
+    /// whichever context happens to be current at that moment.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every document shares one JavaScript context here, and the drain runs from C# with no
+    /// browsing context pushed — so it ran in the main one. A frame's synchronous script was already
+    /// correct (the sub-document script runner pushes the frame's context around it), but the moment
+    /// that script deferred anything, the callback woke up in the parent: its <c>document</c> was the
+    /// parent's document, so <c>document.getElementById(…)</c> for one of its own elements returned
+    /// null and the callback either threw — swallowed by the drain's catch, leaving no trace at all —
+    /// or quietly mutated the wrong document. Deferring work to a timer is how most framed script
+    /// does anything, so this was most of what a frame's scripting could do.
+    /// </para>
+    /// <para>
+    /// The main window is the overwhelmingly common case and is returned unwrapped: the drain already
+    /// runs in its context, so wrapping would buy nothing and cost an allocation per registration
+    /// plus <c>RunWithWindowContext</c>'s save/restore on every tick — on the one call busy pages
+    /// make constantly. Only a frame pays for being a frame.
+    /// </para>
+    /// </remarks>
+    private static JSFunction? BindToRegisteringContext(WindowContextManager windows, JSFunction? callback)
+    {
+        if (callback is null || windows.ResolveCurrentSubWindow() is not { } frameWindow)
+            return callback;
+
+        return new DomFunction((in a) =>
+        {
+            // A queued callback is invoked with at most one real argument — a rAF timestamp, an
+            // IdleDeadline — and `in` parameters cannot be captured, so the call is read out into
+            // locals here. Arguments' first constructor parameter is `this`; Length and the indexer
+            // count only the real arguments, so the one to forward is a[0].
+            var thisValue = a.This ?? JSUndefined.Value;
+            var argument = a.Length > 0 ? a[0] : null;
+
+            JSValue result = JSUndefined.Value;
+            windows.RunWithWindowContext(frameWindow, () =>
+                result = callback.InvokeFunction(argument is null
+                    ? new Arguments(thisValue)
+                    : new Arguments(thisValue, argument)));
+            return result;
+        }, "callback", 0);
     }
 
     /// <summary>
@@ -80,9 +128,9 @@ internal static class TimerBinding
     /// <see cref="ReadDelayMs"/> read <c>NaN</c> off the object and scheduled at 0 regardless of what
     /// the page asked for; <c>timeout</c> is read out of it properly here.
     /// </remarks>
-    public static JSValue RequestIdleCallback(BrowserEventLoop loop, in Arguments a)
+    public static JSValue RequestIdleCallback(BrowserEventLoop loop, WindowContextManager windows, in Arguments a)
     {
-        if (a.Length == 0 || a[0] as JSFunction is not { } callback)
+        if (a.Length == 0 || BindToRegisteringContext(windows, a[0] as JSFunction) is not { } callback)
             return new JSNumber(loop.SetTimeout(null));
 
         // A timeout means "run by then at the latest". There is no idle period here for the callback

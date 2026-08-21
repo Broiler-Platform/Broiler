@@ -214,6 +214,26 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Work a frame defers runs in the frame's browsing context. Every document shares
+  one JavaScript context here and the queue drain runs from C# with no context
+  pushed, so a callback woke up in the **main** one: a frame's `setTimeout`,
+  `setInterval`, `requestAnimationFrame` and `requestIdleCallback` callbacks saw
+  the *parent's* `document`, `location` and `window`. Looking up one of the
+  frame's own elements returned null, and the callback then either threw — caught
+  by the drain and logged, leaving no trace in the page at all — or quietly
+  mutated the wrong document. The frame's synchronous script was always correct,
+  which made the failure look like "frames don't run scripts" rather than what it
+  was; deferring to a timer is how most framed script does anything, so this was
+  most of what a frame could do.
+  - A callback is now bound to the browsing context that registered it and
+    re-enters it when the queue drains — including a callback registered from
+    inside another frame callback, which is the shape of every self-rescheduling
+    loop. The rAF timestamp and the `IdleDeadline` are forwarded through the
+    switch rather than dropped.
+  - Only frames pay for it. A main-window registration is left unwrapped, so
+    `setTimeout` — which busy pages call constantly — keeps its allocation-free
+    path and no per-tick save/restore.
+
 - An idle callback is handed an `IdleDeadline`. `requestIdleCallback` was a bare
   alias of `setTimeout`, which invokes its callback with no arguments at all, so
   the parameter every caller destructures was `undefined` and the first thing they
