@@ -283,20 +283,30 @@ function clearReference(outputDir, pageId) {
  * are ordinary states part-way through a run.
  */
 function parseResultsPayload(serialized) {
+    const empty = { payload: null, count: 0, answered: 0 };
     if (typeof serialized !== 'string' || serialized.trim() === '')
-        return { payload: null, count: 0 };
+        return empty;
     let parsed;
     try {
         parsed = JSON.parse(serialized);
     } catch {
-        return { payload: null, count: 0 };
+        return empty;
     }
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed))
-        return { payload: null, count: 0 };
+        return empty;
     const entries = Array.isArray(parsed.results) ? parsed.results : null;
     if (entries === null)
-        return { payload: null, count: 0 };
-    return { payload: parsed, count: entries.length };
+        return empty;
+    // Most pages push a probe only once it settles, so the length alone would
+    // do; a page that seeds its array and fills the values in afterwards would
+    // otherwise look finished on the first poll, so answered values are counted
+    // as well and the capture waits for both to hold still.
+    const answered = entries.filter(entry =>
+        entry !== null
+        && typeof entry === 'object'
+        && entry.value !== undefined
+        && entry.value !== null).length;
+    return { payload: parsed, count: entries.length, answered };
 }
 
 async function readResults(page, expression) {
@@ -368,23 +378,21 @@ async function captureAttempt(browser, manifest, entry, options, attemptNumber) 
 
         let payload = null;
         let count = 0;
+        let answered = 0;
         let quietPolls = 0;
         let settleState = 'deadline';
         while (Date.now() < deadline) {
             const observed = await readResults(tab, settings.resultsExpression);
-            if (observed.count === count && count > 0) {
-                quietPolls += 1;
-                if (quietPolls >= DEFAULT_STABLE_POLLS) {
-                    payload = observed.payload;
-                    settleState = 'stable';
-                    break;
-                }
-            } else {
-                quietPolls = 0;
-            }
+            const held = observed.count === count && observed.answered === answered;
+            quietPolls = held && count > 0 ? quietPolls + 1 : 0;
             if (observed.payload !== null) {
                 payload = observed.payload;
                 count = observed.count;
+                answered = observed.answered;
+            }
+            if (quietPolls >= DEFAULT_STABLE_POLLS) {
+                settleState = 'stable';
+                break;
             }
             await tab.waitForTimeout(
                 Math.min(options.pollIntervalMilliseconds, Math.max(0, deadline - Date.now())));

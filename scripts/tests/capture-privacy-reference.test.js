@@ -70,14 +70,25 @@ test('page overrides win over the manifest defaults, and the CLI wins over both'
 });
 
 test('the results expression is read as a payload only when it carries a results array', () => {
-    assert.deepEqual(capture.parseResultsPayload(''), { payload: null, count: 0 });
-    assert.deepEqual(capture.parseResultsPayload('not json'), { payload: null, count: 0 });
-    assert.deepEqual(capture.parseResultsPayload('[1,2]'), { payload: null, count: 0 });
-    assert.deepEqual(capture.parseResultsPayload('{"page":"x"}'), { payload: null, count: 0 });
+    const empty = { payload: null, count: 0, answered: 0 };
+    assert.deepEqual(capture.parseResultsPayload(''), empty);
+    assert.deepEqual(capture.parseResultsPayload('not json'), empty);
+    assert.deepEqual(capture.parseResultsPayload('[1,2]'), empty);
+    assert.deepEqual(capture.parseResultsPayload('{"page":"x"}'), empty);
 
     const observed = capture.parseResultsPayload('{"results":[{"id":"a","value":1}]}');
     assert.equal(observed.count, 1);
     assert.equal(observed.payload.results[0].id, 'a');
+});
+
+test('a seeded results array counts as unsettled until its values arrive', () => {
+    const seeded = capture.parseResultsPayload('{"results":[{"id":"a"},{"id":"b","value":null}]}');
+    assert.equal(seeded.count, 2);
+    assert.equal(seeded.answered, 0);
+
+    const filled = capture.parseResultsPayload('{"results":[{"id":"a","value":1},{"id":"b","value":null}]}');
+    assert.equal(filled.count, 2);
+    assert.equal(filled.answered, 1);
 });
 
 test('a manifest from another schema version is rejected rather than half-read', () => {
