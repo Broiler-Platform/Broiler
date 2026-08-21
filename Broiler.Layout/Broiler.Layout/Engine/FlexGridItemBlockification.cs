@@ -41,12 +41,24 @@ internal static class FlexGridItemBlockification
         if (root == null)
             return;
 
+        // The `display: contents` splice has to have happened before anything below reads a
+        // child's display, because a box spliced in from a `contents` wrapper is a flex/grid item
+        // of this container and has to be blockified as one. It is driven from here rather than
+        // from its own line in `DomParser.PrepareCssTree` because that method is in the
+        // Broiler.HTML submodule, which this session cannot push to — and this call is the first
+        // thing the box fix-up sequence there runs, so the pass lands at exactly the point in the
+        // pipeline it belongs at. Idempotent, so adding the direct call later is a no-op here.
+        DisplayContentsBoxes.Generate(root);
+
         Blockify(root);
     }
 
     private static void Blockify(CssBox box)
     {
         bool blockifiesChildren = IsFlexOrGridContainer(box.Display);
+
+        if (blockifiesChildren)
+            WrapTextRunsInAnonymousItems(box);
 
         for (int i = 0; i < box.Boxes.Count; i++)
         {
@@ -69,6 +81,111 @@ internal static class FlexGridItemBlockification
 
     private static bool IsFlexOrGridContainer(string display) =>
         display is "flex" or "inline-flex" or "grid" or "inline-grid";
+
+    /// <summary>
+    /// CSS Flexbox §4 / CSS Grid §6: "each contiguous sequence of child text runs is wrapped in an
+    /// anonymous block container flex item… However, if the entire sequence of child text runs
+    /// contains only white space it is instead not rendered."
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A text run is not an element, so it carries no <c>display</c> for <see cref="Blockify"/> to
+    /// blockify — and the inline/block correction that would ordinarily wrap it never reaches it
+    /// either, because a flex/grid container's children are items rather than inline content. The
+    /// run therefore stayed a display-less box, which <see cref="CssBox.PerformLayout"/> resolves
+    /// no size for: text written directly inside a flex or grid container simply did not appear.
+    /// </para>
+    /// <para>
+    /// duckduckgo.com's start page writes its search-mode chips that way —
+    /// <c>&lt;span style="display:flex"&gt;&lt;button&gt;&lt;svg/&gt;&lt;/button&gt;Search&lt;/span&gt;</c>
+    /// — so the icons rendered and the "Search" and "Ask AI" labels beside them did not.
+    /// </para>
+    /// <para>
+    /// A white-space-only sequence is left unwrapped rather than deleted: it is not rendered either
+    /// way (a display-less box lays out as nothing, and <c>CorrectTextBoxes</c> drops it a moment
+    /// later), and leaving it in place keeps this pass from changing anything about a tree that has
+    /// no real text run in a flex or grid container.
+    /// </para>
+    /// </remarks>
+    private static void WrapTextRunsInAnonymousItems(CssBox box)
+    {
+        bool anyRenderedRun = false;
+        foreach (var child in box.Boxes)
+        {
+            if (IsTextRun(child) && !IsWhiteSpaceOnly(child))
+            {
+                anyRenderedRun = true;
+                break;
+            }
+        }
+
+        if (!anyRenderedRun)
+            return;
+
+        // Rebuilt rather than spliced in place, for the reason AnonymousTableBoxes.WrapRuns is:
+        // creating the wrapper appends it to this list, which is what puts it where the run began.
+        var children = new List<CssBox>(box.Boxes);
+        box.Boxes.Clear();
+
+        List<CssBox> pending = [];
+
+        void Flush()
+        {
+            if (pending.Count == 0)
+                return;
+
+            bool rendered = false;
+            foreach (var run in pending)
+                rendered |= !IsWhiteSpaceOnly(run);
+
+            if (rendered)
+            {
+                var wrapper = CssBoxHelper.CreateBox(box, box.BaseUrl);
+                wrapper.Display = CssConstants.Block;
+
+                foreach (var run in pending)
+                    run.ParentBox = wrapper;
+            }
+            else
+            {
+                foreach (var run in pending)
+                    run.ParentBox = box;
+            }
+
+            pending.Clear();
+        }
+
+        foreach (var child in children)
+        {
+            if (IsTextRun(child))
+            {
+                pending.Add(child);
+                continue;
+            }
+
+            Flush();
+            child.ParentBox = box;
+        }
+
+        Flush();
+    }
+
+    /// <summary>
+    /// Whether the box is one of the anonymous boxes the DOM→box walk makes for a run of text:
+    /// no element of its own, no children, and text to show.
+    /// </summary>
+    private static bool IsTextRun(CssBox box) =>
+        box.HtmlTag == null
+        && box.Boxes.Count == 0
+        && !box.Text.IsEmpty
+        && box.Display != CssConstants.None;
+
+    private static bool IsWhiteSpaceOnly(CssBox box) =>
+        box.Text.Span.IsWhiteSpace()
+        && box.WhiteSpace != CssConstants.Pre
+        && box.WhiteSpace != CssConstants.PreWrap
+        && box.WhiteSpace != "pre-line"
+        && box.WhiteSpace != "break-spaces";
 
     /// <summary>
     /// CSS Display 3 §2.7 / CSS Flexbox §4: only in-flow children become items. A
