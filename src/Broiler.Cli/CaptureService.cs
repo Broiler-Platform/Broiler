@@ -422,10 +422,10 @@ public class CaptureService
     /// negotiation — for want of this one header. See <see cref="BroilerUserAgent"/>.
     /// </remarks>
     private static HttpClient CreateHttpClient(int timeoutSeconds) =>
-        BroilerUserAgent.Apply(new HttpClient
+        BroilerHttpProtocol.Apply(BroilerUserAgent.Apply(new HttpClient
         {
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
-        });
+        }));
 
     /// <summary>
     /// Fetches the top-level document, recording it when a diagnostic run is listening. The page

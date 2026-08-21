@@ -56,6 +56,17 @@ public sealed partial class DomBridge
 
         // Storage interface global — the name a page tests before it touches an area.
         RegisterStorageConstructor(context);
+
+        // Notification — the interface, with its permission already settled at "denied" because
+        // there is no surface to show one on (NotificationBinding).
+        var notification = Dom.Features.NotificationBinding.Build();
+        window.FastAddValue((KeyString)"Notification", notification, JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // MediaSource — the Media Source Extensions entry point, whose isTypeSupported answers for
+        // the playback pipeline the HTML layer does not yet have (MediaCapabilityBinding, which also
+        // installs canPlayType on the media elements themselves).
+        var mediaSource = Dom.Features.MediaCapabilityBinding.BuildMediaSource(context);
+        window.FastAddValue((KeyString)"MediaSource", mediaSource, JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     /// <summary>

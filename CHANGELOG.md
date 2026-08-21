@@ -9,6 +9,46 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- Fifteen platform surfaces a page probes and Broiler had none of. Each was an
+  absence a script could not survive rather than one it could branch on: reading
+  `performance.memory.usedJSHeapSize`, calling `video.canPlayType(type)` or
+  `navigator.getGamepads()`, iterating `navigator.plugins` — all threw, and a
+  throw aborts the whole function that asked, not the statement that asked. The
+  answers below are what the engine can honestly give, which for most of them is
+  a negative one stated in the interface's own vocabulary.
+  - `performance.memory` and `console.memory` — one `MemoryInfo`, read from the
+    GC that is actually executing the page's script and rounded to 100 KiB.
+    Chrome bucketizes the same numbers for the same reason: an exact heap size is
+    a high-entropy value a page can sample repeatedly to identify a browser.
+  - The document's `PerformanceNavigationTiming` entry, which the Performance
+    Timeline getters now have something to return — including
+    `nextHopProtocol`, which names the HTTP version Broiler's loaders actually
+    negotiate (`Broiler.Layout.Net.BroilerHttpProtocol`, now pinned on both
+    clients rather than assumed) and is empty for a document that had no network
+    hop. The entry carries no timing marks: Broiler's loader does not record
+    them, and zeroes would let a page difference two of them into a plausible
+    `0 ms` that no feature test could tell from "not measured".
+  - `screen.orientation`, derived from the screen's own shape so it cannot
+    contradict the `width`/`height` beside it.
+  - `Notification`, whose permission is settled at `denied` — the terminal
+    state, and the true one, since there is no surface a notification could be
+    shown on. `default` would instead invite a page to wait on a prompt that
+    cannot appear.
+  - `MediaSource` and `HTMLMediaElement.canPlayType()` on `<video>`/`<audio>`,
+    answering `false` and `""` for every type. Those are the specified values for
+    "cannot be rendered", which is the state of an engine with no media playback
+    pipeline wired to its HTML layer, and they are what a player needs in order
+    to take its fallback rather than wait on a video that will never arrive.
+  - `navigator.javaEnabled()`, `navigator.getBattery()`,
+    `navigator.getGamepads()`, `navigator.plugins` / `navigator.mimeTypes` /
+    `navigator.pdfViewerEnabled`, `navigator.requestMediaKeySystemAccess()`, and
+    the legacy `navigator.webkitTemporaryStorage` /
+    `webkitPersistentStorage.queryUsageAndQuota` pair, which report the
+    quota-managed storage Broiler has none of.
+  - Found by the privacy test pages' Chromium comparison, which is what turned
+    "Broiler produced nothing here" into a list with a known expected shape; see
+    `docs/privacy-test-page-gaps.md` for the six absences in the same group that
+    are deliberately **not** stubbed, among them WebRTC and the generic sensors.
 - The desktop applications use the machine's clipboard. Broiler.UI has always had
   a clipboard *port* — `IUiClipboardHost`, which every text control copies and
   pastes through — but on Windows and Linux nothing was plugged into it: the
