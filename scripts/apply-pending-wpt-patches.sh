@@ -296,7 +296,6 @@ set -euo pipefail
 # cannot reach a group opened for `opacity` or for a real `mix-blend-mode`. Only this patch keeps
 # those, and only the pixel suite can say the subtree reached the canvas.
 PENDING_PATCHES=(
-  "Broiler.HTML|patches/0001-compositing-group-transform-content.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
