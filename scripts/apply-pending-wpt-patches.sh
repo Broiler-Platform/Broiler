@@ -280,7 +280,23 @@ set -euo pipefail
 # Deliberately NOT listed:
 #   * 0001 (Broiler.JS, compiled-site lifetime) — a retention fix with no effect on rendered
 #     output, so a pixel run has nothing to say about it.
+#
+# Those three landed upstream together, which emptied patches/ and restarted the numbering, so
+# the 0001 below is a different change from the one named just above.
+#
+# 0001 (Broiler.HTML, "Keep a compositing group's contents when the group cannot use the raster
+# canvas") IS listed, for the same reason the dashed-stroke patch was: a draw that misses the
+# raster fast path falls through to the compat seam, which on a host with no OS backend is an
+# inert stub, so it paints *nothing*. Here it is not one edge but a whole compositing group —
+# `opacity`, `mix-blend-mode`, or the `normal`-blend group `isolation: isolate` emits — and every
+# descendant under it, dropped whenever the group encloses a single `TransformItem`, which
+# `IsRasterCompatibleItem` rejects. The main repo carries the half of the fix expressible there
+# (Broiler.Layout stops emitting an isolation group when nothing in the document blends,
+# unit-tested in UnobservableIsolationGroupTests), and that half is narrower by construction: it
+# cannot reach a group opened for `opacity` or for a real `mix-blend-mode`. Only this patch keeps
+# those, and only the pixel suite can say the subtree reached the canvas.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0001-compositing-group-transform-content.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

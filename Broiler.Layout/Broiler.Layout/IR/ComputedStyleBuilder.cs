@@ -34,7 +34,13 @@ internal static class ComputedStyleBuilder
     /// <summary>
     /// Snapshots the computed style of a CssBox, capturing all resolved actual values.
     /// </summary>
-    public static ComputedStyle FromBox(CssBoxProperties box, string? tagName = null)
+    /// <param name="isolationObservable">
+    /// Whether an <c>isolation: isolate</c> on this box can make any difference to the picture —
+    /// see <c>FragmentTreeBuilder.DocumentHasBlending</c>. When it cannot, the box computes to
+    /// <c>isolation: auto</c> so paint does not open a compositing group whose only possible
+    /// contribution is the one thing nothing in the document asks for.
+    /// </param>
+    public static ComputedStyle FromBox(CssBoxProperties box, string? tagName = null, bool isolationObservable = true)
     {
         return new ComputedStyle
         {
@@ -162,7 +168,7 @@ internal static class ComputedStyleBuilder
             MixBlendMode = box.MixBlendMode,
             BackgroundBlendMode = box.BackgroundBlendMode,
             Filter = box.Filter,
-            Isolation = box.Isolation,
+            Isolation = isolationObservable ? box.Isolation : "auto",
             BackgroundClip = box.BackgroundClip,
             // CSS 2.1 §11.1.2's `clip` is the same rectangular clip `clip-path: inset()` names, so
             // it is resolved into one here rather than applied a second time in paint.
