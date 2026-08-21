@@ -178,6 +178,11 @@ jobs:
         if: always()
         shell: bash
         run: |
+          if [ -f "$RESULTS_DIR/reference.log" ]; then
+            echo "--- Chromium capture ---"
+            cat "$RESULTS_DIR/reference.log"
+            echo
+          fi
           if [ -f "$RESULTS_DIR/gaps.md" ]; then
             cat "$RESULTS_DIR/gaps.md"
           else

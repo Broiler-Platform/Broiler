@@ -1681,10 +1681,15 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         page_summary = result["summary"]
         parity_summary = result["parity"]["summary"]
+        chromium = (
+            f"chromium {reference['status']} {reference.get('testCount', 0)} probe(s)"
+            if reference is not None
+            else "no chromium reference"
+        )
         print(
             f"    {result['status']}: {page_summary['withValue']}/{page_summary['tests']} carried out, "
             f"{parity_summary[PARITY_GAP]} behind Chromium, "
-            f"{len(result['comparison']['regressions'])} regression(s)",
+            f"{len(result['comparison']['regressions'])} regression(s) · {chromium}",
             flush=True,
         )
         results.append(result)

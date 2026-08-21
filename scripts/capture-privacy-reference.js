@@ -27,10 +27,19 @@ const LAUNCH_TIMEOUT_MS = 60_000;
 const CONTEXT_TIMEOUT_MS = 30_000;
 const EVALUATE_TIMEOUT_MS = 30_000;
 const DEFAULT_POLL_INTERVAL_MS = 500;
-// A page's probes land in `results` over time, so the array is read until its
-// length holds still. Three quiet polls is the shortest window that does not
-// mistake the gap between two slow probes for the end of the run.
+// A page's probes land in `results` over time, so the array is read until it
+// holds still. Three quiet polls is the shortest window that does not mistake
+// the gap between two slow probes for the end of the run.
 const DEFAULT_STABLE_POLLS = 3;
+// Several pages seed every probe with a null value the moment the run starts
+// and fill them in as requests to third-party hosts complete, which can take
+// seconds. Those pages hold still while they are still working, so a capture
+// is not allowed to finish before this floor, or while nothing has been
+// answered at all — it waits out the page's own timeout instead. Settling
+// early there is worse than waiting: it would publish a reference full of
+// nulls, and every probe Broiler misses would silently read as "Chromium could
+// not do this either".
+const MINIMUM_SETTLE_MS = 5_000;
 const DEFAULT_VIEWPORT = { width: 1280, height: 720 };
 const DEFAULT_LOCALE = 'en-US';
 const DEFAULT_TIMEZONE = 'UTC';
@@ -390,7 +399,10 @@ async function captureAttempt(browser, manifest, entry, options, attemptNumber) 
                 count = observed.count;
                 answered = observed.answered;
             }
-            if (quietPolls >= DEFAULT_STABLE_POLLS) {
+            const settled = quietPolls >= DEFAULT_STABLE_POLLS
+                && answered > 0
+                && Date.now() - started >= MINIMUM_SETTLE_MS;
+            if (settled) {
                 settleState = 'stable';
                 break;
             }
