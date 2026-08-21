@@ -49,7 +49,7 @@ internal static class HtmlReader
         HtmlDocumentParseResult parse;
         try
         {
-            parse = new HtmlDocumentParser().ParseDocument(html);
+            parse = HtmlDocumentParser.ParseDocument(html);
         }
         catch (Exception ex)
         {

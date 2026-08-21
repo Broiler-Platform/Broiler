@@ -75,7 +75,7 @@ public sealed class Phase5SharedCascadeTests
 
     private static (Broiler.CSS.Dom.CssStyleEngine Engine, CssBox Root) Build(string html)
     {
-        var document = new HtmlDocumentParser().ParseDocument(html).Document;
+        var document = HtmlDocumentParser.ParseDocument(html).Document;
         var root = HtmlParser.ParseDocument(document, new Uri("file:///t.html"));
         var styleStart = html.IndexOf("<style>", StringComparison.OrdinalIgnoreCase);
         var styleEnd = html.IndexOf("</style>", StringComparison.OrdinalIgnoreCase);

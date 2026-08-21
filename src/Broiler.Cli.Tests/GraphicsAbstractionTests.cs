@@ -216,7 +216,7 @@ public class GraphicsAbstractionTests
     public void HtmlContainer_Typed_And_Serialized_Paths_Produce_Equivalent_Fragment_Trees()
     {
         const string html = "<html><body style='margin:0'><div id='target' style='width:20px;height:10px'>value</div></body></html>";
-        var document = new HtmlDocumentParser().ParseDocument(html).Document;
+        var document = HtmlDocumentParser.ParseDocument(html).Document;
 
         using var serialized = new HtmlContainer();
         using var typed = new HtmlContainer();
@@ -236,7 +236,7 @@ public class GraphicsAbstractionTests
     [Fact]
     public void HtmlContainer_Typed_Path_Rebuilds_After_Canonical_Dom_Mutation()
     {
-        var document = new HtmlDocumentParser()
+        var document = HtmlDocumentParser
             .ParseDocument("<html><body style='margin:0'><div id='target' style='width:20px;height:10px'></div></body></html>")
             .Document;
         var target = document.GetElementById("target")!;
