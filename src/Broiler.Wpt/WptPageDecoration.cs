@@ -51,9 +51,10 @@ namespace Broiler.Wpt;
 internal sealed record WptPageDecoration(string BackgroundCss, string BoxCss, bool HasInsets)
 {
     /// <summary>
-    /// The decoration <paramref name="html"/>'s unconditional <c>@page</c> rules declare, or
-    /// <c>null</c> when they declare none — which is every document that does not style the sheet,
-    /// and the reason this costs nothing for the rest of the suite.
+    /// The decoration the <c>@page</c> rules that apply to <paramref name="html"/>'s sheet declare
+    /// (see <see cref="WptPageBox.EnumerateAppliedPageBlocks"/>), or <c>null</c> when they declare
+    /// none — which is every document that does not style the sheet, and the reason this costs
+    /// nothing for the rest of the suite.
     /// </summary>
     /// <param name="html">The document's markup.</param>
     /// <param name="page">
@@ -70,7 +71,7 @@ internal sealed record WptPageDecoration(string BackgroundCss, string BoxCss, bo
         bool paints = false, insets = false;
         var axes = WptPageAxes.Resolve(html);
 
-        foreach (var (declarations, _) in WptPageBox.EnumerateUnconditionalPageBlocks(html))
+        foreach (var (declarations, _) in WptPageBox.EnumerateAppliedPageBlocks(html))
         {
             double fontSize = WptPageBox.FontSizeOf(declarations.Declarations.ToList());
 

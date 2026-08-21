@@ -7,6 +7,13 @@ namespace Broiler.Layout.Engine;
 internal partial class CssBox : CssBoxProperties, IDisposable
 {
     /// <summary>
+    /// Whether this box was created by <see cref="SliceTallFragments"/> to carry one column's worth
+    /// of a box taller than the column set. Marked so a second layout pass rebuilds the run against
+    /// its own column height instead of slicing the slices.
+    /// </summary>
+    internal bool IsColumnSlice { get; private init; }
+
+    /// <summary>
     /// CSS Multi-column Layout: Redistributes in-flow child boxes into
     /// multiple columns after single-column layout.  Walks down through
     /// single-child containers (e.g. html to body) to find the actual
@@ -51,6 +58,13 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 continue;
 
             if (child.Display == CssConstants.None)
+                continue;
+
+            // The collapsed whitespace between two elements is an anonymous box of its own, and it
+            // is not a fragment: counting it made a column set with one real child look like a
+            // column set with three, which is the difference between leaving that child alone and
+            // narrowing it to a column.
+            if (!GeneratesAColumnFragment(child))
                 continue;
 
             fragments.Add(child);
@@ -216,6 +230,24 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             }
         }
 
+        // One fragment that either fits in a column or cannot be cut has nothing to distribute and
+        // nothing to fragment, so the column set leaves it exactly where the flow put it. Saying so
+        // is what lets the search above accept a single child at all: columnising one anyway
+        // narrows it to a column's width and moves it for no gain, which is what
+        // `out-of-flow-in-multicolumn-019` and `overflowing-block-003` measured as a loss.
+        if (fragments.Count == 1
+            && (GetVisualBottom(fragments[0]) - fragments[0].Location.Y <= columnHeight + 0.5
+                || !CanBeSlicedAcrossColumns(fragments[0])))
+        {
+            return;
+        }
+
+        // A box taller than the column it is in continues in the next one, which means cutting it
+        // rather than moving it. Done here, before the distribution below, so the loop that places
+        // fragments into columns sees a run of column-sized boxes and needs to know nothing about
+        // fragmentation.
+        fragments = SliceTallFragments(fragments, fragmentParent, columnHeight);
+
         // Distribute fragments across columns.
         int currentCol = 0;
         double currentY = containerTop;
@@ -292,6 +324,175 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
+    /// Cuts every fragment taller than one column into a run of column-tall pieces.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// CSS Fragmentation 3 §3: a box that does not fit in its fragmentainer continues in the next
+    /// one. Distributing whole boxes covers a column set made of several blocks, but not the shape
+    /// most of the fragmentation corpus is actually written in — <em>one</em> block, taller than the
+    /// column set, whose decoration is the thing under test. <c>css-break/borders-003</c> is a
+    /// 250px bordered box in three 100px columns; <c>css-page/fixedpos-011-print</c> is a 400px
+    /// block in four; <c>css-break/background-image-000</c> is four of them at once. Without this
+    /// the box stayed whole in the first column and ran out of the bottom of the column set.
+    /// </para>
+    /// <para>
+    /// Only a box with nothing in it is cut. A slice is a real box in the tree rather than a paint
+    /// instruction, so a box with content would have to have that content divided too — which is
+    /// the general fragmentation this engine does not do. A box with no content of its own is
+    /// entirely described by its own decoration, and is exactly what these tests are made of.
+    /// </para>
+    /// <para>
+    /// The decoration is sliced, not repeated: <c>box-decoration-break</c>'s initial value is
+    /// <c>slice</c> (§5.2), so the run is decorated as though it were one box and then cut — the
+    /// border and its rounded corners belong to the two outer ends, and the cuts between them are
+    /// square and open. That is what <c>borders-003</c> states in its own words: "The border should
+    /// be rounded at the start (first column) and at the end (last column)."
+    /// </para>
+    /// </remarks>
+    private static List<CssBox> SliceTallFragments(
+        List<CssBox> fragments, CssBox fragmentParent, double columnHeight)
+    {
+        // Slices carry a column height that some earlier pass computed; this pass has computed its
+        // own, so they are rebuilt rather than reused. Layout runs twice whenever the width is
+        // unconstrained, and stale slices would otherwise accumulate.
+        fragmentParent.Boxes.RemoveAll(box => box.IsColumnSlice);
+
+        var sliced = new List<CssBox>();
+        bool cut = false;
+
+        foreach (var fragment in fragments)
+        {
+            if (fragment.IsColumnSlice)
+                continue;
+
+            double height = GetVisualBottom(fragment) - fragment.Location.Y;
+            int pieces = columnHeight > 0 ? (int)Math.Ceiling(height / columnHeight - 0.001) : 1;
+
+            if (pieces <= 1 || pieces > MaxColumnSlices || !CanBeSlicedAcrossColumns(fragment))
+            {
+                sliced.Add(fragment);
+                continue;
+            }
+
+            cut = true;
+            float width = fragment.Size.Width;
+
+            for (int piece = 1; piece < pieces; piece++)
+            {
+                var slice = new CssBox(fragmentParent, fragment.HtmlTag, fragment.BaseUrl)
+                {
+                    IsColumnSlice = true,
+                };
+
+                slice.InheritStyle(fragment, everything: true);
+                slice.LayoutEnvironment = fragment.LayoutEnvironment;
+                slice.Location = fragment.Location;
+                slice.Size = new SizeF(width, (float)Math.Min(columnHeight, height - piece * columnHeight));
+                ShapeSlice(slice, first: false, last: piece == pieces - 1);
+                sliced.Add(slice);
+            }
+
+            // The original keeps the first piece, so whatever else in the tree refers to this box
+            // still refers to something in the flow.
+            fragment.Size = new SizeF(width, (float)columnHeight);
+            ShapeSlice(fragment, first: true, last: false);
+            sliced.Insert(sliced.Count - (pieces - 1), fragment);
+        }
+
+        return cut ? sliced : fragments;
+
+        static void ShapeSlice(CssBox slice, bool first, bool last)
+        {
+            if (!first)
+            {
+                slice.BorderTopStyle = CssConstants.None;
+                slice.CornerNwRadius = "0";
+                slice.CornerNeRadius = "0";
+            }
+
+            if (!last)
+            {
+                slice.BorderBottomStyle = CssConstants.None;
+                slice.CornerSeRadius = "0";
+                slice.CornerSwRadius = "0";
+            }
+        }
+    }
+
+    /// <summary>
+    /// A bound on how many pieces one box is cut into — a runaway column height would otherwise
+    /// turn a tall box into thousands of boxes.
+    /// </summary>
+    private const int MaxColumnSlices = 64;
+
+    /// <summary>
+    /// Whether a box puts anything in a column. The whitespace between two elements does not, and
+    /// neither does an empty box with no size.
+    /// </summary>
+    private static bool GeneratesAColumnFragment(CssBox box)
+    {
+        if (box.Boxes.Count > 0)
+            return true;
+
+        foreach (var word in box.Words)
+        {
+            if (!word.IsSpaces || word.IsImage)
+                return true;
+        }
+
+        return box.Size.Height > 0.01 || box.ActualBottom - box.Location.Y > 0.01;
+    }
+
+    /// <summary>
+    /// Whether a box can be cut across a column boundary: it is in the flow, it is not monolithic,
+    /// and it has no content of its own that would have to be divided with it.
+    /// </summary>
+    private static bool CanBeSlicedAcrossColumns(CssBox box)
+    {
+        if (box.Boxes.Count > 0 || box.Words.Count > 0)
+            return false;
+
+        if (box.Display == CssConstants.None
+            || box.Float != CssConstants.None
+            || box.Position is CssConstants.Absolute or CssConstants.Fixed
+            || box.IsImage)
+        {
+            return false;
+        }
+
+        // CSS Fragmentation 3 §5.2: with `box-decoration-break: slice` the run is decorated as one
+        // box and then cut, which a run of independent boxes can only imitate for decoration that
+        // does not depend on where in the box it is drawn. A colour and a border do not; a
+        // background image, a gradient and a box shadow are all positioned against the box they are
+        // on, so slicing one paints it once per piece instead of once across the run — measured on
+        // `css-break/background-image-000` through `-002` and `box-shadow-002` through `-005`,
+        // every one of which got worse when they were cut. They keep the whole box until the paint
+        // can be told what the unfragmented run looked like.
+        if (!IsSliceableDecoration(box.BackgroundImage)
+            || !IsSliceableDecoration(box.BackgroundGradient)
+            || !IsSliceableDecoration(box.BoxShadow))
+        {
+            return false;
+        }
+
+        // CSS Fragmentation 3 §4.1: a scroll container and anything that says so outright is
+        // monolithic — it moves to the next column whole rather than being cut.
+        return (string.IsNullOrEmpty(box.Overflow)
+                || box.Overflow.Equals(CssConstants.Visible, StringComparison.OrdinalIgnoreCase))
+            && !BreakInsideAvoids(box.BreakInside)
+            && !BreakInsideAvoids(box.PageBreakInside);
+    }
+
+    /// <summary>Whether a paint property is absent, so cutting the box does not disturb it.</summary>
+    private static bool IsSliceableDecoration(string value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrEmpty(trimmed)
+            || trimmed.Equals(CssConstants.None, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Walks down through single-child containers to find the nearest
     /// descendant with multiple in-flow block children for multi-column
     /// fragmentation.
@@ -329,7 +530,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             break;
         }
 
-        return current.Boxes.Count > 1 ? current : null;
+        // Two boxes are enough to distribute. One is enough only if it can be *cut*, which is the
+        // capability `SliceTallFragments` adds: the old rule — fewer than two, nothing to do — was
+        // exactly right while a column set could only be filled by moving whole boxes into it, and
+        // it meant a multi-column box with a single child was not columnised at all, however tall
+        // that child was. That is the shape most of the fragmentation corpus is written in:
+        // `css-break/borders-003` and `css-page/fixedpos-011-print` are each one tall block in a
+        // column set, and each rendered as one column running out of the bottom of it.
+        //
+        // Accepting a single child that *cannot* be cut buys nothing and costs something: it
+        // narrows the child to a column's width and moves it, for a column set that will still be
+        // one column. `overflowing-block-003` and `out-of-flow-in-multicolumn-019` measured that as
+        // a loss.
+        //
+        // The child is already the width of one column either way: the pre-layout pass in
+        // `PerformLayout` narrows a multi-column container to a single column's width before its
+        // children lay out, so its content is wrapped for a column and only its placement is left.
+        if (current.Boxes.Count > 1)
+            return current;
+
+        return current.Boxes.Count == 1 && CanBeSlicedAcrossColumns(current.Boxes[0])
+            ? current
+            : null;
     }
 
 

@@ -29,7 +29,7 @@ internal enum WptPageSide
 /// </para>
 /// <para>
 /// The root element's value is read by a scan of the same style sources
-/// <see cref="WptPageBox.EnumerateUnconditionalPageBlocks"/> reads, for the same reason: this runs
+/// <see cref="WptPageBox.EnumerateAppliedPageBlocks"/> reads, for the same reason: this runs
 /// before the document is built, to decide the surface it will be rendered on. Only a rule that
 /// selects the root element counts — <c>html</c>, <c>:root</c> or <c>*</c> — because a
 /// <c>writing-mode</c> further down the tree changes a box inside the page, not the page.
@@ -52,7 +52,7 @@ internal readonly record struct WptPageAxes(string WritingMode, bool Rtl)
         string? pageMode = null;
         bool? pageRtl = null;
 
-        foreach (var (declarations, _) in WptPageBox.EnumerateUnconditionalPageBlocks(html))
+        foreach (var (declarations, _) in WptPageBox.EnumerateAppliedPageBlocks(html))
         {
             foreach (var declaration in declarations.Declarations)
             {

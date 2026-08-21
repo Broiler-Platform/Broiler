@@ -128,6 +128,178 @@ public sealed class WptPageBoxTests
         Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox).BoxSize);
     }
 
+    // A caller that knows its pages one by one asks for a name explicitly, and an empty name says
+    // "take no named rule at all" — which is what a paged render wants, because guessing one name
+    // for the whole document puts one page's margins on every page.
+    // page-name-unnamed-trailing-001 is the case: it uses exactly one *name*, but its flow starts
+    // unnamed, so the guess gave it a 260px page area and a fourth page.
+    [Fact]
+    public void An_Explicit_Page_Name_Replaces_The_Document_Wide_Guess()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 200px 300px; margin: 0; } @page landscape { margin: 20px; }"
+            + "</style></head><body><div style=\"page: landscape\"></div></body></html>";
+
+        // The guess: one name used, so it is taken for the whole document.
+        Assert.Equal(20, WptPageBox.Resolve(html, DefaultBox).MarginTop, 3);
+
+        // Asked for by name: the same rule, but because the caller said so.
+        Assert.Equal(20, WptPageBox.Resolve(html, DefaultBox, pageName: "landscape").MarginTop, 3);
+
+        // Asked for no name at all: the unconditional rule alone.
+        Assert.Equal(0, WptPageBox.Resolve(html, DefaultBox, pageName: string.Empty).MarginTop, 3);
+    }
+
+    // A name the document declares no rule for leaves the unconditional one standing.
+    [Fact]
+    public void An_Unknown_Page_Name_Falls_Back_To_The_Unconditional_Rule()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 200px 300px; margin: 5px; } @page landscape { margin: 20px; }"
+            + "</style></head><body><div style=\"page: landscape\"></div></body></html>";
+
+        Assert.Equal(5, WptPageBox.Resolve(html, DefaultBox, pageName: "nosuchpage").MarginTop, 3);
+    }
+
+    // ---- page one's own box ----------------------------------------------
+
+    // ...except when the caller is asking for page one specifically, which only a paged render
+    // does. `:first` describes exactly one page, so a surface that prints that page can carry it.
+    // page-rule-specificity-print-portrait-ref states its whole geometry that way: one page, sized
+    // by `@page :first { size: portrait }` alone.
+    [Fact]
+    public void First_Page_Reads_The_First_Page_Rule()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page :first { size: 400px; }"
+            + "</style></head><body></body></html>";
+
+        Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox).BoxSize);
+        Assert.Equal(
+            new SizeF(400, 400),
+            WptPageBox.Resolve(html, DefaultBox, firstPage: true).BoxSize);
+    }
+
+    // `:first` is the most specific of the three, so it layers over the unconditional rule and over
+    // the used named one — page-rule-specificity-002-print states `@page :first { size: portrait }`
+    // beside `@page { size: landscape }` and expects the first page portrait.
+    [Fact]
+    public void The_First_Page_Rule_Layers_Over_The_Unconditional_One()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 5in 3in; margin: 10px; } @page :first { size: 3in 5in; }"
+            + "</style></head><body></body></html>";
+
+        var box = WptPageBox.Resolve(html, DefaultBox, firstPage: true);
+
+        Assert.Equal(new SizeF(288, 480), box.BoxSize);
+        Assert.Equal(10, box.MarginTop, 3);   // still the unconditional rule's
+    }
+
+    // The other pseudo-classes describe pages this model still cannot single out, so `:first` does
+    // not open the door to them.
+    [Theory]
+    [InlineData("@page :left { size: 400px; }")]
+    [InlineData("@page :right { size: 400px; }")]
+    [InlineData("@page :blank { size: 400px; }")]
+    public void Only_First_Is_Read_For_Page_One(string rule)
+    {
+        var html = $"<!DOCTYPE html><html><head><style>{rule}</style></head><body></body></html>";
+
+        Assert.Equal(DefaultBox, WptPageBox.Resolve(html, DefaultBox, firstPage: true).BoxSize);
+    }
+
+    // ---- the named page the document actually uses ----
+
+    // The runner renders one sheet and that sheet is page one, so it takes the box of the page the
+    // flow starts on. page-name-table-001-print is the pair: a table on `page: square`, a
+    // `@page square` sizing the sheet 5in, and a reference that spells the same page as the
+    // unconditional rule. Reading only the unconditional rule scored it 0.0 %.
+    [Fact]
+    public void The_One_Named_Page_The_Document_Uses_Is_Applied()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page square { size: 5in; }"
+            + "</style></head><body><table style=\"page: square;\"></table></body></html>";
+
+        Assert.Equal(new SizeF(480, 480), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // The name can come from a style rule rather than a style attribute.
+    [Fact]
+    public void A_Page_Name_From_A_Style_Rule_Counts_As_Used()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "table { page: square; } @page square { size: 5in; }"
+            + "</style></head><body><table></table></body></html>";
+
+        Assert.Equal(new SizeF(480, 480), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // Two names need a per-page box, which one surface cannot carry, so neither is taken.
+    // page-margin-auto-print names six pages and must stay exactly as it was.
+    [Fact]
+    public void Two_Named_Pages_Leave_The_Unconditional_Box_Alone()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page aaa { size: 5in; } @page bbb { size: 7in; }"
+            + "</style></head><body>"
+            + "<div style=\"page: aaa;\"></div><div style=\"page: bbb;\"></div>"
+            + "</body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // `auto` is the initial value and names no page.
+    [Fact]
+    public void Page_Auto_Names_No_Page()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page square { size: 5in; }"
+            + "</style></head><body><div style=\"page: auto;\"></div></body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // A named rule the document never puts content on is still ignored — which is what keeps this
+    // narrower than the earlier attempt that read every selectored rule.
+    [Fact]
+    public void A_Named_Page_Nothing_Uses_Is_Ignored()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page square { size: 5in; }"
+            + "</style></head><body><div></div></body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
+    // The named rule layers over the unconditional one, whichever order they are written in.
+    [Theory]
+    [InlineData("@page { size: 100px; margin: 4px; } @page square { margin: 9px; }")]
+    [InlineData("@page square { margin: 9px; } @page { size: 100px; margin: 4px; }")]
+    public void The_Named_Rule_Layers_Over_The_Unconditional_One(string rules)
+    {
+        var html = "<!DOCTYPE html><html><head><style>" + rules
+            + "</style></head><body><div style=\"page: square;\"></div></body></html>";
+
+        var box = WptPageBox.Resolve(html, DefaultBox);
+
+        Assert.Equal(new SizeF(100, 100), box.BoxSize);
+        Assert.Equal(9, box.MarginTop, 3);
+    }
+
+    // A pseudo-class describes particular pages of a flow this model does not paginate, so it is
+    // never read — even when the document uses exactly one named page beside it.
+    [Fact]
+    public void A_Pseudo_Class_Selector_Is_Never_Read()
+    {
+        const string html = "<!DOCTYPE html><html><head><style>"
+            + "@page { size: 100px; } @page :first { size: 5in; } @page square:first { size: 7in; }"
+            + "</style></head><body><div style=\"page: square;\"></div></body></html>";
+
+        Assert.Equal(new SizeF(100, 100), WptPageBox.Resolve(html, DefaultBox).BoxSize);
+    }
+
     // ...but the unconditional rule in the same sheet still applies.
     [Fact]
     public void The_Unconditional_Rule_Applies_Alongside_Selectored_Ones()
@@ -280,6 +452,114 @@ public sealed class WptPageBoxTests
         Assert.Equal(20, box.MarginTop, 3);
         Assert.Equal(40, box.MarginLeft, 3);
         Assert.Equal(10, box.MarginRight, 3);
+    }
+
+    // ---- `auto` page margins ----------------------------------------------
+
+    // css-page-3 §3.2: with a `size` fixing the box and `width`/`height` fixing the area inside it,
+    // the margins absorb the difference — so `auto` centres the page area. page-margin-auto-print
+    // states exactly this page: 20em x 7em holding a 12em x 3em area.
+    [Fact]
+    public void An_Auto_Margin_Centres_The_Page_Area_In_Its_Box()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 20em 7em; width: 12em; height: 3em; margin: auto;"), DefaultBox);
+
+        Assert.Equal(new SizeF(320, 112), box.BoxSize);
+        Assert.Equal(new SizeF(192, 48), box.AreaSize);
+        Assert.Equal(64, box.MarginLeft, 3);
+        Assert.Equal(64, box.MarginRight, 3);
+        Assert.Equal(32, box.MarginTop, 3);
+        Assert.Equal(32, box.MarginBottom, 3);
+    }
+
+    // One `auto` beside a stated margin takes the whole remainder rather than half of it, which is
+    // how page-margin-auto-print's `@page bbb { margin-top: 0 }` pushes the area to the top.
+    [Theory]
+    [InlineData("margin: auto; margin-top: 0;", 0, 64)]
+    [InlineData("margin: auto; margin-bottom: 0;", 64, 0)]
+    public void A_Single_Auto_Takes_The_Whole_Remainder(string extra, float top, float bottom)
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 20em 7em; width: 12em; height: 3em;" + extra), DefaultBox);
+
+        Assert.Equal(top, box.MarginTop, 3);
+        Assert.Equal(bottom, box.MarginBottom, 3);
+    }
+
+    // The remainder is signed: an area larger than its box hangs off every edge rather than
+    // clamping to zero. page-margin-auto-negative-print states a 300px page with a 340px area and
+    // expects exactly -20 on each side.
+    [Fact]
+    public void An_Area_Larger_Than_Its_Box_Gives_Negative_Auto_Margins()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 300px; width: 340px; height: 340px; margin: auto;"), DefaultBox);
+
+        Assert.Equal(new SizeF(300, 300), box.BoxSize);
+        Assert.Equal(-20, box.MarginLeft, 3);
+        Assert.Equal(-20, box.MarginRight, 3);
+        Assert.Equal(-20, box.MarginTop, 3);
+        Assert.Equal(-20, box.MarginBottom, 3);
+        Assert.Equal(new SizeF(340, 340), box.AreaSize);
+    }
+
+    // With no area stated there is nothing for an `auto` margin to take, so it is zero — and the
+    // page keeps the size it declared rather than collapsing to it.
+    [Fact]
+    public void Auto_With_No_Stated_Area_Is_Zero()
+    {
+        var box = WptPageBox.Resolve(Page("size: 300px; margin: auto;"), DefaultBox);
+
+        Assert.Equal(new SizeF(300, 300), box.BoxSize);
+        Assert.Equal(0, box.MarginTop, 3);
+        Assert.Equal(0, box.MarginLeft, 3);
+    }
+
+    // With no `auto` on the axis the area plus its margins *is* the box, and a declared `size`
+    // gives way to it. page-size-013-print states this over-constrained resolution outright, and
+    // its reference spells the answer out: `size: 500px; margin: 50px; width: 200px; height: 300px`
+    // is the same page as `size: 300px 400px; margin: 50px`.
+    [Fact]
+    public void An_Over_Constrained_Axis_Resizes_The_Box_Around_Its_Area()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 500px; margin: 50px; width: 200px; height: 300px;"), DefaultBox);
+
+        Assert.Equal(new SizeF(300, 400), box.BoxSize);
+        Assert.Equal(new SizeF(200, 300), box.AreaSize);
+        Assert.Equal(50, box.MarginLeft, 3);
+    }
+
+    // `auto` inside the shorthand used to reject the whole declaration, leaving every margin at
+    // zero; it expands like any other component.
+    [Fact]
+    public void Auto_Expands_Through_The_Shorthand()
+    {
+        var box = WptPageBox.Resolve(
+            Page("size: 20em 7em; width: 12em; height: 3em; margin: 10px auto;"), DefaultBox);
+
+        Assert.Equal(10, box.MarginTop, 3);
+        Assert.Equal(10, box.MarginBottom, 3);
+        Assert.Equal(64, box.MarginLeft, 3);
+        Assert.Equal(64, box.MarginRight, 3);
+    }
+
+    // A declared `size` survives a declared area only when an `auto` margin is there to absorb the
+    // difference — which is the one thing that separates page-margin-auto-print (keeps its 20em x
+    // 7em sheet) from page-size-013-print (resized to 300x400).
+    [Fact]
+    public void A_Declared_Size_Survives_A_Declared_Area_Only_Under_Auto()
+    {
+        Assert.Equal(
+            new SizeF(320, 112),
+            WptPageBox.Resolve(
+                Page("size: 20em 7em; width: 12em; height: 3em; margin: auto;"), DefaultBox).BoxSize);
+
+        Assert.Equal(
+            new SizeF(192, 48),
+            WptPageBox.Resolve(
+                Page("size: 20em 7em; width: 12em; height: 3em; margin: 0;"), DefaultBox).BoxSize);
     }
 
     [Theory]

@@ -207,6 +207,7 @@ internal static class ComputedStyleBuilder
 
             // Page
             PageBreakInside = box.PageBreakInside,
+            Page = box.Page,
         };
     }
 }

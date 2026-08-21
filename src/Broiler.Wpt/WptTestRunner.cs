@@ -2804,11 +2804,20 @@ internal sealed partial class WptTestRunner
 
             if (PagedRender)
             {
+                // A paged render knows its pages one by one, so it takes no document-wide guess at
+                // a named page: the base box below is the unconditional rule, page one adds
+                // `@page :first`, and every other page's name is read off the laid-out flow.
+                var surface = new System.Drawing.SizeF(_width, _height);
+                WptPageBox ResolvePage(string? name, bool first) =>
+                    WptPageBox.Resolve(html, surface, firstPage: first, pageName: name ?? string.Empty);
+
+                var basePage = ResolvePage(null, first: false);
+
                 return RenderWithNativeAnchor(html, () => WptDocumentRenderer.RenderPaged(
-                    renderDocument, html, declaredPage,
+                    renderDocument, html, basePage,
                     backgroundColor: BColor.White,
                     stylesheetLoad: stylesheetHandler, imageLoad: imageHandler, baseUrl: testBaseUrl,
-                    decoration: decoration));
+                    decoration: decoration, resolvePage: ResolvePage));
             }
 
             if (decoration is not null)
@@ -2902,6 +2911,16 @@ internal sealed partial class WptTestRunner
         bool previousPrint = PrintMedia;
         PrintMedia = IsPrintTestPath(testPath);
         PagedRender = PagedPrint && PrintMedia;
+
+        // The formatting context has to be established here rather than around the render itself:
+        // a document's style sheets are cascaded while it is being built, well before the render
+        // phase, and the engine memoizes the rule set that cascade produced. A media query answered
+        // on the screen surface before the paged context existed would stay answered that way.
+#if BROILER_CSS_PAGED_MEDIA
+        using var pagedMedia = PrintMedia
+            ? Broiler.CSS.Dom.CssPagedMedia.Pin(WptInitialPageArea.Width, WptInitialPageArea.Height)
+            : null;
+#endif
         try
         {
             return body();

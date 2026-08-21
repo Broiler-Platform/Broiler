@@ -261,14 +261,25 @@ golden suite never looks at a passing test's own reference.
   by construction. Measured locally on 2026-08-20, `css-grid/grid-lanes/alignment`
   is 9 passed / 114 failed out of 123.
 - **And implementing it would cost more than it wins, on the suite the project
-  scores itself by.** The checkout carries 870 `grid-lanes` tests with a
-  `rel=match` and 976 candidate documents overall; the golden-image manifest lists
-  **193** `grid-lanes` failures, so on the order of 780 currently do *not* fail it
-  — they match Chromium's pixels precisely because Chromium drops the declaration
-  too and both engines render the identical fallback. Shipping `grid-lanes` trades
-  up to 500 reftest wins for most of those. (The manifest records failures only, so
-  that 780 includes any skips; treat it as an upper bound on what is at risk, not
-  an exact count.)
+  scores itself by — now measured rather than inferred.** The first pass at this
+  read the golden manifest, which records *failures only*, and could not tell a pass
+  from a skip. So on 2026-08-20 a 60-test sample of the 869 `grid-lanes` tests with a
+  `rel=match` (the twelve from #1726's top thirty plus a seeded random draw) was run
+  against **freshly generated Chromium references**, served over HTTP so the 288
+  Ahem-dependent tests load their font: **46 of ~69 compared tests pass, at a 97.09%
+  average**. Two thirds of the directory currently matches Chromium's pixels
+  *because* Chromium drops the declaration too and both engines render the identical
+  fallback. Shipping `grid-lanes` trades up to 500 reftest wins for most of ~580
+  golden passes.
+  ```sh
+  # how it was measured — the reference generator has no print/forced-colors modes,
+  # so a plain screen screenshot at the runner's 1024x768 is what CI compares against
+  python3 -m http.server 8731 --bind 127.0.0.1   # from tests/wpt/checkout
+  # screenshot each test with the pinned Playwright + /opt/pw-browsers/chromium,
+  # write <refdir>/<relpath>.png, then:
+  dotnet run --project src/Broiler.Wpt -- --wpt-dir tests/wpt/checkout \
+    --reference-dir <refdir> --subset css/css-grid/grid-lanes
+  ```
 - **Do not flip this as a side effect of anything else.** The rejection is stated
   in three places — `Broiler.Layout/Engine/CssUtils.cs`,
   `Broiler.CSS.Dom/CssStyleEngine.Values.cs`, and this entry — and the two suites
@@ -503,6 +514,59 @@ other direction. None is a sizing bug.
   axis. Broiler does not implement that transfer, and the item was only landing on
   the reference by having no natural size to transfer from. **A flexbox rule, not a
   replaced-sizing one.**
+
+### Cutting a box with content in it across columns — attempted, and it does not pay
+
+- **Tests:** `css-break/fieldset-001` (77.7%), `fieldset-003` (92.1%),
+  `fieldset-004` (88.5%) and the rest of the column-fragmentation family.
+- **The gap.** A column set fills itself by placing whole boxes into it, and
+  [cuts one that has nothing in it](wpt-rendering-gaps-fixed.md#a-box-taller-than-a-column-set-stayed-in-the-first-column).
+  A box that has *boxes* in it is not cut: it is either moved whole or thrown away
+  by the "deep fragment" path, which columnises its children and leaves the box's
+  own border and background drawn once, around the first column. That is what
+  `fieldset-001` needs — a `<fieldset>` in a three-column set, with a legend and a
+  block inside it.
+- **It was built, and it works.** Each piece is a copy of the box carrying the part
+  of its subtree that falls in that piece, with a child straddling the cut cut in
+  turn; text is where it stops, because a piece is a real box beside the original
+  rather than a paint instruction and the words of a box are not copied onto it.
+  A controlled render confirms it: a 5px-bordered box holding a 120px green block
+  and a 120px blue one, in a 300 × 100 three-column set, comes out as three pieces
+  — green filling column one, green then blue in column two, blue then the bottom
+  border in column three, with the side borders on every piece, no border at the
+  joins, and the rounded corners only at the two outer ends. That is
+  `box-decoration-break: slice` across a column set, which is what the family asks
+  for.
+- **And on the corpus it does not pay.** Every configuration was measured against
+  paged `css/css-break` at 92 of 204, average 87.45%:
+
+  | configuration | passed | average |
+  | --- | --- | --- |
+  | the cut, with the deep-fragment path stood down for a cuttable box | 91 | 87.41% |
+  | …and the single-child descent stopped at a box that paints | **86** | 87.21% |
+  | the cut, for a decorated box only | 91 | 87.42% |
+  | the cut, strictly additive — the deep path unchanged | 92 | 87.42% |
+  | …and a wrapper cut only for its own decoration | 92 | 87.44% |
+
+  The best of them holds the test count and loses 0.01 of a point, with
+  `fieldset-004` down 88.5% → 84.4% — undoing a gain from
+  [the legend fix](wpt-rendering-gaps-fixed.md#legend-was-an-inline-box-and-two-things-behind-it)
+  — against `fieldset-001` up 77.7% → 78.0% and still failing. **The whole of it
+  was reverted**; nothing of it is in the tree.
+- **Why, as far as it was chased.** The engine's older answer — flatten a tall
+  wrapper into its children and let its decoration stay in the first column — is
+  what the rest of the column set is built around: where the balancing search puts
+  the boundaries, and what the deep-fragment path hands the distribution loop. A
+  correct cut disagrees with it, and the disagreement shows up as pixels in tests
+  that are not about the wrapper at all. And the one configuration that would let
+  `fieldset-001` reach the cut — stopping the single-child descent at a box that
+  paints its own decoration, which is the right rule — costs **six** tests on its
+  own.
+- **What this says for the next attempt.** The cut is not the missing piece by
+  itself. The descent and the deep-fragment path are the two workarounds built in
+  its absence, and both have to come out with it, together, in one change that
+  re-derives the column boundaries rather than inheriting them. Doing the cut
+  alone, as here, buys nothing.
 
 ---
 
@@ -947,23 +1011,131 @@ Worth separating from the rest, because the test itself may be at fault:
   800px` and both references spell their expected geometry out in absolute pixels,
   so the rings land at the right widths on a sheet of the wrong size and the
   content inside them is laid out against the wrong page area.
-- **The obvious fix is measurably wrong, which is the point of this entry.**
-  Honouring the declared box for every `-print` document — rendering the flow into
-  the page area and compositing onto a sheet of the declared size — was tried on
-  2026-08-20 and **regressed** the suite: `css/css-page` 140 → 128 passed,
-  `css/css-break` 107 → 104. The reason is asymmetry, not the geometry. A reference
-  such as `page-box-008-print-ref` declares the same `size` but paints nothing on
-  the sheet, so it takes the undecorated path and keeps the viewport; resizing only
-  the side that carries a decoration resizes one half of the comparison. This is
-  the same trap the existing code comment warns about.
-- **So the exit is pagination, not a sheet size.** The sheet can only be the
-  declared page once *both* sides of a comparison are laid out against it, which
-  means the paged path — and that path is off by default because it currently
-  scores worse (`css/css-page` 140 → 125 passed with `BROILER_WPT_PAGED_PRINT=1`,
-  measured the same day). It shares a root cause with
+- **Three ways of doing the obvious thing were tried on 2026-08-20, and all three
+  are worse. That is the point of this entry.** Starting from `css/css-page` at 142
+  of 224 and `css/css-break` at 109 of 204:
+
+  | what was tried | css-page | css-break |
+  | --- | --- | --- |
+  | declared box, viewport default | 128 | 104 |
+  | WPT's 5in × 3in default alone, sheet unchanged | 142 (no change) | — |
+  | declared box, 5in × 3in default | **114** | 103 |
+
+  The first two attempts were diagnosed as asymmetry — a reference that paints
+  nothing on the sheet takes the undecorated path and keeps the viewport, so only
+  one half of the comparison resizes — and the WPT default was meant to remove it,
+  since `page-rule-specificity-001-print` says outright that *"WPT Print Reftest
+  default size is 5x3in"*. It removed the asymmetry and made things **worse**,
+  which is what identifies the real cause.
+- **The real cause is that one sheet at the real page size can only hold page one.**
+  A 5in × 3in page area is 288px tall; the runner's viewport is 768. Every `-print`
+  document whose flow runs past its first page currently shows the overflow, and
+  its reference — written to be read as a stack of pages — shows it too, so the two
+  agree. Shrink the sheet to one true page and everything past it is clipped away
+  on both sides but *not equally*, because the two sides put different content
+  there. The declared page box is not a sheet-size change at all: it is pagination.
+- **So the work is to make the paged path good enough to become the default**,
+  and the gap is now measured rather than guessed. `BROILER_WPT_PAGED_PRINT=1`
+  scores `css/css-page` **132 of 224** against the unpaginated 142 — it was 125
+  when this entry was first written, and named pages, the paged formatting context,
+  [the empty-root fix](wpt-rendering-gaps-fixed.md#a-paged-render-stamped-a-page-for-a-document-that-generates-none)
+  and [page one's own box](wpt-rendering-gaps-fixed.md#every-page-of-a-paged-render-was-printed-on-the-same-page-box)
+  have closed seven of it since.
+  Paged **wins 8** tests the unpaginated path fails — `basic-pagination-003`/`-004`,
+  five `margin-boxes/content-*`, `page-margin-004` — and **loses 18**, which sort
+  into three groups:
+  - **`SizeMismatch` at 0.0 %** was the largest group, and page one's own box plus
+    `reftest-pages` has since closed `page-rule-specificity-001`–`-003`. **Four
+    remain, and three of them are not per-page layout at all** — that was the
+    working assumption until each was rendered and its page count compared against
+    its reference on 2026-08-20, which is what the rest of this bullet records.
+    Each is a *page count* disagreement with its own cause:
+
+    - **`page-name-img-003` and `-004` — found, and fixed as `patches/0003`.**
+      The staleness was `Broiler.HTML`'s, not `Broiler.Layout`'s: `CorrectImgBoxes`
+      wraps a block-level image in an anonymous block and demotes the image to
+      `display: inline`, which is how a block-level replaced element is laid out
+      here, and the page name stayed behind on the demoted inline instead of
+      moving to the wrapper that now *is* the block-level box. See
+      [the fixed entry](wpt-rendering-gaps-fixed.md#a-display-block-image-lost-its-page-name).
+      The original symptom, kept because the reasoning is the reusable part: Each renders two pages where its reference renders
+      one. `TakesAPageName` asks `CssBox.Display` whether a box is block-level,
+      because an *inline* image must ignore its own `page` name — that is what
+      `page-name-img-001`/`-002` state, and they pass. `-003`/`-004` are their
+      twins with `display: block` on the `<img>`, and there the name must be
+      honoured. It is not: the box reports `Display == "inline"`. The cascade sets
+      it correctly (traced: `img display <- 'block' => 'block'`) and **layout
+      honours it** — an `<img style="display:block">` followed by text puts the
+      text on the next line — but by the time fragmentation runs the box reads
+      `inline` again, so the image's `page: b` is dropped, it stays on the body's
+      page `a`, and the following `div { page: b }` forces a break the reference
+      does not have. Nothing resets `Display` for images and no caller passes
+      `InheritStyle(…, everything: true)`, so the next step is to find whether the
+      box fragmentation sees is the one the cascade wrote to. **`Display` is the
+      only signal that can separate `-001` from `-003`**, so this cannot be worked
+      around in `TakesAPageName`.
+    - **`page-name-003` — fixed.** It was `CarriesThePageFlow` answering *no* for
+      anything inside an out-of-flow subtree, conflating "does not carry its own
+      name out" with "does not break inside itself". See
+      [the fixed entry](wpt-rendering-gaps-fixed.md#an-out-of-flow-subtree-never-broke-on-a-page-name);
+      it trades one-for-one against `page-name-abspos-002`, which states the
+      opposite rule and which Chromium fails too.
+    - **`page-name-unnamed-trailing-001` — page count fixed, still failing.**
+      Per-page boxes landed and the count is now right, three against three; the
+      test went `SizeMismatch` at 0.0% → **96.4% `MissingContent`** and did not
+      pass. See
+      [the fixed entry](wpt-rendering-gaps-fixed.md#a-paged-render-guessed-one-page-name-for-the-whole-document).
+      Two of the three assumptions recorded here were wrong and are kept because
+      the correction is the reusable part. **The four pages were the runner's own
+      doing, not a named-page break**: the test uses exactly one *name*
+      (`landscape`, on its middle page), so the document-wide guess introduced by
+      [the earlier named-page fix](wpt-rendering-gaps-fixed.md#the-sheet-ignored-the-named-page-the-document-put-its-content-on)
+      applied that page's `margin: 20px` to all of them — area 260px and a fourth
+      page, where the reference (two names, so no guess) got 300px and three. And
+      **`page-orientation` is not needed**: both sides declare `rotate-left` on the
+      same page, so it cancels, exactly as the test's own comment implies when it
+      names the margin as the distinguishing factor.
+      What remained was the residual 3.6%, and **that too is now closed**: the
+      wrapper `.page` div was claiming its own page, so the landscape child's box
+      never reached the page it was on. All four are now closed.
+
+    So all four are shut, and the per-page **layout** they were the argument for —
+    a flow dividing against more than one page area — landed with them: the
+    document is now laid out once per distinct page area and each run of pages
+    takes its own. See
+    [the fixed entry](wpt-rendering-gaps-fixed.md#a-paged-render-laid-every-page-out-against-one-page-area),
+    which also records the measured result honestly: the capability moves exactly
+    one test, because every test it was built for is blocked behind something
+    else. What each of those is blocked on is enumerated there — `page-orientation`
+    not rotating (`page-orientation-on-*`), `vw`/`vh` not resolving against the
+    first page's area (`page-size-009`), page-box percentages not resolved per
+    named page (`page-box-004`), `auto` margins on named pages
+    (`page-margin-auto-*`), and a `flow-root` container paginating short inside
+    `page-size-007`/`-008`'s reference. None of those is per-page layout. The
+    sixth on that list, `fixedpos-010`'s `position: fixed` not repeating per page,
+    [has since been fixed](wpt-rendering-gaps-fixed.md#a-fixed-position-box-appeared-once-in-the-document-not-once-on-every-page) —
+    it took `fixedpos-009` with it, and left `-010` failing on its page count.
+  - **`page-background-002` is the page *count* itself**, and it is the cleanest
+    one to start on: test and reference are the same three-page document except
+    that the reference draws its image as `position: absolute; top: 0`, and the
+    count comes from `container.ActualSize.Height`, which that image inflates — the
+    test renders 300×150 (three pages) against the reference's 300×250 (five).
+    **Deriving the count from the in-flow extent instead was tried and does not
+    pay**: excluding `absolute` and `fixed` subtrees goes 128 → 127 (fixes
+    `fixedpos-009`, breaks `-005` and `-006`), excluding only `absolute` goes
+    128 → 125. The average rises either way (73.69 % → 74.64 %), so the extent is
+    closer to right and the page *count* is not what those `fixedpos` tests turn
+    on. Whatever replaces it has to satisfy them too.
+  - **The rest are near-misses** just under the 99 % gate (`monolithic-overflow-018`
+    at 98.1 %, `page-size-006` at 98.7 %, `margin-boxes/alignment-001` at 98.5 %)
+    plus four that are further out (`page-margin-005`/`-006`,
+    `monolithic-overflow-021`, `safe-printable-inset-003`).
+
+  It also shares a root cause with
   [the physical-Y-axis pagination entry](#pagination-runs-along-the-physical-y-axis-only)
-  above: fix the block-axis abstraction there first, then re-measure the paged lever
-  before touching the sheet size here.
+  above, which is what the vertical-writing-mode print tests are waiting on.
+- **Do not re-run the three experiments in the table.** They are recorded so the
+  next attempt starts from per-page boxes and the page count, not from the sheet.
 - **Exit gate:** `page-box-008-print` and `-009-print` match, and the unpaginated
   `-print` corpus does not lose a test.
 

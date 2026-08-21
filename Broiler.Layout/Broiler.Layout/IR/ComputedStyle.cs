@@ -229,4 +229,11 @@ public sealed class ComputedStyle
     // --- Page ---
 
     public string PageBreakInside { get; init; } = "auto";
+
+    /// <summary>
+    /// CSS Paged Media 3 §3.4 <c>page</c>: the page name this box declares, or <c>auto</c>. Carried
+    /// into the IR so a paged renderer can tell which <c>@page</c> rule the content of each page
+    /// takes its box from — the name is not otherwise recoverable from a laid-out fragment.
+    /// </summary>
+    public string Page { get; init; } = "auto";
 }

@@ -240,8 +240,25 @@ set -euo pipefail
 # applied and none lost. There is no main-repo half to fall back on — the shorthand expansion is
 # entirely inside Broiler.CSS — which is precisely why it has to be applied here to reach a run.
 
+# 0002 gives a media query a paged formatting context: `@media print` matching while a document
+# is being printed, and `width`/`height` describing the page area rather than the surface the
+# runner allocated. `css-page/media-queries-001-print` needs it and 0001 together — it states its
+# whole assertion in inches — and it is listed after 0001 for that reason, though they touch
+# different files and apply in either order. The main-repo call sites are already in, behind a
+# `BROILER_CSS_PAGED_MEDIA` probe that defines itself only once this patch puts CssPagedMedia.cs
+# on disk, so applying this here is what switches them on for a run.
+# 0003 carries a block-level image's page name onto the anonymous block that replaces it.
+# CorrectImgBoxes demotes the image to `display: inline` inside a wrapper, which is how a
+# block-level replaced element is laid out here, but a page name hangs on a block-level box and so
+# was being dropped — `page-name-img-003`/`-004` broke a page their references do not. It only
+# moves pixels under BROILER_WPT_PAGED_PRINT=1, where the page name is read at all; the default
+# unpaginated render is unchanged.
 PENDING_PATCHES=(
   "Broiler.CSS|patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch"
+  "Broiler.CSS|patches/0002-give-a-media-query-a-paged-formatting-context.patch"
+  "Broiler.HTML|patches/0003-carry-a-block-images-page-name-onto-the-box-that-replaces-it.patch"
+  "Broiler.CSS|patches/0004-give-legend-the-user-agent-display-block-it-has-in-html.patch"
+  "Broiler.HTML|patches/0005-give-legend-the-user-agent-display-block-in-the-default-sheet.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

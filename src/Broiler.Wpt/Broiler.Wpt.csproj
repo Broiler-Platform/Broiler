@@ -31,4 +31,18 @@
     <ProjectReference Include="..\Broiler.HtmlBridge.Core\Broiler.HtmlBridge.Core.csproj" />
     <ProjectReference Include="..\Broiler.HtmlBridge.Dom\Broiler.HtmlBridge.Dom.csproj" />
   </ItemGroup>
+
+  <!--
+    The paged formatting context a media query is evaluated in (`Broiler.CSS.Dom.CssPagedMedia`)
+    is a pending submodule patch: the push to Broiler-Platform/Broiler.CSS answers 403, so it is
+    captured under patches/ and the gitlink is deliberately not bumped. Guarded rather than left
+    to break the build, and the probe is the source file itself because that is the exact thing
+    being depended on. Once the patch lands upstream and the pointer is bumped, the file is there
+    and this condition simply stops doing anything.
+  -->
+  <PropertyGroup>
+    <BroilerCssPagedMedia Condition="Exists('$(MSBuildThisFileDirectory)..\..\Broiler.CSS\Broiler.CSS.Dom\CssPagedMedia.cs')">true</BroilerCssPagedMedia>
+    <DefineConstants Condition="'$(BroilerCssPagedMedia)' == 'true'">$(DefineConstants);BROILER_CSS_PAGED_MEDIA</DefineConstants>
+  </PropertyGroup>
+
 </Project>

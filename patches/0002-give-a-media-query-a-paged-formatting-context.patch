@@ -1,0 +1,280 @@
+From bd92497ea16eabab688664eeee8fa08dd1048a03 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 20 Aug 2026 17:58:27 +0000
+Subject: [PATCH] Give a media query a paged formatting context
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A formatting context has media-query answers of its own, and neither of the two
+that matter for print was reachable. EvaluateMediaType matched `screen` and
+`all` unconditionally, so `@media print` never applied to a document being
+printed; and Media Queries 4 evaluates `width`/`height` against the page area,
+which is not the surface a paged renderer happens to allocate.
+
+CssPagedMedia carries both. It is thread-static and inert unless pinned, like
+the layout engine's other render levers, so a continuous render evaluates
+exactly as before.
+
+The page area it carries is the *initial* one the formatter is handed, not the
+one `@page` declares. That looks wrong until the circularity shows up: a `@page`
+rule may itself sit inside a media query, so resolving the query against the
+declared page would need the query already resolved.
+css-page/media-queries-001-print states this outright — it declares
+`@page { size: 10in; margin: 2in }` and then asserts a query that matches only
+between 4in and 5in wide and 2in and 3in tall, which is WPT's initial 5in x 3in
+page whether or not a default margin comes off it. The declared 10in page is
+precisely what the query must not see.
+
+Suspend() exists because a nested browsing context is its own formatting
+context: the page area of the document embedding a frame is not that frame's
+viewport. Without it css-page/media-queries-002-print and -003-print go red,
+each embedding a 100 x 100 frame whose own sheet asserts
+`@media (width: 100px) and (height: 100px)`. The embedding renderer suspends it
+around the frame.
+
+Tests cover both surfaces of the media type including `not print`, the page-area
+override against an environment that still carries the layout viewport, the
+restore on dispose, and that suspending gives a frame its own viewport back.
+
+Note for whoever applies this: on its own it does not make
+media-queries-001-print pass, because that test writes its whole assertion in
+inches and ParseToPixels does not yet resolve absolute units. That is the
+separate pending patch "Resolve the absolute length units in ParseToPixels";
+both are needed, in either order.
+---
+ Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs | 70 ++++++++++++++
+ Broiler.CSS.Dom/CssPagedMedia.cs             | 97 ++++++++++++++++++++
+ Broiler.CSS.Dom/CssStyleEngine.Values.cs     | 22 ++++-
+ 3 files changed, 184 insertions(+), 5 deletions(-)
+ create mode 100644 Broiler.CSS.Dom/CssPagedMedia.cs
+
+diff --git a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+index 18f0739..c16ccad 100644
+--- a/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
++++ b/Broiler.CSS.Dom.Tests/CssStyleEngineTests.cs
+@@ -21,6 +21,76 @@ public sealed class CssStyleEngineTests
+                 new CssEnvironment(viewportWidth, viewportHeight)));
+     }
+ 
++    // ---- the paged formatting context -------------------------------------
++
++    // A document being formatted for print is print media, and the `width`/`height` features then
++    // describe the page area rather than whatever surface the renderer allocated. Nothing pinned
++    // means continuous media, so every existing caller is unaffected.
++    [Fact]
++    public void A_Paged_Context_Is_Print_Media_And_Sizes_By_The_Page_Area()
++    {
++        var screenSized = new CssEnvironment(1024, 768);
++
++        Assert.False(CssStyleEngine.MatchesMediaQuery("print", screenSized));
++        Assert.True(CssStyleEngine.MatchesMediaQuery("screen", screenSized));
++
++        // 1024 wide, so this does not match — until the page area answers instead.
++        Assert.False(CssStyleEngine.MatchesMediaQuery("(max-width: 800px)", screenSized));
++
++        using (CssPagedMedia.Pin(480, 288))
++        {
++            Assert.True(CssStyleEngine.MatchesMediaQuery("print", screenSized));
++            Assert.False(CssStyleEngine.MatchesMediaQuery("screen", screenSized));
++
++            // 480 x 288 is the page area, not the 1024 x 768 the environment still carries.
++            Assert.True(CssStyleEngine.MatchesMediaQuery("(max-width: 800px)", screenSized));
++            Assert.True(CssStyleEngine.MatchesMediaQuery(
++                "(min-width: 4in) and (max-width: 5in) and (min-height: 2in) and (max-height: 3in)",
++                screenSized));
++        }
++
++        // ...and the context is restored, so a sibling render is unaffected.
++        Assert.False(CssStyleEngine.MatchesMediaQuery("print", screenSized));
++    }
++
++    // `not print` has to stay correct on both surfaces — it is the spelling a document uses to
++    // exclude itself from one of them.
++    [Fact]
++    public void Not_Print_Is_Correct_On_Either_Surface()
++    {
++        var environment = new CssEnvironment(800, 600);
++
++        Assert.True(CssStyleEngine.MatchesMediaQuery("not print", environment));
++
++        using (CssPagedMedia.Pin(480, 288))
++            Assert.False(CssStyleEngine.MatchesMediaQuery("not print", environment));
++    }
++
++    // A nested browsing context is its own formatting context: the embedder's page area is not the
++    // frame's viewport. css-page/media-queries-002-print and -003-print embed a 100 x 100 frame
++    // that asserts exactly this.
++    [Fact]
++    public void Suspending_Restores_The_Frames_Own_Viewport()
++    {
++        var frame = new CssEnvironment(100, 100);
++
++        using (CssPagedMedia.Pin(480, 288))
++        {
++            Assert.False(CssStyleEngine.MatchesMediaQuery(
++                "(width: 100px) and (height: 100px)", frame));
++
++            using (CssPagedMedia.Suspend())
++            {
++                Assert.True(CssStyleEngine.MatchesMediaQuery(
++                    "(width: 100px) and (height: 100px)", frame));
++                Assert.False(CssStyleEngine.MatchesMediaQuery("print", frame));
++            }
++
++            // The enclosing paged context comes back when the frame is done.
++            Assert.True(CssStyleEngine.MatchesMediaQuery("print", frame));
++        }
++    }
++
+     // An empty <media-query-list> is `all`: `@media { … }` (whitespace after the
+     // at-keyword is optional) and `<style media="">` apply unconditionally.
+     [Theory]
+diff --git a/Broiler.CSS.Dom/CssPagedMedia.cs b/Broiler.CSS.Dom/CssPagedMedia.cs
+new file mode 100644
+index 0000000..7186977
+--- /dev/null
++++ b/Broiler.CSS.Dom/CssPagedMedia.cs
+@@ -0,0 +1,97 @@
++using System;
++
++namespace Broiler.CSS.Dom;
++
++/// <summary>
++/// The paged-media context a media query is evaluated in: whether the document is being formatted
++/// for print, and the page area its <c>width</c>/<c>height</c> features describe.
++/// </summary>
++/// <remarks>
++/// <para>
++/// Two things about a print formatting context are not derivable from the surface the engine is
++/// painting on, and both are media-query questions. The first is the media type: without this the
++/// evaluator matches <c>screen</c> and <c>all</c> unconditionally, so <c>@media print</c> never
++/// applies to a document that is being printed. The second is the size — Media Queries 4 evaluates
++/// <c>width</c> and <c>height</c> against the page area, which is not the layout surface a paged
++/// renderer happens to allocate.
++/// </para>
++/// <para>
++/// <strong>And the page area here is the initial one the system provides, not the one
++/// <c>@page</c> declares.</strong> That looks wrong until you notice the circularity: a
++/// <c>@page</c> rule may itself sit inside a media query, so resolving the query against the
++/// declared page would need the query already resolved. <c>css-page/media-queries-001-print</c> is
++/// the test that pins it down, and its own comment is the clearest statement of the rule — it
++/// declares <c>@page { size: 10in; margin: 2in }</c> and then asserts a query that only matches
++/// between 4in and 5in wide and 2in and 3in tall, which is WPT's 5in × 3in initial page whether or
++/// not a half-inch default margin is taken off it. The declared 10in page is deliberately not what
++/// the query sees.
++/// </para>
++/// <para>
++/// Thread-static and inert by default, like the layout engine's other render levers: a caller pins
++/// it around one render on one thread, and every render that does not pin it evaluates exactly as
++/// before. That makes it an ambient-state contract — a worker thread that formats for print has to
++/// establish it before laying out, the same way it establishes the canvas backdrop.
++/// </para>
++/// </remarks>
++public static class CssPagedMedia
++{
++    [ThreadStatic]
++    private static int _width;
++
++    [ThreadStatic]
++    private static int _height;
++
++    /// <summary>
++    /// Whether this thread is formatting for paged media. False unless a <see cref="Pin"/> scope is
++    /// open, which is what keeps a screen render byte-identical to one from before this existed.
++    /// </summary>
++    public static bool Active => _width > 0 && _height > 0;
++
++    /// <summary>The page area's width in CSS pixels, meaningful only while <see cref="Active"/>.</summary>
++    public static int Width => _width;
++
++    /// <summary>The page area's height in CSS pixels, meaningful only while <see cref="Active"/>.</summary>
++    public static int Height => _height;
++
++    /// <summary>
++    /// Formats for paged media against a page area of <paramref name="pageAreaWidth"/> by
++    /// <paramref name="pageAreaHeight"/> until the returned scope is disposed. Scopes nest: the
++    /// previous context is restored rather than cleared.
++    /// </summary>
++    public static IDisposable Pin(int pageAreaWidth, int pageAreaHeight) =>
++        new Scope(pageAreaWidth, pageAreaHeight);
++
++    /// <summary>
++    /// Formats for continuous media until the returned scope is disposed, whatever context is open
++    /// around it.
++    /// </summary>
++    /// <remarks>
++    /// A <em>nested</em> browsing context is its own formatting context, and the page area of the
++    /// document embedding it is not its viewport: the frame's <c>width</c>/<c>height</c> features
++    /// describe the frame. <c>css-page/media-queries-002-print</c> and <c>-003-print</c> are the
++    /// pair that state it — each embeds a 100 × 100 frame whose own style sheet asserts
++    /// <c>@media (width: 100px) and (height: 100px)</c> — and both go red if the embedder's page
++    /// area reaches them.
++    /// </remarks>
++    public static IDisposable Suspend() => new Scope(0, 0);
++
++    private sealed class Scope : IDisposable
++    {
++        private readonly int _previousWidth;
++        private readonly int _previousHeight;
++
++        internal Scope(int width, int height)
++        {
++            _previousWidth = _width;
++            _previousHeight = _height;
++            _width = width;
++            _height = height;
++        }
++
++        public void Dispose()
++        {
++            _width = _previousWidth;
++            _height = _previousHeight;
++        }
++    }
++}
+diff --git a/Broiler.CSS.Dom/CssStyleEngine.Values.cs b/Broiler.CSS.Dom/CssStyleEngine.Values.cs
+index b82a5d9..39b770b 100644
+--- a/Broiler.CSS.Dom/CssStyleEngine.Values.cs
++++ b/Broiler.CSS.Dom/CssStyleEngine.Values.cs
+@@ -1446,6 +1446,15 @@ public sealed partial class CssStyleEngine
+     {
+         var q = query.Trim();
+ 
++        // In a paged formatting context the `width`/`height` features describe the page area, not
++        // whatever surface the renderer allocated — and the *initial* page area, since a `@page`
++        // rule may itself sit inside a media query. See CssPagedMedia.
++        if (CssPagedMedia.Active)
++        {
++            viewportWidth = CssPagedMedia.Width;
++            viewportHeight = CssPagedMedia.Height;
++        }
++
+         // An empty query inside a non-empty list ("screen, ") is malformed; only a
+         // wholly empty list means `all`, and that is handled by the caller.
+         if (q.Length == 0)
+@@ -1529,13 +1538,16 @@ public sealed partial class CssStyleEngine
+                 return MediaMatch.Invalid;
+         }
+ 
+-        // Broiler paints to a continuous screen surface, so `all` and `screen`
+-        // match; every other well-formed media type (`print`, `speech`, and the
+-        // deprecated `tv`/`handheld`/… set) simply does not — but stays valid, so
+-        // `not print` correctly matches.
++        // Broiler paints to a continuous screen surface, so `all` and `screen` match — unless the
++        // document is being formatted for paged media, where `print` is the one that does and
++        // `screen` is the one that does not. Every other well-formed media type (`speech`, and the
++        // deprecated `tv`/`handheld`/… set) stays valid without matching, so `not print` is
++        // correct on either surface.
++        var surface = CssPagedMedia.Active ? "print" : "screen";
++
+         return Matched(
+             type.Equals("all", StringComparison.OrdinalIgnoreCase) ||
+-            type.Equals("screen", StringComparison.OrdinalIgnoreCase));
++            type.Equals(surface, StringComparison.OrdinalIgnoreCase));
+     }
+ 
+     private static List<string> SplitMediaQueryParts(string query)
+-- 
+2.43.0
+

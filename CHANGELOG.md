@@ -214,6 +214,270 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Nothing in the tree changed for column fragmentation of a box that has content
+  in it, and that is the result rather than an omission. It was built — each piece
+  a copy of the box carrying the part of its subtree in that piece, a straddling
+  child cut in turn, text left alone because a piece is a real box and the words of
+  a box are not copied onto it — and a controlled render confirms it does exactly
+  what `box-decoration-break: slice` asks for across a column set. Five
+  configurations were then measured against paged `css/css-break` at 92 of 204,
+  average 87.45%, and the best of them holds the count and loses 0.01 of a point,
+  with `css-break/fieldset-004` down 88.5% → 84.4% against `fieldset-001` up
+  77.7% → 78.0% and still failing; the one configuration that would let
+  `fieldset-001` reach the cut costs six tests. The whole of it was reverted and
+  the numbers are recorded in `docs/wpt-rendering-gaps-open.md`, because the cut is
+  not the missing piece on its own: the single-child descent and the deep-fragment
+  path are the two workarounds built in its absence, and all three have to move
+  together.
+
+- `Broiler.Layout` (with **pending patches** `0004`/`0005` for `Broiler.CSS` and
+  `Broiler.HTML`) — a `<legend>` is a block box, a fieldset's first one is
+  rendered on the fieldset's block-start border, an `aspect-ratio` no longer sizes
+  a box below its own content, and the flow-relative minimum and maximum sizes
+  reach layout. HTML's rendering section makes a legend a block box and neither
+  user-agent source said so, so a legend's `width`, `height` and `padding` did
+  nothing at all — that is the one-line core, and it needs a patch in each
+  submodule because the two sources feed different paths into layout. This
+  repository's half is the placement: a fieldset's first legend is not laid out in
+  its content (HTML §15.5.13) but belongs to the block-start border, its margin
+  box centred on it, so a legend taller than the border stands proud of the border
+  box and the content begins below it. The placement acts on a block-level legend
+  only, so it is inert against the pinned pointers. Making the legend a block
+  exposed two adjacent gaps the same tests rest on, and both are fixed here: CSS
+  Sizing 4 §5.1's automatic content-based minimum, which stops a preferred aspect
+  ratio from sizing a box shorter than its content (the transferred ratio height
+  was overwriting the content height outright); and `min-block-size`,
+  `max-block-size` and their inline counterparts, which parsed and were then
+  dropped by layout, so the physical `min-`/`max-` longhands now consult whichever
+  flow-relative longhand names the same axis under the box's writing mode.
+  Measured with the submodules at their pinned pointers, under
+  `BROILER_WPT_PAGED_PRINT=1`: `css/css-break` holds at 92 of 204 with the average
+  87.38% → 87.45% and `break-inside-avoid-min-block-size-1` 82.0% → 96.3%;
+  `css/css-sizing` holds at 74 of 112 with both `aspect-ratio/fieldset-element-*`
+  tests reaching exactly 100%; `css/css-page` (135 paged, 142 default),
+  `css/CSS2`, `css/css-backgrounds` and `css/css-values` are unchanged
+  test-for-test. With the patches applied, `fieldset-004` 84.4% → 88.5% and
+  `fieldset-003` 91.3% → 92.1%. `fieldset-001` goes 78.0% → 77.7% and still fails:
+  its column set has to cut a box with content in it, and the column pass walks
+  into the fieldset and redistributes its children — stopping that descent is the
+  right rule and costs four tests (measured 92 → 88), so it stays.
+
+- `Broiler.Layout` — a box taller than a column set continues in the next column
+  instead of staying whole in the first one. The engine filled a column set by
+  moving whole boxes into it, which covers a column set made of several blocks and
+  not the shape most of the fragmentation corpus is written in: one block, taller
+  than the column set, whose decoration is the thing under test.
+  `FindMultiColumnFragmentParent` also answered null for a column set with a single
+  child — fewer than two boxes, nothing to distribute — so a one-child
+  multi-column box was not columnised at all, however tall that child was. That
+  rule was right while the only thing a column set could do was move boxes; it
+  stops being right the moment a box can be cut. `SliceTallFragments` now divides
+  a fragment taller than the column into a run of column-tall pieces, and the
+  decoration is sliced rather than repeated (`box-decoration-break`'s initial
+  value): the border and its rounded corners belong to the two outer ends of the
+  run and the joins between are square and open. Only a box with no content of its
+  own is cut, because a slice here is a real box rather than a paint instruction;
+  and a background image, gradient or box shadow keeps the whole box, because
+  those are positioned against the box they are on and slicing paints them once
+  per piece instead of once across the run. Under `BROILER_WPT_PAGED_PRINT=1`
+  `css/css-break` goes 91 → 92 of 204, average 87.11% → 87.38%: `borders-002`,
+  `out-of-flow-in-multicolumn-014` and `table/table-border-007` gained, and
+  `fieldset-002` (86.4% → 98.7%), `borders-003` through `-006` and
+  `rounded-clipped-border` all move a long way without reaching the gate.
+  `out-of-flow-in-multicolumn-019` and `overflowing-block-003` are lost, both of
+  which were passing on the pixel budget while rendering content that already ran
+  out of the bottom of the column set. `css/css-page` holds at 135 paged and 142
+  default with `fixedpos-011-print` 97.0% → 98.3% and 95.2% → 97.0%; paged
+  `css/CSS2`, `css/css-backgrounds` and `css/css-values` do not move.
+
+- `Broiler.Layout` — a `position: fixed` box is on every page of a paged render,
+  and it lands where its insets say. Three bugs met in one family of tests. CSS
+  Paged Media makes the page area the fixed-positioning containing block, so a
+  fixed box repeats per page rather than appearing once in the document;
+  `FragmentTreeBuilder` now emits the extra appearances, one page further down
+  each, as fragments and never boxes — a fixed box is out of flow, contributes no
+  height, and the page count is unchanged. Second, `PositionAbsoluteBox` — the
+  post-layout pass that re-resolves `right`/`bottom` once the used size is known —
+  ran for `absolute` and not for `fixed`, and the earlier pass recovers a height
+  only from an explicit non-percentage `height`, so a fixed box sized by its
+  content and anchored with `bottom` was anchored by its *top* edge to the
+  viewport's bottom: one box-height low, which in a paged render is the top of the
+  next page. Third, that same first pass placed a bottom-anchored `absolute` box
+  at its containing block's bottom edge while its height was still unknown, so the
+  subtree laid out below that edge and `LayoutEnvironment.ActualSize` — a running
+  maximum — kept the overshoot after the box was corrected; a document 36px too
+  tall is a whole extra blank page. It now stays at its static position until the
+  height is known. Under `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 134 → 135
+  of 224, average 77.21% → 77.67%, `fixedpos-009-print` gained and none lost; nine
+  more `fixedpos-*` go from passing at 99.2%–99.9% to exactly 100%, eight of them
+  on the default unpaginated path too. Paged `css/css-break` (91), `css/CSS2` (96),
+  `css/css-backgrounds` (424) and `css/css-values` (104) do not move, and the
+  default run holds at 142. Two tests slip slightly, both the fix correctly
+  repeating a box that is misplaced for an unrelated reason: `fixedpos-011`
+  (multicol not column-filling inside the fixed box) and `page-margin-005`
+  (percentage `@page` margins).
+
+- `Broiler.Wpt` / `Broiler.Layout` — a paged render lays the flow out once per
+  distinct page area instead of once per document, so a document whose named
+  `@page` rules size the page differently divides against each page's own area —
+  where its floats wrap and where its breaks fall — and not against the
+  unconditional one. Each run of consecutive pages sharing a name is taken from
+  the pass that used its area, which is sound because a page-name change forces a
+  break (CSS Paged Media 3 §5.3): a run always starts at a page boundary in every
+  pass, so its content divides against its own area alone. The *order* of the runs
+  is a property of the document and is read from the flow in document order; only
+  each run's length is a property of the page. Reading both off a scan of the
+  laid-out bands was tried and is wrong twice over — content overflowing its page
+  area invents runs the document never asked for, and it derives the page count
+  from fragment bounds when the content height settles it, which cost nine tests
+  in one measured run. Alongside it, `ApplyForcedPageBreakBefore` no longer steps
+  over a float: a float declares no break of its own, but a `break-after: page` on
+  the sibling before it ends the page the float would otherwise sit on. Measured
+  with the submodules at their pinned pointers, this moves exactly one test —
+  `page-name-unnamed-trailing-001-print`, 96.4% → 100% — because every test the
+  capability was built for turns out to be blocked behind something else
+  (`position: fixed` not repeating per page, `page-orientation` not rotating,
+  `vw`/`vh` not resolving against the first page's area, page-box percentages not
+  resolved per named page, `auto` margins on named pages); those are enumerated in
+  `docs/wpt-rendering-gaps-fixed.md`. Under `BROILER_WPT_PAGED_PRINT=1`
+  `css/css-page` goes 133 → 134 of 224, average 77.19% → 77.21%, none lost; paged
+  `css/css-break` (91), `css/CSS2` (96), `css/css-backgrounds` (424) and
+  `css/css-values` (104) do not move, and the default unpaginated run is unchanged
+  at 142.
+
+- `Broiler.Wpt` / `Broiler.Layout` — a paged render prints each page on the box
+  the *name that page carries* resolves to, instead of guessing one name for the
+  whole document. The guess arrived with the earlier named-page fix and is right
+  for the unpaginated path, which renders a single sheet; a paged render knows its
+  pages one at a time and should never have taken it. `page-name-unnamed-trailing-001`
+  uses exactly one name — `landscape`, on its middle page — so the guess put that
+  page's `margin: 20px` on all of them, giving a 260px page area and a fourth page
+  where its reference (two names, so no guess applied) had 300px and three.
+  `ComputedStyle` now carries `page` into the fragment IR, because a laid-out
+  fragment does not otherwise remember it, and `RenderPaged` reads the name off
+  the first fragment to start on each page — CSS Paged Media 3 §5.3 makes that
+  box's used name the page's name, and a later box on the same page cannot rename
+  it. When every page names the same rule the flow is laid out once more against
+  that rule's area (`page-name-table-001` is a single page on
+  `@page square { size: 5in }` and needs it); a document with mixed names still
+  divides its flow against the unconditional area, so only the boxes differ.
+  `page-size-010-print` gains: under `BROILER_WPT_PAGED_PRINT=1` `css/css-page`
+  goes 135 → 136 of 224, average 77.53% → 78.27%, `css/css-break` unchanged at 90,
+  none lost, default unpaginated unchanged. The test this was opened for goes from
+  `SizeMismatch` at 0.0% to 96.4% `MissingContent` and still fails — the residual
+  is per-page *layout*, which this is not.
+
+- `Broiler.Layout` — a page-name change breaks inside an out-of-flow subtree.
+  `CarriesThePageFlow` walked the whole ancestor chain and answered no for
+  anything inside a `position: absolute` or `fixed` box, conflating two rules: an
+  out-of-flow box does not carry its *own* page name into its parent's flow, but
+  its children are stacked in its own block flow and a name change between two of
+  them is still a page break. `css-page/page-name-003-print` states that and now
+  passes. It trades exactly one-for-one against `page-name-abspos-002-print`,
+  which asserts the opposite on near-identical markup — printed to PDF, Chromium
+  breaks in both cases, passing the first and failing the second against its own
+  reference, so Broiler now lands the same way round and that test is filed in
+  `docs/wpt-rendering-gaps-wont-fix.md` with the page counts. The score does not
+  move (paged `css/css-page` stays at 135 of 224, `css/css-break` at 90, default
+  unpaginated unchanged); this is kept for the rule it removes.
+
+- `Broiler.HTML` (**pending patch**, `patches/0003`) — a block-level image keeps
+  its page name. `CorrectImgBoxes` implements a block-level replaced element by
+  wrapping the image in an anonymous block and demoting the image itself to
+  `display: inline`, so it paints as an inline replaced word inside a block
+  wrapper; the geometry is right, but the wrapper is now the block-level box the
+  element generates and CSS Paged Media 3 §3.4 hangs a page name on a
+  block-level box and nothing else. The name stayed behind on the demoted
+  inline, so `<img style="display:block; page:b">` read as staying on its
+  ancestor's page and a following `div { page: b }` forced a break that should
+  not be there. `css-page/page-name-img-001` and `-002` are the control — there
+  the image really is inline and its name really must be ignored — and all four
+  now pass at 100%. Only paged rendering reads a page name, so the default
+  unpaginated render is unchanged test-for-test across `css/css-page`,
+  `css/css-break`, `css/css-backgrounds` and `css/css-values`; under
+  `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 132 → 134 of 224, average
+  76.45% → 77.36%, none lost.
+
+- `Broiler.Wpt` — a paged render prints each page on the box it is actually
+  printed on, and emits only the pages the comparison asks for. Two things were
+  missing and the first is not a page box at all: a print reftest often needs a
+  page it does not want to compare, and says so with
+  `<meta name="reftest-pages">` — `page-orientation-on-landscape-001-print`
+  spells it out in the markup it renders ("Page 1. Not compared. Just bumps
+  testing to page 2."), and its reference is a one-page document, so emitting
+  both of the test's pages compares two pages against one and fails on the size
+  alone. `WptReftestPages` reads the declaration (single pages, lists, `2-4`
+  ranges) and `RenderPaged` emits only what it names. The second is `@page
+  :first`, which describes exactly one page and could not be drawn while every
+  page shared a box. The flow is still laid out against a single page area, so
+  only page one's box may differ — sound for these tests because each forces its
+  own break. Under `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 128 → 132 of
+  224, average 73.69% → 76.45%, four tests changing state and none lost;
+  `css/css-break` does not move and the default unpaginated run is
+  byte-identical.
+
+- `Broiler.Wpt` — a paged render no longer stamps a page for a document that
+  generates none. A root element with no box generates no page, so the sheet
+  keeps none of its own paint; `RenderDecorated` has gated that on
+  `GeneratesPageContent` since the page paint landed, but `RenderPaged` never
+  asked, so `css-page/root-element-display-none-print` had a hotpink,
+  red-bordered first page stamped against a deliberately blank reference. Under
+  `BROILER_WPT_PAGED_PRINT=1` `css/css-page` goes 127 → 128 of 224, average
+  73.24% → 73.69%, one test changing state and none lost; the default
+  unpaginated run is untouched.
+
+- `Broiler.Wpt` — `@page { margin: auto }` centres the page area instead of
+  leaving every margin at zero. `auto` is a value of the margin property and the
+  shorthand parser read it as a failure to parse, rejecting the whole
+  declaration; the longhands did the same. Resolution now happens once per axis
+  after every declaration is seen: with no `auto` the area plus its margins is
+  the box and a declared `size` gives way (the over-constrained case
+  `page-size-013-print` states, its reference writing the same page as
+  `size: 300px 400px; margin: 50px`), and with an `auto` the box stands while the
+  `auto` sides take the remainder — halved between two, taken whole by one, and
+  signed, so an area larger than its box hangs off the edges rather than
+  clamping. This closes no reftest: the unpaginated render consults the page box
+  only when the `@page` paints, and none of the `page-margin-*` tests do. Under
+  `BROILER_WPT_PAGED_PRINT=1`, which does use it, `css/css-page` goes 72.97% →
+  73.24% average at an unchanged 127 of 224 passing, and the default run is
+  byte-identical test-for-test.
+
+- `Broiler.CSS` (**pending patch**, `patches/0002`) — a media query can tell it
+  is being printed. `EvaluateMediaType` matched `screen` and `all`
+  unconditionally, so `@media print` never applied to a document being printed,
+  and Media Queries 4's `width`/`height` features evaluated against whatever
+  surface the renderer allocated instead of the page area. `CssPagedMedia`
+  carries both, thread-static and inert unless pinned, so a continuous render is
+  byte-identical to before. The page area it carries is the *initial* one rather
+  than the one `@page` declares, because a `@page` rule may itself sit inside a
+  media query — `css-page/media-queries-001-print` declares
+  `@page { size: 10in; margin: 2in }` and then asserts a query matching only
+  between 4in and 5in wide and 2in and 3in tall. `Suspend()` keeps the context
+  out of a nested browsing context, whose frame has its own viewport. Together
+  with the already-pending absolute-length patch (`0001`, which that test needs
+  because it states its assertion in inches) `css/css-page` goes 142 → 143 of 224
+  reftests, 88.37% → 88.83% average, `css/css-break` unmoved, exactly one test
+  changing state. The main-repo call sites sit behind a `BROILER_CSS_PAGED_MEDIA`
+  file-existence probe, so the repo builds and renders identically against the
+  pinned submodule pointer.
+
+- `Broiler.Wpt` — the sheet takes the named page the document puts its content
+  on. `WptPageBox` read only the unconditional `@page`, so
+  `css-page/page-name-table-001-print` — a table on `page: square`, a
+  `@page square` sizing the sheet 5in and painting it `#eee`, an unconditional
+  `@page` painting red — rendered at the default size under red where its
+  reference is a 5in `#eee` square, and scored 0.0%. The runner renders one sheet
+  and that sheet is page one, so it now takes the box of the page the flow starts
+  on: `EnumerateAppliedPageBlocks` yields the unconditional rules and then layers
+  the used named rule over them, and both the geometry and the `@page` decoration
+  follow because both read that one enumerator. **Exactly one** used name is the
+  whole of the guard — a document naming two pages needs a per-page box that one
+  surface cannot carry, so none is taken (`page-margin-auto-print` names six and
+  is untouched), a named rule nothing uses is still ignored, and a pseudo-class
+  selector is never read. `css/css-page` goes 141 → 142 of 224 reftests with the
+  average 87.92% → 88.37%, `css/css-break` does not move, exactly one test
+  changed state, and the golden-image score is unchanged.
+
 - `Broiler.Wpt` — a `@page` rule's flow-relative margins and padding are read.
   CSS Paged Media 3 §3.2 lets the page box carry `margin-inline-start` and its
   seven siblings, and neither half of the runner's `@page` model understood them:

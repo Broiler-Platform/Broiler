@@ -354,15 +354,29 @@ internal partial class CssBox
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Three things take a box's children out of that flow, and WPT has a <c>page-name</c> test for
+    /// Two things take a box's children out of that flow, and WPT has a <c>page-name</c> test for
     /// each. A flex or grid container places items rather than stacking them, so an item's page
     /// name names nothing to break at (<c>page-name-flex-001</c>, <c>-002</c>) — while a name on the
     /// container itself still breaks, because the container <em>is</em> in its parent's flow
-    /// (<c>page-name-flex-003</c>). An out-of-flow subtree is positioned against its containing
-    /// block rather than following the flow (<c>page-name-abspos-002</c>). And a box whose block
-    /// axis is not the page's stacks its children sideways, where a page boundary does not fall
-    /// (<c>page-name-orthogonal-writing-003</c>) — though a box inside it that turns back upright
-    /// is in the page's axis again, which is what <c>-004</c> pins.
+    /// (<c>page-name-flex-003</c>). And a box whose block axis is not the page's stacks its children
+    /// sideways, where a page boundary does not fall (<c>page-name-orthogonal-writing-003</c>) —
+    /// though a box inside it that turns back upright is in the page's axis again, which is what
+    /// <c>-004</c> pins.
+    /// </para>
+    /// <para>
+    /// <b>Being out of flow is not a third.</b> An out-of-flow box does not carry its <em>own</em>
+    /// name into its parent's flow — that is
+    /// <see cref="ParticipatesInPageNamePropagation"/>'s job, and <c>page-name-abspos-001</c> and
+    /// <c>-003</c> are built on it — but its children are stacked in its own block flow and a name
+    /// change between two of them is still a page break. <c>page-name-003</c> states that, citing
+    /// the Chromium bug that established it, and Chromium agrees: printed to PDF it gives that test
+    /// two pages and its two-page reference two.
+    /// </para>
+    /// <para>
+    /// <c>page-name-abspos-002</c> is the same markup asserting the opposite, and it is the odd one
+    /// out rather than the rule — Chromium prints it as two pages against its one-page reference,
+    /// so it fails there too. See
+    /// <c>docs/wpt-rendering-gaps-wont-fix.md</c>.
     /// </para>
     /// <para>
     /// Only the page-<em>name</em> rule is gated here. An explicit <c>break-before: page</c> means
@@ -375,19 +389,8 @@ internal partial class CssBox
         if (Display is "flex" or "inline-flex" or "grid" or "inline-grid")
             return false;
 
-        if (!string.IsNullOrEmpty(WritingMode)
-            && !WritingMode.Equals("horizontal-tb", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        for (var box = this; box is not null; box = box.ParentBox)
-        {
-            if (box.Position is CssConstants.Absolute or CssConstants.Fixed)
-                return false;
-        }
-
-        return true;
+        return string.IsNullOrEmpty(WritingMode)
+            || WritingMode.Equals("horizontal-tb", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -424,14 +427,26 @@ internal partial class CssBox
             return 0;
 
         if (child.Position is CssConstants.Absolute or CssConstants.Fixed
-            || child.Float != CssConstants.None
             || child.Display == CssConstants.None)
         {
             return 0;
         }
 
-        if (!ForcesPageBreak(child.BreakBefore)
-            && !(previous is not null && ForcesPageBreak(previous.BreakAfter))
+        bool afterAForcedBreak = previous is not null && ForcesPageBreak(previous.BreakAfter);
+
+        if (child.Float != CssConstants.None)
+        {
+            // A float declares no break of its own — <c>break-before</c> does not apply to it, and
+            // it carries no page name into the flow — but a break the sibling before it forces is a
+            // break in the flow the float is placed in, so the float belongs after it too. Without
+            // this a float is the one thing a forced break steps over: `page-size-007-print`'s
+            // reference puts `break-after: page` on a div and a float immediately after it, and the
+            // float stayed on the page the break had just ended while the text following it moved.
+            if (!afterAForcedBreak)
+                return 0;
+        }
+        else if (!ForcesPageBreak(child.BreakBefore)
+            && !afterAForcedBreak
             && !StartsANewPageType(child, PreviousOnAPage(Boxes, childIndex)))
         {
             return 0;

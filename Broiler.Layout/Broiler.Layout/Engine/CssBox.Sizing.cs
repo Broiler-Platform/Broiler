@@ -582,6 +582,29 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// §10.6.4 inset constraint above, and their percentage heights always resolve
     /// against a definite containing block.</para>
     /// </summary>
+    /// <summary>
+    /// CSS Sizing 4 §5.1: whether this box's <c>min-height: auto</c> resolves to its content-based
+    /// minimum, which is what stops a preferred aspect ratio from sizing a box shorter than the
+    /// content it holds. An explicit <c>min-height</c> replaces the automatic minimum, and a scroll
+    /// container's content scrolls instead of pushing its box out.
+    /// </summary>
+    private bool AutomaticMinimumSizeApplies
+    {
+        get
+        {
+            var minimum = MinHeight?.Trim();
+            if (!string.IsNullOrEmpty(minimum)
+                && !minimum.Equals("0", StringComparison.Ordinal)
+                && !minimum.Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return string.IsNullOrEmpty(Overflow)
+                || Overflow.Equals(CssConstants.Visible, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private bool CanTransferAspectRatioToBlockHeight
     {
         get

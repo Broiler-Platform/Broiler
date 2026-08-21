@@ -1,6 +1,6 @@
 # Submodule patches waiting to be applied
 
-**One patch is waiting on a maintainer.** See the index below.
+**Five patches are waiting on a maintainer.** See the index below.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS` and `Broiler.Graphics`
 are git submodules with their own remotes. A session whose GitHub scope is this
@@ -51,6 +51,10 @@ again with the one below.
 | # | submodule | subject |
 | --- | --- | --- |
 | `0001` | `Broiler.CSS` | Resolve the absolute length units in ParseToPixels |
+| `0002` | `Broiler.CSS` | Give a media query a paged formatting context |
+| `0003` | `Broiler.HTML` | Carry a block image's page name onto the box that replaces it |
+| `0004` | `Broiler.CSS` | Give `<legend>` the user-agent `display: block` it has in HTML |
+| `0005` | `Broiler.HTML` | The same, in the default style sheet |
 
 ### `0001` — `border: 72pt solid red` painted a thin black line
 
@@ -79,3 +83,123 @@ as *invalid* rather than as the length they name.
 
 The `in` spelling has to be tested after the viewport-unit scan, which claims
 `vmin`.
+
+### `0002` — a media query had no way to know it was being printed
+
+**Apply `0001` first, or rather: apply both.** On its own this one does not make
+`css-page/media-queries-001-print` pass, because that test writes its whole
+assertion in inches and `ParseToPixels` cannot resolve them until `0001` lands.
+They touch different files, so they apply cleanly in either order.
+
+A formatting context has media-query answers of its own, and neither of the two
+that matter for print was reachable from outside `Broiler.CSS`:
+
+* `EvaluateMediaType` matched `screen` and `all` unconditionally, so
+  `@media print` never applied to a document being printed; and
+* Media Queries 4 evaluates `width`/`height` against the **page area**, which is
+  not the surface a paged renderer happens to allocate.
+
+`CssPagedMedia` carries both, thread-static and inert unless pinned — like the
+layout engine's other render levers — so a continuous render evaluates exactly as
+before.
+
+The page area it carries is the **initial** one the formatter is handed, not the
+one `@page` declares. That reads as a bug until the circularity shows up: a
+`@page` rule may itself sit inside a media query, so resolving the query against
+the declared page would need the query already resolved.
+`media-queries-001-print` states it outright — it declares
+`@page { size: 10in; margin: 2in }` and then asserts a query matching only
+between 4in and 5in wide and 2in and 3in tall, which is WPT's initial 5in × 3in
+page whether or not a default margin comes off it. The declared 10in page is
+precisely what the query must not see.
+
+`Suspend()` is the other half, and it is not an optimisation: a **nested**
+browsing context is its own formatting context, so the page area of the document
+embedding a frame is not that frame's viewport. Without it
+`media-queries-002-print` and `-003-print` go red, each embedding a 100 × 100
+frame whose own sheet asserts `@media (width: 100px) and (height: 100px)`.
+`Broiler.Layout`'s `EmbeddedCanvas.Pin` suspends it around every embedded render,
+which covers the call site inside `Broiler.HTML` that the main repo cannot reach.
+
+**The main-repo half is already in and inert.** `EmbeddedCanvas` and
+`WptTestRunner` carry the two call sites behind a `BROILER_CSS_PAGED_MEDIA`
+compile constant that both `.csproj` files define only when
+`Broiler.CSS/Broiler.CSS.Dom/CssPagedMedia.cs` exists — the same file-existence
+probe `Broiler.Render.Stage.Benchmarks.csproj` uses. Against the pinned pointer
+the repo builds and renders byte-identically to before (verified: `css/css-page`
+and `css/css-break` are unchanged test-for-test). Once this patch lands and the
+pointer is bumped, the probe finds the file, the constant is defined and the two
+call sites compile in — no further main-repo change needed.
+
+Measured on top of `0001`: `css/css-page` goes 142 → **143** of 224 reftests with
+the average 88.37% → **88.83%**, `css/css-break` does not move, and a fail-list
+diff shows exactly one test changing state — `media-queries-001-print`, 0.0% →
+100% — with none lost.
+
+### `0003` — a `display: block` image lost its page name
+
+`CorrectImgBoxes` implements a block-level replaced element the way this engine
+lays one out: it wraps the image in an **anonymous block** and demotes the image
+itself to `display: inline`, so the image paints as an inline replaced word
+inside a block wrapper. The geometry that comes out is correct — an
+`<img style="display:block">` followed by text puts the text on the next line —
+but the wrapper is now the block-level box the element generates, and one thing
+was not travelling with it.
+
+CSS Paged Media 3 §3.4 hangs a page name on a block-level box **and nothing
+else**, which is exactly what lets an *inline* image's own `page` be ignored.
+Leaving the name behind on the demoted inline therefore reads
+`<img style="display:block; page:b">` as staying on its ancestor's page: the name
+is dropped, and a following `div { page: b }` forces a break that should not be
+there.
+
+`css-page/page-name-img-003` and `-004` are that failure, each rendering two
+pages where its reference renders one. **`-001` and `-002` are the control** —
+there the image really is inline, its name really must be ignored, and they pass
+both before and after. That pair is why the demoted `Display` could not simply be
+read around downstream: it said `inline` for *both* spellings, so nothing after
+`CorrectImgBoxes` could tell a block image from an inline one. All four now pass
+at 100%, which is the coverage this patch carries — `Broiler.HTML.Orchestration`
+has no unit-test project of its own.
+
+**Only paged rendering sees it.** The page name is not read outside paged media,
+so the default unpaginated render is unchanged — verified test-for-test across
+`css/css-page`, `css/css-break`, `css/css-backgrounds` and `css/css-values`.
+Under `BROILER_WPT_PAGED_PRINT=1`, `css/css-page` goes 132 → **134** of 224 with
+the average 76.45% → **77.36%**, `css/css-break` unmoved, none lost. There is no
+main-repo half and nothing in this repository references anything new, so the
+build is unaffected while the patch waits.
+
+### `0004` and `0005` — `<legend>` was an inline box
+
+HTML's rendering section makes a `<legend>` a block box. Neither of the two
+user-agent sources this engine reads said so: `Broiler.CSS`'s
+`CssUserAgentDefaults.DisplayValues` table lists `fieldset` and every other
+block-level element and not `legend`, and `Broiler.HTML`'s default style sheet
+has the same omission in its `display: block` rule. Left at the CSS initial
+value a legend is **inline**, so its `width`, `height` and `padding` do nothing
+at all.
+
+A four-way render pins it: a `<legend>`, the same legend with `display: block`,
+a `<span>` and a `<div>`, each given `width: 100px; height: 19px; padding: 10px
+7px 20px 3px`. The `<div>` and the explicit `display: block` legend occupy 49px;
+the bare legend and the `<span>` occupy 19px — the legend was behaving as an
+inline box exactly.
+
+**Two patches for one rule**, because the two sources feed different paths into
+layout and a document reaching layout through either one needs it.
+
+`css-break/fieldset-001`, `-003` and `-004` are written on a sized legend. The
+main-repo half of the change — the rendered legend's placement on the fieldset's
+block-start border (`CssBox.Fieldset`) — is inert without these: it only acts on
+a block-level legend, so against the pinned pointers the repository renders
+exactly as it did.
+
+**Measured** on top of the main-repo half, under `BROILER_WPT_PAGED_PRINT=1`:
+`css/css-break` holds at 92 of 204 with the average 87.45% → **87.47%** —
+`fieldset-004` 84.4% → **88.5%** and `fieldset-003` 91.3% → **92.1%**, against
+`fieldset-001` 78.0% → 77.7%, which needs its column set to cut a box that has
+content in it and does not get there on the legend alone. `css/css-sizing` holds
+at 74 of 112 with both of its fieldset `aspect-ratio` tests at 100%, and
+`css/css-page` (paged and default), `css/CSS2`, `css/css-backgrounds` and
+`css/css-values` do not move.

@@ -26,7 +26,7 @@ internal static class FragmentTreeBuilder
         // Publish the host's font services for the pass: SvgRenderer has no box to ask for a font,
         // and a DrawSvgTextItem without one is dropped by the raster backend (see SvgTextEnvironment).
         SvgTextEnvironment.Reset(root.LayoutEnvironment);
-        var tree = BuildFragment(root, parentHasTransform: false);
+        var tree = BuildFragment(root, parentHasTransform: false, isRoot: true);
         CollectSvgDefinitions(tree);
         return tree;
     }
@@ -47,7 +47,96 @@ internal static class FragmentTreeBuilder
             CollectSvgDefinitions(child);
     }
 
-    private static Fragment BuildFragment(CssBox box, bool parentHasTransform)
+    /// <summary>
+    /// A bound on how many times a fixed-position subtree is repeated. The paged renderer composes
+    /// a handful of pages, and a document long enough to exceed this is one where the pages past it
+    /// are not being rasterised anyway — this only keeps a very long flow from building copies
+    /// nothing will ever draw.
+    /// </summary>
+    private const int MaxRepeatedFixedPages = 32;
+
+    /// <summary>
+    /// The extra appearances of every fixed-position box: CSS Paged Media 3 makes the page area the
+    /// fixed-positioning containing block, so a fixed box repeats on each page of the flow.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Paint-time only. The copies are fragments and never boxes, so nothing about the flow moves:
+    /// a fixed box is out of flow, contributes no height, and the page count is what it was.
+    /// </para>
+    /// <para>
+    /// Inert unless a page size is in force. A screen render leaves <c>PageSize</c> at its
+    /// no-pagination default and a single-page render has one page, so in both cases there is
+    /// nothing to repeat and the tree is exactly what it was.
+    /// </para>
+    /// <para>
+    /// WPT's <c>css-page/fixedpos-001-print</c> through <c>-011</c> are written against this, and
+    /// they say so in the markup they render — <c>"This should repeat on every page"</c>. Their
+    /// references state the same layout with one absolutely-positioned copy per page.
+    /// </para>
+    /// </remarks>
+    private static List<Fragment> RepeatedFixedFragments(CssBox root, bool hasTransformAncestor)
+    {
+        var repeats = new List<Fragment>();
+
+        if (root.LayoutEnvironment is not { } environment)
+            return repeats;
+
+        double pageHeight = environment.PageSize.Height;
+        if (pageHeight <= 0 || pageHeight >= UnpaginatedPageExtent)
+            return repeats;
+
+        // The same count the paged renderer cuts its pages at, for the same reason: a fixed box
+        // belongs on every page the flow actually fills, and on no page after them.
+        int pages = (int)Math.Ceiling(environment.ActualSize.Height / pageHeight - 0.01);
+        pages = Math.Min(pages, MaxRepeatedFixedPages);
+        if (pages <= 1)
+            return repeats;
+
+        var fixedBoxes = new List<CssBox>();
+        Collect(root);
+
+        foreach (var box in fixedBoxes)
+        {
+            for (int page = 1; page < pages; page++)
+            {
+                box.OffsetTop(pageHeight);
+                repeats.Add(BuildFragment(box, hasTransformAncestor));
+            }
+
+            // Put it back where layout left it: the fragment already built for page one refers to
+            // that position, and so does anything that reads the box tree afterwards.
+            box.OffsetTop(-pageHeight * (pages - 1));
+        }
+
+        return repeats;
+
+        void Collect(CssBox box)
+        {
+            foreach (var child in box.Boxes)
+            {
+                // A fixed box inside a fixed box is part of the subtree that repeats, not a
+                // subtree of its own to repeat again.
+                if (child.Position == CssConstants.Fixed)
+                {
+                    if (child.Display != CssConstants.None && !child.PositionHidden && !child.ClampedAway)
+                        fixedBoxes.Add(child);
+
+                    continue;
+                }
+
+                Collect(child);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A page size this large means "not paginated" — the value the container installs for an
+    /// ordinary screen render. Kept in step with <c>CssBox.UnpaginatedPageExtent</c>.
+    /// </summary>
+    private const double UnpaginatedPageExtent = 90000;
+
+    private static Fragment BuildFragment(CssBox box, bool parentHasTransform, bool isRoot = false)
     {
         var style = ComputedStyleBuilder.FromBox(box, box.HtmlTag?.Name);
         bool hasTransformAncestor = parentHasTransform
@@ -82,6 +171,13 @@ internal static class FragmentTreeBuilder
                 children.Add(BuildFragment(child, hasTransformAncestor));
             }
         }
+
+        // In paged media a fixed-position box is fixed to the *page area*, so it appears once on
+        // every page rather than once in the document. The box was laid out on page one, which is
+        // where its containing block is; the rest of its appearances are copies of that subtree,
+        // one page further down each time.
+        if (isRoot && !contentHidden)
+            children.AddRange(RepeatedFixedFragments(box, hasTransformAncestor));
 
         List<LineFragment>? lines = null;
         if (!contentHidden && box.LineBoxes.Count > 0)

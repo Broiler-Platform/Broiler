@@ -57,7 +57,19 @@ internal static class EmbeddedCanvas
     /// </summary>
     public static System.IDisposable Pin(string? embedderColorScheme)
     {
-        var scope = new Scope(EmbedderColorScheme, IsEmbedded);
+        // A nested browsing context is also its own *formatting* context, so an enclosing paged
+        // one does not reach into it: the frame's `width`/`height` media features describe the
+        // frame, not the page the embedder is printed on. Suspending it here rather than at the
+        // two call sites means the rule holds for every embedded render, including the one inside
+        // Broiler.HTML that this file cannot see.
+#if BROILER_CSS_PAGED_MEDIA
+        var scope = new Scope(
+            EmbedderColorScheme, IsEmbedded, Broiler.CSS.Dom.CssPagedMedia.Suspend());
+#else
+        // The paged formatting context is a pending Broiler.CSS patch (see patches/). Until it
+        // lands there is no context to suspend, and this reads exactly as it did before.
+        var scope = new Scope(EmbedderColorScheme, IsEmbedded, NoScope.Instance);
+#endif
         EmbedderColorScheme = embedderColorScheme;
         IsEmbedded = true;
         return scope;
@@ -97,7 +109,21 @@ internal static class EmbeddedCanvas
         !IsEmbedded
         || UsesDarkColorScheme(EmbedderColorScheme) != UsesDarkColorScheme(embeddedRootColorScheme);
 
-    private sealed class Scope(string? previousScheme, bool previousIsEmbedded) : System.IDisposable
+#if !BROILER_CSS_PAGED_MEDIA
+    /// <summary>A disposable that does nothing, for the build without the pending patch.</summary>
+    private sealed class NoScope : System.IDisposable
+    {
+        internal static readonly NoScope Instance = new();
+
+        public void Dispose()
+        {
+        }
+    }
+#endif
+
+    private sealed class Scope(
+        string? previousScheme, bool previousIsEmbedded, System.IDisposable continuousMedia)
+        : System.IDisposable
     {
         private bool _disposed;
 
@@ -109,6 +135,7 @@ internal static class EmbeddedCanvas
             _disposed = true;
             EmbedderColorScheme = previousScheme;
             IsEmbedded = previousIsEmbedded;
+            continuousMedia.Dispose();
         }
     }
 }

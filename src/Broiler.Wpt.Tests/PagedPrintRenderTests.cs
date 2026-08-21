@@ -86,6 +86,161 @@ public sealed class PagedPrintRenderTests : IDisposable
         Assert.Equal(100, rendered.Height);
     }
 
+    // A named page may be a different size, and then the flow on it divides against *that* area.
+    // Here the named block is 250px tall on a 300px page of its own, so it is one page; laid out
+    // against the unconditional 100px area — which is what one layout for the whole document can
+    // only ever do — it would be three, and the sheet would come out 1000px instead of 400px.
+    [Fact]
+    public void A_Named_Page_Divides_Its_Flow_Against_Its_Own_Area()
+    {
+        using var rendered = RenderPrint(
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "@page { size: 200px 100px; margin: 0; }"
+            + "@page tall { size: 200px 300px; }"
+            + "html,body { margin: 0; padding: 0; }"
+            + "</style>"
+            + "<div style=\"height:80px; background:#000\"></div>"
+            + "<div style=\"page:tall; height:250px; background:#000\"></div>");
+
+        Assert.Equal(200, rendered.Width);
+        Assert.Equal(400, rendered.Height);
+        Assert.True(IsInk(rendered, 100, 340), "the named page should carry the whole block");
+    }
+
+    // And the page after a named one goes back to the unconditional rule. A run of pages is bounded
+    // by the name changes on either side of it, so an unnamed run following a named one is its own
+    // run and not a continuation — `page-name-unnamed-trailing-001` is built on exactly that.
+    [Fact]
+    public void An_Unnamed_Page_After_A_Named_One_Returns_To_The_Unconditional_Box()
+    {
+        using var rendered = RenderPrint(
+            InsetStyle
+            + "<div style=\"height:60px; background:#000\"></div>"
+            + "<div style=\"page:mid; height:40px; background:#000\"></div>"
+            + "<div style=\"height:60px; background:#000\"></div>");
+
+        Assert.Equal(300, rendered.Height);
+        Assert.True(IsInk(rendered, 5, 5), "page 1 has no margin, so its content starts at the corner");
+        Assert.False(IsInk(rendered, 5, 105), "page 2 is inset by @page mid's margin");
+        Assert.True(IsInk(rendered, 25, 125), "page 2's content starts inside that margin");
+        Assert.True(IsInk(rendered, 5, 205), "page 3 is back on the unconditional box");
+    }
+
+    // The name belongs to the innermost box that starts the page, not the outermost. A plain
+    // wrapper around named content does not claim the page for itself — the same rule the flow
+    // applies when it decides where to break (CssBox.StartPageName).
+    [Fact]
+    public void A_Wrapper_Does_Not_Claim_The_Page_Its_Child_Names()
+    {
+        using var rendered = RenderPrint(
+            InsetStyle
+            + "<div style=\"height:60px; background:#000\"></div>"
+            + "<div><div style=\"page:mid; height:40px; background:#000\"></div></div>"
+            + "<div style=\"height:60px; background:#000\"></div>");
+
+        Assert.Equal(300, rendered.Height);
+        Assert.False(IsInk(rendered, 5, 105), "page 2 is inset by @page mid's margin");
+        Assert.True(IsInk(rendered, 25, 125), "page 2's content starts inside that margin");
+    }
+
+    // A float declares no break of its own, but it does not get to step over one either: a
+    // `break-after: page` on the box before it ends the page the float would otherwise sit on.
+    [Fact]
+    public void A_Float_Follows_A_Forced_Break_Onto_The_Next_Page()
+    {
+        using var rendered = RenderPrint(
+            "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+            + "@page { size: 200px 100px; margin: 0; }"
+            + "html,body { margin: 0; padding: 0; }"
+            + "</style>"
+            + "<div style=\"display:flow-root\">"
+            + "<div style=\"break-after:page; height:20px\"></div>"
+            + "<div style=\"float:left; width:40px; height:40px; background:#000\"></div>"
+            + "</div>");
+
+        Assert.Equal(200, rendered.Height);
+        Assert.False(IsInk(rendered, 20, 40), "the float should not stay on the page the break ended");
+        Assert.True(IsInk(rendered, 20, 120), "the float belongs after the break");
+    }
+
+    // CSS Paged Media 3: the page area is the fixed-positioning containing block, so a fixed box
+    // appears once on every page rather than once in the document. WPT's `css-page/fixedpos-*`
+    // say it in the text they render: "This should repeat on every page."
+    [Fact]
+    public void A_Fixed_Box_Repeats_On_Every_Page()
+    {
+        using var rendered = RenderPrint(
+            PlainPageStyle
+            + "<div style=\"position:fixed; bottom:0; left:0; width:50px; height:20px;"
+            + " background:#000\"></div>"
+            + "<div style=\"height:250px\"></div>");
+
+        Assert.Equal(300, rendered.Height);
+        Assert.True(IsInk(rendered, 10, 90), "page 1 carries the fixed box");
+        Assert.True(IsInk(rendered, 10, 190), "page 2 carries it too");
+        Assert.True(IsInk(rendered, 10, 290), "and so does page 3");
+    }
+
+    // And it is anchored by its bottom *margin edge*, so its own height comes off the page area's
+    // bottom — including when that height is the content's and is only known once the box has been
+    // laid out. Placing it before then anchors it by its top edge instead, which in a paged render
+    // drops it onto the page after the one it belongs to.
+    [Fact]
+    public void A_Bottom_Anchored_Fixed_Box_Sized_By_Its_Content_Sits_On_The_Page_Area()
+    {
+        using var rendered = RenderPrint(
+            PlainPageStyle
+            + "<div style=\"position:fixed; bottom:0; left:0; width:50px; background:#000\">"
+            + "<div style=\"height:20px\"></div></div>"
+            + "<div style=\"height:250px\"></div>");
+
+        Assert.True(IsInk(rendered, 10, 90), "the box ends at the bottom of page 1's area");
+        Assert.False(IsInk(rendered, 10, 70), "and does not start further up than its own height");
+        Assert.True(IsInk(rendered, 10, 190), "page 2 gets the same box in the same place");
+    }
+
+    // A box anchored by `bottom` whose height is its content's is placed twice: once before its
+    // children are laid out and again once they have been. The first placement must not put it
+    // below the containing block's bottom edge, because the running maximum that decides how tall
+    // the document is keeps the overshoot after the box has been corrected — and in a paged render
+    // a document 36px too tall is a whole extra blank page.
+    [Fact]
+    public void A_Bottom_Anchored_Box_Sized_By_Its_Content_Adds_No_Page()
+    {
+        // The masked 36x36 square and the two full-page blocks are `fixedpos-009-print`'s own
+        // reference, cut down: it is two pages of `height: 100vh` and came out three.
+        const string Pencil =
+            ".pencil { background-color: #000;"
+            + " mask-image: url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHBhdGggZD0iTTMgMTcuMjVWMjFoMy43NUwxNy44MSA5Ljk0bC0zLjc1LTMuNzVMMyAxNy4yNXpNMjAuNzEgNy4wNGEuOTk2Ljk5NiAwIDAgMCAwLTEuNDFsLTIuMzQtMi4zNGEuOTk2Ljk5NiAwIDAgMC0xLjQxIDBsLTEuODMgMS44MyAzLjc1IDMuNzUgMS44My0xLjgzeiIvPjxwYXRoIGQ9Ik0wIDBoMjR2MjRIMHoiIGZpbGw9Im5vbmUiLz48L3N2Zz4=);"
+            + " mask-repeat: no-repeat; width: 36px; height: 36px; }";
+
+        using var rendered = RenderPrint(
+            PlainPageStyle
+            + "<style>.p { position: relative; height: 100vh } " + Pencil + "</style>"
+            + "<div class=\"p\"><div style=\"position:absolute; bottom:0; right:0\">"
+            + "<div class=\"pencil\"></div></div>A</div>"
+            + "<div class=\"p\"><div style=\"position:absolute; bottom:0; right:0\">"
+            + "<div class=\"pencil\"></div></div>B</div>");
+
+        Assert.Equal(200, rendered.Height);
+    }
+
+    // A 200x100 sheet with no page margin, for the tests that read a position off the page area.
+    private const string PlainPageStyle =
+        "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+        + "@page { size: 200px 100px; margin: 0; }"
+        + "html,body { margin: 0; padding: 0; }"
+        + "</style>";
+
+    // A 200x100 sheet whose `mid` page carries a 20px margin and whose unconditional page carries
+    // none, so which box a page took is readable from where its content starts.
+    private const string InsetStyle =
+        "<!DOCTYPE html><meta charset=\"utf-8\"><style>"
+        + "@page { size: 200px 100px; margin: 0; }"
+        + "@page mid { margin: 20px; }"
+        + "html,body { margin: 0; padding: 0; }"
+        + "</style>";
+
     // Nothing declares a break here: the content is simply taller than one page area, and the
     // bands are cut from a continuous surface, so it continues on the next page by itself. That is
     // the whole of automatic fragmentation in this model.
