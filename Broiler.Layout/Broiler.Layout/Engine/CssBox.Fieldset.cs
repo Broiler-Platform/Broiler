@@ -22,10 +22,18 @@ namespace Broiler.Layout.Engine;
 /// the fieldset's own padding.
 /// </para>
 /// <para>
+/// The legend's inline size is the other half of the rule and is resolved earlier, in
+/// <c>ResolveBlockUsedWidth</c>: an <c>auto</c> inline size is the <em>fit-content</em> inline
+/// size, so the legend shrink-wraps rather than stretching to the fieldset's content width the way
+/// an ordinary block child would. <see cref="IsRenderedLegend"/> is what that branch asks.
+/// </para>
+/// <para>
 /// Applied after the children are laid out, because the legend's margin box is only measured then —
 /// the same shape as every other post-layout placement here. What is <em>not</em> done is the
 /// notch: the block-start border is still painted behind the legend, where it should stop at the
-/// legend's margin box and resume after it.
+/// legend's margin box and resume after it. Nor is the block-size rule that goes with a
+/// non-<c>auto</c> <c>block-size</c> (subtract the part of the legend's margin box that spills past
+/// the border), which is what WPT's <c>fieldset-block-size</c> asks for.
 /// </para>
 /// </remarks>
 internal partial class CssBox
@@ -55,8 +63,8 @@ internal partial class CssBox
 
         // The content starts below whichever of the border and the legend reaches further down —
         // the legend's margin-box bottom is `border/2 + legendBox/2` by the centring above.
-        double moveRest = Location.Y + Math.Max(border, (border + legendBox) / 2) + ActualPaddingTop
-            - marginBoxBottom;
+        double contentTop = Location.Y + Math.Max(border, (border + legendBox) / 2) + ActualPaddingTop;
+        double moveRest = contentTop - marginBoxBottom;
 
         if (Math.Abs(moveRest) <= 0.01)
             return;
@@ -72,10 +80,43 @@ internal partial class CssBox
 
             child.OffsetTop(moveRest);
         }
+
+        // The children moved, so the auto height measured from them is stale by the same amount.
+        // MarginBottomCollapse cannot be re-run to find out — it only ever grows ActualBottom
+        // (`Math.Max(ActualBottom, …)`), and the move that matters here is upwards: the legend had
+        // been laid out in the flow, so the fieldset was left as tall as if the border carried the
+        // content *and* a legend-sized block below it. WPT's `legend-block-position-centering`
+        // rendered a 100px-bordered fieldset 315px tall where every engine draws 218.
+        //
+        // Every in-flow child shifted by exactly `moveRest`, and the legend itself never reaches
+        // below `contentTop` (it is centred on the border, so its margin box ends at
+        // `border/2 + legendBox/2`, which is where the content begins whenever the legend is the
+        // taller). So the measured bottom shifts with the children, floored at an empty content box.
+        if (Height == CssConstants.Auto || string.IsNullOrEmpty(Height))
+        {
+            ActualBottom = Math.Max(
+                contentTop + ActualPaddingBottom + ActualBorderBottomWidth,
+                ActualBottom + moveRest);
+        }
     }
 
     private bool IsFieldset =>
         string.Equals(HtmlTag?.Name, "fieldset", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Whether this box is the rendered legend of the fieldset it is a child of.
+    /// </summary>
+    /// <remarks>
+    /// HTML §15.5.13 gives the rendered legend a fit-content inline size when its own
+    /// <c>inline-size</c> is <c>auto</c> — it is blockified, but it is not stretched to the
+    /// fieldset's content width the way an ordinary block child would be. Layout asks this before
+    /// resolving the used width; see <c>ResolveBlockUsedWidth</c>.
+    /// </remarks>
+    internal bool IsRenderedLegend =>
+        string.Equals(HtmlTag?.Name, "legend", StringComparison.OrdinalIgnoreCase)
+        && ParentBox is { } parent
+        && parent.IsFieldset
+        && ReferenceEquals(parent.RenderedLegend(), this);
 
     /// <summary>
     /// The fieldset's rendered legend: its first in-flow <c>&lt;legend&gt;</c> child. A second one
