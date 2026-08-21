@@ -31,6 +31,9 @@ public class Program
         var convertDocInputs = new List<string>();
         var urls = new List<string>();
         var captureImageUrls = new List<string>();
+        var evaluatePageUrls = new List<string>();
+        var evaluateExpressions = new List<string>();
+        string? evaluateHtmlOutput = null;
         string? output = null;
         string? outputDir = null;
         string? outputFormat = null;
@@ -67,6 +70,15 @@ public class Program
                     break;
                 case "--capture-image" when i + 1 < args.Length:
                     captureImageUrls.Add(args[++i]);
+                    break;
+                case "--evaluate-page" when i + 1 < args.Length:
+                    evaluatePageUrls.Add(args[++i]);
+                    break;
+                case "--evaluate" when i + 1 < args.Length:
+                    evaluateExpressions.Add(args[++i]);
+                    break;
+                case "--evaluate-html-output" when i + 1 < args.Length:
+                    evaluateHtmlOutput = args[++i];
                     break;
                 case "--output" when i + 1 < args.Length:
                     output = args[++i];
@@ -154,6 +166,9 @@ public class Program
                 case "--convert-doc":
                 case "--url":
                 case "--capture-image":
+                case "--evaluate-page":
+                case "--evaluate":
+                case "--evaluate-html-output":
                 case "--output":
                 case "--output-dir":
                 case "--output-format":
@@ -195,6 +210,22 @@ public class Program
                 outputDir: output,
                 threads: threads,
                 emitTotals: emitFuzzTotals);
+        }
+
+        // --evaluate-page is deliberately single-page: unlike a capture, its whole output is one
+        // small JSON document, and a caller running many pages wants them attributed to separate
+        // files anyway. Rejecting the repeat here is clearer than silently using the first.
+        if (evaluatePageUrls.Count > 1)
+        {
+            Console.Error.WriteLine("Error: '--evaluate-page' accepts one URL; run it once per page.");
+            return 1;
+        }
+
+        if (evaluatePageUrls.Count == 0 && (evaluateExpressions.Count > 0 || evaluateHtmlOutput is not null))
+        {
+            Console.Error.WriteLine("Error: '--evaluate' and '--evaluate-html-output' require '--evaluate-page <URL>'.");
+            PrintUsage();
+            return 1;
         }
 
         // When --diagnostics is active, subscribe to the render logger and
@@ -260,6 +291,22 @@ public class Program
 
         string? url = urls.Count > 0 ? urls[0] : null;
         string? captureImageUrl = captureImageUrls.Count > 0 ? captureImageUrls[0] : null;
+        string? evaluatePageUrl = evaluatePageUrls.Count > 0 ? evaluatePageUrls[0] : null;
+
+        if (evaluatePageUrl is not null)
+        {
+            exitCode = await RunPageEvaluation(
+                evaluatePageUrl, output, evaluateExpressions, evaluateHtmlOutput, timeoutSeconds);
+
+            if (diagnosticSession is not null)
+            {
+                diagnosticSession.Dispose();
+                Console.WriteLine(diagnosticSession.Describe());
+            }
+
+            EmitDiagnostics(diagHandler, diagnosticEntries);
+            return exitCode;
+        }
 
         if (pdfInputPath is not null)
         {
@@ -429,6 +476,85 @@ public class Program
     }
 
     /// <summary>
+    /// Runs a page's scripts and evaluates the requested expressions against the settled page,
+    /// writing a JSON report to <paramref name="output"/>.
+    /// </summary>
+    /// <remarks>
+    /// The exit code reports whether the run happened, not what the page computed: an expression
+    /// that throws is a result the report records, in the same way a capture of a page whose
+    /// scripts failed still produces an image. Only a page that could not be fetched, or an output
+    /// that could not be written, is a failure of the run itself.
+    /// </remarks>
+    private static async Task<int> RunPageEvaluation(
+        string pageUrl,
+        string? output,
+        IReadOnlyList<string> expressions,
+        string? htmlOutput,
+        int timeoutSeconds)
+    {
+        if (output is null)
+        {
+            Console.Error.WriteLine("Error: '--output' is required when using '--evaluate-page'.");
+            PrintUsage();
+            return 1;
+        }
+
+        if (expressions.Count == 0)
+        {
+            Console.Error.WriteLine("Error: '--evaluate-page' requires at least one '--evaluate <EXPRESSION>'.");
+            PrintUsage();
+            return 1;
+        }
+
+        // Support bare file paths by converting to file:// URIs, as the capture modes do.
+        if (File.Exists(pageUrl))
+            pageUrl = new Uri(Path.GetFullPath(pageUrl)).AbsoluteUri;
+
+        if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != "http" && uri.Scheme != "https" && uri.Scheme != "file"))
+        {
+            Console.Error.WriteLine($"Error: '{pageUrl}' is not a valid HTTP, HTTPS, or file URL.");
+            return 1;
+        }
+
+        try
+        {
+            var service = new CaptureService();
+            await service.EvaluatePageAsync(new PageEvaluationOptions
+            {
+                Url = pageUrl,
+                OutputPath = output,
+                Expressions = expressions,
+                HtmlOutputPath = htmlOutput,
+                TimeoutSeconds = timeoutSeconds,
+            });
+
+            Console.WriteLine($"Evaluated {expressions.Count} expression(s) against {pageUrl}; report saved to {output}");
+            return 0;
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.Error.WriteLine($"Page evaluation failed: {ex.Message}");
+            return 1;
+        }
+        catch (TaskCanceledException ex)
+        {
+            Console.Error.WriteLine($"Page evaluation timed out after {timeoutSeconds}s: {ex.Message}");
+            return 1;
+        }
+        catch (IOException ex)
+        {
+            Console.Error.WriteLine($"File I/O error: {ex.Message}");
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Unexpected error: {ex.Message}");
+            return 1;
+        }
+    }
+
+    /// <summary>
     /// Resolves the two diagnostics arguments into one destination. <c>--diagnostic-dir</c> alone
     /// puts the log inside the bundle, which is what a reader expects to find there;
     /// <c>--diagnostic-log</c> alone records the JavaScript failures and archives nothing, for when
@@ -571,6 +697,7 @@ public class Program
         Console.WriteLine("Usage: Broiler.Cli --convert-doc <RTF|DOCX|HTML|MARKDOWN> --output <FILE.txt|FILE.rtf|FILE.docx|FILE.html|FILE.md>");
         Console.WriteLine("Usage: Broiler.Cli --url <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --capture-image <URL> --output <FILE> [OPTIONS]");
+        Console.WriteLine("       Broiler.Cli --evaluate-page <URL> --evaluate <EXPR> --output <FILE.json> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --test-engines");
         Console.WriteLine("       Broiler.Cli --fuzz-layout [--count <N>] [--output <DIR>]");
         Console.WriteLine();
@@ -579,6 +706,13 @@ public class Program
         Console.WriteLine("  --convert-doc <FILE>   Convert RTF/DOCX/HTML/Markdown to TXT, RTF, DOCX, HTML, or Markdown through Broiler.Documents");
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
+        Console.WriteLine("  --evaluate-page <URL>  Run the page's scripts, then evaluate --evaluate expressions");
+        Console.WriteLine("                         against the settled page and write a JSON report to --output");
+        Console.WriteLine("  --evaluate <EXPR>      A JavaScript expression to evaluate; repeat for several. They run");
+        Console.WriteLine("                         in order on the page's own global, and pending timers and promises");
+        Console.WriteLine("                         are drained between them, so an expression that starts the page's");
+        Console.WriteLine("                         work has settled before the next one reads what it produced");
+        Console.WriteLine("  --evaluate-html-output <FILE>  Also write the post-script DOM as HTML to FILE");
         Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");
         Console.WriteLine("  --output-dir <DIR>     Output directory for a batch. --convert-doc, --url and");
         Console.WriteLine("                         --capture-image may each be repeated; with more than one input");

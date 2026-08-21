@@ -153,6 +153,34 @@ are versioned in lockstep during the preview.
     `drawImage`, gradients and patterns, `clip`, `ellipse`, `setLineDash`, `Path2D`,
     `toBlob`, and any transform beyond the identity. See
     `docs/html5test-exceptions.md`.
+- A CI runner for the [DuckDuckGo privacy test pages](https://github.com/duckduckgo/privacy-test-pages),
+  the public corpus that asks a browser to exercise client-side storage, the
+  request paths a page can open, the fingerprinting surface, and HTTPS upgrades.
+  Each page runs its own probes and publishes them in a `results` global, which
+  is what the suite reads — so it reports what the page computed rather than a
+  rendering of it. `python scripts/run-privacy-test-pages.py`; weekly and
+  manual-dispatch `Privacy Test Pages` workflow; `docs/privacy-test-pages.md`.
+  - `Broiler.Cli --evaluate-page <URL> --evaluate <EXPR> --output <FILE.json>`
+    is the general mechanism it is built on: the page's scripts run through the
+    DOM bridge as a capture would, and then the given expressions are evaluated
+    against the same JavaScript context. Pending timers and promises are drained
+    *between* expressions, so one expression can start a page's own run and the
+    next can read the global it filled. `--evaluate-html-output` additionally
+    writes the post-script DOM.
+  - What it measures is **coverage** — which probes Broiler carries out at all —
+    and not a privacy score: these pages are written to describe a browser, so
+    the values they collect are a description of what a page can observe.
+    `tests/privacy-test-pages/baseline.json` records the per-probe outcome, and
+    only a probe that used to produce a value and no longer does, or a page that
+    stops running, fails a run. The corpus is live, so tests added and removed
+    upstream are reported and never fail one.
+  - First baseline, over nine of the Privacy Protections pages: **97 of 173
+    probes carried out**. Nearly all of that is the 124-probe fingerprinting
+    page (97/124); the request- and storage-driven pages are at 0 today, because
+    their probes depend on sub-resource loads, workers, sockets and frames
+    completing and reporting back. Three further pages are deliberately outside
+    the corpus — `referrer-trimming` and `storage-partitioning` cannot report
+    from a single-page evaluation, and `click-to-load` never settles.
 
 ### Changed
 

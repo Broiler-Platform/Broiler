@@ -1,0 +1,139 @@
+name: Privacy Test Pages
+
+# Coverage suite over the DuckDuckGo privacy test pages
+# (https://github.com/duckduckgo/privacy-test-pages). Each page runs its own
+# probes and publishes them in a `results` global, which Broiler.Cli reads back
+# with --evaluate-page; the runner classifies every probe as carried out or not
+# and diffs that against tests/privacy-test-pages/baseline.json.
+#
+# The corpus is live and maintained upstream, so it is not a pull-request gate:
+# tests are added and removed without a Broiler code change. A scheduled run
+# fails only on a regression against the tracked baseline — a probe that used to
+# produce a value and no longer does, or a page that stops running altogether.
+
+on:
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: Comma-separated page IDs from tests/privacy-test-pages/pages.json; empty runs all pages.
+        required: false
+        default: ''
+      fail_on_regression:
+        description: Fail the workflow when a probe stops producing a value.
+        type: boolean
+        required: false
+        default: true
+      fail_on_incomplete:
+        description: Fail the workflow when any page cannot be evaluated at all.
+        type: boolean
+        required: false
+        default: false
+      update_baseline:
+        description: Rewrite the baseline from this run and upload it as an artifact instead of comparing.
+        type: boolean
+        required: false
+        default: false
+  schedule:
+    # Weekly. The pages are public, third-party, and change independently of
+    # this repository, so a per-commit run would report their churn as ours.
+    - cron: '41 5 * * 2'
+
+permissions:
+  contents: read
+
+env:
+  RESULTS_DIR: artifacts/privacy-test-pages
+
+jobs:
+  evaluate:
+    name: Evaluate the privacy test pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          # The tested pages are untrusted live inputs whose scripts this job
+          # executes. Do not leave the job's token in git's credential config
+          # while that happens.
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Apply pending renderer patches
+        shell: bash
+        run: bash scripts/apply-pending-wpt-patches.sh
+
+      - name: Test the runner
+        shell: bash
+        run: python -m unittest scripts.tests.test_run_privacy_test_pages -v
+
+      - name: Build Broiler.Cli
+        shell: bash
+        run: dotnet build src/Broiler.Cli/Broiler.Cli.csproj -c Release
+
+      - name: Run the privacy test pages
+        shell: bash
+        env:
+          SELECTED_PAGES: ${{ github.event.inputs.pages || '' }}
+          FAIL_ON_REGRESSION: ${{ github.event.inputs.fail_on_regression || 'true' }}
+          FAIL_ON_INCOMPLETE: ${{ github.event.inputs.fail_on_incomplete || 'false' }}
+          UPDATE_BASELINE: ${{ github.event.inputs.update_baseline || 'false' }}
+        run: |
+          args=(
+            --output-dir "$RESULTS_DIR"
+            --skip-build
+          )
+          if [ -n "$SELECTED_PAGES" ]; then
+            args+=(--pages "$SELECTED_PAGES")
+          fi
+          if [ "$UPDATE_BASELINE" = "true" ]; then
+            args+=(--update-baseline)
+          else
+            if [ "$FAIL_ON_REGRESSION" = "true" ]; then
+              args+=(--fail-on-regression)
+            fi
+            if [ "$FAIL_ON_INCOMPLETE" = "true" ]; then
+              args+=(--fail-on-incomplete)
+            fi
+          fi
+          python scripts/run-privacy-test-pages.py "${args[@]}"
+
+      - name: Add report to workflow summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RESULTS_DIR/job-summary.md" ]; then
+            cat "$RESULTS_DIR/job-summary.md" >> "$GITHUB_STEP_SUMMARY"
+            echo "[Open this workflow run and its artifacts]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Privacy test pages" >> "$GITHUB_STEP_SUMMARY"
+            echo "The runner stopped before it could create a report." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload evaluation evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: privacy-test-pages-results
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload the regenerated baseline
+        if: always() && github.event.inputs.update_baseline == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: privacy-test-pages-baseline
+          path: tests/privacy-test-pages/baseline.json
+          if-no-files-found: warn
+          retention-days: 30

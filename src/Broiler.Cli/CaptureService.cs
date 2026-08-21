@@ -170,6 +170,55 @@ public class CaptureOptions
 }
 
 /// <summary>
+/// Options for evaluating JavaScript expressions against a page once its own scripts have run.
+/// </summary>
+/// <remarks>
+/// This is the machine-readable counterpart to a capture: instead of an image or a serialized
+/// DOM, it answers "what did the page's JavaScript compute?". A test page that publishes its
+/// outcome in a global — the DuckDuckGo privacy test pages publish <c>results</c> — is otherwise
+/// only readable by scraping whatever markup it happened to render its outcome into.
+/// </remarks>
+public class PageEvaluationOptions
+{
+    /// <summary>
+    /// The URL of the page whose scripts are executed before the expressions are evaluated.
+    /// </summary>
+    public required string Url { get; init; }
+
+    /// <summary>
+    /// The output file path for the JSON evaluation report.
+    /// </summary>
+    public required string OutputPath { get; init; }
+
+    /// <summary>
+    /// The expressions to evaluate, in order, after the page's own scripts and its load event.
+    /// Pending asynchronous work is drained between them, so an expression that starts the page's
+    /// test run has settled before the next expression reads its outcome.
+    /// </summary>
+    public required IReadOnlyList<string> Expressions { get; init; }
+
+    /// <summary>
+    /// Optional path for the post-script DOM, written as HTML. Off unless asked for.
+    /// </summary>
+    public string? HtmlOutputPath { get; init; }
+
+    /// <summary>
+    /// Document fetch timeout in seconds. Defaults to 30.
+    /// </summary>
+    public int TimeoutSeconds { get; init; } = 30;
+}
+
+/// <summary>
+/// One expression evaluated against a page, and what it produced.
+/// </summary>
+/// <param name="Index">Position in the requested order; the caller identifies its expressions by it.</param>
+/// <param name="Expression">The source that was evaluated.</param>
+/// <param name="Type">The JavaScript <c>typeof</c> of the value, or <c>null</c> when the evaluation threw.</param>
+/// <param name="Value">The value as a string, <c>null</c> for <c>null</c>/<c>undefined</c> or when it threw.</param>
+/// <param name="Error">The failure message when the evaluation threw, otherwise <c>null</c>.</param>
+public sealed record PageEvaluation(int Index, string Expression, string? Type, string? Value, string? Error);
+
+/// <summary>
 /// Service that captures website content using HttpClient,
 /// HTML-Renderer for CSS processing, and YantraJS for script execution.
 /// </summary>
@@ -300,6 +349,66 @@ public class CaptureService
         {
             await File.WriteAllTextAsync(options.OutputPath, html);
         }
+    }
+
+    /// <summary>
+    /// Fetches a page, runs its scripts through the DOM bridge, evaluates the requested
+    /// expressions against the same context, and writes a JSON report to
+    /// <see cref="PageEvaluationOptions.OutputPath"/>.
+    /// </summary>
+    /// <remarks>
+    /// The expressions run on the page's own global, after its scripts and its load event, so an
+    /// identifier a script declared — including a top-level <c>const</c>, which is a lexical
+    /// binding rather than a property of <c>window</c> — resolves exactly as it would in a later
+    /// script on the page.
+    /// </remarks>
+    public async Task EvaluatePageAsync(PageEvaluationOptions options)
+    {
+        var outputDir = Path.GetDirectoryName(Path.GetFullPath(options.OutputPath));
+        if (outputDir != null && !Directory.Exists(outputDir))
+            Directory.CreateDirectory(outputDir);
+
+        using var httpClient = CreateHttpClient(options.TimeoutSeconds);
+        var startedAt = DateTimeOffset.UtcNow;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        var html = await FetchDocumentAsync(httpClient, new Uri(options.Url));
+
+        var evaluations = new List<PageEvaluation>();
+        var serialized = ExecuteScriptsWithDom(html, options.Url, localResourceBasePath: null,
+            postScriptExpressions: options.Expressions, evaluations: evaluations);
+        stopwatch.Stop();
+
+        if (options.HtmlOutputPath is { Length: > 0 } htmlPath)
+        {
+            var htmlDir = Path.GetDirectoryName(Path.GetFullPath(htmlPath));
+            if (htmlDir != null && !Directory.Exists(htmlDir))
+                Directory.CreateDirectory(htmlDir);
+            await File.WriteAllTextAsync(htmlPath, serialized);
+        }
+
+        var report = new
+        {
+            url = options.Url,
+            startedAt = startedAt.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
+            durationMs = (long)stopwatch.Elapsed.TotalMilliseconds,
+            documentBytes = Encoding.UTF8.GetByteCount(html),
+            evaluations = evaluations.Select(e => new
+            {
+                index = e.Index,
+                expression = e.Expression,
+                type = e.Type,
+                value = e.Value,
+                error = e.Error,
+            }).ToArray(),
+        };
+
+        await File.WriteAllTextAsync(
+            options.OutputPath,
+            System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+            }));
     }
 
     /// <summary>
@@ -627,8 +736,14 @@ public class CaptureService
         return scan is null ? null : prefetcher;
     }
 
-    internal static string ExecuteScriptsWithDom(string html, string url, string? localResourceBasePath = null)
+    internal static string ExecuteScriptsWithDom(
+        string html,
+        string url,
+        string? localResourceBasePath = null,
+        IReadOnlyList<string>? postScriptExpressions = null,
+        IList<PageEvaluation>? evaluations = null)
     {
+        var hasExpressions = postScriptExpressions is { Count: > 0 };
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
         var moduleRoots = new List<string>();
@@ -721,8 +836,11 @@ public class CaptureService
         // No scripts to run: normally the raw HTML passes through untouched, but
         // a CSP style-src policy that blocks inline styles still has to be applied
         // to the rendered output, so fall through to build and re-serialize the DOM.
+        // An evaluation request also has to fall through — its expressions need a context and a
+        // document to run against, and "the page had no scripts" is an answer they must be able
+        // to report rather than a reason to skip them.
         if (scripts.Count == 0 && deferredScripts.Count == 0 && moduleRoots.Count == 0 &&
-            (csp == null || !csp.AffectsStyles()))
+            !hasExpressions && (csp == null || !csp.AffectsStyles()))
             return html;
 
         // Run modules through the engine's own module machinery when it binds imports (as ScriptEngine
@@ -887,6 +1005,34 @@ public class CaptureService
         // Drain queued microtasks and timer work before capture.
         DrainAsyncWork(bridge, microTasks);
         ReportUnhandledRejections();
+
+        // Evaluate the caller's expressions against the settled page. Each is drained after, so an
+        // expression that starts the page's own test run — the privacy test pages expose
+        // `runTests()` — has finished its timers and promises before the next expression reads the
+        // global it filled. The value is recorded at evaluation time, which is why the drain goes
+        // between the expressions rather than after the last one.
+        if (hasExpressions && evaluations is not null)
+        {
+            for (var ei = 0; ei < postScriptExpressions!.Count; ei++)
+            {
+                var expression = postScriptExpressions[ei];
+                try
+                {
+                    var value = context.Eval(expression, ScriptLabel.Inline(scripts.Count + ei));
+                    evaluations.Add(DescribeEvaluation(ei, expression, value));
+                }
+                catch (Exception ex)
+                {
+                    evaluations.Add(new PageEvaluation(ei, expression, Type: null, Value: null, Error: ex.Message));
+                    RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.ExecuteScriptsWithDom",
+                        $"Evaluation {ei} failed: {ex.Message}", ex);
+                }
+
+                DrainAsyncWork(bridge, microTasks);
+                ReportUnhandledRejections();
+            }
+        }
+
         bridge.ResolveAnimationSnapshots();
 
         var serialized = bridge.SerializeToHtml();
@@ -895,6 +1041,27 @@ public class CaptureService
         // of the run shows.
         ResourceTrace.RecordBody(ResourceTraceKind.Document, url, serialized, DiagnosticSession.AfterScriptsLabel);
         return serialized;
+    }
+
+    /// <summary>
+    /// Describes one evaluated value: its JavaScript <c>typeof</c>, and its string form.
+    /// </summary>
+    /// <remarks>
+    /// <c>null</c> and <c>undefined</c> are reported as a type with no value rather than as the
+    /// strings "null"/"undefined", so a caller can tell them from a page that genuinely produced
+    /// that text. Everything else goes through the engine's own conversion, which is what
+    /// <c>JSON.stringify(...)</c> — the expression a caller reading structured results will use —
+    /// already returns as a string.
+    /// </remarks>
+    private static PageEvaluation DescribeEvaluation(int index, string expression, JSValue? value)
+    {
+        if (value is null)
+            return new PageEvaluation(index, expression, "undefined", Value: null, Error: null);
+
+        var type = value.TypeOf()?.ToString() ?? "undefined";
+        return value.IsNullOrUndefined
+            ? new PageEvaluation(index, expression, value.IsNull ? "null" : "undefined", Value: null, Error: null)
+            : new PageEvaluation(index, expression, type, value.ToString(), Error: null);
     }
 
     /// <summary>
