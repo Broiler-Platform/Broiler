@@ -214,6 +214,74 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Work a frame defers runs in the frame's browsing context. Every document shares
+  one JavaScript context here and the queue drain runs from C# with no context
+  pushed, so a callback woke up in the **main** one: a frame's `setTimeout`,
+  `setInterval`, `requestAnimationFrame` and `requestIdleCallback` callbacks saw
+  the *parent's* `document`, `location` and `window`. Looking up one of the
+  frame's own elements returned null, and the callback then either threw — caught
+  by the drain and logged, leaving no trace in the page at all — or quietly
+  mutated the wrong document. The frame's synchronous script was always correct,
+  which made the failure look like "frames don't run scripts" rather than what it
+  was; deferring to a timer is how most framed script does anything, so this was
+  most of what a frame could do.
+  - A callback is now bound to the browsing context that registered it and
+    re-enters it when the queue drains — including a callback registered from
+    inside another frame callback, which is the shape of every self-rescheduling
+    loop. The rAF timestamp and the `IdleDeadline` are forwarded through the
+    switch rather than dropped.
+  - Only frames pay for it. A main-window registration is left unwrapped, so
+    `setTimeout` — which busy pages call constantly — keeps its allocation-free
+    path and no per-tick save/restore.
+
+- An idle callback is handed an `IdleDeadline`. `requestIdleCallback` was a bare
+  alias of `setTimeout`, which invokes its callback with no arguments at all, so
+  the parameter every caller destructures was `undefined` and the first thing they
+  do with it — `deadline.timeRemaining()` — threw. That is not a peripheral API:
+  MediaWiki's ResourceLoader *evaluates its module implementations* inside an idle
+  callback, looping until `timeRemaining()` reaches 0, and its key-value store
+  walks `localStorage` in another.
+  - `timeRemaining()` reports a 50 ms budget — Background Tasks §2.2's cap —
+    measured from the moment the callback is entered, so a page draining a queue
+    makes progress and then yields. A budget pinned at 0 would be worse than the
+    throw for the common `while (deadline.timeRemaining() > n) { … }` loop: it
+    reschedules for ever without shifting a single item.
+  - `didTimeout` is true when the page passed a `{ timeout }`, because a headless
+    drain has no idle period the callback could have been run in earlier — it is
+    running because that deadline arrived.
+  - The second argument is an options dictionary, not a delay. Read through the
+    `setTimeout` adapter it came out `NaN` and was clamped to 0, so a page's
+    timeout was silently discarded; it is read out of the dictionary now.
+  - `cancelIdleCallback` still cancels: the handle comes from the timer id space,
+    which is what makes it the same thing `clearTimeout` acts on.
+  - Both are mirrored onto a nested browsing context's `window`, beside the
+    animation-frame pair they were the only scheduling API missing next to. The
+    bare name always resolved — it is a context global and every document shares
+    the one context — so what was `undefined` is the qualified read, which is the
+    spelling pages actually use: the standard feature test is
+    `window.requestIdleCallback ? … : fallback`, and inside a frame `window` **is**
+    the sub-window. A framed page therefore took its no-native path, and one that
+    called `window.requestIdleCallback(cb)` unguarded got a TypeError.
+
+- `img.src` is a string. `HTMLImageElement` carried nothing but `width`/`height`,
+  so every other IDL attribute in the interface read back as `undefined` — not the
+  empty string a missing content attribute reflects as — and the first string
+  method a caller reached for threw on it. `www.mediawiki.org`'s start page died
+  exactly there: MultimediaViewer walks the page's thumbnails, hands each one's
+  `src` to `mw.util.parseImageUrl`, and that function opens with `url.match( … )`.
+  Because MediaWiki serves its modules as one `load.php` bundle, the throw took
+  the thumbnail walk and everything queued behind it down with it.
+  - `src` and `currentSrc` are resolved URLs, as they are in a browser, and the
+    absolute one even when the content attribute is relative. `currentSrc` reports
+    the empty string when there is no `src` to settle on, so the
+    `img.currentSrc || img.src` idiom reaches its second operand rather than a
+    page URL manufactured out of an absent attribute.
+  - `alt`, `srcset`, `sizes`, `useMap`, `isMap`, `crossOrigin`, `referrerPolicy`,
+    `decoding`, `loading` and `fetchPriority` reflect their content attributes in
+    both directions. Writing one used to set a plain JS property on the wrapper
+    that no content attribute — and so no layout, cascade or serialization — ever
+    saw.
+
 - `sessionStorage` exists. Only `localStorage` was ever registered, and because
   `window` **is** the global object, the bare `sessionStorage` a page writes was a
   `ReferenceError` rather than an undefined property — which aborts the entire

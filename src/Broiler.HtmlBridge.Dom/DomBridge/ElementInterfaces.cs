@@ -58,6 +58,28 @@ public sealed partial class DomBridge
         ("noModule", "nomodule"),
     ];
 
+    /// <summary>
+    /// HTMLImageElement's plain reflected DOMString IDL attributes (HTML §4.8.3), as IDL name →
+    /// content-attribute name. <c>src</c> is URL-typed and wired separately, <c>isMap</c> is boolean,
+    /// and <c>width</c>/<c>height</c> report the used dimension rather than the raw attribute.
+    /// <c>crossOrigin</c>, <c>decoding</c>, <c>loading</c>, <c>fetchPriority</c> and
+    /// <c>referrerPolicy</c> are enumerated in the IDL and so read back a limited value in a browser;
+    /// they reflect plainly here, which is what a page setting them expects and what the content
+    /// attribute they write carries.
+    /// </summary>
+    private static readonly (string IdlName, string AttributeName)[] ImageReflectedAttributes =
+    [
+        ("alt", "alt"),
+        ("srcset", "srcset"),
+        ("sizes", "sizes"),
+        ("useMap", "usemap"),
+        ("crossOrigin", "crossorigin"),
+        ("referrerPolicy", "referrerpolicy"),
+        ("decoding", "decoding"),
+        ("loading", "loading"),
+        ("fetchPriority", "fetchpriority"),
+    ];
+
     private void AddElementSpecificMembers(JSObject obj, Broiler.Dom.DomElement element)
     {
         // -- Phase 5: HTML DOM Interfaces --
@@ -249,6 +271,46 @@ public sealed partial class DomBridge
                 obj.FastAddProperty((KeyString)dimName,
                     new DomFunction((in _) => Dom.Features.ComputedStyleBinding.GetUsedDimension(this, dimName, element, in _), "get " + dimName),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedDimension(dimName, element, in a), "set " + dimName),
+                    JSPropertyAttributes.EnumerableConfigurableProperty);
+            }
+
+            // .src — a reflected URL, resolved against the page URL exactly as on <script>/<a>/<link>.
+            // It was missing entirely, so reading an image's URL the ordinary way produced *undefined*
+            // rather than a string, and every caller that went straight on to a string method died on
+            // it: mediawiki.org's start page reached mw.Title.newFromImg(), which hands img.src to
+            // mw.util.parseImageUrl(), whose first act is url.match(...) — "Cannot get property match
+            // of undefined". That throw took MultimediaViewerBootstrap.processThumbs down and, with
+            // it, the rest of the single load.php bundle queued behind it.
+            obj.FastAddProperty((KeyString)"src",
+                new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetSrc(this, element, in _), "get src"),
+                new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetSrc(element, in a), "set src"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // .currentSrc — read-only, the URL of the image the element actually settled on. Srcset
+            // candidate selection happens down in layout and is not visible from here, so this reports
+            // the resolved src, and the empty string when there is no src at all. That is the pair of
+            // answers the `img.currentSrc || img.src` idiom is written against (mmv.bootstrap's
+            // processThumb reads exactly that, then calls .includes() on the result).
+            obj.FastAddProperty((KeyString)"currentSrc",
+                new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetCurrentSrc(this, element, in _), "get currentSrc"),
+                null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // .isMap — the one boolean in the interface: present or absent, never the string "false".
+            obj.FastAddProperty((KeyString)"isMap",
+                new DomFunction((in _) => HasAttr(element, "ismap") ? JSBoolean.True : JSBoolean.False, "get isMap"),
+                new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedBoolean("ismap", element, in a), "set isMap"),
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+
+            // The rest of HTMLImageElement's plain reflected DOMStrings — alt, srcset, sizes, useMap
+            // and the enumerated fetch hints. Same gap as .src: reading any of them returned undefined
+            // and writing one set a plain JS property on the wrapper that no content attribute, and so
+            // no layout or serialization, ever saw.
+            foreach (var (idlName, attrName) in ImageReflectedAttributes)
+            {
+                var captured = attrName; // capture for closure
+                obj.FastAddProperty((KeyString)idlName,
+                    new DomFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
+                    new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + idlName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
         }

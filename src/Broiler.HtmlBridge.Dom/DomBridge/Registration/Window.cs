@@ -57,11 +57,11 @@ public sealed partial class DomBridge
 
         // window timers / animation frames — thin adapters over the P2.4 BrowserEventLoop, co-located
         // in the TimerBinding feature module (Phase 3).
-        window.FastAddValue((KeyString)"setTimeout", new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"setTimeout", new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, _windowContext, in a), "setTimeout", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"clearTimeout", new DomFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "clearTimeout", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"setInterval", new DomFunction((in a) => Dom.Features.TimerBinding.SetInterval(_eventLoop, in a), "setInterval", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"setInterval", new DomFunction((in a) => Dom.Features.TimerBinding.SetInterval(_eventLoop, _windowContext, in a), "setInterval", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"clearInterval", new DomFunction((in a) => Dom.Features.TimerBinding.ClearInterval(_eventLoop, in a), "clearInterval", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"requestAnimationFrame", new DomFunction((in a) => Dom.Features.TimerBinding.RequestAnimationFrame(_eventLoop, in a), "requestAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue((KeyString)"requestAnimationFrame", new DomFunction((in a) => Dom.Features.TimerBinding.RequestAnimationFrame(_eventLoop, _windowContext, in a), "requestAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"cancelAnimationFrame", new DomFunction((in a) => Dom.Features.TimerBinding.CancelAnimationFrame(_eventLoop, in a), "cancelAnimationFrame", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.alert(msg) — logs to debug output
@@ -208,7 +208,9 @@ public sealed partial class DomBridge
     /// promise the module was resolving, and every module waiting on that one stayed unresolved —
     /// which is how a page can lose behaviour that has nothing to do with performance timing.
     /// <c>requestIdleCallback</c> runs its callback on a timer instead of dropping it, because
-    /// what pages defer to idle is often the work that produces visible content.
+    /// what pages defer to idle is often the work that produces visible content — and it hands that
+    /// callback a real <c>IdleDeadline</c> (see <c>TimerBinding.RequestIdleCallback</c>), because a
+    /// callback that receives no deadline throws on the first thing it does with the parameter.
     /// </remarks>
     private void RegisterObservationStubs(JSContext context, JSObject window)
     {
@@ -240,11 +242,11 @@ public sealed partial class DomBridge
 
         if (window[(KeyString)"requestIdleCallback"] is JSUndefined)
         {
-            var requestIdle = new DomFunction((in a) => Dom.Features.TimerBinding.SetTimeout(_eventLoop, in a), "requestIdleCallback", 1);
+            var requestIdle = new DomFunction((in a) => Dom.Features.TimerBinding.RequestIdleCallback(_eventLoop, _windowContext, in a), "requestIdleCallback", 1);
             window.FastAddValue((KeyString)"requestIdleCallback", requestIdle, JSPropertyAttributes.EnumerableConfigurableValue);
             context["requestIdleCallback"] = requestIdle;
 
-            var cancelIdle = new DomFunction((in a) => Dom.Features.TimerBinding.ClearTimeout(_eventLoop, in a), "cancelIdleCallback", 1);
+            var cancelIdle = new DomFunction((in a) => Dom.Features.TimerBinding.CancelIdleCallback(_eventLoop, in a), "cancelIdleCallback", 1);
             window.FastAddValue((KeyString)"cancelIdleCallback", cancelIdle, JSPropertyAttributes.EnumerableConfigurableValue);
             context["cancelIdleCallback"] = cancelIdle;
         }
