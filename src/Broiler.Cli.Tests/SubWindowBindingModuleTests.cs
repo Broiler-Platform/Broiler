@@ -67,4 +67,71 @@ public sealed class SubWindowBindingModuleTests
 
         Assert.Equal("function|number|function|true|true", result.ToString());
     }
+
+    /// <summary>
+    /// A frame gets the idle-callback pair its parent has, alongside the animation-frame pair it was
+    /// the only scheduling API missing next to. The bare name always resolved — it is a context
+    /// global and every document shares the one context — so what was <c>undefined</c> is the
+    /// qualified read, which is the one pages actually write: the standard feature test is
+    /// <c>window.requestIdleCallback ? … : fallback</c>, and inside a frame <c>window</c> is the
+    /// sub-window. A framed page therefore took its no-native path, and one that called
+    /// <c>window.requestIdleCallback(cb)</c> unguarded got a TypeError.
+    /// </summary>
+    [Fact]
+    public void A_Frame_Gets_The_Idle_Callback_Pair_Its_Parent_Has()
+    {
+        const string html =
+            "<!DOCTYPE html><html><body>" +
+            "<iframe id='f' srcdoc='<!DOCTYPE html><body>" +
+            "<script>var seen = typeof window.requestIdleCallback;</script>" +
+            "</body>'></iframe>" +
+            "</body></html>";
+        using var bridge = Attach(out var context, html);
+        bridge.FireWindowLoadEvent();
+        bridge.FlushTimers();
+
+        var result = context.Eval("""
+            (() => {
+              const w = document.getElementById('f').contentWindow;
+              return [
+                'contentWindow=' + typeof w.requestIdleCallback,
+                'cancel=' + typeof w.cancelIdleCallback,
+                'frames=' + typeof frames[0].requestIdleCallback,
+                'insideTheFrame=' + w.seen
+              ].join('|');
+            })()
+            """);
+
+        Assert.Equal("contentWindow=function|cancel=function|frames=function|insideTheFrame=function",
+            result.ToString());
+    }
+
+    /// <summary>
+    /// The mirrored pair is the parent's own function, so a frame that registers through it schedules
+    /// on the bridge's one event loop and gets the same <c>IdleDeadline</c> a top-level caller does —
+    /// the identity the whole mirror rests on. (Whether a sub-document's <em>own</em> scheduled
+    /// callbacks are ever drained is a separate question this does not touch: they are not today, and
+    /// a frame's <c>setTimeout</c> is not either.)
+    /// </summary>
+    [Fact]
+    public void The_Mirrored_Idle_Pair_Is_The_Parents_Own_Function()
+    {
+        const string html =
+            "<!DOCTYPE html><html><body>" +
+            "<iframe id='f' srcdoc='<!DOCTYPE html><body></body>'></iframe>" +
+            "</body></html>";
+        using var bridge = Attach(out var context, html);
+
+        var result = context.Eval("""
+            (() => {
+              const w = document.getElementById('f').contentWindow;
+              return [
+                w.requestIdleCallback === window.requestIdleCallback,
+                w.cancelIdleCallback === window.cancelIdleCallback
+              ].join('|');
+            })()
+            """);
+
+        Assert.Equal("true|true", result.ToString());
+    }
 }

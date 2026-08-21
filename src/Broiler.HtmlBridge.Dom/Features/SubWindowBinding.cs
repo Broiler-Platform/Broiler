@@ -104,6 +104,17 @@ internal sealed class SubWindowBinding(
         "TextEncoder", "TextDecoder", "Blob", "AbortController", "Headers",
         "setTimeout", "clearTimeout", "setInterval", "clearInterval",
         "requestAnimationFrame", "cancelAnimationFrame", "queueMicrotask",
+        // The idle pair belongs with the animation-frame pair it sits beside on the main window; it
+        // was the only scheduling API missing here. The bare name always resolved (it is a context
+        // global, and every document shares the one context), so what was undefined is the qualified
+        // read — `contentWindow.requestIdleCallback` and `frames[0].requestIdleCallback` from the
+        // parent, and `window.requestIdleCallback` from inside the frame, where `window` IS the
+        // sub-window. That last one is the idiomatic spelling: the standard feature test is
+        // `window.requestIdleCallback ? … : fallback` (MediaWiki writes exactly that), so a framed
+        // page took its no-native path, and one that called `window.requestIdleCallback(cb)`
+        // unguarded got a TypeError. They schedule on the bridge's one event loop, as the mirrored
+        // timers already do.
+        "requestIdleCallback", "cancelIdleCallback",
         "atob", "btoa", "structuredClone", "performance", "crypto",
 
         // The two storage areas. A frame gets the parent's objects rather than fresh ones, which

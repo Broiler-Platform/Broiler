@@ -234,6 +234,14 @@ are versioned in lockstep during the preview.
     timeout was silently discarded; it is read out of the dictionary now.
   - `cancelIdleCallback` still cancels: the handle comes from the timer id space,
     which is what makes it the same thing `clearTimeout` acts on.
+  - Both are mirrored onto a nested browsing context's `window`, beside the
+    animation-frame pair they were the only scheduling API missing next to. The
+    bare name always resolved — it is a context global and every document shares
+    the one context — so what was `undefined` is the qualified read, which is the
+    spelling pages actually use: the standard feature test is
+    `window.requestIdleCallback ? … : fallback`, and inside a frame `window` **is**
+    the sub-window. A framed page therefore took its no-native path, and one that
+    called `window.requestIdleCallback(cb)` unguarded got a TypeError.
 
 - `img.src` is a string. `HTMLImageElement` carried nothing but `width`/`height`,
   so every other IDL attribute in the interface read back as `undefined` — not the
