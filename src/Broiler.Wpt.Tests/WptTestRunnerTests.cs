@@ -9,6 +9,7 @@ namespace Broiler.Wpt.Tests;
 /// Unit tests for <see cref="WptTestRunner"/> — validates test discovery,
 /// rendering pipeline, and result reporting.
 /// </summary>
+[Collection("DomRender")]
 public class WptTestRunnerTests : IDisposable
 {
     private readonly string _tempDir;
@@ -75,6 +76,16 @@ public class WptTestRunnerTests : IDisposable
         return runner.RunMatchTest(testFile, refFile, _tempDir);
     }
 
+    /// <summary>
+    /// Runs a document's scripts through the runner's script/DOM pass and returns the document they
+    /// left behind, as HTML.
+    /// </summary>
+    /// <remarks>
+    /// The pass hands back whichever form the render path wants — the serialised HTML, or the
+    /// <c>DomDocument</c> itself on the direct path (<see cref="WptTestRunner.DomRender"/>, which is
+    /// on by default). Only the bridge can serialise the latter, and it is gone by the time the pass
+    /// returns, so the lever is set here rather than read: every caller of this asserts on the text.
+    /// </remarks>
     private string RunTempScriptExecution(string testHtml, string namePrefix)
     {
         var testFile = Path.Combine(_tempDir, $"{namePrefix}.html");
@@ -85,9 +96,22 @@ public class WptTestRunnerTests : IDisposable
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
         Assert.NotNull(method);
 
-        return Assert.IsType<string>(method!.Invoke(
-            null,
-            [testHtml, new Uri(Path.GetFullPath(testFile)).AbsoluteUri, _tempDir, false]));
+        var previousDomRender = WptTestRunner.DomRender;
+        WptTestRunner.DomRender = false;
+        object? executed;
+        try
+        {
+            executed = method!.Invoke(
+                null,
+                [testHtml, new Uri(Path.GetFullPath(testFile)).AbsoluteUri, _tempDir, false]);
+        }
+        finally
+        {
+            WptTestRunner.DomRender = previousDomRender;
+        }
+
+        Assert.NotNull(executed);
+        return Assert.IsType<string>(executed!.GetType().GetProperty("Html")!.GetValue(executed));
     }
 
     private void WriteTempSupportFile(string relativePath, string content)

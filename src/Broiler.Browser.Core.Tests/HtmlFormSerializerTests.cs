@@ -13,7 +13,7 @@ namespace Broiler.Browser.Core.Tests;
 public class HtmlFormSerializerTests
 {
     private static DomElement Parse(string html) =>
-        new HtmlDocumentParser().ParseDocument(html).Document.DocumentElement
+        HtmlDocumentParser.ParseDocument(html).Document.DocumentElement
         ?? throw new InvalidOperationException("No document element.");
 
     private static DomElement Form(string html) =>

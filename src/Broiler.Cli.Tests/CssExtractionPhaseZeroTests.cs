@@ -16,10 +16,13 @@ public sealed class CssExtractionPhaseZeroTests
         var htmlSource = Path.Combine(root, "Broiler.HTML", "Source");
 
         Assert.False(File.Exists(Path.Combine(htmlSource, "Broiler.HTML.CSS", "Broiler.HTML.CSS.csproj")));
-        Assert.Empty(Directory.EnumerateFiles(
-            Path.Combine(htmlSource, "Broiler.HTML.Orchestration", "CompatibilityCss"),
-            "*.cs",
-            SearchOption.AllDirectories));
+
+        // The directory is gone once the last shim in it is retired, which is this assertion's
+        // point rather than a case it has to survive — but EnumerateFiles on a missing path throws
+        // where an empty one returns nothing, so the strongest outcome would fail the test.
+        var compatibilityCss = Path.Combine(htmlSource, "Broiler.HTML.Orchestration", "CompatibilityCss");
+        if (Directory.Exists(compatibilityCss))
+            Assert.Empty(Directory.EnumerateFiles(compatibilityCss, "*.cs", SearchOption.AllDirectories));
 
         var legacyModels = new[]
         {
@@ -64,9 +67,9 @@ public sealed class CssExtractionPhaseZeroTests
             .OrderBy(static member => member, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.Equal(
-            ["Method:Clone", "Method:Combine", "Property:StyleSet", "Property:StyleSheet"],
-            members);
+        // Clone and Combine went with the compatibility window they were kept open for; what is
+        // left is the wrapper this asserts CssData is, and nothing may be added back to it.
+        Assert.Equal(["Property:StyleSet", "Property:StyleSheet"], members);
     }
 
     [Fact(Timeout = 600000)]
@@ -119,15 +122,20 @@ public sealed class CssExtractionPhaseZeroTests
             .Select(static line => line.Trim())
             .ToArray();
 
-        // RF-LAYOUT-1 trimmed the friend surface to seven direct box-tree consumers
-        // (three production: Broiler.HTML.Dom/.HTML/.Orchestration; plus DevConsole and
-        // three focused test assemblies). Keep this count in sync with the csproj.
-        Assert.Equal(7, grants.Length);
+        // RF-LAYOUT-1 trimmed the friend surface to seven direct box-tree consumers; the five
+        // added since each carry their reason in the csproj beside them (a nested browsing
+        // context's canvas opacity, the two benchmark/runner knobs, and the two assemblies that
+        // set NativeAnchorPlacement around a geometry pass). Keep this count in sync with the
+        // csproj — a grant added without one is what this is here to catch.
+        Assert.Equal(12, grants.Length);
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.Core", StringComparison.Ordinal));
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.Image.Compat", StringComparison.Ordinal));
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.Image.Tests", StringComparison.Ordinal));
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HTML.WPF", StringComparison.Ordinal));
-        Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HtmlBridge", StringComparison.Ordinal));
+        // Broiler.HtmlBridge itself, not Broiler.HtmlBridge.Dom — the bridge assembly reaches the
+        // box tree through the renderer, while .Dom is one of the two that set
+        // NativeAnchorPlacement directly and is granted deliberately above.
+        Assert.DoesNotContain(grants, static line => line.Contains("Broiler.HtmlBridge\"", StringComparison.Ordinal));
         Assert.DoesNotContain(grants, static line => line.Contains("Broiler.Cli\"", StringComparison.Ordinal));
     }
 
