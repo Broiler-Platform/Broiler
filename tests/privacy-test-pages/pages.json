@@ -1,0 +1,120 @@
+{
+  "$schema": "./pages.schema.json",
+  "schemaVersion": 1,
+  "source": {
+    "repository": "https://github.com/duckduckgo/privacy-test-pages",
+    "baseUrl": "https://privacy-test-pages.site"
+  },
+  "defaults": {
+    "timeoutSeconds": 60,
+    "attempts": 2,
+    "startExpression": "typeof runTests === 'function' ? (runTests(), 'started') : 'auto'",
+    "resultsExpression": "typeof results === 'undefined' ? null : JSON.stringify(results)"
+  },
+  "pages": [
+    {
+      "id": "fingerprinting",
+      "name": "Fingerprinting",
+      "path": "/privacy-protections/fingerprinting/?run",
+      "description": "Reads the browser's fingerprinting surface: navigator, screen, window, WebGL, audio, media devices, permissions, temporal and request-header properties.",
+      "tags": [
+        "fingerprinting",
+        "navigator",
+        "webgl",
+        "media"
+      ]
+    },
+    {
+      "id": "storage-blocking",
+      "name": "Storage blocking",
+      "path": "/privacy-protections/storage-blocking/?retrive",
+      "description": "Reads back every client-side storage mechanism — cookies (JS and header, first and third party), localStorage, sessionStorage, IndexedDB, cache API, service workers.",
+      "tags": [
+        "storage",
+        "cookies",
+        "indexeddb",
+        "third-party"
+      ]
+    },
+    {
+      "id": "request-blocking",
+      "name": "Request blocking",
+      "path": "/privacy-protections/request-blocking/?run",
+      "description": "Loads a tracking third party through every request path a page has: script, image, stylesheet, iframe, fetch, XHR, web worker, websocket, beacon.",
+      "tags": [
+        "requests",
+        "third-party",
+        "workers",
+        "websocket"
+      ]
+    },
+    {
+      "id": "blocking-behaviour",
+      "name": "Blocking behaviour",
+      "path": "/privacy-protections/blocking-behaviour/?run",
+      "description": "Observes how a blocked request surfaces to the page: what fetch (basic, CORS, no-CORS) and XHR (async, sync) report when the response never arrives.",
+      "tags": [
+        "requests",
+        "fetch",
+        "xhr",
+        "cors"
+      ]
+    },
+    {
+      "id": "gpc",
+      "name": "Global Privacy Control",
+      "path": "/privacy-protections/gpc/?run",
+      "description": "Reads the Global Privacy Control signal from the top-level page, from frames, and from the request headers of sub-resources.",
+      "tags": [
+        "gpc",
+        "navigator",
+        "headers",
+        "frames"
+      ]
+    },
+    {
+      "id": "https-upgrades",
+      "name": "HTTPS upgrades",
+      "path": "/privacy-protections/https-upgrades/?run",
+      "description": "Loads plain-HTTP sub-resources and navigations to observe whether they are upgraded, and how an upgrade is reported to the page.",
+      "tags": [
+        "https",
+        "upgrades",
+        "requests"
+      ]
+    },
+    {
+      "id": "https-loop-protection",
+      "name": "HTTPS upgrade loop protection",
+      "path": "/privacy-protections/https-loop-protection/?run",
+      "description": "Navigates a host that redirects an upgraded request back to HTTP, checking a browser breaks the resulting upgrade/downgrade loop.",
+      "tags": [
+        "https",
+        "upgrades",
+        "redirects"
+      ]
+    },
+    {
+      "id": "amp-loop-protection",
+      "name": "AMP loop protection",
+      "path": "/privacy-protections/amp-loop-protection/?run",
+      "description": "Follows an AMP link that rewrites back to its AMP form, checking a browser resolves it to the canonical page rather than looping.",
+      "tags": [
+        "amp",
+        "redirects",
+        "navigation"
+      ]
+    },
+    {
+      "id": "surrogates",
+      "name": "Surrogates",
+      "path": "/privacy-protections/surrogates/",
+      "description": "Loads a tracker script from several document positions and checks whether a stand-in implementation is exposed to the page in its place. Runs on load; it has no start button.",
+      "tags": [
+        "surrogates",
+        "third-party",
+        "scripts"
+      ]
+    }
+  ]
+}

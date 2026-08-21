@@ -189,6 +189,17 @@ something to attempt from inside the container.
   observational weekly/manual suite, not a standards-conformance rate; it
   writes JSON, Markdown, HTML, screenshots, and diffs under
   `artifacts/real-world-render-tests`. See `docs/real-world-render-tests.md`.
+- Privacy test page runner: `python scripts/run-privacy-test-pages.py
+  [--pages <id,...>] [--skip-build] [--fail-on-regression]`. No third-party
+  Python packages. It drives the DuckDuckGo privacy test pages through
+  `Broiler.Cli --evaluate-page`, reads each page's own `results` global, and
+  diffs the per-probe outcomes against `tests/privacy-test-pages/baseline.json`;
+  reports land in `artifacts/privacy-test-pages`. It measures **coverage** —
+  which probes Broiler carries out at all — not a privacy score, and only a
+  probe that stops producing a value is a regression (the corpus is live, so
+  additions and upstream removals never fail a run). Regenerate the baseline
+  deliberately with `--update-baseline`, never to clear a red run. See
+  `docs/privacy-test-pages.md`.
 - WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
   and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
   0 disables). The cap is on the *growth* of the rendering process's resident

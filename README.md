@@ -164,7 +164,10 @@ self-contained debug APKs and Release AABs, and ship `android-arm64` plus
 Each submodule README contains its standalone build and test commands. Broiler.HTML also
 has repository-specific WPT tooling, while Broiler.JS documents its test262 workflow.
 The [real-world website render suite](docs/real-world-render-tests.md) complements those
-standards tests with visual comparisons against a small allowlist of public websites.
+standards tests with visual comparisons against a small allowlist of public websites, and
+the [privacy test page suite](docs/privacy-test-pages.md) tracks how much of the DuckDuckGo
+privacy test corpus — storage, request paths, fingerprinting surface, HTTPS upgrades —
+Broiler is able to carry out at all.
 
 ## Repository layout
 
