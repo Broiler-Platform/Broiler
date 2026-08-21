@@ -142,6 +142,16 @@ Each probe of a compared page falls into one of four buckets:
 | `neither` | No engine answered — a page, corpus or network limitation, not Broiler's. |
 | `broiler-only` | Only Broiler answered; nearly always a sign the two runs saw different pages. |
 
+These pages run each probe in a `try` and store the caught error where the
+result belongs, so a probe that threw is published as a value like
+`{"name": "ReferenceError", "message": "…", "stack": "…"}`. The comparison
+recognizes that shape and counts it as *not answered*, whichever engine threw —
+otherwise a missing API would read as parity. The baseline outcome is
+deliberately left alone (a thrown probe is still a `value` there), so this
+reinterpretation can never turn into a regression; it only decides what the
+comparison calls a gap, and the gap then carries the thrown message as its
+evidence.
+
 A gap carries the evidence with it: the type Chromium returned and a bounded
 excerpt of the value, so a reader can tell a missing API from a request that
 never completed without re-running anything. Probes both engines answer in

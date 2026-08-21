@@ -305,6 +305,24 @@ def classify_test_value(value: Any) -> str:
     return OUTCOME_VALUE
 
 
+def is_error_value(value: Any) -> bool:
+    """Recognize a probe whose "value" is the error the page caught for it.
+
+    These pages run each probe in a ``try`` and store the error object itself
+    when one throws, so a failed probe is serialized as a value like
+    ``{"name": "ReferenceError", "message": "…", "stack": "…"}``.  Counting that
+    as a result would report a missing API as coverage, so it is recognized by
+    shape: an object carrying a string ``message`` beside a string ``name`` or
+    ``stack``.  A genuine probe value with all of those is conceivable, which is
+    why this only reclassifies against the reference — never in the outcome the
+    baseline tracks.
+    """
+
+    if not isinstance(value, dict) or not isinstance(value.get("message"), str):
+        return False
+    return isinstance(value.get("name"), str) or isinstance(value.get("stack"), str)
+
+
 def extract_test_entries(results: Any) -> dict[str, dict[str, Any]]:
     """Map a page's ``results`` payload to ``{test id: {outcome, value, name}}``.
 
@@ -334,6 +352,7 @@ def extract_test_entries(results: Any) -> dict[str, dict[str, Any]]:
         extracted[identifier] = {
             "outcome": classify_test_value(entry.get("value")),
             "value": entry.get("value"),
+            "error": is_error_value(entry.get("value")),
             "name": name if isinstance(name, str) and name.strip() else identifier,
         }
     return extracted
@@ -528,11 +547,22 @@ def load_reference_document(path: Path) -> dict[str, Any] | None:
     return data
 
 
-def classify_parity(broiler_outcome: str, reference_outcome: str) -> str:
-    """Relate one probe's Broiler outcome to the same probe in Chromium."""
+def classify_parity(
+    broiler_outcome: str,
+    reference_outcome: str,
+    *,
+    broiler_error: bool = False,
+    reference_error: bool = False,
+) -> str:
+    """Relate one probe's Broiler outcome to the same probe in Chromium.
 
-    broiler_has = broiler_outcome == OUTCOME_VALUE
-    reference_has = reference_outcome == OUTCOME_VALUE
+    A probe that threw did not answer, whichever engine threw it: the page
+    recorded an error where a result belongs.  Treating it as an answer is what
+    would let a missing API read as parity.
+    """
+
+    broiler_has = broiler_outcome == OUTCOME_VALUE and not broiler_error
+    reference_has = reference_outcome == OUTCOME_VALUE and not reference_error
     if broiler_has and reference_has:
         return PARITY_MATCH
     if reference_has:
@@ -560,7 +590,14 @@ def compare_to_reference(
         "available": False,
         "referenceStatus": (reference or {}).get("status"),
         "reason": (reference or {}).get("reason") or "no Chromium reference was captured",
-        "summary": {"tests": 0, PARITY_MATCH: 0, PARITY_GAP: 0, PARITY_AHEAD: 0, PARITY_NEITHER: 0},
+        "summary": {
+            "tests": 0,
+            PARITY_MATCH: 0,
+            PARITY_GAP: 0,
+            PARITY_AHEAD: 0,
+            PARITY_NEITHER: 0,
+            "broilerErrors": 0,
+        },
         "gaps": [],
         "broilerOnly": [],
         "neither": [],
@@ -580,19 +617,25 @@ def compare_to_reference(
     divergent: list[dict[str, Any]] = []
     counts = {PARITY_MATCH: 0, PARITY_GAP: 0, PARITY_AHEAD: 0, PARITY_NEITHER: 0}
 
+    errors = 0
     for test in sorted(set(reference_entries) | set(broiler_entries)):
         broiler = broiler_entries.get(test, {})
         expected = reference_entries.get(test, {})
+        broiler_threw = bool(broiler.get("error"))
         parity = classify_parity(
             broiler.get("outcome", OUTCOME_MISSING),
             expected.get("outcome", OUTCOME_MISSING),
+            broiler_error=broiler_threw,
+            reference_error=bool(expected.get("error")),
         )
         counts[parity] += 1
         if parity == PARITY_GAP:
+            errors += 1 if broiler_threw else 0
             gaps.append({
                 "test": test,
                 "name": expected.get("name", test),
-                "broiler": broiler.get("outcome", OUTCOME_MISSING),
+                "broiler": "error" if broiler_threw else broiler.get("outcome", OUTCOME_MISSING),
+                "broilerValue": describe_value(broiler.get("value")) if broiler_threw else None,
                 "referenceType": json_type_name(expected.get("value")),
                 "referenceValue": describe_value(expected.get("value")),
             })
@@ -621,7 +664,7 @@ def compare_to_reference(
         "available": True,
         "referenceStatus": "ok",
         "reason": None,
-        "summary": {"tests": sum(counts.values()), **counts},
+        "summary": {"tests": sum(counts.values()), **counts, "broilerErrors": errors},
         "gaps": gaps,
         "broilerOnly": broiler_only,
         "neither": neither,
@@ -881,6 +924,7 @@ def summarize_run(results: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "referenceTests": sum(parity["summary"]["tests"] for parity in compared),
         "parity": sum(parity["summary"][PARITY_MATCH] for parity in compared),
         "gaps": sum(parity["summary"][PARITY_GAP] for parity in compared),
+        "gapsFromErrors": sum(parity["summary"].get("broilerErrors", 0) for parity in compared),
         "broilerOnly": sum(parity["summary"][PARITY_AHEAD] for parity in compared),
         "neither": sum(parity["summary"][PARITY_NEITHER] for parity in compared),
         "divergentTypes": sum(len(parity.get("divergentTypes", [])) for parity in compared),
@@ -958,7 +1002,16 @@ def build_gap_document(aggregate: Mapping[str, Any]) -> dict[str, Any]:
         "environment": aggregate["environment"],
         "summary": {
             key: aggregate["summary"][key]
-            for key in ("pages", "pagesCompared", "parity", "gaps", "broilerOnly", "neither", "divergentTypes")
+            for key in (
+                "pages",
+                "pagesCompared",
+                "parity",
+                "gaps",
+                "gapsFromErrors",
+                "broilerOnly",
+                "neither",
+                "divergentTypes",
+            )
         },
         "pages": pages,
         "notCompared": uncompared,
@@ -981,7 +1034,8 @@ def render_gap_report(document: Mapping[str, Any]) -> str:
         f"> {COMPARISON_NOTICE}",
         "",
         f"{summary['gaps']} probe(s) Chromium answered and Broiler did not, across "
-        f"{summary['pagesCompared']}/{summary['pages']} compared page(s). "
+        f"{summary['pagesCompared']}/{summary['pages']} compared page(s) — "
+        f"{summary['gapsFromErrors']} of them because the probe threw in Broiler. "
         f"{summary['parity']} probe(s) agree; {summary['neither']} were answered by neither engine.",
         "",
     ]
@@ -1006,7 +1060,8 @@ def render_gap_report(document: Mapping[str, Any]) -> str:
             page["description"],
             "",
             f"- Page: <{page['url']}>",
-            f"- Probes: {page_summary[PARITY_MATCH]} in parity, **{page_summary[PARITY_GAP]} gap(s)**, "
+            f"- Probes: {page_summary[PARITY_MATCH]} in parity, **{page_summary[PARITY_GAP]} gap(s)** "
+            f"({page_summary.get('broilerErrors', 0)} of them a thrown error), "
             f"{page_summary[PARITY_NEITHER]} answered by neither engine.",
             "",
         ]
@@ -1014,14 +1069,20 @@ def render_gap_report(document: Mapping[str, Any]) -> str:
             lines += [
                 "### Probes Chromium answers and Broiler does not",
                 "",
-                "| Probe | Broiler | Chromium returns | Chromium value |",
-                "| --- | --- | --- | --- |",
+                "`error` means the page caught something the probe threw, and stored it "
+                "where the result belongs; the message is in the last column.",
+                "",
+                "| Probe | Broiler | Chromium returns | Chromium value | Broiler threw |",
+                "| --- | --- | --- | --- | --- |",
             ]
-            lines += [
-                f"| `{gap['test']}` | {gap['broiler']} | {gap['referenceType']} "
-                f"| `{_escape_table_cell(gap['referenceValue'])}` |"
-                for gap in page["gaps"]
-            ]
+            for gap in page["gaps"]:
+                thrown = (
+                    f"`{_escape_table_cell(gap['broilerValue'])}`" if gap.get("broilerValue") else "—"
+                )
+                lines.append(
+                    f"| `{gap['test']}` | {gap['broiler']} | {gap['referenceType']} "
+                    f"| `{_escape_table_cell(gap['referenceValue'])}` | {thrown} |"
+                )
             lines.append("")
         if page["divergentTypes"]:
             lines += [
@@ -1177,7 +1238,8 @@ def render_job_summary(aggregate: Mapping[str, Any]) -> str:
         f"- Matching Chromium `{reference.get('chromiumVersion') or 'n/a'}`: "
         f"**{summary['parity']}/{summary['parity'] + summary['gaps']}** "
         f"({parity_percent(summary)}%) over {summary['pagesCompared']}/{summary['pages']} compared page(s)",
-        f"- Gaps behind Chromium: **{summary['gaps']}**",
+        f"- Gaps behind Chromium: **{summary['gaps']}** "
+        f"({summary['gapsFromErrors']} where the probe threw in Broiler)",
         f"- Regressions: **{summary['regressions']}** · improvements: {summary['improvements']}",
         f"- Upstream churn: {summary['newTests']} new, {summary['removedTests']} removed",
         "",

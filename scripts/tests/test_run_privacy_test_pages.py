@@ -361,6 +361,7 @@ class ReportRenderingTests(unittest.TestCase):
             "referenceTests": 4,
             "parity": 3,
             "gaps": 1,
+            "gapsFromErrors": 0,
             "broilerOnly": 0,
             "neither": 0,
             "divergentTypes": 0,
@@ -394,12 +395,14 @@ class ReportRenderingTests(unittest.TestCase):
                         MODULE.PARITY_GAP: 1,
                         MODULE.PARITY_AHEAD: 0,
                         MODULE.PARITY_NEITHER: 0,
+                        "broilerErrors": 0,
                     },
                     "gaps": [
                         {
                             "test": "screen.width",
                             "name": "screen.width",
                             "broiler": "empty",
+                            "broilerValue": None,
                             "referenceType": "number",
                             "referenceValue": "1280",
                         }
@@ -435,6 +438,7 @@ class ReportRenderingTests(unittest.TestCase):
                         MODULE.PARITY_GAP: 0,
                         MODULE.PARITY_AHEAD: 0,
                         MODULE.PARITY_NEITHER: 0,
+                        "broilerErrors": 0,
                     },
                     "gaps": [],
                     "broilerOnly": [],
@@ -516,6 +520,52 @@ class ReferenceComparisonTests(unittest.TestCase):
         self.assertEqual("webgl", parity["gaps"][0]["test"])
         self.assertEqual("object", parity["gaps"][0]["referenceType"])
         self.assertIn("Google Inc.", parity["gaps"][0]["referenceValue"])
+
+    def test_a_probe_that_threw_in_broiler_is_a_gap_not_a_match(self) -> None:
+        thrown = {
+            "name": "ReferenceError",
+            "message": "webkitOfflineAudioContext is not defined",
+            "stack": "\n at inline:deferred-3",
+        }
+        broiler = MODULE.extract_test_entries({"results": [{"id": "audio", "value": thrown}]})
+        reference = self.reference([{"id": "audio", "value": "124.043"}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(0, parity["summary"][MODULE.PARITY_MATCH])
+        self.assertEqual(1, parity["summary"][MODULE.PARITY_GAP])
+        self.assertEqual(1, parity["summary"]["broilerErrors"])
+        self.assertEqual("error", parity["gaps"][0]["broiler"])
+        self.assertIn("webkitOfflineAudioContext", parity["gaps"][0]["broilerValue"])
+
+    def test_a_probe_that_threw_in_both_engines_is_answered_by_neither(self) -> None:
+        thrown = {"name": "ReferenceError", "message": "Gyroscope is not defined", "stack": "…"}
+        broiler = MODULE.extract_test_entries({"results": [{"id": "Gyroscope", "value": thrown}]})
+        reference = self.reference([{"id": "Gyroscope", "value": thrown}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(["Gyroscope"], parity["neither"])
+        self.assertEqual(0, parity["summary"][MODULE.PARITY_GAP])
+
+    def test_only_an_error_shaped_object_is_read_as_a_thrown_probe(self) -> None:
+        self.assertTrue(MODULE.is_error_value({"name": "TypeError", "message": "x is not a function"}))
+        self.assertTrue(MODULE.is_error_value({"message": "boom", "stack": "at <anonymous>"}))
+        self.assertFalse(MODULE.is_error_value({"message": "boom"}))
+        self.assertFalse(MODULE.is_error_value({"name": "Chrome", "version": "141"}))
+        self.assertFalse(MODULE.is_error_value("TypeError: x is not a function"))
+        self.assertFalse(MODULE.is_error_value(None))
+
+    def test_the_baseline_outcome_of_a_thrown_probe_is_left_alone(self) -> None:
+        thrown = {"name": "TypeError", "message": "x is not a function"}
+
+        # The baseline tracks what the page published; only the comparison
+        # reinterprets it, so a reclassification here cannot fail a run.
+        self.assertEqual(MODULE.OUTCOME_VALUE, MODULE.classify_test_value(thrown))
+        self.assertEqual(
+            {"x": MODULE.OUTCOME_VALUE},
+            MODULE.extract_test_outcomes({"results": [{"id": "x", "value": thrown}]}),
+        )
 
     def test_a_probe_neither_engine_answers_is_not_a_gap(self) -> None:
         broiler = MODULE.extract_test_entries({"results": [{"id": "websocket", "value": None}]})
