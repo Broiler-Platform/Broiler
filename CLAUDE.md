@@ -191,15 +191,20 @@ something to attempt from inside the container.
   `artifacts/real-world-render-tests`. See `docs/real-world-render-tests.md`.
 - Privacy test page runner: `python scripts/run-privacy-test-pages.py
   [--pages <id,...>] [--skip-build] [--fail-on-regression]`. No third-party
-  Python packages. It drives the DuckDuckGo privacy test pages through
-  `Broiler.Cli --evaluate-page`, reads each page's own `results` global, and
-  diffs the per-probe outcomes against `tests/privacy-test-pages/baseline.json`;
-  reports land in `artifacts/privacy-test-pages`. It measures **coverage** —
-  which probes Broiler carries out at all — not a privacy score, and only a
-  probe that stops producing a value is a regression (the corpus is live, so
-  additions and upstream removals never fail a run). Regenerate the baseline
-  deliberately with `--update-baseline`, never to clear a red run. See
-  `docs/privacy-test-pages.md`.
+  Python packages; the Chromium half needs the pinned Playwright under
+  `tests/wpt` (`npm ci`, then `npx playwright install chromium`) and is skipped
+  with `--no-reference`. It runs every page **twice** — Chromium through
+  `scripts/capture-privacy-reference.js` and Broiler through
+  `Broiler.Cli --evaluate-page` — reads each page's own `results` global from
+  both, diffs Broiler's per-probe outcomes against
+  `tests/privacy-test-pages/baseline.json`, and reports every probe Chromium
+  answered that Broiler did not as a gap (`gaps.md`, with the expected value
+  beside it). Reports land in `artifacts/privacy-test-pages`. It measures
+  **coverage** — which probes Broiler carries out at all — not a privacy score,
+  and only a probe that stops producing a value is a regression (the corpus is
+  live, so additions, upstream removals and gaps never fail a run). Regenerate
+  the baseline deliberately with `--update-baseline`, never to clear a red run.
+  See `docs/privacy-test-pages.md`.
 - WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
   and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
   0 disables). The cap is on the *growth* of the rendering process's resident

@@ -8,14 +8,22 @@ Each page runs its probes itself and publishes the outcome in a `results`
 global — the interface the upstream README documents — so what a run reports is
 what the page computed, not a rendering of it.
 
+Every page is run **twice**: once by Chromium through Playwright and once by
+Broiler, from the same manifest and the same expressions. The two `results`
+payloads are then compared probe by probe, so the report says not only what
+Broiler produced but what a shipping engine produces for the same probe.
+
 ```sh
-python scripts/run-privacy-test-pages.py                 # every page in the manifest
+python scripts/run-privacy-test-pages.py                 # every page, both engines
 python scripts/run-privacy-test-pages.py --pages fingerprinting,gpc
 python scripts/run-privacy-test-pages.py --skip-build --fail-on-regression
+python scripts/run-privacy-test-pages.py --no-reference   # Broiler only
 ```
 
-The runner needs no third-party Python packages, and the reports land under the
-ignored `artifacts/privacy-test-pages/`.
+The Python runner needs no third-party packages; the Chromium capture needs the
+pinned Playwright under `tests/wpt` (`npm ci` there, then
+`npx playwright install chromium`), and the runner sets `NODE_PATH` to it
+itself. Reports land under the ignored `artifacts/privacy-test-pages/`.
 
 ## What this measures, and what it does not
 
@@ -23,11 +31,26 @@ ignored `artifacts/privacy-test-pages/`.
 to carry out; a probe that produces nothing is a platform gap — an API that is
 not there, a request that never completed, a callback that never ran.
 
+**Chromium says which gaps are Broiler's.** Several of these pages depend on
+endpoints, sub-frames and return navigations that can fail for reasons that have
+nothing to do with the engine under test, and a probe nothing answers looks
+exactly like a probe Broiler cannot answer. Running Chromium over the same
+manifest separates the two: a probe Chromium answers and Broiler does not is a
+platform gap, and it arrives with the shape and value that were expected.
+
 **It does not grade privacy.** The pages are written to *describe* a browser, so
 the values they collect are a description of what a page can observe, not a
 score. "Broiler reported a `navigator.userAgent`" is coverage; whether that
 string is a good answer for a shipping browser is a product question this suite
-does not answer. Nothing here should be read as a privacy result for Broiler.
+does not answer. Nothing here should be read as a privacy result for Broiler —
+including agreement with Chromium, which means Broiler carried the probe out,
+not that it made the right privacy choice.
+
+**Nothing is compared as pixels.** These pages render a summary of what their
+own JavaScript measured; their `results` payload *is* the output, and a
+screenshot of it would restate the same thing less precisely and with more
+false positives. Pixel comparison against Chromium is what
+[the real-world render suite](real-world-render-tests.md) is for.
 
 ## How a page is run
 
@@ -53,6 +76,34 @@ The mode is general — it answers "what did this page's JavaScript compute?" fo
 any page — and is documented under `--help`. `--evaluate-html-output <FILE>`
 additionally writes the post-script DOM.
 
+## How the Chromium reference is captured
+
+`scripts/capture-privacy-reference.js` drives the same manifest through
+Playwright's Chromium and writes one `pages/<id>/reference.json` per page:
+
+```sh
+NODE_PATH=tests/wpt/node_modules node scripts/capture-privacy-reference.js \
+  --pages fingerprinting --output-dir artifacts/privacy-test-pages
+```
+
+It evaluates the manifest's own `startExpression` and `resultsExpression` —
+comparing two engines is only meaningful if they were asked the same question —
+and then re-reads the results array on a poll until its length holds still for
+three consecutive checks or the page's timeout expires. Nothing is blocked in
+the browser context: storage, workers and service workers are exactly what
+several of these pages measure, so the reference has to be what a stock browser
+does. `--executable-path` (or `BROILER_CHROMIUM_EXECUTABLE`) points the capture
+at a Chromium that is already on the machine instead of Playwright's own.
+
+The runner captures references before it builds Broiler, so a browser failure
+surfaces in the first minute rather than the last. `--skip-reference` reuses the
+references already in the output directory (the one artefact a run may inherit;
+everything else is cleared), and `--no-reference` runs Broiler alone.
+
+A page Chromium could not run is reported as **not compared** rather than as
+parity — an absent reference must never read as agreement. `--require-reference`
+turns that into a failure for runs that need the comparison to have happened.
+
 ## Outcomes and the baseline
 
 Every entry of a page's `results` array is classified:
@@ -74,6 +125,33 @@ python scripts/run-privacy-test-pages.py --update-baseline
 
 A partial run (`--pages`) keeps the baseline entries for the pages it skipped,
 so regenerating one page does not delete the rest.
+
+The baseline records Broiler's own outcomes only. The Chromium comparison is
+recomputed from a fresh capture every run and is deliberately not baselined:
+freezing another engine's answers would turn upstream corpus churn and Chromium
+releases into Broiler regressions.
+
+## Chromium parity
+
+Each probe of a compared page falls into one of four buckets:
+
+| Parity | Meaning |
+| --- | --- |
+| `parity` | Both engines answered. Broiler carried the probe out. |
+| `gap` | Chromium answered, Broiler did not. **This is the finding.** |
+| `neither` | No engine answered — a page, corpus or network limitation, not Broiler's. |
+| `broiler-only` | Only Broiler answered; nearly always a sign the two runs saw different pages. |
+
+A gap carries the evidence with it: the type Chromium returned and a bounded
+excerpt of the value, so a reader can tell a missing API from a request that
+never completed without re-running anything. Probes both engines answer in
+*different shapes* are listed separately — a differing value is expected between
+engines (a user-agent string, a screen size), but a differing type usually means
+a stub standing in for a result.
+
+Gaps never fail a run. They are the backlog this suite exists to describe, and
+they change when the upstream corpus or Chromium changes; only the baseline
+comparison decides pass or fail.
 
 ## What counts as a regression
 
@@ -120,24 +198,38 @@ results elsewhere can override `resultsExpression`.
 Each run writes to `artifacts/privacy-test-pages/`:
 
 ```
-results.json        the whole run, machine-readable: per-page outcomes, comparison, attempts
-report.md           per-page detail, including every regression, addition and removal
+results.json        the whole run, machine-readable: per-page outcomes, comparison, parity, attempts
+report.md           per-page detail, including every regression, addition, removal and gap
 report.html         the same as a browsable page
-job-summary.md      the workflow summary: totals, regressions, pages that did not run
+job-summary.md      the workflow summary: totals, gaps, regressions, pages that did not run
+gaps.json           the Chromium comparison alone, with the expected value per gap
+gaps.md             the same, as the issue-ready document a reader files from
+reference.log       the Chromium capture's own output
 pages/<id>/
-  results.json      the page's own results payload, as it published it
+  results.json      the page's own results payload, as Broiler published it
+  reference.json    the same page as Chromium published it, plus browser and diagnostics
   attempt-N.json    the raw --evaluate-page report
   attempt-N.stdout.log, attempt-N.stderr.log
 ```
+
+`gaps.md` is the one to read first: it lists, per page, every probe Chromium
+answered and Broiler did not, with what Chromium returned beside it.
 
 ## CI
 
 The `Privacy Test Pages` workflow runs weekly and on manual dispatch. It is not
 a pull-request gate: the inputs are public pages that change independently of
 this repository. A scheduled run fails on a regression against the baseline;
-`fail_on_regression`, `fail_on_incomplete`, `pages`, and `update_baseline` are
-dispatch inputs. `update_baseline` uploads the regenerated file as an artifact
-rather than committing it, so a baseline change stays a reviewed commit.
+`fail_on_regression`, `fail_on_incomplete`, `require_reference`,
+`skip_reference`, `pages`, and `update_baseline` are dispatch inputs.
+`update_baseline` uploads the regenerated file as an artifact rather than
+committing it, so a baseline change stays a reviewed commit. The job prints
+`gaps.md` to its log as well as uploading it, so the comparison outlives the
+artifact retention window.
+
+If Chromium cannot be installed the job warns and continues: the run then
+reports its pages as uncompared rather than as parity, and the Broiler-side
+coverage and baseline comparison still stand.
 
 ## Current coverage
 
@@ -146,4 +238,8 @@ it. The request- and storage-driven pages are largely `empty` today: their
 probes depend on sub-resource loads, workers, sockets, and frames completing and
 reporting back, which is the gap this baseline exists to track. Read the
 per-page numbers in `report.md` rather than the total, which the 124-test
-fingerprinting page dominates.
+fingerprinting page dominates, and read `gaps.md` for which of those empty
+probes Chromium answers — those are the ones that are Broiler's to fix.
+
+The findings from the first two-engine run, and the issues opened from them, are
+in [Privacy test page gaps](privacy-test-page-gaps.md).
