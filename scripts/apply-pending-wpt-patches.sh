@@ -281,8 +281,6 @@ set -euo pipefail
 #   * 0001 (Broiler.JS, compiled-site lifetime) — a retention fix with no effect on rendered
 #     output, so a pixel run has nothing to say about it.
 PENDING_PATCHES=(
-  "Broiler.CSS|patches/0002-keep-a-css-escape-from-ending-a-rule.patch"
-  "Broiler.HTML|patches/0003-correct-the-box-tree-inside-a-float.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
