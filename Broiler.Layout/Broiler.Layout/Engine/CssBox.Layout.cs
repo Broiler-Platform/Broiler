@@ -745,6 +745,37 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
+    /// CSS2.1 §9.5.1 rules 3/5: when a float will not fit beside the floats already placed,
+    /// it moves down until it does. Returns the border-box top it must move to, or
+    /// <paramref name="top"/> when nothing overlaps it.
+    /// </summary>
+    /// <remarks>
+    /// The rules are stated on <em>outer</em> (margin) edges, so the move is computed there and
+    /// converted back: the moved float's outer top lands on the lowest overlapping float's outer
+    /// bottom, which puts its border-box top a further <c>margin-top</c> down. Comparing
+    /// border-box edges instead swallowed the moved float's own top margin — Acid1's second row
+    /// of floats (<c>#baz</c>, the <c>blockquote</c> and the <c>h1</c>, each with
+    /// <c>margin-top: 1em</c>) all sat 10px too high.
+    /// </remarks>
+    private double MoveBelowOverlappingFloats(IReadOnlyList<CssBox> precedingFloats, double top, double floatHeight)
+    {
+        double outerTop = top - ActualMarginTop;
+        double maxOuterBottom = outerTop;
+
+        foreach (var floatBox in precedingFloats)
+        {
+            double fBottom = floatBox.ActualBottom;
+
+            if (top < fBottom && top + floatHeight > floatBox.Location.Y)
+                maxOuterBottom = Math.Max(maxOuterBottom, fBottom + floatBox.ActualMarginBottom);
+        }
+
+        // No overlap: report the unchanged border-box top so the caller's `<= top` guard
+        // terminates the collision loop.
+        return maxOuterBottom <= outerTop ? top : maxOuterBottom + ActualMarginTop;
+    }
+
+    /// <summary>
     /// Compute this box's in-flow static position, then apply float placement
     /// (CSS2.1§9.5 collision resolution), clearance, BFC float avoidance, and
     /// theabsolute/fixed offset overrides. Sets Location / ActualBottom.
@@ -884,15 +915,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                             break;
 
                         // Move below the lowest overlapping float
-                        double maxBottom = top;
-
-                        foreach (var floatBox in precedingFloats)
-                        {
-                            double fBottom = floatBox.ActualBottom;
-
-                            if (top < fBottom && top + floatHeight > floatBox.Location.Y)
-                                maxBottom = Math.Max(maxBottom, fBottom);
-                        }
+                        double maxBottom = MoveBelowOverlappingFloats(precedingFloats, top, floatHeight);
 
                         if (maxBottom <= top)
                             break;
@@ -937,15 +960,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                             break;
 
                         // Move below the lowest overlapping float
-                        double maxBottom = top;
-
-                        foreach (var floatBox in precedingFloats)
-                        {
-                            double fBottom = floatBox.ActualBottom;
-
-                            if (top < fBottom && top + floatHeight > floatBox.Location.Y)
-                                maxBottom = Math.Max(maxBottom, fBottom);
-                        }
+                        double maxBottom = MoveBelowOverlappingFloats(precedingFloats, top, floatHeight);
 
                         if (maxBottom <= top)
                             break;
