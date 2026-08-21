@@ -2,14 +2,20 @@ name: Privacy Test Pages
 
 # Coverage suite over the DuckDuckGo privacy test pages
 # (https://github.com/duckduckgo/privacy-test-pages). Each page runs its own
-# probes and publishes them in a `results` global, which Broiler.Cli reads back
-# with --evaluate-page; the runner classifies every probe as carried out or not
-# and diffs that against tests/privacy-test-pages/baseline.json.
+# probes and publishes them in a `results` global. Every page is run twice from
+# the same manifest — once by Chromium through Playwright and once by Broiler.Cli
+# with --evaluate-page — and the two `results` payloads are compared probe by
+# probe. The runner classifies every probe as carried out or not, diffs that
+# against tests/privacy-test-pages/baseline.json, and reports every probe
+# Chromium answered that Broiler did not as a gap with the expected value beside
+# it.
 #
 # The corpus is live and maintained upstream, so it is not a pull-request gate:
 # tests are added and removed without a Broiler code change. A scheduled run
 # fails only on a regression against the tracked baseline — a probe that used to
 # produce a value and no longer does, or a page that stops running altogether.
+# Gaps behind Chromium are reported, never failed on: they are the backlog this
+# suite exists to describe, not a change this run introduced.
 
 on:
   workflow_dispatch:
@@ -28,6 +34,16 @@ on:
         type: boolean
         required: false
         default: false
+      require_reference:
+        description: Fail the workflow when any page could not be captured in Chromium to compare against.
+        type: boolean
+        required: false
+        default: false
+      skip_reference:
+        description: Skip the Chromium capture and run Broiler only.
+        type: boolean
+        required: false
+        default: false
       update_baseline:
         description: Rewrite the baseline from this run and upload it as an artifact instead of comparing.
         type: boolean
@@ -43,12 +59,13 @@ permissions:
 
 env:
   RESULTS_DIR: artifacts/privacy-test-pages
+  NODE_PATH: ${{ github.workspace }}/tests/wpt/node_modules
 
 jobs:
   evaluate:
     name: Evaluate the privacy test pages
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v5
@@ -65,6 +82,12 @@ jobs:
             8.0.x
             10.0.x
 
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: tests/wpt/package-lock.json
+
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -73,9 +96,30 @@ jobs:
         shell: bash
         run: bash scripts/apply-pending-wpt-patches.sh
 
+      - name: Restore Playwright browser
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: wpt-playwright-${{ runner.os }}-${{ hashFiles('tests/wpt/package-lock.json') }}
+          restore-keys: wpt-playwright-${{ runner.os }}-
+
+      - name: Install the reference browser
+        if: github.event.inputs.skip_reference != 'true'
+        shell: bash
+        run: |
+          (
+            cd tests/wpt
+            npm ci
+            if ! timeout 20m npx playwright install --with-deps chromium; then
+              echo "::warning::Chromium installation did not complete; the run will report its pages as uncompared."
+            fi
+          )
+
       - name: Test the runner
         shell: bash
-        run: python -m unittest scripts.tests.test_run_privacy_test_pages -v
+        run: |
+          python -m unittest scripts.tests.test_run_privacy_test_pages -v
+          node --test scripts/tests/capture-privacy-reference.test.js
 
       - name: Build Broiler.Cli
         shell: bash
@@ -87,6 +131,8 @@ jobs:
           SELECTED_PAGES: ${{ github.event.inputs.pages || '' }}
           FAIL_ON_REGRESSION: ${{ github.event.inputs.fail_on_regression || 'true' }}
           FAIL_ON_INCOMPLETE: ${{ github.event.inputs.fail_on_incomplete || 'false' }}
+          REQUIRE_REFERENCE: ${{ github.event.inputs.require_reference || 'false' }}
+          SKIP_REFERENCE: ${{ github.event.inputs.skip_reference || 'false' }}
           UPDATE_BASELINE: ${{ github.event.inputs.update_baseline || 'false' }}
         run: |
           args=(
@@ -95,6 +141,11 @@ jobs:
           )
           if [ -n "$SELECTED_PAGES" ]; then
             args+=(--pages "$SELECTED_PAGES")
+          fi
+          if [ "$SKIP_REFERENCE" = "true" ]; then
+            args+=(--no-reference)
+          elif [ "$REQUIRE_REFERENCE" = "true" ]; then
+            args+=(--require-reference)
           fi
           if [ "$UPDATE_BASELINE" = "true" ]; then
             args+=(--update-baseline)
@@ -118,6 +169,24 @@ jobs:
           else
             echo "## Privacy test pages" >> "$GITHUB_STEP_SUMMARY"
             echo "The runner stopped before it could create a report." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # The gap report is what a reader turns into an issue, so it goes to the
+      # log as well as the artifact: the log survives artifact expiry and can be
+      # read without downloading a zip.
+      - name: Print the Chromium comparison
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "$RESULTS_DIR/reference.log" ]; then
+            echo "--- Chromium capture ---"
+            cat "$RESULTS_DIR/reference.log"
+            echo
+          fi
+          if [ -f "$RESULTS_DIR/gaps.md" ]; then
+            cat "$RESULTS_DIR/gaps.md"
+          else
+            echo "No gap report was produced."
           fi
 
       - name: Upload evaluation evidence

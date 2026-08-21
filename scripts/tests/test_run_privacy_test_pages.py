@@ -337,6 +337,15 @@ class ReportRenderingTests(unittest.TestCase):
             "dotnetSdkVersion": "10.0.302",
             "gitCommit": "abc123",
         },
+        "reference": {
+            "engine": "chromium",
+            "chromiumVersion": "141.0.0.0",
+            "playwrightVersion": "1.59.1",
+            "captured": True,
+            "reused": False,
+            "disabled": False,
+            "run": {"exitCode": 0, "timedOut": False},
+        },
         "summary": {
             "pages": 2,
             "pagesOk": 1,
@@ -348,6 +357,14 @@ class ReportRenderingTests(unittest.TestCase):
             "improvements": 0,
             "newTests": 1,
             "removedTests": 0,
+            "pagesCompared": 1,
+            "referenceTests": 4,
+            "parity": 3,
+            "gaps": 1,
+            "gapsFromErrors": 0,
+            "broilerOnly": 0,
+            "neither": 0,
+            "divergentTypes": 0,
         },
         "results": [
             {
@@ -355,6 +372,7 @@ class ReportRenderingTests(unittest.TestCase):
                 "name": "Fingerprinting",
                 "url": "https://privacy-test-pages.site/privacy-protections/fingerprinting/?run",
                 "description": "Reads the fingerprinting surface.",
+                "tags": ["fingerprinting"],
                 "status": "ok",
                 "reason": None,
                 "summary": {"tests": 4, "withValue": 3, "empty": 1},
@@ -367,12 +385,39 @@ class ReportRenderingTests(unittest.TestCase):
                     "newTests": ["navigator.gpu"],
                     "removedTests": [],
                 },
+                "parity": {
+                    "available": True,
+                    "referenceStatus": "ok",
+                    "reason": None,
+                    "summary": {
+                        "tests": 4,
+                        MODULE.PARITY_MATCH: 3,
+                        MODULE.PARITY_GAP: 1,
+                        MODULE.PARITY_AHEAD: 0,
+                        MODULE.PARITY_NEITHER: 0,
+                        "broilerErrors": 0,
+                    },
+                    "gaps": [
+                        {
+                            "test": "screen.width",
+                            "name": "screen.width",
+                            "broiler": "empty",
+                            "broilerValue": None,
+                            "referenceType": "number",
+                            "referenceValue": "1280",
+                        }
+                    ],
+                    "broilerOnly": [],
+                    "neither": [],
+                    "divergentTypes": [],
+                },
             },
             {
                 "id": "gpc",
                 "name": "Global Privacy Control",
                 "url": "https://privacy-test-pages.site/privacy-protections/gpc/?run",
                 "description": "Reads the GPC signal.",
+                "tags": ["gpc"],
                 "status": "failed",
                 "reason": "the page did not define a results object",
                 "summary": {"tests": 0, "withValue": 0, "empty": 0},
@@ -382,6 +427,23 @@ class ReportRenderingTests(unittest.TestCase):
                     "improvements": [],
                     "newTests": [],
                     "removedTests": [],
+                },
+                "parity": {
+                    "available": False,
+                    "referenceStatus": "failed",
+                    "reason": "the page did not publish a results object",
+                    "summary": {
+                        "tests": 0,
+                        MODULE.PARITY_MATCH: 0,
+                        MODULE.PARITY_GAP: 0,
+                        MODULE.PARITY_AHEAD: 0,
+                        MODULE.PARITY_NEITHER: 0,
+                        "broilerErrors": 0,
+                    },
+                    "gaps": [],
+                    "broilerOnly": [],
+                    "neither": [],
+                    "divergentTypes": [],
                 },
             },
         ],
@@ -413,6 +475,248 @@ class ReportRenderingTests(unittest.TestCase):
     def test_coverage_percent_is_zero_when_nothing_ran(self) -> None:
         self.assertEqual(0.0, MODULE.coverage_percent({"tests": 0, "testsWithValue": 0}))
         self.assertEqual(75.0, MODULE.coverage_percent({"tests": 4, "testsWithValue": 3}))
+
+    def test_reports_name_the_reference_engine_and_the_gap(self) -> None:
+        report = MODULE.render_markdown_report(self.AGGREGATE)
+        summary = MODULE.render_job_summary(self.AGGREGATE)
+        page = MODULE.render_html_report(self.AGGREGATE)
+
+        for rendered in (report, summary, page):
+            self.assertIn("141.0.0.0", rendered)
+        self.assertIn("Chromium returns number", report)
+        self.assertIn("### Gaps behind Chromium", summary)
+        self.assertIn("### Pages with no Chromium reference", summary)
+
+    def test_a_page_without_a_reference_is_reported_as_uncompared(self) -> None:
+        report = MODULE.render_markdown_report(self.AGGREGATE)
+
+        self.assertIn("Not compared with Chromium", report)
+
+    def test_parity_percent_ignores_probes_neither_engine_answered(self) -> None:
+        self.assertEqual(0.0, MODULE.parity_percent({"parity": 0, "gaps": 0}))
+        self.assertEqual(75.0, MODULE.parity_percent({"parity": 3, "gaps": 1}))
+
+
+class ReferenceComparisonTests(unittest.TestCase):
+    @staticmethod
+    def reference(results: list[dict[str, object]], status: str = "ok") -> dict[str, object]:
+        return {
+            "schemaVersion": MODULE.SCHEMA_VERSION,
+            "engine": "chromium",
+            "status": status,
+            "reason": None,
+            "browser": {"chromiumVersion": "141.0.0.0", "playwrightVersion": "1.59.1"},
+            "results": {"results": results},
+        }
+
+    def test_a_probe_chromium_answers_and_broiler_does_not_is_a_gap(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "webgl", "value": None}]})
+        reference = self.reference([{"id": "webgl", "value": {"vendor": "Google Inc."}}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertTrue(parity["available"])
+        self.assertEqual(1, parity["summary"][MODULE.PARITY_GAP])
+        self.assertEqual("webgl", parity["gaps"][0]["test"])
+        self.assertEqual("object", parity["gaps"][0]["referenceType"])
+        self.assertIn("Google Inc.", parity["gaps"][0]["referenceValue"])
+
+    def test_a_probe_that_threw_in_broiler_is_a_gap_not_a_match(self) -> None:
+        thrown = {
+            "name": "ReferenceError",
+            "message": "webkitOfflineAudioContext is not defined",
+            "stack": "\n at inline:deferred-3",
+        }
+        broiler = MODULE.extract_test_entries({"results": [{"id": "audio", "value": thrown}]})
+        reference = self.reference([{"id": "audio", "value": "124.043"}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(0, parity["summary"][MODULE.PARITY_MATCH])
+        self.assertEqual(1, parity["summary"][MODULE.PARITY_GAP])
+        self.assertEqual(1, parity["summary"]["broilerErrors"])
+        self.assertEqual("error", parity["gaps"][0]["broiler"])
+        self.assertIn("webkitOfflineAudioContext", parity["gaps"][0]["broilerValue"])
+
+    def test_a_probe_that_threw_in_both_engines_is_answered_by_neither(self) -> None:
+        thrown = {"name": "ReferenceError", "message": "Gyroscope is not defined", "stack": "…"}
+        broiler = MODULE.extract_test_entries({"results": [{"id": "Gyroscope", "value": thrown}]})
+        reference = self.reference([{"id": "Gyroscope", "value": thrown}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(["Gyroscope"], parity["neither"])
+        self.assertEqual(0, parity["summary"][MODULE.PARITY_GAP])
+
+    def test_only_an_error_shaped_object_is_read_as_a_thrown_probe(self) -> None:
+        self.assertTrue(MODULE.is_error_value({"name": "TypeError", "message": "x is not a function"}))
+        self.assertTrue(MODULE.is_error_value({"message": "boom", "stack": "at <anonymous>"}))
+        self.assertFalse(MODULE.is_error_value({"message": "boom"}))
+        self.assertFalse(MODULE.is_error_value({"name": "Chrome", "version": "141"}))
+        self.assertFalse(MODULE.is_error_value("TypeError: x is not a function"))
+        self.assertFalse(MODULE.is_error_value(None))
+
+    def test_the_baseline_outcome_of_a_thrown_probe_is_left_alone(self) -> None:
+        thrown = {"name": "TypeError", "message": "x is not a function"}
+
+        # The baseline tracks what the page published; only the comparison
+        # reinterprets it, so a reclassification here cannot fail a run.
+        self.assertEqual(MODULE.OUTCOME_VALUE, MODULE.classify_test_value(thrown))
+        self.assertEqual(
+            {"x": MODULE.OUTCOME_VALUE},
+            MODULE.extract_test_outcomes({"results": [{"id": "x", "value": thrown}]}),
+        )
+
+    def test_a_probe_neither_engine_answers_is_not_a_gap(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "websocket", "value": None}]})
+        reference = self.reference([{"id": "websocket", "value": None}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(0, parity["summary"][MODULE.PARITY_GAP])
+        self.assertEqual(["websocket"], parity["neither"])
+
+    def test_both_engines_answering_counts_as_parity_however_the_values_differ(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "ua", "value": "Broiler/1.0"}]})
+        reference = self.reference([{"id": "ua", "value": "Chrome/141"}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(1, parity["summary"][MODULE.PARITY_MATCH])
+        self.assertEqual([], parity["divergentTypes"])
+
+    def test_a_shared_probe_answered_in_a_different_shape_is_reported_separately(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "screen", "value": "1280x720"}]})
+        reference = self.reference([{"id": "screen", "value": {"width": 1280}}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(1, parity["summary"][MODULE.PARITY_MATCH])
+        self.assertEqual(1, len(parity["divergentTypes"]))
+        self.assertEqual("string", parity["divergentTypes"][0]["broilerType"])
+        self.assertEqual("object", parity["divergentTypes"][0]["referenceType"])
+
+    def test_a_probe_only_broiler_answered_is_kept_apart_from_the_gaps(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "extra", "value": "yes"}]})
+        reference = self.reference([{"id": "other", "value": "yes"}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(["extra"], [entry["test"] for entry in parity["broilerOnly"]])
+        self.assertEqual(["other"], [gap["test"] for gap in parity["gaps"]])
+
+    def test_a_failed_chromium_run_leaves_the_page_uncompared(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "webgl", "value": "yes"}]})
+        reference = self.reference([], status="failed")
+        reference["reason"] = "net::ERR_CONNECTION_RESET"
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertFalse(parity["available"])
+        self.assertIn("ERR_CONNECTION_RESET", parity["reason"])
+        self.assertEqual([], parity["gaps"])
+
+    def test_no_reference_at_all_leaves_the_page_uncompared(self) -> None:
+        parity = MODULE.compare_to_reference({}, None)
+
+        self.assertFalse(parity["available"])
+        self.assertEqual("no Chromium reference was captured", parity["reason"])
+
+    def test_repeated_probe_ids_are_compared_occurrence_by_occurrence(self) -> None:
+        payload = {"results": [{"id": "cookie", "value": "a"}, {"id": "cookie", "value": None}]}
+        broiler = MODULE.extract_test_entries(payload)
+        reference = self.reference([{"id": "cookie", "value": "a"}, {"id": "cookie", "value": "b"}])
+
+        parity = MODULE.compare_to_reference(broiler, reference)
+
+        self.assertEqual(1, parity["summary"][MODULE.PARITY_MATCH])
+        self.assertEqual(["cookie (2)"], [gap["test"] for gap in parity["gaps"]])
+
+    def test_a_reference_from_another_schema_version_is_ignored(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "reference.json"
+            path.write_text(json.dumps({"schemaVersion": 99, "status": "ok"}), encoding="utf-8")
+
+            self.assertIsNone(MODULE.load_reference_document(path))
+
+    def test_an_unreadable_reference_is_absent_rather_than_fatal(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "reference.json"
+            path.write_text("{not json", encoding="utf-8")
+
+            self.assertIsNone(MODULE.load_reference_document(path))
+            self.assertIsNone(MODULE.load_reference_document(Path(directory) / "absent.json"))
+
+    def test_the_browser_version_is_taken_from_whichever_reference_has_one(self) -> None:
+        metadata = MODULE.reference_metadata([
+            {"browser": {"chromiumVersion": None}},
+            {"browser": {"chromiumVersion": "141.0.0.0", "playwrightVersion": "1.59.1"}},
+        ])
+
+        self.assertEqual("141.0.0.0", metadata["chromiumVersion"])
+        self.assertEqual("chromium", metadata["engine"])
+
+    def test_a_value_excerpt_stays_one_bounded_line(self) -> None:
+        excerpt = MODULE.describe_value({"text": "a\nb" + "c" * 500})
+
+        self.assertNotIn("\n", excerpt)
+        self.assertLessEqual(len(excerpt), MODULE.VALUE_EXCERPT_CHARS)
+
+    def test_a_pipe_in_a_probe_value_cannot_break_the_report_table(self) -> None:
+        self.assertNotIn("|", MODULE._escape_table_cell("a|b").replace("\\|", ""))
+
+
+class GapDocumentTests(unittest.TestCase):
+    def test_the_gap_document_carries_the_evidence_and_the_uncompared_pages(self) -> None:
+        document = MODULE.build_gap_document(ReportRenderingTests.AGGREGATE)
+
+        self.assertEqual(["fingerprinting"], [page["id"] for page in document["pages"]])
+        self.assertEqual(["gpc"], [page["id"] for page in document["notCompared"]])
+        self.assertEqual("screen.width", document["pages"][0]["gaps"][0]["test"])
+
+        report = MODULE.render_gap_report(document)
+        self.assertIn("## Fingerprinting (`fingerprinting`)", report)
+        self.assertIn("Probes Chromium answers and Broiler does not", report)
+        self.assertIn("## Pages with no Chromium reference", report)
+
+    def test_a_run_with_no_gaps_says_so_rather_than_rendering_nothing(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        parity = aggregate["results"][0]["parity"]
+        parity["gaps"] = []
+        parity["summary"][MODULE.PARITY_GAP] = 0
+        parity["summary"][MODULE.PARITY_MATCH] = 4
+
+        report = MODULE.render_gap_report(MODULE.build_gap_document(aggregate))
+
+        self.assertIn("No gaps were found on the compared pages.", report)
+
+
+class OutputRetentionTests(unittest.TestCase):
+    def test_reusing_references_keeps_them_and_clears_everything_else(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory)
+            page_dir = output_root / "pages" / "fingerprinting"
+            page_dir.mkdir(parents=True)
+            (page_dir / "reference.json").write_text("{}", encoding="utf-8")
+            (page_dir / "attempt-1.json").write_text("{}", encoding="utf-8")
+            (output_root / "report.md").write_text("stale", encoding="utf-8")
+
+            MODULE.clear_previous_run(output_root, keep_references=True)
+
+            self.assertTrue((page_dir / "reference.json").is_file())
+            self.assertFalse((page_dir / "attempt-1.json").exists())
+            self.assertFalse((output_root / "report.md").exists())
+
+    def test_a_fresh_run_clears_the_references_too(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory)
+            page_dir = output_root / "pages" / "fingerprinting"
+            page_dir.mkdir(parents=True)
+            (page_dir / "reference.json").write_text("{}", encoding="utf-8")
+
+            MODULE.clear_previous_run(output_root)
+
+            self.assertFalse((output_root / "pages").exists())
 
 
 if __name__ == "__main__":
