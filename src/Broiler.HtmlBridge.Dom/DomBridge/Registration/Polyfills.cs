@@ -53,6 +53,41 @@ public sealed partial class DomBridge
 
         // SVGLength interface constants
         RegisterSVGLength(context);
+
+        // Storage interface global — the name a page tests before it touches an area.
+        RegisterStorageConstructor(context);
+    }
+
+    /// <summary>
+    /// The <c>Storage</c> interface global (HTML §12.2.2), as the name a feature test asks for
+    /// rather than as a constructible class: the two areas come from <c>localStorage</c> and
+    /// <c>sessionStorage</c>, never from <c>new Storage()</c>.
+    /// </summary>
+    /// <remarks>
+    /// <c>typeof Storage !== 'undefined'</c> is the canonical Web Storage feature test — MDN
+    /// documents it as such — so an absent global makes a page conclude it has no storage at all
+    /// and take its no-storage path, however complete the two area objects are. Like the DOM
+    /// interface globals (see <c>RegisterDomInterfaceConstructors</c>) it answers
+    /// <c>instanceof</c> from the object's shape, because a bridge storage object carries its
+    /// members directly instead of inheriting them from this constructor's prototype.
+    /// </remarks>
+    private static void RegisterStorageConstructor(JSContext context)
+    {
+        context.Eval(@"
+            function Storage() { throw new TypeError('Illegal constructor'); }
+
+            Object.defineProperty(Storage, Symbol.hasInstance, {
+                value: function (o) {
+                    return !!o && typeof o === 'object'
+                        && typeof o.getItem === 'function'
+                        && typeof o.setItem === 'function'
+                        && typeof o.removeItem === 'function'
+                        && typeof o.key === 'function'
+                        && typeof o.length === 'number';
+                },
+                writable: false, enumerable: false, configurable: true
+            });
+        ");
     }
 
 }

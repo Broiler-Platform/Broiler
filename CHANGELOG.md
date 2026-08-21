@@ -214,6 +214,32 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `sessionStorage` exists. Only `localStorage` was ever registered, and because
+  `window` **is** the global object, the bare `sessionStorage` a page writes was a
+  `ReferenceError` rather than an undefined property — which aborts the entire
+  script, not the statement that read it. `www.mediawiki.org` serves its modules
+  as one `load.php` bundle, so that single identifier took ResourceLoader, the
+  Vector skin and every module queued behind them down with it, and the only
+  symptom was `ReferenceError: sessionStorage is not defined` on a page that had
+  quietly lost all of its script-driven behaviour. The two areas are separate
+  stores, as they are in a browser, and a same-origin frame now sees its parent's
+  areas rather than empty ones of its own.
+  - The `Storage` object grew the rest of its interface with them: `length` and
+    `key(n)`, which is how a page walks an area it did not write itself, and
+    named-property access in both directions — `storage.foo = 1` is now the same
+    item as `setItem('foo', '1')`, where a directly-assigned property used to be
+    invisible to `getItem`, `length` and `key()` alike. The methods are
+    non-enumerable, so `Object.keys(storage)` and `for (var k in storage)` yield
+    the stored keys alone rather than four methods among them.
+  - `Storage` is registered as an interface global, because
+    `typeof Storage !== 'undefined'` is the canonical Web Storage feature test: a
+    page that fails it takes its no-storage path however complete the areas
+    themselves are. Like the DOM interface globals it answers `instanceof` from
+    the object's shape.
+  - The CLI's script-only capture path (no DOM) had a second, thinner copy of the
+    same storage stub, reachable only as `window.localStorage`; it now shares the
+    one implementation and registers both areas unqualified as well.
+
 - Nothing in the tree changed for column fragmentation of a box that has content
   in it, and that is the result rather than an omission. It was built — each piece
   a copy of the box carrying the part of its subtree in that piece, a straddling
