@@ -267,7 +267,17 @@ set -euo pipefail
 # output. Its geometry is unit-tested in the main repo (MirroredTransformPaintTests), which
 # feature-probes and self-skips until this is applied; only the pixel suite can say a mirrored
 # element reached the canvas.
+# 0001 keeps a CSS escape from ending the rule it sits in, and drops three kinds of invalid
+# declaration. The escape half is what makes it WPT-relevant beyond the value rules: an escaped
+# `\}` inside a declaration value closed its rule, and every rule after it in that stylesheet was
+# dropped — a whole-stylesheet failure, not a one-property one, on any sheet that contains one.
+# 0002 lets both box-tree correction passes descend into a float. A `display: inline` box holding
+# block children anywhere inside a float never had its anonymous blocks built, so that subtree laid
+# out at zero size and painted nothing at all — the same absent-output failure mode as the entries
+# above, and it needs the pixel suite to say the content reached the canvas.
 PENDING_PATCHES=(
+  "Broiler.CSS|patches/0001-keep-a-css-escape-from-ending-a-rule.patch"
+  "Broiler.HTML|patches/0002-correct-the-box-tree-inside-a-float.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

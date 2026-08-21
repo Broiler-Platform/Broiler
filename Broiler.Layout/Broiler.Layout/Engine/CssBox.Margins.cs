@@ -125,21 +125,32 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 CssBoxHelper.CollectEmptyBoxMargins(prevBox, ref maxPos, ref maxNeg);
                 double collapsed = maxPos + maxNeg; // maxNeg <= 0
 
-                // Subtract the portion of the collapsed margin already
-                // consumed when positioning the empty box itself (its
-                // CollapsedMarginTop was recorded during its own layout).
-                // Never subtract more than this collapse would have added: the record says how
-                // much margin is already standing above the empty box, and margin that is not
-                // there cannot be cancelled. Taking the difference unclamped turns a large
-                // already-spent margin into a *negative* one here, which lifts this box above
-                // its own parent's content edge — www.mediawiki.org's site notice was drawn
-                // 18px above the box that owns it, because the empty #centralNotice before it
-                // sits under the notice container's 24px margin.
-                double alreadySpent = Math.Min(
-                    Math.Max(prevBox.CollapsedMarginTop, 0),
-                    Math.Max(collapsed, 0));
+                // Subtract the portion of the collapsed margin already consumed when
+                // positioning the empty box itself (its CollapsedMarginTop was recorded during
+                // its own layout). The difference is taken whole — including when it comes out
+                // negative, which is how this box lands *above* the empty one's border edge.
+                // That is the correct outcome whenever the run's collapsed value is smaller
+                // than what was spent placing the empty box, and CSS2.1 §8.3.1's
+                // collapse-through rules produce exactly that as soon as anything in the run
+                // carries a negative margin: Acid2's `.empty` (margin 6.25em, one child with
+                // `margin-bottom: -6em`) spends 75px placing itself and collapses to 3px, so
+                // the `.smile` after it belongs 72px higher — high enough for its `clear: both`
+                // to take effect, without which the face was cut in half by a 15px gap.
+                value = collapsed - prevBox.CollapsedMarginTop;
 
-                value = collapsed - alreadySpent;
+                // The guard the old clamp was really after: a collapse may not pull a box above
+                // its parent's content edge unless the run itself collapsed to a negative
+                // margin. Margin already spent placing the empty box can come from the *parent*
+                // rather than from this sibling run — www.mediawiki.org's empty #centralNotice
+                // sits under its container's 24px margin — and cancelling that would draw the
+                // next box 18px above the box that owns it. Flooring the resulting position
+                // keeps that honest while leaving genuine negative margins free to lift the box.
+                if (_parentBox != null)
+                {
+                    double floorTop = _parentBox.ClientTop + Math.Min(collapsed, 0);
+                    if (prevBox.ActualBottom + value < floorTop)
+                        value = floorTop - prevBox.ActualBottom;
+                }
 
                 // What stands above this box's top edge is the whole set — the part this
                 // collapse adds and the part that was already there. A first in-flow child of
@@ -370,6 +381,10 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         bool collapseThrough = lastInFlowChild != null
             && ActualPaddingBottom < 0.1 && ActualBorderBottomWidth < 0.1
             && autoHeight
+            // CSS2.1 §8.3.1: margins of the root element's box do not collapse, so the
+            // body's bottom margin stays inside the root's height instead of propagating
+            // out of it (where nothing would ever contain it, shortening the canvas).
+            && !CssBoxHelper.IsRootElement(this)
             && lastInFlowChild.Float == CssConstants.None
             && lastInFlowChild.Display != CssConstants.Inline
             && lastInFlowChild.Display != CssConstants.InlineBlock;

@@ -550,6 +550,21 @@ internal static class CssBoxHelper
     }
 
     /// <summary>
+    /// Whether <paramref name="box"/> is the document's root element box — the
+    /// <c>&lt;html&gt;</c> box the anonymous document box wraps.
+    /// </summary>
+    /// <remarks>
+    /// CSS2.1 §8.3.1 exempts the root element from margin collapsing, which is what keeps
+    /// the body's bottom margin inside the document's height: the canvas is the root's
+    /// margin box (§11.1.1), so a collapsed-through body margin shortens the whole page.
+    /// Acid1's <c>--full-page</c> capture came out 405px tall instead of 420 for exactly
+    /// that reason — the black body border ended up flush with the bottom edge of the image
+    /// with none of the blue canvas below it.
+    /// </remarks>
+    internal static bool IsRootElement(CssBox box) =>
+        box.HtmlTag is { } tag && tag.Name.Equals("html", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Returns the effective bottom margin for a box, accounting for
     /// parent-child bottom-margin collapse (CSS 2.1 §8.3.1).
     /// When a box has no bottom border, no bottom padding, and auto height,
@@ -561,6 +576,12 @@ internal static class CssBoxHelper
         double mb = box.ActualMarginBottom;
 
         if (box.ActualBorderBottomWidth > 0.1 || box.ActualPaddingBottom > 0.1)
+            return mb;
+
+        // CSS2.1 §8.3.1: "Margins of the root element's box do not collapse." The root
+        // keeps its own margin and its last child's margin stays inside its height, so
+        // nothing propagates out. See IsRootElement.
+        if (IsRootElement(box))
             return mb;
 
         if (box.Height != CssConstants.Auto && !string.IsNullOrEmpty(box.Height))
