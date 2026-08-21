@@ -67,7 +67,7 @@ diagnosis does not rest on the pages' own reporting. Issue #1755 indexes them.
 | 13 | Window/screen geometry and `BarProp` | #1749 |
 | 3 | `measureText` font-insensitive; no `crypto.subtle`, no `OffscreenCanvas` | #1750 |
 | 6 | HTTP sub-resource, iframe and navigation attempts | #1753 |
-| 21 | Single-API absences on the fingerprinting page | #1755 |
+| 21 | Single-API absences on the fingerprinting page (15 since resolved) | #1755 |
 | — | Storage: IndexedDB, Cache API, service workers, CookieStore | #1751 |
 | — | Request paths: WebSocket, EventSource, SharedWorker | #1752 |
 | — | Corpus: four pages measure nothing in either engine | #1754 |
@@ -133,6 +133,37 @@ Single-API absences, each throwing where Chromium answers: `Notification`,
 `navigator.javaEnabled()`, `navigator.requestMediaKeySystemAccess`,
 `HTMLVideoElement.canPlayType()`,
 `PerformanceNavigationTiming.nextHopProtocol`, and the storage-quota shims.
+
+**What was implemented.** Fifteen of them now resolve. Eleven answer:
+`Notification.permission` (`denied` — the terminal state, since there is no
+surface to show one on), `MediaSource.isTypeSupported()` and
+`HTMLVideoElement.canPlayType()` (`false` and `""` — the vocabularies' own
+"cannot be rendered", which is what an engine with no playback pipeline wired to
+its HTML layer can honestly say), `performance.memory` and `console.memory` (one
+object, read from the GC that is actually running the page's script, rounded to
+100 KiB so the low bits carry no entropy),
+`PerformanceNavigationTiming.nextHopProtocol` via a real
+`performance.getEntries()`, `screen.orientation`, `navigator.javaEnabled()`,
+`navigator.getBattery()`, and both storage-quota shims. Four more stop throwing
+without moving the probe: `navigator.plugins`, `navigator.mimeTypes`,
+`navigator.getGamepads()` and `navigator.requestMediaKeySystemAccess` answer with
+an empty collection, which is the specified answer and which the suite classifies
+as `empty` — the measurement cannot tell an empty answer from no answer, so their
+baseline entries moved from `value` (they had been *throwing*, and a caught error
+is stored where a value belongs) to `empty`. That reclassification is also why the
+page's "tests carried out" count falls from 97 to 93 while eleven more probes
+gained real answers.
+
+**What was deliberately left.** Six are not shims to write:
+
+| Absent | Why it is not stubbed |
+| --- | --- |
+| `RTCPeerConnection` | Needs an ICE/DTLS/SRTP stack, not an interface object. It sits with the other request paths in #1752, and the probe waits on a real ICE candidate that no stub can produce. |
+| `AmbientLightSensor`, `Gyroscope`, `Magnetometer` | No sensor hardware path. Chromium's own answer here is an error object, so these are not gaps against the reference either. |
+| `speechSynthesis` | No speech engine; `getVoices()` would return an empty list, and the interface's own detection is `'speechSynthesis' in window`, which a present-but-mute object answers wrongly. |
+| `navigator.bluetooth` | Same: a `getAvailability()` that resolves `false` makes `'bluetooth' in navigator` true, which is the more misleading of the two answers. |
+| `chrome.loadTimes()` | Chrome-proprietary. Defining a `chrome` global is an identity claim, not a capability. |
+| `window.openDatabase` | WebSQL, removed from the web platform; Chromium no longer answers this probe either. |
 
 ### HTTP sub-resources, iframes and navigations never report back — 6 probes (#1753)
 

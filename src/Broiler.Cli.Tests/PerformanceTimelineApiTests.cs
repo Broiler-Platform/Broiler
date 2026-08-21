@@ -5,9 +5,12 @@ namespace Broiler.Cli.Tests;
 /// (see <c>DomBridge.RegisterPerformanceObject</c>).
 /// </summary>
 /// <remarks>
-/// A capture records no performance entries, so the getters answer with an empty list — the answer
-/// a browser gives before anything has been recorded, and not the same thing as the method being
-/// absent. <c>getEntriesByName</c> was missing, and a page does not reach it behind a feature test:
+/// A capture records one performance entry — the document's own
+/// <c>PerformanceNavigationTiming</c> — and none of the others a browser would have: no paint
+/// timings, no resource entries, no marks. So a search for any of those answers with an empty
+/// list, which is the answer a browser gives before anything has been recorded and not the same
+/// thing as the method being absent. <c>getEntriesByName</c> was missing, and a page does not
+/// reach it behind a feature test:
 /// <c>performance</c> and <c>PerformanceObserver</c> both existing is the guard it writes, and the
 /// call comes after it. <c>duckduckgo.com</c>'s first-contentful-paint pixel opens with
 /// <c>performance.getEntriesByName('first-contentful-paint')</c> on exactly that guard, and threw
@@ -61,22 +64,28 @@ r.push(typeof performance.timeOrigin === 'number');
     }
 
     /// <summary>
-    /// The three getters return a real (empty) entry list, so the indexing and length reads a
-    /// caller does next work rather than throwing on <c>undefined</c>.
+    /// The three getters return a real entry list, so the indexing and length reads a caller does
+    /// next work rather than throwing on <c>undefined</c> — empty for the entry types a capture
+    /// records none of, and holding the navigation entry for the one it does.
     /// </summary>
     [Fact(Timeout = 600000)]
-    public void Entry_Getters_Return_An_Empty_List()
+    public void Entry_Getters_Return_A_Real_List()
     {
         var result = Run(@"
 var byName = performance.getEntriesByName('first-contentful-paint');
-var byType = performance.getEntriesByType('navigation');
+var byPaintType = performance.getEntriesByType('paint');
+var byNavType = performance.getEntriesByType('navigation');
 var all = performance.getEntries();
 r.push(Array.isArray(byName) && byName.length === 0);
-r.push(Array.isArray(byType) && byType.length === 0);
-r.push(Array.isArray(all) && all.length === 0);
+r.push(Array.isArray(byPaintType) && byPaintType.length === 0);
 r.push(byName[0] === undefined);
+// The navigation entry is the one thing on this timeline, so it is what both the type search and
+// the unfiltered read find.
+r.push(Array.isArray(byNavType) && byNavType.length === 1);
+r.push(Array.isArray(all) && all.length === 1 && all[0] === byNavType[0]);
+r.push(byNavType[0].entryType === 'navigation');
 ");
-        Assert.Contains("true,true,true,true", result);
+        Assert.Contains("true,true,true,true,true,true", result);
     }
 
     /// <summary>

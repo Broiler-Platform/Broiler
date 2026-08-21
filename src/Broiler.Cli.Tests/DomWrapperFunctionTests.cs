@@ -102,12 +102,14 @@ public class DomWrapperFunctionTests
     public void Bridge_Mints_Wrapper_Members_Through_DomFunction()
     {
         // These register interface objects — URL, Response, Request, Headers, FormData,
-        // MessageChannel, CSSStyleSheet — which must stay constructable.
+        // MessageChannel, CSSStyleSheet, Notification, MediaSource — which must stay constructable.
         var interfaceObjectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "Document.cs",
             "Registration.cs",
             "FetchBinding.cs",
+            "NotificationBinding.cs",
+            "MediaCapabilityBinding.cs",
         };
 
         var bridgeRoot = Path.Combine(FindRepositoryRoot(), "src", "Broiler.HtmlBridge.Dom");

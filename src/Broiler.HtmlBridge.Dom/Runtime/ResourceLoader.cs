@@ -29,8 +29,8 @@ internal sealed class ResourceLoader
     // serve differently: Wikimedia answers a request with no User-Agent 403 Forbidden, so every
     // stylesheet, script, fetch() and XHR a mediawiki.org page asked for here failed even once the
     // document itself had loaded. See Broiler.Layout.Net.BroilerUserAgent.
-    private static readonly HttpClient SharedClient =
-        BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) });
+    private static readonly HttpClient SharedClient = BroilerHttpProtocol.Apply(
+        BroilerUserAgent.Apply(new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) }));
 
     /// <summary>
     /// Host policy on which absolute URLs may be fetched over the network at all, or

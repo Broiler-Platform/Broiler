@@ -12,6 +12,11 @@ namespace Broiler.HtmlBridge;
 
 public sealed partial class DomBridge
 {
+    // The one MemoryInfo behind both console.memory and performance.memory. It is built with the
+    // console in RegisterWindowBasics and read by RegisterPerformanceObject, which runs after it —
+    // the two names report one object, as they do in Chrome. See PerformanceMemoryBinding.
+    private JSObject? _memoryInfo;
+
     private JSObject RegisterWindowBasics(JSObject document, JSObject window)
     {
         window.FastAddValue((KeyString)"document", document, JSPropertyAttributes.EnumerableConfigurableValue);
@@ -75,6 +80,13 @@ public sealed partial class DomBridge
 
         // console object (shared between window.console and global console)
         var console = Dom.Features.ConsoleBinding.Build();
+
+        // console.memory — the same MemoryInfo shape performance.memory reports, and in Chrome the
+        // same object. Kept as one object here too, so a page that samples both does not have to
+        // reconcile two answers taken a moment apart. See PerformanceMemoryBinding.
+        _memoryInfo = Dom.Features.PerformanceMemoryBinding.Build();
+        console.FastAddValue((KeyString)"memory", _memoryInfo, JSPropertyAttributes.EnumerableConfigurableValue);
+
         window.FastAddValue((KeyString)"console", console, JSPropertyAttributes.EnumerableConfigurableValue);
 
         return console;
@@ -139,20 +151,26 @@ public sealed partial class DomBridge
         performanceObj.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
         performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceTimeOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // The Performance Timeline getters (Performance Timeline §3). A capture records no
-        // performance entries, so all three answer with an empty list — which is a buffer that holds
-        // nothing, the same answer a browser gives before anything has been recorded, and not the
-        // same thing as the method being absent.
+        // The Performance Timeline getters (Performance Timeline §3), all three of which answer from
+        // the one entry a document that has navigated once and loaded no instrumented resources has:
+        // its own PerformanceNavigationTiming. Everything else a browser would have recorded — paint
+        // timings, resource entries, marks — a capture does not, so those searches still come back
+        // with an empty list, which is a buffer holding nothing rather than a missing method. See
+        // NavigationTimingBinding for what the navigation entry does and does not carry.
         //
         // getEntriesByName was the one of the three missing, and a page does not reach it behind a
         // feature test: performance and PerformanceObserver both existing is the guard it writes, and
         // this call comes after it. duckduckgo.com's first-contentful-paint pixel opens with
         // `performance.getEntriesByName('first-contentful-paint')` on exactly that guard, which threw
         // "undefined is not a function" — taking the PerformanceObserver fallback in the same try
-        // block with it, so the page never observed the paint it was asking about either.
-        performanceObj.FastAddValue((KeyString)"getEntries", new DomFunction((in _) => new JSArray(), "getEntries", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-        performanceObj.FastAddValue((KeyString)"getEntriesByType", new DomFunction((in _) => new JSArray(), "getEntriesByType", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        performanceObj.FastAddValue((KeyString)"getEntriesByName", new DomFunction((in _) => new JSArray(), "getEntriesByName", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        // block with it, so the page never observed the paint it was asking about either. That name
+        // is not the document's, so the pixel still finds nothing and still installs its observer.
+        Dom.Features.NavigationTimingBinding.Install(performanceObj, _pageUrl, _pageProtocol);
+
+        // performance.memory — the same MemoryInfo console.memory reports (built with the console in
+        // RegisterWindowBasics, which runs first).
+        if (_memoryInfo is { } memory)
+            performanceObj.FastAddValue((KeyString)"memory", memory, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // performance.mark() / performance.measure() — no-op stubs
         performanceObj.FastAddValue((KeyString)"mark", UndefinedFunction("mark", 1), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -303,6 +321,14 @@ public sealed partial class DomBridge
 
         // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
         navigatorObj.FastAddValue((KeyString)"sendBeacon", new DomFunction((in a) => Dom.Features.BeaconBinding.Send(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // What the host machine can do — javaEnabled, plugins/mimeTypes, getGamepads, getBattery,
+        // requestMediaKeySystemAccess — and the legacy storage-quota pair, each answering "no" in
+        // its interface's own vocabulary rather than throwing. See NavigatorCapabilityBinding and
+        // StorageQuotaBinding.
+        Dom.Features.NavigatorCapabilityBinding.Install(navigatorObj, context);
+        Dom.Features.StorageQuotaBinding.Install(navigatorObj);
+
         window.FastAddValue((KeyString)"navigator", navigatorObj, JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["navigator"] = navigatorObj;
@@ -354,6 +380,11 @@ public sealed partial class DomBridge
         screenObj.FastAddValue((KeyString)"availHeight", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"colorDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"pixelDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // screen.orientation — derived from the screen's own shape, so it stays consistent with the
+        // width/height above rather than being a second, independent claim. See
+        // ScreenOrientationBinding.
+        screenObj.FastAddValue((KeyString)"orientation", Dom.Features.ScreenOrientationBinding.Build(vpWidth, vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
 
         window.FastAddValue((KeyString)"screen", screenObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["screen"] = screenObj;

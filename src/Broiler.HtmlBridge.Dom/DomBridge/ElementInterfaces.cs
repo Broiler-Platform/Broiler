@@ -101,6 +101,11 @@ public sealed partial class DomBridge
         // SelectBinding feature module).
         _select.Install(obj, element, tag);
 
+        // HTMLMediaElement.canPlayType() on <video>/<audio> — the capability question a media player
+        // asks before it commits to a source (Phase 3 co-located MediaCapabilityBinding module,
+        // shared with the MediaSource.isTypeSupported that answers it statically).
+        Dom.Features.MediaCapabilityBinding.Install(obj, tag);
+
         // HTMLLabelElement — htmlFor property (maps to 'for' content attribute)
         if (tag == "label")
         {

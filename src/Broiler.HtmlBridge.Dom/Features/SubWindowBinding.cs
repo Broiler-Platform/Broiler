@@ -117,6 +117,12 @@ internal sealed class SubWindowBinding(
         "requestIdleCallback", "cancelIdleCallback",
         "atob", "btoa", "structuredClone", "performance", "crypto",
 
+        // Interface objects a framed page feature-tests before it uses the capability behind them.
+        // Both answer "not available here" rather than throwing (NotificationBinding,
+        // MediaCapabilityBinding), and that answer is worth as much inside a frame as outside one —
+        // an embedded player is exactly the kind of document that probes MediaSource first.
+        "Notification", "MediaSource",
+
         // The two storage areas. A frame gets the parent's objects rather than fresh ones, which
         // is what a same-origin frame sees in a browser: the Storage object differs there, the
         // *area* behind it does not, and a frame that cannot read what its opener wrote is the
