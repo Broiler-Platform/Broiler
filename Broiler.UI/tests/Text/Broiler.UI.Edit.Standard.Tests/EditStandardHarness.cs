@@ -83,6 +83,14 @@ internal sealed class ClipboardTestHost : IUiHost, IUiClipboardHost
     }
 }
 
+/// <summary>A clock the test drives, so the double-click window is deterministic.</summary>
+internal sealed class ManualClock : IUiClock
+{
+    public UiTimestamp Now { get; set; }
+
+    public void Advance(TimeSpan delta) => Now = new UiTimestamp(Now.Elapsed + delta);
+}
+
 internal sealed class EditScene
 {
     public required UiSession Session { get; init; }
@@ -90,6 +98,8 @@ internal sealed class EditScene
     public required StandardEdit Edit { get; init; }
 
     public required ClipboardTestHost Host { get; init; }
+
+    public required ManualClock Clock { get; init; }
 
     public required StandardInputRoute Route { get; init; }
 
@@ -108,8 +118,10 @@ internal static class EditStandardHarness
     {
         BSize size = viewportSize ?? new BSize(400, 300);
         var host = new ClipboardTestHost(size) { ClipboardText = clipboardText };
+        var clock = new ManualClock();
         UiSession session = new StandardUiSessionBuilder()
             .WithDispatcher(new ImmediateUiDispatcher())
+            .WithClock(clock)
             .Build(host);
         var edit = new StandardEdit { Text = text, PreferredSize = new BSize(240, 32) };
         var root = new EditRoot(edit);
@@ -120,6 +132,7 @@ internal static class EditStandardHarness
             Session = session,
             Edit = edit,
             Host = host,
+            Clock = clock,
             Route = new StandardInputRoute(session),
         };
 
@@ -141,14 +154,19 @@ internal static class EditStandardHarness
 
     public static TextInputEvent Text(string text) => new(Header("text"), text, InputEventSource.Synthetic);
 
-    public static MouseButtonEvent MouseDown(double x, double y, MouseButton button = MouseButton.Left) =>
+    public static MouseButtonEvent MouseDown(
+        double x,
+        double y,
+        MouseButton button = MouseButton.Left,
+        InputModifiers modifiers = InputModifiers.None) =>
         new(
             Header("mouse"),
             InputPoint.ClientDeviceIndependentPixels(x, y),
             button == MouseButton.Right ? MouseButtons.Right : MouseButtons.Left,
             button,
             MouseButtonTransition.Down,
-            InputEventSource.Synthetic);
+            InputEventSource.Synthetic,
+            modifiers);
 
     public static MouseButtonEvent MouseUp(double x, double y, MouseButton button = MouseButton.Left) =>
         new(
@@ -159,8 +177,11 @@ internal static class EditStandardHarness
             MouseButtonTransition.Up,
             InputEventSource.Synthetic);
 
-    public static MouseMoveEvent MouseMove(double x, double y) =>
-        new(Header("mouse"), InputPoint.ClientDeviceIndependentPixels(x, y), MouseButtons.None, InputEventSource.Synthetic);
+    public static MouseMoveEvent MouseMove(double x, double y, MouseButtons buttons = MouseButtons.None) =>
+        new(Header("mouse"), InputPoint.ClientDeviceIndependentPixels(x, y), buttons, InputEventSource.Synthetic);
+
+    /// <summary>A move with the left button held, as a drag delivers it.</summary>
+    public static MouseMoveEvent MouseDrag(double x, double y) => MouseMove(x, y, MouseButtons.Left);
 
     /// <summary>Places the edit at a fixed offset so pointer coordinates are unambiguous.</summary>
     private sealed class EditRoot : UiElement

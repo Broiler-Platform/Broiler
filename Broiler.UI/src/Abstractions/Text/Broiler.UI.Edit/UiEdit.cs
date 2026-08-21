@@ -13,6 +13,7 @@ public abstract class UiEdit : UiElement
     private int _caretIndex;
     private int _selectionStart;
     private int _selectionLength;
+    private int _selectionAnchor;
     private int _maxLength = int.MaxValue;
     private BSize _preferredSize = new(240, 32);
     private UiEditTextDirection _direction;
@@ -96,6 +97,14 @@ public abstract class UiEdit : UiElement
 
     public int SelectionEnd => SelectionStart + SelectionLength;
 
+    /// <summary>
+    /// The fixed end of the selection — where marking began. Extending the
+    /// selection moves the caret and leaves this in place, so a selection made
+    /// backwards (a drag or Shift+Left that runs right to left) keeps its caret
+    /// at <see cref="SelectionStart"/> rather than flipping to the other end.
+    /// </summary>
+    public int SelectionAnchor => _selectionAnchor;
+
     public bool HasSelection => SelectionLength > 0;
 
     public int MaxLength
@@ -150,16 +159,24 @@ public abstract class UiEdit : UiElement
         ThrowIfDisposed();
         start = Math.Clamp(start, 0, Text.Length);
         length = Math.Clamp(length, 0, Text.Length - start);
-        if (_selectionStart == start && _selectionLength == length && CaretIndex == start + length)
-            return;
-
-        _selectionStart = start;
-        _selectionLength = length;
-        CaretIndex = start + length;
-        Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+        SetSelectionCore(start, length, start + length, start);
     }
 
     public void SelectAll() => SetSelection(0, Text.Length);
+
+    /// <summary>
+    /// Marks the text between a fixed <paramref name="anchor"/> and a moving
+    /// <paramref name="caret"/>, which is what a mouse drag and a Shift-extended
+    /// key both do. The caret ends up at <paramref name="caret"/> whichever side
+    /// of the anchor that is.
+    /// </summary>
+    protected void SetSelectionFromAnchor(int anchor, int caret)
+    {
+        ThrowIfDisposed();
+        anchor = Math.Clamp(anchor, 0, Text.Length);
+        caret = Math.Clamp(caret, 0, Text.Length);
+        SetSelectionCore(Math.Min(anchor, caret), Math.Abs(caret - anchor), caret, anchor);
+    }
 
     public void Submit()
     {
@@ -208,14 +225,9 @@ public abstract class UiEdit : UiElement
         ThrowIfDisposed();
         index = Math.Clamp(index, 0, Text.Length);
         if (extendSelection)
-        {
-            int anchor = HasSelection ? SelectionStart : CaretIndex;
-            SetSelection(Math.Min(anchor, index), Math.Abs(index - anchor));
-        }
+            SetSelectionFromAnchor(HasSelection ? SelectionAnchor : CaretIndex, index);
         else
-        {
             SetSelection(index, 0);
-        }
     }
 
     protected void SetCaretIndex(int index) => SetSelection(Math.Clamp(index, 0, Text.Length), 0);
@@ -243,6 +255,20 @@ public abstract class UiEdit : UiElement
         return state;
     }
 
+    private void SetSelectionCore(int start, int length, int caret, int anchor)
+    {
+        // The anchor is not drawn, so it is recorded even when nothing else
+        // moved: a click that lands on the caret still restarts marking there.
+        _selectionAnchor = anchor;
+        if (_selectionStart == start && _selectionLength == length && _caretIndex == caret)
+            return;
+
+        _selectionStart = start;
+        _selectionLength = length;
+        CaretIndex = caret;
+        Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+    }
+
     private void SetText(string text)
     {
         ThrowIfDisposed();
@@ -265,6 +291,7 @@ public abstract class UiEdit : UiElement
         _selectionStart = 0;
         _selectionLength = 0;
         CaretIndex = caretIndex;
+        _selectionAnchor = _caretIndex;
         TextChanged?.Invoke(this, new UiEditTextChangedEventArgs(oldText, text));
         Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render | UiInvalidationKind.Semantic);
     }

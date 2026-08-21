@@ -26,9 +26,23 @@ public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTe
         ContextMenuBorderColor = theme.Border;
     }
 
+    /// <summary>
+    /// How long after a press a second press still counts as a double click. It
+    /// matches the window <c>StandardRichEdit</c> uses, so the two editors feel
+    /// the same.
+    /// </summary>
+    private static readonly TimeSpan DoubleClickWindow = TimeSpan.FromMilliseconds(400);
+
+    /// <summary>How far the second press of a double click may stray from the first.</summary>
+    private const double DoubleClickSlop = 4;
+
     private readonly List<string> _undoStack = [];
     private double _horizontalScrollOffset;
     private string _compositionText = string.Empty;
+    private UiTimestamp _lastClickTime;
+    private BPoint _lastClickPosition;
+    private bool _hasClicked;
+    private bool _isMarkingWithMouse;
 
     public BColor Background { get; set; } = StandardControlPaint.Surface;
 
@@ -197,6 +211,7 @@ public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTe
     {
         if (!IsEnabled)
         {
+            _isMarkingWithMouse = false;
             CloseContextMenu();
             return false;
         }
@@ -207,6 +222,7 @@ public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTe
         return input.Kind switch
         {
             UiInputEventKind.PointerButton => HandlePointerButton(input),
+            UiInputEventKind.PointerMove => HandlePointerMove(input),
             UiInputEventKind.TextInput => HandleTextInput(input),
             UiInputEventKind.TextComposition => HandleTextComposition(input),
             UiInputEventKind.KeyboardKey => HandleKeyboard(input),
@@ -226,17 +242,71 @@ public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTe
         {
             Session?.SetFocus(this);
             Session?.CaptureInput(this);
-            SetCaretFromPoint(input.Position);
+
+            // A double click marks the whole field. A single-line edit has no
+            // word-then-line escalation to offer — there is one line, and it is
+            // what the user is reaching for.
+            if (IsDoubleClick(input.Position))
+            {
+                SelectAll();
+                EnsureCaretVisible();
+                _isMarkingWithMouse = false;
+            }
+            else
+            {
+                // Shift keeps the existing anchor and drags the caret to the
+                // click; a plain press drops a fresh anchor there.
+                MoveCaret(IndexFromPoint(input.Position), input.KeyModifiers.HasFlag(KeyboardModifierState.Shift));
+                EnsureCaretVisible();
+                _isMarkingWithMouse = true;
+            }
+
+            UpdateClickState(input.Position);
             return true;
         }
 
         if (input.MouseButtonTransition == MouseButtonTransition.Up)
         {
+            _isMarkingWithMouse = false;
             Session?.ReleaseInputCapture(this);
             return true;
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Extends the mark while the button is held. Only the capturing edit reacts,
+    /// so a drag that leaves the control keeps marking this field rather than
+    /// handing the gesture to whatever is under the pointer.
+    /// </summary>
+    private bool HandlePointerMove(UiInputEvent input)
+    {
+        if (!_isMarkingWithMouse || Session?.CapturedElement != this)
+            return false;
+
+        MoveCaret(IndexFromPoint(input.Position), extendSelection: true);
+        EnsureCaretVisible();
+        return true;
+    }
+
+    private bool IsDoubleClick(BPoint point)
+    {
+        if (!_hasClicked || Session is null)
+            return false;
+
+        TimeSpan delta = Session.Clock.Now.Elapsed - _lastClickTime.Elapsed;
+        bool quick = delta >= TimeSpan.Zero && delta <= DoubleClickWindow;
+        bool near = Math.Abs(point.X - _lastClickPosition.X) <= DoubleClickSlop &&
+            Math.Abs(point.Y - _lastClickPosition.Y) <= DoubleClickSlop;
+        return quick && near;
+    }
+
+    private void UpdateClickState(BPoint point)
+    {
+        _lastClickTime = Session?.Clock.Now ?? default;
+        _lastClickPosition = point;
+        _hasClicked = true;
     }
 
     private bool HandleTextInput(UiInputEvent input) =>
@@ -267,6 +337,8 @@ public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTe
 
     protected override void OnDetached()
     {
+        _isMarkingWithMouse = false;
+        _hasClicked = false;
         CloseContextMenu();
         if (Session?.Host is IUiTextInputHost textInput)
             textInput.ClearCaret(this);
@@ -432,27 +504,34 @@ public sealed partial class StandardEdit : UiEdit, IStandardThemedControl, IUiTe
 
     private void SetCaretFromPoint(BPoint point)
     {
-        BRect inner = GetInnerBounds();
+        SetCaretIndex(IndexFromPoint(point));
+        EnsureCaretVisible();
+    }
+
+    /// <summary>
+    /// The insertion index nearest <paramref name="point"/>. The point is
+    /// measured against the same text origin the glyphs are drawn from, so the
+    /// horizontal scroll offset and the right-to-left origin are already in it,
+    /// and a point beyond either edge clamps to that end of the text.
+    /// </summary>
+    private int IndexFromPoint(BPoint point)
+    {
         string display = GetDisplayText();
-        double relative = Direction == UiEditTextDirection.RightToLeft
-            ? inner.Right - point.X - _horizontalScrollOffset
-            : point.X - inner.Left + _horizontalScrollOffset;
+        double relative = point.X - GetTextOriginX(GetInnerBounds(), display);
+        if (relative <= 0)
+            return 0;
+
         double advance = 0;
         for (int index = 0; index < display.Length; index++)
         {
             double next = advance + BTextMeasurer.MeasureAdvance(display[index].ToString(), Font);
             if (relative < (advance + next) / 2)
-            {
-                SetCaretIndex(index);
-                EnsureCaretVisible();
-                return;
-            }
+                return index;
 
             advance = next;
         }
 
-        SetCaretIndex(display.Length);
-        EnsureCaretVisible();
+        return display.Length;
     }
 
     private void EnsureCaretVisible()
