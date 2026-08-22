@@ -325,9 +325,19 @@ set -euo pipefail
 # NOTE: the WPT workflows do not run this script — only privacy-test-pages.yml and
 # real-world-render-tests.yml do — so the entries below serve those two. The WPT suite picks each
 # fix up when a maintainer lands it upstream and bumps the pointer.
+# 0003 (Broiler.CSS, "Match :link on an SVG <a> that links through xlink:href") IS listed: a
+# pseudo-class that does not match is a whole rule that does not apply, so `a:link rect { fill:
+# lime }` over an `<a xlink:href="…">` painted the red rectangle underneath instead of the lime
+# one — the absent-output failure mode again, and one only a pixel run can see. It pairs with the
+# main-repo fix that fires `load` at an outermost inline <svg>: WPT
+# svg/linking/reftests/href-a-element-attr-change removes `href` from its handler and asserts the
+# element keeps its link status, so before that handler ran the test passed without ever reaching
+# its own assertion. With the handler firing and this patch absent the test fails honestly; with
+# both it passes for the right reason.
 PENDING_PATCHES=(
   "Broiler.JS|patches/0001-js-private-name-key-classification.patch"
   "Broiler.HTML|patches/0002-html-outermost-svg-author-display.patch"
+  "Broiler.CSS|patches/0003-css-link-matches-xlink-href.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

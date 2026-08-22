@@ -59,6 +59,76 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Fires the <c>load</c> event on every outermost inline <c>&lt;svg&gt;</c> beneath
+    /// <paramref name="element"/> — the SVG counterpart of the stylesheet-link and
+    /// nested-browsing-context passes either side of it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// SVG 1.1 §16.2 puts a <c>load</c> event on the outermost <c>&lt;svg&gt;</c> once the element
+    /// and its children are parsed, and <c>onload</c> on that element is its handler. It is the
+    /// entry point the SVG test suites are written against: they define a function in a
+    /// <c>&lt;script&gt;</c> inside the fragment and call it from <c>&lt;svg onload="…"&gt;</c>.
+    /// Nothing fired it here, so the handler never ran — and because those suites are written to
+    /// paint a red "not supported" rectangle that the handler is supposed to clear, the page
+    /// rendered its own failure state. Every <c>conformance-checkers/html-svg</c> case built that
+    /// way was affected; <c>struct-dom-06-b-isvalid</c> is one, ranked at 16.5 % in the
+    /// 2026-08-21 run.
+    /// </para>
+    /// <para>
+    /// A <em>nested</em> <c>&lt;svg&gt;</c> is part of the fragment its outermost ancestor roots,
+    /// not a root of its own, so the walk stops at the first <c>&lt;svg&gt;</c> it meets rather
+    /// than dispatching again for every inner viewport.
+    /// </para>
+    /// </remarks>
+    private void FireInlineSvgRootLoads(DomElement element)
+    {
+        if (_jsContext == null)
+            return;
+
+        if (string.Equals(element.TagName, "svg", StringComparison.OrdinalIgnoreCase))
+        {
+            FireInlineSvgRootLoad(element);
+            return;
+        }
+
+        // Snapshot before iterating: a load handler can structurally mutate the tree mid-walk —
+        // the same hazard FireDescendantOnloads documents, and exactly what these tests do (the
+        // SVG DOM cases remove the element that carries the failure text).
+        foreach (var child in SnapshotChildren(element))
+        {
+            if (child is DomElement childElement)
+                FireInlineSvgRootLoads(childElement);
+        }
+    }
+
+    /// <summary>
+    /// Dispatches <c>load</c> at one outermost inline <c>&lt;svg&gt;</c>, once. Runs the
+    /// <c>onload</c> content attribute and any <c>addEventListener('load', …)</c> registered on
+    /// the element, and gives the handler the <c>evt.target</c> the SVG suites read their
+    /// <c>ownerDocument</c> from.
+    /// </summary>
+    private void FireInlineSvgRootLoad(DomElement element)
+    {
+        if (_browsingContexts.HasOnloadFired(element))
+            return;
+        _browsingContexts.MarkOnloadFired(element);
+
+        try
+        {
+            var evt = new JSObject();
+            evt.FastAddValue((KeyString)"type", new JSString("load"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            DispatchEventOnElement(element, evt);
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.FireInlineSvgRootLoad",
+                $"svg load handler error: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
     /// Fires the <c>load</c> event on the <c>&lt;body&gt;</c> element, which
     /// triggers the inline <c>onload</c> attribute handler as well as any
     /// <c>addEventListener('load', …)</c> listeners registered on the body.
@@ -94,6 +164,7 @@ public sealed partial class DomBridge
             // sheets, so by the time anything below runs their `load` events have already fired.
             FireDescendantStylesheetLinkLoads(htmlEl);
             FireDescendantOnloads(htmlEl);
+            FireInlineSvgRootLoads(htmlEl);
         }
 
         SetDocumentReadyState("complete");
