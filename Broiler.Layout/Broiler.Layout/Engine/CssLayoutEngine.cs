@@ -1364,7 +1364,13 @@ internal static class CssLayoutEngine
         b.ActualBottom = b.Location.Y;
 
         // --- Lay out children inside the inline-block ---
-        if (b.Display == "flex" && b.IsRowFlexContainer() && HasBlockLevelFlexItems(b))
+        // `inline-flex` is a flex container in every way that matters here — only its outer display
+        // differs, and this method is precisely the path an inline-level box arrives on. Testing
+        // for `flex` alone meant an inline-flex container never ran the flex algorithm at all: its
+        // items were flowed as ordinary inline-block content, so nothing sized them from the
+        // container's cross size and nothing distributed its free space. Every
+        // css-flexbox/aspect-ratio-intrinsic-size test builds its case on an `inline-flex` box.
+        if (b.Display is "flex" or "inline-flex" && b.IsRowFlexContainer() && HasBlockLevelFlexItems(b))
         {
             b.PerformFlexRowLayout(g);
         }

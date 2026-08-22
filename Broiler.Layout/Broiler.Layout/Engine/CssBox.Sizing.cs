@@ -368,8 +368,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         ResolveReplacedContentSize(natural, availableInlineSize, out double contentWidth, out double contentHeight);
 
-        width = ResolveSpecifiedWidthToBorderBox(contentWidth);
-        height = ResolveSpecifiedHeightToBorderBox(contentHeight);
+        // ResolveReplacedContentSize answers in *content* sizes — that is the frame the natural
+        // size and the ratio are stated in, and the one its min/max clamp works in. So the border
+        // box is the content box plus the edges, always. Converting with
+        // ResolveSpecifiedWidthToBorderBox instead treated the number as an author-specified
+        // length, which under `box-sizing: border-box` is already inclusive — so the padding and
+        // border were dropped: a 16x16 image with `padding: 1px 2px 3px 4px; box-sizing:
+        // border-box` reported a 16x16 border box where its content alone is 16x16 and the box is
+        // 22x20 (css-flexbox/image-as-flexitem-size-007), and one sized from the other axis
+        // through its ratio came out the content size in both.
+        width = Math.Max(0, contentWidth
+            + ActualBorderLeftWidth + ActualBorderRightWidth + ActualPaddingLeft + ActualPaddingRight);
+        height = Math.Max(0, contentHeight
+            + ActualBorderTopWidth + ActualBorderBottomWidth + ActualPaddingTop + ActualPaddingBottom);
         return true;
     }
 

@@ -342,6 +342,17 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             borderBoxWidth = child.ResolveSpecifiedWidthToBorderBox(
                 ParseFlexLengthOrZero(child, child.Width, containerContentWidth));
         }
+        // §9.2 step 3.B: an item with an intrinsic aspect ratio, a flex base size that would come
+        // from its content, and a *definite* cross size takes its flex base size from that cross
+        // size through the ratio — not from its natural main size. A 16x16 image stretched to a
+        // 40px-tall row is 40px wide, and one whose `max-height` caps the stretch at 10px is 10px
+        // wide; both are what css-flexbox/image-as-flexitem-size-003 measures, and Broiler left
+        // every such item at its bitmap's width.
+        else if (TryGetTransferredSizeSuggestion(
+            child, definiteCrossContentHeight, authorRatioCounts: true, out double fromRatio))
+        {
+            borderBoxWidth = fromRatio;
+        }
         else
         {
             child.GetMinMaxWidth(out _, out double preferred);
@@ -438,18 +449,28 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// It is what bounds the content size suggestion, so a replaced item stretched to a short flex
     /// line is allowed to shrink to the width that ratio asks for rather than to its bitmap's.
     /// </summary>
+    /// <param name="authorRatioCounts">
+    /// Whether an author <c>aspect-ratio</c> on a non-replaced box counts. It does for the flex base
+    /// size (§9.2 step 3.B reads "a preferred aspect ratio", which CSS Sizing 4 §4 gives any box),
+    /// and it does not for the automatic minimum: §4.5's transferred size suggestion is stated for
+    /// an item with an <em>intrinsic</em> ratio, and css-sizing/aspect-ratio/flex-aspect-ratio-002
+    /// says so in as many words — "no transferred size suggestion since the flex item is
+    /// non-replaced" — with its <c>aspect-ratio: 1/2</c> item taking the 100px its content asks for
+    /// rather than the 50px the ratio would transfer.
+    /// </param>
     private static bool TryGetTransferredSizeSuggestion(
-        CssBox child, double? definiteCrossContentHeight, out double borderBoxWidth)
+        CssBox child, double? definiteCrossContentHeight, bool authorRatioCounts, out double borderBoxWidth)
     {
         borderBoxWidth = 0;
 
         if (definiteCrossContentHeight is not { } crossContentHeight || crossContentHeight <= 0)
             return false;
 
-        if (!child.TryGetNaturalReplacedSize(out SizeF natural) || natural.Height <= 0)
+        bool hasNatural = child.TryGetNaturalReplacedSize(out SizeF natural) && natural.Height > 0;
+        if (!hasNatural && !authorRatioCounts)
             return false;
 
-        double ratio = natural.Width / natural.Height;
+        double ratio = hasNatural ? natural.Width / natural.Height : 0;
         if (TryParseAspectRatio(child.AspectRatio, out double preferred) && preferred > 0)
             ratio = preferred;
 
@@ -526,7 +547,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // of 50 × 300/150 = 100px, not the 300px its bitmap is wide — which is what
             // css-flexbox/flex-minimum-width-flex-items-013 measures, and what decides whether an
             // image in a fixed-height flex row shrinks to its line or overflows it.
-            if (TryGetTransferredSizeSuggestion(child, definiteCrossContentHeight, out double transferred)
+            if (TryGetTransferredSizeSuggestion(
+                    child, definiteCrossContentHeight, authorRatioCounts: false, out double transferred)
                 && transferred < contentSuggestion)
             {
                 contentSuggestion = transferred;
@@ -635,8 +657,22 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             if (growTotal > 0)
             {
+                // §9.7 step 4: every item's target main size is clamped by its used min and max
+                // main sizes, whether the distribution grew it or shrank it. Only the shrink
+                // branch below clamped, so `flex: 1` grew an item straight past its own
+                // `max-width` — a `max-width: 10px` item in a 40px row came out 40px wide
+                // (css-flexbox/image-as-flexitem-size-005).
                 foreach (var item in line.Items)
-                    item.TargetOuterWidth = item.BaseOuterWidth + freeSpace * (item.Grow / growTotal);
+                {
+                    double target = item.BaseOuterWidth + freeSpace * (item.Grow / growTotal);
+                    double marginWidth = item.Box.ActualMarginLeft + item.Box.ActualMarginRight;
+
+                    item.TargetOuterWidth = marginWidth + ClampFlexItemBorderBoxWidth(
+                        item.Box,
+                        Math.Max(0, target - marginWidth),
+                        contentWidth,
+                        item.DefiniteCrossContentHeight);
+                }
             }
         }
         else if (freeSpace < -0.5)
@@ -1737,6 +1773,16 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 continue;
 
             double target = line.CrossSize - child.ActualMarginTop - child.ActualMarginBottom;
+
+            // §9.4 step 11 stretches "subject to the item's min/max cross size". Without the clamp
+            // an item was stretched straight past its own `max-height`: every `max-height: 10px`
+            // image in css-flexbox/image-as-flexitem-size-003 came out 40px tall, the full line.
+            double blockEdges = child.ActualBorderTopWidth + child.ActualBorderBottomWidth
+                              + child.ActualPaddingTop + child.ActualPaddingBottom;
+            target = blockEdges + child
+                .ToContentBoxBounds(child.ResolveBlockSizeBounds(), blockEdges)
+                .Clamp(target - blockEdges);
+
             if (target <= 0 || target <= child.Size.Height + 0.5)
                 continue;
 

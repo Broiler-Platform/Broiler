@@ -194,6 +194,109 @@ public sealed class FlexReplacedItemSizingTests
         Assert.False(FlexGridItemBlockification.IsRowFlexItem(image));
     }
 
+    // ─────────────────── §9.2 step 3.B: the flex base size from the ratio ───────────────────
+
+    /// <summary>
+    /// §9.2 step 3.B: an item whose flex base size would come from its content, that has a ratio and
+    /// a definite cross size, takes its base size from that cross size through the ratio. A 300×150
+    /// image stretched to a 50px-tall row is 100px wide, not the 300px its bitmap is — and Broiler
+    /// left every such item at its bitmap's width (css-flexbox/image-as-flexitem-size-003).
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void A_Stretched_Image_Takes_Its_Flex_Base_Size_From_The_Ratio()
+    {
+        var (root, image) = FlexRowWithAnImage(
+            containerWidth: "400px", containerHeight: "50px", imageStyle: null);
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(100, image.Size.Width, 3);
+    }
+
+    /// <summary>The same, with the stretch capped: the cross size that transfers is the clamped
+    /// one, so a <c>max-height: 10px</c> image in a 50px row is 20px wide.</summary>
+    [Fact(Timeout = 600000)]
+    public void A_Max_Height_Caps_The_Cross_Size_The_Base_Size_Comes_From()
+    {
+        var (root, image) = FlexRowWithAnImage(
+            containerWidth: "400px",
+            containerHeight: "50px",
+            imageStyle: box => box.MaxHeight = "10px");
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(20, image.Size.Width, 3);
+    }
+
+    // ─────────────────────── §9.4 step 11 / §9.7 step 4: the clamps ───────────────────────
+
+    /// <summary>
+    /// §9.4 step 11 stretches an item "subject to its min/max cross size". Without the clamp the
+    /// item was stretched straight past its own <c>max-height</c> to the full line.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void The_Cross_Axis_Stretch_Is_Clamped_By_Max_Height()
+    {
+        var (root, image) = FlexRowWithAnImage(
+            containerWidth: "400px",
+            containerHeight: "50px",
+            imageStyle: box => box.MaxHeight = "10px");
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        Assert.Equal(10, image.Size.Height, 3);
+    }
+
+    /// <summary>
+    /// §9.7 step 4 clamps an item's target main size by its used min and max main sizes whichever
+    /// way the distribution moved it. Only the shrink branch clamped, so <c>flex-grow</c> pushed an
+    /// item straight past its own <c>max-width</c> (css-flexbox/image-as-flexitem-size-005).
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void A_Grown_Item_Is_Clamped_By_Its_Max_Width()
+    {
+        var environment = new StubLayoutEnvironment();
+        var (root, container) = FlexRow(environment, containerWidth: "400px", containerHeight: "50px");
+
+        var item = new CssBox(container, new HtmlTag("div", false, null), BaseUrl)
+        {
+            Display = CssConstants.Block,
+            FontSize = "16px",
+            FlexGrow = "1",
+            MaxWidth = "10px",
+        };
+
+        root.PerformLayout(environment);
+
+        Assert.Equal(10, item.Size.Width, 3);
+    }
+
+    // ───────────────────────── an inline-flex container is a flex container ─────────────────────
+
+    /// <summary>
+    /// An <c>inline-flex</c> box arrives on the inline-block path, and that path ran the flex
+    /// algorithm only for <c>display: flex</c> — so an inline-flex container never ran it at all
+    /// and its items were flowed as ordinary inline-block content. Nothing then sized them from the
+    /// container's cross size, which is what every css-flexbox/aspect-ratio-intrinsic-size test
+    /// builds its case on.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void An_Inline_Flex_Container_Runs_The_Flex_Algorithm()
+    {
+        var (root, image) = FlexRowWithAnImage(
+            containerWidth: "400px",
+            containerHeight: "50px",
+            imageStyle: null,
+            containerDisplay: "inline-flex");
+
+        root.PerformLayout(root.LayoutEnvironment);
+
+        // Sized from the 50px line through the 2:1 ratio, as in a `display: flex` container —
+        // untouched by the algorithm it would have stayed at the bitmap's 300×150.
+        Assert.Equal(100, image.Size.Width, 3);
+        Assert.Equal(50, image.Size.Height, 3);
+    }
+
     // ───────────────────────────────── the shapes ─────────────────────────────────
 
     private static (CssBox Root, CssBoxImage Image) FlexRowWithAnImage(
