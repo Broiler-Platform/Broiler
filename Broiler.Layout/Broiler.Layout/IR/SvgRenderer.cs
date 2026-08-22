@@ -123,6 +123,9 @@ internal static partial class SvgRenderer
         // rendered part: a <pattern> lives in <defs> precisely so it paints only through a reference.
         var patterns = CollectPatterns(svgXml);
 
+        // The gradient paint servers, collected the same way and for the same reason.
+        var gradients = CollectGradients(svgXml);
+
         // The <clipPath> rectangles a shape's own clip-path attribute may point at.
         var clipRects = CollectClipRects(svgXml);
 
@@ -176,7 +179,7 @@ internal static partial class SvgRenderer
                 GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
                 GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
             var rectFill = ResolveFill(
-                items, bounds, patterns, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
+                items, bounds, patterns, gradients, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
                 elementTransform);
             var rectStroke = GetPaint(attrs, "stroke", BColor.Empty);
 
