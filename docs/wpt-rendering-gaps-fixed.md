@@ -1211,6 +1211,29 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   on its own: `css/css-page`, `css/CSS2/margin-padding-clear`, `css/css-position` and
   `css/css-anchor-position` together go **968 → 972 passing, +4 / −0**.
 
+### `display: contents` on the root element took the canvas with it
+
+- **Test:** `css/css-display/display-contents-root-background` (reftest suite,
+  [#1788](https://github.com/Broiler-Platform/Broiler/issues/1788).6), 0.0% →
+  **100.0%, passing.** Owner: main repo, `Broiler.Layout/Engine/DisplayContentsBoxes.cs`.
+- **The rule was implemented; it was applied to the wrong box.** CSS Display 3 §2.3 blockifies
+  the root element, so `contents` on it is `block`, and `DisplayContentsBoxes.Generate` did
+  exactly that — to the box it was handed. The renderer hands it the anonymous *document* box
+  (`HtmlParser.ParseDocument` creates a block and appends `<html>` to it), so the real root
+  element was still a child like any other and was spliced out. What went with it was the
+  canvas: the canvas background is the root element's (CSS Backgrounds §2.11.2), so
+  `:root { display: contents; background-image: url(…) }` painted a white page where the test
+  asks for a green one.
+- **The blast radius is two files in the whole corpus**, which is why this sat unreported: a
+  scan of the checkout finds `display: contents` on `:root`/`html` in
+  `display-contents-root-background` and in `display-contents-computed-style`, and the second
+  is a testharness test with no reference. Nothing else in the reftest suite can move.
+- **Verified:** the reftest end to end, plus two unit tests over the box tree — the document-box
+  shape the renderer actually produces, and a sub-document's root element, which is entitled to
+  the same rule. Both fail on the parent commit. The pass's existing root test was passing
+  because it handed `Generate` the `<html>` box directly, which is the one shape the renderer
+  never produces.
+
 ### A grid with only out-of-flow children resolved no grid areas
 
 **[Issue #1667](https://github.com/Broiler-Platform/Broiler/issues/1667).12.**
