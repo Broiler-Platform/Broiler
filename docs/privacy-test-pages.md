@@ -244,6 +244,16 @@ the list into work: a probe that threw is reported once per probe, and
 normalizing the quoted values, URLs and numbers out of the message regroups every
 probe that a single missing API gates into one row.
 
+A thrown probe is stored as the error object itself, so it is signed by its
+`name` and `message` — the two fields that name the fault — and never by the
+stack or the serialized object around them. Signing the object cannot group
+anything: every field naming the fault is a quoted string, so the normalization
+above reduces the whole object to `{<value>: <value>, …}`, identical for every
+error, while the stack trailing it survives only as far as the excerpt limit and
+splits one missing API into a signature per truncation point. Each gap therefore
+records a `broilerSignature` taken from the error while it is still whole, beside
+the bounded `broilerValue` excerpt kept as evidence.
+
 `run-privacy-test-pages.py` decides all of this and writes the bodies —
 `--gap-issue-limit` and `--regression-issue-limit` bound them — so the rules live
 with the runner that measured them rather than in the workflow. `--github-output`
