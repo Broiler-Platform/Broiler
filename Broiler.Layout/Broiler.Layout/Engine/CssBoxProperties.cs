@@ -1428,6 +1428,17 @@ internal abstract partial class CssBoxProperties
     public string Transform { get; set; } = "none";
 
     /// <summary>
+    /// CSS Transforms 1 §8: <c>transform-origin</c> — the point <see cref="Transform"/> is applied
+    /// about, relative to the box's border box. The initial value is the box's centre.
+    /// </summary>
+    /// <remarks>
+    /// Kept as the declaration rather than a resolved point, because the point depends on the used
+    /// border box and that is not settled while the cascade is applying declarations.
+    /// <see cref="IR.CssTransformOrigin"/> resolves it once the box has one.
+    /// </remarks>
+    public string TransformOrigin { get; set; } = "50% 50%";
+
+    /// <summary>
     /// CSS Will Change Module Level 1: the <c>will-change</c> property. A
     /// comma-separated hint list (<c>auto</c> by default). Consumed only by the
     /// native anchor-placement containing-block resolution: <c>will-change: transform</c>

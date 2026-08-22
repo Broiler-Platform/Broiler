@@ -94,29 +94,27 @@ public sealed partial class DomBridge
         return (left + offsetX, top + offsetY);
     }
 
+    /// <summary>
+    /// CSS Transforms 1 §8: the transform origin, as an offset from the box's own top-left corner.
+    /// </summary>
+    /// <remarks>
+    /// Defers to <see cref="Layout.IR.CssTransformOrigin"/>, the grammar shared with the SVG
+    /// renderer and the paint walker. Reading it here on its own got three things wrong that only
+    /// the shared reading has ever handled: a lone <c>top</c> or <c>bottom</c> names the
+    /// <em>vertical</em> axis and centres the other, so taking the first component as x put it on
+    /// the wrong one; the keyword pair may be written <c>top left</c>, which has to be swapped back;
+    /// and an invalid declaration such as <c>top 100%</c> — a length-percentage may not follow a
+    /// vertical keyword — is dropped whole rather than half-read.
+    /// </remarks>
     private static (double X, double Y) ParseTransformOrigin(string? origin, double width, double height)
     {
-        // Default is the box centre.
-        if (string.IsNullOrWhiteSpace(origin))
-            return (width / 2, height / 2);
+        var point = Layout.IR.CssTransformOrigin.Resolve(
+            origin,
+            new System.Drawing.RectangleF(0, 0, (float)width, (float)height),
+            initialIsBoxCorner: false);
 
-        var parts = origin.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        var x = ResolveOriginComponent(parts.Length > 0 ? parts[0] : "50%", width, horizontal: true);
-        var y = ResolveOriginComponent(parts.Length > 1 ? parts[1] : "50%", height, horizontal: false);
-        return (x, y);
+        return (point.X, point.Y);
     }
-
-    private static double ResolveOriginComponent(string value, double extent, bool horizontal) =>
-        value.ToLowerInvariant() switch
-        {
-            "left" or "top" => 0,
-            "right" or "bottom" => extent,
-            "center" => extent / 2,
-            _ when value.EndsWith("%", StringComparison.Ordinal) &&
-                   double.TryParse(value[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out var pct)
-                => extent * pct / 100.0,
-            _ => ParsePixels(value) ?? extent / 2,
-        };
 
     /// <summary>Composes a CSS <c>transform</c> function list into a single affine matrix. Functions
     /// apply left-to-right as outermost-to-innermost (CSS Transforms §1), so the list is folded in

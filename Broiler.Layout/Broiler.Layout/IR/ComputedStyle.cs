@@ -181,6 +181,9 @@ public sealed class ComputedStyle
     public string ContentVisibility { get; init; } = "visible";
     public string Transform { get; init; } = "none";
 
+    /// <summary>CSS Transforms 1 §8: the point <see cref="Transform"/> is applied about.</summary>
+    public string TransformOrigin { get; init; } = "50% 50%";
+
     // --- Flex ---
 
     public string FlexDirection { get; init; } = "row";

@@ -938,6 +938,56 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### Every CSS transform was applied about the box centre, whatever `transform-origin` said
+
+- **Tests:** `css/filter-effects/filter-scaling-001` — entry 28 of
+  [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 at 50.1% —
+  rendered a blank page and now renders the half-viewport green band it describes.
+  **272 tests in the corpus declare `transform-origin`** and every one of them painted
+  about the wrong point.
+- **Owner:** `Broiler.Layout` for the grammar (`IR/CssTransformOrigin.cs`),
+  `Broiler.HTML` for the two lines in `PaintWalker` that call it — patch
+  *"paint: apply a CSS transform about its transform-origin"*.
+- **Root cause.** `PaintWalker` hardcoded the origin to `bounds.X + bounds.Width * 0.5f`
+  with the comment "(default: center center)", and never read the property. The centre
+  *is* the initial value, so this was right for every element that declares nothing and
+  wrong for every element that declares anything.
+- **Paint and script disagreed about the same element.** The bridge's transform chain
+  — what `getBoundingClientRect` reports — *did* read `transform-origin`, so
+  `transform-origin: 0 0; transform: scale(0.5)` on a 100×100 box reported a rect at
+  (0, 0) and painted it at (25, 25). Two answers, one element.
+- **Scaling up is not a displacement, it is a blank page.** About the centre, a
+  top-left child of a scaled box lands off the canvas entirely: `scale(2)` and above
+  painted *nothing at all*. `filter-scaling-001` is `transform-origin: 0 0;
+  transform: scale(5)` and rendered white where half the viewport should be green —
+  and its own `rel=match` reference is the same markup minus the filter, so both sides
+  rendered blank and the test **passed its own reference at 100%** while scoring 50.1%
+  against Chromium's.
+- **Which is why the reftest suite is nearly blind to this**, and the fix measures
+  +4/−3 there. Both sides of a reftest are rendered by Broiler and a reference normally
+  declares the same origin as its test, so the error cancels. The three that moved the
+  other way are `transform3d-scale-002`/`-005`/`-006`, where the *reference* became
+  correct (a plain `scaleX(2) scaleY(2)` from the corner) while the test still needs a
+  3D transform Broiler does not implement — its `rotateX(90deg) scale3d(2,1,2)
+  rotateX(-90deg)` should conjugate to a Y scale of 2 and stays at 1. One side is now
+  right; both used to be wrong together.
+- **One grammar, three callers.** The reading was duplicated and inconsistent: the SVG
+  renderer's was thorough, the bridge's split on whitespace and took the components in
+  order, and the paint walker had none. `CssTransformOrigin` is now shared, and it fixes
+  three things the bridge got wrong — a lone `top`/`bottom` names the *vertical* axis;
+  the keyword pair may be written `top left`; and `top 100%` is invalid (a
+  length-percentage may not follow a vertical keyword) and is dropped whole rather than
+  half-read. The one thing that legitimately differs by caller is the **initial** value,
+  which is now a parameter: `50% 50%` for a CSS box, `0 0` for an SVG element, which has
+  no CSS layout box.
+- **Checks:** `Broiler.Layout.Tests.CssTransformOriginTests` (30 cases over the grammar,
+  main-repo and unconditional) and `src/Broiler.Wpt.Tests/TransformOriginPaintTests.cs`
+  (8 painted cases, which probe the pinned pointer and self-skip until the patch lands).
+- **Reach on CI:** the main-repo half ships now and is a measured no-op on the reftest
+  suite. The paint half reaches the privacy-test-page and real-world-render workflows
+  through `apply-pending-wpt-patches.sh`, and the WPT suite only once a maintainer lands
+  it upstream and bumps the pointer.
+
 ### A broken image drew a 2px frame, and reported it as part of its box
 
 - **Tests:** `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003` —

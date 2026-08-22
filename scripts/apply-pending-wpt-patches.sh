@@ -334,10 +334,28 @@ set -euo pipefail
 # element keeps its link status, so before that handler ran the test passed without ever reaching
 # its own assertion. With the handler firing and this patch absent the test fails honestly; with
 # both it passes for the right reason.
+# 0004 (Broiler.HTML, "paint: apply a CSS transform about its transform-origin") IS listed, and it
+# decides *where on the canvas* a transformed element is drawn — which is as directly a pixel
+# question as anything here gets. The paint walker applied every CSS transform about the box centre
+# and never read the property, so a declared origin did nothing: `transform-origin: 0 0;
+# transform: scale(0.5)` on a 100x100 box painted at (25, 25) while the box's own script measured a
+# rect at (0, 0) — paint and the script bridge disagreeing about the same element. Scaling *up* is
+# worse than a displacement, because a centre origin throws a top-left child clean off the canvas:
+# css/filter-effects/filter-scaling-001 (#1774 entry 28, 50.1%) is `transform-origin: 0 0;
+# transform: scale(5)` and rendered a blank page where half the viewport should be green.
+#
+# The grammar it calls is main-repo (Broiler.Layout.IR.CssTransformOrigin, unit-tested in
+# CssTransformOriginTests and shared with the bridge's transform chain and the SVG renderer), so
+# this patch is the two lines that reach it. It is also the entry whose absence a pixel suite is
+# least able to show: both sides of a reftest are rendered by Broiler and a reference normally
+# declares the same origin as its test, so the error cancels there and only stops cancelling
+# against a reference browser's screenshot. 272 tests in the corpus declare `transform-origin`.
+
 PENDING_PATCHES=(
   "Broiler.JS|patches/0001-js-private-name-key-classification.patch"
   "Broiler.HTML|patches/0002-html-outermost-svg-author-display.patch"
   "Broiler.CSS|patches/0003-css-link-matches-xlink-href.patch"
+  "Broiler.HTML|patches/0004-html-paint-transform-origin.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
