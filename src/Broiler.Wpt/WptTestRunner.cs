@@ -3,6 +3,7 @@ using Broiler.HTML.Image;
 using Broiler.Media.Image;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Modules;
 using Broiler.JavaScript.Runtime;
 using Broiler.HTML.Core.Entities;
 using Broiler.HtmlBridge.Logging;
@@ -3221,6 +3222,44 @@ internal sealed partial class WptTestRunner
     [GeneratedRegex(@"(?://\s*)?\]\]>(?:\s*-->)?\s*\z")]
     private static partial Regex CdataClosePattern();
 
+    /// <summary>
+    /// The page's authorised ES-module roots, or an empty list when it has none or the engine cannot
+    /// bind static imports.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The runner scans a document's scripts itself — it has its own stub injection, its own
+    /// testharness handling and its own ordering — and that scan knows only how to hand a string to
+    /// <c>Eval</c>. A module cannot be run that way: its <c>import</c> is a syntax error to a classic
+    /// evaluation, so every <c>&lt;script type="module"&gt;</c> in the corpus threw on its first line
+    /// and the document it was there to build was never built. The 32 css-grid/abspos tests that
+    /// generate their grids from a shared support module rendered a blank page against a reference
+    /// full of them.
+    /// </para>
+    /// <para>
+    /// Extraction is delegated to <see cref="ScriptExtractionService"/> rather than reimplemented:
+    /// it is what resolves an inline body, a <c>data:</c> module and an external <c>src</c> module to
+    /// a root, keyed by the absolute URL its own relative imports resolve against. The engine then
+    /// loads the graph below each root.
+    /// </para>
+    /// </remarks>
+    private static IReadOnlyList<ModuleRoot> ExtractModuleRoots(string html, string url)
+    {
+        if (!EngineModuleSupport.Available)
+            return [];
+
+        try
+        {
+            return ScriptExtractionService.ExtractAll(html, url).ModuleRoots;
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExtractModuleRoots",
+                $"Module extraction failed: {ex.Message}", ex);
+            return [];
+        }
+    }
+
     private static ExecutedDocument ExecuteScriptsWithDom(
         string html,
         string url,
@@ -3252,6 +3291,7 @@ internal sealed partial class WptTestRunner
         html = InlineLinkedStylesheets(html, testDir, wptRoot);
 
         bool needsStubs = false;
+        bool hasModuleScript = false;
 
         foreach (Match match in ScriptTagPattern.Matches(html))
         {
@@ -3282,6 +3322,17 @@ internal sealed partial class WptTestRunner
                     RegexOptions.IgnoreCase);
                 if (typeMatch.Success && !ScriptMimeType.IsExecutable(typeMatch.Groups["v"].Value))
                     continue;
+
+                // A module is not a classic script and must not be evaluated as one: its `import`
+                // is a syntax error to `Eval`, so the whole body was lost — and with it every DOM
+                // the module builds. They are collected below instead and run through the engine's
+                // module machinery, which is the same path Broiler.Cli and the browser shell take.
+                if (typeMatch.Success
+                    && typeMatch.Groups["v"].Value.Trim().Equals("module", StringComparison.OrdinalIgnoreCase))
+                {
+                    hasModuleScript = true;
+                    continue;
+                }
             }
 
             bool isDefer = attrs.Contains("defer", StringComparison.OrdinalIgnoreCase);
@@ -3354,9 +3405,13 @@ internal sealed partial class WptTestRunner
         // injects from what the page brought.
         var injectedScriptCount = 2 + (needsStubs ? 1 : 0);
 
+        // The document's ES-module roots, with their transitive imports left to the engine to fetch.
+        // Empty unless the page has modules and the engine binds static imports.
+        var moduleRoots = hasModuleScript ? ExtractModuleRoots(html, url) : [];
+
         scanScope.Dispose();
 
-        if (scripts.Count == 0 && deferredScripts.Count == 0)
+        if (scripts.Count == 0 && deferredScripts.Count == 0 && moduleRoots.Count == 0)
         {
             // Even with no inline scripts, we still need to process anchor
             // positioning, animation snapshots, etc. via the DomBridge.
@@ -3381,7 +3436,12 @@ internal sealed partial class WptTestRunner
         // continuations on the thread pool, racing this thread's serialize/render.
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         var contextScope = WptPhaseTrace.Measure(WptPhaseTrace.Phases.JsContext);
-        using var context = new JSContext();
+        // A module executes on a module realm, so the context the DOM is attached to has to be one
+        // when the page has modules — the same context, so a module reaches `document` exactly as a
+        // classic script does. A page without modules keeps the plain context it always had.
+        using JSContext context = moduleRoots.Count > 0
+            ? new BridgeModuleContext(csp: null, pageUrl: url)
+            : new JSContext();
         contextScope.Dispose();
         // Disposed with this call: the bridge owns a per-document session — the headless layout
         // view and its HtmlContainer (hence the whole box tree and every sub-resource its image
@@ -3506,6 +3566,35 @@ internal sealed partial class WptTestRunner
                 {
                     RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
                         $"Script {deferredLabel} failed: {ex.Message}", ex);
+                }
+            }
+
+            // Modules are deferred, so the roots run after the classic deferred scripts — and each
+            // on the realm the DOM is attached to, with the engine resolving and fetching its
+            // transitive imports itself. Mirrors ScriptEngine.RunPageScripts.
+            if (context is JSModuleContext moduleContext)
+            {
+                foreach (var root in moduleRoots)
+                {
+                    try
+                    {
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
+                        {
+                            moduleContext
+                                .RunScriptAsync(root.Source, root.BaseUrl ?? url, uniqueModuleID: root.Key)
+                                .GetAwaiter().GetResult();
+                        }
+
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
+                            PromoteWindowGlobalsToContext(bridge);
+                        using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
+                            DrainAsyncWork();
+                    }
+                    catch (Exception ex)
+                    {
+                        RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
+                            $"Module root {root.Key} failed: {ex.Message}", ex);
+                    }
                 }
             }
 
