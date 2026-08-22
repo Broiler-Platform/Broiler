@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 7124,
+    "failed": 7021,
     "skipped": 0,
-    "total": 7124
+    "total": 7021
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 5057,
+      "count": 5030,
       "examples": [
         "appmanifest/id-member/id-member-manifest-update-manual-v2.html",
         "battery-status/battery-plugging-in-manual.https.html",
@@ -27,7 +27,7 @@
       "label": "PixelMismatch / ColorShift",
       "category": "PixelMismatch",
       "subCategory": "ColorShift",
-      "count": 680,
+      "count": 673,
       "examples": [
         "css/css-align/blocks/align-content-block-007.html",
         "css/css-anchor-position/last-successful-change-fallbacks.html",
@@ -39,7 +39,7 @@
       "label": "PixelMismatch / ReferenceOverlayExposed",
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed",
-      "count": 590,
+      "count": 531,
       "examples": [
         "css/css-backgrounds/background-size/background-size-cover-svg.html",
         "css/css-backgrounds/border-image-slice-fill-002.html",
@@ -51,7 +51,7 @@
       "label": "PixelMismatch / LayoutShift",
       "category": "PixelMismatch",
       "subCategory": "LayoutShift",
-      "count": 402,
+      "count": 392,
       "examples": [
         "css/compositing/mix-blend-mode/mix-blend-mode-both-parent-and-blended-with-3D-transform.html",
         "css/css-backgrounds/background-size-029.html",
@@ -94,7 +94,7 @@
     ],
     [
       "conformance-checkers/html-svg",
-      501
+      498
     ],
     [
       "css/css-text",
@@ -110,7 +110,7 @@
     ],
     [
       "css/css-flexbox",
-      268
+      232
     ],
     [
       "css/css-overflow",
@@ -121,14 +121,14 @@
       193
     ],
     [
-      "css/css-transforms",
-      176
+      "html/semantics",
+      147
     ]
   ],
   "failuresByCategory": [
     [
       "PixelMismatch",
-      6772
+      6669
     ],
     [
       "Timeout",
@@ -199,18 +199,6 @@
       ]
     },
     {
-      "family": "css/css-transforms/transform-origin/svg-origin-relative-length-{N}.html",
-      "count": 46,
-      "categories": {
-        "PixelMismatch": 46
-      },
-      "examples": [
-        "css/css-transforms/transform-origin/svg-origin-relative-length-002.html",
-        "css/css-transforms/transform-origin/svg-origin-relative-length-015.html",
-        "css/css-transforms/transform-origin/svg-origin-relative-length-020.html"
-      ]
-    },
-    {
       "family": "html/dom/render-blocking/element-render-blocking-{N}.html",
       "count": 40,
       "categories": {
@@ -256,6 +244,18 @@
         "css/WOFF2/metadatadisplay-schema-copyright-008.xht",
         "css/WOFF2/metadatadisplay-schema-copyright-017.xht",
         "css/WOFF2/metadatadisplay-schema-copyright-026.xht"
+      ]
+    },
+    {
+      "family": "css/WOFF2/metadatadisplay-schema-trademark-{N}.xht",
+      "count": 30,
+      "categories": {
+        "PixelMismatch": 30
+      },
+      "examples": [
+        "css/WOFF2/metadatadisplay-schema-trademark-006.xht",
+        "css/WOFF2/metadatadisplay-schema-trademark-015.xht",
+        "css/WOFF2/metadatadisplay-schema-trademark-020.xht"
       ]
     }
   ],
@@ -562,7 +562,7 @@
     },
     {
       "relativeTestPath": "css/css-grid/grid-lanes/baseline/column-grid-lanes-item-baseline-005.html",
-      "matchPercent": 65.5255635579427,
+      "matchPercent": 65.0543212890625,
       "referenceMatchPercent": 99.53231811523438,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (99.5%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -674,7 +674,7 @@
     },
     {
       "relativeTestPath": "svg/path/reftests/path-zoom.html",
-      "matchPercent": 79.3755849202474,
+      "matchPercent": 79.3908437093099,
       "referenceMatchPercent": 100.0,
       "cleared": true,
       "detail": "\u26a0 suspect reference: Broiler matches its rel=match reference HTML (100.0%) but not the committed reference PNG \u2014 the committed reference is likely stale/incorrect, not a Broiler bug"
@@ -3390,13 +3390,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "conformance-checkers/html-svg/pservers-grad-15-b-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "conformance-checkers/html-svg/pservers-grad-16-b-isvalid.html",
       "passed": false,
       "skipped": false,
@@ -3881,13 +3874,6 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/struct-dom-13-f-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/struct-dom-15-f-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -4777,13 +4763,6 @@
     },
     {
       "relativeTestPath": "conformance-checkers/html-svg/types-dom-05-b-isvalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "conformance-checkers/html-svg/types-dom-06-f-isvalid.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -12086,7 +12065,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/compositing/mix-blend-mode/mix-blend-mode-blended-with-3D-transform.html",
@@ -12170,7 +12149,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-align/abspos/align-self-static-position-002.html",
@@ -13542,7 +13521,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-borders/border-shape/border-shape-ellipse-extent-keywords.html",
@@ -13557,13 +13536,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-borders/border-shape/border-shape-half-border-box-default.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
     },
     {
       "relativeTestPath": "css/css-borders/border-shape/border-shape-ignore-radius.html",
@@ -16701,13 +16673,6 @@
       "subCategory": "ColorShift"
     },
     {
-      "relativeTestPath": "css/css-flexbox/cross-axis-scrollbar.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-flexbox/dynamic-grid-flex-abspos.html",
       "passed": false,
       "skipped": false,
@@ -16720,20 +16685,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flex-002.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flex-004.htm",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-flexbox/flex-abspos-inset-cross-size-001.html",
@@ -17030,13 +16981,6 @@
       "subCategory": "LayoutShift"
     },
     {
-      "relativeTestPath": "css/css-flexbox/flex-shrink-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-flexbox/flex-svg-no-intrinsic-column-001.html",
       "passed": false,
       "skipped": false,
@@ -17140,13 +17084,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox-basic-block-horiz-001v.xhtml",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-flexbox/flexbox-basic-canvas-horiz-001v.xhtml",
@@ -17363,7 +17300,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-flexbox/flexbox-mbp-horiz-003-reverse.xhtml",
@@ -17497,167 +17434,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-0-0-unitless.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-0-0.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-0.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-1-0-unitless.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-1-0.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-1-N-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-1-Npercent-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-1.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-N-0-unitless.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-N-0.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-N-N-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-N-Npercent-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-N.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-0-auto.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-1-1-N-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-1-1-Npercent-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-1-N-N-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-1-N-Npercent-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-N-1-N-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-N-1-Npercent-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-N-N-N-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-N-N-Npercent-shrink.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/flexbox_flex-initial.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-flexbox/flexbox_justifycontent-flex-end.html",
@@ -17870,41 +17646,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-flexbox/interactive/flexbox_interactive_flex-basis-transitions.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/interactive/flexbox_interactive_flex-grow-transitions.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/interactive/flexbox_interactive_flex-shrink-transitions-invalid.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/interactive/flexbox_interactive_flex-shrink-transitions.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/interactive/flexbox_interactive_flex-transitions.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-flexbox/interactive/flexbox_interactive_order-transitions.html",
       "passed": false,
       "skipped": false,
@@ -17976,13 +17717,6 @@
     },
     {
       "relativeTestPath": "css/css-flexbox/justify-content_space-between-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/max-width-violation.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -18221,20 +17955,6 @@
     },
     {
       "relativeTestPath": "css/css-flexbox/table-as-item-specified-height.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/table-as-item-specified-width-vertical.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/table-as-item-specified-width.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -29294,13 +29014,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/focus-element-no-snap.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/move-current-target.html",
       "passed": false,
       "skipped": false,
@@ -29333,7 +29046,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "LayoutShift"
+      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-scroll-snap/snap-after-relayout/remove-current-target.html",
@@ -34795,13 +34508,6 @@
       "subCategory": "MissingContent"
     },
     {
-      "relativeTestPath": "css/css-transforms/animation/transform-interpolation-scale.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
       "relativeTestPath": "css/css-transforms/animation/transform-interpolation-skew.html",
       "passed": false,
       "skipped": false,
@@ -34898,20 +34604,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/gradientTransform/svg-gradientTransform-combination-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/gradientTransform/svg-gradientTransform-combination-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "css/css-transforms/hittest-preserve-3d-2.html",
@@ -35404,406 +35096,14 @@
       "subCategory": "ReferenceOverlayExposed"
     },
     {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-012.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-013.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-014.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-015.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-016.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-017.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-018.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-019.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-020.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-021.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-022.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-023.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-024.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-025.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-026.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-027.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-028.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-029.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-030.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-031.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-032.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-033.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-034.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-035.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-036.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-037.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-038.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-039.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-040.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-041.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-042.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-043.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-044.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-045.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-046.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-001.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-002.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-003.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-004.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-005.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-006.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-007.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-008.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-009.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-010.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-011.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "css/css-transforms/transform-origin/svg-origin-relative-length-invalid-012.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -39759,13 +39059,6 @@
     },
     {
       "relativeTestPath": "css/filter-effects/svg-filter-filter-units-user-space.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/filter-effects/svg-filter-gradient-interpolation.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
@@ -49441,7 +48734,7 @@
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
-      "subCategory": "MissingContent"
+      "subCategory": "ColorShift"
     },
     {
       "relativeTestPath": "svg/animations/animate-elem-14-t-drt.html",
@@ -49484,13 +48777,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ReferenceOverlayExposed"
-    },
-    {
-      "relativeTestPath": "svg/animations/correct-events-for-short-animations-with-syncbases.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/animations/non-additive-type-by-animation.html",
@@ -49659,13 +48945,6 @@
       "skipped": false,
       "category": "PixelMismatch",
       "subCategory": "ColorShift"
-    },
-    {
-      "relativeTestPath": "svg/render/reftests/render-sync-with-font-size.html",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
     },
     {
       "relativeTestPath": "svg/shapes/reftests/ellipse-auto-rx-clip-path.html",
