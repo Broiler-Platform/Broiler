@@ -80,6 +80,37 @@ internal static class CssLayoutEngine
         return true;
     }
 
+    /// <summary>
+    /// Whether the block-size basis a percentage on <paramref name="box"/> would resolve against
+    /// lies beyond a grid area — in which case there is no basis to use here.
+    /// </summary>
+    /// <remarks>
+    /// A grid item's block size comes from the track that holds it, and its descendants' percentage
+    /// heights resolve against that grid area. Broiler does not model a grid area as a containing
+    /// block, so the basis walk goes straight past the grid to the next ancestor that states a
+    /// height — which is a different, usually larger, number. An `img { height: 100% }` in a `1fr`
+    /// row of a 200px grid would resolve to 200 rather than to the row's 100
+    /// (css-grid/replaced-element-percentage-height-in-grid-nested-in-flex-001). Declining leaves
+    /// the image at its natural size, which is what it had before any of this resolved at all.
+    /// </remarks>
+    private static bool PercentageBlockBasisCrossesAGridArea(CssBox box)
+    {
+        for (var cb = box.ContainingBlock; cb?.ParentBox != null; cb = cb.ContainingBlock)
+        {
+            bool heightIsAuto = cb.Height == CssConstants.Auto || string.IsNullOrEmpty(cb.Height);
+
+            // A stated, non-percentage height is the basis the walk would stop at, so nothing
+            // beyond it matters.
+            if (!heightIsAuto && !cb.Height.Contains('%'))
+                return false;
+
+            if (cb.ParentBox.Display is "grid" or "inline-grid")
+                return true;
+        }
+
+        return false;
+    }
+
     public static void MeasureImageSize(ILayoutEnvironment g, CssRectImage imageWord)
     {
         ArgumentNullException.ThrowIfNull(imageWord);
@@ -169,9 +200,31 @@ internal static class CssLayoutEngine
             }
         }
 
+        // A percentage height is a stated height too, on exactly the footing the percentage *width*
+        // branch above puts one: it resolves against the nearest ancestor that states a definite
+        // block size, and the ratio then carries it to the inline axis. Nothing resolved it — the
+        // definite-length resolver rejects percentages by design — so `img { height: 100% }` kept
+        // its bitmap's height, and with it its bitmap's width. Every box sized from that image's
+        // intrinsic contribution then came out the bitmap's width: a `float` around a 200x200 image
+        // asked to be 100px tall is 100px wide, not 200 (css-sizing/intrinsic-percent-replaced-*,
+        // 40 of its 45 tests, and the shrink-to-fit half of the same rule in css-flexbox).
+        double percentHeightPx = 0;
+        bool hasPercentageHeight =
+            !hasImageTagHeight
+            && imageWord.OwnerBox.Height is { Length: > 0 } blockSize
+            && blockSize.Contains('%')
+            && !PercentageBlockBasisCrossesAGridArea(imageWord.OwnerBox)
+            && imageWord.OwnerBox.TryResolveSpecifiedReplacedContentHeight(out percentHeightPx);
+
+        bool hasStatedHeight = hasImageTagHeight || hasPercentageHeight;
+
         if (hasImageTagHeight)
         {
             imageWord.Height = tagHeightPx;
+        }
+        else if (hasPercentageHeight)
+        {
+            imageWord.Height = percentHeightPx;
         }
         else if (image != null)
         {
@@ -211,14 +264,14 @@ internal static class CssLayoutEngine
                 ? attributeRatio
                 : 0;
 
-        bool widthDriven = hasStatedWidth && !hasImageTagHeight;
+        bool widthDriven = hasStatedWidth && !hasStatedHeight;
 
         if (usedRatio > 0)
         {
             // If only the width was stated, the ratio fills in the height, and vice versa.
             if (widthDriven)
                 imageWord.Height = imageWord.Width / usedRatio;
-            else if (hasImageTagHeight && !hasStatedWidth)
+            else if (hasStatedHeight && !hasStatedWidth)
                 imageWord.Width = imageWord.Height * usedRatio;
         }
 
@@ -230,7 +283,7 @@ internal static class CssLayoutEngine
 
         ReplacedBoxSizing.ApplyMinMax(
             ref usedWidth, ref usedHeight,
-            widthIsAuto: !hasStatedWidth, heightIsAuto: !hasImageTagHeight, usedRatio,
+            widthIsAuto: !hasStatedWidth, heightIsAuto: !hasStatedHeight, usedRatio,
             imageWord.OwnerBox.ResolveInlineSizeBounds(),
             imageWord.OwnerBox.ResolveBlockSizeBounds());
 

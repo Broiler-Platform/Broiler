@@ -250,7 +250,7 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// replaced box then takes its block axis from its natural size, or from the inline axis
     /// through its ratio.
     /// </summary>
-    private bool TryResolveSpecifiedReplacedContentHeight(out double contentHeight)
+    internal bool TryResolveSpecifiedReplacedContentHeight(out double contentHeight)
     {
         contentHeight = 0;
 
