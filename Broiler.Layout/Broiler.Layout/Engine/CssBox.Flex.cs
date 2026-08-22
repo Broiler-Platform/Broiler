@@ -339,6 +339,29 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return borderBoxWidth + child.ActualMarginLeft + child.ActualMarginRight;
     }
 
+    /// <summary>
+    /// CSS Flexbox §4.5 <em>specified size suggestion</em>: the item's own <c>width</c> as a
+    /// border-box length when that width is definite, which is what caps the content-based
+    /// minimum. An <c>auto</c> width, an intrinsic keyword or an absent one has no suggestion —
+    /// the minimum is then the content size suggestion alone.
+    /// </summary>
+    private static bool TryGetSpecifiedSizeSuggestion(
+        CssBox child, double containerContentWidth, out double borderBoxWidth)
+    {
+        borderBoxWidth = 0;
+
+        if (child.Width == CssConstants.Auto
+            || string.IsNullOrEmpty(child.Width)
+            || IsIntrinsicWidthKeyword(child.Width))
+        {
+            return false;
+        }
+
+        borderBoxWidth = child.ResolveSpecifiedWidthToBorderBox(
+            ParseFlexLengthOrZero(child, child.Width, containerContentWidth));
+        return true;
+    }
+
     private static double ParseFlexLengthOrZero(CssBox box, string value, double percentBase)
     {
         try
@@ -366,7 +389,27 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         if (useAutomaticMinWidth)
         {
-            child.GetMinMaxWidth(out double minContentWidth, out _);
+            // CSS Flexbox §4.5 automatic minimum size. The content-based minimum is the *content
+            // size suggestion* — the item's min-content size — and, when the item has a definite
+            // specified main size, no larger than that *specified size suggestion* either.
+            //
+            // GetMinMaxWidth folds the box's own `width` into what it reports, so it answered the
+            // specified width rather than the content's: a `width: 300px` item declared a 300px
+            // floor, and `flex-shrink` — which defaults to 1 — could not move it at all. A 300px
+            // item in a 100px container simply overflowed, and every flex layout that relies on
+            // shrinking an explicitly-sized item was wrong by the amount it should have shrunk.
+            // GetContentMinMaxWidth is the same measurement with the box's own width suppressed,
+            // which is the suggestion §4.5 actually asks for. `min-width: 0` was the workaround
+            // that worked, because it takes the branch below instead of this one.
+            child.GetContentMinMaxWidth(out double contentSuggestion, out _);
+
+            double minContentWidth = contentSuggestion;
+
+            if (TryGetSpecifiedSizeSuggestion(child, containerContentWidth, out double specified)
+                && specified < minContentWidth)
+            {
+                minContentWidth = specified;
+            }
 
             if (!double.IsNaN(minContentWidth) && minContentWidth > 0)
             {
