@@ -938,6 +938,65 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### A column flex container never read `flex-basis` and never shrank
+
+- **Tests:** `css/css-flexbox` reftests **693 → 704 passing**, 11 won and none lost. The
+  headline is `percentage-heights-002`, entry 19 of
+  [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 at 40.9%,
+  now **100%**. The other ten:
+  `dynamic-isize-change-003`, `flex-basis-012`, `flex-flow-007`,
+  `flex-minimum-height-flex-items-003`/`-026`/`-027`,
+  `flexbox-justify-content-vert-003`/`-004`/`-006` and `percentage-widths-001`, most of
+  them at 98.7% against a 99% threshold.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Flex.cs`, `Engine/CssBox.ContainingBlock.cs`).
+  Main repo — no patch, so it reaches the WPT run directly.
+- **Three gaps, and the third gated the first two.**
+  - **§9.2 step 3.** A column container's items stack through ordinary block flow here,
+    and the pass that resizes that stack afterwards measured each item's height instead
+    of reading its flex base size. Those coincide for a content-sized item, which is why
+    it went unnoticed; they part company the moment `flex-basis` names a block size,
+    which block flow does not implement and so ignored outright.
+  - **§9.7, the shrink half.** Deliberately omitted, on the stated grounds that §4.5's
+    automatic minimum size did not exist in this axis to floor a shrink with. Since
+    `flex-shrink` is `1` by default, that is every column flex item on the web asking to
+    shrink and none of them shrinking. `ClampFlexColumnItemBorderBoxHeight` is the floor
+    that made turning it on safe — the block-axis twin of `ClampFlexItemBorderBoxWidth`,
+    reading the content size the same way (measuring the item with its own `height`
+    suppressed) and adding the one rule the row clamp omits: §4.5 gives no automatic
+    minimum to an item whose main-axis `overflow` is not `visible`, which is what lets
+    the `flex: 1; overflow: auto` pane of a column layout scroll instead of pushing its
+    container open.
+  - **CSS2.1 §10.6.4, which gates both.** "Definite main size" was read from the
+    container's `height` declaration alone. An out-of-flow box with `height: auto` and
+    both `top` and `bottom` set has no such declaration and a perfectly definite used
+    height — the constraint equation leaves one unknown — and `position: absolute;
+    inset: 0` is how a full-viewport app shell is written, so the most common definite
+    column container there is was treated as content-sized. The same blindness sent
+    every percentage height inside such a box to `auto` (§10.5).
+    `TryGetInsetDerivedContentHeight` answers it once for all four readers.
+- **`min-height: 0` had to become distinguishable from an undeclared minimum.**
+  `MinHeight` computes to `"0"` either way, and §4.5 turns on exactly that distinction:
+  an undeclared minimum on a flex item is `auto` and floors it at its content, while
+  `min-height: 0` is the idiom for deliberately letting a column item shrink past it.
+  `IsMinHeightSpecified` is the block-axis twin of the `IsMinWidthSpecified` flag the row
+  path already had.
+- **A vertical writing mode is declined, not transposed.** `column` names the *block*
+  axis, so under `vertical-lr` the main axis is horizontal and every number the pass
+  reads belongs to the cross axis. Growing on the wrong axis was inert; shrinking on it
+  is not, and `flexbox-column-row-gap-002` squashed all six of its items. The sibling
+  multi-line pass already declined for the same reason.
+- **Two tests moved from passing to failing, and both were passing by omission.**
+  `css-position/sticky/position-sticky-flex-item-001` and `-003` are the `column` half
+  of a family of four; their red item is sized by `flex-basis`, so it used to be
+  zero-tall and there was no red to show. They now fail exactly as their `row` twins
+  `-002`/`-004` always have, on
+  [a sticky box's contribution to scrollable overflow](wpt-rendering-gaps-open.md#a-sticky-box-contributes-its-stuck-position-to-the-scroll-containers-overflow)
+  — one bug, no longer masked by a second.
+- **Checks:** `src/Broiler.Wpt.Tests/FlexColumnMainAxisSizingTests.cs` renders each rule
+  and measures it off the canvas. `FlexColumnWrapAndReverseTests`'
+  nowrap case was restated: it pins the line breaking, and had been written against the
+  pre-shrink geometry of two 40px items overflowing a 50px container.
+
 ### A table box outside a table painted nothing at all
 
 - **Tests:** the `css/CSS2/tables/table-anonymous-objects-*` family — **103 of its

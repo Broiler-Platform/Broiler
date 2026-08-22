@@ -685,6 +685,7 @@ internal static partial class CssUtils
                 break;
             case "min-height":
                 cssBox.MinHeight = value;
+                cssBox.IsMinHeightSpecified = true;
                 break;
             case "aspect-ratio":
                 cssBox.AspectRatio = value;

@@ -451,6 +451,35 @@ other direction. None is a sizing bug.
 - **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
   elsewhere.
 
+### A sticky box contributes its *stuck* position to the scroll container's overflow
+
+- **Tests:** `css-position/sticky/position-sticky-flex-item-001` … `-004`, all four at
+  99.0% against their own reference (a 100×80 red band showing where the reference
+  has none), against a 99% threshold.
+- **Owner:** `src/Broiler.HtmlBridge.Dom` (`DomBridge/LayoutMetrics.cs`,
+  `TryGetSharedScrollExtent`) with a `Broiler.HTML` half — see the exit gate.
+- **Root cause.** The scrollable overflow region is the union of the container's
+  padding box and its descendants' **border boxes**, read from the layout snapshot
+  *after* the sticky pass has moved them. CSS Positioned Layout 3 §6.3 says the
+  opposite: a sticky box contributes its **in-flow** position, and the test's own
+  `meta name="assert"` says so in as many words ("the sticky flex item reserves its
+  in-flow space in the scroll container's overflow area"). Reading the stuck position
+  is circular — the item is stuck *because* the scroll offset is 0, and the scroll
+  offset is 0 because `scrollTop = 1000` clamped against a `scrollHeight` the stuck
+  item made equal to `clientHeight`. Removing `position: sticky` from the same markup
+  scrolls correctly and paints no red, which isolates it.
+- **How -001/-003 got here.** They are the `column` half of the family and were green
+  until [column main-axis flexing](wpt-rendering-gaps-fixed.md) landed: `flex-basis`
+  was ignored in the block axis, so the red item was zero-tall and there was no red to
+  show. They now fail exactly as their `row` twins -002/-004 always have — the same
+  bug, no longer masked by a second one.
+- **Exit gate:** all four match. The obstacle is plumbing, not the rule: the shift is
+  computed in `Broiler.Layout` (`Engine/CssBox.Sticky.cs`, main repo) but reaches the
+  bridge through `BoxGeometry`, which `HtmlContainerInt.CollectLayoutGeometry`
+  populates inside `Broiler.HTML` — so carrying the pre-sticky position across needs a
+  submodule patch, and `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh`.
+  Landing it upstream and bumping the pointer is the route.
+
 ### An inline-block's height ignores `line-height`
 
 - **The diagnosis stands; two fixes were measured and both reverted.** An

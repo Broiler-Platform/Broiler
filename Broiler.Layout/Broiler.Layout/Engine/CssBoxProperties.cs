@@ -679,6 +679,30 @@ internal abstract partial class CssBoxProperties
     private string _minHeight = "0";
 
     /// <summary>
+    /// Whether the author declared <c>min-height</c> (or a logical <c>min-block-size</c>/
+    /// <c>min-inline-size</c> that resolves to it) at all. The block-axis twin of
+    /// <see cref="IsMinWidthSpecified"/>, and needed for the same reason: <see cref="MinHeight"/>
+    /// defaults to <c>"0"</c>, so its value alone cannot tell an undeclared minimum from an
+    /// explicit <c>min-height: 0</c>. CSS Flexbox §4.5 turns on exactly that distinction — an
+    /// undeclared minimum on a flex item is <c>auto</c> and floors the item at its content, while
+    /// <c>min-height: 0</c> is the idiom that deliberately lets a column flex item shrink past it.
+    /// </summary>
+    /// <remarks>
+    /// The logical halves need no flag of their own: <see cref="MinBlockSize"/> and
+    /// <see cref="MinInlineSize"/> default to the empty string rather than to <c>"0"</c>, so a
+    /// value there already <em>is</em> the declaration. Which of the two lands on the physical
+    /// block axis follows the writing mode, exactly as <see cref="MinHeight"/> resolves it.
+    /// </remarks>
+    internal bool IsMinHeightSpecified
+    {
+        get => _isMinHeightSpecified
+            || !string.IsNullOrEmpty(IsVerticalWritingMode(WritingMode) ? MinInlineSize : MinBlockSize);
+        set => _isMinHeightSpecified = value;
+    }
+
+    private bool _isMinHeightSpecified;
+
+    /// <summary>
     /// CSS Logical 1 §4: the flow-relative minimum and maximum sizes. Stored on their own rather
     /// than folded into the physical longhands, for the same reason
     /// <see cref="BlockSize"/> is: which physical axis each names depends on the box's writing
@@ -2939,6 +2963,7 @@ internal abstract partial class CssBoxProperties
         MinWidth = p.MinWidth;
         IsMinWidthSpecified = p.IsMinWidthSpecified;
         MinHeight = p.MinHeight;
+        IsMinHeightSpecified = p.IsMinHeightSpecified;
         MaxHeight = p.MaxHeight;
         IntrinsicReplacedSize = p.IntrinsicReplacedSize;
         ObjectFit = p.ObjectFit;
