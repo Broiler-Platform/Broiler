@@ -89,11 +89,49 @@ public class SvgTransformOriginTests
             "without transform-box the rotate is about the viewport origin, so the square leaves the canvas");
     }
 
-    /// <summary><c>fill-box</c> with no origin written uses the box centre, so the square holds.</summary>
+    /// <summary>
+    /// CSS Transforms 1 §8: an SVG element has no CSS layout box, and for one of those the used
+    /// value of an unspecified <c>transform-origin</c> is <c>0 0</c> — the reference box's own
+    /// corner, not its centre. For a rect already at the origin that is the user-space origin too,
+    /// so the quarter turn still carries the square off the canvas.
+    /// </summary>
     [Fact(Timeout = 600000)]
-    public void FillBox_DefaultsToTheBoxCentre()
+    public void FillBox_WithNoOriginWritten_UsesTheBoxCorner()
     {
-        Assert.True(SquareStaysPut("transform=\"rotate(90)\" style=\"transform-box: fill-box\""));
+        Assert.False(SquareStaysPut("transform=\"rotate(90)\" style=\"transform-box: fill-box\""));
+    }
+
+    /// <summary>
+    /// And the corner is the <em>box's</em> corner, which is what tells <c>fill-box</c> apart from
+    /// <c>view-box</c>: a rect away from the origin turns about itself, so it holds its place.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void FillBoxCorner_IsTheElementsOwnCorner()
+    {
+        string html =
+            "<!DOCTYPE html><html><body style=\"margin:0\">"
+            + "<svg width=\"200\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">"
+            + "<rect x=\"50\" y=\"50\" width=\"100\" height=\"100\" fill=\"blue\""
+            + " transform=\"rotate(90)\" style=\"transform-box: fill-box\"/>"
+            + "</svg></body></html>";
+
+        string dir = Path.Combine(Path.GetTempPath(), "broiler-torigin-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            string file = Path.Combine(dir, "t.html");
+            File.WriteAllText(file, html);
+            var bmp = new WptTestRunner(Canvas, Canvas).RenderHtmlFileBitmapPublic(file, dir);
+
+            // rotate(90) about the box corner (50,50) takes (50,50)..(150,150) to
+            // (-50,50)..(50,150), so the square's right edge lands just past x = 50 at y = 100.
+            Assert.True(IsBlue(bmp, 25, 100),
+                "fill-box measures 0 0 from the element's own corner, not the viewport's");
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { }
+        }
     }
 
     /// <summary>
@@ -107,7 +145,7 @@ public class SvgTransformOriginTests
             "<!DOCTYPE html><html><head><style>rect { transform-box: fill-box; }</style></head>"
             + "<body style=\"margin:0\">"
             + "<svg width=\"200\" height=\"200\" xmlns=\"http://www.w3.org/2000/svg\">"
-            + "<rect width=\"100\" height=\"100\" fill=\"blue\" transform=\"rotate(90)\"/>"
+            + "<rect x=\"50\" y=\"50\" width=\"100\" height=\"100\" fill=\"blue\" transform=\"rotate(90)\"/>"
             + "</svg></body></html>";
 
         string dir = Path.Combine(Path.GetTempPath(), "broiler-torigin-" + Guid.NewGuid().ToString("N"));
@@ -117,7 +155,11 @@ public class SvgTransformOriginTests
             string file = Path.Combine(dir, "t.html");
             File.WriteAllText(file, html);
             var bmp = new WptTestRunner(Canvas, Canvas).RenderHtmlFileBitmapPublic(file, dir);
-            Assert.True(IsBlue(bmp, 50, 50),
+
+            // The rule reaching the renderer is what is under test, so the rect is placed away
+            // from the origin: under view-box the quarter turn would take it off the canvas, and
+            // under fill-box it turns about its own corner and stays partly on it.
+            Assert.True(IsBlue(bmp, 25, 100),
                 "a `rect { transform-box: fill-box }` rule must reach the SVG renderer");
         }
         finally
@@ -168,19 +210,20 @@ public class SvgTransformOriginTests
 
     /// <summary>
     /// A length-percentage may not follow a vertical keyword, so `top 100%` is not a form at all.
-    /// The declaration is dropped whole and the initial `50% 50%` stands — which keeps the square
-    /// in place. Reading it as `100% top` instead is what the twelve WPT
-    /// <c>svg-origin-relative-length-invalid-*</c> cases catch.
+    /// The declaration is dropped whole and the initial value stands — which for an SVG element is
+    /// `0 0`, the reference box's corner. Two separate errors here kept the twelve WPT
+    /// <c>svg-origin-relative-length-invalid-*</c> cases red: first reading `top 100%` as
+    /// `100% top`, then falling back to the box centre rather than to `0 0`.
     /// </summary>
     [Theory(Timeout = 600000)]
     [InlineData("top 100%")]
     [InlineData("bottom 50px")]
     [InlineData("50% left")]
-    public void InvalidOrigin_FallsBackToTheInitialCentre(string origin)
+    public void InvalidOrigin_FallsBackToTheInitialCorner(string origin)
     {
-        Assert.True(SquareStaysPut(
+        Assert.False(SquareStaysPut(
             $"transform=\"rotate(90)\" transform-origin=\"{origin}\" style=\"transform-box: fill-box\""),
-            $"transform-origin: {origin} is invalid, so the initial 50% 50% must stand");
+            $"transform-origin: {origin} is invalid, so the initial 0 0 must stand — not the centre");
     }
 
     /// <summary><c>transform-box</c> with no transform must not invent one.</summary>
@@ -200,6 +243,10 @@ public class SvgTransformOriginTests
     [InlineData("border-box")]
     public void OtherBoxRelativeValues_AlsoUseTheElementsBox(string box)
     {
-        Assert.True(SquareStaysPut($"transform=\"rotate(90)\" style=\"transform-box: {box}\""));
+        // `center` is what distinguishes them from view-box: resolved against the element's own
+        // 100x100 box it is (50,50) and the quarter turn maps the square onto itself, where
+        // view-box would not reach this path at all and carry the square off the canvas.
+        Assert.True(SquareStaysPut(
+            $"transform=\"rotate(90)\" transform-origin=\"center\" style=\"transform-box: {box}\""));
     }
 }

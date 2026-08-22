@@ -80,12 +80,21 @@ internal static partial class SvgRenderer
         float centreX = box.X + box.Width / 2f;
         float centreY = box.Y + box.Height / 2f;
 
+        // CSS Transforms 1 §8: an SVG element has no CSS layout box, and for one of those the used
+        // value of an *unspecified* `transform-origin` is `0 0` — the reference box's own corner,
+        // not its centre. An invalid declaration is dropped whole and takes that same initial
+        // value. Falling back to the centre instead is what kept the twelve WPT
+        // svg-origin-relative-length-invalid-* cases failing: each is built so that its transform
+        // maps the square onto itself about `0 0`, matching a reference that draws the rect with no
+        // transform at all, and a centre origin threw the square hundreds of pixels away.
+        var initial = new PointF(box.X, box.Y);
+
         if (string.IsNullOrWhiteSpace(value))
-            return new PointF(centreX, centreY);
+            return initial;
 
         var parts = value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0)
-            return new PointF(centreX, centreY);
+            return initial;
 
         if (parts.Length == 1)
         {
@@ -96,7 +105,7 @@ internal static partial class SvgRenderer
 
             return IsHorizontalCompatible(parts[0])
                 ? new PointF(ResolveOriginComponent(parts[0], box.X, box.Width, horizontal: true, centreX), centreY)
-                : new PointF(centreX, centreY);
+                : initial;
         }
 
         // The pair may be written the other way round — but only when *both* halves are keywords.
@@ -109,13 +118,13 @@ internal static partial class SvgRenderer
         if (IsVerticalKeyword(first))
         {
             if (!IsHorizontalKeyword(second))
-                return new PointF(centreX, centreY);
+                return initial;
 
             (first, second) = (second, first);
         }
 
         if (!IsHorizontalCompatible(first) || !IsVerticalCompatible(second))
-            return new PointF(centreX, centreY);
+            return initial;
 
         return new PointF(
             ResolveOriginComponent(first, box.X, box.Width, horizontal: true, centreX),
