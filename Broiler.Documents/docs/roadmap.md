@@ -28,14 +28,14 @@ residual work is tracked here.
 Intentional limitations in the conformance documents are not release blockers
 unless they are explicitly promoted into this roadmap.
 
-## Native PDF proposal
+## Native PDF support
 
-- Re-baseline the repository before reviving the old native-PDF parser proposal:
-  there is currently no `src/Broiler.Pdf` project to extend.
-- Make an explicit product scope and component-ownership decision first. Only
-  then scaffold a bounded parser with corpus, limits, diagnostics, and
-  differential tests; do not treat the obsolete project assumptions as a
-  current implementation plan.
+PDF is an active, separately gated initiative. The detailed
+[PDF support roadmap](pdf-support-roadmap.md) is authoritative for scope,
+component ownership, phases, security, conformance claims, provenance, and legal
+review. Phase 0 removes the obsolete standalone-process assumptions and creates
+the decision and evidence controls; it does not revive old parser code or grant
+implementation clearance.
 
 ## Stabilization
 

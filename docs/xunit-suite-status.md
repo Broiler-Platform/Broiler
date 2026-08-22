@@ -30,7 +30,7 @@ most of what is listed below, and it is worth fixing before the list is.
 | `Broiler.Layout.Tests` | 1 | green — 1 126 tests |
 | `src/*.Tests` except the two below | 8 | green |
 | `src/Broiler.Wpt.Tests` | 1 | **54 failing** of 1 083 |
-| `src/Broiler.Cli.Tests` | 1 | **52 failing** of 3 485 (48 distinct tests) |
+| `src/Broiler.Cli.Tests` | 1 | **50 failing** of 3 482 (46 distinct tests) |
 
 `Broiler.Media.*` and `Broiler.Input.*` also live under `*.Tests` names but are
 not xUnit — they are `Exe` projects with their own `Main`, and nothing here
@@ -91,7 +91,7 @@ two failures at once. `Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_…` and
 `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Groups_…` are the same
 assertion.
 
-## `src/Broiler.Cli.Tests` — 48 distinct tests (52 cases)
+## `src/Broiler.Cli.Tests` — 46 distinct tests (50 cases)
 
 | Kind | Count | Examples |
 | --- | --- | --- |
@@ -99,7 +99,6 @@ assertion.
 | Acid targets not yet met | 4 | Acid3 scores 96; `PhaseD_…_At_Least_97` and `PhaseE_…_At_Least_100` state the targets, and `V7_Acid3_Image_Capture_Produces_Valid_Output` asserts 100. These are goals, not regressions. |
 | Architecture guards the code has drifted past | 4 | `HtmlBridgeArchitectureGuardTests` (files over the 750-line limit), `HtmlBridgeBoundaryGuardTests` (the frozen `Broiler.JavaScript.*` dependency set has grown to three), `DomWrapperFunctionTests` (`new JSFunction(` where `DomFunction` is wanted), `CssExtractionPhaseThreeTests`. Each names the refactor it wants; none can be closed by editing the test, which is the difference between these and the `CssExtractionPhaseZeroTests` fixed above. |
 | Missing artifact | 1 | `AcidRenderComparisonInfrastructureTests.Acid_Umbrella_Roadmap_Covers_All_Three_Tests` requires `docs/roadmap/acid-test-triage.md` with `## Acid1`, `## Acid2` and `## Acid3` headings. No such file has existed in this history, and writing one to satisfy the assertion would be inventing the plan it is meant to check. |
-| Environmental | 2 | `PdfToWordConverterTests` needs the `Broiler.Pdf` app, which a bare container does not build. |
 
 One more is load-sensitive rather than broken:
 `ScriptCompileAheadOverlapTests.Every_Source_Is_Compiled_By_A_Worker_When_The_Budget_Is_On`

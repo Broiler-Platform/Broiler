@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using Broiler.HTML.Image;
@@ -24,7 +23,6 @@ public class Program
         Broiler.Graphics.BImageCodecs.Use(
             new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
 
-        string? pdfInputPath = null;
         // Repeatable inputs: one is the single-input path this CLI has always had, more than
         // one is a batch. Accumulating rather than overwriting is what makes `--convert-doc a
         // --convert-doc b` mean both instead of only the last.
@@ -42,7 +40,6 @@ public class Program
         // Set by the parent on a fuzz shard so the child appends a machine-readable totals line
         // for it to sum. Not part of the documented surface — it only means anything to a parent.
         bool emitFuzzTotals = false;
-        bool preservePdfLayout = false;
         bool fullPage = false;
         bool testEngines = false;
         bool fuzzLayout = false;
@@ -59,9 +56,6 @@ public class Program
         {
             switch (args[i])
             {
-                case "--convert-pdf" when i + 1 < args.Length:
-                    pdfInputPath = args[++i];
-                    break;
                 case "--convert-doc" when i + 1 < args.Length:
                     convertDocInputs.Add(args[++i]);
                     break;
@@ -106,9 +100,6 @@ public class Program
                     }
 
                     fuzzSeed = parsedSeed;
-                    break;
-                case "--preserve-layout":
-                    preservePdfLayout = true;
                     break;
                 case "--timeout" when i + 1 < args.Length:
                     if (!int.TryParse(args[++i], out timeoutSeconds) || timeoutSeconds <= 0)
@@ -162,7 +153,6 @@ public class Program
                         return 1;
                     }
                     break;
-                case "--convert-pdf":
                 case "--convert-doc":
                 case "--url":
                 case "--capture-image":
@@ -308,35 +298,7 @@ public class Program
             return exitCode;
         }
 
-        if (pdfInputPath is not null)
-        {
-            try
-                {
-                    var converter = new PdfConverterProcessRunner();
-                    exitCode = await converter.RunAsync(pdfInputPath, output, preservePdfLayout);
-                }
-                catch (FileNotFoundException ex)
-                {
-                    Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
-                exitCode = 1;
-            }
-            catch (IOException ex)
-            {
-                Console.Error.WriteLine($"File I/O error: {ex.Message}");
-                exitCode = 1;
-            }
-            catch (InvalidOperationException ex)
-            {
-                Console.Error.WriteLine($"PDF conversion failed: {ex.Message}");
-                exitCode = 1;
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Unexpected error: {ex.Message}");
-                exitCode = 1;
-            }
-        }
-        else if (captureImageUrl is not null)
+        if (captureImageUrl is not null)
         {
             if (output is null)
             {
@@ -693,7 +655,6 @@ public class Program
 
     private static void PrintUsage()
     {
-        Console.WriteLine("Usage: Broiler.Cli --convert-pdf <PDF> [--output <FILE|DIR>] [--preserve-layout]");
         Console.WriteLine("Usage: Broiler.Cli --convert-doc <RTF|DOCX|HTML|MARKDOWN> --output <FILE.txt|FILE.rtf|FILE.docx|FILE.html|FILE.md>");
         Console.WriteLine("Usage: Broiler.Cli --url <URL> --output <FILE> [OPTIONS]");
         Console.WriteLine("       Broiler.Cli --capture-image <URL> --output <FILE> [OPTIONS]");
@@ -702,7 +663,6 @@ public class Program
         Console.WriteLine("       Broiler.Cli --fuzz-layout [--count <N>] [--output <DIR>]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  --convert-pdf <PDF>    Convert a PDF file via the external Broiler.Pdf app");
         Console.WriteLine("  --convert-doc <FILE>   Convert RTF/DOCX/HTML/Markdown to TXT, RTF, DOCX, HTML, or Markdown through Broiler.Documents");
         Console.WriteLine("  --url <URL>            The URL of the website to capture");
         Console.WriteLine("  --capture-image <URL>  Capture the website as an image (PNG or JPEG)");
@@ -713,7 +673,7 @@ public class Program
         Console.WriteLine("                         are drained between them, so an expression that starts the page's");
         Console.WriteLine("                         work has settled before the next one reads what it produced");
         Console.WriteLine("  --evaluate-html-output <FILE>  Also write the post-script DOM as HTML to FILE");
-        Console.WriteLine("  --output <FILE|DIR>    Output file path, or output directory for PDF conversion");
+        Console.WriteLine("  --output <FILE>        Output file path");
         Console.WriteLine("  --output-dir <DIR>     Output directory for a batch. --convert-doc, --url and");
         Console.WriteLine("                         --capture-image may each be repeated; with more than one input");
         Console.WriteLine("                         the items run concurrently and each result is written to");
@@ -723,7 +683,6 @@ public class Program
         Console.WriteLine("  --threads <N>          Concurrency for a batch or for --fuzz-layout (default: one per");
         Console.WriteLine("                         core). --threads 1 reproduces the sequential run exactly.");
         Console.WriteLine("  --seed <N>             Base seed for --fuzz-layout (default: a clock reading)");
-        Console.WriteLine("  --preserve-layout      Preserve PDF page layout and styling during PDF conversion");
         Console.WriteLine("  --width <PIXELS>       Image width in pixels (default: 1024, used with --capture-image)");
         Console.WriteLine("  --height <PIXELS>      Image height in pixels (default: 768, used with --capture-image)");
         Console.WriteLine("  --full-page            Capture the full page content");
@@ -745,9 +704,6 @@ public class Program
         Console.WriteLine("  --diagnostic-log <FILE>  Write the JavaScript failure log to FILE. On its own it records");
         Console.WriteLine("                         only that log; with --diagnostic-dir it relocates the log.");
         Console.WriteLine("  --help                 Show this help message");
-        Console.WriteLine();
-        Console.WriteLine("PDF conversion requires the standalone Broiler.Pdf app.");
-        Console.WriteLine("Set BROILER_PDF_APP or place Broiler.Pdf beside Broiler.Cli.");
     }
 
     /// <summary>
@@ -858,154 +814,3 @@ internal static class CaptureArtifactMetadata
         File.WriteAllText(GetSidecarPath(outputPath), json);
     }
 }
-
-internal sealed class PdfConverterProcessRunner
-{
-    private const string PdfAppEnvironmentVariable = "BROILER_PDF_APP";
-    private const string PdfAppName = "Broiler.Pdf";
-
-    public async Task<int> RunAsync(string inputPdfPath, string? outputPath, bool preserveLayout = false)
-    {
-        var command = ResolveCommand();
-        using var process = new Process
-        {
-            StartInfo = CreateStartInfo(command, inputPdfPath, outputPath, preserveLayout),
-        };
-
-        try
-        {
-            process.Start();
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Could not start the external PDF converter '{command.FileName}': {ex.Message}",
-                ex);
-        }
-
-        var standardOutputTask = process.StandardOutput.ReadToEndAsync();
-        var standardErrorTask = process.StandardError.ReadToEndAsync();
-
-        await process.WaitForExitAsync();
-
-        var standardOutput = await standardOutputTask;
-        var standardError = await standardErrorTask;
-
-        if (!string.IsNullOrEmpty(standardOutput))
-            Console.Out.Write(standardOutput);
-
-        if (!string.IsNullOrEmpty(standardError))
-            Console.Error.Write(standardError);
-
-        return process.ExitCode;
-    }
-
-    internal static PdfProcessCommand ResolveCommand()
-    {
-        var configuredCommand = TryResolveConfiguredCommand();
-        if (configuredCommand is not null)
-            return configuredCommand;
-
-        var adjacentCommand = TryResolveAdjacentCommand();
-        if (adjacentCommand is not null)
-            return adjacentCommand;
-
-        var sourceProjectCommand = TryResolveSourceProjectCommand();
-        if (sourceProjectCommand is not null)
-            return sourceProjectCommand;
-
-        throw new InvalidOperationException(
-            "Broiler PDF conversion now lives in the standalone Broiler.Pdf app. " +
-            "To continue, use one of these options: " +
-            "1) place Broiler.Pdf beside Broiler.Cli, " +
-            "2) set BROILER_PDF_APP to the Broiler.Pdf executable or .dll path, or " +
-            "3) run 'dotnet run --project src/Broiler.Pdf -- --input <PDF> [--output <FILE|DIR>]'.");
-    }
-
-    private static ProcessStartInfo CreateStartInfo(PdfProcessCommand command, string inputPdfPath, string? outputPath, bool preserveLayout)
-    {
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = command.FileName,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-
-        foreach (var argument in command.BaseArguments)
-            startInfo.ArgumentList.Add(argument);
-
-        startInfo.ArgumentList.Add("--input");
-        startInfo.ArgumentList.Add(inputPdfPath);
-
-        if (!string.IsNullOrWhiteSpace(outputPath))
-        {
-            startInfo.ArgumentList.Add("--output");
-            startInfo.ArgumentList.Add(outputPath);
-        }
-
-        if (preserveLayout)
-            startInfo.ArgumentList.Add("--preserve-layout");
-
-        return startInfo;
-    }
-
-    private static PdfProcessCommand? TryResolveConfiguredCommand()
-    {
-        var configuredPath = Environment.GetEnvironmentVariable(PdfAppEnvironmentVariable);
-        if (string.IsNullOrWhiteSpace(configuredPath))
-            return null;
-
-        var fullPath = Path.GetFullPath(configuredPath);
-        return CreateCommandForPath(fullPath)
-            ?? throw new InvalidOperationException(
-                $"{PdfAppEnvironmentVariable} points to '{fullPath}', but that file does not exist.");
-    }
-
-    private static PdfProcessCommand? TryResolveAdjacentCommand()
-    {
-        var baseDirectory = AppContext.BaseDirectory;
-        foreach (var candidate in new[]
-        {
-            Path.Combine(baseDirectory, PdfAppName),
-            Path.Combine(baseDirectory, PdfAppName + ".exe"),
-            Path.Combine(baseDirectory, PdfAppName + ".dll"),
-        })
-        {
-            var command = CreateCommandForPath(candidate);
-            if (command is not null)
-                return command;
-        }
-
-        return null;
-    }
-
-    private static PdfProcessCommand? TryResolveSourceProjectCommand()
-    {
-        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
-        {
-            var projectPath = Path.Combine(directory.FullName, "src", PdfAppName, PdfAppName + ".csproj");
-            if (File.Exists(projectPath))
-            {
-                return new PdfProcessCommand(
-                    "dotnet",
-                    ["run", "--project", projectPath, "--"]);
-            }
-        }
-
-        return null;
-    }
-
-    private static PdfProcessCommand? CreateCommandForPath(string candidatePath)
-    {
-        if (!File.Exists(candidatePath))
-            return null;
-
-        if (string.Equals(Path.GetExtension(candidatePath), ".dll", StringComparison.OrdinalIgnoreCase))
-            return new PdfProcessCommand("dotnet", [candidatePath]);
-
-        return new PdfProcessCommand(candidatePath, []);
-    }
-}
-
-internal sealed record PdfProcessCommand(string FileName, IReadOnlyList<string> BaseArguments);

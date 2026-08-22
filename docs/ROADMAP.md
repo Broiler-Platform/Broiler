@@ -1436,19 +1436,16 @@ publish an evidence-based preview support statement.
 
 ## PDF conversion decision
 
-`Broiler.Cli --convert-pdf` describes an external `Broiler.Pdf` application, but
-no `src/Broiler.Pdf` project exists in the current checkout. Do not continue an
-old parser milestone as though that baseline were present.
+The standalone `Broiler.Pdf` process path is retired. Native PDF support is being
+planned as an explicitly composed, in-process `Broiler.Documents.Pdf` codec; any
+reusable graphics, media, document-model, or pagination work belongs in its
+neutral owner. Scope, phases, security gates, feature claims, and legal review are
+maintained in the
+[PDF support roadmap](../Broiler.Documents/docs/pdf-support-roadmap.md).
 
-**Next action:** choose one of the following and record an owner:
-
-- restore/scaffold the standalone application and re-baseline its corpus,
-  dependencies, CLI compatibility, security limits, and M1 entry gate; or
-- remove the unavailable source-project fallback and narrow the CLI/documentation
-  claim to an explicitly external tool.
-
-**Exit gate:** the advertised CLI behavior resolves to a shipped, tested tool, or
-fails with documentation that exactly matches the supported configuration.
+**Exit gate:** the obsolete CLI/process path and tests remain absent, and future
+PDF behavior is advertised only after the roadmap's implementation, corpus,
+security, interoperability, and clearance gates pass.
 
 ## Maintenance policy
 

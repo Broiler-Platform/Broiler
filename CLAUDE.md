@@ -220,10 +220,8 @@ something to attempt from inside the container.
   the tracked `tests/wpt-baseline`. Nothing generated belongs in the index — the
   old `tests/html/wpt-results` and `tests/css/wpt-results` snapshots were
   retired for that reason.
-- Some `Broiler.Cli.Tests` (PDF conversion) and some `Wpt_*_MatchesReference`
-  tests can fail in a bare container for environmental reasons (missing
-  `Broiler.Pdf` app, font differences) — baseline before attributing a failure
-  to your change.
+- Some `Wpt_*_MatchesReference` tests can fail in a bare container because of
+  font differences — baseline before attributing a failure to your change.
 
 ## Conventions
 
