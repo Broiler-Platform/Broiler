@@ -691,6 +691,311 @@ class GapDocumentTests(unittest.TestCase):
         self.assertIn("No gaps were found on the compared pages.", report)
 
 
+class ErrorSignatureTests(unittest.TestCase):
+    def test_the_same_missing_api_groups_whatever_value_it_was_passed(self) -> None:
+        first = MODULE.error_signature('"TypeError: navigator.storage.estimate is not a function"')
+        second = MODULE.error_signature('"TypeError: navigator.storage.estimate is not a function"')
+
+        self.assertEqual(first, second)
+        self.assertEqual("TypeError: navigator.storage.estimate is not a function", first)
+
+    def test_incidental_detail_does_not_split_one_finding_into_many(self) -> None:
+        signatures = {
+            MODULE.error_signature('"SecurityError: blocked https://a.example/1.png after 30 ms"'),
+            MODULE.error_signature('"SecurityError: blocked https://b.example/2.png after 45 ms"'),
+        }
+
+        self.assertEqual(1, len(signatures))
+
+    def test_a_quoted_fragment_inside_a_message_is_normalized_not_swallowed(self) -> None:
+        signature = MODULE.error_signature('Failed to read \'localStorage\' from Window')
+
+        self.assertEqual("Failed to read <value> from Window", signature)
+
+    def test_a_probe_that_stored_nothing_still_has_a_signature(self) -> None:
+        self.assertEqual("(no message)", MODULE.error_signature(None))
+
+    def test_a_long_message_is_bounded(self) -> None:
+        signature = MODULE.error_signature("x" * 500)
+
+        self.assertLessEqual(len(signature), MODULE.ERROR_SIGNATURE_CHARS)
+
+
+class IssueDocumentTests(unittest.TestCase):
+    @staticmethod
+    def aggregate_with_errors() -> dict:
+        """A run whose gaps are mostly one thrown error across two pages."""
+
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        fingerprinting = aggregate["results"][0]["parity"]
+        fingerprinting["gaps"] = [
+            {
+                "test": "storage.estimate",
+                "name": "storage.estimate",
+                "broiler": "error",
+                "broilerValue": '"TypeError: navigator.storage.estimate is not a function"',
+                "referenceType": "object",
+                "referenceValue": '{"quota": 1}',
+            },
+            {
+                "test": "storage.persisted",
+                "name": "storage.persisted",
+                "broiler": "error",
+                "broilerValue": '"TypeError: navigator.storage.persisted is not a function"',
+                "referenceType": "boolean",
+                "referenceValue": "false",
+            },
+            {
+                "test": "screen.width",
+                "name": "screen.width",
+                "broiler": "empty",
+                "broilerValue": None,
+                "referenceType": "number",
+                "referenceValue": "1280",
+            },
+        ]
+        fingerprinting["summary"][MODULE.PARITY_GAP] = 3
+        fingerprinting["summary"]["broilerErrors"] = 2
+
+        # A second compared page carrying the same thrown error, so the grouping
+        # has something to collapse across pages.
+        gpc = aggregate["results"][1]
+        gpc["status"] = "ok"
+        gpc["reason"] = None
+        gpc["parity"] = {
+            "available": True,
+            "referenceStatus": "ok",
+            "reason": None,
+            "summary": {
+                "tests": 1,
+                MODULE.PARITY_MATCH: 0,
+                MODULE.PARITY_GAP: 1,
+                MODULE.PARITY_AHEAD: 0,
+                MODULE.PARITY_NEITHER: 0,
+                "broilerErrors": 1,
+            },
+            "gaps": [
+                {
+                    "test": "storage.estimate",
+                    "name": "storage.estimate",
+                    "broiler": "error",
+                    "broilerValue": '"TypeError: navigator.storage.estimate is not a function"',
+                    "referenceType": "object",
+                    "referenceValue": '{"quota": 2}',
+                }
+            ],
+            "broilerOnly": [],
+            "neither": [],
+            "divergentTypes": [],
+        }
+        aggregate["summary"].update({
+            "pagesOk": 2,
+            "pagesFailed": 0,
+            "pagesCompared": 2,
+            "gaps": 4,
+            "gapsFromErrors": 3,
+            "parity": 3,
+        })
+        return aggregate
+
+    def test_the_gap_issue_ranks_error_signatures_before_pages(self) -> None:
+        aggregate = self.aggregate_with_errors()
+        issue = MODULE.build_gap_issue(MODULE.build_gap_document(aggregate))
+
+        signatures = issue["errorSignatures"]
+        self.assertEqual(
+            "TypeError: navigator.storage.estimate is not a function", signatures[0]["signature"]
+        )
+        self.assertEqual(2, signatures[0]["count"])
+        self.assertEqual(["fingerprinting", "gpc"], signatures[0]["pages"])
+        self.assertEqual(["fingerprinting", "gpc"], [page["id"] for page in issue["pages"]])
+        self.assertEqual(3, issue["pages"][0]["gaps"])
+        self.assertEqual(2, issue["pages"][0]["errors"])
+
+    def test_the_gap_issue_body_carries_its_marker_and_the_evidence(self) -> None:
+        aggregate = self.aggregate_with_errors()
+        body = MODULE.render_gap_issue_markdown(
+            MODULE.build_gap_issue(MODULE.build_gap_document(aggregate)),
+            "https://example.invalid/run/1",
+        )
+
+        self.assertIn(MODULE.issue_marker(MODULE.ISSUE_KIND_GAPS), body)
+        self.assertIn("navigator.storage.estimate is not a function", body)
+        self.assertIn("`fingerprinting:storage.estimate`", body)
+        self.assertIn("`gpc:storage.estimate`", body)
+        self.assertIn("141.0.0.0", body)
+        self.assertIn("https://example.invalid/run/1", body)
+
+    def test_the_gap_issue_limit_bounds_both_rankings(self) -> None:
+        aggregate = self.aggregate_with_errors()
+        issue = MODULE.build_gap_issue(MODULE.build_gap_document(aggregate), limit=1)
+
+        self.assertEqual(1, len(issue["errorSignatures"]))
+        self.assertEqual(2, issue["errorSignatureCount"])
+        self.assertEqual(1, len(issue["pages"]))
+        self.assertEqual(2, issue["pageCount"])
+
+    def test_the_regression_issue_names_the_page_that_stopped_running(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        aggregate["results"][1]["comparison"]["regressions"] = [
+            {"test": "(page)", "from": "ok", "to": "failed"}
+        ]
+
+        issue = MODULE.build_regression_issue(aggregate)
+        body = MODULE.render_regression_issue_markdown(issue)
+
+        self.assertEqual(2, issue["count"])
+        self.assertTrue(any(page["stoppedRunning"] for page in issue["pages"]))
+        self.assertIn("| `screen.width` | value | empty |", body)
+        self.assertIn("stopped running altogether", body)
+        self.assertIn(MODULE.issue_marker(MODULE.ISSUE_KIND_REGRESSIONS), body)
+
+    def test_the_regression_issue_bounds_the_probes_it_lists_per_page(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        aggregate["results"][0]["comparison"]["regressions"] = [
+            {"test": f"probe-{index}", "from": "value", "to": "empty"} for index in range(5)
+        ]
+
+        issue = MODULE.build_regression_issue(aggregate, limit=2)
+        body = MODULE.render_regression_issue_markdown(issue)
+
+        self.assertEqual(5, issue["pages"][0]["probeCount"])
+        self.assertEqual(2, len(issue["pages"][0]["probes"]))
+        self.assertIn("… 3 more", body)
+
+    def test_the_unmeasured_issue_reports_the_page_neither_engine_measured(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+
+        issue = MODULE.build_unmeasured_issue(aggregate)
+        body = MODULE.render_unmeasured_issue_markdown(issue)
+
+        self.assertEqual(["gpc"], [page["id"] for page in issue["pages"]])
+        self.assertFalse(issue["pages"][0]["comparedWithChromium"])
+        self.assertIn("the page did not define a results object", body)
+        self.assertIn(MODULE.issue_marker(MODULE.ISSUE_KIND_UNMEASURED), body)
+
+    def test_a_deliberately_uncompared_run_reports_no_unmeasured_pages(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        aggregate["reference"]["disabled"] = True
+        aggregate["results"][1]["status"] = "ok"
+        aggregate["results"][0]["parity"]["available"] = False
+
+        issue = MODULE.build_unmeasured_issue(aggregate)
+
+        self.assertEqual(0, issue["count"])
+
+    def test_the_documents_say_which_findings_are_worth_filing(self) -> None:
+        documents = {
+            document["kind"]: document
+            for document in MODULE.build_issue_documents(
+                ReportRenderingTests.AGGREGATE,
+                MODULE.build_gap_document(ReportRenderingTests.AGGREGATE),
+            )
+        }
+
+        self.assertTrue(documents[MODULE.ISSUE_KIND_REGRESSIONS]["create"])
+        self.assertTrue(documents[MODULE.ISSUE_KIND_UNMEASURED]["create"])
+        self.assertTrue(documents[MODULE.ISSUE_KIND_GAPS]["create"])
+        self.assertIn("2026-01-01", documents[MODULE.ISSUE_KIND_GAPS]["title"])
+        self.assertIn("1 probe(s) behind Chromium", documents[MODULE.ISSUE_KIND_GAPS]["title"])
+
+    def test_a_clean_run_files_nothing(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        aggregate["results"][1]["status"] = "ok"
+        aggregate["results"][1]["parity"]["available"] = True
+        aggregate["results"][0]["parity"]["gaps"] = []
+        aggregate["results"][0]["comparison"]["regressions"] = []
+        aggregate["summary"].update({"gaps": 0, "regressions": 0, "pagesCompared": 2, "pagesOk": 2})
+
+        documents = MODULE.build_issue_documents(aggregate, MODULE.build_gap_document(aggregate))
+
+        self.assertEqual([], [document["kind"] for document in documents if document["create"]])
+
+    def test_a_run_that_compared_nothing_does_not_claim_zero_gaps_as_parity(self) -> None:
+        aggregate = copy.deepcopy(ReportRenderingTests.AGGREGATE)
+        aggregate["results"][0]["parity"]["available"] = False
+        aggregate["summary"].update({"gaps": 0, "pagesCompared": 0})
+
+        documents = {
+            document["kind"]: document
+            for document in MODULE.build_issue_documents(
+                aggregate, MODULE.build_gap_document(aggregate)
+            )
+        }
+
+        self.assertFalse(documents[MODULE.ISSUE_KIND_GAPS]["create"])
+        self.assertTrue(documents[MODULE.ISSUE_KIND_UNMEASURED]["create"])
+
+    def test_only_the_findings_are_written_and_the_index_names_them(self) -> None:
+        documents = MODULE.build_issue_documents(
+            ReportRenderingTests.AGGREGATE,
+            MODULE.build_gap_document(ReportRenderingTests.AGGREGATE),
+        )
+        for document in documents:
+            if document["kind"] == MODULE.ISSUE_KIND_UNMEASURED:
+                document["create"] = False
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory)
+            index = MODULE.write_issue_documents(output_root, documents, run_url="https://run")
+
+            issue_dir = output_root / MODULE.ISSUE_DIR_NAME
+            self.assertTrue((issue_dir / "gaps.md").is_file())
+            self.assertFalse((issue_dir / "unmeasured.md").exists())
+            self.assertEqual("https://run", index["runUrl"])
+            entries = {entry["kind"]: entry for entry in index["issues"]}
+            self.assertEqual("issues/gaps.md", entries[MODULE.ISSUE_KIND_GAPS]["body"])
+            self.assertIsNone(entries[MODULE.ISSUE_KIND_UNMEASURED]["body"])
+            self.assertEqual(
+                json.loads((issue_dir / MODULE.ISSUE_INDEX_NAME).read_text(encoding="utf-8")),
+                index,
+            )
+
+    def test_the_step_outputs_carry_the_counts_and_the_flags(self) -> None:
+        documents = MODULE.build_issue_documents(
+            ReportRenderingTests.AGGREGATE,
+            MODULE.build_gap_document(ReportRenderingTests.AGGREGATE),
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory)
+            index = MODULE.write_issue_documents(output_root, documents)
+            outputs_path = output_root / "step-output"
+            MODULE.write_github_outputs(outputs_path, index)
+
+            outputs = dict(
+                line.split("=", 1)
+                for line in outputs_path.read_text(encoding="utf-8").splitlines()
+                if line
+            )
+
+        self.assertEqual("3", outputs["issue_count"])
+        self.assertEqual("true", outputs["create_gaps_issue"])
+        self.assertEqual("true", outputs["create_regressions_issue"])
+        self.assertEqual("true", outputs["create_unmeasured_issue"])
+        self.assertEqual("1", outputs["gap_count"])
+        self.assertEqual("1", outputs["regression_count"])
+        self.assertEqual("1", outputs["unmeasured_page_count"])
+
+    def test_the_step_outputs_are_appended_not_overwritten(self) -> None:
+        documents = MODULE.build_issue_documents(
+            ReportRenderingTests.AGGREGATE,
+            MODULE.build_gap_document(ReportRenderingTests.AGGREGATE),
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory)
+            index = MODULE.write_issue_documents(output_root, documents)
+            outputs_path = output_root / "step-output"
+            outputs_path.write_text("already_there=1\n", encoding="utf-8")
+            MODULE.write_github_outputs(outputs_path, index)
+
+            text = outputs_path.read_text(encoding="utf-8")
+
+        self.assertTrue(text.startswith("already_there=1\n"))
+        self.assertIn("issue_count=3", text)
+
+
 class OutputRetentionTests(unittest.TestCase):
     def test_reusing_references_keeps_them_and_clears_everything_else(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -706,6 +1011,17 @@ class OutputRetentionTests(unittest.TestCase):
             self.assertTrue((page_dir / "reference.json").is_file())
             self.assertFalse((page_dir / "attempt-1.json").exists())
             self.assertFalse((output_root / "report.md").exists())
+
+    def test_a_stale_issue_body_never_survives_into_the_next_run(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output_root = Path(directory)
+            issue_dir = output_root / MODULE.ISSUE_DIR_NAME
+            issue_dir.mkdir(parents=True)
+            (issue_dir / "gaps.md").write_text("last week's gaps", encoding="utf-8")
+
+            MODULE.clear_previous_run(output_root, keep_references=True)
+
+            self.assertFalse(issue_dir.exists())
 
     def test_a_fresh_run_clears_the_references_too(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

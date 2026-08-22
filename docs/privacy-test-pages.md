@@ -215,6 +215,8 @@ job-summary.md      the workflow summary: totals, gaps, regressions, pages that 
 gaps.json           the Chromium comparison alone, with the expected value per gap
 gaps.md             the same, as the issue-ready document a reader files from
 reference.log       the Chromium capture's own output
+issues/index.json   what this run would file as a GitHub issue: kind, title, marker, counts
+issues/<kind>.md    the body of each issue worth filing (see "Issues" below)
 pages/<id>/
   results.json      the page's own results payload, as Broiler published it
   reference.json    the same page as Chromium published it, plus browser and diagnostics
@@ -225,13 +227,50 @@ pages/<id>/
 `gaps.md` is the one to read first: it lists, per page, every probe Chromium
 answered and Broiler did not, with what Chromium returned beside it.
 
+## Issues
+
+Like the WPT runners, a CI run files what it found as GitHub issues rather than
+leaving it in an artifact that expires. Three of them, because ranking them
+together would bury the two small ones under the large one:
+
+| Kind | What it carries | Filed when |
+| --- | --- | --- |
+| `regressions` | Probes that stopped producing a value, and pages that stopped running; a page that stopped running reports its probe count rather than every probe, since they all went for one reason. | Any regression against the baseline. |
+| `unmeasured` | Pages Broiler could not run, and pages with no Chromium reference, each with its reason. | Any such page — except a run that disabled the comparison itself. |
+| `gaps` | Probes Chromium answers and Broiler does not, ranked by thrown-error signature and then by page. | Any gap, on a run that compared at least one page. |
+
+The gaps issue leads with the error signatures because they are what collapses
+the list into work: a probe that threw is reported once per probe, and
+normalizing the quoted values, URLs and numbers out of the message regroups every
+probe that a single missing API gates into one row.
+
+`run-privacy-test-pages.py` decides all of this and writes the bodies —
+`--gap-issue-limit` and `--regression-issue-limit` bound them — so the rules live
+with the runner that measured them rather than in the workflow. `--github-output`
+writes the counts and `create_<kind>_issue` flags a workflow step files them
+from. A `--update-baseline` run files nothing: its comparison describes the
+baseline being replaced.
+
+Each body carries a hidden marker naming its kind, and
+`scripts/lib/github-issue.js` uses it to find the issue already open for that
+kind and refresh it in place — title, body, and a comment linking the run. This
+is the one place the suite deliberately differs from the WPT runners, which open
+a fresh issue per run: those are dispatched by a human who then reads them, while
+this one runs weekly and unattended over a backlog that changes slowly, so a
+second copy every Tuesday would bury the one somebody is working from.
+
 ## CI
 
 The `Privacy Test Pages` workflow runs weekly and on manual dispatch. It is not
 a pull-request gate: the inputs are public pages that change independently of
 this repository. A scheduled run fails on a regression against the baseline;
 `fail_on_regression`, `fail_on_incomplete`, `require_reference`,
-`skip_reference`, `pages`, and `update_baseline` are dispatch inputs.
+`skip_reference`, `pages`, `update_baseline`, `create_issues`,
+`gap_issue_limit`, and `regression_issue_limit` are dispatch inputs.
+It files its findings as the issues described above — a run that fails on a
+regression still files, since that is exactly the run with something to say —
+using `ISSUE_TOKEN` when the repository configures one and the workflow's own
+token otherwise. `create_issues: false` runs the suite without filing anything.
 `update_baseline` uploads the regenerated file as an artifact rather than
 committing it, so a baseline change stays a reviewed commit. The job prints
 `gaps.md` to its log as well as uploading it, so the comparison outlives the

@@ -204,7 +204,10 @@ something to attempt from inside the container.
   and only a probe that stops producing a value is a regression (the corpus is
   live, so additions, upstream removals and gaps never fail a run). Regenerate
   the baseline deliberately with `--update-baseline`, never to clear a red run.
-  See `docs/privacy-test-pages.md`.
+  A CI run also files its findings as GitHub issues — regressions, pages it could
+  not measure, gaps behind Chromium — refreshing the issue already open for each
+  kind rather than filing a duplicate every week. See
+  `docs/privacy-test-pages.md`.
 - WPT per-test limits: 30s timeout (`--timeout`, `BROILER_WPT_TIMEOUT_SECONDS`)
   and a 1024 MiB RAM cap (`--memory-limit-mb`, `BROILER_WPT_MEMORY_LIMIT_MB`,
   0 disables). The cap is on the *growth* of the rendering process's resident

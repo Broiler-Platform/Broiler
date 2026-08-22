@@ -16,6 +16,26 @@ name: Privacy Test Pages
 # produce a value and no longer does, or a page that stops running altogether.
 # Gaps behind Chromium are reported, never failed on: they are the backlog this
 # suite exists to describe, not a change this run introduced.
+#
+# Like the WPT runners, a run files what it found as GitHub issues rather than
+# leaving it in an artifact that expires — three of them, each answering a
+# different question, because ranking them together would bury the two small ones
+# under the large one:
+#
+#   1. the regressions (probes that stopped producing a value, pages that stopped
+#      running) — the only one describing a change this repository made;
+#   2. the pages this run could not measure at all, whose zero gaps otherwise read
+#      like the zero of a page in full parity;
+#   3. the probes Chromium answers and Broiler does not, grouped by thrown-error
+#      signature and by page, so one fix reads as one row.
+#
+# Unlike the WPT runners, which a human dispatches and then reads, this suite runs
+# weekly and unattended over a backlog that changes slowly, so a run refreshes the
+# issue already open for a kind rather than filing a near-identical copy beside
+# it. Each body carries a hidden marker naming its kind, and
+# scripts/lib/github-issue.js matches on it. run-privacy-test-pages.py decides
+# what is worth filing and writes the bodies, so the rules live with the runner
+# that measured them rather than in a second, drifting copy here.
 
 on:
   workflow_dispatch:
@@ -49,6 +69,22 @@ on:
         type: boolean
         required: false
         default: false
+      create_issues:
+        description: >
+          File (or refresh) the GitHub issues for this run's regressions, unmeasured
+          pages and gaps behind Chromium. A baseline rewrite never files any.
+        type: boolean
+        required: false
+        default: true
+      gap_issue_limit:
+        description: >
+          Maximum thrown-error signatures and pages to rank in the gaps issue.
+        required: false
+        default: '10'
+      regression_issue_limit:
+        description: Maximum regressed probes to list per page in the regressions issue.
+        required: false
+        default: '20'
   schedule:
     # Weekly. The pages are public, third-party, and change independently of
     # this repository, so a per-commit run would report their churn as ours.
@@ -56,10 +92,13 @@ on:
 
 permissions:
   contents: read
+  issues: write   # the run files its findings as issues
 
 env:
   RESULTS_DIR: artifacts/privacy-test-pages
   NODE_PATH: ${{ github.workspace }}/tests/wpt/node_modules
+  GAP_ISSUE_LIMIT: ${{ github.event.inputs.gap_issue_limit || '10' }}
+  REGRESSION_ISSUE_LIMIT: ${{ github.event.inputs.regression_issue_limit || '20' }}
 
 jobs:
   evaluate:
@@ -120,14 +159,17 @@ jobs:
         run: |
           python -m unittest scripts.tests.test_run_privacy_test_pages -v
           node --test scripts/tests/capture-privacy-reference.test.js
+          node --test scripts/tests/github-issue.test.js
 
       - name: Build Broiler.Cli
         shell: bash
         run: dotnet build src/Broiler.Cli/Broiler.Cli.csproj -c Release
 
       - name: Run the privacy test pages
+        id: evaluate
         shell: bash
         env:
+          PRIVACY_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           SELECTED_PAGES: ${{ github.event.inputs.pages || '' }}
           FAIL_ON_REGRESSION: ${{ github.event.inputs.fail_on_regression || 'true' }}
           FAIL_ON_INCOMPLETE: ${{ github.event.inputs.fail_on_incomplete || 'false' }}
@@ -138,6 +180,9 @@ jobs:
           args=(
             --output-dir "$RESULTS_DIR"
             --skip-build
+            --github-output "$GITHUB_OUTPUT"
+            --gap-issue-limit "$GAP_ISSUE_LIMIT"
+            --regression-issue-limit "$REGRESSION_ISSUE_LIMIT"
           )
           if [ -n "$SELECTED_PAGES" ]; then
             args+=(--pages "$SELECTED_PAGES")
@@ -197,6 +242,59 @@ jobs:
           path: ${{ env.RESULTS_DIR }}
           if-no-files-found: warn
           retention-days: 30
+
+      # One step for all three issues rather than one step each: the runner has
+      # already decided which of them are findings and written their titles and
+      # bodies, so a step per issue would only restate that decision in YAML.
+      # `!cancelled()` rather than `always()`: a run that fails on a regression is
+      # exactly the run whose issue still has to be filed, but a run a human
+      # cancelled measured only part of the corpus and should file nothing.
+      - name: File the run's findings as GitHub issues
+        if: >-
+          !cancelled()
+          && github.event.inputs.create_issues != 'false'
+          && steps.evaluate.outputs.issue_count != '0'
+        uses: actions/github-script@v8
+        with:
+          # Prefer the configured PAT/App token, then use this workflow's token.
+          github-token: ${{ secrets.ISSUE_TOKEN || github.token }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { createOrUpdateIssue } =
+              require(`${process.env.GITHUB_WORKSPACE}/scripts/lib/github-issue.js`);
+
+            const indexPath = path.join(process.env.RESULTS_DIR, 'issues', 'index.json');
+            if (!fs.existsSync(indexPath)) {
+              core.warning(
+                `No issue index at ${indexPath}: the runner stopped before it could decide ` +
+                'what this run found.');
+              return;
+            }
+
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}` +
+              `/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
+            const filed = index.issues.filter(issue => issue.create);
+            if (filed.length === 0) {
+              core.info('Nothing to file: this run found no regression, no unmeasured page and no gap.');
+              return;
+            }
+
+            for (const entry of filed) {
+              const body = fs.readFileSync(
+                path.join(process.env.RESULTS_DIR, entry.body), 'utf8').trim();
+              const result = await createOrUpdateIssue({
+                github,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                marker: entry.marker,
+                title: entry.title,
+                body,
+                runUrl,
+              });
+              core.info(`${result.action} the ${entry.kind} issue #${result.number}: ${result.url}`);
+            }
 
       - name: Upload the regenerated baseline
         if: always() && github.event.inputs.update_baseline == 'true'
