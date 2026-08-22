@@ -129,6 +129,12 @@ ERROR_SIGNATURE_CHARS = 160
 ERROR_SIGNATURE_URL_RE = re.compile(r"\bhttps?://\S+")
 ERROR_SIGNATURE_QUOTED_RE = re.compile(r"""(['"`])(?:\\.|(?!\1).)*\1""")
 ERROR_SIGNATURE_NUMBER_RE = re.compile(r"\b(?:0x[0-9a-fA-F]+|\d+(?:\.\d+)?)\b")
+# A thrown error reaches the issue builder as the JSON excerpt describe_value
+# made of it, which the excerpt limit can cut mid-string.  These read the two
+# fields that identify the error back out of such a fragment, so a signature is
+# decided by what threw rather than by where the excerpt happened to end.
+ERROR_SIGNATURE_NAME_RE = re.compile(r'"name"\s*:\s*"((?:\\.|[^"\\])*)')
+ERROR_SIGNATURE_MESSAGE_RE = re.compile(r'"message"\s*:\s*"((?:\\.|[^"\\])*)')
 
 
 class ManifestError(ValueError):
@@ -652,6 +658,13 @@ def compare_to_reference(
                 "name": expected.get("name", test),
                 "broiler": "error" if broiler_threw else broiler.get("outcome", OUTCOME_MISSING),
                 "broilerValue": describe_value(broiler.get("value")) if broiler_threw else None,
+                # Signed from the error itself rather than from the excerpt
+                # beside it: the excerpt is bounded evidence for a reader, and
+                # a message long enough to be cut would otherwise group by
+                # where the cut landed.
+                "broilerSignature": (
+                    error_signature(broiler.get("value")) if broiler_threw else None
+                ),
                 "referenceType": json_type_name(expected.get("value")),
                 "referenceValue": describe_value(expected.get("value")),
             })
@@ -1349,6 +1362,65 @@ def issue_marker(kind: str) -> str:
     return f"<!-- broiler:privacy-test-pages:{kind} -->"
 
 
+def _normalize_incidental(text: str) -> str:
+    """Replace the detail that differs between two reports of the same fault."""
+
+    text = ERROR_SIGNATURE_URL_RE.sub("<url>", text)
+    text = ERROR_SIGNATURE_QUOTED_RE.sub("<value>", text)
+    text = ERROR_SIGNATURE_NUMBER_RE.sub("<n>", text)
+    return " ".join(text.split())
+
+
+def _truncated_json_string(text: str, pattern: re.Pattern[str]) -> str | None:
+    """Read one JSON string field out of an excerpt that may end mid-value."""
+
+    match = pattern.search(text)
+    if match is None:
+        return None
+    fragment = match.group(1)
+    try:
+        return json.loads(f'"{fragment}"')
+    except ValueError:
+        # The excerpt ended inside an escape, so the fragment is not decodable
+        # on its own; its literal text still identifies the error.
+        return fragment
+
+
+def error_identity(value: Any) -> tuple[str | None, str | None] | None:
+    """The ``name`` and ``message`` of a thrown error, however it arrives.
+
+    ``is_error_value`` recognizes a thrown probe by shape, so the error reaches
+    a report as that object — or, once ``describe_value`` has excerpted it, as a
+    JSON rendering of it that the excerpt limit may have cut mid-string.  Both
+    are read here, because those two fields are what names the fault; the stack
+    is where it was thrown from, which is not the same question.  ``None`` means
+    the value is not a serialized error, and is what sends a plain message to
+    the caller's own handling.
+    """
+
+    if isinstance(value, Mapping):
+        name = value.get("name")
+        message = value.get("message")
+        if not isinstance(name, str) and not isinstance(message, str):
+            return None
+        return (
+            name if isinstance(name, str) else None,
+            message if isinstance(message, str) else None,
+        )
+    text = str(value if value is not None else "").strip()
+    if not text.startswith("{"):
+        return None
+    try:
+        decoded = json.loads(text)
+    except ValueError:
+        decoded = None
+    if isinstance(decoded, Mapping):
+        return error_identity(decoded)
+    name = _truncated_json_string(text, ERROR_SIGNATURE_NAME_RE)
+    message = _truncated_json_string(text, ERROR_SIGNATURE_MESSAGE_RE)
+    return None if name is None and message is None else (name, message)
+
+
 def error_signature(value: Any, limit: int = ERROR_SIGNATURE_CHARS) -> str:
     """Group thrown errors that differ only in their incidental detail.
 
@@ -1357,22 +1429,31 @@ def error_signature(value: Any, limit: int = ERROR_SIGNATURE_CHARS) -> str:
     usually differ only in the value they passed it, which is why quoted
     fragments, URLs and numbers are normalized away: one signature should mean
     one fix.
+
+    An error object is signed by its ``name`` and ``message`` alone.  Signing
+    the whole serialized object instead cannot group anything: every field that
+    names the fault is a quoted string, so the rule above would reduce it to
+    ``{<value>: <value>, …}`` — identical for every error — while the stack that
+    follows survives only as far as the excerpt limit, splitting one missing API
+    into a signature per truncation point.
     """
 
-    text = " ".join(str(value if value is not None else "").split())
-    if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
-        # describe_value JSON-encodes the stored value, so a plain error message
-        # arrives quoted; unwrap it before the quoted-detail rule below eats it.
-        try:
-            decoded = json.loads(text)
-        except ValueError:
-            text = text[1:-1]
-        else:
-            text = decoded if isinstance(decoded, str) else text
-    text = ERROR_SIGNATURE_URL_RE.sub("<url>", text)
-    text = ERROR_SIGNATURE_QUOTED_RE.sub("<value>", text)
-    text = ERROR_SIGNATURE_NUMBER_RE.sub("<n>", text)
-    text = " ".join(text.split())
+    identity = error_identity(value)
+    if identity is not None:
+        text = _normalize_incidental(": ".join(part for part in identity if part))
+    else:
+        text = " ".join(str(value if value is not None else "").split())
+        if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
+            # describe_value JSON-encodes the stored value, so a plain error
+            # message arrives quoted; unwrap it before the quoted-detail rule
+            # below eats it.
+            try:
+                decoded = json.loads(text)
+            except ValueError:
+                text = text[1:-1]
+            else:
+                text = decoded if isinstance(decoded, str) else text
+        text = _normalize_incidental(text)
     if not text:
         return "(no message)"
     return text if len(text) <= limit else f"{text[: limit - 1]}…"
@@ -1435,7 +1516,9 @@ def build_gap_issue(
         for gap in gaps:
             if gap.get("broiler") != "error":
                 continue
-            signature = error_signature(gap.get("broilerValue"))
+            # A gap document written before the signature was recorded still
+            # has to group, so the excerpt remains the fallback.
+            signature = gap.get("broilerSignature") or error_signature(gap.get("broilerValue"))
             entry = signatures.setdefault(
                 signature,
                 {"signature": signature, "count": 0, "pages": [], "examples": []},

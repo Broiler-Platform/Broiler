@@ -567,6 +567,29 @@ class ReferenceComparisonTests(unittest.TestCase):
             MODULE.extract_test_outcomes({"results": [{"id": "x", "value": thrown}]}),
         )
 
+    def test_a_thrown_gap_records_the_signature_of_the_error_itself(self) -> None:
+        # The excerpt beside a gap is bounded evidence, so a message longer than
+        # the limit survives only in part.  Signing the error where it is still
+        # whole is what keeps such a probe from grouping by where the cut fell.
+        message = "Cannot read property 'measureText' of null " + "detail " * 60
+        thrown = {"name": "TypeError", "message": message, "stack": "\n at probe:1:2"}
+        broiler = MODULE.extract_test_entries({"results": [{"id": "canvas", "value": thrown}]})
+        reference = self.reference([{"id": "canvas", "value": {"width": 12}}])
+
+        gap = MODULE.compare_to_reference(broiler, reference)["gaps"][0]
+
+        self.assertEqual(MODULE.error_signature(thrown), gap["broilerSignature"])
+        self.assertTrue(gap["broilerSignature"].startswith("TypeError: Cannot read property"))
+        self.assertLessEqual(len(gap["broilerValue"]), MODULE.VALUE_EXCERPT_CHARS)
+
+    def test_a_gap_that_did_not_throw_records_no_signature(self) -> None:
+        broiler = MODULE.extract_test_entries({"results": [{"id": "audio", "value": None}]})
+        reference = self.reference([{"id": "audio", "value": "44100"}])
+
+        gap = MODULE.compare_to_reference(broiler, reference)["gaps"][0]
+
+        self.assertIsNone(gap["broilerSignature"])
+
     def test_a_probe_neither_engine_answers_is_not_a_gap(self) -> None:
         broiler = MODULE.extract_test_entries({"results": [{"id": "websocket", "value": None}]})
         reference = self.reference([{"id": "websocket", "value": None}])
@@ -714,6 +737,67 @@ class ErrorSignatureTests(unittest.TestCase):
 
     def test_a_probe_that_stored_nothing_still_has_a_signature(self) -> None:
         self.assertEqual("(no message)", MODULE.error_signature(None))
+
+    @staticmethod
+    def thrown(message: str, *frames: str) -> dict[str, str]:
+        """One probe's caught error, in the shape the pages actually store."""
+
+        return {
+            "name": "TypeError",
+            "message": message,
+            "stack": "\n at " + ",\n at ".join(frames),
+        }
+
+    def test_a_thrown_error_object_is_signed_by_what_it_threw(self) -> None:
+        # Every field naming the fault is a quoted string, so signing the
+        # serialized object would reduce it to "{<value>: <value>, …}" — the
+        # same signature every error would get.
+        error = self.thrown("navigator.storage.estimate is not a function", "probe:1:2")
+
+        self.assertEqual(
+            "TypeError: navigator.storage.estimate is not a function",
+            MODULE.error_signature(error),
+        )
+
+    def test_one_missing_api_is_one_signature_however_deep_the_stack(self) -> None:
+        # The excerpt limit cuts a serialized error mid-stack, leaving a
+        # different unterminated tail per probe; grouping on that reported one
+        # null WebGL context as four separate findings.
+        null_frame = "Item:/_/Broiler.JS/Broiler.JavaScript.BuiltIns/Null/JSNull.cs:118"
+        signatures = {
+            MODULE.error_signature(
+                MODULE.describe_value(
+                    self.thrown(f"Cannot read property '{probe}' of null", null_frame, *frames)
+                )
+            )
+            for probe, frames in (
+                ("getParameter", ("inline:deferred-3:41", "run:deferred-3:12", "at:1:2")),
+                ("getSupportedExtensions", ("inline:deferred-3:41", "run:deferred-3:12")),
+                ("getContextAttributes", ("inline:deferred-3:41",)),
+                ("getShaderPrecisionFormat", ("inline:deferred-3:41", "run:deferred-3:12", "x:3:4")),
+            )
+        }
+
+        self.assertEqual({"TypeError: Cannot read property <value> of null"}, signatures)
+
+    def test_an_excerpted_error_signs_the_same_as_the_error_itself(self) -> None:
+        error = self.thrown("navigator.userAgentData is not defined", "probe:1:2", "run:3:4")
+
+        self.assertEqual(
+            MODULE.error_signature(error),
+            MODULE.error_signature(MODULE.describe_value(error)),
+        )
+
+    def test_an_error_that_says_nothing_reads_as_saying_nothing(self) -> None:
+        # Better an honest "(no message)" than the stringified object, which
+        # would rank as though it were a distinct finding.
+        self.assertEqual("(no message)", MODULE.error_signature({"name": "", "message": ""}))
+
+    def test_two_different_faults_are_not_collapsed_into_one_signature(self) -> None:
+        first = MODULE.error_signature(self.thrown("webkitRTCPeerConnection is not a constructor"))
+        second = MODULE.error_signature(self.thrown("navigator.connection is undefined"))
+
+        self.assertNotEqual(first, second)
 
     def test_a_long_message_is_bounded(self) -> None:
         signature = MODULE.error_signature("x" * 500)
