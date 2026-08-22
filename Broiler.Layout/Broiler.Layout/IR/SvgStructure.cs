@@ -71,6 +71,13 @@ internal sealed partial class SvgStructure
     private readonly Dictionary<int, SvgTransform> _transforms = [];
 
     /// <summary>
+    /// Start-tag offset → the transform in effect for that element's <em>ancestors</em> alone,
+    /// without its own. <c>transform-origin</c> conjugates an element's own transform and only its
+    /// own, so the two halves have to be separable.
+    /// </summary>
+    private readonly Dictionary<int, SvgTransform> _ancestorTransforms = [];
+
+    /// <summary>
     /// Start-tag offset → the element's own attributes, for every element the scan reached,
     /// painting or not.
     /// </summary>
@@ -162,6 +169,13 @@ internal sealed partial class SvgStructure
     /// </summary>
     public SvgTransform TransformAt(int index)
         => _transforms.TryGetValue(index, out var transform) ? transform : SvgTransform.Identity;
+
+    /// <summary>
+    /// The transform the element's ancestors put it under, without its own — the half a
+    /// <c>transform-origin</c> leaves alone.
+    /// </summary>
+    public SvgTransform AncestorTransformAt(int index)
+        => _ancestorTransforms.TryGetValue(index, out var transform) ? transform : SvgTransform.Identity;
 
     /// <summary>The attributes of the element starting at <paramref name="index"/>, painting or not.</summary>
     public bool TryGetAttributes(int index, out IReadOnlyDictionary<string, string> attributes)
@@ -313,6 +327,8 @@ internal sealed partial class SvgStructure
                 structure._rendered[m.Index] = inherited;
                 if (!transform.IsIdentity)
                     structure._transforms[m.Index] = transform;
+                if (!ancestorTransform.IsIdentity)
+                    structure._ancestorTransforms[m.Index] = ancestorTransform;
             }
 
             if (m.Groups["empty"].Value.Length > 0)

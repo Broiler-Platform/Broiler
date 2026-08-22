@@ -24,6 +24,17 @@ public sealed partial class DomBridge
         ApplySvgPresentationAttribute(element, props, "stroke", cascadeWins: true);
         ApplySvgPresentationAttribute(element, props, "stroke-width", preferInlineStyle: true);
 
+        // CSS Transforms 1 §6/§8. Both are presentation attributes in SVG 2 and both are read off
+        // the serialized markup by SvgRenderer, which sees no stylesheet of its own — so a
+        // `rect { transform-box: fill-box }` rule reached nothing at all, and the element's
+        // `transform` kept turning about the viewport origin instead of about its own box. That is
+        // the whole of what the 45 css-transforms/transform-origin/svg-origin-* tests measure;
+        // every one of them declares transform-box in a <style> block rather than as an attribute.
+        // Neither inherits, so the cascaded value is this element's own and may overwrite the
+        // attribute — the same reasoning `fill` and `stroke` are given above.
+        ApplySvgPresentationAttribute(element, props, "transform-box", cascadeWins: true);
+        ApplySvgPresentationAttribute(element, props, "transform-origin", cascadeWins: true);
+
         if (tag is "text" or "textpath")
         {
             ApplySvgPresentationAttribute(element, props, "font-size", preferInlineStyle: true);

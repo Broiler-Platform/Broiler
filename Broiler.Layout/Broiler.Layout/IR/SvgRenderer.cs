@@ -147,7 +147,17 @@ internal static partial class SvgRenderer
                 continue;
 
             var items = order.Open(m.Index);
-            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
+            // The rect's own geometry, needed before the transform because `transform-box:
+            // fill-box` makes this rectangle the reference box its `transform-origin` is measured
+            // in. It depends only on the attributes, so computing it first changes nothing else.
+            var rectBox = new RectangleF(
+                GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
+                GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
+
+            var elementTransform = structure.AncestorTransformAt(m.Index)
+                .Concat(OwnTransformAbout(attrs, rectBox))
+                .ToPageSpace(sx, sy, bounds.X + tx, bounds.Y + ty);
             if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
                 order.ClipLast(clip);
 
@@ -175,9 +185,7 @@ internal static partial class SvgRenderer
 
             // A pattern fill paints as tiles behind the shape, so it is resolved before the rect
             // item is added and leaves the rect's own fill empty; a stroke then draws over it.
-            var objectBounds = new RectangleF(
-                GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
-                GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
+            var objectBounds = rectBox;
             var rectFill = ResolveFill(
                 items, bounds, patterns, gradients, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
                 elementTransform);
