@@ -38,6 +38,7 @@ git -C <Submodule> log --oneline --grep '<subject>'
 | `0002-html-outermost-svg-author-display.patch` | `Broiler.HTML` | Let an outermost `<svg>` keep the display the author cascaded | An outermost `<svg>` is a replaced element, so its `display` is *initially* `inline`; the box tree substitutes `inline-block` for that (how an inline replaced box is laid out here) but applied the substitution to the **cascaded** value too, discarding whatever the author wrote. `svg { display: block }` therefore laid out inline — siblings side by side instead of stacked, and `margin: 0 auto` computing to zero rather than centring (`css/compositing/line-with-svg-background` is ten block `<svg>`s and came out two to a row) — and `svg { display: none }` was overridden into a visible box, so the hidden `<svg>` a page uses to carry nothing but a `<filter>` or `<defs>` painted (`css/filter-effects/tainting-css-dropshadow-currentcolor`, 97.4 % → 100 %). The cascaded value is now read on the outermost `<svg>` only: a nested one is SVG content rather than a CSS box and arrives already carrying its ancestor's `display: none`. |
 | `0003-css-link-matches-xlink-href.patch` | `Broiler.CSS` | Match `:link` on an SVG `<a>` that links through `xlink:href` | SVG 1.1 §17.1 gives `<a>` its link through `xlink:href`, and SVG 2 §14.1 adds plain `href` without retiring it, so either attribute alone makes the element a link. `CssSelectorMatcher` tested `href` alone, so an `<a xlink:href="…">` matched no `a:link` rule and the whole rule was dropped — `a:link rect { fill: lime }` left the red rectangle beneath it showing. Pairs with the main-repo fix that fires `load` at an outermost inline `<svg>`: WPT `svg/linking/reftests/href-a-element-attr-change` removes `href` from its own load handler and asserts the element keeps its link status, so until that handler ran the test passed without reaching its assertion at all. |
 | `0004-html-paint-transform-origin.patch` | `Broiler.HTML` | paint: apply a CSS transform about its transform-origin | CSS Transforms 1 §8 applies an element's `transform` about its `transform-origin`, and `PaintWalker` used the box centre for every element without reading the property. So a declared origin did nothing, and paint disagreed with the element's own script: `transform-origin: 0 0; transform: scale(0.5)` on a 100×100 box reported a rect at (0, 0) from `getBoundingClientRect` and painted it at (25, 25). Scaling *up* is worse than a displacement — a centre origin throws a top-left child clean off the canvas — so `css/filter-effects/filter-scaling-001` (#1774 entry 28, 50.1 %) rendered a blank page where half the viewport should be green. The grammar is main-repo (`Broiler.Layout.IR.CssTransformOrigin`, shared with the bridge's transform chain and the SVG renderer, unit-tested in `CssTransformOriginTests`); this patch is the two lines that reach it. |
+| `0005-html-row-flex-replaced-item.patch` | `Broiler.HTML` | parse: leave a row flex container's image unwrapped | `CorrectImgBoxes` wraps a block-level replaced element in an anonymous block, which is how such a box is laid out here — and blockification has already made a flex item's `<img>` block-level by the time it runs. For an item that wrapper is fatal: it *becomes* the flex item, so every size the flex algorithm resolves lands on it while the image inside keeps the width it was declared with. An `<img style="width:999px">` in a zero-width flex row could not shrink at all — not even with `min-width: 0`, the one spelling that always lets an item collapse — and simply overflowed its container. Column containers are deliberately excluded: they place items by ordinary block flow, and block flow is what cannot position a block-level replaced box, which is why the wrapper exists at all. |
 
 None is bumped as a pointer, and the main repo builds and passes without any of
 them.
@@ -66,7 +67,18 @@ way `0002`'s test does — it probes the pinned pointer and self-skips rather th
 going red. There is no main-repo fallback that can stand in for the paint half:
 the transform is emitted in `Broiler.HTML`'s own stacking walk.
 
-All four are listed in `scripts/apply-pending-wpt-patches.sh`, which the privacy
+`0005` is shaped the same way. The whole of the CSS Flexbox §4.5 sizing it unblocks
+is main-repo (`Broiler.Layout/Engine/CssBox.Flex.cs`: a replaced item's *content size
+suggestion* is its natural inline size rather than the width it was declared with, and
+its *transferred size suggestion* — its definite cross size through the aspect ratio —
+bounds that; plus the block-axis twins of both), and it is unit-tested unconditionally
+by `Broiler.Layout.Tests.FlexReplacedItemSizingTests`, which builds the unwrapped tree
+by hand and so passes with or without the patch. The patch is the one condition that
+produces that tree from a real document. Measured against Chromium goldens with it
+applied, `css/css-flexbox` goes 899 → 906 of 1439 and `css/css-sizing` 390 → 391 of 748,
+with `css/css-grid` unchanged at 1220 of 2343.
+
+All five are listed in `scripts/apply-pending-wpt-patches.sh`, which the privacy
 test-page and real-world render workflows run before their builds — so they
 reach those on top of the pinned pointer. The **WPT** workflows
 (`wpt-tests.yml`, `wpt-reftests.yml`) do not run that script today, so the WPT

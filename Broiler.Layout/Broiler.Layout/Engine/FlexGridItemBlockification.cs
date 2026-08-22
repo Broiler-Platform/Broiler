@@ -83,6 +83,40 @@ internal static class FlexGridItemBlockification
         display is "flex" or "inline-flex" or "grid" or "inline-grid";
 
     /// <summary>
+    /// Whether <paramref name="box"/> is an in-flow item of a <em>row</em> flex container — a child
+    /// this pass blockified, rather than a box that merely became block-level on its own.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Blockification runs before the box fix-ups, so an <c>&lt;img&gt;</c> item reaches them as
+    /// <c>display: block</c> — and the fix-up for a block-level replaced element wraps it in an
+    /// anonymous block, because that is how such a box is laid out here. For an item that wrapper is
+    /// fatal rather than helpful: it becomes the flex item, so every size the flex algorithm
+    /// resolves is applied to <em>it</em> and the image inside keeps whatever width it was declared
+    /// with. A <c>&lt;img style="width:999px"&gt;</c> in a zero-width flex row could not shrink at
+    /// all — not even with <c>min-width: 0</c>, which is the one spelling that always lets an item
+    /// collapse — and simply overflowed its container, which is the shape of nearly every image in
+    /// a flex row on the real web.
+    /// </para>
+    /// <para>
+    /// A <em>column</em> container is deliberately not included. Its items are placed by ordinary
+    /// block flow rather than by the arranging loop a row container runs, and block flow is what
+    /// cannot position a block-level replaced box — which is why the wrapper exists at all. Without
+    /// it a column container's image landed at the document origin, on top of whatever preceded the
+    /// container. A row container arranges its items itself, so it needs no such help.
+    /// </para>
+    /// <para>
+    /// This is the predicate that fix-up asks before wrapping. It lives here, with the pass that
+    /// created the block display in the first place, so the two cannot disagree about what an item
+    /// is.
+    /// </para>
+    /// </remarks>
+    internal static bool IsRowFlexItem(CssBox box) =>
+        box?.ParentBox is { } parent
+        && parent.IsRowFlexContainer()
+        && IsInFlowItem(box);
+
+    /// <summary>
     /// CSS Flexbox §4 / CSS Grid §6: "each contiguous sequence of child text runs is wrapped in an
     /// anonymous block container flex item… However, if the entire sequence of child text runs
     /// contains only white space it is instead not rendered."

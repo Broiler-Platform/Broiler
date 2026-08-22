@@ -29,6 +29,14 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         public double Shrink { get; init; }
         public double BaseOuterWidth { get; init; }
         public double TargetOuterWidth { get; set; }
+
+        /// <summary>
+        /// The item's cross-axis content height when that size is definite before layout — its own
+        /// <c>height</c>, or the height it stretches to in a container whose cross size is definite.
+        /// <see langword="null"/> when the cross size is content-based, which is when CSS Flexbox
+        /// §4.5 has no transferred size suggestion to offer.
+        /// </summary>
+        public double? DefiniteCrossContentHeight { get; init; }
     }
 
     private sealed class FlexLineLayout
@@ -128,17 +136,26 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         var lines = new List<FlexLineLayout>();
         var currentLine = new FlexLineLayout();
 
+        // Read before the items are measured, not after: an item's *cross* size is what CSS
+        // Flexbox §4.5 transfers through an aspect ratio to bound its main size, and the container's
+        // definite content height is where a stretched item's cross size comes from.
+        double? definiteContentHeight = TryGetDefiniteContentHeight();
+
         foreach (var child in Boxes)
         {
             if (!IsInFlowFlexItem(child))
                 continue;
+
+            double? itemCrossContentHeight =
+                ResolveFlexItemDefiniteCrossContentHeight(child, definiteContentHeight);
 
             var item = new FlexItemLayout
             {
                 Box = child,
                 Grow = ParseFlexFactor(child.FlexGrow, 0),
                 Shrink = ParseFlexFactor(child.FlexShrink, 1),
-                BaseOuterWidth = ResolveFlexItemBaseOuterWidth(child, contentWidth)
+                DefiniteCrossContentHeight = itemCrossContentHeight,
+                BaseOuterWidth = ResolveFlexItemBaseOuterWidth(child, contentWidth, itemCrossContentHeight)
             };
 
             item.TargetOuterWidth = item.BaseOuterWidth;
@@ -161,7 +178,6 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         double cursorY = contentTop;
         bool reverse = FlexDirection?.Trim().Equals("row-reverse", StringComparison.OrdinalIgnoreCase) == true;
-        double? definiteContentHeight = TryGetDefiniteContentHeight();
 
         foreach (var line in lines)
         {
@@ -307,7 +323,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         child.Display != CssConstants.None
         && child.Position is not (CssConstants.Absolute or CssConstants.Fixed);
 
-    private static double ResolveFlexItemBaseOuterWidth(CssBox child, double containerContentWidth)
+    private static double ResolveFlexItemBaseOuterWidth(
+        CssBox child, double containerContentWidth, double? definiteCrossContentHeight)
     {
         double borderBoxWidth;
         string basis = child.FlexBasis?.Trim();
@@ -335,7 +352,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             borderBoxWidth = preferred + child.ActualBorderLeftWidth + child.ActualBorderRightWidth;
         }
 
-        borderBoxWidth = ClampFlexItemBorderBoxWidth(child, borderBoxWidth, containerContentWidth);
+        borderBoxWidth = ClampFlexItemBorderBoxWidth(
+            child, borderBoxWidth, containerContentWidth, definiteCrossContentHeight);
         return borderBoxWidth + child.ActualMarginLeft + child.ActualMarginRight;
     }
 
@@ -362,6 +380,86 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return true;
     }
 
+    /// <summary>
+    /// The cross-axis <em>content</em> height a row flex item is known to have before its main size
+    /// is resolved, after <c>min-height</c>/<c>max-height</c>: its own <c>height</c>, or the height
+    /// it stretches to in a container whose cross size is definite, or — for a replaced item — its
+    /// natural height. <see langword="null"/> when it has none of those, which is when there is
+    /// nothing for CSS Flexbox §4.5 to transfer through the aspect ratio.
+    /// </summary>
+    /// <remarks>
+    /// The cross <em>constraints</em> are the reason the natural height is a source here at all. An
+    /// <c>&lt;img&gt;</c> with <c>max-height</c> and an auto height has no stated cross size, but
+    /// the height it will use is still bounded — and css-flexbox/flex-minimum-width-flex-items-010
+    /// and -012 are exactly that shape, asserting that the implied minimum main size follows the
+    /// clamped cross size through the ratio rather than the bitmap's own width.
+    /// </remarks>
+    private double? ResolveFlexItemDefiniteCrossContentHeight(
+        CssBox child, double? containerDefiniteContentHeight)
+    {
+        double blockEdges = child.ActualBorderTopWidth + child.ActualBorderBottomWidth
+                          + child.ActualPaddingTop + child.ActualPaddingBottom;
+
+        double? crossContentHeight = null;
+
+        if (!string.IsNullOrEmpty(child.Height) && child.Height != CssConstants.Auto)
+        {
+            double specified = ParseFlexLengthOrZero(
+                child, child.Height, containerDefiniteContentHeight ?? 0);
+            crossContentHeight = child.ResolveSpecifiedHeightToBorderBox(specified) - blockEdges;
+        }
+        else if (containerDefiniteContentHeight is { } lineCross
+                 && ResolveFlexItemAlignment(child) == "stretch"
+                 && !child.IsSpecifiedMarginTopAuto
+                 && !child.IsSpecifiedMarginBottomAuto)
+        {
+            // §9.4 step 11: an item with an auto cross size, no auto cross margin and `stretch`
+            // alignment is sized to the line — and a single line's cross size is the container's
+            // own definite content height.
+            crossContentHeight = lineCross
+                - child.ActualMarginTop - child.ActualMarginBottom
+                - blockEdges;
+        }
+        else if (child.TryGetNaturalReplacedSize(out SizeF natural) && natural.Height > 0)
+        {
+            crossContentHeight = natural.Height;
+        }
+
+        if (crossContentHeight is not { } cross)
+            return null;
+
+        cross = child.ToContentBoxBounds(child.ResolveBlockSizeBounds(), blockEdges).Clamp(cross);
+        return cross > 0 ? cross : null;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §4.5 <em>transferred size suggestion</em>: for an item with a preferred aspect
+    /// ratio and a definite cross size, the main size that cross size converts to through the ratio.
+    /// It is what bounds the content size suggestion, so a replaced item stretched to a short flex
+    /// line is allowed to shrink to the width that ratio asks for rather than to its bitmap's.
+    /// </summary>
+    private static bool TryGetTransferredSizeSuggestion(
+        CssBox child, double? definiteCrossContentHeight, out double borderBoxWidth)
+    {
+        borderBoxWidth = 0;
+
+        if (definiteCrossContentHeight is not { } crossContentHeight || crossContentHeight <= 0)
+            return false;
+
+        if (!child.TryGetNaturalReplacedSize(out SizeF natural) || natural.Height <= 0)
+            return false;
+
+        double ratio = natural.Width / natural.Height;
+        if (TryParseAspectRatio(child.AspectRatio, out double preferred) && preferred > 0)
+            ratio = preferred;
+
+        if (ratio <= 0)
+            return false;
+
+        borderBoxWidth = child.ResolveSpecifiedWidthToBorderBox(crossContentHeight * ratio);
+        return borderBoxWidth > 0;
+    }
+
     private static double ParseFlexLengthOrZero(CssBox box, string value, double percentBase)
     {
         try
@@ -374,7 +472,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
     }
 
-    private static double ClampFlexItemBorderBoxWidth(CssBox child, double borderBoxWidth, double containerContentWidth)
+    private static double ClampFlexItemBorderBoxWidth(
+        CssBox child,
+        double borderBoxWidth,
+        double containerContentWidth,
+        double? definiteCrossContentHeight)
     {
         if (!string.IsNullOrEmpty(child.MaxWidth) && !child.MaxWidth.Equals("none", StringComparison.OrdinalIgnoreCase))
         {
@@ -402,6 +504,33 @@ internal partial class CssBox : CssBoxProperties, IDisposable
             // which is the suggestion §4.5 actually asks for. `min-width: 0` was the workaround
             // that worked, because it takes the branch below instead of this one.
             child.GetContentMinMaxWidth(out double contentSuggestion, out _);
+
+            // §4.5 *content size suggestion*: the item's min-content main size. For a replaced item
+            // that is its NATURAL inline size — the bitmap's width — not the width the author
+            // declared. The measurement above reports the width the box was laid out at even with
+            // the box's own width suppressed (its whole purpose), because a replaced box's single
+            // word carries the used size; so an <img style="width:999px"> claimed a 999px
+            // min-content size and pinned the item there however much its container asked it to
+            // shrink. Only the flex minimum reads it this way — grid track sizing asks the same
+            // method a different question — so the correction lives here.
+            if (child.TryGetNaturalReplacedSize(out SizeF naturalItem) && naturalItem.Width > 0)
+            {
+                contentSuggestion = naturalItem.Width
+                    + child.ActualBorderLeftWidth + child.ActualBorderRightWidth
+                    + child.ActualPaddingLeft + child.ActualPaddingRight;
+            }
+
+            // §4.5 *transferred size suggestion*: when the item has a preferred aspect ratio and a
+            // definite cross size, that cross size converted through the ratio bounds the content
+            // size suggestion. An <img> stretched to a 50px-tall flex line has a min-content width
+            // of 50 × 300/150 = 100px, not the 300px its bitmap is wide — which is what
+            // css-flexbox/flex-minimum-width-flex-items-013 measures, and what decides whether an
+            // image in a fixed-height flex row shrinks to its line or overflows it.
+            if (TryGetTransferredSizeSuggestion(child, definiteCrossContentHeight, out double transferred)
+                && transferred < contentSuggestion)
+            {
+                contentSuggestion = transferred;
+            }
 
             double minContentWidth = contentSuggestion;
 
@@ -527,7 +656,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                     double borderBoxWidth = ClampFlexItemBorderBoxWidth(
                         item.Box,
                         Math.Max(0, target - marginWidth),
-                        contentWidth);
+                        contentWidth,
+                        item.DefiniteCrossContentHeight);
 
                     item.TargetOuterWidth = borderBoxWidth + marginWidth;
                 }
@@ -853,6 +983,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
             double minBorderBoxHeight = ContentHeight();
 
+            // §4.5 in the block axis, the twin of the two corrections
+            // <see cref="ClampFlexItemBorderBoxWidth"/> makes: a replaced item's *content size
+            // suggestion* is its natural block size rather than the height block flow settled on
+            // (which is the height the container already squashed it to), and its *transferred size
+            // suggestion* — its definite cross size through the aspect ratio — bounds that.
+            if (child.TryGetNaturalReplacedSize(out SizeF naturalItem) && naturalItem.Height > 0)
+                minBorderBoxHeight = child.ResolveSpecifiedHeightToBorderBox(naturalItem.Height);
+
+            if (TryGetColumnTransferredSizeSuggestion(child, out double transferred)
+                && transferred < minBorderBoxHeight)
+            {
+                minBorderBoxHeight = transferred;
+            }
+
             if (TryGetSpecifiedBlockSizeSuggestion(child, containerContentHeight, out double specified)
                 && specified < minBorderBoxHeight)
             {
@@ -876,6 +1020,44 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         contentHeight = measured;
         return Math.Max(0, borderBoxHeight);
+    }
+
+    /// <summary>
+    /// CSS Flexbox §4.5 <em>transferred size suggestion</em> in the block axis: the height a column
+    /// flex item's cross (inline) size converts to through its preferred aspect ratio. The cross
+    /// size is the width the item has already been given — a column container resolves its items'
+    /// inline axis before their main sizes — clamped by <c>min-width</c>/<c>max-width</c>.
+    /// </summary>
+    private static bool TryGetColumnTransferredSizeSuggestion(CssBox child, out double borderBoxHeight)
+    {
+        borderBoxHeight = 0;
+
+        if (!child.TryGetNaturalReplacedSize(out SizeF natural) || natural.Height <= 0)
+            return false;
+
+        double ratio = natural.Width / natural.Height;
+        if (TryParseAspectRatio(child.AspectRatio, out double preferred) && preferred > 0)
+            ratio = preferred;
+
+        if (ratio <= 0)
+            return false;
+
+        double inlineEdges = child.ActualBorderLeftWidth + child.ActualBorderRightWidth
+                           + child.ActualPaddingLeft + child.ActualPaddingRight;
+        double crossContentWidth = child.Size.Width - inlineEdges;
+
+        if (crossContentWidth <= 0)
+            return false;
+
+        crossContentWidth = child
+            .ToContentBoxBounds(child.ResolveInlineSizeBounds(), inlineEdges)
+            .Clamp(crossContentWidth);
+
+        if (crossContentWidth <= 0)
+            return false;
+
+        borderBoxHeight = child.ResolveSpecifiedHeightToBorderBox(crossContentWidth / ratio);
+        return borderBoxHeight > 0;
     }
 
     private static bool IsVisibleOverflow(string overflow) =>
