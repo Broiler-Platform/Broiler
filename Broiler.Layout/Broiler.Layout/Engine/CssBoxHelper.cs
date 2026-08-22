@@ -305,6 +305,23 @@ internal static class CssBoxHelper
         if (box.Display == CssConstants.Table)
             paddingSum += CssLayoutEngineTable.GetTableSpacing(box);
 
+        // CSS Sizing 3 §5.2.1: a replaced box's intrinsic inline size is its own — it has no
+        // contents to walk for one. An <img> carries a word to be measured, but a <canvas>, a
+        // <video> or an <svg> carries none: this walk found nothing in it and contributed zero, so
+        // a shrink-to-fit box around one came out as wide as its other content and no wider. The
+        // canvas of css-sizing/intrinsic-percent-replaced-001 sizes itself correctly from its
+        // `height: 100%` and its ratio; it was the float around it that collapsed to nothing.
+        if (box.Words.Count == 0
+            && box.IntrinsicReplacedSize is { Width: > 0, Height: > 0 } natural)
+        {
+            box.ResolveReplacedContentSize(natural, box.ContainingBlock?.Size.Width ?? 0,
+                out double replacedContentWidth, out _);
+
+            maxSum += replacedContentWidth;
+            min = Math.Max(min, replacedContentWidth);
+            return;
+        }
+
         if (box.Words.Count > 0)
         {
             // calculate the min and max sum for all the words in the box

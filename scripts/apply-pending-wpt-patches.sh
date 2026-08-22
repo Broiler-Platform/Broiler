@@ -344,6 +344,22 @@ set -euo pipefail
 # css/filter-effects/filter-scaling-001 (#1774 entry 28, 50.1%) is `transform-origin: 0 0;
 # transform: scale(5)` and rendered a blank page where half the viewport should be green.
 #
+# 0005 (Broiler.HTML, "parse: leave a row flex container's image unwrapped") IS listed, and it is
+# the half of a two-repo fix that decides whether the flex algorithm reaches the image at all. The
+# box fix-up for a block-level replaced element wraps it in an anonymous block, and blockification
+# has already made a flex item's <img> block-level by the time that runs — so the wrapper became the
+# flex item and every size the algorithm resolved landed on it, while the image inside kept the
+# width it was declared with. An <img style="width:999px"> in a zero-width flex row could not shrink
+# at all, not even with min-width: 0, and overflowed its container; that is the shape of nearly
+# every image in a flex row on the real web, so it is not a corner. The main-repo half is the whole
+# of the §4.5 sizing this unblocks (Broiler.Layout.Engine.CssBox.Flex's content and transferred size
+# suggestions for a replaced item, unit-tested unconditionally in
+# Broiler.Layout.Tests.FlexReplacedItemSizingTests, which builds the unwrapped tree by hand and so
+# passes with or without this patch), and the patch is the one condition that produces that tree
+# from a real document. Measured against Chromium goldens with the patch applied,
+# css/css-flexbox goes 899 -> 906 of 1439 and css/css-sizing 390 -> 391 of 748, with css/css-grid
+# unchanged at 1220 of 2343.
+#
 # The grammar it calls is main-repo (Broiler.Layout.IR.CssTransformOrigin, unit-tested in
 # CssTransformOriginTests and shared with the bridge's transform chain and the SVG renderer), so
 # this patch is the two lines that reach it. It is also the entry whose absence a pixel suite is
@@ -356,6 +372,7 @@ PENDING_PATCHES=(
   "Broiler.HTML|patches/0002-html-outermost-svg-author-display.patch"
   "Broiler.CSS|patches/0003-css-link-matches-xlink-href.patch"
   "Broiler.HTML|patches/0004-html-paint-transform-origin.patch"
+  "Broiler.HTML|patches/0005-html-row-flex-replaced-item.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

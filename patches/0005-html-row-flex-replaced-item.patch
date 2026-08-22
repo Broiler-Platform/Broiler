@@ -1,0 +1,51 @@
+From dc53f9c6715b75f5632842211d8372bdd4de6b31 Mon Sep 17 00:00:00 2001
+From: Enrico Bartky <enrico.bartky@gmail.com>
+Date: Sat, 22 Aug 2026 16:21:13 +0000
+Subject: [PATCH] parse: leave a row flex container's image unwrapped
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+CorrectImgBoxes wraps a block-level replaced element in an anonymous
+block, which is how such a box is laid out here. Blockification runs
+first, so an <img> that is a flex item reaches this fix-up as
+display: block and was wrapped too — and for an item the wrapper is
+fatal: it becomes the flex item, so every size the flex algorithm
+resolves lands on it while the image inside keeps the width it was
+declared with. An <img style="width:999px"> in a zero-width flex row
+could not shrink at all, not even with min-width: 0, and simply
+overflowed its container.
+
+The predicate is main-repo (Broiler.Layout.Engine
+.FlexGridItemBlockification.IsRowFlexItem), alongside the pass that
+gave the item its block display. It deliberately excludes column
+containers: their items are placed by ordinary block flow, and block
+flow is what cannot position a block-level replaced box — which is why
+the wrapper exists. A row container arranges its items itself.
+---
+ Source/Broiler.HTML.Orchestration/Parse/DomParser.cs | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+index 15f2716..1bbac7e 100644
+--- a/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
++++ b/Source/Broiler.HTML.Orchestration/Parse/DomParser.cs
+@@ -938,7 +938,14 @@ internal sealed class DomParser
+         for (int i = box.Boxes.Count - 1; i >= 0; i--)
+         {
+             var childBox = box.Boxes[i];
+-            if (childBox is CssBoxImage && childBox.Display == CssConstants.Block)
++
++            // A row flex container's item is never wrapped: the wrapper would become the item, so
++            // every size the flex algorithm resolves would land on it and the image inside would
++            // keep the width it was declared with. See FlexGridItemBlockification.IsRowFlexItem,
++            // which is where that decision and the blockification that creates this `block`
++            // display live together.
++            if (childBox is CssBoxImage && childBox.Display == CssConstants.Block
++                && !Broiler.Layout.Engine.FlexGridItemBlockification.IsRowFlexItem(childBox))
+             {
+                 var block = CssBoxHelper.CreateBlock(childBox.ParentBox, baseUrl, null, childBox);
+                 childBox.ParentBox = block;
+-- 
+2.43.0
+

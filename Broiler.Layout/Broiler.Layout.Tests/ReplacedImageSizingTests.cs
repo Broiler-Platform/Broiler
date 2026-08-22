@@ -274,6 +274,48 @@ public sealed class ReplacedImageSizingTests
         Assert.Equal(expectedHeight, contentHeight, 3);
     }
 
+    // ─────────── the content box the replaced rules answer in, and the border box ───────────
+
+    /// <summary>
+    /// CSS2.1 §10.3.2/§10.6.2 answer in <em>content</em> sizes — that is the frame the natural size
+    /// and the ratio are stated in — so the used border box is the content box plus the edges,
+    /// whatever <c>box-sizing</c> says. Converting as though the number were an author-specified
+    /// length made <c>box-sizing: border-box</c> a no-op in the wrong direction and dropped the
+    /// padding and border entirely: a 16×16 image with <c>padding: 1px 2px 3px 4px</c> reported a
+    /// 16×16 border box where its content alone is 16×16 (css-flexbox/image-as-flexitem-size-007),
+    /// and one sized from the other axis through its ratio came out the content size in both.
+    /// </summary>
+    [Theory]
+    [InlineData("content-box", 22, 20)]
+    [InlineData("border-box", 22, 20)]
+    public void A_Replaced_Border_Box_Is_Its_Content_Box_Plus_The_Edges(
+        string boxSizing, double expectedWidth, double expectedHeight)
+    {
+        var environment = new FakeLayoutEnvironment(new ImageIntrinsics(16, 16, true));
+
+        var root = new CssBox(null, null, BaseUrl)
+        {
+            Display = "block",
+            Size = new SizeF(400, 400),
+            LayoutEnvironment = environment,
+        };
+        var box = new CssBox(root, new HtmlTag("canvas", false, null), BaseUrl)
+        {
+            Display = "block",
+            BoxSizing = boxSizing,
+            PaddingTop = "1px",
+            PaddingRight = "2px",
+            PaddingBottom = "3px",
+            PaddingLeft = "4px",
+            IntrinsicReplacedSize = new SizeF(16, 16),
+            LayoutEnvironment = environment,
+        };
+
+        Assert.True(box.TryResolveReplacedBorderBoxSize(400, out double width, out double height));
+        Assert.Equal(expectedWidth, width, 3);
+        Assert.Equal(expectedHeight, height, 3);
+    }
+
     // Minimal ILayoutEnvironment: a fixed font, and the one image's intrinsics.
     private sealed class FakeLayoutEnvironment(ImageIntrinsics intrinsics) : Broiler.Layout.ILayoutEnvironment
     {
