@@ -451,26 +451,15 @@ other direction. None is a sizing bug.
 - **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
   elsewhere.
 
-### A size-contained `<img>`, `<svg>`, `<video>` or `<iframe>` still reports a size
+### A size-contained `<svg>`, `<video>` or `<iframe>` still reports a size
 
-The 64 assertions left in `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003`
-(32 of 96 pass) after
-[size containment landed](wpt-rendering-gaps-fixed.md#contain-size-did-nothing-to-a-boxs-size-and-contain-intrinsic-size-was-not-parsed).
-Its `<div>` and `<canvas>` rows pass; the other four element types fail, and **neither
-cause is about containment**.
+The 54 assertions left in `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003`
+(42 of 96 pass) after
+[size containment landed](wpt-rendering-gaps-fixed.md#contain-size-did-nothing-to-a-boxs-size-and-contain-intrinsic-size-was-not-parsed)
+and [the broken-image frame came off](wpt-rendering-gaps-fixed.md#a-broken-image-drew-a-2px-frame-and-reported-it-as-part-of-its-box).
+Its `<div>`, `<canvas>` and most of its `<img>` rows pass; the rest is **not about
+containment**.
 
-- **`<img>` is 4px too large in both axes, contained or not.** Every `<img>` in the
-  engine is: `<img style="width: 50px; height: 30px">` reports 54×34 from
-  `getBoundingClientRect`, `clientWidth`/`clientHeight` and `offsetWidth`/`offsetHeight`
-  alike, with no border and no padding, and independent of `font-size`, `word-spacing`,
-  `display` and whether the bitmap loaded. It is the box, not the paint — the green
-  draws at 50×30 inside it. Contained rows read `4` where they want `0` and `104` where
-  they want `100`, which is the same constant.
-  - **Owner:** unlocated. It is not `MeasureImageSize` (which sets the word to the
-    stated size), not `CssLineBox.UpdateRectangle`, and not the bridge's
-    `clientWidth`/`clientHeight`, all of which were ruled out by inspection.
-  - **Exit gate:** an `<img>` with a stated width and height reports exactly it. Worth
-    more than these 16 assertions — it is four pixels on every image on every page.
 - **`<svg>`, `<video>` and `<iframe>` report the 300×150 default object size.** Under
   size containment they have natural dimensions of *zero*, so the default must not
   apply. Broiler applies it in `Broiler.HTML`'s `DomParser` box fix-ups
@@ -481,6 +470,29 @@ cause is about containment**.
     `Broiler.HTML` patch to make the default object size conditional, and
     `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh` — so landing it upstream
     and bumping the pointer is the route.
+
+### An inline element's three box-model rects are all the same rectangle
+
+- **Tests:** the six `<img>` assertions still failing in
+  `contain-intrinsic-size-logical-003`, and — more to the point — `clientWidth` and
+  `clientHeight` on **every** inline element that has a border or padding.
+  `<img style="width: 50px; height: 30px; border: 3px solid">` reports
+  `getBoundingClientRect` 56×36 (right) and `clientWidth`/`clientHeight` 56×36 (wrong:
+  the client box excludes the border, so 50×30). The same declarations on a `<div>` or
+  an `inline-block` report 50×30 correctly.
+- **Owner:** `Broiler.HTML` (`HtmlContainerInt.CollectLayoutGeometry`).
+- **Root cause.** A `display: inline` box lays out as one rectangle per line box rather
+  than a single border box, so `box.Location`/`box.Size` are unset and the collector
+  rebuilds the border box from the union of the line rectangles — then sets all three
+  levels of `BoxGeometry` to that same rectangle, on the stated grounds that "inline
+  boxes contribute no box-model padding/border to line geometry in this engine". That
+  premise does not hold for a **replaced** inline: `CssLineBox.UpdateRectangle` adds the
+  box's border and padding to an image's line rectangle explicitly, and
+  `MeasureImageSize` adds them in the block axis, so the union genuinely *is* the border
+  box and the other two levels have to be deflated out of it.
+- **Exit gate:** an inline `<img>` with a border reports a client box smaller than its
+  border box by exactly that border. Submodule-side, so the same routing as the entry
+  above.
 
 ### A sticky box contributes its *stuck* position to the scroll container's overflow
 

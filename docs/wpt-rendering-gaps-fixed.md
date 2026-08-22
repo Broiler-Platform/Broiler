@@ -938,6 +938,41 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### A broken image drew a 2px frame, and reported it as part of its box
+
+- **Tests:** `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003` —
+  entry 21 of [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 —
+  32 → **42 of 96** assertions, all ten in its `<img>` rows.
+  `css/css-grid` reftests 677 → **679**, and nothing lost across `css/css-sizing`,
+  `css/css-contain`, `css/css-flexbox`, `css/CSS2`, `css/css-backgrounds` and `svg`.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxImage.cs`). Main repo.
+- **Root cause.** A load that ended without an image gave the box a 2px inset border in
+  `#A0A0A0`/`#E3E3E3` — the "broken image" frame a Netscape-era UA drew, inherited from
+  HtmlRenderer. No UA draws one now; HTML's rendering rules give `<img>` no default
+  border at all, and a browser that cannot decode an image shows its `alt` text, or
+  nothing.
+- **It was a sizing bug, not a cosmetic one.** 2px on four sides is **4px in both axes**
+  of border box, and the border box is what `getBoundingClientRect`,
+  `clientWidth`/`clientHeight` and `offsetWidth`/`offsetHeight` all report:
+  `<img style="width: 50px; height: 30px">` came back 54×34 with nothing declaring a
+  border or padding anywhere. It also displaced whatever followed the image on its line.
+- **And it reached far more than genuinely broken images.** The geometry a script reads
+  is captured before the images finish loading, so an image that loads perfectly well
+  still reported the broken-image box: the probe above uses a `<img>` whose bitmap is on
+  disk and paints correctly at 50×30 inside a box that measures 54×34.
+- **Why the reftest suite barely moves.** Both sides of a reftest are rendered by
+  Broiler, so a frame on the test appears on its reference too and cancels; only the
+  two `css-grid` cases where it changed a *layout* consequence show up. The measurable
+  signal is the check-layout suite, which states absolute geometry and does not
+  cancel — hence the +10 above.
+- **Checks:** `src/Broiler.Cli.Tests/BrokenImageBorderTests.cs`, five check-layout cases
+  over an unloadable `<img>`: CSS-sized, attribute-sized, bordered, padded, and one that
+  pins a following box's offset.
+- **What it does not fix:** `clientWidth`/`clientHeight` on an inline element with a
+  border, which is
+  [a separate collector gap](wpt-rendering-gaps-open.md#an-inline-elements-three-box-model-rects-are-all-the-same-rectangle)
+  and the reason six of that test's `<img>` assertions still fail.
+
 ### `contain: size` did nothing to a box's size, and `contain-intrinsic-size` was not parsed
 
 - **Tests:** **+43 reftests, none lost**, across four directories: `css/css-contain`

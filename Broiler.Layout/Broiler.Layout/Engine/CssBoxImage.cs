@@ -8,7 +8,6 @@ internal sealed class CssBoxImage : CssBox
 {
     private readonly CssRectImage _imageWord;
     private ILayoutImageLoader _imageLoadHandler;
-    private bool _imageLoadingComplete;
 
     /// <summary>
     /// This box's replaced-content completion, captured by the image prefetch (multithreading item #8)
@@ -129,21 +128,33 @@ internal sealed class CssBoxImage : CssBox
         base.Dispose();
     }
 
-    private void SetErrorBorder()
-    {
-        SetAllBorders(CssConstants.Solid, "2px", "#A0A0A0");
-        BorderRightColor = BorderBottomColor = "#E3E3E3";
-    }
-
+    /// <remarks>
+    /// A load that ended without an image used to give the box a 2px inset border in
+    /// <c>#A0A0A0</c>/<c>#E3E3E3</c> — the "broken image" frame a Netscape-era UA drew, inherited
+    /// here from HtmlRenderer. No UA draws one now: HTML's rendering rules give <c>&lt;img&gt;</c>
+    /// no default border at all, and a browser that cannot decode the image shows its <c>alt</c>
+    /// text, or nothing.
+    ///
+    /// <para>
+    /// Removing it is a <b>sizing</b> fix as much as a painting one, which is why it is worth doing
+    /// rather than leaving as cosmetic legacy. The frame is 2px on all four sides, so it inflated
+    /// the border box by 4px in <em>both axes</em> — and the inflated box is what
+    /// <c>getBoundingClientRect</c>, <c>clientWidth</c>/<c>clientHeight</c> and
+    /// <c>offsetWidth</c>/<c>offsetHeight</c> all reported: an <c>&lt;img style="width: 50px;
+    /// height: 30px"&gt;</c> came back 54×34 with no border and no padding declared anywhere. It
+    /// reached far more than genuinely broken images, because the geometry a script reads is
+    /// captured before the images finish loading, so an image that loads perfectly well still
+    /// reported the broken-image box to script. WPT
+    /// <c>css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003</c> measures exactly
+    /// that, and its sixteen <c>&lt;img&gt;</c> assertions all read 4 where they want 0 and 104
+    /// where they want 100.
+    /// </para>
+    /// </remarks>
     private void OnLoadImageComplete(object? image, RectangleF rectangle, bool async)
     {
         _imageWord.Image = image;
         _imageWord.ImageRectangle = rectangle;
-        _imageLoadingComplete = true;
         _wordsSizeMeasured = false;
-
-        if (_imageLoadingComplete && image == null)
-            SetErrorBorder();
 
         if (!LayoutEnvironment.AvoidImagesLateLoading || async)
         {
