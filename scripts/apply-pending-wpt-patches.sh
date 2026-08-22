@@ -368,11 +368,6 @@ set -euo pipefail
 # against a reference browser's screenshot. 272 tests in the corpus declare `transform-origin`.
 
 PENDING_PATCHES=(
-  "Broiler.JS|patches/0001-js-private-name-key-classification.patch"
-  "Broiler.HTML|patches/0002-html-outermost-svg-author-display.patch"
-  "Broiler.CSS|patches/0003-css-link-matches-xlink-href.patch"
-  "Broiler.HTML|patches/0004-html-paint-transform-origin.patch"
-  "Broiler.HTML|patches/0005-html-row-flex-replaced-item.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
