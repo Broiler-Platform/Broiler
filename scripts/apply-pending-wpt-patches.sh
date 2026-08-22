@@ -309,11 +309,35 @@ set -euo pipefail
 # testharness-based page in the corpus. Its unit tests pin the classification (StorageTests,
 # Issue693Tests); only a run of a real harness page can say the harness survives loading.
 #
+# 0002 (Broiler.HTML, "Let an outermost <svg> keep the display the author cascaded") IS listed,
+# and one half of it is the same absent-output failure mode as the anonymous-table and
+# dashed-stroke entries above, only inverted: an outermost <svg> was forced to `inline-block`
+# whatever the cascade said, so `svg { display: none }` painted a box the author had removed —
+# the shape every page that keeps a bare <filter> or <defs> in a hidden <svg> uses, and what
+# css/filter-effects/tainting-css-dropshadow-currentcolor asserts (97.4 % -> 100 %). The other
+# half is `svg { display: block }` laying out inline, so a column of SVGs came out as rows and
+# `margin: 0 auto` centred nothing (css/compositing/line-with-svg-background is ten of them).
+# Both decide where — and whether — an element reaches the canvas, which is what a pixel run
+# measures. Its behaviour is unit-tested in the main repo (SvgAuthorDisplayTests), which
+# feature-probes and self-skips until this is applied; there is no main-repo seam that can stand
+# in for it, because the substitution is made in Broiler.HTML's own box-tree cascade.
+#
 # NOTE: the WPT workflows do not run this script — only privacy-test-pages.yml and
-# real-world-render-tests.yml do — so the entry below serves those two. The WPT suite picks the
+# real-world-render-tests.yml do — so the entries below serve those two. The WPT suite picks each
 # fix up when a maintainer lands it upstream and bumps the pointer.
+# 0003 (Broiler.CSS, "Match :link on an SVG <a> that links through xlink:href") IS listed: a
+# pseudo-class that does not match is a whole rule that does not apply, so `a:link rect { fill:
+# lime }` over an `<a xlink:href="…">` painted the red rectangle underneath instead of the lime
+# one — the absent-output failure mode again, and one only a pixel run can see. It pairs with the
+# main-repo fix that fires `load` at an outermost inline <svg>: WPT
+# svg/linking/reftests/href-a-element-attr-change removes `href` from its handler and asserts the
+# element keeps its link status, so before that handler ran the test passed without ever reaching
+# its own assertion. With the handler firing and this patch absent the test fails honestly; with
+# both it passes for the right reason.
 PENDING_PATCHES=(
   "Broiler.JS|patches/0001-js-private-name-key-classification.patch"
+  "Broiler.HTML|patches/0002-html-outermost-svg-author-display.patch"
+  "Broiler.CSS|patches/0003-css-link-matches-xlink-href.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

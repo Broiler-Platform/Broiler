@@ -129,6 +129,7 @@ internal static partial class SvgRenderer
     /// </returns>
     private static BColor ResolveFill(
         List<DisplayItem> items, RectangleF bounds, Dictionary<string, SvgPattern> patterns,
+        Dictionary<string, SvgGradient> gradients,
         Dictionary<string, string> attrs, RectangleF objectBounds,
         float sx, float sy, float tx, float ty, float pctW, float pctH,
         SvgTransform elementTransform)
@@ -143,6 +144,13 @@ internal static partial class SvgRenderer
         {
             return BColor.Empty;
         }
+
+        // The other paint server a fill may name. Tried after patterns because the two never share
+        // an id, and before the fallback because reaching the fallback with a gradient present is
+        // exactly the bug: `fill="url(#grad)"` has no colour after it, so the shape painted nothing.
+        if (TryEmitGradientFill(
+                items, bounds, gradients, id, objectBounds, sx, sy, tx, ty, pctW, pctH, elementTransform))
+            return BColor.Empty;
 
         return FallbackPaint(fallback);
     }

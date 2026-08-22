@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace Broiler.Layout.IR;
@@ -68,6 +69,13 @@ internal sealed partial class SvgStructure
     /// <c>transform</c> composed outermost-first, with the element's own applied last.
     /// </summary>
     private readonly Dictionary<int, SvgTransform> _transforms = [];
+
+    /// <summary>
+    /// Start-tag offset → the transform in effect for that element's <em>ancestors</em> alone,
+    /// without its own. <c>transform-origin</c> conjugates an element's own transform and only its
+    /// own, so the two halves have to be separable.
+    /// </summary>
+    private readonly Dictionary<int, SvgTransform> _ancestorTransforms = [];
 
     /// <summary>
     /// Start-tag offset → the element's own attributes, for every element the scan reached,
@@ -161,6 +169,13 @@ internal sealed partial class SvgStructure
     /// </summary>
     public SvgTransform TransformAt(int index)
         => _transforms.TryGetValue(index, out var transform) ? transform : SvgTransform.Identity;
+
+    /// <summary>
+    /// The transform the element's ancestors put it under, without its own — the half a
+    /// <c>transform-origin</c> leaves alone.
+    /// </summary>
+    public SvgTransform AncestorTransformAt(int index)
+        => _ancestorTransforms.TryGetValue(index, out var transform) ? transform : SvgTransform.Identity;
 
     /// <summary>The attributes of the element starting at <paramref name="index"/>, painting or not.</summary>
     public bool TryGetAttributes(int index, out IReadOnlyDictionary<string, string> attributes)
@@ -312,6 +327,8 @@ internal sealed partial class SvgStructure
                 structure._rendered[m.Index] = inherited;
                 if (!transform.IsIdentity)
                     structure._transforms[m.Index] = transform;
+                if (!ancestorTransform.IsIdentity)
+                    structure._ancestorTransforms[m.Index] = ancestorTransform;
             }
 
             if (m.Groups["empty"].Value.Length > 0)
@@ -367,7 +384,62 @@ internal sealed partial class SvgStructure
             extended[property] = value;
         }
 
+        // `opacity` is deliberately NOT in InheritableProperties above, because it does not inherit:
+        // SVG 1.1 §14.5 applies it to the element it is written on, that element's children
+        // included, as one composite. But this renderer draws leaves — it matches one regex per
+        // shape type and has no group to hang a layer on — so a `<g opacity="0.5">` had nowhere to
+        // put its value and dropped it. Carrying the running product of the ancestors' opacity
+        // lets each shape apply its share of it.
+        float declared = ParseOpacity(ReadPresentation(attributes, "opacity"));
+        if (declared < 1f)
+        {
+            extended ??= new Dictionary<string, string>(inherited, StringComparer.OrdinalIgnoreCase);
+            extended[AncestorOpacityKey] =
+                (AncestorOpacityOf(inherited) * declared).ToString(CultureInfo.InvariantCulture);
+        }
+
         return extended ?? inherited;
+    }
+
+    /// <summary>
+    /// The key the ancestors' composed <c>opacity</c> travels under in an element's inherited map.
+    /// Not an SVG property — the leading marker keeps it out of the way of anything an author can
+    /// write, and it is read back only by <see cref="AncestorOpacityOf"/>.
+    /// </summary>
+    internal const string AncestorOpacityKey = "-broiler-ancestor-opacity";
+
+    /// <summary>
+    /// The product of the <c>opacity</c> values on an element's ancestors, or <c>1</c> when none of
+    /// them fades it.
+    /// </summary>
+    /// <remarks>
+    /// Multiplying the group's opacity into each leaf is exact while the group's children do not
+    /// overlap one another, which is the ordinary case and the one the SVG test suites are built
+    /// from. Where they do overlap, true group compositing flattens the children first and fades
+    /// the result once, so the overlap would come out slightly darker there than here. That is a
+    /// far smaller error than dropping the group's opacity altogether, which is what happened
+    /// before.
+    /// </remarks>
+    internal static float AncestorOpacityOf(IReadOnlyDictionary<string, string> attributes)
+        => attributes.TryGetValue(AncestorOpacityKey, out var raw)
+            && float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float value)
+            ? value
+            : 1f;
+
+    /// <summary>An SVG <c>&lt;alpha-value&gt;</c> — a number or a percentage — clamped to 0..1.</summary>
+    private static float ParseOpacity(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            return 1f;
+
+        var value = raw.AsSpan().Trim();
+        bool percent = value.Length > 0 && value[^1] == '%';
+        if (percent)
+            value = value[..^1];
+
+        return float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed)
+            ? Math.Clamp(percent ? parsed / 100f : parsed, 0f, 1f)
+            : 1f;
     }
 
     /// <summary>

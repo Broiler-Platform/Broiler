@@ -3258,20 +3258,30 @@ internal sealed partial class WptTestRunner
             var attrs = match.Groups["attrs"].Value;
 
             // Skip non-JavaScript types (e.g. type="text/template").
+            //
+            // Ask the engine's own classifier rather than re-listing the types here. The three
+            // this scan used to accept — `text/javascript`, `application/javascript`, `module` —
+            // are a fraction of the JavaScript MIME essences HTML §4.12.1 defines, so the runner
+            // skipped scripts the engine underneath it runs perfectly well, and the test was
+            // scored on a page whose script had never executed. `text/ecmascript` is the costly
+            // omission: it is what the SVG 1.1 test suite writes, so every
+            // conformance-checkers/html-svg case carrying a `domTest` handler rendered its own
+            // "not supported" red rectangle (struct-dom-06-b-isvalid, ranked at 16.5 % in the
+            // 2026-08-21 run, is one). `text/jscript` and the versioned `text/javascript1.x`
+            // aliases were skipped for the same reason.
+            //
+            // The old pattern also stopped the value at the first space, so a perfectly ordinary
+            // `type="text/javascript; charset=utf-8"` captured `text/javascript;` and matched
+            // nothing. Capture the quoted value whole and let ScriptMimeType strip the
+            // parameters, which is where that rule already lives.
             if (attrs.Contains("type=", StringComparison.OrdinalIgnoreCase))
             {
-                var typeMatch = Regex.Match(attrs, @"type\s*=\s*[""']?([^""'\s>]+)", RegexOptions.IgnoreCase);
-                if (typeMatch.Success)
-                {
-                    var type = typeMatch.Groups[1].Value;
-                    if (!string.IsNullOrEmpty(type)
-                        && !type.Equals("text/javascript", StringComparison.OrdinalIgnoreCase)
-                        && !type.Equals("application/javascript", StringComparison.OrdinalIgnoreCase)
-                        && !type.Equals("module", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-                }
+                var typeMatch = Regex.Match(
+                    attrs,
+                    @"type\s*=\s*(?:""(?<v>[^""]*)""|'(?<v>[^']*)'|(?<v>[^\s>]+))",
+                    RegexOptions.IgnoreCase);
+                if (typeMatch.Success && !ScriptMimeType.IsExecutable(typeMatch.Groups["v"].Value))
+                    continue;
             }
 
             bool isDefer = attrs.Contains("defer", StringComparison.OrdinalIgnoreCase);

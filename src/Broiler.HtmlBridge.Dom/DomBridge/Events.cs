@@ -70,6 +70,23 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Whether <paramref name="element"/> is SVG content — the <c>&lt;svg&gt;</c> element itself or
+    /// anything inside one. Decided by walking ancestors rather than reading a namespace, so it
+    /// holds for a fragment the HTML parser built as well as one script created with
+    /// <c>createElementNS</c>.
+    /// </summary>
+    private static bool IsInSvgContent(DomElement element)
+    {
+        for (var node = element; node != null; node = ParentEl(node))
+        {
+            if (string.Equals(node.TagName, "svg", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Compiles a single <c>on*</c> attribute value into a <see cref="JSFunction"/>
     /// and stores it in <see cref="bridge-owned inline event handler state"/>.
     /// </summary>
@@ -85,7 +102,18 @@ public sealed partial class DomBridge
 
         try
         {
-            var fn = _jsContext.Eval($"(function(event) {{ {code} }})") as JSFunction;
+            // SVG 1.1 §16.2.2 names the event object `evt` inside an event-handler attribute,
+            // where HTML §8.1.5.1 names it `event`. Both are real: an element in SVG content is
+            // reached through the SVG rule, and the SVG test suites are written to it —
+            // `<svg onload="domTest(evt)">` calling a function defined in a <script> inside the
+            // fragment is the entry point of every conformance-checkers/html-svg case. With only
+            // `event` bound, `evt` was undefined, the handler threw before its first statement,
+            // and the page kept the red "not supported" state the handler exists to clear.
+            //
+            // The alias is added for SVG content only. Binding `evt` on an HTML element would
+            // shadow a page's own global of that name inside its handlers, which no browser does.
+            var svgEventAlias = IsInSvgContent(element) ? "var evt = event; " : string.Empty;
+            var fn = _jsContext.Eval($"(function(event) {{ {svgEventAlias}{code} }})") as JSFunction;
             if (fn != null)
                 GetInlineEventHandlers(element)[eventName] = fn;
         }

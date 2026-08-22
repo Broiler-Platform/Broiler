@@ -239,10 +239,34 @@ internal static partial class CssUtils
         if (grow is null)
             return;
 
+        // CSS Flexbox §7.1: `<'flex-basis'>` is `content | <'width'>`, and a `<'width'>` is never a
+        // bare non-zero number. A unitless zero *is* one — the spec's own note says a unitless zero
+        // already preceded by two flex factors reads as the basis rather than a third factor — so
+        // `flex: 0 0 0` is valid where `flex: 0 0 4` is not. An invalid component invalidates the
+        // whole shorthand, which then leaves `flex` at the value it already had.
+        //
+        // Taking `4` as a basis instead made every item in the four WPT
+        // css-flexbox/flexbox_flex-*-unitless-basis tests size to its content rather than keeping
+        // the `width: 5em` the dropped declaration leaves in force.
+        if (basis is not null && IsUnitlessNonZeroNumber(basis))
+            return;
+
         cssBox.FlexGrow = grow;
         cssBox.FlexShrink = shrink ?? "1";
         cssBox.FlexBasis = basis ?? "0%";
     }
+
+    /// <summary>
+    /// Whether <paramref name="token"/> is a plain number with no unit and a non-zero value — the
+    /// one shape that is a valid flex <em>factor</em> but never a valid <c>flex-basis</c>.
+    /// </summary>
+    private static bool IsUnitlessNonZeroNumber(string token) =>
+        double.TryParse(
+            token,
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out double parsed)
+        && parsed != 0;
 
     public static void SetPropertyValue(CssBox cssBox, string propName, string value)
     {

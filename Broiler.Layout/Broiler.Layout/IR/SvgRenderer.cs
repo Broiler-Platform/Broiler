@@ -123,6 +123,9 @@ internal static partial class SvgRenderer
         // rendered part: a <pattern> lives in <defs> precisely so it paints only through a reference.
         var patterns = CollectPatterns(svgXml);
 
+        // The gradient paint servers, collected the same way and for the same reason.
+        var gradients = CollectGradients(svgXml);
+
         // The <clipPath> rectangles a shape's own clip-path attribute may point at.
         var clipRects = CollectClipRects(svgXml);
 
@@ -144,7 +147,17 @@ internal static partial class SvgRenderer
                 continue;
 
             var items = order.Open(m.Index);
-            var elementTransform = PageTransformOf(structure, m, bounds, sx, sy, tx, ty);
+
+            // The rect's own geometry, needed before the transform because `transform-box:
+            // fill-box` makes this rectangle the reference box its `transform-origin` is measured
+            // in. It depends only on the attributes, so computing it first changes nothing else.
+            var rectBox = new RectangleF(
+                GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
+                GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
+
+            var elementTransform = structure.AncestorTransformAt(m.Index)
+                .Concat(OwnTransformAbout(attrs, rectBox))
+                .ToPageSpace(sx, sy, bounds.X + tx, bounds.Y + ty);
             if (ClipRectFor(attrs, clipRects, bounds, sx, sy, tx, ty, elementTransform) is { } clip)
                 order.ClipLast(clip);
 
@@ -172,11 +185,9 @@ internal static partial class SvgRenderer
 
             // A pattern fill paints as tiles behind the shape, so it is resolved before the rect
             // item is added and leaves the rect's own fill empty; a stroke then draws over it.
-            var objectBounds = new RectangleF(
-                GetLength(attrs, "x", pctW), GetLength(attrs, "y", pctH),
-                GetLength(attrs, "width", pctW), GetLength(attrs, "height", pctH));
+            var objectBounds = rectBox;
             var rectFill = ResolveFill(
-                items, bounds, patterns, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
+                items, bounds, patterns, gradients, attrs, objectBounds, sx, sy, tx, ty, pctW, pctH,
                 elementTransform);
             var rectStroke = GetPaint(attrs, "stroke", BColor.Empty);
 
@@ -998,6 +1009,22 @@ internal static partial class SvgRenderer
         bool blended = !string.IsNullOrWhiteSpace(mode)
             && !mode.Equals("normal", StringComparison.OrdinalIgnoreCase);
 
+        // SVG 1.1 §14.5 `opacity`: unlike `fill-opacity`, which GetPaint folds into the paint
+        // colour, this one composites the element as a whole — fill and stroke together — and so
+        // needs a real layer. Nothing emitted one, so `opacity` was dropped outright on every
+        // shape: `<rect fill="blue" opacity="0.5">` painted solid blue. OpacityItem is the layer
+        // the CSS paint path already pushes for the same property (PaintWalker.Stacking), so the
+        // raster backend composites this exactly as it does an HTML element's opacity.
+        // The element's own opacity, times whatever its ancestors contribute: a `<g opacity>` has
+        // no group layer to hang its value on here, so SvgStructure carries the ancestors' product
+        // down to the leaves for this multiplication (see SvgStructure.AncestorOpacityOf).
+        float opacity = ParseAlpha(GetPresentationValue(attrs, "opacity"))
+            * SvgStructure.AncestorOpacityOf(attrs);
+        bool faded = opacity < 1f;
+
+        if (faded)
+            items.Add(new OpacityItem { Bounds = bounds, Opacity = opacity });
+
         if (blended)
             items.Add(new BlendModeItem { Bounds = bounds, Mode = mode! });
 
@@ -1005,6 +1032,9 @@ internal static partial class SvgRenderer
 
         if (blended)
             items.Add(new RestoreBlendModeItem { Bounds = bounds });
+
+        if (faded)
+            items.Add(new RestoreOpacityItem { Bounds = bounds });
     }
 
     /// <summary>
