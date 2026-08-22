@@ -998,6 +998,22 @@ internal static partial class SvgRenderer
         bool blended = !string.IsNullOrWhiteSpace(mode)
             && !mode.Equals("normal", StringComparison.OrdinalIgnoreCase);
 
+        // SVG 1.1 §14.5 `opacity`: unlike `fill-opacity`, which GetPaint folds into the paint
+        // colour, this one composites the element as a whole — fill and stroke together — and so
+        // needs a real layer. Nothing emitted one, so `opacity` was dropped outright on every
+        // shape: `<rect fill="blue" opacity="0.5">` painted solid blue. OpacityItem is the layer
+        // the CSS paint path already pushes for the same property (PaintWalker.Stacking), so the
+        // raster backend composites this exactly as it does an HTML element's opacity.
+        // The element's own opacity, times whatever its ancestors contribute: a `<g opacity>` has
+        // no group layer to hang its value on here, so SvgStructure carries the ancestors' product
+        // down to the leaves for this multiplication (see SvgStructure.AncestorOpacityOf).
+        float opacity = ParseAlpha(GetPresentationValue(attrs, "opacity"))
+            * SvgStructure.AncestorOpacityOf(attrs);
+        bool faded = opacity < 1f;
+
+        if (faded)
+            items.Add(new OpacityItem { Bounds = bounds, Opacity = opacity });
+
         if (blended)
             items.Add(new BlendModeItem { Bounds = bounds, Mode = mode! });
 
@@ -1005,6 +1021,9 @@ internal static partial class SvgRenderer
 
         if (blended)
             items.Add(new RestoreBlendModeItem { Bounds = bounds });
+
+        if (faded)
+            items.Add(new RestoreOpacityItem { Bounds = bounds });
     }
 
     /// <summary>
