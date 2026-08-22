@@ -451,6 +451,37 @@ other direction. None is a sizing bug.
 - **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
   elsewhere.
 
+### A size-contained `<img>`, `<svg>`, `<video>` or `<iframe>` still reports a size
+
+The 64 assertions left in `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003`
+(32 of 96 pass) after
+[size containment landed](wpt-rendering-gaps-fixed.md#contain-size-did-nothing-to-a-boxs-size-and-contain-intrinsic-size-was-not-parsed).
+Its `<div>` and `<canvas>` rows pass; the other four element types fail, and **neither
+cause is about containment**.
+
+- **`<img>` is 4px too large in both axes, contained or not.** Every `<img>` in the
+  engine is: `<img style="width: 50px; height: 30px">` reports 54×34 from
+  `getBoundingClientRect`, `clientWidth`/`clientHeight` and `offsetWidth`/`offsetHeight`
+  alike, with no border and no padding, and independent of `font-size`, `word-spacing`,
+  `display` and whether the bitmap loaded. It is the box, not the paint — the green
+  draws at 50×30 inside it. Contained rows read `4` where they want `0` and `104` where
+  they want `100`, which is the same constant.
+  - **Owner:** unlocated. It is not `MeasureImageSize` (which sets the word to the
+    stated size), not `CssLineBox.UpdateRectangle`, and not the bridge's
+    `clientWidth`/`clientHeight`, all of which were ruled out by inspection.
+  - **Exit gate:** an `<img>` with a stated width and height reports exactly it. Worth
+    more than these 16 assertions — it is four pixels on every image on every page.
+- **`<svg>`, `<video>` and `<iframe>` report the 300×150 default object size.** Under
+  size containment they have natural dimensions of *zero*, so the default must not
+  apply. Broiler applies it in `Broiler.HTML`'s `DomParser` box fix-ups
+  (`CorrectIframeBoxes`, `CorrectVideoBoxes` and their neighbours), which write it as a
+  CSS width and height — so what the layout engine sees is an author-level size it is
+  right to honour, and there is no main-repo seam to decline it at.
+  - **Exit gate:** the three element types report zero under `contain: size`. Needs a
+    `Broiler.HTML` patch to make the default object size conditional, and
+    `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh` — so landing it upstream
+    and bumping the pointer is the route.
+
 ### A sticky box contributes its *stuck* position to the scroll container's overflow
 
 - **Tests:** `css-position/sticky/position-sticky-flex-item-001` … `-004`, all four at

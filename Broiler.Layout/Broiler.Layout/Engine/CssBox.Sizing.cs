@@ -323,6 +323,15 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     private bool TryGetNaturalReplacedSize(out SizeF natural)
     {
+        // CSS Containment 2 §3.2: a size-contained replaced element "must be treated as having no
+        // natural dimensions and no natural aspect ratio" — the bitmap or the canvas attributes are
+        // contents like any other, and just as unobservable from outside.
+        if (AppliesSizeContainment)
+        {
+            natural = default;
+            return false;
+        }
+
         if (IntrinsicReplacedSize is { Width: > 0, Height: > 0 } declared)
         {
             natural = declared;
@@ -398,6 +407,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);
         using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Intrinsic);
 
+        // CSS Containment 2 §3.2: a size-contained box measures as though it were empty, so there
+        // are no contents here to measure.
+        if (TryGetContainedIntrinsicWidth(out minWidth, out maxWidth))
+            return;
+
         double min = 0f;
         double maxSum = 0f;
         double paddingSum = 0f;
@@ -416,6 +430,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     {
         LayoutWorkTrace.Count(LayoutWorkTrace.Counters.IntrinsicCalls);
         using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Intrinsic);
+
+        // CSS Containment 2 §3.2: a size-contained box measures as though it were empty. Ahead of
+        // the grid branch below for the same reason it is ahead of the word walk: a contained
+        // grid's tracks are contents too, and are exactly as unobservable as its text.
+        if (TryGetContainedIntrinsicWidth(out minWidth, out maxWidth))
+            return;
 
         // A grid with a fixed track template contributes its physical-width track
         // sum (+ gaps + own border/padding) as both min- and max-content, rather
@@ -632,17 +652,59 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         }
     }
 
+    /// <summary>
+    /// The preferred aspect ratio the block-axis transfer uses: the box's own <c>aspect-ratio</c>,
+    /// an outer <c>&lt;svg&gt;</c>'s <c>viewBox</c> ratio (SVG 2 §8.2), or — for a size-contained
+    /// replaced element — the ratio its presentational <c>width</c>/<c>height</c> attributes declare.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The three are not interchangeable under CSS Containment 2 §3.2, which is the only reason this
+    /// is a method rather than one expression. Size containment removes an element's <b>natural</b>
+    /// ratio and leaves its <b>declared</b> one alone. A <c>viewBox</c> states a natural ratio, so it
+    /// goes; the UA stylesheet's <c>aspect-ratio: attr(width) / attr(height)</c> (HTML §14.4) is a
+    /// declaration, so it stays — WPT <c>css-contain/contain-size-replaced-002</c> and
+    /// <c>css-flexbox/canvas-contain-size</c> are the two halves of that, and they pull in opposite
+    /// directions.
+    /// </para>
+    /// <para>
+    /// The awkward case is the middle one: Broiler's style pass records an outer <c>&lt;svg&gt;</c>'s
+    /// <c>viewBox</c> ratio *into* <see cref="CssBoxProperties.AspectRatio"/> when the height is
+    /// <c>auto</c>, so by the time it is read here a natural ratio is indistinguishable from a
+    /// declared one. Comparing it back against the <c>viewBox</c> is what separates them, and it
+    /// misreads only an author who declares the ratio their own <c>viewBox</c> already implies —
+    /// where the two answers coincide anyway.
+    /// </para>
+    /// </remarks>
+    private bool TryGetPreferredRatioForBlockTransfer(out double ratio)
+    {
+        bool contained = AppliesSizeContainment;
+        bool hasViewBoxRatio = TryGetSvgViewBoxRatio(out double viewBoxRatio);
+
+        if (TryParseAspectRatio(AspectRatio, out ratio) && ratio > 0)
+        {
+            bool isRecordedViewBoxRatio =
+                hasViewBoxRatio && viewBoxRatio > 0 && Math.Abs(viewBoxRatio - ratio) < 1e-6;
+
+            if (!contained || !isRecordedViewBoxRatio)
+                return true;
+        }
+
+        if (!contained && hasViewBoxRatio && viewBoxRatio > 0)
+        {
+            ratio = viewBoxRatio;
+            return true;
+        }
+
+        return TryGetContainedPresentationalRatio(out ratio) && ratio > 0;
+    }
+
     private bool TryResolveAspectRatioBlockHeight(out double borderBoxHeight)
     {
         borderBoxHeight = 0;
-        if (!TryParseAspectRatio(AspectRatio, out double ratio) || !(ratio > 0))
-        {
-            // SVG 2 §8.2: an outer <svg>'s viewBox is its natural ratio. The style pass records it
-            // as an `aspect-ratio` only when the height is written `auto`, so a percentage height
-            // that computes to auto has to read it from the element itself.
-            if (!TryGetSvgViewBoxRatio(out ratio))
-                return false;
-        }
+
+        if (!TryGetPreferredRatioForBlockTransfer(out double ratio))
+            return false;
 
         double borderBoxWidth = Size.Width;
         if (!(borderBoxWidth > 0))

@@ -172,6 +172,11 @@ internal static partial class CssUtils
             "grid-auto-rows" => cssBox.GridAutoRows,
             "grid-auto-columns" => cssBox.GridAutoColumns,
             "contain" => cssBox.Contain,
+            "contain-intrinsic-size" => JoinContainIntrinsicSize(cssBox),
+            "contain-intrinsic-width" => cssBox.ContainIntrinsicWidth,
+            "contain-intrinsic-height" => cssBox.ContainIntrinsicHeight,
+            "contain-intrinsic-inline-size" => cssBox.ContainIntrinsicInlineSize,
+            "contain-intrinsic-block-size" => cssBox.ContainIntrinsicBlockSize,
             "overflow-clip-margin" => cssBox.OverflowClipMargin,
             "content-visibility" => cssBox.ContentVisibility,
             "color-scheme" => cssBox.ColorScheme,
@@ -512,6 +517,21 @@ internal static partial class CssUtils
                 break;
             case "contain":
                 cssBox.Contain = value;
+                break;
+            case "contain-intrinsic-size":
+                ApplyContainIntrinsicSizeShorthand(cssBox, value);
+                break;
+            case "contain-intrinsic-width":
+                cssBox.ContainIntrinsicWidth = value;
+                break;
+            case "contain-intrinsic-height":
+                cssBox.ContainIntrinsicHeight = value;
+                break;
+            case "contain-intrinsic-inline-size":
+                cssBox.ContainIntrinsicInlineSize = value;
+                break;
+            case "contain-intrinsic-block-size":
+                cssBox.ContainIntrinsicBlockSize = value;
                 break;
             case "overflow-clip-margin":
                 cssBox.OverflowClipMargin = value;
@@ -936,6 +956,56 @@ internal static partial class CssUtils
     /// implicit-track longhands to their initial values when it applies, per the
     /// spec's reset semantics.
     /// </summary>
+    /// <summary>
+    /// CSS Sizing 4 §5: expands <c>contain-intrinsic-size</c> into
+    /// <c>contain-intrinsic-width</c> and <c>contain-intrinsic-height</c>. One component sets
+    /// both; two set width then height.
+    /// </summary>
+    /// <remarks>
+    /// A component is <c>auto? [ none | &lt;length&gt; ]</c>, so the value cannot simply be split on
+    /// whitespace: <c>auto 100px</c> is one component naming both axes, and
+    /// <c>auto 100px auto 200px</c> is two. The <c>auto</c> keyword binds forward to the value
+    /// after it, which is what tells the two apart.
+    /// </remarks>
+    private static void ApplyContainIntrinsicSizeShorthand(CssBox cssBox, string value)
+    {
+        var tokens = (value ?? string.Empty)
+            .Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+
+        var components = new List<string>();
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            if (tokens[i].Equals(CssConstants.Auto, StringComparison.OrdinalIgnoreCase)
+                && i + 1 < tokens.Length)
+            {
+                components.Add(tokens[i] + " " + tokens[i + 1]);
+                i++;
+                continue;
+            }
+
+            components.Add(tokens[i]);
+        }
+
+        if (components.Count == 0)
+            return;
+
+        cssBox.ContainIntrinsicWidth = components[0];
+        cssBox.ContainIntrinsicHeight = components.Count > 1 ? components[1] : components[0];
+
+        // The shorthand names the physical longhands, so a flow-relative value cascaded earlier
+        // would otherwise keep winning the ResolvePhysicalBound lookup and the shorthand would
+        // appear to do nothing.
+        cssBox.ContainIntrinsicInlineSize = string.Empty;
+        cssBox.ContainIntrinsicBlockSize = string.Empty;
+    }
+
+    /// <summary>The <c>contain-intrinsic-size</c> shorthand rebuilt from its two longhands.</summary>
+    private static string JoinContainIntrinsicSize(CssBox cssBox) =>
+        cssBox.ContainIntrinsicWidth == cssBox.ContainIntrinsicHeight
+            ? cssBox.ContainIntrinsicWidth
+            : cssBox.ContainIntrinsicWidth + " " + cssBox.ContainIntrinsicHeight;
+
     private static void ApplyGridShorthand(CssBox cssBox, string value, bool resetAutoTracks)
     {
         string v = value.Trim();

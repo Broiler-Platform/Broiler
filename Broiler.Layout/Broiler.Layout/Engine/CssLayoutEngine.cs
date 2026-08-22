@@ -97,6 +97,17 @@ internal static class CssLayoutEngine
         // selected against a zero-width slot) gives the zero-sized image the spec asks for.
         image = ApplyPixelDensity(image, imageWord.PixelDensity);
 
+        // CSS Containment 2 §3.2: a size-contained replaced element "must be treated as having no
+        // natural dimensions and no natural aspect ratio". Dropping the decoded bitmap here is the
+        // whole of that: the auto branches below fall to the contained stand-ins, and `usedRatio`
+        // has nothing left to derive one axis from the other with. An author's own `width`,
+        // `height` or `aspect-ratio` still applies — containment hides the contents, not the box's
+        // own declarations.
+        bool sizeContained = imageWord.OwnerBox.AppliesSizeContainment;
+
+        if (sizeContained)
+            image = null;
+
         double em = imageWord.OwnerBox.GetEmHeight();
 
         // A specified, non-percentage size counts as a "tag" size — but resolve it
@@ -148,6 +159,10 @@ internal static class CssLayoutEngine
                 // inline replaced elements are allowed to overflow their
                 // container.  Authors use max-width:100% to opt into clamping.
             }
+            else if (sizeContained)
+            {
+                imageWord.Width = imageWord.OwnerBox.ContainedIntrinsicContentWidth;
+            }
             else
             {
                 imageWord.Width = hasImageTagHeight ? tagHeightPx / 1.14f : 20;
@@ -163,6 +178,10 @@ internal static class CssLayoutEngine
             imageWord.Height = imageWord.ImageRectangle == RectangleF.Empty
                 ? image.Value.Height
                 : imageWord.ImageRectangle.Height / imageWord.PixelDensity;
+        }
+        else if (sizeContained)
+        {
+            imageWord.Height = imageWord.OwnerBox.ContainedIntrinsicContentHeight;
         }
         else
         {
@@ -181,9 +200,16 @@ internal static class CssLayoutEngine
 
         // The ratio the box is sized by: the author's preferred one when declared, otherwise the
         // image's natural one. Zero when the box has neither, which leaves the two axes independent.
+        // HTML §14.4: a size-contained replaced element has no natural ratio left, but the UA
+        // stylesheet's `aspect-ratio: attr(width) / attr(height)` is a declaration and survives —
+        // so `<img width=60 height=60 style="width: 100px; height: auto; contain: size">` is still
+        // square (WPT css-contain/contain-size-replaced-007, whose assert says exactly that).
         double usedRatio = hasCssAspectRatio
             ? cssAspectRatio
-            : image is { HasIntrinsicRatio: true, Height: > 0 } natural ? natural.Width / natural.Height : 0;
+            : image is { HasIntrinsicRatio: true, Height: > 0 } natural ? natural.Width / natural.Height
+            : sizeContained && imageWord.OwnerBox.TryGetContainedPresentationalRatio(out double attributeRatio)
+                ? attributeRatio
+                : 0;
 
         bool widthDriven = hasStatedWidth && !hasImageTagHeight;
 
@@ -1230,7 +1256,10 @@ internal static class CssLayoutEngine
         // than shrinking to fit its (absent) content, and keeps the two axes tied by the natural
         // ratio while min-*/max-* clamp them. Sized in one step below; the per-axis clamps that
         // follow are skipped for it.
-        var intrinsic = b.IntrinsicReplacedSize;
+        // CSS Containment 2 §3.2: size containment leaves a replaced element with no natural
+        // dimensions and no natural ratio, so a contained <canvas>/<svg> is sized like any other
+        // contained box rather than from its bitmap.
+        var intrinsic = b.AppliesSizeContainment ? null : b.IntrinsicReplacedSize;
         bool isReplaced = intrinsic is { Width: > 0, Height: > 0 };
 
         // --- Compute inline-block content width ---
@@ -1469,6 +1498,18 @@ internal static class CssLayoutEngine
         else if (b.TryGetAspectRatioBlockHeight(out double ratioHeight))
         {
             ibHeight = ratioHeight;
+        }
+        // CSS Containment 2 §3.2: an atomic inline computes its height here rather than in
+        // CssBox.ResolveUsedBlockHeight, so size containment has to be honoured on this path too —
+        // otherwise the contents this box just laid out are measured straight back into it. Below
+        // the ratio arm, because a preferred aspect ratio and a definite inline size settle the
+        // block axis outright and `contain-intrinsic-size` only stands in for *contents*; above the
+        // content-derived arm, which is precisely what containment removes.
+        else if (b.AppliesSizeContainment)
+        {
+            ibHeight = b.ContainedIntrinsicContentHeight
+                + b.ActualBorderTopWidth + b.ActualBorderBottomWidth
+                + b.ActualPaddingTop + b.ActualPaddingBottom;
         }
         else
         {

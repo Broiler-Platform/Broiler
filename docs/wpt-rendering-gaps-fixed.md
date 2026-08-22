@@ -938,6 +938,72 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### `contain: size` did nothing to a box's size, and `contain-intrinsic-size` was not parsed
+
+- **Tests:** **+43 reftests, none lost**, across four directories: `css/css-contain`
+  323 → **348**, `css/css-sizing` 299 → **311** (of which
+  `css-sizing/contain-intrinsic-size` 9 → **18**), and `css/css-grid` 671 → **677**.
+  The check-layout suite the feature is specified through moves further, because it
+  states its own expected geometry: over the seven `contain-intrinsic-size` tests
+  that carry `data-expected-*`, **54 → 203 of 312** assertions.
+  `contain-intrinsic-size-logical-003` — entry 21 of
+  [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 at 42.0% —
+  goes 0 → 32 of 96, and `contain-intrinsic-size-030` 0 → **48 of 48**.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.SizeContainment.cs` and four sizing call
+  sites). Main repo — no patch, so it reaches the WPT run directly.
+- **Root cause.** `contain` reached the box and two things read it — background
+  propagation (CSS Backgrounds §2.11.1) and fragmentation, which treats a contained
+  box as monolithic — but nothing acted on what it says about **size**. CSS
+  Containment 2 §3.2 makes a size-contained box lay out as though it had no contents,
+  which is the whole point of the keyword: it is what lets a page state a placeholder
+  for a subtree it has not measured. And `contain-intrinsic-size`, the property that
+  states that placeholder, was not parsed at all — neither the shorthand nor its four
+  longhands, though `@supports` already claimed all five.
+- **The parse is not a split on whitespace.** A component is
+  `auto? [ none | <length> ]`, so `auto 100px` is *one* component naming both axes and
+  `auto 100px auto 50px` is two. The `auto` keyword asks for the element's last
+  remembered size and falls back to the stated length, which is the only state a
+  render that has never skipped the element can be in — so it is parsed and dropped.
+- **The logical longhands map through the *frame*, not through the physical axes.**
+  `contain-intrinsic-inline-size` had to follow `ResolvePhysicalSize` (what `width` and
+  `height` use) rather than `ResolvePhysicalBound` (what `min-width` uses): the
+  vertical-flow prototype lays a transposed box out horizontally with its inline extent
+  as the frame width and rotates afterwards, and these values are consumed *inside*
+  that frame. Mapped the other way, all eight `vertical-lr` cases came out transposed.
+- **The aspect ratio is where this gets interesting, and it needed both directions.**
+  Containment removes an element's **natural** ratio and leaves a **declared** one
+  alone — and the two reach the engine looking alike:
+  - `css-flexbox/canvas-contain-size` asserts that a `<canvas width=20 height=20>`
+    keeps its ratio under `contain: size`, because HTML §14.4 maps the presentational
+    attributes to `aspect-ratio: attr(width) / attr(height)` — a UA stylesheet
+    *declaration*. Broiler carries those attributes as a natural size instead
+    (`IntrinsicReplacedSize`, set by the renderer's canvas fix-up), so suppressing the
+    natural size took the ratio with it. Reading the attributes back in the layout
+    engine is the same rule expressed on the side of the seam that can see them.
+  - `css-contain/contain-size-replaced-002` asserts the *opposite* for an
+    `<svg viewBox="0 0 50 50">`, whose viewBox states a **natural** ratio (SVG 2 §8.2)
+    that must go. Broiler's style pass records the viewBox ratio *into*
+    `aspect-ratio`, so by layout time it is indistinguishable from a declaration;
+    comparing the recorded value back against the viewBox is what separates them, and
+    it misreads only an author who declares the ratio their own viewBox already
+    implies — where both answers agree anyway.
+- **"Non-atomic" is the load-bearing word in the applicability list.** §3.2 exempts
+  non-atomic inline-level boxes, and a replaced element's computed `display` is
+  `inline` — that is the UA value for `<img>` and `<svg>` — while the box it generates
+  is atomic. Testing the keyword alone declined containment on exactly the elements
+  `contain-size-replaced-*` is written about.
+- **`contain: content` deliberately does not contain size** — that is the difference
+  between it and `strict`, and the reason a page can use it without stating a
+  placeholder. The fragmentation predicate treats `content` as monolithic and is right
+  to for its own question (paint containment clips the box), so the two questions keep
+  two predicates.
+- **Checks:** `src/Broiler.Wpt.Tests/SizeContainmentTests.cs`, 20 cases rendered and
+  measured off the canvas, including both halves of the ratio rule.
+- **What is still not contained** — `<img>`, `<svg>`, `<video>` and `<iframe>`, the
+  other 64 assertions of `contain-intrinsic-size-logical-003` — is
+  [two separate gaps below](wpt-rendering-gaps-open.md#a-size-contained-img-svg-video-or-iframe-still-reports-a-size),
+  neither of them about containment.
+
 ### A column flex container never read `flex-basis` and never shrank
 
 - **Tests:** `css/css-flexbox` reftests **693 → 704 passing**, 11 won and none lost. The
