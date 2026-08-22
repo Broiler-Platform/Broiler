@@ -224,6 +224,27 @@ are versioned in lockstep during the preview.
 
 ### Changed
 
+- The `Privacy Test Pages` workflow files what a run found as GitHub issues, the
+  way the WPT runners do, instead of leaving it in an artifact that expires in 30
+  days. Three of them, because ranking them together buries the two small ones
+  under the large one: the regressions (the only finding that describes a change
+  this repository made), the pages this run could not measure at all (whose zero
+  gaps otherwise read like the zero of a page in full parity), and the probes
+  Chromium answers and Broiler does not. `run-privacy-test-pages.py` decides what
+  is worth filing and writes the bodies, so the rules live with the runner that
+  measured them; `--github-output` carries the counts and flags to the workflow.
+  - The gaps issue leads with thrown-error signatures rather than with the probe
+    list. A missing API is reported once per probe that touches it, so
+    normalizing the quoted values, URLs and numbers out of each message regroups
+    a page of repetitions back into the one finding it is.
+  - Unlike the WPT runners, which open a fresh issue per run, this suite refreshes
+    the issue already open for a kind — title, body, and a comment linking the run
+    — matching on a hidden marker in the body (`scripts/lib/github-issue.js`). The
+    WPT suites are dispatched by a human who then reads them; this one runs weekly
+    and unattended over a backlog that changes slowly, and a second copy every
+    Tuesday would bury the one somebody is working from. A `--update-baseline` run
+    files nothing: its comparison describes the baseline being replaced.
+
 - `Broiler.JS` (patch, pending upstream) — `new undefined()` and `new null()` report
   `undefined is not a constructor` / `null is not a constructor` instead of
   `cannot create instance of …`. No browser used the old wording and neither did
