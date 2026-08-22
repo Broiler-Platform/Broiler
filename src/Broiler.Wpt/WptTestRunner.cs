@@ -2679,6 +2679,7 @@ internal sealed partial class WptTestRunner
         // once substituted. WPT serves every one of those hosts from this same checkout, so such a
         // URL is the root-relative one with an origin in front of it.
         src = WptSubstitution.TryStripServedOrigin(src) ?? src;
+        src = TryStripUnservedFileOrigin(src) ?? src;
 
         if (src == null || !src.StartsWith("/", StringComparison.Ordinal))
             return null;
@@ -2709,6 +2710,46 @@ internal sealed partial class WptTestRunner
         // regardless, because it resolves against the process's working directory, so
         // the failure is invisible: the render simply comes out with no image.
         return Path.GetFullPath(local);
+    }
+
+    /// <summary>
+    /// The root-relative form of a <c>file:</c> URL that names nothing on disk, or <see langword="null"/>
+    /// for anything else — including a <c>file:</c> URL that does name a real file, which is already
+    /// resolved and must be left exactly as it is.
+    /// </summary>
+    /// <remarks>
+    /// A run gives each document a <c>file:///…</c> page URL, so a script that absolutizes a
+    /// root-relative corpus path — <c>new URL("/images/green.png", location.href).href</c>, the
+    /// idiom WPT uses whenever a URL has to be handed to another document — produces
+    /// <c>file:///images/green.png</c>: the filesystem root, not the checkout. Nothing serves that,
+    /// and the caller's <c>/</c>-prefix test does not recognise it either, so the resource silently
+    /// did not load while the same path written literally in the markup loaded fine. Reading the
+    /// path back out of such a URL is the <c>file:</c> counterpart of stripping a served WPT origin,
+    /// and it is strictly additive: it only ever turns a resource that was not found into one the
+    /// corpus holds, because a <c>file:</c> URL that resolves on its own is returned untouched and
+    /// the caller still requires the corpus to actually hold what is left.
+    /// </remarks>
+    private static string? TryStripUnservedFileOrigin(string? url)
+    {
+        if (url == null || !url.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !uri.IsFile)
+            return null;
+
+        try
+        {
+            if (File.Exists(uri.LocalPath))
+                return null;
+        }
+        catch (Exception ex) when (ex is ArgumentException or PathTooLongException or NotSupportedException)
+        {
+            return null;
+        }
+
+        // PathAndQuery, not AbsolutePath: the query is what the caller strips, and a WPT resource
+        // routinely carries one it is identified by (`?pipe=trickle(d2)`, a cache-buster).
+        return uri.PathAndQuery;
     }
 
     /// <summary>

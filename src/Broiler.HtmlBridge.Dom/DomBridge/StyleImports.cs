@@ -280,16 +280,22 @@ public sealed partial class DomBridge
         return UrlResolver.Resolve(href, string.IsNullOrEmpty(baseUrl) ? _pageUrl : baseUrl)?.AbsoluteUri;
     }
 
-    /// <summary>Fetches the CSS text for an already-absolute stylesheet URL — decoding a
-    /// <c>data:</c> URI in-process, or loading <c>file</c>/<c>http(s)</c> via the loader.</summary>
-    private string? FetchStyleSheetText(string absoluteUrl)
+    /// <summary>
+    /// Fetches the CSS text for a stylesheet URL — decoding a <c>data:</c> URI in-process, or
+    /// loading <c>file</c>/<c>http(s)</c> via the loader. The seam every stylesheet read goes
+    /// through, <c>@import</c> and <c>&lt;link rel="stylesheet"&gt;</c> alike, so a <c>data:</c>
+    /// sheet is decoded wherever it is named rather than only where someone remembered to.
+    /// Anything but a <c>data:</c> URI is passed to the loader as given, which for a
+    /// <c>&lt;link&gt;</c> href means the caller resolves it first if it needs to be absolute.
+    /// </summary>
+    private string? FetchStyleSheetText(string url)
     {
-        if (absoluteUrl.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+        if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
         {
-            var (_, body) = DecodeDataUriParts(absoluteUrl);
+            var (_, body) = DecodeDataUriParts(url);
             return body;
         }
-        return FetchExternalStylesheet(absoluteUrl);
+        return FetchExternalStylesheet(url);
     }
 
     /// <summary>

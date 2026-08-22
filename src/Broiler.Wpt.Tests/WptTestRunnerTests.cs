@@ -11816,4 +11816,41 @@ div {{ width: 256px; height: 768px; }}
         Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("/", _tempDir));
         Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("/nope/missing.png?x", _tempDir));
     }
+
+    [Fact(Timeout = 600000)]
+    public void TryResolveWptRootRelativePath_Reads_A_Corpus_Path_Back_Out_Of_A_File_Url()
+    {
+        // A run hands each document a file:///… page URL, so a script that absolutizes a
+        // root-relative corpus path — new URL("/images/green.png", location.href).href, the idiom
+        // WPT uses whenever a URL has to be passed to another document — produces
+        // file:///images/green.png: the filesystem root, not the checkout. Nothing served it and
+        // the /-prefix test did not recognise it, so the resource silently failed to load while the
+        // same path written literally in the markup loaded fine
+        // (css-backgrounds/background-image-shared-stylesheet, whose whole assertion is that the
+        // image the stylesheet names paints).
+        Directory.CreateDirectory(Path.Combine(_tempDir, "images"));
+        var onDisk = Path.Combine(_tempDir, "images", "green.png");
+        File.WriteAllText(onDisk, "not-really-a-png");
+
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("file:///images/green.png", _tempDir));
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("file:///images/green.png?pipe=trickle(d2)&0.5", _tempDir));
+        Assert.Equal(onDisk, WptTestRunner.TryResolveWptRootRelativePath("file:///images/green%2Epng", _tempDir));
+
+        // Still null when the corpus does not hold it — the remap only ever finds a real file.
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath("file:///images/missing.png", _tempDir));
+    }
+
+    [Fact(Timeout = 600000)]
+    public void TryResolveWptRootRelativePath_Leaves_A_File_Url_That_Resolves_On_Its_Own_Alone()
+    {
+        // The guard on the remap above: a file: URL naming a real file is already resolved, and
+        // reinterpreting its path as corpus-relative would point a test's own sibling resource at
+        // an unrelated file that happened to sit at the same path under the checkout. Returning
+        // null leaves it to the engine, which reads it directly.
+        Directory.CreateDirectory(Path.Combine(_tempDir, "images"));
+        var onDisk = Path.Combine(_tempDir, "images", "blue.png");
+        File.WriteAllText(onDisk, "not-really-a-png");
+
+        Assert.Null(WptTestRunner.TryResolveWptRootRelativePath(new Uri(onDisk).AbsoluteUri, _tempDir));
+    }
 }

@@ -303,6 +303,17 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A `<link rel="stylesheet" href="data:text/css,…">` now contributes its rules to
+  the cascade and the CSSOM, and fires `load` rather than `error`. The sheet is in
+  the URL, so there is nothing to fetch — but the href went to the resource loader
+  like any other, and that loader dispatches `file` and `http(s)` only, so the
+  sheet came back empty. The renderer's own loader has always decoded `data:`
+  URIs, which is what hid it: such a sheet *painted*, while `getComputedStyle`
+  and the link's load event both reported it as not loaded.
+  A page that builds the link from script and waits on `link.onload` before doing
+  its next step therefore waited forever. `@import url(data:text/css,…)` was
+  already decoded in process; both call sites now go through that one seam.
+
 - The desktop browser paints a page's load window while it runs, instead of only
   its final state. Settling the load window on the load worker took the page's
   callbacks out of the message pump, which is what stopped www.google.com hanging

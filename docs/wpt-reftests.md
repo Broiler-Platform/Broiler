@@ -255,6 +255,18 @@ argument for reading it as a ranking of blast radius rather than a work queue.
 Issue #1716's actual defect was found by ignoring that list and asking why a
 63-test family was failing uniformly — see the mismatch-comparison section above.
 
+**The streak ended at
+[issue #1788](https://github.com/Broiler-Platform/Broiler/issues/1788), and how it
+ended is the usable part.** Its top thirty opens with the same three unwinnables —
+`root-box-003`, `forced-colors-mode-49`, the 60×60 bitmap reference — and its #2,
+`css-backgrounds/background-image-shared-stylesheet`, was a real defect that
+[now passes at 100%](wpt-rendering-gaps-fixed.md#a-datatextcss-link-contributed-nothing-to-the-cascade).
+It was findable because it was the one entry on the list that already carried a
+diagnosis: the gaps file said what the 5.7% was made of down to the 300×150 pixels.
+So the rule the streak taught still holds — **do not start at the top of the list** —
+but the refinement is that the entries worth starting from are the ones a previous
+triage has already reduced, wherever they sit in the ranking.
+
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
   a *different document*. Two distinct versions of this, and the fix for the

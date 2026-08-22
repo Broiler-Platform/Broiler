@@ -1328,22 +1328,32 @@ Worth separating from the rest, because the test itself may be at fault:
 
 ## Dynamic stylesheets
 
-### A script-injected `data:text/css` stylesheet never applies
+### A script-injected `data:text/css` stylesheet never applies — **fixed**
 
-- **Test:** `css-backgrounds/background-image-shared-stylesheet`, CI 5.7% →
-  **5.7%** against its own reference. Reproduces exactly.
-- **It does not need the WPT server, and was filed for three runs as though it
-  did.** The `?pipe=trickle(d2)` query is simply stripped and `/images/green.png` is
-  served from the checkout like any other root-relative resource. The earlier note
-  that "the pair matched at 99.8% locally while CI reports 0.0%" was
-  [the resolver bug](wpt-rendering-gaps-fixed.md#a-root-relative-resolver-returned-a-working-directory-relative-path):
-  neither side loaded the image, so the two agreed on nothing.
-- **What the 5.7% is, precisely.** The reference is 100% lime. Broiler paints 94%
-  white with a green block of exactly 300×150 — **the default `<iframe>` size**. So
-  the iframe is never removed and the parent's script-injected `data:text/css`
-  stylesheet never applies, while the *iframe's own* copy of that stylesheet does.
-- **Exit gate:** a `data:text/css` stylesheet injected from script applies to the
-  injecting document, with a focused test covering the shared-sheet case.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-datatextcss-link-contributed-nothing-to-the-cascade).
+`background-image-shared-stylesheet` now **passes at 100.0%**, and it took a second
+fix beside the data: one — the runner could not read a corpus path back out of the
+`file:///…` URL a script builds from `location.href`.
+
+### `document.styleSheets` lists no `<link>` sheet at all
+
+- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom/Features/DocumentCollectionBinding.cs`.
+  No test on any current list is known to turn on it; it was found while fixing the entry
+  above and is recorded rather than fixed, because widening what that collection returns
+  changes what every script iterating it sees.
+- **What it is.** `GetStyleSheets` filters the document's elements to tag `style`, so an
+  external sheet is absent from `document.styleSheets` however well it loaded — measured
+  on a page whose linked sheet demonstrably applies (`getComputedStyle` reads the linked
+  colour, `document.styleSheets.length` reads `0`). CSSOM §2.2 makes the collection every
+  sheet associated with the document, `<link rel=stylesheet>` included.
+- **The fix is already written, one layer over.** A sub-document's `styleSheets` goes
+  through `DomBridge.BuildStyleSheetsCollection`, which collects `<style>` *and*
+  `IsExternalStylesheet` links, skips a disabled `<link>`, and caches per element for
+  identity. The main-document binding predates it and never adopted it, so the two
+  disagree about what a document's stylesheets are.
+- **Exit gate:** both bindings return the same collection for the same tree, with a test
+  covering a linked sheet, a `<link disabled>`, and object identity across two reads.
 
 ---
 
@@ -1518,7 +1528,7 @@ can follow the same shape the
 [`sub` pipe already did](wpt-rendering-gaps-fixed.md#the-runner-never-performed-wpts-sub-substitution)
 — a runner-side transform, not a server. No test currently on any list is blocked on
 it: `background-image-shared-stylesheet`, the one that was, turned out
-[not to need it](#a-script-injected-datatextcss-stylesheet-never-applies).
+[not to need it](#a-script-injected-datatextcss-stylesheet-never-applies--fixed) and now passes.
 
 ### Paged media is partial
 

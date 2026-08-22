@@ -2890,6 +2890,42 @@ the test that exposed it.
   [below the threshold](wpt-rendering-gaps-open.md#bold-and-italic-never-reach-the-face) on
   bold text.
 
+### A `data:text/css` `<link>` contributed nothing to the cascade
+
+- **Test:** `css-backgrounds/background-image-shared-stylesheet` (reftest suite,
+  [#1788](https://github.com/Broiler-Platform/Broiler/issues/1788).2), 0.0% →
+  **100.0%, passing.** Owner: main repo — `src/Broiler.HtmlBridge.Dom` and
+  `src/Broiler.Wpt`. No submodule patch.
+- **The bug.** A `<link rel="stylesheet" href="data:text/css,…">` carries its own sheet;
+  there is nothing to fetch. The bridge handed the href to the resource loader like any
+  other URL, and that loader dispatches `file` and `http(s)` only — so the sheet came back
+  empty, contributed no rules to the cascade or the CSSOM, and the link dispatched `error`
+  where the spec says `load`. `@import url(data:text/css,…)` was already decoded in
+  process; the `<link>` spelling of the same thing was not, so both call sites now go
+  through that one seam (`FetchStyleSheetText`).
+- **Why it survived so long: the renderer disagreed with the DOM.** `Broiler.HTML`'s own
+  stylesheet loader has always decoded `data:` URIs, so a data: sheet written in the markup
+  *painted* — while `getComputedStyle`, the CSSOM and the link's load event all said it had
+  not loaded. Only a page that reads one of those three notices, which is why the symptom
+  was a script waiting forever on `link.onload` rather than an unstyled render.
+- **The second half was the runner, and it is the more transferable one.** A run gives each
+  document a `file:///…` page URL, so the WPT idiom
+  `new URL("/images/green.png", location.href).href` — how a test hands a corpus URL to
+  another document — produces `file:///images/green.png`: the filesystem root, not the
+  checkout. `TryResolveWptRootRelativePath` already reads a corpus path back out of a served
+  WPT origin (`http://web-platform.test:8000/…`); it now does the same for a `file:` URL
+  that names nothing on disk. Strictly additive — a `file:` URL that resolves on its own is
+  returned untouched, and the corpus still has to hold what is left.
+- **Verified:** five focused tests in `DataUriStylesheetLinkTests` (script-injected sheet
+  reaches computed style; it fires `load`, not `error`; the markup and base64 spellings; and
+  the shared-sheet case the WPT test is named for) — all five fail on the parent commit —
+  plus two for the runner remap, and the reftest itself run end to end against a checkout
+  holding the test, its reference, `/images/green.png` and `/css/reference/blank.html`.
+- **Do not read the first half as the whole fix.** Landing only the data: decode moves the
+  test from 0.0% to 0.0%: the iframe is correctly removed (that is `link.onload` firing at
+  last) and the page is then blank white against a lime reference, because the image the
+  sheet names still does not load. The two together are what pass it.
+
 ### `transform: scale()` with percentages
 
 - **Test:** `css/css-transforms/transform-scale-percent-001`, 0.5% → **99.99%**.
