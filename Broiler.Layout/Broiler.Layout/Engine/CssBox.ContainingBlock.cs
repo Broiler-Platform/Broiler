@@ -508,7 +508,128 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (ContainingBlock.HasDefiniteAspectRatioBlockHeight())
             return false;
 
+        // CSS2.1 §10.6.4: a containing block that is out of flow with an `auto` height but both
+        // `top` and `bottom` specified takes its used block size from the constraint equation, so
+        // that size is definite even though nothing declared it. The `Height == auto` test below
+        // cannot see that and would send every percentage inside such a box to `auto`.
+        if (ContainingBlock.TryGetInsetDerivedContentHeight(out _))
+            return false;
+
         return ContainingBlock.Height == CssConstants.Auto || string.IsNullOrEmpty(ContainingBlock.Height);
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.6.4: the used <em>content</em>-box height of an out-of-flow box whose
+    /// <c>height</c> is <c>auto</c> but whose <c>top</c> and <c>bottom</c> are both specified —
+    /// the constraint equation
+    /// <c>top + margin-top + border + padding + height + padding + border + margin-bottom + bottom</c>
+    /// <c> = containing-block height</c> leaves exactly one unknown, so the block size is
+    /// <b>definite</b> even though no <c>height</c> declaration names it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The definiteness is what callers are after, not just the number. Percentage heights inside
+    /// such a box resolve against it rather than falling back to <c>auto</c> (§10.5), and a flex or
+    /// grid container sized this way has a definite main/block size to hand out to its items
+    /// (CSS Flexbox §9.2). Both were reading the <c>height</c> declaration alone and so treated
+    /// <c>position: absolute; inset: 0</c> — the shape a full-viewport app shell is written in — as
+    /// content-sized: WPT <c>css-flexbox/percentage-heights-002</c> is a
+    /// <c>position: absolute; top/right/bottom/left: 0</c> column flex container over a red
+    /// backdrop, and every percentage in it collapsed to the text's own height, leaving the page
+    /// red where the test says "you should see no red".
+    /// </para>
+    /// <para>
+    /// Read at measurement time, before block sizes resolve bottom-up, so the containing block's
+    /// extent comes from <see cref="GetAbsoluteContainingBlockPaddingBox"/> — which already walks
+    /// up a chain of inset-sized ancestors — rather than from a <see cref="CssBoxProperties.Size"/>
+    /// that has not settled. A box whose own used height is over-constrained to nothing returns
+    /// <see langword="false"/>: a zero block size is indistinguishable here from one that has not
+    /// been computed, and every caller treats it as indefinite anyway.
+    /// </para>
+    /// <para>
+    /// Auto margins are not the §10.6.4 centring case: that applies only when none of the three of
+    /// <c>top</c>, <c>height</c> and <c>bottom</c> is <c>auto</c>. With <c>height: auto</c> the
+    /// spec sets an auto margin to zero and solves for the height, which is what
+    /// <see cref="CssBoxProperties.ActualMarginTop"/> already holds.
+    /// </para>
+    /// </remarks>
+    internal bool TryGetInsetDerivedContentHeight(out double contentHeight)
+    {
+        contentHeight = 0;
+
+        if (Position is not (CssConstants.Absolute or CssConstants.Fixed))
+            return false;
+
+        if (!string.IsNullOrEmpty(Height) && Height != CssConstants.Auto)
+            return false;
+
+        if (Top is null or CssConstants.Auto || Bottom is null or CssConstants.Auto)
+            return false;
+
+        double cbHeight;
+
+        if (Position == CssConstants.Fixed && LayoutEnvironment != null)
+        {
+            cbHeight = FixedPositioningViewport().Height;
+        }
+        else
+        {
+            var cb = FindPositionedContainingBlock();
+
+            // A box that is its own positioned containing block has no outer extent to solve
+            // against; the recursion in GetAbsoluteContainingBlockPaddingBox makes the same guard.
+            if (ReferenceEquals(cb, this))
+                return false;
+
+            GetAbsoluteContainingBlockPaddingBox(cb, out _, out _, out _, out cbHeight);
+        }
+
+        if (cbHeight <= 0)
+            return false;
+
+        double resolved = cbHeight
+            - ParseUsedLength(Top, cbHeight) - ParseUsedLength(Bottom, cbHeight)
+            - ActualMarginTop - ActualMarginBottom
+            - ActualPaddingTop - ActualPaddingBottom
+            - ActualBorderTopWidth - ActualBorderBottomWidth;
+
+        if (double.IsNaN(resolved) || double.IsInfinity(resolved))
+            return false;
+
+        // §10.7: the used height is then clamped, and the clamped value is the definite one.
+        resolved = ClampInsetDerivedContentHeight(resolved, cbHeight);
+
+        contentHeight = resolved;
+        return contentHeight > 0;
+    }
+
+    /// <summary>
+    /// CSS2.1 §10.7 over the §10.6.4 result: <c>min-height</c> and <c>max-height</c> clamp the
+    /// height the inset pair solved for, in the content-box frame that solution is stated in.
+    /// </summary>
+    private double ClampInsetDerivedContentHeight(double contentHeight, double cbHeight)
+    {
+        double em = GetEmHeight();
+
+        double? ToContentHeight(string declaration)
+        {
+            if (string.IsNullOrEmpty(declaration) || declaration == CssConstants.Auto
+                || declaration.Equals("none", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            double length = CssLengthParser.ParseLength(declaration, cbHeight, em);
+            return double.IsNaN(length) || double.IsInfinity(length)
+                ? null
+                : ResolveSpecifiedHeightToContentBox(length);
+        }
+
+        if (ToContentHeight(MaxHeight) is { } max && max < contentHeight)
+            contentHeight = max;
+
+        if (ToContentHeight(MinHeight) is { } min && min > contentHeight)
+            contentHeight = min;
+
+        return Math.Max(0, contentHeight);
     }
 
     /// <summary>CSS Sizing 4 §4: <c>true</c> when this box's block (height) axis is
@@ -588,6 +709,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 return flowCb.ResolveSpecifiedHeightToContentBox(cssHeight);
         }
 
+        // §10.6.4 again: the containing block is out of flow with an auto height that its own
+        // top/bottom pair makes definite. Its Size.Height is still 0 at this point for the same
+        // bottom-up reason the definite-declaration branch above exists.
+        if (flowCb != null && flowCb.TryGetInsetDerivedContentHeight(out double insetHeight))
+            return insetHeight;
+
         // Size.Height is a border box, so the padding and border come off it to leave the
         // content height, exactly as TryGetPercentageBlockSizeBasis does for the same box.
         if (flowCb == null)
@@ -664,6 +791,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 cb.TryGetAspectRatioBlockHeight(out basis);
                 return basis > 0;
             }
+
+            // CSS2.1 §10.6.4: so is an auto block axis an out-of-flow box's own top/bottom pair
+            // solves for — the same exception, and made in the same two places.
+            if (heightIsAuto && cb.TryGetInsetDerivedContentHeight(out basis))
+                return true;
 
             // A real element with an auto (or already-resolved percentage) height: its used block
             // size, when layout has settled it, and otherwise indefinite. Size.Height is a border

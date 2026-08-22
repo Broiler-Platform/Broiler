@@ -536,8 +536,8 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
-    /// CSS Flexbox §9.7: distributes a <c>column</c> flex container's positive free space along
-    /// its main (block) axis, per <c>flex-grow</c>.
+    /// CSS Flexbox §9.7: distributes a <c>column</c> flex container's free space along its main
+    /// (block) axis, growing its items into what is left over and shrinking them into what is not.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -548,18 +548,19 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </para>
     /// <para>
     /// It runs only when the container's main size is <b>definite</b>, which per §9.2 means a
-    /// specified <c>height</c> (then clamped by <c>min-height</c>/<c>max-height</c>) — not a
-    /// <c>min-height</c> alone. The distinction is exactly what
-    /// css-flexbox/percentage-heights-003 pins: its <c>height: 0; min-height: 100%</c> containers
-    /// flex their items to the clamped 100px, and its <c>min-height: 100%</c>-only containers,
-    /// whose main size stays content-based, leave them at zero.
+    /// specified <c>height</c> (then clamped by <c>min-height</c>/<c>max-height</c>) or a block
+    /// size the box's own inset pair solves for — not a <c>min-height</c> alone. The distinction
+    /// is exactly what css-flexbox/percentage-heights-003 pins: its <c>height: 0;
+    /// min-height: 100%</c> containers flex their items to the clamped 100px, and its
+    /// <c>min-height: 100%</c>-only containers, whose main size stays content-based, leave them at
+    /// zero.
     /// </para>
     /// <para>
-    /// Each grown item is laid out again at its target height rather than resized in place,
+    /// Each flexed item is laid out again at its target height rather than resized in place,
     /// because a percentage-height descendant resolves against the item's used height — the
     /// <c>span { height: 100% }</c> the same test measures — and poking <c>Size</c> alone would
-    /// leave it reading the pre-flex one. Single-line only: <c>column wrap</c> with items that
-    /// overflow the main axis needs real line breaking, which this does not attempt.
+    /// leave it reading the pre-flex one. Single-line only: <c>column wrap</c> is
+    /// <see cref="PerformFlexColumnLineLayout"/>'s.
     /// </para>
     /// </remarks>
     private void ApplyFlexColumnMainAxisSizing(ILayoutEnvironment g)
@@ -567,11 +568,20 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         if (!IsFlexContainer() || IsRowFlexContainer())
             return;
 
+        // `column` names the *block* axis, so under a vertical writing mode the main axis is
+        // horizontal — the opposite of every axis this pass reads, starting with the height it
+        // takes for the container's main size. PerformFlexColumnLineLayout declines for the same
+        // reason; growing on the wrong axis was merely inert here (a vertical container's items
+        // rarely leave vertical free space to hand out), but shrinking on it is not, and
+        // css-flexbox/flexbox-column-row-gap-002's `vertical-lr` container squashed all six of its
+        // 28px items to fit a main size that is not its main size.
+        if (IsVerticalWritingMode(WritingMode))
+            return;
+
         if (TryGetDefiniteMainAxisContentHeight() is not { } mainSize)
             return;
 
         var items = new List<CssBox>();
-        double usedOuterHeight = 0;
 
         foreach (var child in Boxes)
         {
@@ -579,44 +589,26 @@ internal partial class CssBox : CssBoxProperties, IDisposable
                 continue;
 
             items.Add(child);
-            usedOuterHeight += GetFlexItemOuterHeight(child);
         }
 
         if (items.Count == 0)
             return;
 
         double rowGap = ResolveFlexGap(RowGap, mainSize);
-        double freeSpace = mainSize - usedOuterHeight - Math.Max(0, items.Count - 1) * rowGap;
 
-        // Growth only. Shrinking is the other half of §9.7 and is deliberately left out:
-        // `flex-shrink` defaults to 1, so implementing it here would make every column
-        // container whose content overflows squash its items — and squash them further than
-        // §4.5 allows, because that clamp (an item's min-content size as the floor for an
-        // `auto` `min-height`) does not exist yet. Not shrinking is the better of the two
-        // wrong answers until it does.
-        if (freeSpace <= 0.5)
-            return;
-
-        double growTotal = 0;
-
-        foreach (var child in items)
-            growTotal += ParseFlexFactor(child.FlexGrow, 0);
-
-        if (growTotal <= 0)
+        if (!ResolveFlexColumnMainSizes(g, items, mainSize, rowGap, out var targets))
             return;
 
         double cursorY = ClientTop;
         bool moved = false;
 
-        foreach (var child in items)
+        for (int i = 0; i < items.Count; i++)
         {
-            double outerHeight = GetFlexItemOuterHeight(child);
-            double factor = ParseFlexFactor(child.FlexGrow, 0);
-            double target = outerHeight + freeSpace * (factor / growTotal);
+            var child = items[i];
 
-            if (factor > 0 && Math.Abs(target - outerHeight) > 0.5)
+            if (Math.Abs(targets[i] - GetFlexItemOuterHeight(child)) > 0.5)
             {
-                LayoutFlexItemAtTargetHeight(g, child, Math.Max(0, target));
+                LayoutFlexItemAtTargetHeight(g, child, Math.Max(0, targets[i]));
                 moved = true;
             }
 
@@ -639,6 +631,331 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
         cursorY -= rowGap;   // the trailing gap the loop added after the last item
         ActualBottom = Math.Max(ActualBottom, cursorY + ActualPaddingBottom + ActualBorderBottomWidth);
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.2, §9.4 and §9.7 over one column flex line: each item's flex base size in
+    /// the block axis, clamped to its hypothetical main size, and the target outer height that
+    /// growing or shrinking into <paramref name="mainSize"/> then gives it.
+    /// </summary>
+    /// <returns>
+    /// <see langword="false"/> when no item's target differs from the height block flow already
+    /// gave it, so the caller can leave the stack exactly as it stands.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The base size is read from <c>flex-basis</c> (or, when that is <c>auto</c>, from the item's
+    /// own <c>height</c>) rather than from the height block flow gave it. Those coincide for an
+    /// item sized by its content, which is why the growth-only pass this replaces got away with
+    /// measuring: they part company the moment <c>flex-basis</c> names a block size of its own,
+    /// which block flow does not implement and so had simply ignored — WPT
+    /// css-flexbox/percentage-heights-002's <c>flex-basis: 100%</c> pane sat at the height of the
+    /// one line of text in it.
+    /// </para>
+    /// <para>
+    /// Shrinking is the half of §9.7 that was left out here until now, on the grounds that §4.5's
+    /// automatic minimum size did not exist in this axis to floor it with. It does now
+    /// (<see cref="ClampFlexColumnItemBorderBoxHeight"/>), so an item that overflows its container
+    /// shrinks the way <c>flex-shrink: 1</c> — the initial value, and therefore what nearly every
+    /// column flex item on the web has — asks it to, and no further than its own content.
+    /// </para>
+    /// <para>
+    /// That clamp is applied twice, and both are load-bearing: to the base size, giving §9.4
+    /// step 3's hypothetical main size that free space is measured from, and again to each
+    /// distributed target (§9.7 step 4). Clamping only the shrink branch is not enough — an item
+    /// that takes no share at all still has a minimum and a maximum. <c>flex-basis: 0</c> with a
+    /// 100px child in a 10px container (<c>flex-minimum-height-flex-items-011</c>) is floored at
+    /// its content either way, and <c>max-height: min-content</c> over a <c>flex-basis: 200px</c>
+    /// (<c>flex-item-max-height-min-content</c>) is capped at it.
+    /// </para>
+    /// </remarks>
+    private bool ResolveFlexColumnMainSizes(
+        ILayoutEnvironment g, List<CssBox> items, double mainSize, double rowGap, out double[] targets)
+    {
+        int count = items.Count;
+        targets = new double[count];
+
+        // The §4.5 content size suggestion, memoized: reading it re-lays an item out, and each is
+        // read by both clamps below.
+        var contentHeights = new double?[count];
+        double usedOuterHeight = 0;
+
+        for (int i = 0; i < count; i++)
+        {
+            targets[i] = ClampFlexColumnItemOuterHeight(
+                g, items[i], ResolveFlexItemBaseOuterHeight(items[i], mainSize), mainSize, ref contentHeights[i]);
+
+            usedOuterHeight += targets[i];
+        }
+
+        double freeSpace = mainSize - usedOuterHeight - Math.Max(0, count - 1) * rowGap;
+
+        if (freeSpace > 0.5)
+        {
+            double growTotal = 0;
+
+            foreach (var child in items)
+                growTotal += ParseFlexFactor(child.FlexGrow, 0);
+
+            if (growTotal > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    targets[i] = ClampFlexColumnItemOuterHeight(
+                        g, items[i],
+                        targets[i] + freeSpace * (ParseFlexFactor(items[i].FlexGrow, 0) / growTotal),
+                        mainSize, ref contentHeights[i]);
+                }
+            }
+        }
+        else if (freeSpace < -0.5)
+        {
+            // §9.7 step 2: the shrink factor is scaled by the base size, so a large item gives up
+            // more of the overflow than a small one with the same `flex-shrink`.
+            double shrinkTotal = 0;
+
+            for (int i = 0; i < count; i++)
+                shrinkTotal += ParseFlexFactor(items[i].FlexShrink, 1) * Math.Max(0, targets[i]);
+
+            if (shrinkTotal > 0)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    double share = (ParseFlexFactor(items[i].FlexShrink, 1) * Math.Max(0, targets[i])) / shrinkTotal;
+
+                    targets[i] = ClampFlexColumnItemOuterHeight(
+                        g, items[i], targets[i] + freeSpace * share, mainSize, ref contentHeights[i]);
+                }
+            }
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            if (Math.Abs(targets[i] - GetFlexItemOuterHeight(items[i])) > 0.5)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// <see cref="ClampFlexColumnItemBorderBoxHeight"/> over an <em>outer</em> height, since that
+    /// is the currency §9.7 distributes free space in.
+    /// </summary>
+    private static double ClampFlexColumnItemOuterHeight(
+        ILayoutEnvironment g, CssBox child, double outerHeight, double containerContentHeight,
+        ref double? contentHeight)
+    {
+        double marginHeight = child.ActualMarginTop + child.ActualMarginBottom;
+        double borderBoxHeight = ClampFlexColumnItemBorderBoxHeight(
+            g, child, Math.Max(0, outerHeight - marginHeight), containerContentHeight, ref contentHeight);
+
+        return borderBoxHeight + marginHeight;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §9.2 step 3 in the block axis: an item's flex base size, as an outer height.
+    /// <c>flex-basis</c> when it names a length, the item's own definite <c>height</c> when it does
+    /// not, and the block size its content produced when neither does.
+    /// </summary>
+    private static double ResolveFlexItemBaseOuterHeight(CssBox child, double containerContentHeight)
+    {
+        double marginHeight = child.ActualMarginTop + child.ActualMarginBottom;
+        double borderBoxHeight;
+        string basis = child.FlexBasis?.Trim();
+
+        if (!string.IsNullOrEmpty(basis)
+            && !basis.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            && !basis.Equals("content", StringComparison.OrdinalIgnoreCase)
+            && !IsIntrinsicSizingHeightKeyword(basis))
+        {
+            borderBoxHeight = child.ResolveSpecifiedHeightToBorderBox(
+                ParseFlexLengthOrZero(child, basis, containerContentHeight));
+        }
+        else if (!string.IsNullOrEmpty(child.Height)
+            && child.Height != CssConstants.Auto
+            && !IsIntrinsicSizingHeightKeyword(child.Height)
+            && !child.HeightPercentageResolvesToAuto())
+        {
+            borderBoxHeight = child.ResolveSpecifiedHeightToBorderBox(
+                ParseFlexLengthOrZero(child, child.Height, containerContentHeight));
+        }
+        else
+        {
+            // The height block flow settled on, which for an auto-height item *is* its content
+            // size — the third branch of §9.2 step 3, already measured.
+            return GetFlexItemOuterHeight(child);
+        }
+
+        return Math.Max(0, borderBoxHeight) + marginHeight;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §4.5 and §9.7 step 4 in the block axis: clamps an item's target border-box
+    /// height by its <c>min-height</c>/<c>max-height</c>, treating an undeclared
+    /// <c>min-height</c> as the <c>auto</c> it computes to on a flex item — the automatic minimum
+    /// size, which is the item's own content block size, and no larger than a definite
+    /// <c>height</c> it declares.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the floor that makes column shrinking safe to turn on: without it a container
+    /// smaller than its content squashes every item towards nothing, because <c>flex-shrink</c>
+    /// defaults to <c>1</c>. The row axis has had the same clamp for as long as it has shrunk
+    /// (<see cref="ClampFlexItemBorderBoxWidth"/>); this is its block-axis twin, and reads the
+    /// content size the same way — by measuring the item with its own size declaration suppressed,
+    /// so a <c>height: 300px</c> item does not declare a 300px floor and become unshrinkable.
+    /// </para>
+    /// <para>
+    /// One thing it adds that the row clamp does not: §4.5 gives an automatic minimum size only to
+    /// an item whose main-axis <c>overflow</c> is <c>visible</c>. A scroll container states that
+    /// its content may be scrolled rather than that its box must fit it, and
+    /// <c>flex: 1; overflow: auto</c> is how the scrolling pane of nearly every column layout on
+    /// the web is written — flooring it at its content is what makes such a pane push its own
+    /// container open instead of scrolling.
+    /// </para>
+    /// <para>
+    /// <paramref name="contentHeight"/> memoizes the content measurement across the two clamps one
+    /// item takes (base size, then distributed target), because taking it re-lays the item out.
+    /// </para>
+    /// </remarks>
+    private static double ClampFlexColumnItemBorderBoxHeight(
+        ILayoutEnvironment g, CssBox child, double borderBoxHeight, double containerContentHeight,
+        ref double? contentHeight)
+    {
+        double? measured = contentHeight;
+
+        double ContentHeight() => measured ??= MeasureFlexColumnItemContentBorderBoxHeight(g, child);
+
+        if (!string.IsNullOrEmpty(child.MaxHeight) && !child.MaxHeight.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            // An intrinsic `max-height` is a content measurement, not a length: parsing it as one
+            // yields 0 and caps the item at nothing.
+            double maxHeight = IsIntrinsicSizingHeightKeyword(child.MaxHeight)
+                ? ContentHeight()
+                : child.ResolveSpecifiedHeightToBorderBox(
+                    ParseFlexLengthOrZero(child, child.MaxHeight, containerContentHeight));
+
+            if (borderBoxHeight > maxHeight)
+                borderBoxHeight = maxHeight;
+        }
+
+        bool useAutomaticMinHeight =
+            !child.IsMinHeightSpecified || child.MinHeight.Equals("auto", StringComparison.OrdinalIgnoreCase);
+
+        if (useAutomaticMinHeight)
+        {
+            if (!IsVisibleOverflow(child.Overflow))
+            {
+                contentHeight = measured;
+                return Math.Max(0, borderBoxHeight);
+            }
+
+            double minBorderBoxHeight = ContentHeight();
+
+            if (TryGetSpecifiedBlockSizeSuggestion(child, containerContentHeight, out double specified)
+                && specified < minBorderBoxHeight)
+            {
+                minBorderBoxHeight = specified;
+            }
+
+            if (borderBoxHeight < minBorderBoxHeight)
+                borderBoxHeight = minBorderBoxHeight;
+        }
+        else if (!string.IsNullOrEmpty(child.MinHeight)
+            && !child.MinHeight.Equals("0", StringComparison.OrdinalIgnoreCase))
+        {
+            double minHeight = IsIntrinsicSizingHeightKeyword(child.MinHeight)
+                ? ContentHeight()
+                : child.ResolveSpecifiedHeightToBorderBox(
+                    ParseFlexLengthOrZero(child, child.MinHeight, containerContentHeight));
+
+            if (borderBoxHeight < minHeight)
+                borderBoxHeight = minHeight;
+        }
+
+        contentHeight = measured;
+        return Math.Max(0, borderBoxHeight);
+    }
+
+    private static bool IsVisibleOverflow(string overflow) =>
+        string.IsNullOrEmpty(overflow)
+        || overflow.Equals("visible", StringComparison.OrdinalIgnoreCase)
+        || overflow.Equals("clip", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// CSS Flexbox §4.5 <em>specified size suggestion</em> in the block axis — the block-axis twin
+    /// of <see cref="TryGetSpecifiedSizeSuggestion"/>.
+    /// </summary>
+    private static bool TryGetSpecifiedBlockSizeSuggestion(
+        CssBox child, double containerContentHeight, out double borderBoxHeight)
+    {
+        borderBoxHeight = 0;
+
+        if (string.IsNullOrEmpty(child.Height)
+            || child.Height == CssConstants.Auto
+            || IsIntrinsicSizingHeightKeyword(child.Height)
+            || child.HeightPercentageResolvesToAuto())
+        {
+            return false;
+        }
+
+        borderBoxHeight = child.ResolveSpecifiedHeightToBorderBox(
+            ParseFlexLengthOrZero(child, child.Height, containerContentHeight));
+        return true;
+    }
+
+    /// <summary>
+    /// CSS Flexbox §4.5 <em>content size suggestion</em> in the block axis: the border-box height
+    /// the item's content alone produces, measured by laying it out with its own <c>height</c>
+    /// declaration suppressed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An item that declares no height needs no measurement at all — block flow has already
+    /// produced exactly this number, and the box is left untouched.
+    /// </para>
+    /// <para>
+    /// One that does is laid out again, and the inline axis is <b>pinned</b> across that pass. The
+    /// item's used width at this point is the one the column path shrink-wrapped it to, and a
+    /// re-layout would re-derive it from the <c>auto</c> declaration against the ordinary
+    /// containing block instead — so measuring the block axis silently widened the item, and the
+    /// cross sizes and offsets computed from that width before the measurement no longer described
+    /// it (WPT css-flexbox/flex-lines/multi-line-wrap-with-column-reverse lost the 10px gutters
+    /// between its three columns, which is what the widened items had swallowed). A size
+    /// measurement must not move the axis it is not measuring.
+    /// </para>
+    /// <para>
+    /// It does leave the item laid out at the measured content height, which is why
+    /// <see cref="ResolveFlexColumnMainSizes"/>'s callers re-lay every item out whose target
+    /// differs from its current height — and after a measurement, one whose target is its base
+    /// size differs, so the pass restores it rather than leaving the measurement showing.
+    /// </para>
+    /// </remarks>
+    private static double MeasureFlexColumnItemContentBorderBoxHeight(ILayoutEnvironment g, CssBox child)
+    {
+        double Measured() => Math.Max(0, child.ActualBottom - child.Location.Y);
+
+        string savedHeight = child.Height;
+
+        if (string.IsNullOrEmpty(savedHeight) || savedHeight == CssConstants.Auto)
+            return Measured();
+
+        string savedWidth = child.Width;
+        double borderBoxWidth = child.Size.Width;
+        double cssWidth = child.UsesBorderBoxSizing
+            ? borderBoxWidth
+            : borderBoxWidth
+              - child.ActualPaddingLeft - child.ActualPaddingRight
+              - child.ActualBorderLeftWidth - child.ActualBorderRightWidth;
+
+        child.Width = FormatCssPx(Math.Max(0, cssWidth));
+        child.Height = CssConstants.Auto;
+        child.PerformLayout(g);
+        child.Width = savedWidth;
+        child.Height = savedHeight;
+
+        return Measured();
     }
 
     private sealed class FlexColumnLine
@@ -842,45 +1159,29 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     }
 
     /// <summary>
-    /// CSS Flexbox §9.7 and §9.4 step 11 for one column flex line: grows the items into the line's
-    /// free main space per <c>flex-grow</c>, and stretches an <c>auto</c>-width item across the
-    /// line's cross size.
+    /// CSS Flexbox §9.7 and §9.4 step 11 for one column flex line: flexes the items into the
+    /// line's main size, and stretches an <c>auto</c>-width item across the line's cross size.
     /// </summary>
     /// <remarks>
     /// Both are settled in a single re-layout per item, because they resize different axes of the
-    /// same box: laying an item out at its stretched width and then again at its grown height
+    /// same box: laying an item out at its stretched width and then again at its flexed height
     /// would let the second layout re-derive the width from the <c>auto</c> declaration and undo
-    /// the stretch. Growth only, no shrinking — the same restriction as the single-line pass, and
-    /// for the reason given there.
+    /// the stretch. The main-axis half is <see cref="ResolveFlexColumnMainSizes"/>, shared with the
+    /// single-line pass so a wrapped container flexes by the same rules an unwrapped one does.
     /// </remarks>
     private void ResolveFlexColumnLineItemSizes(ILayoutEnvironment g, FlexColumnLine line, double lineMain, double rowGap)
     {
-        double freeMain = lineMain - line.MainSize;
-        double growTotal = 0;
-
-        if (freeMain > 0.5)
-        {
-            foreach (var child in line.Items)
-                growTotal += ParseFlexFactor(child.FlexGrow, 0);
-        }
-
+        bool flexes = ResolveFlexColumnMainSizes(g, line.Items, lineMain, rowGap, out double[] targets);
         double mainSize = 0;
 
         for (int i = 0; i < line.Items.Count; i++)
         {
             var child = line.Items[i];
-            double outerHeight = GetFlexItemOuterHeight(child);
             double? targetHeight = null;
             double? targetWidth = null;
 
-            if (growTotal > 0)
-            {
-                double factor = ParseFlexFactor(child.FlexGrow, 0);
-                double grown = outerHeight + freeMain * (factor / growTotal);
-
-                if (factor > 0 && Math.Abs(grown - outerHeight) > 0.5)
-                    targetHeight = Math.Max(0, grown);
-            }
+            if (flexes && Math.Abs(targets[i] - GetFlexItemOuterHeight(child)) > 0.5)
+                targetHeight = Math.Max(0, targets[i]);
 
             if (ShouldStretchFlexColumnItemAcrossLine(child, line.CrossSize))
                 targetWidth = line.CrossSize;
@@ -1025,7 +1326,11 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private double? TryGetDefiniteMainAxisContentHeight()
     {
         if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
-            return null;
+        {
+            // §9.2 reads "definite", not "declared": an out-of-flow container with an auto height
+            // and both insets set has its main size solved by CSS2.1 §10.6.4, already clamped.
+            return TryGetInsetDerivedContentHeight(out double insetHeight) ? insetHeight : null;
+        }
 
         double basis = PercentageHeightContainingBlockHeight();
         double em = GetEmHeight();
@@ -1184,7 +1489,12 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     private double? TryGetDefiniteContentHeight()
     {
         if (string.IsNullOrEmpty(Height) || Height == CssConstants.Auto || HeightPercentageResolvesToAuto())
-            return null;
+        {
+            // Same §10.6.4 exception the main-axis helper above makes: an inset-sized out-of-flow
+            // container has cross-axis space to hand out, so its items stretch rather than
+            // collapsing to their own content.
+            return TryGetInsetDerivedContentHeight(out double insetHeight) ? insetHeight : null;
+        }
 
         double containingBlockHeight =
             Position == CssConstants.Fixed && LayoutEnvironment != null ? LayoutEnvironment.ViewportSize.Height

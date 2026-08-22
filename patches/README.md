@@ -37,6 +37,7 @@ git -C <Submodule> log --oneline --grep '<subject>'
 | `0001-js-private-name-key-classification.patch` | `Broiler.JS` | Classify a private-name key by its marker and `#`, not the marker alone | A private name's property key is the U+0001 marker followed by the name, and the name always carries its leading `#` (`JSObject.MintPrivateName`, `FastCompiler.KeyOfPrivateName`). `KeyStrings.Classify` tested only the marker, so **every ordinary string key beginning with U+0001** was taken for a private name: writing one threw the brand-check `TypeError`, and reflection and enumeration hid it. WPT's `testharness.js` does exactly that while building its escape map — `formatEscapeMap[String.fromCharCode(p)]` with `p = 1` — so the harness threw *while loading* and **every testharness-based test in the suite reported no results at all**. With the patch applied the harness loads and the usual pass/fail table renders. |
 | `0002-html-outermost-svg-author-display.patch` | `Broiler.HTML` | Let an outermost `<svg>` keep the display the author cascaded | An outermost `<svg>` is a replaced element, so its `display` is *initially* `inline`; the box tree substitutes `inline-block` for that (how an inline replaced box is laid out here) but applied the substitution to the **cascaded** value too, discarding whatever the author wrote. `svg { display: block }` therefore laid out inline — siblings side by side instead of stacked, and `margin: 0 auto` computing to zero rather than centring (`css/compositing/line-with-svg-background` is ten block `<svg>`s and came out two to a row) — and `svg { display: none }` was overridden into a visible box, so the hidden `<svg>` a page uses to carry nothing but a `<filter>` or `<defs>` painted (`css/filter-effects/tainting-css-dropshadow-currentcolor`, 97.4 % → 100 %). The cascaded value is now read on the outermost `<svg>` only: a nested one is SVG content rather than a CSS box and arrives already carrying its ancestor's `display: none`. |
 | `0003-css-link-matches-xlink-href.patch` | `Broiler.CSS` | Match `:link` on an SVG `<a>` that links through `xlink:href` | SVG 1.1 §17.1 gives `<a>` its link through `xlink:href`, and SVG 2 §14.1 adds plain `href` without retiring it, so either attribute alone makes the element a link. `CssSelectorMatcher` tested `href` alone, so an `<a xlink:href="…">` matched no `a:link` rule and the whole rule was dropped — `a:link rect { fill: lime }` left the red rectangle beneath it showing. Pairs with the main-repo fix that fires `load` at an outermost inline `<svg>`: WPT `svg/linking/reftests/href-a-element-attr-change` removes `href` from its own load handler and asserts the element keeps its link status, so until that handler ran the test passed without reaching its assertion at all. |
+| `0004-html-paint-transform-origin.patch` | `Broiler.HTML` | paint: apply a CSS transform about its transform-origin | CSS Transforms 1 §8 applies an element's `transform` about its `transform-origin`, and `PaintWalker` used the box centre for every element without reading the property. So a declared origin did nothing, and paint disagreed with the element's own script: `transform-origin: 0 0; transform: scale(0.5)` on a 100×100 box reported a rect at (0, 0) from `getBoundingClientRect` and painted it at (25, 25). Scaling *up* is worse than a displacement — a centre origin throws a top-left child clean off the canvas — so `css/filter-effects/filter-scaling-001` (#1774 entry 28, 50.1 %) rendered a blank page where half the viewport should be green. The grammar is main-repo (`Broiler.Layout.IR.CssTransformOrigin`, shared with the bridge's transform chain and the SVG renderer, unit-tested in `CssTransformOriginTests`); this patch is the two lines that reach it. |
 
 None is bumped as a pointer, and the main repo builds and passes without any of
 them.
@@ -54,7 +55,18 @@ fixes are main-repo; those are pinned unconditionally by
 `svg/linking/reftests/href-a-element-attr-change` the rest of the way once they
 let its load handler run.
 
-All three are listed in `scripts/apply-pending-wpt-patches.sh`, which the privacy
+`0004` is shaped the way CLAUDE.md asks a two-repo fix to be shaped: the whole of
+the `transform-origin` grammar is main-repo
+(`Broiler.Layout/IR/CssTransformOrigin.cs`, shared with the script bridge's
+transform chain and with the SVG renderer's `transform-box` handling, and
+unit-tested unconditionally by `Broiler.Layout.Tests.CssTransformOriginTests`), so
+the patch itself is the two lines in `PaintWalker` that call it.
+`src/Broiler.Wpt.Tests/TransformOriginPaintTests.cs` pins the painted result the
+way `0002`'s test does — it probes the pinned pointer and self-skips rather than
+going red. There is no main-repo fallback that can stand in for the paint half:
+the transform is emitted in `Broiler.HTML`'s own stacking walk.
+
+All four are listed in `scripts/apply-pending-wpt-patches.sh`, which the privacy
 test-page and real-world render workflows run before their builds — so they
 reach those on top of the pinned pointer. The **WPT** workflows
 (`wpt-tests.yml`, `wpt-reftests.yml`) do not run that script today, so the WPT

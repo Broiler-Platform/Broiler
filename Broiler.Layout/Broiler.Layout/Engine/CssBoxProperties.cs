@@ -679,6 +679,30 @@ internal abstract partial class CssBoxProperties
     private string _minHeight = "0";
 
     /// <summary>
+    /// Whether the author declared <c>min-height</c> (or a logical <c>min-block-size</c>/
+    /// <c>min-inline-size</c> that resolves to it) at all. The block-axis twin of
+    /// <see cref="IsMinWidthSpecified"/>, and needed for the same reason: <see cref="MinHeight"/>
+    /// defaults to <c>"0"</c>, so its value alone cannot tell an undeclared minimum from an
+    /// explicit <c>min-height: 0</c>. CSS Flexbox §4.5 turns on exactly that distinction — an
+    /// undeclared minimum on a flex item is <c>auto</c> and floors the item at its content, while
+    /// <c>min-height: 0</c> is the idiom that deliberately lets a column flex item shrink past it.
+    /// </summary>
+    /// <remarks>
+    /// The logical halves need no flag of their own: <see cref="MinBlockSize"/> and
+    /// <see cref="MinInlineSize"/> default to the empty string rather than to <c>"0"</c>, so a
+    /// value there already <em>is</em> the declaration. Which of the two lands on the physical
+    /// block axis follows the writing mode, exactly as <see cref="MinHeight"/> resolves it.
+    /// </remarks>
+    internal bool IsMinHeightSpecified
+    {
+        get => _isMinHeightSpecified
+            || !string.IsNullOrEmpty(IsVerticalWritingMode(WritingMode) ? MinInlineSize : MinBlockSize);
+        set => _isMinHeightSpecified = value;
+    }
+
+    private bool _isMinHeightSpecified;
+
+    /// <summary>
     /// CSS Logical 1 §4: the flow-relative minimum and maximum sizes. Stored on their own rather
     /// than folded into the physical longhands, for the same reason
     /// <see cref="BlockSize"/> is: which physical axis each names depends on the box's writing
@@ -1298,6 +1322,92 @@ internal abstract partial class CssBoxProperties
     public string Contain { get; set; } = "none";
 
     /// <summary>
+    /// CSS Sizing 4 §5: <c>contain-intrinsic-width</c> — the size a size-contained box reports as
+    /// its intrinsic inline extent in a horizontal writing mode, standing in for the contents that
+    /// containment made unobservable. <c>none</c> (the initial value) leaves that extent at zero.
+    /// </summary>
+    /// <remarks>
+    /// Only read when size containment actually applies; without it a box is sized by its contents
+    /// and this says nothing. The <c>auto</c> prefix of the grammar (<c>auto &lt;length&gt;</c>) is
+    /// parsed and dropped: it asks for the element's *last remembered size* when it has been
+    /// rendered before, which needs the skipped-contents bookkeeping <c>content-visibility: auto</c>
+    /// would bring, and the stated length is what the spec falls back to until then — the only
+    /// state a still render ever observes.
+    /// </remarks>
+    public string ContainIntrinsicWidth
+    {
+        get => ResolveContainIntrinsicAxis(_containIntrinsicWidth, isWidth: true);
+        set => _containIntrinsicWidth = value;
+    }
+
+    /// <summary>CSS Sizing 4 §5: <c>contain-intrinsic-height</c>; see <see cref="ContainIntrinsicWidth"/>.</summary>
+    public string ContainIntrinsicHeight
+    {
+        get => ResolveContainIntrinsicAxis(_containIntrinsicHeight, isWidth: false);
+        set => _containIntrinsicHeight = value;
+    }
+
+    /// <summary>
+    /// Picks the <c>contain-intrinsic-*</c> value for one axis of the frame the box is laid out
+    /// in, following <see cref="ResolvePhysicalSize"/> rather than
+    /// <see cref="ResolvePhysicalBound"/>.
+    /// </summary>
+    /// <remarks>
+    /// The distinction is the vertical-flow prototype's logical frame: a transposed box is laid out
+    /// horizontally with its <em>inline</em> extent as the frame width and its <em>block</em> extent
+    /// as the frame height, and the rotation swaps them into physical space afterwards. These values
+    /// are consumed by the sizing code inside that frame — the shrink-to-fit width in
+    /// <c>GetMinMaxWidth</c>, the atomic-inline height in <c>FlowInlineBlock</c> — so they have to
+    /// arrive in frame terms, exactly as <c>Width</c> and <c>Height</c> do. Mapping them the way
+    /// <c>min-width</c> is mapped instead put <c>contain-intrinsic-inline-size</c> on the physical
+    /// width and the rotation then turned it into the height (WPT
+    /// <c>contain-intrinsic-size-logical-003</c>'s eight <c>vertical-lr</c> cases come out
+    /// transposed).
+    /// </remarks>
+    private string ResolveContainIntrinsicAxis(string physical, bool isWidth)
+    {
+        static bool Declared(string value) => !string.IsNullOrEmpty(value);
+
+        if (IsVerticalWritingMode(WritingMode)
+            && VerticalFlowPrototype.Enabled
+            && WillBeVerticalTransposed())
+        {
+            string frameLogical = isWidth ? ContainIntrinsicInlineSize : ContainIntrinsicBlockSize;
+            if (Declared(frameLogical))
+                return frameLogical;
+
+            string swappedPhysical = isWidth ? _containIntrinsicHeight : _containIntrinsicWidth;
+            return Declared(swappedPhysical) ? swappedPhysical : physical;
+        }
+
+        if (Declared(physical))
+            return physical;
+
+        bool vertical = IsVerticalWritingMode(WritingMode);
+        string logical = isWidth
+            ? (vertical ? ContainIntrinsicBlockSize : ContainIntrinsicInlineSize)
+            : (vertical ? ContainIntrinsicInlineSize : ContainIntrinsicBlockSize);
+
+        return Declared(logical) ? logical : physical;
+    }
+
+    /// <summary>
+    /// CSS Sizing 4 §5: the flow-relative spellings, stored on their own for the same reason
+    /// <see cref="MinBlockSize"/> is — which physical axis each names depends on the writing mode,
+    /// and the mode is not settled while the cascade is applying declarations. Empty means
+    /// undeclared, which is what lets the physical longhand above win when both are absent.
+    /// </summary>
+    public string ContainIntrinsicInlineSize { get; set; } = "";
+
+    /// <summary>CSS Sizing 4 §5: <c>contain-intrinsic-block-size</c>; see <see cref="ContainIntrinsicInlineSize"/>.</summary>
+    public string ContainIntrinsicBlockSize { get; set; } = "";
+
+    // Empty rather than "none" so an undeclared physical longhand can be told from a declared
+    // `none`, which is what lets a flow-relative one win the lookup above. Both read as zero.
+    private string _containIntrinsicWidth = "";
+    private string _containIntrinsicHeight = "";
+
+    /// <summary>
     /// CSS Color Adjust Module Level 1: the <c>color-scheme</c> property.
     /// A space-separated list of the color schemes the element can render in
     /// (<c>normal</c>, <c>light</c>, <c>dark</c>, optionally prefixed by
@@ -1316,6 +1426,17 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     public string ContentVisibility { get; set; } = "visible";
     public string Transform { get; set; } = "none";
+
+    /// <summary>
+    /// CSS Transforms 1 §8: <c>transform-origin</c> — the point <see cref="Transform"/> is applied
+    /// about, relative to the box's border box. The initial value is the box's centre.
+    /// </summary>
+    /// <remarks>
+    /// Kept as the declaration rather than a resolved point, because the point depends on the used
+    /// border box and that is not settled while the cascade is applying declarations.
+    /// <see cref="IR.CssTransformOrigin"/> resolves it once the box has one.
+    /// </remarks>
+    public string TransformOrigin { get; set; } = "50% 50%";
 
     /// <summary>
     /// CSS Will Change Module Level 1: the <c>will-change</c> property. A
@@ -2939,6 +3060,7 @@ internal abstract partial class CssBoxProperties
         MinWidth = p.MinWidth;
         IsMinWidthSpecified = p.IsMinWidthSpecified;
         MinHeight = p.MinHeight;
+        IsMinHeightSpecified = p.IsMinHeightSpecified;
         MaxHeight = p.MaxHeight;
         IntrinsicReplacedSize = p.IntrinsicReplacedSize;
         ObjectFit = p.ObjectFit;

@@ -451,6 +451,78 @@ other direction. None is a sizing bug.
 - **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
   elsewhere.
 
+### A size-contained `<svg>`, `<video>` or `<iframe>` still reports a size
+
+The 54 assertions left in `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003`
+(42 of 96 pass) after
+[size containment landed](wpt-rendering-gaps-fixed.md#contain-size-did-nothing-to-a-boxs-size-and-contain-intrinsic-size-was-not-parsed)
+and [the broken-image frame came off](wpt-rendering-gaps-fixed.md#a-broken-image-drew-a-2px-frame-and-reported-it-as-part-of-its-box).
+Its `<div>`, `<canvas>` and most of its `<img>` rows pass; the rest is **not about
+containment**.
+
+- **`<svg>`, `<video>` and `<iframe>` report the 300×150 default object size.** Under
+  size containment they have natural dimensions of *zero*, so the default must not
+  apply. Broiler applies it in `Broiler.HTML`'s `DomParser` box fix-ups
+  (`CorrectIframeBoxes`, `CorrectVideoBoxes` and their neighbours), which write it as a
+  CSS width and height — so what the layout engine sees is an author-level size it is
+  right to honour, and there is no main-repo seam to decline it at.
+  - **Exit gate:** the three element types report zero under `contain: size`. Needs a
+    `Broiler.HTML` patch to make the default object size conditional, and
+    `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh` — so landing it upstream
+    and bumping the pointer is the route.
+
+### An inline element's three box-model rects are all the same rectangle
+
+- **Tests:** the six `<img>` assertions still failing in
+  `contain-intrinsic-size-logical-003`, and — more to the point — `clientWidth` and
+  `clientHeight` on **every** inline element that has a border or padding.
+  `<img style="width: 50px; height: 30px; border: 3px solid">` reports
+  `getBoundingClientRect` 56×36 (right) and `clientWidth`/`clientHeight` 56×36 (wrong:
+  the client box excludes the border, so 50×30). The same declarations on a `<div>` or
+  an `inline-block` report 50×30 correctly.
+- **Owner:** `Broiler.HTML` (`HtmlContainerInt.CollectLayoutGeometry`).
+- **Root cause.** A `display: inline` box lays out as one rectangle per line box rather
+  than a single border box, so `box.Location`/`box.Size` are unset and the collector
+  rebuilds the border box from the union of the line rectangles — then sets all three
+  levels of `BoxGeometry` to that same rectangle, on the stated grounds that "inline
+  boxes contribute no box-model padding/border to line geometry in this engine". That
+  premise does not hold for a **replaced** inline: `CssLineBox.UpdateRectangle` adds the
+  box's border and padding to an image's line rectangle explicitly, and
+  `MeasureImageSize` adds them in the block axis, so the union genuinely *is* the border
+  box and the other two levels have to be deflated out of it.
+- **Exit gate:** an inline `<img>` with a border reports a client box smaller than its
+  border box by exactly that border. Submodule-side, so the same routing as the entry
+  above.
+
+### A sticky box contributes its *stuck* position to the scroll container's overflow
+
+- **Tests:** `css-position/sticky/position-sticky-flex-item-001` … `-004`, all four at
+  99.0% against their own reference (a 100×80 red band showing where the reference
+  has none), against a 99% threshold.
+- **Owner:** `src/Broiler.HtmlBridge.Dom` (`DomBridge/LayoutMetrics.cs`,
+  `TryGetSharedScrollExtent`) with a `Broiler.HTML` half — see the exit gate.
+- **Root cause.** The scrollable overflow region is the union of the container's
+  padding box and its descendants' **border boxes**, read from the layout snapshot
+  *after* the sticky pass has moved them. CSS Positioned Layout 3 §6.3 says the
+  opposite: a sticky box contributes its **in-flow** position, and the test's own
+  `meta name="assert"` says so in as many words ("the sticky flex item reserves its
+  in-flow space in the scroll container's overflow area"). Reading the stuck position
+  is circular — the item is stuck *because* the scroll offset is 0, and the scroll
+  offset is 0 because `scrollTop = 1000` clamped against a `scrollHeight` the stuck
+  item made equal to `clientHeight`. Removing `position: sticky` from the same markup
+  scrolls correctly and paints no red, which isolates it.
+- **How -001/-003 got here.** They are the `column` half of the family and were green
+  until [column main-axis flexing](wpt-rendering-gaps-fixed.md) landed: `flex-basis`
+  was ignored in the block axis, so the red item was zero-tall and there was no red to
+  show. They now fail exactly as their `row` twins -002/-004 always have — the same
+  bug, no longer masked by a second one.
+- **Exit gate:** all four match. The obstacle is plumbing, not the rule: the shift is
+  computed in `Broiler.Layout` (`Engine/CssBox.Sticky.cs`, main repo) but reaches the
+  bridge through `BoxGeometry`, which `HtmlContainerInt.CollectLayoutGeometry`
+  populates inside `Broiler.HTML` — so carrying the pre-sticky position across needs a
+  submodule patch, and `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh`.
+  Landing it upstream and bumping the pointer is the route.
+
 ### An inline-block's height ignores `line-height`
 
 - **The diagnosis stands; two fixes were measured and both reverted.** An

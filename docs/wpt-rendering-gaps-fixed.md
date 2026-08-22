@@ -938,6 +938,216 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## Layout
 
+### Every CSS transform was applied about the box centre, whatever `transform-origin` said
+
+- **Tests:** `css/filter-effects/filter-scaling-001` — entry 28 of
+  [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 at 50.1% —
+  rendered a blank page and now renders the half-viewport green band it describes.
+  **272 tests in the corpus declare `transform-origin`** and every one of them painted
+  about the wrong point.
+- **Owner:** `Broiler.Layout` for the grammar (`IR/CssTransformOrigin.cs`),
+  `Broiler.HTML` for the two lines in `PaintWalker` that call it — patch
+  *"paint: apply a CSS transform about its transform-origin"*.
+- **Root cause.** `PaintWalker` hardcoded the origin to `bounds.X + bounds.Width * 0.5f`
+  with the comment "(default: center center)", and never read the property. The centre
+  *is* the initial value, so this was right for every element that declares nothing and
+  wrong for every element that declares anything.
+- **Paint and script disagreed about the same element.** The bridge's transform chain
+  — what `getBoundingClientRect` reports — *did* read `transform-origin`, so
+  `transform-origin: 0 0; transform: scale(0.5)` on a 100×100 box reported a rect at
+  (0, 0) and painted it at (25, 25). Two answers, one element.
+- **Scaling up is not a displacement, it is a blank page.** About the centre, a
+  top-left child of a scaled box lands off the canvas entirely: `scale(2)` and above
+  painted *nothing at all*. `filter-scaling-001` is `transform-origin: 0 0;
+  transform: scale(5)` and rendered white where half the viewport should be green —
+  and its own `rel=match` reference is the same markup minus the filter, so both sides
+  rendered blank and the test **passed its own reference at 100%** while scoring 50.1%
+  against Chromium's.
+- **Which is why the reftest suite is nearly blind to this**, and the fix measures
+  +4/−3 there. Both sides of a reftest are rendered by Broiler and a reference normally
+  declares the same origin as its test, so the error cancels. The three that moved the
+  other way are `transform3d-scale-002`/`-005`/`-006`, where the *reference* became
+  correct (a plain `scaleX(2) scaleY(2)` from the corner) while the test still needs a
+  3D transform Broiler does not implement — its `rotateX(90deg) scale3d(2,1,2)
+  rotateX(-90deg)` should conjugate to a Y scale of 2 and stays at 1. One side is now
+  right; both used to be wrong together.
+- **One grammar, three callers.** The reading was duplicated and inconsistent: the SVG
+  renderer's was thorough, the bridge's split on whitespace and took the components in
+  order, and the paint walker had none. `CssTransformOrigin` is now shared, and it fixes
+  three things the bridge got wrong — a lone `top`/`bottom` names the *vertical* axis;
+  the keyword pair may be written `top left`; and `top 100%` is invalid (a
+  length-percentage may not follow a vertical keyword) and is dropped whole rather than
+  half-read. The one thing that legitimately differs by caller is the **initial** value,
+  which is now a parameter: `50% 50%` for a CSS box, `0 0` for an SVG element, which has
+  no CSS layout box.
+- **Checks:** `Broiler.Layout.Tests.CssTransformOriginTests` (30 cases over the grammar,
+  main-repo and unconditional) and `src/Broiler.Wpt.Tests/TransformOriginPaintTests.cs`
+  (8 painted cases, which probe the pinned pointer and self-skip until the patch lands).
+- **Reach on CI:** the main-repo half ships now and is a measured no-op on the reftest
+  suite. The paint half reaches the privacy-test-page and real-world-render workflows
+  through `apply-pending-wpt-patches.sh`, and the WPT suite only once a maintainer lands
+  it upstream and bumps the pointer.
+
+### A broken image drew a 2px frame, and reported it as part of its box
+
+- **Tests:** `css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003` —
+  entry 21 of [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 —
+  32 → **42 of 96** assertions, all ten in its `<img>` rows.
+  `css/css-grid` reftests 677 → **679**, and nothing lost across `css/css-sizing`,
+  `css/css-contain`, `css/css-flexbox`, `css/CSS2`, `css/css-backgrounds` and `svg`.
+- **Owner:** `Broiler.Layout` (`Engine/CssBoxImage.cs`). Main repo.
+- **Root cause.** A load that ended without an image gave the box a 2px inset border in
+  `#A0A0A0`/`#E3E3E3` — the "broken image" frame a Netscape-era UA drew, inherited from
+  HtmlRenderer. No UA draws one now; HTML's rendering rules give `<img>` no default
+  border at all, and a browser that cannot decode an image shows its `alt` text, or
+  nothing.
+- **It was a sizing bug, not a cosmetic one.** 2px on four sides is **4px in both axes**
+  of border box, and the border box is what `getBoundingClientRect`,
+  `clientWidth`/`clientHeight` and `offsetWidth`/`offsetHeight` all report:
+  `<img style="width: 50px; height: 30px">` came back 54×34 with nothing declaring a
+  border or padding anywhere. It also displaced whatever followed the image on its line.
+- **And it reached far more than genuinely broken images.** The geometry a script reads
+  is captured before the images finish loading, so an image that loads perfectly well
+  still reported the broken-image box: the probe above uses a `<img>` whose bitmap is on
+  disk and paints correctly at 50×30 inside a box that measures 54×34.
+- **Why the reftest suite barely moves.** Both sides of a reftest are rendered by
+  Broiler, so a frame on the test appears on its reference too and cancels; only the
+  two `css-grid` cases where it changed a *layout* consequence show up. The measurable
+  signal is the check-layout suite, which states absolute geometry and does not
+  cancel — hence the +10 above.
+- **Checks:** `src/Broiler.Cli.Tests/BrokenImageBorderTests.cs`, five check-layout cases
+  over an unloadable `<img>`: CSS-sized, attribute-sized, bordered, padded, and one that
+  pins a following box's offset.
+- **What it does not fix:** `clientWidth`/`clientHeight` on an inline element with a
+  border, which is
+  [a separate collector gap](wpt-rendering-gaps-open.md#an-inline-elements-three-box-model-rects-are-all-the-same-rectangle)
+  and the reason six of that test's `<img>` assertions still fail.
+
+### `contain: size` did nothing to a box's size, and `contain-intrinsic-size` was not parsed
+
+- **Tests:** **+43 reftests, none lost**, across four directories: `css/css-contain`
+  323 → **348**, `css/css-sizing` 299 → **311** (of which
+  `css-sizing/contain-intrinsic-size` 9 → **18**), and `css/css-grid` 671 → **677**.
+  The check-layout suite the feature is specified through moves further, because it
+  states its own expected geometry: over the seven `contain-intrinsic-size` tests
+  that carry `data-expected-*`, **54 → 203 of 312** assertions.
+  `contain-intrinsic-size-logical-003` — entry 21 of
+  [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 at 42.0% —
+  goes 0 → 32 of 96, and `contain-intrinsic-size-030` 0 → **48 of 48**.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.SizeContainment.cs` and four sizing call
+  sites). Main repo — no patch, so it reaches the WPT run directly.
+- **Root cause.** `contain` reached the box and two things read it — background
+  propagation (CSS Backgrounds §2.11.1) and fragmentation, which treats a contained
+  box as monolithic — but nothing acted on what it says about **size**. CSS
+  Containment 2 §3.2 makes a size-contained box lay out as though it had no contents,
+  which is the whole point of the keyword: it is what lets a page state a placeholder
+  for a subtree it has not measured. And `contain-intrinsic-size`, the property that
+  states that placeholder, was not parsed at all — neither the shorthand nor its four
+  longhands, though `@supports` already claimed all five.
+- **The parse is not a split on whitespace.** A component is
+  `auto? [ none | <length> ]`, so `auto 100px` is *one* component naming both axes and
+  `auto 100px auto 50px` is two. The `auto` keyword asks for the element's last
+  remembered size and falls back to the stated length, which is the only state a
+  render that has never skipped the element can be in — so it is parsed and dropped.
+- **The logical longhands map through the *frame*, not through the physical axes.**
+  `contain-intrinsic-inline-size` had to follow `ResolvePhysicalSize` (what `width` and
+  `height` use) rather than `ResolvePhysicalBound` (what `min-width` uses): the
+  vertical-flow prototype lays a transposed box out horizontally with its inline extent
+  as the frame width and rotates afterwards, and these values are consumed *inside*
+  that frame. Mapped the other way, all eight `vertical-lr` cases came out transposed.
+- **The aspect ratio is where this gets interesting, and it needed both directions.**
+  Containment removes an element's **natural** ratio and leaves a **declared** one
+  alone — and the two reach the engine looking alike:
+  - `css-flexbox/canvas-contain-size` asserts that a `<canvas width=20 height=20>`
+    keeps its ratio under `contain: size`, because HTML §14.4 maps the presentational
+    attributes to `aspect-ratio: attr(width) / attr(height)` — a UA stylesheet
+    *declaration*. Broiler carries those attributes as a natural size instead
+    (`IntrinsicReplacedSize`, set by the renderer's canvas fix-up), so suppressing the
+    natural size took the ratio with it. Reading the attributes back in the layout
+    engine is the same rule expressed on the side of the seam that can see them.
+  - `css-contain/contain-size-replaced-002` asserts the *opposite* for an
+    `<svg viewBox="0 0 50 50">`, whose viewBox states a **natural** ratio (SVG 2 §8.2)
+    that must go. Broiler's style pass records the viewBox ratio *into*
+    `aspect-ratio`, so by layout time it is indistinguishable from a declaration;
+    comparing the recorded value back against the viewBox is what separates them, and
+    it misreads only an author who declares the ratio their own viewBox already
+    implies — where both answers agree anyway.
+- **"Non-atomic" is the load-bearing word in the applicability list.** §3.2 exempts
+  non-atomic inline-level boxes, and a replaced element's computed `display` is
+  `inline` — that is the UA value for `<img>` and `<svg>` — while the box it generates
+  is atomic. Testing the keyword alone declined containment on exactly the elements
+  `contain-size-replaced-*` is written about.
+- **`contain: content` deliberately does not contain size** — that is the difference
+  between it and `strict`, and the reason a page can use it without stating a
+  placeholder. The fragmentation predicate treats `content` as monolithic and is right
+  to for its own question (paint containment clips the box), so the two questions keep
+  two predicates.
+- **Checks:** `src/Broiler.Wpt.Tests/SizeContainmentTests.cs`, 20 cases rendered and
+  measured off the canvas, including both halves of the ratio rule.
+- **What is still not contained** — `<img>`, `<svg>`, `<video>` and `<iframe>`, the
+  other 64 assertions of `contain-intrinsic-size-logical-003` — is
+  [two separate gaps below](wpt-rendering-gaps-open.md#a-size-contained-img-svg-video-or-iframe-still-reports-a-size),
+  neither of them about containment.
+
+### A column flex container never read `flex-basis` and never shrank
+
+- **Tests:** `css/css-flexbox` reftests **693 → 704 passing**, 11 won and none lost. The
+  headline is `percentage-heights-002`, entry 19 of
+  [#1774](https://github.com/Broiler-Platform/Broiler/issues/1774)'s top 30 at 40.9%,
+  now **100%**. The other ten:
+  `dynamic-isize-change-003`, `flex-basis-012`, `flex-flow-007`,
+  `flex-minimum-height-flex-items-003`/`-026`/`-027`,
+  `flexbox-justify-content-vert-003`/`-004`/`-006` and `percentage-widths-001`, most of
+  them at 98.7% against a 99% threshold.
+- **Owner:** `Broiler.Layout` (`Engine/CssBox.Flex.cs`, `Engine/CssBox.ContainingBlock.cs`).
+  Main repo — no patch, so it reaches the WPT run directly.
+- **Three gaps, and the third gated the first two.**
+  - **§9.2 step 3.** A column container's items stack through ordinary block flow here,
+    and the pass that resizes that stack afterwards measured each item's height instead
+    of reading its flex base size. Those coincide for a content-sized item, which is why
+    it went unnoticed; they part company the moment `flex-basis` names a block size,
+    which block flow does not implement and so ignored outright.
+  - **§9.7, the shrink half.** Deliberately omitted, on the stated grounds that §4.5's
+    automatic minimum size did not exist in this axis to floor a shrink with. Since
+    `flex-shrink` is `1` by default, that is every column flex item on the web asking to
+    shrink and none of them shrinking. `ClampFlexColumnItemBorderBoxHeight` is the floor
+    that made turning it on safe — the block-axis twin of `ClampFlexItemBorderBoxWidth`,
+    reading the content size the same way (measuring the item with its own `height`
+    suppressed) and adding the one rule the row clamp omits: §4.5 gives no automatic
+    minimum to an item whose main-axis `overflow` is not `visible`, which is what lets
+    the `flex: 1; overflow: auto` pane of a column layout scroll instead of pushing its
+    container open.
+  - **CSS2.1 §10.6.4, which gates both.** "Definite main size" was read from the
+    container's `height` declaration alone. An out-of-flow box with `height: auto` and
+    both `top` and `bottom` set has no such declaration and a perfectly definite used
+    height — the constraint equation leaves one unknown — and `position: absolute;
+    inset: 0` is how a full-viewport app shell is written, so the most common definite
+    column container there is was treated as content-sized. The same blindness sent
+    every percentage height inside such a box to `auto` (§10.5).
+    `TryGetInsetDerivedContentHeight` answers it once for all four readers.
+- **`min-height: 0` had to become distinguishable from an undeclared minimum.**
+  `MinHeight` computes to `"0"` either way, and §4.5 turns on exactly that distinction:
+  an undeclared minimum on a flex item is `auto` and floors it at its content, while
+  `min-height: 0` is the idiom for deliberately letting a column item shrink past it.
+  `IsMinHeightSpecified` is the block-axis twin of the `IsMinWidthSpecified` flag the row
+  path already had.
+- **A vertical writing mode is declined, not transposed.** `column` names the *block*
+  axis, so under `vertical-lr` the main axis is horizontal and every number the pass
+  reads belongs to the cross axis. Growing on the wrong axis was inert; shrinking on it
+  is not, and `flexbox-column-row-gap-002` squashed all six of its items. The sibling
+  multi-line pass already declined for the same reason.
+- **Two tests moved from passing to failing, and both were passing by omission.**
+  `css-position/sticky/position-sticky-flex-item-001` and `-003` are the `column` half
+  of a family of four; their red item is sized by `flex-basis`, so it used to be
+  zero-tall and there was no red to show. They now fail exactly as their `row` twins
+  `-002`/`-004` always have, on
+  [a sticky box's contribution to scrollable overflow](wpt-rendering-gaps-open.md#a-sticky-box-contributes-its-stuck-position-to-the-scroll-containers-overflow)
+  — one bug, no longer masked by a second.
+- **Checks:** `src/Broiler.Wpt.Tests/FlexColumnMainAxisSizingTests.cs` renders each rule
+  and measures it off the canvas. `FlexColumnWrapAndReverseTests`'
+  nowrap case was restated: it pins the line breaking, and had been written against the
+  pre-shrink geometry of two 40px items overflowing a 50px container.
+
 ### A table box outside a table painted nothing at all
 
 - **Tests:** the `css/CSS2/tables/table-anonymous-objects-*` family — **103 of its

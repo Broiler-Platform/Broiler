@@ -1605,6 +1605,22 @@ internal partial class CssBox : CssBoxProperties, IDisposable
     /// </summary>
     private void ResolveUsedBlockHeight()
     {
+        // CSS Containment 2 §3.2: a size-contained box is sized as though it had no contents, so
+        // the content height the child loop just accumulated into ActualBottom is not this box's
+        // to report — `contain-intrinsic-height` stands in for it, or zero when nothing does.
+        // Stated up front rather than in an auto-height branch of its own: everything below
+        // (an explicit height, the inset-pair constraint, an aspect-ratio transfer, the
+        // quirks-mode floor) is the box's own size talking and still wins over its contents,
+        // exactly as it does without containment.
+        if (AppliesSizeContainment)
+        {
+            double containedContentHeight = ContainedIntrinsicContentHeight;
+
+            ActualBottom = Location.Y + containedContentHeight
+                + ActualPaddingTop + ActualPaddingBottom
+                + ActualBorderTopWidth + ActualBorderBottomWidth;
+        }
+
         // CSS content-box model: 'height' specifies the content height only;
         // padding and border are additive (CSS2.1 §10.6.3). An intrinsic-sizing
         // height keyword (min-/max-/fit-content) is not a length — the content

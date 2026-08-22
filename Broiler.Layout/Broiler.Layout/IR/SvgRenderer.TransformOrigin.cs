@@ -70,137 +70,20 @@ internal static partial class SvgRenderer
 
     /// <summary>
     /// CSS Transforms 1 §8: <c>transform-origin</c> as a point in user units, relative to
-    /// <paramref name="box"/>. One value gives the x with the y centred; a keyword names an edge or
-    /// the centre; a percentage resolves against the box. The z component a third value carries is
-    /// dropped — nothing here is 3D. An absent or unreadable value is the initial
-    /// <c>50% 50%</c>: the centre of the box.
+    /// <paramref name="box"/>.
     /// </summary>
-    private static PointF ResolveTransformOrigin(string value, RectangleF box)
-    {
-        float centreX = box.X + box.Width / 2f;
-        float centreY = box.Y + box.Height / 2f;
-
-        // CSS Transforms 1 §8: an SVG element has no CSS layout box, and for one of those the used
-        // value of an *unspecified* `transform-origin` is `0 0` — the reference box's own corner,
-        // not its centre. An invalid declaration is dropped whole and takes that same initial
-        // value. Falling back to the centre instead is what kept the twelve WPT
-        // svg-origin-relative-length-invalid-* cases failing: each is built so that its transform
-        // maps the square onto itself about `0 0`, matching a reference that draws the rect with no
-        // transform at all, and a centre origin threw the square hundreds of pixels away.
-        var initial = new PointF(box.X, box.Y);
-
-        if (string.IsNullOrWhiteSpace(value))
-            return initial;
-
-        var parts = value.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0)
-            return initial;
-
-        if (parts.Length == 1)
-        {
-            // One value sets that axis and centres the other. `top`/`bottom` name the vertical one,
-            // so a lone one of those moves y rather than x.
-            if (IsVerticalKeyword(parts[0]))
-                return new PointF(centreX, ResolveOriginComponent(parts[0], box.Y, box.Height, horizontal: false, centreY));
-
-            return IsHorizontalCompatible(parts[0])
-                ? new PointF(ResolveOriginComponent(parts[0], box.X, box.Width, horizontal: true, centreX), centreY)
-                : initial;
-        }
-
-        // The pair may be written the other way round — but only when *both* halves are keywords.
-        // `top left` is the keyword form; `top 100%` is not a form at all, because a
-        // length-percentage may not follow a vertical keyword. An invalid declaration is dropped
-        // whole, leaving the initial `50% 50%` — which is what the twelve WPT
-        // css-transforms/transform-origin/svg-origin-relative-length-invalid-* cases assert, and
-        // what accepting `top 100%` as `100% top` got wrong.
-        string first = parts[0], second = parts[1];
-        if (IsVerticalKeyword(first))
-        {
-            if (!IsHorizontalKeyword(second))
-                return initial;
-
-            (first, second) = (second, first);
-        }
-
-        if (!IsHorizontalCompatible(first) || !IsVerticalCompatible(second))
-            return initial;
-
-        return new PointF(
-            ResolveOriginComponent(first, box.X, box.Width, horizontal: true, centreX),
-            ResolveOriginComponent(second, box.Y, box.Height, horizontal: false, centreY));
-    }
-
-    /// <summary>A keyword naming a position on the horizontal axis.</summary>
-    private static bool IsHorizontalKeyword(string token) =>
-        token.Equals("left", StringComparison.OrdinalIgnoreCase)
-        || token.Equals("right", StringComparison.OrdinalIgnoreCase)
-        || token.Equals("center", StringComparison.OrdinalIgnoreCase);
-
-    /// <summary>Whether the token may occupy the horizontal slot: a keyword for it, or a length.</summary>
-    private static bool IsHorizontalCompatible(string token) =>
-        IsHorizontalKeyword(token) || IsLengthOrPercentage(token);
-
-    /// <summary>Whether the token may occupy the vertical slot: a keyword for it, or a length.</summary>
-    private static bool IsVerticalCompatible(string token) =>
-        IsVerticalKeyword(token)
-        || token.Equals("center", StringComparison.OrdinalIgnoreCase)
-        || IsLengthOrPercentage(token);
-
-    private static bool IsLengthOrPercentage(string token)
-    {
-        var span = token.AsSpan().Trim();
-        if (span.Length == 0)
-            return false;
-
-        if (span[^1] == '%')
-            span = span[..^1];
-
-        return float.TryParse(
-            span.ToString().Replace("px", string.Empty), NumberStyles.Float,
-            CultureInfo.InvariantCulture, out _);
-    }
-
-    private static bool IsVerticalKeyword(string token) =>
-        token.Equals("top", StringComparison.OrdinalIgnoreCase)
-        || token.Equals("bottom", StringComparison.OrdinalIgnoreCase);
-
-    private static float ResolveOriginComponent(
-        string token, float origin, float extent, bool horizontal, float fallback)
-    {
-        if (token.Equals("center", StringComparison.OrdinalIgnoreCase))
-            return origin + extent / 2f;
-
-        if (horizontal)
-        {
-            if (token.Equals("left", StringComparison.OrdinalIgnoreCase))
-                return origin;
-            if (token.Equals("right", StringComparison.OrdinalIgnoreCase))
-                return origin + extent;
-        }
-        else
-        {
-            if (token.Equals("top", StringComparison.OrdinalIgnoreCase))
-                return origin;
-            if (token.Equals("bottom", StringComparison.OrdinalIgnoreCase))
-                return origin + extent;
-        }
-
-        var span = token.AsSpan().Trim();
-        if (span.Length > 0 && span[^1] == '%')
-        {
-            return float.TryParse(
-                span[..^1], NumberStyles.Float, CultureInfo.InvariantCulture, out float percent)
-                ? origin + extent * percent / 100f
-                : fallback;
-        }
-
-        // A bare number, or one carrying a unit this renderer treats as pixels — the same reading
-        // GetLength gives an attribute length. The origin is measured from the box's own corner.
-        return float.TryParse(
-            token.Replace("px", string.Empty), NumberStyles.Float, CultureInfo.InvariantCulture,
-            out float length)
-            ? origin + length
-            : fallback;
-    }
+    /// <remarks>
+    /// The grammar lives in <see cref="CssTransformOrigin"/>, shared with the script bridge's
+    /// transform chain and with the paint walker, so the three cannot drift apart. What is specific
+    /// here is the <b>initial</b> value: an SVG element has no CSS layout box, and §8 gives one of
+    /// those a used value of <c>0 0</c> — the reference box's own corner, not its centre. An
+    /// invalid declaration is dropped whole and takes that same value. Falling back to the centre
+    /// instead is what kept the twelve WPT
+    /// <c>css-transforms/transform-origin/svg-origin-relative-length-invalid-*</c> cases failing:
+    /// each is built so that its transform maps the square onto itself about <c>0 0</c>, matching a
+    /// reference that draws the rect with no transform at all, and a centre origin threw the square
+    /// hundreds of pixels away.
+    /// </remarks>
+    private static PointF ResolveTransformOrigin(string value, RectangleF box) =>
+        CssTransformOrigin.Resolve(value, box, initialIsBoxCorner: true);
 }

@@ -178,6 +178,7 @@ internal static class ComputedStyleBuilder
             ContentVisibility = box.ContentVisibility,
             ColorScheme = box.ColorScheme,
             Transform = box.Transform,
+            TransformOrigin = box.TransformOrigin,
 
             // Flex
             FlexDirection = box.FlexDirection,

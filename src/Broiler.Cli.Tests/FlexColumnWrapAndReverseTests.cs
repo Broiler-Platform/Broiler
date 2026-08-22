@@ -171,12 +171,20 @@ public sealed class FlexColumnWrapAndReverseTests
     }
 
     [Fact(Timeout = 600000)]
-    public void A_Nowrap_Column_Container_Overflows_Rather_Than_Wrapping()
+    public void A_Nowrap_Column_Container_Keeps_Everything_On_One_Line()
     {
+        // What this pins is the line breaking: `nowrap` produces one line whatever it holds, so
+        // both items stay in the same column at x=0 rather than the second starting a new one.
+        //
+        // Their *heights* are §9.7's business, and this case was written before the column main
+        // axis shrank: two 40px items overflowed a 50px container by 30 and were left overflowing.
+        // `flex-shrink` is 1 by default and neither item has content to floor it at, so they now
+        // give up 15 each and come out 25 tall, stacked at 0 and 25 — which is what the reference
+        // browser lays this out as, and what FlexColumnMainAxisSizingTests states as a rule.
         AssertCheckLayout(
             "<div style=\"display:flex;flex-direction:column;height:50px;width:200px\">" +
-            "  <div style=\"height:40px\" data-offset-x=\"0\" data-offset-y=\"0\"></div>" +
-            "  <div style=\"height:40px\" data-offset-x=\"0\" data-offset-y=\"40\"></div>" +
+            "  <div style=\"height:40px\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-height=\"25\"></div>" +
+            "  <div style=\"height:40px\" data-offset-x=\"0\" data-offset-y=\"25\" data-expected-height=\"25\"></div>" +
             "</div>");
     }
 
