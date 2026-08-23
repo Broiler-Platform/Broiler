@@ -554,6 +554,48 @@ containment**.
   rows are 76px against 54px), with `position-area-scrolling-002` and the `lh`-unit
   tests staying green.
 
+### An inline-block does not sit on the line's baseline
+
+- **Owner:** `Broiler.Layout` (`Engine/CssLayoutEngine.cs` `ApplyVerticalAlignment`,
+  `Engine/CssLineBox.cs` `SetBaseLine`). Main repo.
+- **Reproduction, no WPT checkout needed** — an empty 80px inline-block beside text:
+  ```sh
+  printf '%s' '<style>body{font-size:40px;padding:20px}
+  .ib{display:inline-block;outline:2px solid #000;height:80px;width:40px}</style>
+  Hxy<span class="ib"></span>Hxy' > /tmp/ib.html
+  dotnet run --project src/Broiler.Wpt -- --render /tmp/ib.html
+  ```
+  The box's **top** lines up with the text top and it hangs ~60px below the baseline.
+  CSS 2.1 §10.8.1 gives an inline-block with no in-flow line boxes its baseline at the
+  **bottom margin edge**, so the box should stand *on* the text baseline and extend
+  upward; Chromium renders it that way.
+- **It is deliberate in the code, not an oversight to patch in one line.** Two places
+  agree on leaving it where the flow put it: `ApplyVerticalAlignment` excludes
+  `display: inline-block` from the boxes that contribute to the line's baseline
+  (the `box.Display != CssConstants.InlineBlock` guard), and `SetBaseLine` returns
+  early for a box whose `vertical-align` is absent or `baseline`. Only a *non-default*
+  `vertical-align` moves an inline-block at all.
+- **The line-height entry above is the same root.** The layout layer approximates the
+  baseline with a hardcoded `TypicalAscentRatio = 0.8` and has no real ascent/descent,
+  so there is no number to align an inline-block's last line box *to*. Closing this
+  and closing that one are the same piece of work.
+- **What it blocks, beyond its own tests.** It is the reason ruby cannot be desugared
+  to ordinary CSS boxes — see
+  [ruby annotations are not laid out at all](#ruby-annotations-are-not-laid-out-at-all).
+  It is also the shape of an icon-and-label row, a badge, and every
+  `vertical-align: middle` cell replacement, so it caps far more than the reftests
+  that name it.
+- **Do not "fix" it speculatively.** It moves the vertical position of *every*
+  inline-block in the corpus, and the compensating code written around the current
+  behaviour (the atomic-inline margin-box term in the line-box height calculation, the
+  `minTop < starty` line-box shift) has to move with it. The
+  [line-height entry](#an-inline-blocks-height-ignores-line-height) already records two
+  such attempts that measured well in isolation and lost over the suite. This one needs
+  a full before/after sweep, not a local metric.
+- **Exit gate:** an empty inline-block's bottom margin edge lands on the baseline and
+  one with in-flow content aligns on its last line box, with a before/after sweep over
+  the full reftest suite showing a net gain.
+
 ### Text does not flow around a float
 
 - **Owner:** `Broiler.Layout`. Long-standing; the
@@ -1443,6 +1485,66 @@ fix beside the data: one — the runner could not read a corpus path back out of
 ---
 
 ## Text and fonts
+
+### Ruby annotations are not laid out at all
+
+- **Tests:** the whole `html-ruby-extensions/` directory — **35 failures of its 84
+  reftests**, and the largest uniform failure family outside `grid-lanes` in the
+  [#1792 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1792)
+  (`failureFamilies` heads its list with `html-ruby-extensions/html-ruby-{N}.html`, 35).
+  Twenty of that run's top forty are `grid-lanes`, which is
+  [a maintainer's call, not a defect](#grid-lanes-is-an-unshipped-draft-feature); this
+  family is the run's largest tractable one.
+- **Owner:** `Broiler.Layout` (no ruby layout model) and `Broiler.HTML`
+  (`Source/Broiler.HTML.Core/CssDefaults.cs` — the UA stylesheet has no ruby rules at
+  all). Submodule half is one block of default styles; the layout half is the feature.
+- **They are `rel=mismatch` tests, so they fail at a *100%* match, not a low one.**
+  Each test declares up to ten references that each spell out one *incorrect* way to
+  render it, and passes only by differing from every one. Broiler renders
+  `html-ruby-001` byte-identically to its `-a-ref`, whose comment reads *"incorrect
+  rendering: annotations displayed identical to base text, interleaved"*. So the
+  runner's "100.0% match" on these is the failure, not a near-miss.
+- **Root cause, and it is not the fonts.** The CJK text these tests use renders blank
+  in a bare container, which makes the failure images look like a font gap. It is not
+  — reproduce it in Latin:
+  ```sh
+  printf '%s' '<style>body{font-size:24px}</style>
+  <hr>context<ruby>BASE<rt>note</rt></ruby>after
+  <hr>context<span>BASE</span><span>note</span>after' > /tmp/ruby.html
+  dotnet run --project src/Broiler.Wpt -- --render /tmp/ruby.html
+  ```
+  Both lines render `contextBASEnoteafter`, identically. `<rt>` is an unknown inline
+  element, so its text is laid out in document order between the bases. `<rp>` is not
+  hidden either — `<ruby>BASE<rp>(</rp><rt>note</rt><rp>)</rp></ruby>` renders
+  `BASE(note)`, which is precisely the legacy fallback `<rp>` exists to give a UA that
+  has no ruby, and what Chromium suppresses.
+- **`display: ruby` already parses; nothing consumes it.** `Broiler.CSS`'s
+  `CssStyleEngine.Values.cs` accepts `ruby`, `ruby-base`, `ruby-text`,
+  `ruby-base-container` and `ruby-text-container` as valid `<display>` values with the
+  standing comment *"the layout engine does not model ruby specially yet"*, and
+  `CssBox.SizeContainment.cs` is the only file in the engine that names them.
+- **Desugaring it to existing boxes was tried and does not land.** The natural shape —
+  a box-tree fixup in the `AnonymousTableBoxes` / `DisplayContentsBoxes` pattern (both
+  in `Broiler.Layout/Engine`, called from `Broiler.HTML`'s `DomParser`) that rewrites
+  each ruby column as an `inline-block` holding an annotation block above a base
+  block — puts the
+  base **28px below** the surrounding text at 40px/em rather than on its baseline, and
+  no `vertical-align` constant fixes it, because
+  [an inline-block does not sit on the line's baseline](#an-inline-block-does-not-sit-on-the-lines-baseline)
+  in the first place. That entry is the blocker, and it is the bigger of the two.
+  A change to `SetBaseLine` to move an aligned inline-block's whole subtree was written
+  during this triage and **reverted**: the contents already move with the box, so it
+  dropped the content out of the box entirely. Do not re-try that one.
+- **Do not buy these 35 with a cosmetic rule.** `rt { vertical-align: super;
+  font-size: 50% }` plus `rp { display: none }` differs from all ten references and
+  would flip the whole family green while rendering nothing like ruby — the annotation
+  trails its base instead of centring over it. That is the
+  [fake pass](wpt-rendering-gaps-wont-fix.md) this suite is built to produce, and it
+  would move *away* from Chromium on the golden-image suite, which does render real
+  ruby. The UA rules are worth landing only together with the layout.
+- **Exit gate:** `html-ruby-001` renders its annotations above their correct bases and
+  differs from all ten of its references, with the `html-ruby-extensions` directory
+  going 49/84 → most of 84 and the golden-image suite not losing ruby tests.
 
 ### Bold and italic never reach the face
 
