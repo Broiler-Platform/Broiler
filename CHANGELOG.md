@@ -303,6 +303,16 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `image-set()` picks an image instead of painting nothing. It was recognised as
+  an image value and never resolved, so the layer reached two readers that each
+  understand only part of what the function can hold — the background loader
+  looks for `url(`, the paint walker looks for `gradient(` — and whichever kind
+  of image it named, nothing was drawn. The selection is now resolved into the
+  value before either of them sees it: resolution units (`x`/`dppx`, `dpi`,
+  `dpcm`, `calc()`), an omitted resolution as 1x, `type()` filtering, and the
+  smallest resolution that reaches the display, largest when none does, first on
+  a tie. The selected resolution does not yet scale the image's intrinsic size.
+
 - A CSS `transform` rule applies to an SVG element. The renderer reads an
   element's transform off the markup and sees no stylesheet, so the cascaded
   value is projected onto the SVG presentation attribute — `transform-box` and

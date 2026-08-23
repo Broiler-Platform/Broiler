@@ -292,6 +292,19 @@ PY
 ```
 
 
+
+## A single-run diff carries about one test of noise
+
+`css/compositing/background-blending/background-blend-mode-plus-lighter` renders at **93.6%** every
+time it is run on its own, and came back **100.0%** in one full sweep out of four. Nothing about the
+test is timing-dependent; what varies is what ran before it in the same worker. So a before/after
+diff taken from one run of each carries roughly a test of noise in both directions, and a change
+whose whole claim is ±1 needs the suspect test re-run on its own before the number is believed —
+which costs seconds, against the twenty minutes a second sweep costs.
+
+The rule that follows: **a single test that moves against the direction of a change is noise until
+re-run in isolation**, and one that moves *with* it is not evidence on its own either.
+
 ## The 98–99% band is not a work queue either, and it is a trap that looks like one
 
 Ranking the reftest failures by match percentage puts **3 207 of 7 373 — 44% — in a single

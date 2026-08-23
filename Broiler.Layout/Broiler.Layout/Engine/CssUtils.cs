@@ -718,7 +718,18 @@ internal static partial class CssUtils
                 cssBox.BackgroundColor = value;
                 break;
             case "background-image":
-                cssBox.BackgroundImage = value;
+                // CSS Images 4 §5.4: `image-set()` is resolved to the one image it selects before
+                // anything downstream reads the value. The background loader looks for `url(` and
+                // the paint walker looks for `gradient(` to tell a fetched layer from a drawn one,
+                // so an unresolved `image-set(...)` was neither — it loaded nothing and drew
+                // nothing, whichever kind of image it held. Unwrapping it here leaves both of them
+                // reading a value they already understand.
+                //
+                // An invalid function (a negative resolution) leaves the property alone rather than
+                // overwriting it, which is what a dropped declaration does: the value already set
+                // is the one that was cascaded under it.
+                if (IR.CssImageSet.TryResolveLayers(value, out var resolvedImage))
+                    cssBox.BackgroundImage = resolvedImage;
                 break;
             case "background-position":
                 cssBox.BackgroundPosition = value;

@@ -1310,6 +1310,37 @@ express those, and does not claim to.
 
 ---
 
+### `image-set()`'s resolution does not size the image
+
+- **Tests:** `css-images/image-set/image-set-resolution-001`, `-002`, `-003` — the three the
+  [selection fix](wpt-rendering-gaps-fixed.md#image-set-selected-nothing-whatever-it-held) left
+  behind, out of that directory's 37.
+- **Owner:** main repo. `Broiler.Layout/IR/CssImageSet.cs` already computes the number; nothing
+  carries it past the selection.
+- **What it is.** CSS Images 4 §5.4: the chosen option's resolution divides the image's intrinsic
+  size, so `image-set(url(green.png) 0.5x)` on a 100×50 file is a 200×100 image. The resolver picks
+  the right option and then throws the resolution away, so the image draws at its file size. The
+  three tests differ only in which property carries it — `content`, `background-image`,
+  `list-style-image` — which is the second half of the work: the resolution has to reach the image
+  sizing path for each, and today only `background-image` is even resolved.
+- **Exit gate:** the three tests match, with a `Broiler.Layout` test over an intrinsic size scaled
+  by a non-1x selection.
+
+### An invalid `image-set()` does not drop its declaration
+
+- **Tests:** `css-images/image-set/image-set-negative-resolution-rendering` and `-2`.
+- **Owner:** `Broiler.CSS` (`CssDeclarationValidator`). **Submodule** — a fix ships as a patch.
+- **What it is.** A negative resolution is a parse error, so CSS Syntax 3 §9 drops the declaration
+  whole and the one cascaded under it applies; `-2` puts a green `url()` there and expects green.
+  The renderer sees only the winning value, so refusing it there leaves the property at its
+  *initial* value rather than at the previous declaration — the fallback has to happen in the
+  cascade. `CssImageSet.TryResolveLayers` already reports the parse error separately from a
+  function that validly selects nothing, so the validator has something to call.
+- **Deliberately not fixed yet:** two tests against a third pending submodule patch is the wrong
+  trade while the first two are still waiting to be applied.
+
+---
+
 ## Masking
 
 ### SVG `<clipPath>` referenced by `url()`

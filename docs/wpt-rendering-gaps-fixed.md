@@ -2988,6 +2988,40 @@ the test that exposed it.
   last) and the page is then blank white against a lime reference, because the image the
   sheet names still does not load. The two together are what pass it.
 
+### `image-set()` selected nothing, whatever it held
+
+- **Owner:** main repo — `Broiler.Layout/IR/CssImageSet.cs` and the `background-image` assignment
+  in `Engine/CssUtils.cs`. **No submodule patch.**
+- **The bug.** `image-set()` was recognised as an image value and never resolved, so the layer
+  reached two readers that each understand only part of what the function can hold: the background
+  loader looks for `url(` and found a function it did not know, so it fetched nothing; the paint
+  walker looks for `gradient(` to tell a drawn layer from a fetched one, so
+  `image-set(linear-gradient(…) 1x)` was neither. Whichever kind of image the function named, the
+  layer painted nothing.
+- **What landed.** The selection is resolved into the property value before either of them looks at
+  it, which is what makes it work for every kind of image at once — both readers then see a value
+  they already understand. `CssImageSet` implements CSS Images 4 §5.4: the resolution units
+  (`x`/`dppx`, `dpi` at 96, `dpcm` at 96/2.54, and `calc()` far enough to cover a resolution
+  expression), an omitted resolution as 1x, `type()` filtering against what this engine decodes, a
+  bare `<string>` as an image, and the choice itself — the smallest resolution that reaches the
+  device, the largest when none does, first on a tie.
+- **Invalid and "selects nothing" are different answers, and two tests are built to tell them
+  apart.** A negative resolution is a parse error, so the declaration is dropped whole and the one
+  under it applies; a zero resolution parses but leaves no usable option, so the declaration applies
+  and paints nothing. `image-set-zero-resolution-rendering` puts a **red** `url()` in the
+  declaration below and expects a blank page — so "selects nothing" must not fall back to it —
+  while `image-set-negative-resolution-rendering-2` puts a **green** one there and expects green.
+- **`css/css-images/image-set` goes 10 → 32 of 37**, and the full 26 366-test reftest suite
+  **+22 / −0**.
+- **What is left, and why it is not here.** Three tests
+  (`image-set-resolution-001`/`-002`/`-003`) assert the *other* half of the resolution: the selected
+  option's resolution divides the image's intrinsic size, so `url(green.png) 0.5x` on a 100×50 image
+  is drawn 200×100. That needs the resolution carried alongside the chosen image into the sizing
+  path, and it reaches `content` and `list-style-image` as well as `background-image`. The two
+  negative-resolution tests need the declaration dropped at parse time, which is `Broiler.CSS`'s
+  validator — a submodule, and two tests is not worth a third pending patch. Both are
+  [filed](wpt-rendering-gaps-open.md#image-sets-resolution-does-not-size-the-image).
+
 ### A CSS `transform` rule never reached an SVG element
 
 - **Owner:** main repo — `src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.SvgZoom.cs` and
