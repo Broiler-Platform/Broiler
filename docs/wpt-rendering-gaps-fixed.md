@@ -2988,6 +2988,38 @@ the test that exposed it.
   last) and the page is then blank white against a lime reference, because the image the
   sheet names still does not load. The two together are what pass it.
 
+### A CSS `transform` rule never reached an SVG element
+
+- **Owner:** main repo — `src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.SvgZoom.cs` and
+  `Broiler.Layout/IR/SvgTransform.cs`. **No submodule patch.**
+- **The bug.** `SvgRenderer` reads an element's transform off the serialized markup, and sees no
+  stylesheet of its own, so the bridge projects the cascaded value onto the SVG presentation
+  attribute on the way out. `transform-box` and `transform-origin` were projected; **`transform`
+  itself was not** — so `#target { transform: rotate(90deg) }` reached nothing and the element
+  rendered untransformed. The other two can only move a transform that arrived by attribute, so
+  projecting them without it was half a mechanism.
+- **The guard is the interesting half, and the tests are explicit about it.** A cascaded value that
+  parses no transform function must be *skipped*, not written. Two different things depend on that:
+  this bridge's cascade does not model SVG presentation attributes as declarations, so an element
+  carrying `transform="translate(50)"` and no rule computes `none` — writing that back erases the
+  attribute the renderer was about to read; and CSS Transforms 1 §3 drops an *invalid* declaration
+  whole, so `transform: scale(invalid)` over a real `transform="rotate(90)"` must leave the
+  attribute standing. The nine `css-transforms/svg-{document,external,inline}-styles-005/006/013`
+  tests assert exactly the second, and an unguarded first cut failed all nine — which is how the
+  rule was found.
+- **`SvgTransform.TryParse` is what makes that decidable.** The transform alone cannot say why it
+  is the identity: `scale(invalid)` and `rotate(0deg)` both come out as `Identity`, and the caller
+  needs the invalid one to lose to the attribute while the valid one wins. `TryParse` reports
+  whether any function was recognised; `Parse` is now a call to it.
+- **Measured over the full 26 366-test reftest suite: +13 / −0**, and **+10 / −0** across the four
+  families it touches (`transform-box`, `document-styles`, `external-styles`, `inline-styles`:
+  29 → 39 of 75).
+- **What it exposes rather than fixes.** `transform-origin` is honoured on `<rect>` and nowhere
+  else — `SvgStructure` composes every other element's transform straight from the attribute with
+  no origin conjugation — so a `<path>` that now receives its CSS transform turns about the
+  viewport origin. That, and `transform-box`'s reference-box choice, are
+  [the open entry](wpt-rendering-gaps-open.md#transform-box-is-not-read-at-all).
+
 ### A rotated element and its whole subtree were not painted at all
 
 - **Owner:** `Broiler.Layout` (`IR/AffineLayerMap.cs`, main repo) and `Broiler.HTML`

@@ -303,6 +303,15 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A CSS `transform` rule applies to an SVG element. The renderer reads an
+  element's transform off the markup and sees no stylesheet, so the cascaded
+  value is projected onto the SVG presentation attribute — `transform-box` and
+  `transform-origin` were, and `transform` itself was not, so
+  `rect { transform: rotate(90deg) }` did nothing at all. A declaration that
+  parses no transform function is skipped rather than written, which is what
+  makes an invalid one fall back to the `transform` attribute instead of
+  destroying it (CSS Transforms 1 §3).
+
 - A rotated or skewed element is painted. `transform: rotate(45deg)` on a green
   square produced a **blank page** — and took its whole subtree with it, so a page
   that rotates a wrapper lost everything inside it. The raster canvas maps a point

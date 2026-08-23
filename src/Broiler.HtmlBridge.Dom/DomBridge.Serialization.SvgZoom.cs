@@ -32,6 +32,24 @@ public sealed partial class DomBridge
         // every one of them declares transform-box in a <style> block rather than as an attribute.
         // Neither inherits, so the cascaded value is this element's own and may overwrite the
         // attribute — the same reasoning `fill` and `stroke` are given above.
+        // `transform` itself is the third of them, and it was the one left out — so a
+        // `#target { transform: rotate(90deg) }` rule reached nothing and the element rendered
+        // untransformed, which is the whole of what the css-transforms/transform-box `svgbox-*`
+        // family measures: each declares its transform in a <style> block. `transform-box` and
+        // `transform-origin` were already projected, and on their own they can only move a
+        // transform that arrived by attribute.
+        //
+        // A value that parses no function at all is skipped rather than written, and that is not a
+        // detail — it is the rule CSS Transforms 1 §3 states. This bridge's cascade does not model
+        // SVG presentation attributes as declarations, so an element carrying
+        // `transform="translate(50)"` and no rule computes `none`, and writing that back would
+        // erase the attribute the renderer was going to read. The same guard is what makes an
+        // *invalid* declaration fall back to the attribute instead of destroying it:
+        // `transform: scale(invalid)` must leave `transform="rotate(90)"` standing, which is
+        // exactly what the nine svg-{document,external,inline}-styles-005/006/013 tests assert.
+        ApplySvgPresentationAttribute(
+            element, props, "transform", cascadeWins: true,
+            accept: static value => Layout.IR.SvgTransform.TryParse(value, out _));
         ApplySvgPresentationAttribute(element, props, "transform-box", cascadeWins: true);
         ApplySvgPresentationAttribute(element, props, "transform-origin", cascadeWins: true);
 
@@ -88,7 +106,7 @@ public sealed partial class DomBridge
     /// </param>
     private void ApplySvgPresentationAttribute(
         DomElement element, Dictionary<string, string> props, string propertyName,
-        bool preferInlineStyle = false, bool cascadeWins = false)
+        bool preferInlineStyle = false, bool cascadeWins = false, Func<string, bool>? accept = null)
     {
         if (!cascadeWins && HasAttr(element, propertyName))
             return;
@@ -102,6 +120,12 @@ public sealed partial class DomBridge
             value = fallbackProp;
 
         if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        // A value the caller will not accept carries no author intent this attribute should take,
+        // and writing it would overwrite one that does. See the `transform` call site for why that
+        // is not hypothetical.
+        if (accept is not null && !accept(value.Trim()))
             return;
 
         SetAttr(element, propertyName, value.Trim());

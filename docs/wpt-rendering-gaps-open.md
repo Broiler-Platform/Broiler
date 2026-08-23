@@ -1253,10 +1253,23 @@ express those, and does not claim to.
   `content-box`/`border-box`/`border-box`.
 - **Measured:** `cssbox-content-box-001` now renders the correct shape in the wrong place,
   offset by exactly the 50px left border its `content-box` reference box would have removed.
-  The SVG half is partly there already — `SvgRenderer.TransformOrigin` reads
-  `transform-box` for the box-relative values — so this is the CSS-layout half.
+- **The directory is now 11 of 34**, up from 5, after
+  [the CSS `transform` projection](wpt-rendering-gaps-fixed.md#a-css-transform-rule-never-reached-an-svg-element)
+  — the `svgbox-*` tests were failing because their transform never arrived at all, not because
+  of the reference box. What is left splits in two.
+- **The CSS-layout half** (`cssbox-content-box-001`/`-002`, `cssbox-fill-box`,
+  `content-box-mutation-001`, `value-changed`) is the reference-box choice above.
+- **The SVG half is a bigger and more general gap than `transform-box`:** `transform-origin` is
+  honoured on `<rect>` and nowhere else. `SvgStructure` composes every element's transform
+  straight from the attribute (`SvgTransform.Parse(attributes["transform"])`) with no origin
+  conjugation, and only the `<rect>` path calls `OwnTransformAbout`. So a `<path>` with a
+  `transform-origin` turns about the viewport origin — `svgbox-initial` and `svgbox-view-box`
+  are that, not a `transform-box` failure. Fixing it properly needs each element's fill box,
+  stroke box and nearest viewport rect available where the transform is composed, which
+  `SvgStructure` builds during a markup scan without geometry.
 - **Exit gate:** the eight `cssbox-*` tests match, and the `*-mutation-*` ones follow, with
-  a `Broiler.Layout` test over the five keywords against a box with a border and padding.
+  a `Broiler.Layout` test over the five keywords against a box with a border and padding;
+  separately, `transform-origin` applies to every SVG shape rather than to `<rect>` alone.
 
 ### Transform interpolation has no matrix fallback
 
