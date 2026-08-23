@@ -45,15 +45,24 @@
     </application>
   </compatibility>
 
-  <!-- Indicates that the application is DPI-aware and will not be automatically scaled by Windows at higher
-       DPIs. Windows Presentation Foundation (WPF) applications are automatically DPI-aware and do not need 
-       to opt in. Windows Forms applications targeting .NET Framework 4.6 that opt into this setting, should 
-       also set the 'EnableWindowsFormsHighDpiAutoResizing' setting to 'true' in their app.config. 
-       
+  <!-- Per-monitor DPI awareness, declared rather than requested.
+
+       The loader applies manifest-declared awareness before Main runs, so whatever this says wins
+       over Program.cs's SetProcessDpiAwarenessContext call — that call fails with
+       ERROR_ACCESS_DENIED once awareness is already set. This said `false` while the rest of the
+       stack was written for awareness (Direct2DWindow sizes in DIPs, converts with the live DPI,
+       and handles WM_DPICHANGED), so the process ran unaware: GetDpiForWindow reported 96,
+       DpiScale pinned at 1.0, and the DWM bitmap-stretched the whole window on any scaled display.
+       Text was resampled rather than rendered at the display's resolution.
+
+       dpiAwareness is the Windows 10 1607+ key and is the one that takes effect there; dpiAware is
+       the legacy fallback for older systems, which understand "true/pm" but not PerMonitorV2.
+
        Makes the application long-path aware. See https://docs.microsoft.com/windows/win32/fileio/maximum-file-path-limitation -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">false</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
     </windowsSettings>
   </application>

@@ -29,7 +29,13 @@ internal static class Program
         if (!ConfirmPreviewSafetyNotice())
             return 0;
 
-        _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2, best effort.
+        // app.manifest declares PerMonitorV2, and the loader applies that before Main runs — so this
+        // call is expected to fail with ERROR_ACCESS_DENIED on the normal apphost launch, and the
+        // failure is the *success* case. It stays because it is not redundant everywhere: launching
+        // through `dotnet Broiler.Browser.Windows.dll` uses the host's manifest rather than ours, and
+        // there this is the only thing that makes the process DPI-aware. Either way awareness must be
+        // settled before the first window exists; Direct2DWindow reads the live DPI from creation on.
+        _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2.
 
         string? initialUrl = args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]) ? args[0] : null;
 
