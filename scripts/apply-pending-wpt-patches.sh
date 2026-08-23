@@ -380,6 +380,7 @@ PENDING_PATCHES=(
   "Broiler.HTML|patches/0002-html-affine-transform-layer.patch"
   "Broiler.HTML|patches/0003-html-column-flex-image-stretch.patch"
   "Broiler.HTML|patches/0004-html-inline-replaced-box-model.patch"
+  "Broiler.CSS|patches/0005-css-image-set-negative-resolution.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

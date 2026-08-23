@@ -33,6 +33,7 @@ succeeding and it is skipped rather than re-applied.
 | `0002-html-affine-transform-layer.patch` | `Broiler.HTML` | A rotated or skewed element is resampled through its matrix instead of being dropped on the floor: `transform: rotate(45deg)` painted a blank page and took its whole subtree with it. Pairs with `Broiler.Layout.IR.AffineLayerMap` in the main repo. Listed in the apply script. |
 | `0003-html-column-flex-image-stretch.patch` | `Broiler.HTML` | A column flex item's cross-axis stretch reaches the image inside the anonymous wrapper that became the item, instead of leaving it at the 300×150 default object size. Pairs with `Broiler.Layout.Engine.FlexGridItemBlockification.IsStretchedColumnFlexItem` in the main repo. Listed in the apply script. |
 | `0004-html-inline-replaced-box-model.patch` | `Broiler.HTML` | An inline replaced element's padding and content rects are deflated out of the line rectangle instead of all three box-model levels being the same rectangle, so `clientWidth`/`clientHeight` on a bordered or padded inline `<img>` stop reporting the border box. Pairs with `Broiler.Layout.BoxGeometry.ForInlineBox` in the main repo. Listed in the apply script. |
+| `0005-css-image-set-negative-resolution.patch` | `Broiler.CSS` | A declaration whose `image-set()` carries a negative `<resolution>` is dropped in the cascade, so the declaration under it applies instead of the property falling back to its initial value. No main-repo half — the dependency direction forbids one. Listed in the apply script. |
 
 ### `0001-html-svg-viewbox-intrinsic-ratio.patch`
 
@@ -172,3 +173,35 @@ padding and is not what that test measures.
 
 `Broiler.Cli.Tests` 50 → 49 failures with no new ones, `Broiler.Wpt.Tests` holds at 54,
 `Broiler.Layout.Tests` at 0.
+
+### `0005-css-image-set-negative-resolution.patch`
+
+CSS Images 4 §5.4 makes a `<resolution>` non-negative, so `image-set(url(a) -1x, …)` is a
+parse error and CSS Syntax 3 §9 drops the **whole declaration**, letting the one cascaded
+under it apply. `image-set-negative-resolution-rendering-2` puts a green `url()` behind it
+and expects green.
+
+**It has to be refused in the cascade, not at the renderer.** Only the winning value
+reaches the renderer, so declining it there leaves the property at its *initial* value
+rather than at the previous declaration — which is why the main-repo half already present
+in `CssUtils` (leave the property alone when `CssImageSet.TryResolveLayers` reports a parse
+error) could not close these two on its own.
+
+**This one has no main-repo half, and the open entry was wrong to imply it could.** That
+entry read *"`CssImageSet.TryResolveLayers` already reports the parse error separately from
+a function that validly selects nothing, so the validator has something to call."*
+`CssImageSet` lives in `Broiler.Layout`, which **references `Broiler.CSS`** and not the
+other way round, so the validator cannot call it. The check is therefore self-contained in
+the cascade — a scan that ignores anything inside `url()` or quotes, so a file genuinely
+named `sprite-1x.png` does not invalidate the declaration that loads it.
+
+A **zero** resolution is deliberately still accepted: it parses and simply selects nothing,
+which is a different outcome from the declaration being dropped.
+
+**Measured: `css/css-images/image-set` goes 26 → 28 of 31, +2 / −0**, and `css/css-images`
+as a whole 271 → 273 of 439. `Broiler.Cli.Tests` is unchanged at 49 failures.
+
+**A note for whoever measures next.** `Broiler.Cli.Tests.SpeculativePreloadScanTests` is
+**flaky under the full run**: two identical full runs of the suite gave 56 and 49 failures,
+differing by exactly its seven cases, and all ten pass in isolation. It cost a diagnosis
+here; re-run before attributing it to a change.
