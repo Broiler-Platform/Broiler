@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 1081,
+    "failed": 1080,
     "skipped": 0,
-    "total": 1081
+    "total": 1080
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 574,
+      "count": 573,
       "examples": [
         "css/compositing/root-element-background-image-transparency-003.html",
         "css/css-backgrounds/box-shadow/box-shadow-table-row-display.html",
@@ -138,7 +138,7 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1081
+      1080
     ]
   ],
   "droppedDeclarations": [],
@@ -286,8 +286,8 @@
       "impact": 1,
       "matchPercent": 0.0,
       "engineGapPercent": 0.0,
-      "relativeTestPath": "forced-colors-mode/forced-colors-mode-49.html",
-      "title": "0.0% match \u2014 forced-colors-mode/forced-colors-mode-49.html",
+      "relativeTestPath": "css/css-view-transitions/view-transition-waituntil-animation-manipulation.html",
+      "title": "0.0% match \u2014 css/css-view-transitions/view-transition-waituntil-animation-manipulation.html",
       "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
     },
     {
@@ -297,9 +297,9 @@
       "impact": 1,
       "matchPercent": 0.0,
       "engineGapPercent": 0.0,
-      "relativeTestPath": "html/rendering/replaced-elements/images/abs-pos-transferred-max-width-from-percentage-max-height-in-auto-height-containing-block.html",
-      "title": "0.0% match \u2014 html/rendering/replaced-elements/images/abs-pos-transferred-max-width-from-percentage-max-height-in-auto-height-containing-block.html",
-      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / SizeMismatch)."
+      "relativeTestPath": "forced-colors-mode/forced-colors-mode-49.html",
+      "title": "0.0% match \u2014 forced-colors-mode/forced-colors-mode-49.html",
+      "detail": "Rendered output matches the reference by only 0.0% (PixelMismatch / MissingContent)."
     }
   ],
   "timeoutLimit": 10,
@@ -1248,13 +1248,6 @@
     },
     {
       "relativeTestPath": "css/css-exclusions/css3-exclusions/exclusions-wrap-flow-04.xht",
-      "passed": false,
-      "skipped": false,
-      "category": "PixelMismatch",
-      "subCategory": "MissingContent"
-    },
-    {
-      "relativeTestPath": "css/css-flexbox/aspect-ratio-intrinsic-size-007.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
