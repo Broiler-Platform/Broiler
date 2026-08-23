@@ -1213,31 +1213,63 @@ Worth separating from the rest, because the test itself may be at fault:
 
 ## Transforms
 
-### Nothing with a rotation or a skew in it paints at all
+### Nothing with a rotation or a skew in it paints at all — **fixed**
 
-- **Tests:** `css-transforms/animation/transform-interpolation-005`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).23) and every test whose
-  transform is not axis-aligned.
-- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Image/BCanvas.cs`,
-  `Adapters/GraphicsAdapter.cs`). **Submodule** — a fix ships as a patch.
-- **Root cause.** `BCanvas.TrySaveTransform` returns false when the affine's `b` or `c` is
-  non-zero, i.e. for any rotation or skew — including every `matrix()` with non-zero b/c.
-  `GraphicsAdapter` then routes the layer to `_canvasCompat`, whose only implementation in
-  the tree is `StubCanvasCompat`, **every method of which is a no-op**, and
-  `CanUseRaster` sends every enclosed draw there too. So the content does not paint
-  mis-rotated; it does not paint.
-- **What it needs:** `BCanvas` keeps `_translation`, `_scaleX`, `_scaleY` and maps points
-  per axis. That has to become a real 2×3 matrix, composed in
-  `TrySaveTransform`/`Translate`/`Scale` and applied at the ~12 mapping call sites; a
-  rect-shaped primitive under a rotation has to go out as the polygon primitive the backend
-  already draws, and `PushClip` has to become the polygon clip that already exists.
-- **`perspective-split-by-zero-w`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).22) is a tier beyond
-  that** and belongs with
-  [the 3D entry below](#a-perspective-transformed-box-is-not-rasterised-in-3d): there is no
-  `w` to split against because there is no 3D pipeline at all —
-  `ParseCssTransformMatrix` reduces the whole list to a 2D affine and silently drops
-  `rotateX`, `rotateY`, off-Z `rotate3d` and genuinely-3D `matrix3d`.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-rotated-element-and-its-whole-subtree-were-not-painted-at-all).
+**Not by the route this entry proposed**, which is worth recording. It asked for
+`BCanvas`'s per-axis mapping to become a real 2×3 matrix, composed in
+`TrySaveTransform`/`Translate`/`Scale` and applied at a dozen call sites, with rect
+primitives going out as polygons under a rotation and `PushClip` becoming a polygon clip.
+What landed instead leaves every primitive exactly as it was: the contents draw into an
+offscreen with the mapping unchanged, and the *finished layer* is resampled through the
+matrix (`Broiler.Layout.IR.AffineLayerMap` in the main repo, the call as a submodule
+patch). Same result for one tenth of the surface area, and the arithmetic ends up on the
+side of the boundary this session can test.
+
+**What is still open here is the 3D half**, which that entry already separated out:
+`perspective-split-by-zero-w` belongs with
+[the 3D entry below](#a-perspective-transformed-box-is-not-rasterised-in-3d), because
+`ParseCssTransformMatrix` reduces the whole list to a 2D affine and silently drops
+`rotateX`, `rotateY`, off-Z `rotate3d` and genuinely-3D `matrix3d`. A 2D warp cannot
+express those, and does not claim to.
+
+### `transform-box` is not read at all
+
+- **Tests:** `css-transforms/transform-box` — 33 of 34 failing, the highest failure rate of
+  any directory in the corpus outside the deliberate ones. The whole directory rotates, so
+  it read as a rotation bug and
+  [was one](wpt-rendering-gaps-fixed.md#a-rotated-element-and-its-whole-subtree-were-not-painted-at-all);
+  what is left underneath is the property itself.
+- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs`)
+  for the call, with the box choice belonging in `Broiler.Layout` beside
+  `CssTransformOrigin` — the same split the rotation fix used. Needs
+  `ComputedStyle.TransformBox` plumbed through first, which is main repo.
+- **What it is.** The reference box for a CSS transform is always the border box:
+  `PaintWalker.Stacking` passes `bounds` to both `ParseCssTransformMatrix` (which resolves
+  percentage translations against it) and `CssTransformOrigin.Resolve`. CSS Transforms 1 §6
+  makes that a choice of five — `content-box`, `border-box`, `fill-box`, `stroke-box`,
+  `view-box` — and on a non-SVG element `fill-box`/`stroke-box`/`view-box` behave as
+  `content-box`/`border-box`/`border-box`.
+- **Measured:** `cssbox-content-box-001` now renders the correct shape in the wrong place,
+  offset by exactly the 50px left border its `content-box` reference box would have removed.
+- **The directory is now 11 of 34**, up from 5, after
+  [the CSS `transform` projection](wpt-rendering-gaps-fixed.md#a-css-transform-rule-never-reached-an-svg-element)
+  — the `svgbox-*` tests were failing because their transform never arrived at all, not because
+  of the reference box. What is left splits in two.
+- **The CSS-layout half** (`cssbox-content-box-001`/`-002`, `cssbox-fill-box`,
+  `content-box-mutation-001`, `value-changed`) is the reference-box choice above.
+- **The SVG half is a bigger and more general gap than `transform-box`:** `transform-origin` is
+  honoured on `<rect>` and nowhere else. `SvgStructure` composes every element's transform
+  straight from the attribute (`SvgTransform.Parse(attributes["transform"])`) with no origin
+  conjugation, and only the `<rect>` path calls `OwnTransformAbout`. So a `<path>` with a
+  `transform-origin` turns about the viewport origin — `svgbox-initial` and `svgbox-view-box`
+  are that, not a `transform-box` failure. Fixing it properly needs each element's fill box,
+  stroke box and nearest viewport rect available where the transform is composed, which
+  `SvgStructure` builds during a markup scan without geometry.
+- **Exit gate:** the eight `cssbox-*` tests match, and the `*-mutation-*` ones follow, with
+  a `Broiler.Layout` test over the five keywords against a box with a border and padding;
+  separately, `transform-origin` applies to every SVG shape rather than to `<rect>` alone.
 
 ### Transform interpolation has no matrix fallback
 
@@ -1275,6 +1307,37 @@ Worth separating from the rest, because the test itself may be at fault:
   plane, which is a rasteriser feature rather than a layout one.
 - **Exit gate:** the red patch is fully covered — i.e. the test matches its own
   reference *and* both differ from a render with the transform removed.
+
+---
+
+### `image-set()`'s resolution does not size the image
+
+- **Tests:** `css-images/image-set/image-set-resolution-001`, `-002`, `-003` — the three the
+  [selection fix](wpt-rendering-gaps-fixed.md#image-set-selected-nothing-whatever-it-held) left
+  behind, out of that directory's 37.
+- **Owner:** main repo. `Broiler.Layout/IR/CssImageSet.cs` already computes the number; nothing
+  carries it past the selection.
+- **What it is.** CSS Images 4 §5.4: the chosen option's resolution divides the image's intrinsic
+  size, so `image-set(url(green.png) 0.5x)` on a 100×50 file is a 200×100 image. The resolver picks
+  the right option and then throws the resolution away, so the image draws at its file size. The
+  three tests differ only in which property carries it — `content`, `background-image`,
+  `list-style-image` — which is the second half of the work: the resolution has to reach the image
+  sizing path for each, and today only `background-image` is even resolved.
+- **Exit gate:** the three tests match, with a `Broiler.Layout` test over an intrinsic size scaled
+  by a non-1x selection.
+
+### An invalid `image-set()` does not drop its declaration
+
+- **Tests:** `css-images/image-set/image-set-negative-resolution-rendering` and `-2`.
+- **Owner:** `Broiler.CSS` (`CssDeclarationValidator`). **Submodule** — a fix ships as a patch.
+- **What it is.** A negative resolution is a parse error, so CSS Syntax 3 §9 drops the declaration
+  whole and the one cascaded under it applies; `-2` puts a green `url()` there and expects green.
+  The renderer sees only the winning value, so refusing it there leaves the property at its
+  *initial* value rather than at the previous declaration — the fallback has to happen in the
+  cascade. `CssImageSet.TryResolveLayers` already reports the parse error separately from a
+  function that validly selects nothing, so the validator has something to call.
+- **Deliberately not fixed yet:** two tests against a third pending submodule patch is the wrong
+  trade while the first two are still waiting to be applied.
 
 ---
 
@@ -1328,22 +1391,32 @@ Worth separating from the rest, because the test itself may be at fault:
 
 ## Dynamic stylesheets
 
-### A script-injected `data:text/css` stylesheet never applies
+### A script-injected `data:text/css` stylesheet never applies — **fixed**
 
-- **Test:** `css-backgrounds/background-image-shared-stylesheet`, CI 5.7% →
-  **5.7%** against its own reference. Reproduces exactly.
-- **It does not need the WPT server, and was filed for three runs as though it
-  did.** The `?pipe=trickle(d2)` query is simply stripped and `/images/green.png` is
-  served from the checkout like any other root-relative resource. The earlier note
-  that "the pair matched at 99.8% locally while CI reports 0.0%" was
-  [the resolver bug](wpt-rendering-gaps-fixed.md#a-root-relative-resolver-returned-a-working-directory-relative-path):
-  neither side loaded the image, so the two agreed on nothing.
-- **What the 5.7% is, precisely.** The reference is 100% lime. Broiler paints 94%
-  white with a green block of exactly 300×150 — **the default `<iframe>` size**. So
-  the iframe is never removed and the parent's script-injected `data:text/css`
-  stylesheet never applies, while the *iframe's own* copy of that stylesheet does.
-- **Exit gate:** a `data:text/css` stylesheet injected from script applies to the
-  injecting document, with a focused test covering the shared-sheet case.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-datatextcss-link-contributed-nothing-to-the-cascade).
+`background-image-shared-stylesheet` now **passes at 100.0%**, and it took a second
+fix beside the data: one — the runner could not read a corpus path back out of the
+`file:///…` URL a script builds from `location.href`.
+
+### `document.styleSheets` lists no `<link>` sheet at all
+
+- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom/Features/DocumentCollectionBinding.cs`.
+  No test on any current list is known to turn on it; it was found while fixing the entry
+  above and is recorded rather than fixed, because widening what that collection returns
+  changes what every script iterating it sees.
+- **What it is.** `GetStyleSheets` filters the document's elements to tag `style`, so an
+  external sheet is absent from `document.styleSheets` however well it loaded — measured
+  on a page whose linked sheet demonstrably applies (`getComputedStyle` reads the linked
+  colour, `document.styleSheets.length` reads `0`). CSSOM §2.2 makes the collection every
+  sheet associated with the document, `<link rel=stylesheet>` included.
+- **The fix is already written, one layer over.** A sub-document's `styleSheets` goes
+  through `DomBridge.BuildStyleSheetsCollection`, which collects `<style>` *and*
+  `IsExternalStylesheet` links, skips a disabled `<link>`, and caches per element for
+  identity. The main-document binding predates it and never adopted it, so the two
+  disagree about what a document's stylesheets are.
+- **Exit gate:** both bindings return the same collection for the same tree, with a test
+  covering a linked sheet, a `<link disabled>`, and object identity across two reads.
 
 ---
 
@@ -1518,7 +1591,7 @@ can follow the same shape the
 [`sub` pipe already did](wpt-rendering-gaps-fixed.md#the-runner-never-performed-wpts-sub-substitution)
 — a runner-side transform, not a server. No test currently on any list is blocked on
 it: `background-image-shared-stylesheet`, the one that was, turned out
-[not to need it](#a-script-injected-datatextcss-stylesheet-never-applies).
+[not to need it](#a-script-injected-datatextcss-stylesheet-never-applies--fixed) and now passes.
 
 ### Paged media is partial
 

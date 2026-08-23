@@ -246,7 +246,7 @@ reference-disagreement list rather than from its severity ranking.
 
 | Test | Status | CI (#1624) | `rel=match` | First reported |
 | --- | --- | --- | --- | --- |
-| `css-backgrounds/background-image-shared-stylesheet` | **not fixed** | fails | 5.7% | #1491.4 |
+| `css-backgrounds/background-image-shared-stylesheet` | **fixed** | fails | 100.0% | #1491.4 |
 | `css-flexbox/percentage-heights-003` | **not fixed** | fails | n/a | #1624.27 |
 | `css-grid/abspos/grid-sizing-positioned-items-001` | **not fixed** | fails | n/a | #1624.13 |
 | `css-grid/grid-lanes/…/column-subgrid-orthogonal-writing-mode-004` | **not fixed** | fails | 94.8% | #1624.3 |

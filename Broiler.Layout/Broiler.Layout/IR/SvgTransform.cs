@@ -23,8 +23,23 @@ internal readonly partial record struct SvgTransform(float A, float B, float C, 
     /// <summary>Parses a transform list; an absent or unparseable list is the identity.</summary>
     public static SvgTransform Parse(string? transformList)
     {
+        TryParse(transformList, out var transform);
+        return transform;
+    }
+
+    /// <summary>
+    /// Parses a transform list, reporting separately whether <em>any</em> function in it was
+    /// recognised. The transform alone cannot say: an unparseable list and a list that genuinely
+    /// resolves to the identity — <c>rotate(0deg)</c>, <c>scale(1)</c> — both come out as
+    /// <see cref="Identity"/>, and a caller deciding whether a declaration beats a presentation
+    /// attribute has to tell those apart. CSS Transforms 1 §3 drops an invalid declaration whole,
+    /// so the attribute stands; a valid one that happens to be the identity still wins.
+    /// </summary>
+    public static bool TryParse(string? transformList, out SvgTransform transform)
+    {
+        transform = Identity;
         if (string.IsNullOrWhiteSpace(transformList))
-            return Identity;
+            return false;
 
         var result = Identity;
         bool any = false;
@@ -61,7 +76,9 @@ internal readonly partial record struct SvgTransform(float A, float B, float C, 
             any = true;
         }
 
-        return any ? result : Identity;
+        if (any)
+            transform = result;
+        return any;
     }
 
     /// <summary><c>rotate(angle, cx, cy)</c>: a rotation about an arbitrary centre.</summary>

@@ -1211,6 +1211,68 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   on its own: `css/css-page`, `css/CSS2/margin-padding-clear`, `css/css-position` and
   `css/css-anchor-position` together go **968 → 972 passing, +4 / −0**.
 
+### An SVG's `viewBox` stopped giving it an intrinsic ratio when `preserveAspectRatio: none`
+
+- **Tests:** the whole `css/css-backgrounds/background-size` directory, **146 → 214 of 217**.
+  Owner: `Broiler.HTML` (`Source/Broiler.HTML.Image.Compat/Adapters/StubImageAdapter.cs`) —
+  **submodule**, so it ships as the patch named
+  "image: an SVG's viewBox gives an intrinsic ratio whatever preserveAspectRatio says"
+  (push denied, 403), listed in `scripts/apply-pending-wpt-patches.sh`.
+- **The wrong question was being asked.** `RasterizeSvg` read `preserveAspectRatio="none"`
+  as removing the image's intrinsic aspect ratio, reasoning that an image willing to scale
+  non-uniformly does not insist on a shape. SVG 2 §8.2 derives the intrinsic sizing
+  properties from `width`/`height`/`viewBox` alone; `preserveAspectRatio` governs how the
+  content is fitted *once the viewport size is known*, which is a later question than what
+  size the image asks to be. Reading it the other way made such an image report no ratio at
+  all, so CSS sized it to the whole background positioning area.
+- **The directory was failing by construction, which is why it was worth looking at.** Every
+  SVG in `background-size/vector` carries `preserveAspectRatio="none"`, so all 60 of its
+  failures were one bug — a ratio-only image stretched to 768×256 where the test asks for
+  16×256. The same flag also hid dimensions the SVG states outright: with `width="8px"` and a
+  `viewBox`, `background-size: auto` sized to 24×384 in a 128×384 box instead of the 8×128 the
+  stated width and the ratio ask for. It survives under a name that says what it now decides
+  (`renderOversizedAndCrop`) — an SVG that gives one dimension and stretches to the other has
+  no viewport of its own to draw into, so it is rendered oversized and cropped to its content.
+- **Measured over the full 26 366-test reftest suite**, baseline and change on the same build
+  against the same checkout: **18 776 → 18 844 passing, +68 / −0**, average match 98.42% →
+  98.46%. All 68 wins are in `css/css-backgrounds/background-size`; nothing anywhere else in
+  the suite moved in either direction. The blast radius is small by construction — only 43
+  standalone SVGs in the whole corpus carry `preserveAspectRatio="none"` — but the sweep was
+  run rather than argued.
+- **Three stragglers remain in the directory**, and none is this bug:
+  `background-size-cover-svg` (74.5%) uses a `viewBox`-only SVG with *default*
+  `preserveAspectRatio`, so its ratio was never suppressed — it rasterises at the 300×150
+  default object size and is then scaled to 4923×400, which is a rasterisation-resolution
+  question; and `background-size-025`/`-031` are raster-image tests unrelated to SVG sizing.
+- **How it was found is the transferable part.** It is not on
+  [#1788](https://github.com/Broiler-Platform/Broiler/issues/1788)'s top-thirty list at all.
+  It came from reading `tests/wpt-baseline/failed-reftests.json` — the run's own failure
+  manifest — and grouping by directory, which puts a 65-test single-feature cluster three rows
+  below `grid-lanes` and well above anything the severity ranking surfaces.
+
+### `display: contents` on the root element took the canvas with it
+
+- **Test:** `css/css-display/display-contents-root-background` (reftest suite,
+  [#1788](https://github.com/Broiler-Platform/Broiler/issues/1788).6), 0.0% →
+  **100.0%, passing.** Owner: main repo, `Broiler.Layout/Engine/DisplayContentsBoxes.cs`.
+- **The rule was implemented; it was applied to the wrong box.** CSS Display 3 §2.3 blockifies
+  the root element, so `contents` on it is `block`, and `DisplayContentsBoxes.Generate` did
+  exactly that — to the box it was handed. The renderer hands it the anonymous *document* box
+  (`HtmlParser.ParseDocument` creates a block and appends `<html>` to it), so the real root
+  element was still a child like any other and was spliced out. What went with it was the
+  canvas: the canvas background is the root element's (CSS Backgrounds §2.11.2), so
+  `:root { display: contents; background-image: url(…) }` painted a white page where the test
+  asks for a green one.
+- **The blast radius is two files in the whole corpus**, which is why this sat unreported: a
+  scan of the checkout finds `display: contents` on `:root`/`html` in
+  `display-contents-root-background` and in `display-contents-computed-style`, and the second
+  is a testharness test with no reference. Nothing else in the reftest suite can move.
+- **Verified:** the reftest end to end, plus two unit tests over the box tree — the document-box
+  shape the renderer actually produces, and a sub-document's root element, which is entitled to
+  the same rule. Both fail on the parent commit. The pass's existing root test was passing
+  because it handed `Generate` the `<html>` box directly, which is the one shape the renderer
+  never produces.
+
 ### A grid with only out-of-flow children resolved no grid areas
 
 **[Issue #1667](https://github.com/Broiler-Platform/Broiler/issues/1667).12.**
@@ -2889,6 +2951,181 @@ the test that exposed it.
 - **The test renders `PASS` where it rendered `FAIL`** and is still
   [below the threshold](wpt-rendering-gaps-open.md#bold-and-italic-never-reach-the-face) on
   bold text.
+
+### A `data:text/css` `<link>` contributed nothing to the cascade
+
+- **Test:** `css-backgrounds/background-image-shared-stylesheet` (reftest suite,
+  [#1788](https://github.com/Broiler-Platform/Broiler/issues/1788).2), 0.0% →
+  **100.0%, passing.** Owner: main repo — `src/Broiler.HtmlBridge.Dom` and
+  `src/Broiler.Wpt`. No submodule patch.
+- **The bug.** A `<link rel="stylesheet" href="data:text/css,…">` carries its own sheet;
+  there is nothing to fetch. The bridge handed the href to the resource loader like any
+  other URL, and that loader dispatches `file` and `http(s)` only — so the sheet came back
+  empty, contributed no rules to the cascade or the CSSOM, and the link dispatched `error`
+  where the spec says `load`. `@import url(data:text/css,…)` was already decoded in
+  process; the `<link>` spelling of the same thing was not, so both call sites now go
+  through that one seam (`FetchStyleSheetText`).
+- **Why it survived so long: the renderer disagreed with the DOM.** `Broiler.HTML`'s own
+  stylesheet loader has always decoded `data:` URIs, so a data: sheet written in the markup
+  *painted* — while `getComputedStyle`, the CSSOM and the link's load event all said it had
+  not loaded. Only a page that reads one of those three notices, which is why the symptom
+  was a script waiting forever on `link.onload` rather than an unstyled render.
+- **The second half was the runner, and it is the more transferable one.** A run gives each
+  document a `file:///…` page URL, so the WPT idiom
+  `new URL("/images/green.png", location.href).href` — how a test hands a corpus URL to
+  another document — produces `file:///images/green.png`: the filesystem root, not the
+  checkout. `TryResolveWptRootRelativePath` already reads a corpus path back out of a served
+  WPT origin (`http://web-platform.test:8000/…`); it now does the same for a `file:` URL
+  that names nothing on disk. Strictly additive — a `file:` URL that resolves on its own is
+  returned untouched, and the corpus still has to hold what is left.
+- **Verified:** five focused tests in `DataUriStylesheetLinkTests` (script-injected sheet
+  reaches computed style; it fires `load`, not `error`; the markup and base64 spellings; and
+  the shared-sheet case the WPT test is named for) — all five fail on the parent commit —
+  plus two for the runner remap, and the reftest itself run end to end against a checkout
+  holding the test, its reference, `/images/green.png` and `/css/reference/blank.html`.
+- **Do not read the first half as the whole fix.** Landing only the data: decode moves the
+  test from 0.0% to 0.0%: the iframe is correctly removed (that is `link.onload` firing at
+  last) and the page is then blank white against a lime reference, because the image the
+  sheet names still does not load. The two together are what pass it.
+
+### `image-set()` selected nothing, whatever it held
+
+- **Owner:** main repo — `Broiler.Layout/IR/CssImageSet.cs` and the `background-image` assignment
+  in `Engine/CssUtils.cs`. **No submodule patch.**
+- **The bug.** `image-set()` was recognised as an image value and never resolved, so the layer
+  reached two readers that each understand only part of what the function can hold: the background
+  loader looks for `url(` and found a function it did not know, so it fetched nothing; the paint
+  walker looks for `gradient(` to tell a drawn layer from a fetched one, so
+  `image-set(linear-gradient(…) 1x)` was neither. Whichever kind of image the function named, the
+  layer painted nothing.
+- **What landed.** The selection is resolved into the property value before either of them looks at
+  it, which is what makes it work for every kind of image at once — both readers then see a value
+  they already understand. `CssImageSet` implements CSS Images 4 §5.4: the resolution units
+  (`x`/`dppx`, `dpi` at 96, `dpcm` at 96/2.54, and `calc()` far enough to cover a resolution
+  expression), an omitted resolution as 1x, `type()` filtering against what this engine decodes, a
+  bare `<string>` as an image, and the choice itself — the smallest resolution that reaches the
+  device, the largest when none does, first on a tie.
+- **Invalid and "selects nothing" are different answers, and two tests are built to tell them
+  apart.** A negative resolution is a parse error, so the declaration is dropped whole and the one
+  under it applies; a zero resolution parses but leaves no usable option, so the declaration applies
+  and paints nothing. `image-set-zero-resolution-rendering` puts a **red** `url()` in the
+  declaration below and expects a blank page — so "selects nothing" must not fall back to it —
+  while `image-set-negative-resolution-rendering-2` puts a **green** one there and expects green.
+- **`css/css-images/image-set` goes 10 → 32 of 37**, and the full 26 366-test reftest suite
+  **+22 / −0**.
+- **What is left, and why it is not here.** Three tests
+  (`image-set-resolution-001`/`-002`/`-003`) assert the *other* half of the resolution: the selected
+  option's resolution divides the image's intrinsic size, so `url(green.png) 0.5x` on a 100×50 image
+  is drawn 200×100. That needs the resolution carried alongside the chosen image into the sizing
+  path, and it reaches `content` and `list-style-image` as well as `background-image`. The two
+  negative-resolution tests need the declaration dropped at parse time, which is `Broiler.CSS`'s
+  validator — a submodule, and two tests is not worth a third pending patch. Both are
+  [filed](wpt-rendering-gaps-open.md#image-sets-resolution-does-not-size-the-image).
+
+### A CSS `transform` rule never reached an SVG element
+
+- **Owner:** main repo — `src/Broiler.HtmlBridge.Dom/DomBridge.Serialization.SvgZoom.cs` and
+  `Broiler.Layout/IR/SvgTransform.cs`. **No submodule patch.**
+- **The bug.** `SvgRenderer` reads an element's transform off the serialized markup, and sees no
+  stylesheet of its own, so the bridge projects the cascaded value onto the SVG presentation
+  attribute on the way out. `transform-box` and `transform-origin` were projected; **`transform`
+  itself was not** — so `#target { transform: rotate(90deg) }` reached nothing and the element
+  rendered untransformed. The other two can only move a transform that arrived by attribute, so
+  projecting them without it was half a mechanism.
+- **The guard is the interesting half, and the tests are explicit about it.** A cascaded value that
+  parses no transform function must be *skipped*, not written. Two different things depend on that:
+  this bridge's cascade does not model SVG presentation attributes as declarations, so an element
+  carrying `transform="translate(50)"` and no rule computes `none` — writing that back erases the
+  attribute the renderer was about to read; and CSS Transforms 1 §3 drops an *invalid* declaration
+  whole, so `transform: scale(invalid)` over a real `transform="rotate(90)"` must leave the
+  attribute standing. The nine `css-transforms/svg-{document,external,inline}-styles-005/006/013`
+  tests assert exactly the second, and an unguarded first cut failed all nine — which is how the
+  rule was found.
+- **`SvgTransform.TryParse` is what makes that decidable.** The transform alone cannot say why it
+  is the identity: `scale(invalid)` and `rotate(0deg)` both come out as `Identity`, and the caller
+  needs the invalid one to lose to the attribute while the valid one wins. `TryParse` reports
+  whether any function was recognised; `Parse` is now a call to it.
+- **Measured over the full 26 366-test reftest suite: +13 / −0**, and **+10 / −0** across the four
+  families it touches (`transform-box`, `document-styles`, `external-styles`, `inline-styles`:
+  29 → 39 of 75).
+- **What it exposes rather than fixes.** `transform-origin` is honoured on `<rect>` and nowhere
+  else — `SvgStructure` composes every other element's transform straight from the attribute with
+  no origin conjugation — so a `<path>` that now receives its CSS transform turns about the
+  viewport origin. That, and `transform-box`'s reference-box choice, are
+  [the open entry](wpt-rendering-gaps-open.md#transform-box-is-not-read-at-all).
+
+### A rotated element and its whole subtree were not painted at all
+
+- **Owner:** `Broiler.Layout` (`IR/AffineLayerMap.cs`, main repo) and `Broiler.HTML`
+  (`Broiler.HTML.Image/BCanvas.cs`, `Adapters/GraphicsAdapter.cs`, **submodule — the
+  call ships as a patch**).
+- **The bug.** `transform: rotate(45deg)` on a green square painted a **blank page**.
+  Broiler's raster canvas maps a point per axis — `p → p·scale + translation` — so
+  translation and axis-aligned scale (mirrors included, and therefore `rotate(180deg)`)
+  fold straight into its own state, and anything carrying a `b` or `c` term does not.
+  Those fell through to a compat backend that on a headless host is an inert stub, and
+  the fall-through also switches `CanUseRaster` off for **every draw the group encloses**
+  — so the element and its entire subtree landed nowhere. The three neighbouring layer
+  kinds had already been moved off that same fall-through by degrading gracefully
+  (opacity draws at full opacity, a filter draws unfiltered, a blend draws unblended);
+  the transform one had not, and for it the fall-through was not an inaccuracy but a
+  disappearance.
+- **It was never a `transform-box` bug, which is how it was found.**
+  `css/css-transforms/transform-box` was failing 33 of 34 — the highest failure rate of
+  any directory in the corpus outside the deliberate ones — and reducing its first test
+  to a plain `<div>` showed the same blank output with the property deleted. The
+  directory is uniform because *every* test in it rotates.
+- **What landed: the finished layer is warped, rather than every primitive taught a
+  matrix.** The contents draw into a full-surface offscreen with the mapping unchanged —
+  fills, text, images, clips all keep the arithmetic they already have — and one resample
+  puts the result where the transform says. `Broiler.Layout.IR.AffineLayerMap` is the
+  arithmetic: it conjugates the CSS matrix by the surface mapping (`B = S·A·S⁻¹`, exact
+  when the axes differ rather than assuming one zoom factor), and answers where a layer
+  point lands and, for the resample, which layer point lands on a destination pixel.
+  Inverse mapping is what makes it hole-free — scattering the source forward leaves gaps
+  wherever the transform magnifies.
+  - **Nearest sample, not bilinear.** A quarter turn maps pixel centres onto pixel
+    centres, so nearest is exact for the axis-swapping rotations most of the corpus uses,
+    and it cannot fringe a hard edge the way interpolating against transparent black
+    does. A diagonal rotation gets hard edges instead of antialiased ones; both sides of
+    a reftest are rendered here, so they get the same ones.
+  - **The clips in force are suspended while the layer fills and applied at the
+    composite.** An ancestor's `overflow` or `clip-path` bounds where the element *ends
+    up* (CSS Transforms 1 §3), and the tile clip of a parallel replay bounds which slice
+    of the surface the canvas may write. Leaving either in force while the layer filled
+    would clip in pre-transform space — wrong for the first, and for the second a seam,
+    because content just outside a tile that rotates into it would be clipped away before
+    it could.
+- **Measured over the full 26 366-test reftest suite: 18 776 → 18 771 passing, +22 / −27**,
+  average match unchanged at 98.42%, run time unchanged (22:04 → 21:5x). **The score
+  going down is the honest result**, and the shape of it is the one
+  [this suite is built to produce](wpt-reftests.md#the-bug-is-as-likely-to-be-in-the-reference-and-that-inverts-the-scoreboard):
+  25 of the 27 losses rotate on *both* sides, so both used to render blank and match at
+  100%, and the other two were checked by rendering them — their references transform
+  too, through spellings a grep for `rotate` misses. 13 of the 22 wins transform on only
+  one side and could not have passed before at all. **The upside is in the golden suite,
+  which this one structurally cannot show**: 192 of its 6 914 failures declare a rotation
+  or skew, and a blank render can only lose against a Chromium reference that shows the
+  rotated content.
+- **A first cut cost a factor of ten and is worth not repeating.** Suspending the clips
+  by emptying the stack is correct and unaffordable: `_clipBounds` is what bounds a
+  rasterizer's loops, so with nothing in it every fill inside a warp layer walked the
+  whole surface. Replacing them with the *pre-image of what is still visible* — the part
+  of the layer that can land inside the suspended clip — keeps both properties, because
+  content outside it cannot reach the surface however it is transformed.
+- **Verified:** 20 `AffineLayerMapTests` in the main repo pin the arithmetic — the fixed
+  point is `transform-origin`, a quarter turn sends the x axis to y, the worked
+  `cssbox-content-box-001` box lands where its reference states, a diagonal turn grows
+  the destination box by root two, the inverse undoes the forward for rotation, skew and
+  a rotation composed with a scale, a non-uniform surface scale is conjugated rather than
+  averaged, and every axis-aligned, singular or malformed matrix is declined so exactly
+  one of the two paths claims a given matrix.
+- **What this exposes rather than fixes.** `transform-box` itself is still unimplemented:
+  `cssbox-content-box-001` now renders the right shape in the wrong place, offset by
+  exactly the 50px left border, because the reference box is always the border box
+  (`PaintWalker.Stacking` passes `bounds` to both the matrix and
+  `CssTransformOrigin.Resolve`). That is the next thing in this directory, and it is a
+  smaller job than this was.
 
 ### `transform: scale()` with percentages
 

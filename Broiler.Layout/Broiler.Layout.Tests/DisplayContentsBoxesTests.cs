@@ -140,6 +140,45 @@ public sealed class DisplayContentsBoxesTests
         Assert.Equal([child], root.Boxes);
     }
 
+    // …and it is still the root element when the pass is handed the *document* box, which is what
+    // the renderer hands it: HtmlParser.ParseDocument creates an anonymous block and appends <html>
+    // to it, so blockifying only the box we were given left the real root element to be spliced out
+    // like any other wrapper. What goes with it is the canvas: the canvas background is the root
+    // element's (CSS Backgrounds §2.11.2), so `:root { display: contents; background: … }` painted
+    // nothing at all — the shape of css/css-display/display-contents-root-background, which asks
+    // for a green page and got a white one.
+    [Fact(Timeout = 600000)]
+    public void The_Root_Element_Is_Blockified_Under_The_Anonymous_Document_Box()
+    {
+        var document = Box(null, "div", CssConstants.Block);
+        var html = Box(document, "html", Contents);
+        var body = Box(html, "body", CssConstants.Block);
+
+        DisplayContentsBoxes.Generate(document);
+
+        Assert.Equal([html], document.Boxes);
+        Assert.Equal(CssConstants.Block, html.Display);
+        Assert.Equal([body], html.Boxes);
+    }
+
+    // The rule is the document's, not the outermost box's: a sub-document's root element — an
+    // <iframe>'s, projected under a sub-viewport box — is entitled to the same blockification.
+    [Fact(Timeout = 600000)]
+    public void A_Sub_Documents_Root_Element_Is_Blockified_Too()
+    {
+        var document = Box(null, "div", CssConstants.Block);
+        var html = Box(document, "html", CssConstants.Block);
+        var subViewport = Box(html, "div", CssConstants.Block);
+        var subHtml = Box(subViewport, "html", Contents);
+        var subBody = Box(subHtml, "body", CssConstants.Block);
+
+        DisplayContentsBoxes.Generate(document);
+
+        Assert.Equal([subHtml], subViewport.Boxes);
+        Assert.Equal(CssConstants.Block, subHtml.Display);
+        Assert.Equal([subBody], subHtml.Boxes);
+    }
+
     [Fact(Timeout = 600000)]
     public void Running_The_Pass_Twice_Changes_Nothing()
     {

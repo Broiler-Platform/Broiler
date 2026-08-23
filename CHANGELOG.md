@@ -303,6 +303,66 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `image-set()` picks an image instead of painting nothing. It was recognised as
+  an image value and never resolved, so the layer reached two readers that each
+  understand only part of what the function can hold — the background loader
+  looks for `url(`, the paint walker looks for `gradient(` — and whichever kind
+  of image it named, nothing was drawn. The selection is now resolved into the
+  value before either of them sees it: resolution units (`x`/`dppx`, `dpi`,
+  `dpcm`, `calc()`), an omitted resolution as 1x, `type()` filtering, and the
+  smallest resolution that reaches the display, largest when none does, first on
+  a tie. The selected resolution does not yet scale the image's intrinsic size.
+
+- A CSS `transform` rule applies to an SVG element. The renderer reads an
+  element's transform off the markup and sees no stylesheet, so the cascaded
+  value is projected onto the SVG presentation attribute — `transform-box` and
+  `transform-origin` were, and `transform` itself was not, so
+  `rect { transform: rotate(90deg) }` did nothing at all. A declaration that
+  parses no transform function is skipped rather than written, which is what
+  makes an invalid one fall back to the `transform` attribute instead of
+  destroying it (CSS Transforms 1 §3).
+
+- A rotated or skewed element is painted. `transform: rotate(45deg)` on a green
+  square produced a **blank page** — and took its whole subtree with it, so a page
+  that rotates a wrapper lost everything inside it. The raster canvas maps a point
+  per axis, so translation and axis-aligned scale fold into its own state and a
+  rotation does not; those fell through to a compat backend that on a headless host
+  is an inert stub, and the fall-through also stops every draw the group encloses
+  from reaching the canvas at all. Such a transform now opens a layer the contents
+  draw into untransformed, resampled through the matrix on the way out — so every
+  primitive keeps the arithmetic it already has. Ancestor clips are applied to the
+  transformed result rather than to the content on its way in, which is where
+  CSS Transforms 1 §3 puts them.
+
+- An SVG used as an image keeps the intrinsic aspect ratio its `viewBox` gives it
+  even when it declares `preserveAspectRatio="none"`, and reports an absolute
+  `width` or `height` it states even when the other one is missing. SVG 2 §8.2
+  derives the intrinsic sizing properties from `width`/`height`/`viewBox` alone —
+  `preserveAspectRatio` governs how the content is fitted once the viewport size
+  is known, which is a later question than what size the image asks to be. Reading
+  `none` as "no intrinsic ratio" made every such image size to the whole
+  background positioning area, so a `background-size: contain` that should paint a
+  16×256 strip stretched across the full 768×256 box instead. Measured over the
+  full WPT reftest suite: 18 776 → 18 844 passing, +68 / −0.
+
+- `display: contents` on the root element no longer takes the page's canvas with
+  it. The root element is blockified (CSS Display 3 §2.3) and the rule was
+  implemented, but it was applied to the anonymous document box the parse creates
+  rather than to the `<html>` box beneath it — so the real root element was
+  spliced out like any other wrapper, and the canvas background, which is the root
+  element's, went with it.
+
+- A `<link rel="stylesheet" href="data:text/css,…">` now contributes its rules to
+  the cascade and the CSSOM, and fires `load` rather than `error`. The sheet is in
+  the URL, so there is nothing to fetch — but the href went to the resource loader
+  like any other, and that loader dispatches `file` and `http(s)` only, so the
+  sheet came back empty. The renderer's own loader has always decoded `data:`
+  URIs, which is what hid it: such a sheet *painted*, while `getComputedStyle`
+  and the link's load event both reported it as not loaded.
+  A page that builds the link from script and waits on `link.onload` before doing
+  its next step therefore waited forever. `@import url(data:text/css,…)` was
+  already decoded in process; both call sites now go through that one seam.
+
 - The desktop browser paints a page's load window while it runs, instead of only
   its final state. Settling the load window on the load worker took the page's
   callbacks out of the message pump, which is what stopped www.google.com hanging

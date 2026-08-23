@@ -255,6 +255,76 @@ argument for reading it as a ranking of blast radius rather than a work queue.
 Issue #1716's actual defect was found by ignoring that list and asking why a
 63-test family was failing uniformly — see the mismatch-comparison section above.
 
+**The streak ended at
+[issue #1788](https://github.com/Broiler-Platform/Broiler/issues/1788), and how it
+ended is the usable part.** Its top thirty opens with the same three unwinnables —
+`root-box-003`, `forced-colors-mode-49`, the 60×60 bitmap reference — and its #2,
+`css-backgrounds/background-image-shared-stylesheet`, was a real defect that
+[now passes at 100%](wpt-rendering-gaps-fixed.md#a-datatextcss-link-contributed-nothing-to-the-cascade).
+It was findable because it was the one entry on the list that already carried a
+diagnosis: the gaps file said what the 5.7% was made of down to the 300×150 pixels.
+So the rule the streak taught still holds — **do not start at the top of the list** —
+but the refinement is that the entries worth starting from are the ones a previous
+triage has already reduced, wherever they sit in the ranking.
+
+**The better entry point is the run's own manifest, not its issue.**
+`tests/wpt-baseline/failed-reftests.json` records every failure, so grouping it by
+directory ranks *families* rather than individual severities — and a family that
+fails uniformly is one bug however mild each instance looks. Two rows of that
+grouping paid for themselves on #1788. `css/css-backgrounds/background-size` (65
+failures, three rows below `grid-lanes`) turned out to be a single wrong reading of
+`preserveAspectRatio`, worth
+[+68 / −0](wpt-rendering-gaps-fixed.md#an-svgs-viewbox-stopped-giving-it-an-intrinsic-ratio-when-preserveaspectratio-none)
+over the whole suite; `css/css-display` had just 9, of which the top-thirty entry
+`display-contents-root-background` was
+[the root element never being blockified](wpt-rendering-gaps-fixed.md#display-contents-on-the-root-element-took-the-canvas-with-it).
+Neither is visible as a *cluster* from the severity ranking, which by design shows
+one line per test.
+
+```sh
+python3 - <<'PY'
+import json, collections
+d = json.load(open('tests/wpt-baseline/failed-reftests.json'))
+paths = [x['relativeTestPath'] for x in d['results']]
+for k, v in collections.Counter('/'.join(p.split('/')[:3]) for p in paths).most_common(25):
+    print(f"{v:5d}  {k}")
+PY
+```
+
+
+
+## A single-run diff carries about one test of noise
+
+`css/compositing/background-blending/background-blend-mode-plus-lighter` renders at **93.6%** every
+time it is run on its own, and came back **100.0%** in one full sweep out of four. Nothing about the
+test is timing-dependent; what varies is what ran before it in the same worker. So a before/after
+diff taken from one run of each carries roughly a test of noise in both directions, and a change
+whose whole claim is ±1 needs the suspect test re-run on its own before the number is believed —
+which costs seconds, against the twenty minutes a second sweep costs.
+
+The rule that follows: **a single test that moves against the direction of a change is noise until
+re-run in isolation**, and one that moves *with* it is not evidence on its own either.
+
+## The 98–99% band is not a work queue either, and it is a trap that looks like one
+
+Ranking the reftest failures by match percentage puts **3 207 of 7 373 — 44% — in a single
+98–99% bucket**, just under the gate, with another 1 193 in 97–98%. That reads like one
+systematic near-miss with one cause behind it, and it is not: it is a property of the
+*canvas*, not of the engine. A reftest's subject is usually a small box on a 1024×768
+viewport, and a 100×100 square is 1.27% of it — so a test whose square is **completely
+wrong** still scores 98.7%.
+
+Sampled across the ten directories that band is thickest in, the failures had nothing in
+common: `CSS2/selectors/default-attribute-selector-003` is a 100×100 square painted where
+no square belongs, `css-text/shaping/shaping-005` is Arabic characters that do not join.
+Two unrelated bugs, one number.
+
+**Rank by what a directory's pass rate says instead.** A directory failing 97% of its tests
+is one feature nobody implemented; a directory failing 20% is twenty unrelated bugs, and no
+amount of sorting by percentage separates them. That is what found the rotation defect:
+`css-transforms/transform-box` at 33 of 34 failing, reduced to a plain `<div>`, showed a
+blank page with the property deleted.
+
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
   a *different document*. Two distinct versions of this, and the fix for the

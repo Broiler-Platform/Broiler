@@ -105,4 +105,61 @@ public sealed class SvgTransformTests
         AssertMaps(page, 100, 50, 100, 50);
         AssertMaps(page, 110, 50, 100, 60);
     }
+
+    // TryParse separates the two things the transform alone cannot: a list that resolved to the
+    // identity because it *is* the identity, and one that resolved to it because nothing in it
+    // parsed. A caller deciding whether a CSS declaration beats a `transform` presentation
+    // attribute has to tell those apart — CSS Transforms 1 §3 drops an invalid declaration whole,
+    // so the attribute stands, while a valid identity still wins. The bridge's projection of a
+    // cascaded `transform` onto SVG markup is that caller, and the nine
+    // css-transforms/svg-{document,external,inline}-styles-005/006/013 tests are the assertion:
+    // each declares `transform: scale(invalid)` over a real `transform="rotate(90)"`.
+    [Theory]
+    [InlineData("rotate(90deg)")]
+    [InlineData("rotate(0deg)")]
+    [InlineData("scale(1)")]
+    [InlineData("translate(0)")]
+    [InlineData("matrix(1, 0, 0, 1, 0, 0)")]
+    public void TryParse_Accepts_A_List_Whose_Functions_Parse(string value)
+    {
+        Assert.True(SvgTransform.TryParse(value, out _));
+    }
+
+    [Theory]
+    [InlineData("scale(invalid)")]
+    [InlineData("rotate()")]
+    [InlineData("none")]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    [InlineData("nonsense(3)")]
+    [InlineData("matrix(1, 0, 0)")]
+    public void TryParse_Rejects_A_List_With_No_Function_In_It(string value)
+    {
+        Assert.False(SvgTransform.TryParse(value, out var transform));
+        Assert.True(transform.IsIdentity);
+    }
+
+    // A valid list that resolves to the identity is accepted, and that is the whole point of
+    // reporting acceptance separately from the value.
+    [Fact(Timeout = 600000)]
+    public void A_Valid_Identity_Is_Accepted_And_Is_Still_The_Identity()
+    {
+        Assert.True(SvgTransform.TryParse("rotate(0deg)", out var transform));
+        Assert.True(transform.IsIdentity);
+    }
+
+    [Fact(Timeout = 600000)]
+    public void Parse_Still_Answers_The_Identity_For_Everything_TryParse_Rejects()
+    {
+        Assert.True(SvgTransform.Parse("scale(invalid)").IsIdentity);
+        Assert.True(SvgTransform.Parse(null).IsIdentity);
+        Assert.Equal(SvgTransform.Parse("translate(10 20)"), Translated());
+
+        static SvgTransform Translated()
+        {
+            SvgTransform.TryParse("translate(10 20)", out var t);
+            return t;
+        }
+    }
 }

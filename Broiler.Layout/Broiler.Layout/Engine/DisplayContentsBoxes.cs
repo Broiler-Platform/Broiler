@@ -58,6 +58,25 @@ internal static class DisplayContentsBoxes
         Flatten(root);
     }
 
+    /// <summary>
+    /// Whether this box is a document's root element, which CSS Display 3 §2.3 blockifies — so
+    /// <c>contents</c> on it is <c>block</c> and it keeps its box.
+    /// </summary>
+    /// <remarks>
+    /// The box <see cref="Generate"/> is handed is the anonymous <em>document</em> box the parse
+    /// creates, not the root element: <c>&lt;html&gt;</c> is a child of it. Blockifying only the box
+    /// we were given therefore left the actual root element to be spliced out like any other
+    /// wrapper — and with it went the canvas, because the canvas background is the root element's
+    /// (CSS Backgrounds §2.11.2). The test that names this reads
+    /// <c>:root { display: contents; background-image: url(…) }</c> and asks for a green page;
+    /// Broiler painted the page's text on white
+    /// (<c>css/css-display/display-contents-root-background</c>). Recognised by tag rather than by
+    /// position so a sub-document's root element — an <c>&lt;iframe&gt;</c>'s, projected under a
+    /// sub-viewport box — is covered by the same rule, which is the rule its own document is
+    /// entitled to.
+    /// </remarks>
+    private static bool IsBlockifiedRootElement(CssBox box) => CssBoxHelper.IsRootElement(box);
+
     private static void Flatten(CssBox box)
     {
         // Depth first: a chain of nested `contents` boxes collapses from the inside out, so by the
@@ -70,6 +89,12 @@ internal static class DisplayContentsBoxes
         {
             if (child.Display != Contents)
                 continue;
+
+            if (IsBlockifiedRootElement(child))
+            {
+                child.Display = CssConstants.Block;
+                continue;
+            }
 
             // CSS Display 3 §3.1: on an element whose rendering is not purely CSS-based —
             // a replaced element or a form control — `contents` computes to `none` instead.

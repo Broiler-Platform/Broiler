@@ -359,7 +359,12 @@ public sealed partial class DomBridge
             {
                 try
                 {
-                    var fetchedCss = FetchExternalStylesheet(href);
+                    // Through the data:-aware seam, not the loader directly: a
+                    // <link rel="stylesheet" href="data:text/css,…"> carries its own sheet and
+                    // never goes on the wire. The loader only dispatches file/http(s), so a data:
+                    // href fetched as an ordinary URL came back empty and the sheet — the whole
+                    // sheet, for a link a script builds at run time — silently did not apply.
+                    var fetchedCss = FetchStyleSheetText(href);
                     if (!string.IsNullOrEmpty(fetchedCss))
                     {
                         StyleSheetStateFor(styleEl).FetchedCss.Set(fetchedCss);
@@ -713,9 +718,11 @@ public sealed partial class DomBridge
         // The resource loader only takes absolute URLs, so the content attribute is resolved against
         // the page URL first — the same rebasing the renderer does for a linked sheet. Skipping it
         // made every relative href look like a failed fetch and dispatched `error` for a sheet that
-        // then applied perfectly well.
+        // then applied perfectly well. A data: href is already its own absolute URL and carries the
+        // sheet in it, so it is read through the same seam the cascade uses rather than rebased and
+        // handed to the loader, which knows no data: scheme and reported the sheet as failed.
         var loaded = IsExternalStyleAllowedByCsp(element, href) &&
-                     !string.IsNullOrEmpty(FetchExternalStylesheet(ResolveAgainstPageUrl(href)));
+                     !string.IsNullOrEmpty(FetchStyleSheetText(ResolveStyleSheetLinkUrl(href)));
 
         try
         {
@@ -739,6 +746,17 @@ public sealed partial class DomBridge
         Uri.TryCreate(baseUri, url, out var resolved)
             ? resolved.AbsoluteUri
             : url;
+
+    /// <summary>
+    /// The URL a <c>&lt;link rel="stylesheet"&gt;</c>'s sheet is read from: a <c>data:</c> href
+    /// verbatim, anything else resolved against the page URL. The verbatim case matters — round
+    /// tripping a data: URL through <see cref="Uri"/> normalizes the percent-escapes its payload is
+    /// made of, and the payload is the stylesheet.
+    /// </summary>
+    private string ResolveStyleSheetLinkUrl(string href) =>
+        href.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+            ? href
+            : ResolveAgainstPageUrl(href);
 
     /// <summary>Fires the stylesheet <c>load</c> event for <paramref name="element"/> and every
     /// <c>&lt;link rel="stylesheet"&gt;</c> beneath it — the subtree counterpart used when a whole
@@ -781,6 +799,11 @@ public sealed partial class DomBridge
                 continue;
 
             if (!TryGetAttribute(styleEl, "href", out var href) || string.IsNullOrEmpty(href))
+                continue;
+
+            // A data: sheet is decoded in-process by the consuming path and never reaches the
+            // loader, so prefetching one buys nothing and would leave an unconsumed entry behind.
+            if (href.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
                 continue;
 
             // Already fetched for this document — the consuming path reads the cached text and
