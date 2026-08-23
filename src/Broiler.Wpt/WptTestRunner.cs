@@ -1939,7 +1939,9 @@ internal sealed partial class WptTestRunner
                 html,
                 new Uri(Path.GetFullPath(testPath)).AbsoluteUri,
                 wptRoot,
-                batchStyleInvalidations: IsCrashTest(testPath));
+                batchStyleInvalidations: IsCrashTest(testPath),
+                viewportWidth: _width,
+                viewportHeight: _height);
             html = executed.Html ?? html;
             renderDocument = executed.Document;
             layoutAssertionFailures = ComputeLayoutAssertionFailures(executed.LayoutAssertions);
@@ -2801,7 +2803,7 @@ internal sealed partial class WptTestRunner
         Broiler.Dom.DomDocument? renderDocument;
         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.Scripts))
         {
-            var executed = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot);
+            var executed = ExecuteScriptsWithDom(html, testBaseUrl, wptRoot, viewportWidth: _width, viewportHeight: _height);
             html = executed.Html ?? html;
             renderDocument = executed.Document;
             LastLayoutAssertions = executed.LayoutAssertions;
@@ -3301,11 +3303,20 @@ internal sealed partial class WptTestRunner
         }
     }
 
+    /// <param name="viewportWidth">
+    /// The width the document is about to be rendered at, carried onto the bridge so the geometry
+    /// the scripts see agrees with the pixels the comparison is made from. It used to be fixed at
+    /// the bridge's own 1024x768 default whatever size the run asked for, so `vh` lengths and the
+    /// maximum scroll offset resolved against a viewport the render did not use.
+    /// </param>
+    /// <param name="viewportHeight"><inheritdoc cref="ExecuteScriptsWithDom" path="/param[@name='viewportWidth']"/></param>
     private static ExecutedDocument ExecuteScriptsWithDom(
         string html,
         string url,
         string? wptRoot = null,
-        bool batchStyleInvalidations = false)
+        bool batchStyleInvalidations = false,
+        int viewportWidth = DomBridge.DefaultViewportWidth,
+        int viewportHeight = DomBridge.DefaultViewportHeight)
     {
         // This method is what drives the bridge's headless geometry pass, and that pass builds a
         // container of its own — out of reach of the handlers the render is handed afterwards. Tell
@@ -3458,7 +3469,7 @@ internal sealed partial class WptTestRunner
             // positioning, animation snapshots, etc. via the DomBridge.
             using var microTaskContext2 = MicroTaskSynchronizationContext.Install(microTasks);
             using var context2 = new JSContext();
-            using var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
+            using var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop, ViewportWidth = viewportWidth, ViewportHeight = viewportHeight };
             bridge2.Attach(context2, html, url);
             // Inject browser API stubs so onload handlers etc. can reference them.
             try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
@@ -3488,7 +3499,7 @@ internal sealed partial class WptTestRunner
         // view and its HtmlContainer (hence the whole box tree and every sub-resource its image
         // load handlers hold), timer/animation queues, listener stores and observers. Leaving it
         // to the GC kept one of those sessions alive per rendered document.
-        using var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop };
+        using var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop, ViewportWidth = viewportWidth, ViewportHeight = viewportHeight };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {

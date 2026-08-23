@@ -169,8 +169,40 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     }
 
     // viewport dimensions for window.innerWidth/innerHeight and element box-model properties
-    private int _viewportWidth = 1024;
-    private int _viewportHeight = 768;
+    private int _viewportWidth = DefaultViewportWidth;
+    private int _viewportHeight = DefaultViewportHeight;
+
+    /// <summary>The viewport a bridge assumes when its host does not say otherwise.</summary>
+    public const int DefaultViewportWidth = 1024;
+
+    /// <inheritdoc cref="DefaultViewportWidth"/>
+    public const int DefaultViewportHeight = 768;
+
+    /// <summary>
+    /// The CSS viewport this document is laid out against, in pixels. Everything the bridge
+    /// resolves against the viewport reads it: <c>window.innerWidth</c>/<c>innerHeight</c>,
+    /// <c>vw</c>/<c>vh</c> lengths, media-query evaluation, and the maximum scroll offset.
+    /// </summary>
+    /// <remarks>
+    /// These were fixed at 1024×768 and never written, so a host rendering at any other size got a
+    /// document whose script-visible geometry disagreed with the pixels: a page built to be "taller
+    /// than the viewport" at 200×200 scrolled to somewhere that was not the bottom of the canvas,
+    /// and a test asserting on what is on screen then failed for a reason that had nothing to do
+    /// with what it was testing. A host that renders at a size is expected to set this to the same
+    /// size; leaving it alone keeps the historical default.
+    /// </remarks>
+    public int ViewportWidth
+    {
+        get => _viewportWidth;
+        set => _viewportWidth = value > 0 ? value : DefaultViewportWidth;
+    }
+
+    /// <inheritdoc cref="ViewportWidth"/>
+    public int ViewportHeight
+    {
+        get => _viewportHeight;
+        set => _viewportHeight = value > 0 ? value : DefaultViewportHeight;
+    }
 
     /// <summary>
     /// Optional callback invoked after each queued timer, interval, animation-frame,
