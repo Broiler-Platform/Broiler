@@ -138,18 +138,35 @@ exclusion; the dashboard records exact engine and suite revisions.
 
 ### Direct eval, parser, scope, and control flow
 
+Each bullet below was reproduced against the pinned ref before being worked on or retired;
+the ones marked **fixed** carry a minimal regression in
+`Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs`.
+
 - A captured read after deleting an eval-introduced `var` retains the torn-down cell instead of
-  re-resolving the name outward.
+  re-resolving the name outward. **Still reproduces.**
+- An empty statement does not correctly terminate a Directive Prologue. **Fixed:** a statement
+  that already ended at its own `;` was consuming a second one, deleting exactly the empty
+  statement that ends the prologue.
+- A parameter named `undefined` does not shadow the global binding. **Fixed:** the compiler
+  folded every identifier of that name to the undefined value; it now folds only a reference
+  that resolves to no binding.
+- Async and generator bodies do not enter the runtime strict-mode scope, so a failed strict
+  `[[Set]]` may not throw. **Still reproduces.**
+- **Early errors that never fire** — the cluster the modes and the named-error reporting made
+  visible, and the largest one here. `for (const x;;)`, a body `var` shadowing the head's
+  lexical name, a labelled function declaration as a loop body, `export` inside `eval`, and a
+  direct `var` colliding with a global lexical binding are accepted and RUN: each test reaches
+  its `$DONOTEVALUATE()`. About 30 files across `test/language/statements/{for,if,labeled}`,
+  `test/language/eval-code` and `test/language/global-code`.
 - `new.target` is rejected in a direct eval nested inside an eval-compiled function.
-- An empty statement does not correctly terminate a Directive Prologue.
-- Comment and regular-expression-literal lexical edge cases remain in the failure manifest.
-- Labeled and unlabeled `continue`, block-scoped loop bindings, and other lexical-environment
-  cases remain open.
+  **Does not reproduce**; `staging/sm/class/newTargetEval.js` passes. It is in the failure
+  manifest from an older run — confirm against a current CI run before removing the path.
+- Comment and regular-expression-literal lexical edge cases, labeled and unlabeled `continue`,
+  and block-scoped loop bindings. **Do not reproduce:** `test/language/comments`,
+  `test/language/asi` and the `for`/`if`/`while`/`do-while`/`labeled` directories pass apart
+  from the early-error cluster above.
 - Remaining Annex B cases must be reduced from the current manifest rather than reconstructed
   from deleted issue snapshots.
-- A parameter named `undefined` does not shadow the global binding.
-- Async and generator bodies do not enter the runtime strict-mode scope, so a failed strict
-  `[[Set]]` may not throw.
 
 Evidence:
 
@@ -162,10 +179,18 @@ Evidence:
 ### Objects, arrays, symbols, and Proxy-sensitive behavior
 
 - Symbol own keys enumerate by Symbol-creation order rather than property-creation order.
+  **Still reproduces**; fixing it needs a per-object record of the order symbol properties
+  were added, so it is a property-storage change rather than a sort to delete.
 - `slice`, `unshift`, `toReversed`, `reduceRight`, array mutation limits, near-maximum lengths,
-  and Proxy-created results retain confirmed failure paths.
+  and Proxy-created results retain confirmed failure paths. **Largely does not reproduce:** all
+  four directories pass except `slice/create-proto-from-ctor-realm-array.js`, a cross-realm
+  species case.
 - `Reflect.set(base, key, value, receiver)` gives a new receiver property the base property's
-  attributes instead of the all-true descriptor required by `CreateDataProperty`.
+  attributes instead of the all-true descriptor required by `CreateDataProperty`. **Fixed:**
+  the receiver-create paths in `JSObject.PropertyStorage` use the CreateDataProperty
+  attributes. No test262 file at the pinned ref reaches the case, so
+  `ReflectSetReceiverAttributesTests` — which pinned the deviation and now pins the fix — is
+  the only evidence there is.
 
 Evidence:
 
