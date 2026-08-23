@@ -32,6 +32,7 @@ succeeding and it is skipped rather than re-applied.
 | `0001-html-svg-viewbox-intrinsic-ratio.patch` | `Broiler.HTML` | An SVG image's `viewBox` gives it an intrinsic aspect ratio whatever `preserveAspectRatio` says (SVG 2 §8.2), and an absolute `width`/`height` it states is reported even when the other one is missing. Listed in the apply script. |
 | `0002-html-affine-transform-layer.patch` | `Broiler.HTML` | A rotated or skewed element is resampled through its matrix instead of being dropped on the floor: `transform: rotate(45deg)` painted a blank page and took its whole subtree with it. Pairs with `Broiler.Layout.IR.AffineLayerMap` in the main repo. Listed in the apply script. |
 | `0003-html-column-flex-image-stretch.patch` | `Broiler.HTML` | A column flex item's cross-axis stretch reaches the image inside the anonymous wrapper that became the item, instead of leaving it at the 300×150 default object size. Pairs with `Broiler.Layout.Engine.FlexGridItemBlockification.IsStretchedColumnFlexItem` in the main repo. Listed in the apply script. |
+| `0004-html-inline-replaced-box-model.patch` | `Broiler.HTML` | An inline replaced element's padding and content rects are deflated out of the line rectangle instead of all three box-model levels being the same rectangle, so `clientWidth`/`clientHeight` on a bordered or padded inline `<img>` stop reporting the border box. Pairs with `Broiler.Layout.BoxGeometry.ForInlineBox` in the main repo. Listed in the apply script. |
 
 ### `0001-html-svg-viewbox-intrinsic-ratio.patch`
 
@@ -138,3 +139,36 @@ passed before and pass now.
 **Outside those conditions the stretch still belongs on the replaced element and is still
 not applied.** That is the general form, and it wants the cross size pushed onto the box
 during flex layout rather than a declaration rewritten before it.
+
+### `0004-html-inline-replaced-box-model.patch`
+
+A `display: inline` box lays out as one rectangle per line rather than as a single
+border box, so `HtmlContainerInt.CollectLayoutGeometry` rebuilds its border box from the
+union of those rectangles — and then set **all three** box-model levels to that same
+rectangle, on the stated grounds that inline boxes contribute no box-model padding or
+border to line geometry in this engine.
+
+**That premise holds for a non-replaced inline and not for a replaced one.**
+`CssLineBox.UpdateRectangle` adds an image's border and padding to its line rectangle
+explicitly, and `MeasureImageSize` adds them in the block axis, so the union really *is*
+the border box and the other two levels have to be deflated out of it. Measured:
+`<img style="width:50px;height:30px;border:3px solid;padding:4px">` reported
+`getBoundingClientRect` **64×44** — right — and `clientWidth`/`clientHeight` **64×44**
+too, where the client box excludes the border and must be **58×38**. It now reports
+58×38, and a `<div>` with the same declarations reports 58×38 as it always did, so the
+two paths agree again. A non-replaced `<span>` is untouched.
+
+The main-repo half is `BoxGeometry.ForInlineBox`, which owns the replaced/non-replaced
+distinction and the arithmetic; the patch is the call.
+
+**It moves no WPT test, and the entry it came from was wrong about why it would.**
+`css-sizing/contain-intrinsic-size/contain-intrinsic-size-logical-003` was named as
+carrying "the six `<img>` assertions still failing"; it holds at **42/96 before and
+after**, and those six are identical in both — `client-width: expected 50, actual 0`
+against `client-height: expected 0, actual 50` is a logical/physical axis transposition
+under `contain-intrinsic-size`'s logical properties, not a border deflation. What this
+fixes is the general API defect, which is every inline replaced element with a border or
+padding and is not what that test measures.
+
+`Broiler.Cli.Tests` 50 → 49 failures with no new ones, `Broiler.Wpt.Tests` holds at 54,
+`Broiler.Layout.Tests` at 0.
