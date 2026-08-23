@@ -830,6 +830,14 @@ the two defects at the end of this entry.
   single-stop test render at all; declining the conversion instead was measured and is
   *worse* — it takes `gradient-none-interpolation` to 68.2% and loses the single-stop pass.
   Carry-forward has to be implemented, not worked around.
+- **Re-scoped on 2026-08-23: well specified, but a feature rather than a patch.** The three
+  rules are named precisely and none is a one-liner, and they land in two places rather than
+  one: the interpolation space is *parsed* in `PaintWalker.Gradients.cs` and carried on the
+  display item (`DisplayList.GradientInterpolationSpace`, main repo, already there), while the
+  ramp is *evaluated* in the image backend. Premultiplying before interpolating and taking a
+  hue arc both change the evaluator; carrying a `none` component forward changes the
+  normaliser that runs before it. Nothing here is main-repo-only, so it ships as a patch of
+  real size.
 - **Exit gate:** the three tests pass, and `gradient-single-stop-none-interpolation` and the
   four `gradient-powerless-hue-*` stay passing.
 
@@ -1376,6 +1384,16 @@ express those, and does not claim to.
   three tests differ only in which property carries it — `content`, `background-image`,
   `list-style-image` — which is the second half of the work: the resolution has to reach the image
   sizing path for each, and today only `background-image` is even resolved.
+- **Re-scoped on 2026-08-23: this is two halves times three properties, not a carry.** The
+  number is indeed already computed, but nothing downstream can use it where it is. The
+  intrinsic-size arithmetic for a background lives in `Broiler.HTML`'s
+  `PaintWalker.Parsing.cs`, so the resolution has to be carried onto the box or the fragment
+  in the main repo *and* divided into the intrinsic size in the submodule — and then the same
+  again for `content` and `list-style-image`, neither of which resolves `image-set()` at all
+  today. It is the shape `CLAUDE.md` recommends, but the submodule half is not a call.
+- **Its sibling is closed and does not help.**
+  [The negative-resolution drop](#an-invalid-image-set-does-not-drop-its-declaration--fixed)
+  landed, taking `css/css-images/image-set` to 28 of 31; these three are the whole remainder.
 - **Exit gate:** the three tests match, with a `Broiler.Layout` test over an intrinsic size scaled
   by a non-1x selection.
 
