@@ -308,4 +308,45 @@ try {
         // 'data-ssg-error' string is in it either way; only the written attribute has an '='.
         Assert.DoesNotContain("data-ssg-error=", result);
     }
+
+    /// <summary>
+    /// A page may probe <c>ViewTransition.prototype</c> for a member this engine does not have,
+    /// and doing so must not abort the script that contains the probe.
+    /// </summary>
+    /// <remarks>
+    /// WPT's <c>view-transition-waituntil-animation-manipulation</c> opens with
+    /// <c>failIfNot(ViewTransition.prototype.waitUntil, …)</c>. With no <c>ViewTransition</c>
+    /// global, evaluating the *argument* threw <c>ReferenceError</c> before <c>failIfNot</c> was
+    /// entered, so the whole inline script aborted — including the work at the bottom of it — and
+    /// the page reported nothing at all. The probe must read <c>undefined</c> and the statements
+    /// after it must still run. <c>waitUntil</c> is deliberately absent: it is unimplemented here,
+    /// and this pins that the *probe* is what stopped costing a page its script.
+    /// </remarks>
+    [Fact(Timeout = 600000)]
+    public void Probing_ViewTransition_Prototype_Does_Not_Abort_The_Script()
+    {
+        var html = @"<!DOCTYPE html>
+<html><body>
+<div id=""result""></div>
+<script>
+var out;
+try {
+  var probe = typeof ViewTransition.prototype.waitUntil;
+  var t = document.startViewTransition(function () {});
+  var ctor;
+  try { new ViewTransition(); ctor = 'constructed'; } catch (e) { ctor = e.name; }
+  out = 'probe=' + probe + '|instance=' + (t instanceof ViewTransition) + '|ctor=' + ctor;
+} catch (e) {
+  out = 'aborted: ' + e.name;
+}
+document.getElementById('result').textContent = out;
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // The probe reads undefined rather than throwing; the object startViewTransition returns is
+        // recognised by the interface; and the interface itself is not constructible (WebIDL).
+        Assert.Contains("probe=undefined|instance=true|ctor=TypeError", result);
+    }
 }

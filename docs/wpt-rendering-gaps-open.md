@@ -19,6 +19,18 @@ measured 2026-08-13; CI is the golden-image score from the
    [the false negative](#the-flag-can-be-a-false-negative) — and it can fail its
    own reference while passing CI, which is the newer and more interesting case:
    four tests below are green on CI and demonstrably wrong.
+3. **Re-measure the entry before you believe its diagnosis.** An entry is written at a
+   moment; the tree moves under it, and the *stalest part is usually the "what is left"
+   line*, because that is the part written from inference rather than from a run. Working
+   through the readiest-looking entries on 2026-08-23 turned up three in a row where the
+   remaining-work sentence was wrong:
+   [the quirks table colour](#a-table-inherits-color-where-it-must-not) is not the quirk
+   (which is implemented and unit-tested) but scripts running after the parse;
+   [the `clipPath`](#svg-clippath-referenced-by-url) is not `userSpaceOnUse` units (also
+   implemented) but a 512px offset; and
+   [`document.styleSheets`](#a-linked-sheet-is-listed-and-carries-no-rules) was reported as
+   a page "whose linked sheet demonstrably applies", which `getComputedStyle` does not
+   agree with. Each cost a few minutes to check and would have cost far more to act on.
 
 ## Contents
 
@@ -171,7 +183,7 @@ The largest remaining cluster, and it reduces to three causes.
   were written to verify are still untested here**; a future reader must not take these two
   passing as evidence that scrollbars in a snapshot work.
 
-### `ViewTransition` is not an interface object, and has no `waitUntil`
+### `ViewTransition` has no `waitUntil` — the interface object is **fixed**
 
 - **Test:** `css-view-transitions/view-transition-waituntil-animation-manipulation`
   ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).4), 1.3% against its
@@ -193,8 +205,18 @@ The largest remaining cluster, and it reduces to three causes.
   `waitUntil` on its prototype is small. Making `waitUntil` *mean* something — the test then
   manipulates the pseudo-element animations through the Web Animations API — needs
   `document.getAnimations()` over the pseudo tree, which does not exist.
-- **Exit gate:** the interface object exists, and a focused test pins that a page probing
-  `ViewTransition.prototype` no longer aborts.
+- **The interface object landed** — see
+  [the fixed entry](wpt-rendering-gaps-fixed.md#viewtransition-was-not-an-interface-object-and-a-page-probing-it-lost-its-whole-script).
+  The probe now reads `undefined` instead of throwing, so the script runs and the page paints
+  *"Precondition Failed: ViewTransition.waitUntil is not available"*. That took the test
+  **1.3% → 0.0%** against its own reference, which is the crashed-script artifact ending, not a
+  regression: the green square it used to leave on screen was never something the engine earned.
+  `css/css-view-transitions` is 181 of 305 before and after.
+- **What is still open is the half with the feature in it.** `waitUntil` is deliberately not
+  defined: faking one carries the test past its own guard into Web Animations calls that are not
+  there either. Implementing it for real needs `document.getAnimations()` over the pseudo tree.
+- **Exit gate:** `waitUntil` defers the transition's completion and `document.getAnimations()`
+  returns the pseudo tree's animations, so the test manipulates them and reaches its screenshot.
 
 ### Two tests are green on CI and wrong
 
@@ -432,24 +454,15 @@ other direction. None is a sizing bug.
 - **Exit gate:** a 2D canvas context that paints, at which point the first two
   become ordinary comparisons.
 
-### A column flex container destroys an inline replaced item when it stretches it
+### A column flex container destroys an inline replaced item — **fixed**
 
-- **Test:** `css-flexbox/aspect-ratio-intrinsic-size-007`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).28), 35.4% against its
-  own reference, `MissingContent` over a 1008×10 strip.
-- **Owner:** `Broiler.Layout` (`Engine/CssBox.Flex.cs`). Main repo.
-- **Root cause.** A column flex container whose only child is inline-level takes the
-  `ContainsInlinesOnly` branch: the line boxes are built first, and the cross-axis stretch
-  is then applied as a *post*-pass that re-lays the item out at a target width. That is
-  destructive for an inline replaced `<img>`, which never goes through
-  `ResolveBlockUsedWidth` on the inline path, so the re-layout does not resize it the way
-  the pass assumes.
-- **The fix is to make the stretch width definite *before* the inline formatting context
-  runs** rather than re-running layout after it: a pre-pass over the in-flow items that
-  resolve to `stretch`, have no specified width and no auto inline margin, and are
-  replaced.
-- **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
-  elsewhere.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-column-flex-items-stretch-never-reached-the-image-inside-it).
+The diagnosis in this entry was right about the symptom and wrong about the mechanism. The
+stretch is not destructive; it simply never reaches the image, because a block-level image
+in a flex container is wrapped in an anonymous block and for a *column* container that
+wrapper becomes the item. `aspect-ratio-intrinsic-size-007` painted the 300×150 default
+object size and now matches at 100%; `css/css-flexbox` goes 436 → 438, +2 / −0.
 
 ### A size-contained `<svg>`, `<video>` or `<iframe>` still reports a size
 
@@ -471,28 +484,21 @@ containment**.
     `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh` — so landing it upstream
     and bumping the pointer is the route.
 
-### An inline element's three box-model rects are all the same rectangle
+### An inline element's three box-model rects are all the same rectangle — **fixed**
 
-- **Tests:** the six `<img>` assertions still failing in
-  `contain-intrinsic-size-logical-003`, and — more to the point — `clientWidth` and
-  `clientHeight` on **every** inline element that has a border or padding.
-  `<img style="width: 50px; height: 30px; border: 3px solid">` reports
-  `getBoundingClientRect` 56×36 (right) and `clientWidth`/`clientHeight` 56×36 (wrong:
-  the client box excludes the border, so 50×30). The same declarations on a `<div>` or
-  an `inline-block` report 50×30 correctly.
-- **Owner:** `Broiler.HTML` (`HtmlContainerInt.CollectLayoutGeometry`).
-- **Root cause.** A `display: inline` box lays out as one rectangle per line box rather
-  than a single border box, so `box.Location`/`box.Size` are unset and the collector
-  rebuilds the border box from the union of the line rectangles — then sets all three
-  levels of `BoxGeometry` to that same rectangle, on the stated grounds that "inline
-  boxes contribute no box-model padding/border to line geometry in this engine". That
-  premise does not hold for a **replaced** inline: `CssLineBox.UpdateRectangle` adds the
-  box's border and padding to an image's line rectangle explicitly, and
-  `MeasureImageSize` adds them in the block axis, so the union genuinely *is* the border
-  box and the other two levels have to be deflated out of it.
-- **Exit gate:** an inline `<img>` with a border reports a client box smaller than its
-  border box by exactly that border. Submodule-side, so the same routing as the entry
-  above.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#an-inline-replaced-elements-three-box-model-rects-were-all-the-same-rectangle).
+`clientWidth`/`clientHeight` on a bordered or padded inline `<img>` reported the border box
+and now report the padding box, agreeing with what a `<div>` carrying the same declarations
+always reported.
+
+**It moves no WPT test, and this entry was wrong about why it would.** The six `<img>`
+assertions of `contain-intrinsic-size-logical-003` named here are unchanged — the test holds
+at 42/96 — and reading them shows why: `client-width: expected 50, actual 0` beside
+`client-height: expected 0, actual 50` is a logical/physical axis transposition under
+`contain-intrinsic-size`'s logical properties, not a border deflation. Those six belong with
+[the size-containment entry](#a-size-contained-svg-video-or-iframe-still-reports-a-size)
+above, not here.
 
 ### A sticky box contributes its *stuck* position to the scroll container's overflow
 
@@ -553,6 +559,48 @@ containment**.
 - **Exit gate:** a line box holding nested inline-blocks sizes to the reference (the
   rows are 76px against 54px), with `position-area-scrolling-002` and the `lh`-unit
   tests staying green.
+
+### An inline-block does not sit on the line's baseline
+
+- **Owner:** `Broiler.Layout` (`Engine/CssLayoutEngine.cs` `ApplyVerticalAlignment`,
+  `Engine/CssLineBox.cs` `SetBaseLine`). Main repo.
+- **Reproduction, no WPT checkout needed** — an empty 80px inline-block beside text:
+  ```sh
+  printf '%s' '<style>body{font-size:40px;padding:20px}
+  .ib{display:inline-block;outline:2px solid #000;height:80px;width:40px}</style>
+  Hxy<span class="ib"></span>Hxy' > /tmp/ib.html
+  dotnet run --project src/Broiler.Wpt -- --render /tmp/ib.html
+  ```
+  The box's **top** lines up with the text top and it hangs ~60px below the baseline.
+  CSS 2.1 §10.8.1 gives an inline-block with no in-flow line boxes its baseline at the
+  **bottom margin edge**, so the box should stand *on* the text baseline and extend
+  upward; Chromium renders it that way.
+- **It is deliberate in the code, not an oversight to patch in one line.** Two places
+  agree on leaving it where the flow put it: `ApplyVerticalAlignment` excludes
+  `display: inline-block` from the boxes that contribute to the line's baseline
+  (the `box.Display != CssConstants.InlineBlock` guard), and `SetBaseLine` returns
+  early for a box whose `vertical-align` is absent or `baseline`. Only a *non-default*
+  `vertical-align` moves an inline-block at all.
+- **The line-height entry above is the same root.** The layout layer approximates the
+  baseline with a hardcoded `TypicalAscentRatio = 0.8` and has no real ascent/descent,
+  so there is no number to align an inline-block's last line box *to*. Closing this
+  and closing that one are the same piece of work.
+- **What it blocks, beyond its own tests.** It is the reason ruby cannot be desugared
+  to ordinary CSS boxes — see
+  [ruby annotations are not laid out at all](#ruby-annotations-are-not-laid-out-at-all).
+  It is also the shape of an icon-and-label row, a badge, and every
+  `vertical-align: middle` cell replacement, so it caps far more than the reftests
+  that name it.
+- **Do not "fix" it speculatively.** It moves the vertical position of *every*
+  inline-block in the corpus, and the compensating code written around the current
+  behaviour (the atomic-inline margin-box term in the line-box height calculation, the
+  `minTop < starty` line-box shift) has to move with it. The
+  [line-height entry](#an-inline-blocks-height-ignores-line-height) already records two
+  such attempts that measured well in isolation and lost over the suite. This one needs
+  a full before/after sweep, not a local metric.
+- **Exit gate:** an empty inline-block's bottom margin edge lands on the baseline and
+  one with in-flow content aligns on its last line box, with a before/after sweep over
+  the full reftest suite showing a net gain.
 
 ### Text does not flow around a float
 
@@ -782,6 +830,14 @@ the two defects at the end of this entry.
   single-stop test render at all; declining the conversion instead was measured and is
   *worse* — it takes `gradient-none-interpolation` to 68.2% and loses the single-stop pass.
   Carry-forward has to be implemented, not worked around.
+- **Re-scoped on 2026-08-23: well specified, but a feature rather than a patch.** The three
+  rules are named precisely and none is a one-liner, and they land in two places rather than
+  one: the interpolation space is *parsed* in `PaintWalker.Gradients.cs` and carried on the
+  display item (`DisplayList.GradientInterpolationSpace`, main repo, already there), while the
+  ramp is *evaluated* in the image backend. Premultiplying before interpolating and taking a
+  hue arc both change the evaluator; carrying a `none` component forward changes the
+  normaliser that runs before it. Nothing here is main-repo-only, so it ships as a patch of
+  real size.
 - **Exit gate:** the three tests pass, and `gradient-single-stop-none-interpolation` and the
   four `gradient-powerless-hue-*` stay passing.
 
@@ -1016,8 +1072,13 @@ the other five are unexamined.
     black. Only `flood-opacity` on an `feFlood` is read today.
   - **`mix-blend-mode` on a shape is unhandled**, so the `screen` compositing the reference relies on
     does not happen.
-  - **`style="background: …"` on the root `<svg>` is not painted**, leaving white where the reference
-    wants black.
+  - **`style="background: …"` on the root `<svg>` — fixed.** See
+    [the fixed entry](wpt-rendering-gaps-fixed.md#an-svg-images-root-background-was-never-painted).
+    It is painted for an SVG used *as an image*, which is where the canvas is the destination box;
+    an inline `<svg>` is left alone because its own CSS box already paints it. The other two on
+    this list landed with
+    [the SVG shape opacity and blend work](#fill-opacity-stroke-opacity-and-mix-blend-mode-on-an-svg-shape--fixed),
+    so all three are now closed and this entry is down to `cross-fade()` itself.
 
   Those three are worth more than this test: they apply to every SVG document Broiler renders, inline
   or as an image. They are the reason `Broiler reference vs Chromium reference` is only 67.4%.
@@ -1323,21 +1384,30 @@ express those, and does not claim to.
   three tests differ only in which property carries it — `content`, `background-image`,
   `list-style-image` — which is the second half of the work: the resolution has to reach the image
   sizing path for each, and today only `background-image` is even resolved.
+- **Re-scoped on 2026-08-23: this is two halves times three properties, not a carry.** The
+  number is indeed already computed, but nothing downstream can use it where it is. The
+  intrinsic-size arithmetic for a background lives in `Broiler.HTML`'s
+  `PaintWalker.Parsing.cs`, so the resolution has to be carried onto the box or the fragment
+  in the main repo *and* divided into the intrinsic size in the submodule — and then the same
+  again for `content` and `list-style-image`, neither of which resolves `image-set()` at all
+  today. It is the shape `CLAUDE.md` recommends, but the submodule half is not a call.
+- **Its sibling is closed and does not help.**
+  [The negative-resolution drop](#an-invalid-image-set-does-not-drop-its-declaration--fixed)
+  landed, taking `css/css-images/image-set` to 28 of 31; these three are the whole remainder.
 - **Exit gate:** the three tests match, with a `Broiler.Layout` test over an intrinsic size scaled
   by a non-1x selection.
 
-### An invalid `image-set()` does not drop its declaration
+### An invalid `image-set()` does not drop its declaration — **fixed**
 
-- **Tests:** `css-images/image-set/image-set-negative-resolution-rendering` and `-2`.
-- **Owner:** `Broiler.CSS` (`CssDeclarationValidator`). **Submodule** — a fix ships as a patch.
-- **What it is.** A negative resolution is a parse error, so CSS Syntax 3 §9 drops the declaration
-  whole and the one cascaded under it applies; `-2` puts a green `url()` there and expects green.
-  The renderer sees only the winning value, so refusing it there leaves the property at its
-  *initial* value rather than at the previous declaration — the fallback has to happen in the
-  cascade. `CssImageSet.TryResolveLayers` already reports the parse error separately from a
-  function that validly selects nothing, so the validator has something to call.
-- **Deliberately not fixed yet:** two tests against a third pending submodule patch is the wrong
-  trade while the first two are still waiting to be applied.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-declaration-whose-image-set-carried-a-negative-resolution-was-not-dropped).
+Both tests match at 100%; `css/css-images/image-set` goes 26 → 28 of 31.
+
+**The split this entry proposed is not available, and that is worth recording.** It read
+*"`CssImageSet.TryResolveLayers` already reports the parse error … so the validator has
+something to call"* — but `CssImageSet` lives in `Broiler.Layout`, which **references**
+`Broiler.CSS` and not the other way round. The check is self-contained in the cascade, so
+this one is a submodule patch with no main-repo half.
 
 ---
 
@@ -1349,10 +1419,20 @@ express those, and does not claim to.
   **82.6%** against its own reference.
 - The [path-clip work](wpt-rendering-gaps-fixed.md#clip-path-modelled-only-inset)
   landed `polygon()`, `circle()`, `ellipse()` and `url(#…)` resolution, and took this
-  test from 2.9% to 82.6% — but not over the line. `userSpaceOnUse` units on the
-  referenced `<clipPath>` are the remaining piece.
-- **Exit gate:** the test matches, with the two `clip-path-document-element` tests
-  staying passing.
+  test from 2.9% to 82.6% — but not over the line.
+- **"`userSpaceOnUse` units are the remaining piece" is stale, and re-measuring the family
+  is what shows it.** `userSpaceOnUse` is implemented and covered by
+  `Broiler.Cli.Tests/ClipPathShapeTests` for `-001`, `-003` and `-004`. Measured over
+  `css/css-masking/clip-path` on 2026-08-23: **157 of 227 pass, average 98.35%**, and the two
+  that name this entry fail with signatures that are not a units gap —
+  `userSpaceOnUse-003` at **50.0%** with *"content shifted right ~512px"*, and `-004` at
+  **83.3%** with *"extra content present in output, blank in reference"*. A shift of half the
+  1024px viewport and an over-large clip are two different bugs, and neither is "the units are
+  not read".
+- **So this is not the one-piece fix it was filed as.** Start from `-003`'s 512px offset,
+  which is the larger and the more legible of the two.
+- **Exit gate:** `-003` and `-004` match, with the two `clip-path-document-element` tests and
+  the 157 currently passing staying passing.
 
 ---
 
@@ -1386,8 +1466,24 @@ express those, and does not claim to.
   the border-box origin after the translate, so two errors cancel. And
   `visibility: hidden` takes an early return above the flood branch entirely, where an
   `feFlood` ignores its input and must still paint.
+- **Re-measured on 2026-08-23, and it is not the small job the split makes it sound.** The
+  main-repo/submodule shape is right — the region type and resolver here, a two-line call
+  there — but the *resolver* is the work, and the targets are near-misses rather than
+  blanks: `svg-filter-filter-units-user-space` **95.3%**, `svg-feflood-001` **97.6%**,
+  `empty-element-with-filter-002`/`-004` **98.7%** each, with
+  `feflood-with-filter-reference` already passing. `css/filter-effects` is 185 of 318.
+- **And one of its own tests is held up by the errors cancelling.**
+  `svg-filter-primitive-units-user-space` **passes today** because the correct local region
+  happens to land on the border-box origin after the translate — so fixing the region
+  without also moving the flood inside the transform layer is likely to *lose* it. The two
+  halves have to land together, which is what the exit gate says and what makes this a
+  feature rather than a patch. Its semantics are the real cost: `filterUnits` percentages
+  resolve against the *referencing element's* viewport (the test references one filter from
+  three different contexts, including an HTML `<div>` with a `transform`), and the primitive
+  subregion defaults to the filter region.
 - **Exit gate:** `filterUnits`/`primitiveUnits` resolve on both paths, and the flood is
-  emitted inside the transform layer.
+  emitted inside the transform layer — with `svg-filter-primitive-units-user-space` and the
+  185 currently passing staying passing.
 
 ## Dynamic stylesheets
 
@@ -1399,24 +1495,26 @@ Closed: see
 fix beside the data: one — the runner could not read a corpus path back out of the
 `file:///…` URL a script builds from `location.href`.
 
-### `document.styleSheets` lists no `<link>` sheet at all
+### A linked sheet is listed, and carries no rules
 
-- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom/Features/DocumentCollectionBinding.cs`.
-  No test on any current list is known to turn on it; it was found while fixing the entry
-  above and is recorded rather than fixed, because widening what that collection returns
-  changes what every script iterating it sees.
-- **What it is.** `GetStyleSheets` filters the document's elements to tag `style`, so an
-  external sheet is absent from `document.styleSheets` however well it loaded — measured
-  on a page whose linked sheet demonstrably applies (`getComputedStyle` reads the linked
-  colour, `document.styleSheets.length` reads `0`). CSSOM §2.2 makes the collection every
-  sheet associated with the document, `<link rel=stylesheet>` included.
-- **The fix is already written, one layer over.** A sub-document's `styleSheets` goes
-  through `DomBridge.BuildStyleSheetsCollection`, which collects `<style>` *and*
-  `IsExternalStylesheet` links, skips a disabled `<link>`, and caches per element for
-  identity. The main-document binding predates it and never adopted it, so the two
-  disagree about what a document's stylesheets are.
-- **Exit gate:** both bindings return the same collection for the same tree, with a test
-  covering a linked sheet, a `<link disabled>`, and object identity across two reads.
+- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom` (the `CSSStyleSheet` projection in
+  `DomBridge/StyleSheets.cs`, and the computed-style path).
+- **The collection itself is
+  [fixed](wpt-rendering-gaps-fixed.md#documentstylesheets-listed-no-link-sheet-at-all)** —
+  `document.styleSheets` now lists a `<link rel=stylesheet>` beside a `<style>`, in document
+  order, with a disabled `<link>` correctly out. What that made visible is two further gaps,
+  found by measuring the fixed behaviour rather than assumed:
+  1. **The listed link sheet reports zero `cssRules`.** `document.styleSheets[0].cssRules.length`
+     is `0` for a sheet that loaded and applied.
+  2. **`getComputedStyle` does not reflect a linked sheet's declarations.** On a served page
+     whose `linked.css` says `p { color: rgb(0,128,0) }`, `getComputedStyle(p).color` reads
+     `rgb(0, 0, 0)` — while the `<style>` element's own rule on the same page reads back
+     correctly.
+- **The loader is not the problem, which is the useful half.** *Rendering* the same page paints
+  the linked colour — the green pixels are there — so the sheet reaches the cascade and it is
+  the CSSOM projection that stops at the element. Do not start by looking at fetching.
+- **Exit gate:** a linked sheet's `cssRules` enumerate its rules, and `getComputedStyle` reads a
+  value the linked sheet alone supplies.
 
 ---
 
@@ -1433,16 +1531,90 @@ fix beside the data: one — the runner could not read a corpus path back out of
   5.1% square against a reference that is 94.6% `rgb(18,18,18)` + the same 5.1%
   square. **The page renders and the document element is installed.**
 - **The entire difference is the square's colour** — ours `rgb(255,0,0)`, the
-  reference's `rgb(0,0,0)`. So it is the quirk the test is named for after all: the
-  table inherits `color: red` from the `<div>` instead of falling back to the initial
-  colour, and the test says so outright — *"Test passes if there is a square filled
-  with initial color and no red"*.
-- **Exit gate:** a table does not inherit `color` from a non-body ancestor in quirks
-  mode, and the square paints the initial colour.
+  reference's `rgb(0,0,0)`.
+- **And the second diagnosis was wrong too. It is not the quirk.** The quirk is implemented
+  (`Broiler.Layout/Engine/TablesInheritColorFromBodyQuirk.cs`), including the no-body arm, and
+  `TablesInheritColorFromBodyQuirkTests.With_No_Body_Element_A_Table_Takes_The_Initial_Colour`
+  passes. Probing the real document is what settles it: after the test's script runs,
+  `document.documentElement.children` is **`HEAD,BODY,DIV`**. A `<body>` exists — and the
+  stylesheet says `body { color: red }`, which is exactly the 40 000 red pixels the runner
+  reports (a 200×200 Ahem square, `006` and `007` alike).
+- **The real cause is script timing, and it is general.** The test's comment says *"At this
+  point, the `<body>` has not been created yet"* — it removes `documentElement` mid-parse so no
+  body is ever created. Broiler runs inline scripts **after** the parse, so the body already
+  exists and is cloned along with everything else. Reproduced directly, independently of this
+  test: a script in the `<head>` reports `document.body` already present, and a script reports
+  a `<p>` that appears *after* it in the source. Both are impossible during a real parse.
+- **So this is not a quirks fix and not a small one.** Nothing in the quirk can distinguish a
+  body the document has from a body the test prevented; closing it means running scripts at
+  their position in the parse.
+- **Exit gate:** an inline script observes the document as it stands at its own position — no
+  `document.body` before the body is open, and no elements that follow it — after which
+  `006`/`007` should follow from the quirk that is already there.
 
 ---
 
 ## Text and fonts
+
+### Ruby annotations are not laid out at all
+
+- **Tests:** the whole `html-ruby-extensions/` directory — **35 failures of its 84
+  reftests**, and the largest uniform failure family outside `grid-lanes` in the
+  [#1792 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1792)
+  (`failureFamilies` heads its list with `html-ruby-extensions/html-ruby-{N}.html`, 35).
+  Twenty of that run's top forty are `grid-lanes`, which is
+  [a maintainer's call, not a defect](#grid-lanes-is-an-unshipped-draft-feature); this
+  family is the run's largest tractable one.
+- **Owner:** `Broiler.Layout` (no ruby layout model) and `Broiler.HTML`
+  (`Source/Broiler.HTML.Core/CssDefaults.cs` — the UA stylesheet has no ruby rules at
+  all). Submodule half is one block of default styles; the layout half is the feature.
+- **They are `rel=mismatch` tests, so they fail at a *100%* match, not a low one.**
+  Each test declares up to ten references that each spell out one *incorrect* way to
+  render it, and passes only by differing from every one. Broiler renders
+  `html-ruby-001` byte-identically to its `-a-ref`, whose comment reads *"incorrect
+  rendering: annotations displayed identical to base text, interleaved"*. So the
+  runner's "100.0% match" on these is the failure, not a near-miss.
+- **Root cause, and it is not the fonts.** The CJK text these tests use renders blank
+  in a bare container, which makes the failure images look like a font gap. It is not
+  — reproduce it in Latin:
+  ```sh
+  printf '%s' '<style>body{font-size:24px}</style>
+  <hr>context<ruby>BASE<rt>note</rt></ruby>after
+  <hr>context<span>BASE</span><span>note</span>after' > /tmp/ruby.html
+  dotnet run --project src/Broiler.Wpt -- --render /tmp/ruby.html
+  ```
+  Both lines render `contextBASEnoteafter`, identically. `<rt>` is an unknown inline
+  element, so its text is laid out in document order between the bases. `<rp>` is not
+  hidden either — `<ruby>BASE<rp>(</rp><rt>note</rt><rp>)</rp></ruby>` renders
+  `BASE(note)`, which is precisely the legacy fallback `<rp>` exists to give a UA that
+  has no ruby, and what Chromium suppresses.
+- **`display: ruby` already parses; nothing consumes it.** `Broiler.CSS`'s
+  `CssStyleEngine.Values.cs` accepts `ruby`, `ruby-base`, `ruby-text`,
+  `ruby-base-container` and `ruby-text-container` as valid `<display>` values with the
+  standing comment *"the layout engine does not model ruby specially yet"*, and
+  `CssBox.SizeContainment.cs` is the only file in the engine that names them.
+- **Desugaring it to existing boxes was tried and does not land.** The natural shape —
+  a box-tree fixup in the `AnonymousTableBoxes` / `DisplayContentsBoxes` pattern (both
+  in `Broiler.Layout/Engine`, called from `Broiler.HTML`'s `DomParser`) that rewrites
+  each ruby column as an `inline-block` holding an annotation block above a base
+  block — puts the
+  base **28px below** the surrounding text at 40px/em rather than on its baseline, and
+  no `vertical-align` constant fixes it, because
+  [an inline-block does not sit on the line's baseline](#an-inline-block-does-not-sit-on-the-lines-baseline)
+  in the first place. That entry is the blocker, and it is the bigger of the two.
+  A change to `SetBaseLine` to move an aligned inline-block's whole subtree was written
+  during this triage and **reverted**: the contents already move with the box, so it
+  dropped the content out of the box entirely. Do not re-try that one.
+- **Do not buy these 35 with a cosmetic rule.** `rt { vertical-align: super;
+  font-size: 50% }` plus `rp { display: none }` differs from all ten references and
+  would flip the whole family green while rendering nothing like ruby — the annotation
+  trails its base instead of centring over it. That is the
+  [fake pass](wpt-rendering-gaps-wont-fix.md) this suite is built to produce, and it
+  would move *away* from Chromium on the golden-image suite, which does render real
+  ruby. The UA rules are worth landing only together with the layout.
+- **Exit gate:** `html-ruby-001` renders its annotations above their correct bases and
+  differs from all ten of its references, with the `html-ruby-extensions` directory
+  going 49/84 → most of 84 and the golden-image suite not losing ruby tests.
 
 ### Bold and italic never reach the face
 
@@ -1572,16 +1744,16 @@ None of the four declares a `rel=match`.
 
 ## Runner and harness
 
-### The runner resolves scroll metrics against the wrong viewport
+### The runner resolves scroll metrics against the wrong viewport — **fixed**
 
-`new WptTestRunner(w, h)` renders at the given size, but the scroll metrics — `vh`
-lengths and the maximum scroll offset — resolve against the default 1024×768
-regardless. A page built to be "taller than the viewport" at 200×200 therefore
-scrolls to somewhere that is not the bottom of the canvas, and a test asserting on
-what is on screen fails for a reason that has nothing to do with what it is testing.
-`ScrollClampingTests` and `ViewTransitionOldCaptureScrollTests` pin their renders to
-the default size to work around it. **A real defect in the runner, not just a
-test-authoring trap.**
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#the-bridge-resolved-every-viewport-question-against-1024768-whatever-the-run-rendered-at).
+`DomBridge` held its viewport at 1024×768 and nothing ever assigned it, so
+`window.innerWidth`/`innerHeight`, `vw`/`vh`, media queries and the maximum scroll offset
+all answered for a viewport the render did not use. The size the runner renders at is now
+carried onto the bridge, and `ScrollClampingTests` gained two cases at 200×200 — the sizes
+the old ones could not tell apart. Layout was never affected, which is why this only ever
+showed up through a script.
 
 ### `?pipe=` is not emulated
 

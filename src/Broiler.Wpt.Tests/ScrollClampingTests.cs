@@ -102,4 +102,49 @@ public class ScrollClampingTests : IDisposable
         Assert.True(body > 0);
         Assert.True(canvas < body);
     }
+
+    /// <summary>
+    /// The clamp has to be computed against the size the run actually renders at, not against the
+    /// bridge's own default.
+    /// </summary>
+    /// <remarks>
+    /// The tests above all render at 1024×768 — the bridge's built-in default — and passed for that
+    /// reason rather than on their own merits: <c>vh</c> lengths and the maximum scroll offset
+    /// resolved against 1024×768 whatever size the runner was constructed with, so a page built to
+    /// be taller than *its* viewport scrolled to somewhere that was not the bottom of the canvas.
+    /// This renders the same page small, where the two sizes disagree and the mismatch shows.
+    /// </remarks>
+    [Fact(Timeout = 600000)]
+    public void TheEndOfTheScrollRangeIsTheRenderedViewportNotTheDefaultOne()
+    {
+        // 400vh of content in a 200×200 viewport: scrolling past the end must still come to rest
+        // with the body filling the view, exactly as it does at the default size.
+        var (canvas, body) = Render("window.scrollTo(0, 1e9);", w: 200, h: 200);
+
+        Assert.True(body > canvas,
+            $"expected the body to still fill most of the 200x200 viewport (body={body}, canvas={canvas})");
+    }
+
+    /// <summary>
+    /// <c>window.innerWidth</c>/<c>innerHeight</c> report the size the run renders at.
+    /// </summary>
+    /// <remarks>
+    /// This is the script-visible half of the same defect, and it is worth its own test because
+    /// *layout* was never wrong: the engine is handed the real width and height, so a <c>vh</c>
+    /// length in a stylesheet already resolved correctly. Only the bridge disagreed, which is
+    /// exactly the split that makes the bug hard to see — the page looks right and the script
+    /// reading its geometry is told something else.
+    /// </remarks>
+    [Fact(Timeout = 600000)]
+    public void WindowInnerSizeReportsTheRenderedViewport()
+    {
+        // The body is hidden unless the script sees the size it is actually being rendered at, so a
+        // bridge still reporting its 1024x768 default paints no body at all.
+        var (_, body) = Render(
+            "if (window.innerWidth !== 200 || window.innerHeight !== 200)" +
+            " { document.body.style.display = 'none'; }", w: 200, h: 200);
+
+        Assert.True(body > 0,
+            "window.innerWidth/innerHeight should report 200x200, the size this render was asked for");
+    }
 }

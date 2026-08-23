@@ -281,6 +281,21 @@ over the whole suite; `css/css-display` had just 9, of which the top-thirty entr
 Neither is visible as a *cluster* from the severity ranking, which by design shows
 one line per test.
 
+**#1792 is the third run where that grouping beat the ranking, and the cleanest
+example of why.** Its top forty opens with the same three unwinnables, spends twenty
+of its forty lines on
+[`grid-lanes`](wpt-rendering-gaps-open.md#grid-lanes-is-an-unshipped-draft-feature)
+(a maintainer's call, not a defect) and nine more on the
+[`-print` corpus](wpt-rendering-gaps-open.md#a--print-document-renders-on-the-viewport-not-on-the-page-it-declares),
+so almost nothing on it is startable. The manifest's `failureFamilies` list, by
+contrast, *heads* with `html-ruby-extensions/html-ruby-{N}.html` at 35 — a family
+that appears nowhere in the top forty, because
+[ruby is unimplemented](wpt-rendering-gaps-open.md#ruby-annotations-are-not-laid-out-at-all)
+and every one of the 35 therefore fails at a **100% match** against a `rel=mismatch`
+reference. A severity ranking sorted by *lowest* match cannot show a family that
+fails at the highest possible number, which is the structural blind spot the grouping
+covers.
+
 ```sh
 python3 - <<'PY'
 import json, collections

@@ -44,19 +44,35 @@ public sealed partial class DomBridge
     {
         foreach (var element in root.Descendants().OfType<DomElement>())
         {
-            if (!(string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase) || IsExternalStylesheet(element)))
-                continue;
-
-            // A disabled <link> has no associated CSS style sheet, so it is absent from
-            // document.styleSheets (HTML §4.2.4 <link disabled>). A <style> whose sheet was
-            // disabled via CSSOM (CSSStyleSheet.disabled) still appears in the collection —
-            // only its rules stop applying — so it is not filtered here.
-            if (IsStyleSheetDisabled(element) &&
-                string.Equals(element.TagName, "link", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            results.Add(element);
+            if (HasAssociatedStyleSheet(element))
+                results.Add(element);
         }
+    }
+
+    /// <summary>
+    /// Whether the element has an associated CSS style sheet, and so belongs in a document's
+    /// <c>styleSheets</c> collection (CSSOM §2.2).
+    /// </summary>
+    /// <remarks>
+    /// Shared with the main-document binding through
+    /// <see cref="Dom.Features.IDocumentCollectionHost.HasAssociatedStyleSheet"/>. It is factored
+    /// out precisely because the two collections disagreed: this one has always counted
+    /// <c>&lt;link rel=stylesheet&gt;</c>, and the main document's filtered to tag <c>style</c>, so
+    /// the same tree answered two different things depending on which document was asked.
+    /// <para>
+    /// A disabled <c>&lt;link&gt;</c> has no associated sheet, so it is absent (HTML §4.2.4
+    /// <c>&lt;link disabled&gt;</c>). A <c>&lt;style&gt;</c> whose sheet was disabled through CSSOM
+    /// (<c>CSSStyleSheet.disabled</c>) still appears — only its rules stop applying — so it is not
+    /// filtered here.
+    /// </para>
+    /// </remarks>
+    private bool HasAssociatedStyleSheet(DomElement element)
+    {
+        bool isStyle = string.Equals(element.TagName, "style", StringComparison.OrdinalIgnoreCase);
+        if (!isStyle && !IsExternalStylesheet(element))
+            return false;
+
+        return !(!isStyle && IsStyleSheetDisabled(element));
     }
 
     /// <summary>

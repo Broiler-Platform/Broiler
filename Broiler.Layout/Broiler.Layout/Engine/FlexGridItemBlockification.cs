@@ -117,6 +117,104 @@ internal static class FlexGridItemBlockification
         && IsInFlowItem(box);
 
     /// <summary>
+    /// Whether a replaced box that is about to be wrapped in an anonymous block — because it is a
+    /// <em>column</em> flex item, which <see cref="IsRowFlexItem"/> deliberately does not exempt —
+    /// must be made to fill that wrapper, because the item it becomes will be stretched across the
+    /// flex line (CSS Flexbox §9.4 step 11).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The wrapper is an implementation artifact: to the spec the replaced element <em>is</em> the
+    /// flex item, and stretching it is what gives it its cross size. With the wrapper in between,
+    /// the stretch lands on the wrapper and the image inside keeps an <c>auto</c> width — which for
+    /// an inline replaced box with no intrinsic size means the 300×150 default object size. So
+    /// <c>&lt;div style="display:flex;flex-direction:column"&gt;&lt;img&gt;</c> holding an SVG sized
+    /// <c>100%</c> with a 2:1 <c>viewBox</c> painted a 300×150 rectangle where every browser paints
+    /// one the full width of the container, its height derived through the ratio
+    /// (<c>css-flexbox/aspect-ratio-intrinsic-size-007</c>).
+    /// </para>
+    /// <para>
+    /// The conditions are §9.4 step 11's own, asked before layout: the item resolves to
+    /// <c>stretch</c>, its cross size is <c>auto</c>, and neither cross-axis margin is <c>auto</c>.
+    /// A container that aligns its items any other way leaves the wrapper to shrink-wrap, and
+    /// filling it would then be circular. It is the same trade the auto-side-margin case in the
+    /// wrapping fix-up already makes, and it lives here beside <see cref="IsRowFlexItem"/> so the
+    /// two readings of "what is the item" cannot drift apart.
+    /// </para>
+    /// <para>
+    /// <b>Two further conditions are what make <c>width: 100%</c> an exact stand-in for the
+    /// stretch rather than an approximation of it, and both were found by measuring.</b> A
+    /// percentage width sizes the <em>content</em> box while a stretch sizes the <em>border</em>
+    /// box, so the two agree only when the replaced element has no inline-axis padding or border —
+    /// with <c>img { padding: 20px }</c> in a 240px container the shortcut overflows by exactly the
+    /// padding (<c>flex-aspect-ratio-intrinsic-padding-001</c>, whose assertion names the content
+    /// box outright). And the container's cross size has to come from outside rather than from its
+    /// own contents: an <c>inline-flex</c> column container shrink-wraps to its items, so an item
+    /// declared <c>100%</c> of it contributes nothing to the size it is a percentage of, and the
+    /// container collapses (<c>inline-flex-column-image-load</c>). Both of those pass today and
+    /// must keep passing.
+    /// </para>
+    /// <para>
+    /// Outside those conditions the stretch still belongs on the replaced element and is still not
+    /// applied — that is the general form of this gap, and it wants the cross size pushed onto the
+    /// box during flex layout rather than a declaration rewritten before it.
+    /// </para>
+    /// </remarks>
+    internal static bool IsStretchedColumnFlexItem(CssBox box)
+    {
+        if (box?.ParentBox is not { } parent)
+            return false;
+
+        // `inline-flex` is deliberately excluded: its cross size is shrink-to-fit, so a
+        // percentage against it is circular. Only a block-level `flex` container's cross size is
+        // settled without consulting the item.
+        if (parent.Display != "flex" || !parent.IsColumnFlexContainer() || !IsInFlowItem(box))
+            return false;
+
+        // `align-self: auto` defers to the container's `align-items`; `normal` behaves as
+        // `stretch` for a flex item, and it is what an unstyled container has.
+        var align = box.AlignSelf;
+        if (string.IsNullOrEmpty(align) || align is "auto")
+            align = parent.AlignItems;
+        if (!(string.IsNullOrEmpty(align) || align is "normal" or "stretch"))
+            return false;
+
+        if (!string.IsNullOrEmpty(box.Width) && box.Width != CssConstants.Auto)
+            return false;
+
+        if (box.MarginLeft == CssConstants.Auto || box.MarginRight == CssConstants.Auto)
+            return false;
+
+        return !HasInlineAxisSpacing(box);
+    }
+
+    /// <summary>
+    /// Whether the box has any inline-axis padding or border, which is what separates a
+    /// content-box percentage width from a border-box stretch.
+    /// </summary>
+    private static bool HasInlineAxisSpacing(CssBox box) =>
+        !IsZeroLength(box.PaddingLeft)
+        || !IsZeroLength(box.PaddingRight)
+        || DrawsBorder(box.BorderLeftStyle, box.BorderLeftWidth)
+        || DrawsBorder(box.BorderRightStyle, box.BorderRightWidth);
+
+    private static bool IsZeroLength(string? value)
+    {
+        var v = value?.Trim();
+        return string.IsNullOrEmpty(v) || v is "0" or "0px" or "0%" or "0em" or "0rem";
+    }
+
+    /// <summary>A border occupies space only when its style is neither <c>none</c> nor
+    /// <c>hidden</c>; the <c>medium</c> default width means nothing on its own.</summary>
+    private static bool DrawsBorder(string? style, string? width)
+    {
+        var s = style?.Trim();
+        if (string.IsNullOrEmpty(s) || s is CssConstants.None or "hidden")
+            return false;
+        return !IsZeroLength(width);
+    }
+
+    /// <summary>
     /// CSS Flexbox §4 / CSS Grid §6: "each contiguous sequence of child text runs is wrapped in an
     /// anonymous block container flex item… However, if the entire sequence of child text runs
     /// contains only white space it is instead not rendered."

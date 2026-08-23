@@ -1218,6 +1218,61 @@ internal static partial class SvgRenderer
         return ParseColorValue(val, defaultColor);
     }
 
+    /// <summary>
+    /// The colour the root <c>&lt;svg&gt;</c> element declares as its background, if any.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// CSS Backgrounds §2.11.2 makes the root element's background the canvas's. For an SVG document
+    /// used <em>as an image</em> that canvas is the destination box, and nothing painted it — a file
+    /// opening <c>&lt;svg style="background: black"&gt;</c> came back transparent, so a document
+    /// drawing tinted shapes over a dark ground rendered them on white instead.
+    /// </para>
+    /// <para>
+    /// Only <see cref="SvgImageRaster"/> asks. An <em>inline</em> <c>&lt;svg&gt;</c> is an ordinary
+    /// element whose CSS box already paints its background, so painting it here as well would double
+    /// a translucent colour over itself; an image has no box to have done it.
+    /// </para>
+    /// <para>
+    /// <c>background</c> is a shorthand, so its colour is taken as the last component that parses as
+    /// one — which covers <c>background: green</c>, <c>background: #001</c> and
+    /// <c>background: url(x) navy</c> alike. <c>background-color</c> is preferred when both are
+    /// present, matching the cascade's own order for a longhand written after the shorthand.
+    /// </para>
+    /// </remarks>
+    internal static bool TryGetRootBackgroundColor(string svgXml, out BColor color)
+    {
+        color = BColor.Empty;
+        if (string.IsNullOrEmpty(svgXml))
+            return false;
+
+        var svgMatch = ParseRegex().Match(svgXml);
+        if (!svgMatch.Success)
+            return false;
+
+        var attrs = ParseAttributes(svgMatch.Groups[1].Value);
+
+        var longhand = GetPresentationValue(attrs, "background-color");
+        if (!string.IsNullOrWhiteSpace(longhand))
+        {
+            color = ParseColorValue(longhand.Trim(), BColor.Empty);
+            return !color.IsEmpty && color.A > 0;
+        }
+
+        var shorthand = GetPresentationValue(attrs, "background");
+        if (string.IsNullOrWhiteSpace(shorthand))
+            return false;
+
+        foreach (var token in shorthand.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parsed = ParseColorValue(token.Trim(), BColor.Empty);
+            if (!parsed.IsEmpty)
+                color = parsed;
+        }
+
+        return !color.IsEmpty && color.A > 0;
+    }
+
     /// <summary>Parses one already-resolved colour value; <c>none</c> and empty are "no paint".</summary>
     private static BColor ParseColorValue(string val, BColor defaultColor)
     {

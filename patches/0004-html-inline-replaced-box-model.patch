@@ -1,0 +1,53 @@
+From 0eb8584fef44a68722e328e2198e4343b424419b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 23 Aug 2026 12:20:07 +0000
+Subject: [PATCH] geometry: deflate an inline replaced box's padding and
+ content rects
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A display:inline box lays out as one rectangle per line rather than as a single
+border box, so the geometry collector rebuilds its border box from the union of
+those rectangles — and then set all three box-model levels to that same
+rectangle, on the stated grounds that inline boxes contribute no box-model
+padding or border to line geometry here.
+
+That premise holds for a non-replaced inline and not for a replaced one.
+CssLineBox.UpdateRectangle adds an image's border and padding to its line
+rectangle explicitly, and MeasureImageSize adds them in the block axis, so the
+union really is the border box and the other two levels have to be deflated out
+of it. <img style='width:50px;height:30px;border:3px;padding:4px'> reported
+getBoundingClientRect 64x44 — right — and clientWidth/clientHeight 64x44 too,
+where the client box excludes the border and must be 58x38. The same
+declarations on a <div> already reported 58x38, so the two paths disagreed with
+each other as well as with the spec.
+
+The split is BoxGeometry.ForInlineBox in Broiler.Layout, which owns the
+replaced/non-replaced distinction and the arithmetic; this is the call.
+---
+ Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+index f681d0a..5faf76f 100644
+--- a/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
++++ b/Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
+@@ -1004,9 +1004,11 @@ public sealed class HtmlContainerInt : IHtmlContainerInt, IDisposable
+             if (borderBox is { Width: 0, Height: 0 } && box.Rectangles.Count > 0)
+             {
+                 borderBox = UnionLineRectangles(box.Rectangles.Values);
+-                // Inline boxes contribute no box-model padding/border to line
+-                // geometry in this engine, so all three levels coincide.
+-                result[element] = new BoxGeometry(borderBox, borderBox, borderBox);
++                // A non-replaced inline contributes no box-model padding/border to line geometry
++                // in this engine, so its three levels coincide — but a *replaced* one's do not:
++                // the line rectangle already includes its border and padding, so they have to be
++                // deflated back out. BoxGeometry.ForInlineBox owns that split.
++                result[element] = BoxGeometry.ForInlineBox(borderBox, box);
+             }
+             else
+             {
+-- 
+2.43.0
+

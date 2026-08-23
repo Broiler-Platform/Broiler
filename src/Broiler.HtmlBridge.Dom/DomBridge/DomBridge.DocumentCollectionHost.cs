@@ -25,4 +25,7 @@ public sealed partial class DomBridge : Dom.Features.IDocumentCollectionHost
 
     JSObject Dom.Features.IDocumentCollectionHost.BuildStyleSheetObject(DomElement styleElement)
         => BuildStyleSheetObject(styleElement);
+
+    bool Dom.Features.IDocumentCollectionHost.HasAssociatedStyleSheet(DomElement element)
+        => HasAssociatedStyleSheet(element);
 }

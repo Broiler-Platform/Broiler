@@ -117,6 +117,9 @@ internal partial class CssBox : CssBoxProperties, IDisposable
         return direction is not ("column" or "column-reverse");
     }
 
+    /// <summary>A flex container whose main axis is the block axis, so its cross axis is inline.</summary>
+    internal bool IsColumnFlexContainer() => IsFlexContainer() && !IsRowFlexContainer();
+
     internal void PerformFlexRowLayout(ILayoutEnvironment g)
     {
         using var trace = LayoutWorkTrace.Measure(LayoutWorkTrace.Ops.Flex);
