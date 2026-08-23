@@ -31,6 +31,7 @@ succeeding and it is skipped rather than re-applied.
 | --- | --- | --- |
 | `0001-html-svg-viewbox-intrinsic-ratio.patch` | `Broiler.HTML` | An SVG image's `viewBox` gives it an intrinsic aspect ratio whatever `preserveAspectRatio` says (SVG 2 §8.2), and an absolute `width`/`height` it states is reported even when the other one is missing. Listed in the apply script. |
 | `0002-html-affine-transform-layer.patch` | `Broiler.HTML` | A rotated or skewed element is resampled through its matrix instead of being dropped on the floor: `transform: rotate(45deg)` painted a blank page and took its whole subtree with it. Pairs with `Broiler.Layout.IR.AffineLayerMap` in the main repo. Listed in the apply script. |
+| `0003-html-column-flex-image-stretch.patch` | `Broiler.HTML` | A column flex item's cross-axis stretch reaches the image inside the anonymous wrapper that became the item, instead of leaving it at the 300×150 default object size. Pairs with `Broiler.Layout.Engine.FlexGridItemBlockification.IsStretchedColumnFlexItem` in the main repo. Listed in the apply script. |
 
 ### `0001-html-svg-viewbox-intrinsic-ratio.patch`
 
@@ -98,3 +99,42 @@ carefully:
   the reference is Chromium's render rather than Broiler's: **192 of the 6 914
   golden-image failures declare a rotation or skew**, and a blank render can only
   lose against a reference that shows the rotated content.
+
+### `0003-html-column-flex-image-stretch.patch`
+
+A block-level image inside a flex or grid container is wrapped in an anonymous block
+(`DomParser.CorrectImgBoxes`), and for a **column** container that wrapper becomes the
+flex item — `FlexGridItemBlockification.IsRowFlexItem` exempts only *row* containers,
+deliberately, because block flow cannot position a block-level replaced box on its own.
+The cross-axis stretch therefore lands on the wrapper while the image inside keeps an
+`auto` width, which for an inline replaced box with no intrinsic size means the 300×150
+default object size. To the spec the image *is* the item, so it has to fill what was
+stretched.
+
+**The main-repo half carries the decision and the submodule half is one call**, which is
+the shape `CLAUDE.md` recommends: the patch is 16 lines, and
+`IsStretchedColumnFlexItem` — with the conditions, the reasoning and the counter-examples
+— sits beside the `IsRowFlexItem` this fix-up already asks, so the two readings of "what
+is the item" cannot drift apart. The predicate is asked *before* the reparent, while the
+image is still the container's own child and still carries the width, margins and
+alignment CSS Flexbox §9.4 step 11 turns on.
+
+**Measured over `css/css-flexbox`, 644 reftests: 436 → 438 passing, +2 / −0**
+(`aspect-ratio-intrinsic-size-007` and `flex-svg-no-intrinsic-column-001`).
+`css/css-images` (271/439), `css/css-masking/clip-path` (157/227) and `quirks` (21/25) do
+not move, and `Broiler.Wpt.Tests` holds at its 54 pre-existing failures.
+
+**Two conditions in the predicate exist because the first attempt lost two tests**, and
+they are worth keeping in mind for the general form of this gap. A percentage width sizes
+the *content* box while a stretch sizes the *border* box, so `width: 100%` is an exact
+stand-in only when the image has no inline-axis padding or border —
+`flex-aspect-ratio-intrinsic-padding-001`, whose assertion names the content box outright,
+overflowed by exactly its `padding: 20px`. And the container's cross size has to come from
+outside rather than from its contents: an `inline-flex` column container shrink-wraps to
+its items, so an item declared `100%` of it contributes nothing to the size it is a
+percentage of and the container collapses (`inline-flex-column-image-load`). Both of those
+passed before and pass now.
+
+**Outside those conditions the stretch still belongs on the replaced element and is still
+not applied.** That is the general form, and it wants the cross size pushed onto the box
+during flex layout rather than a declaration rewritten before it.
