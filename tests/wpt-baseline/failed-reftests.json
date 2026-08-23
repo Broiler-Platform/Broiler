@@ -1,9 +1,9 @@
 {
   "summary": {
     "passed": 0,
-    "failed": 1080,
+    "failed": 1081,
     "skipped": 0,
-    "total": 1080
+    "total": 1081
   },
   "shardCount": 8,
   "problemLimit": 10,
@@ -15,7 +15,7 @@
       "label": "PixelMismatch / MissingContent",
       "category": "PixelMismatch",
       "subCategory": "MissingContent",
-      "count": 573,
+      "count": 574,
       "examples": [
         "css/compositing/root-element-background-image-transparency-003.html",
         "css/css-backgrounds/box-shadow/box-shadow-table-row-display.html",
@@ -138,7 +138,7 @@
   "failuresByCategory": [
     [
       "PixelMismatch",
-      1080
+      1081
     ]
   ],
   "droppedDeclarations": [],
@@ -5664,6 +5664,13 @@
     },
     {
       "relativeTestPath": "css/css-ui/box-sizing-007.html",
+      "passed": false,
+      "skipped": false,
+      "category": "PixelMismatch",
+      "subCategory": "MissingContent"
+    },
+    {
+      "relativeTestPath": "css/css-ui/box-sizing-008.html",
       "passed": false,
       "skipped": false,
       "category": "PixelMismatch",
