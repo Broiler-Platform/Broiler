@@ -1,0 +1,3430 @@
+From 659ebea037f33b9462b0adfdcc2661497455f256 Mon Sep 17 00:00:00 2001
+From: MaiRat <enrico.bartky@gmail.com>
+Date: Sun, 23 Aug 2026 23:30:46 +0000
+Subject: [PATCH] Resolve property escapes, evaluate v-mode class sets, and
+ fold from the UCD
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Track 2 of the Broiler.JS gaps roadmap asks for three things Broiler.Regex parsed but
+did not implement, and they turn out to be one problem: every character class is a set,
+and the engine had no set.
+
+`\p{…}` / `\P{…}` now resolve against the pinned Broiler.Unicode range tables — the same
+generated UCD revision the JavaScript layer's translator reads, so the two cannot
+disagree about a property's members. General_Category (lone value and the `gc=`
+dimension), binary properties with their ECMAScript aliases, `Script`,
+`Script_Extensions`, and the UTS #51 properties of strings all resolve; an unknown name
+is a located syntax error rather than a silent mis-match.
+
+`v`-mode class-set expressions are evaluated rather than skipped: nesting, `&&`, `--`
+and `\q{…}` string alternatives, over a new CodePointSet that carries the union,
+intersection, difference and complement the grammar needs. A class holding
+multi-code-point members compiles to a longest-first alternation, which is the one
+CharSet that is not a single-character matcher. The ordering that matters is §22.2.1
+MaybeSimpleCaseFolding *before* §22.2.2.9 CharacterComplement, whose universe under `vi`
+is only the code points that fold to themselves — that is the entire reason `[^\p{Lu}]`
+matches neither `A` nor `a` under `vi` while it matches `a` under `ui`.
+
+Canonicalize is table-driven from the Unicode Character Database instead of `char`/`Rune`
+casing plus five hand-written special cases. Two consequences are observable. `İ` and `ı`
+have no simple case folding, so neither is case-equivalent to an ASCII `i` any more; the
+old ToLowerInvariant derivation folded both to `i`. And WordCharacters now widens `\w`
+under `iu` from the fold table, so `/\W/iu` rejects `ſ` and `\b` agrees with `\w` about
+it. The inverse fold orbits come from the same table, which is what lets class membership
+answer "does any member canonicalize to this?" without canonicalizing 130,000 members.
+
+Six Annex B boundaries came out of differential testing rather than the roadmap. `\u{…}`
+was read as a code point without the `u` flag (it is the identity escape `u` there); a
+bare `]`/`{`/`}` was a literal in Unicode mode; a class escape was accepted as a range
+endpoint in Unicode mode; `\-` was rejected inside a class; a quantifier was silently
+dropped after every assertion, where Annex B admits one after a look-ahead and forbids it
+everywhere else; and `\k<n>` was a broken reference in a pattern that declares no group
+name, where it is the literal text "k<n>".
+
+247 tests, up from 57. Beyond those, 220,172 differential pattern/flag/input cases were
+compared against V8 on match index and every capture — three hand-built corpora and one
+seeded fuzz. Two mismatches remain, both deliberate and both recorded in the README with
+a test that pins them: under `vi` the spec folds a lone binary property's set and a
+one-character `\q{…}` alternative, and V8 folds neither consistently.
+---
+ Broiler.Regex.Tests/AnnexBGrammarTests.cs     | 151 ++++
+ Broiler.Regex.Tests/CanonicalizeTests.cs      | 119 ++++
+ Broiler.Regex.Tests/SyntaxTests.cs            |  12 +-
+ .../UnicodePropertyEscapeTests.cs             | 100 +++
+ Broiler.Regex.Tests/UnicodeSetsTests.cs       | 210 ++++++
+ Broiler.Regex/Ast/CharSet.cs                  | 143 ++--
+ Broiler.Regex/Ast/CodePointSet.cs             | 201 ++++++
+ Broiler.Regex/Broiler.Regex.csproj            |  27 +-
+ Broiler.Regex/Matching/Matcher.cs             |  77 +-
+ Broiler.Regex/Parsing/RegexParser.cs          | 661 ++++++++++++++++--
+ Broiler.Regex/README.md                       |  65 +-
+ Broiler.Regex/Unicode/CaseFolding.cs          | 297 ++++----
+ .../Unicode/Generated/CaseFoldingData.g.cs    | 125 ++++
+ Broiler.Regex/Unicode/UnicodeCharSets.cs      | 270 ++++++-
+ Broiler.Regex/Unicode/tools/README.md         |  31 +
+ .../Unicode/tools/generate-case-folding.py    | 183 +++++
+ Broiler.Regex/docs/ecmascript-mapping.md      |  30 +-
+ THIRD_PARTY_NOTICES.md                        |  15 +
+ docs/roadmap.md                               |  41 +-
+ 19 files changed, 2445 insertions(+), 313 deletions(-)
+ create mode 100644 Broiler.Regex.Tests/AnnexBGrammarTests.cs
+ create mode 100644 Broiler.Regex.Tests/CanonicalizeTests.cs
+ create mode 100644 Broiler.Regex.Tests/UnicodePropertyEscapeTests.cs
+ create mode 100644 Broiler.Regex.Tests/UnicodeSetsTests.cs
+ create mode 100644 Broiler.Regex/Ast/CodePointSet.cs
+ create mode 100644 Broiler.Regex/Unicode/Generated/CaseFoldingData.g.cs
+ create mode 100644 Broiler.Regex/Unicode/tools/README.md
+ create mode 100644 Broiler.Regex/Unicode/tools/generate-case-folding.py
+ create mode 100644 THIRD_PARTY_NOTICES.md
+
+diff --git a/Broiler.Regex.Tests/AnnexBGrammarTests.cs b/Broiler.Regex.Tests/AnnexBGrammarTests.cs
+new file mode 100644
+index 0000000..164b04b
+--- /dev/null
++++ b/Broiler.Regex.Tests/AnnexBGrammarTests.cs
+@@ -0,0 +1,151 @@
++namespace Broiler.Regex.Tests;
++
++/// <summary>
++/// Where the Annex B (non-Unicode) grammar and the strict Unicode grammar disagree. Each
++/// case below came out of a differential run against V8: the same pattern is a literal in
++/// one mode and a syntax error in the other, and getting that boundary wrong silently
++/// changes what a legacy pattern matches.
++/// </summary>
++public class AnnexBGrammarTests
++{
++    private static string? Match(string pattern, string flags, string input)
++    {
++        var m = new BroilerRegex(pattern, flags).Match(input);
++        return m.Success ? m.Value : null;
++    }
++
++    [Theory]
++    // `\u{…}` is a code-point escape only in Unicode mode. Outside it, `\u` is the identity
++    // escape `u` and the braces are an ordinary quantifier or literal text.
++    [InlineData(@"\u{2}", "uu")]
++    [InlineData(@"\u", "u")]
++    [InlineData(@"\uZZ", "uZZ")]
++    [InlineData(@"\u12", "u12")]
++    [InlineData(@"\x", "x")]
++    [InlineData(@"\xZZ", "xZZ")]
++    public void MalformedHexEscape_IsAnIdentityEscapeOutsideUnicodeMode(string pattern, string input)
++        => Assert.Equal(input, Match(pattern, "", input));
++
++    [Fact(Timeout = 600000)]
++    public void BracedUnicodeEscape_IsACodePointOnlyInUnicodeMode()
++    {
++        Assert.Equal("\U0001F600", Match(@"\u{1F600}", "u", "\U0001F600"));
++        Assert.Null(Match(@"\u{1F600}", "", "\U0001F600"));
++        // …which is what makes this class a range from '}' to 'u' — out of order, and so a
++        // syntax error rather than an emoji range.
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"[\u{1F600}-\u{1F64F}]", ""));
++    }
++
++    [Theory]
++    // Unicode mode drops Annex B's ExtendedPatternCharacter, so these stand for themselves
++    // only without `u`/`v`.
++    [InlineData("]")]
++    [InlineData("}")]
++    [InlineData("{")]
++    [InlineData("a{")]
++    [InlineData("a{1")]
++    public void UnescapedBraceOrBracket_IsLiteralOnlyOutsideUnicodeMode(string pattern)
++    {
++        Assert.NotNull(Match(pattern, "", pattern));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, "u"));
++    }
++
++    [Theory]
++    // A range endpoint that is itself a class is an early error in Unicode mode; Annex B
++    // rescues it as a literal '-' between the two atoms.
++    [InlineData(@"[\d-a]")]
++    [InlineData(@"[a-\d]")]
++    [InlineData(@"[\w-\d]")]
++    public void ClassEscapeAsRangeEndpoint_IsAnErrorOnlyInUnicodeMode(string pattern)
++    {
++        Assert.Equal("-", Match(pattern, "", "-"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, "u"));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void PropertyEscapeAsRangeEndpoint_FailsForADifferentReasonInEachMode()
++    {
++        // Unicode mode: `\p{L}` is a class, so it cannot end a range. Without the flag it
++        // is the six characters `p{L}` — and the class then asks for the range `}` to `a`,
++        // which is out of order.
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"[\p{L}-a]", "u"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"[\p{L}-a]", ""));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void TrailingDashInAClassStaysLiteralInBothModes()
++    {
++        Assert.Equal("-", Match(@"[\d-]", "u", "-"));
++        Assert.Equal("-", Match("[-a]", "u", "-"));
++        Assert.Equal("-", Match("[a-]", "u", "-"));
++    }
++
++    [Theory]
++    // Annex B `ExtendedTerm :: QuantifiableAssertion Quantifier` — a look-AHEAD, and only
++    // a look-ahead, may carry a quantifier outside Unicode mode.
++    [InlineData(@"(?!a)+", "b")]
++    [InlineData(@"(?!a)*", "b")]
++    [InlineData(@"(?!a){1,3}", "b")]
++    [InlineData(@"(?!a)+?", "b")]
++    [InlineData(@"(?=a){0}", "b")]
++    public void QuantifiedLookahead_IsAllowedOutsideUnicodeMode(string pattern, string input)
++    {
++        Assert.Equal("", Match(pattern, "", input));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, "u"));
++    }
++
++    [Theory]
++    // Every other assertion is unquantifiable in both modes.
++    [InlineData(@"(?<!a){2,}")]
++    [InlineData(@"(?<=a)*")]
++    [InlineData(@"(?<!a)?")]
++    [InlineData("^{2}")]
++    [InlineData("^*")]
++    [InlineData("^{2,}")]
++    [InlineData(@"\b*")]
++    [InlineData(@"\B{1}")]
++    [InlineData("$?")]
++    public void QuantifiedNonLookahead_IsASyntaxError(string pattern)
++    {
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, ""));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, "u"));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void ABraceThatIsNotAQuantifierStillFollowsAnAssertion()
++    {
++        // `{a}` cannot be a quantifier, so it is literal text after the anchor — only a
++        // well-formed `{n,m}` makes the assertion a quantified one.
++        Assert.Equal("{a}", Match("^{a}", "", "{a}"));
++        Assert.Null(Match(@"\b{a}", "", "{a}"));
++        Assert.Equal("{", Match("^{", "", "{"));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void NamedBackreferenceNeedsADeclaredNameSomewhereOutsideUnicodeMode()
++    {
++        // With no GroupName anywhere, Annex B reads `\k` as the identity escape `k`, so
++        // the pattern is the literal text "k<n>" rather than a reference to nothing.
++        Assert.Equal("k<n>", Match(@"\k<n>", "", "k<n>"));
++        Assert.Equal("k", Match(@"\k", "", "k"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"\k<n>", "u"));
++
++        // Once the pattern declares one, `\k` is a reference again — including a forward
++        // one — and naming a group that does not exist is an error.
++        Assert.Equal("aa", Match(@"(?<n>a)\k<n>", "", "aa"));
++        Assert.Equal("a", Match(@"\k<n>(?<n>a)", "", "a"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"(?<n>a)\k<m>", ""));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void EscapedDashIsAClassEscapeButNotAnIdentityEscape()
++    {
++        // `ClassEscape :: -` makes `\-` a literal hyphen inside a class in every mode,
++        // while outside a class Unicode mode admits only a SyntaxCharacter or '/'.
++        Assert.Equal("-", Match(@"[\-]", "u", "-"));
++        Assert.Equal("-", Match(@"[a\-z]", "u", "-"));
++        Assert.Equal("-", Match(@"[\-]", "v", "-"));
++        Assert.Equal("-", Match(@"\-", "", "-"));
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"\-", "u"));
++    }
++}
+diff --git a/Broiler.Regex.Tests/CanonicalizeTests.cs b/Broiler.Regex.Tests/CanonicalizeTests.cs
+new file mode 100644
+index 0000000..f7640e2
+--- /dev/null
++++ b/Broiler.Regex.Tests/CanonicalizeTests.cs
+@@ -0,0 +1,119 @@
++namespace Broiler.Regex.Tests;
++
++/// <summary>
++/// ECMA-262 §22.2.2.9.4 Canonicalize, now table-driven from the pinned Unicode Character
++/// Database rather than from <c>char</c>/<c>Rune</c> casing plus five hand-written special
++/// cases (Broiler.JS gaps roadmap, track 2 action 3).
++/// </summary>
++public class CanonicalizeTests
++{
++    private static string? Match(string pattern, string flags, string input)
++    {
++        var m = new BroilerRegex(pattern, flags).Match(input);
++        return m.Success ? m.Value : null;
++    }
++
++    [Theory]
++    // Unicode mode canonicalizes with CaseFolding.txt's common+simple mapping…
++    [InlineData("ſ", "iu", "s", "s")]
++    [InlineData("s", "iu", "ſ", "ſ")]
++    [InlineData("K", "iu", "k", "k")]
++    [InlineData("Å", "iu", "å", "å")]
++    // …while the non-Unicode branch uppercases a single code unit and refuses a fold that
++    // would carry a non-ASCII code unit into ASCII, so ſ and s stay distinct.
++    [InlineData("ſ", "i", "s", null)]
++    [InlineData("s", "i", "ſ", null)]
++    [InlineData("K", "i", "k", null)]
++    [InlineData("a", "i", "A", "A")]
++    [InlineData("Σ", "i", "σ", "σ")]
++    public void Canonicalize_DiffersBetweenModes(string pattern, string flags, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, flags, input));
++
++    [Theory]
++    // İ (U+0130) and ı (U+0131) have only full and Turkic-conditional foldings, so their
++    // simple case folding is the identity and neither is case-equivalent to an ASCII i.
++    // Deriving the fold from ToLowerInvariant made both of them fold to `i`.
++    [InlineData("İ", "iu", "i")]
++    [InlineData("ı", "iu", "i")]
++    [InlineData("İ", "iu", "I")]
++    [InlineData("ı", "iu", "I")]
++    [InlineData("[İ]", "iu", "i")]
++    [InlineData("İ", "i", "i")]
++    [InlineData("ı", "i", "I")]
++    public void DottedAndDotlessI_AreNotEquivalentToAsciiI(string pattern, string flags, string input)
++        => Assert.Null(Match(pattern, flags, input));
++
++    [Theory]
++    [InlineData("İ", "iu", "İ")]
++    [InlineData("ı", "iu", "ı")]
++    public void DottedAndDotlessI_StillMatchThemselves(string pattern, string flags, string input)
++        => Assert.Equal(input, Match(pattern, flags, input));
++
++    [Theory]
++    // §22.2.2.9.2 WordCharacters widens \w with every code point that folds into the basic
++    // set when both `i` and `u` are on — so ſ is a word character there, and \W, which is
++    // the complement of that widened set, must reject it.
++    [InlineData(@"\w", "iu", "ſ", "ſ")]
++    [InlineData(@"\w", "iu", "K", "K")]
++    [InlineData(@"\W", "iu", "ſ", null)]
++    [InlineData(@"\W", "iu", "K", null)]
++    [InlineData(@"\S", "iu", "ſ", "ſ")]
++    // Without both flags the basic set applies unchanged.
++    [InlineData(@"\W", "u", "ſ", "ſ")]
++    [InlineData(@"\w", "u", "ſ", null)]
++    [InlineData(@"\W", "i", "ſ", "ſ")]
++    public void WordCharacters_WidenUnderIgnoreCaseAndUnicode(string pattern, string flags, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, flags, input));
++
++    [Fact(Timeout = 600000)]
++    public void WordBoundary_UsesTheSameWidenedSet()
++    {
++        // \b reads WordCharacters directly, so it has to agree with \w about ſ.
++        Assert.Equal("ſ", Match(@"\bſ\b", "iu", "ſ"));
++        Assert.Null(Match(@"\Bſ", "iu", "ſ"));
++    }
++
++    [Theory]
++    // Supplementary-plane bicameral scripts fold through the table, including ones .NET's
++    // own casing has no mapping for.
++    [InlineData("\U00010400", "\U00010428")] // Deseret
++    [InlineData("\U000118A0", "\U000118C0")] // Warang Citi
++    [InlineData("\U00010D50", "\U00010D70")] // Garay (Unicode 16.0)
++    [InlineData("\U0001E900", "\U0001E922")] // Adlam
++    [InlineData("\U00010570", "\U00010597")] // Vithkuqi
++    public void AstralScripts_FoldBothDirections(string upper, string lower)
++    {
++        Assert.Equal(lower, Match(upper, "iu", lower));
++        Assert.Equal(upper, Match(lower, "iu", upper));
++        Assert.Equal(lower, Match("[" + upper + "]", "iu", lower));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void AstralScripts_DoNotFoldAcrossUnrelatedCodePoints()
++    {
++        Assert.Null(Match("\U00010400", "iu", "\U000118C0"));
++        Assert.Null(Match("\U00010400", "iu", "\U00010401"));
++        Assert.Null(Match("\U00010400", "u", "\U00010428"));
++    }
++
++    [Theory]
++    // Cherokee is the case where the uppercase and the folding directions disagree: the
++    // small letters were added later, so scf maps them UP to the capitals.
++    [InlineData("Ꭰ", "ꭰ")]
++    [InlineData("ꭰ", "Ꭰ")]
++    public void CherokeeFoldsTowardsTheCapitals(string pattern, string input)
++        => Assert.Equal(input, Match(pattern, "iu", input));
++
++    [Fact(Timeout = 600000)]
++    public void FoldEquivalenceIsSymmetricAcrossAnOrbit()
++    {
++        // k, K and the Kelvin sign are one orbit, so a class holding any of them matches
++        // all three under `iu`.
++        foreach (var member in new[] { "k", "K", "K" })
++        {
++            Assert.Equal(member, Match("[k]", "iu", member));
++            Assert.Equal(member, Match("[K]", "iu", member));
++            Assert.Null(Match("[^k]", "iu", member));
++        }
++    }
++}
+diff --git a/Broiler.Regex.Tests/SyntaxTests.cs b/Broiler.Regex.Tests/SyntaxTests.cs
+index dfdeaae..7f85f35 100644
+--- a/Broiler.Regex.Tests/SyntaxTests.cs
++++ b/Broiler.Regex.Tests/SyntaxTests.cs
+@@ -6,12 +6,22 @@ public class SyntaxTests
+     [InlineData("(")]            // unterminated group
+     [InlineData("[a")]           // unterminated class
+     [InlineData("a{2,1}")]       // m < n
+-    [InlineData("\\k<x>")]       // reference to non-existent named group
++    [InlineData("(?<x>a)\\k<y>")] // reference to a name the pattern does not declare
+     public void InvalidPatterns_Throw(string pattern)
+     {
+         Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern));
+     }
+ 
++    [Fact(Timeout = 600000)]
++    public void LoneNamedBackreference_IsLiteralOutsideUnicodeMode()
++    {
++        // `\k<x>` in a pattern that declares no group name is not a broken reference: the
++        // Annex B grammar reads `\k` as the identity escape, so the pattern is literal
++        // text. It is an error only under `u`/`v`. See AnnexBGrammarTests.
++        Assert.True(new BroilerRegex("\\k<x>").Match("k<x>").Success);
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex("\\k<x>", "u"));
++    }
++
+     [Theory]
+     [InlineData("gg")]           // duplicate flag
+     [InlineData("uv")]           // u and v together
+diff --git a/Broiler.Regex.Tests/UnicodePropertyEscapeTests.cs b/Broiler.Regex.Tests/UnicodePropertyEscapeTests.cs
+new file mode 100644
+index 0000000..d7c364a
+--- /dev/null
++++ b/Broiler.Regex.Tests/UnicodePropertyEscapeTests.cs
+@@ -0,0 +1,100 @@
++namespace Broiler.Regex.Tests;
++
++/// <summary>
++/// <c>\p{…}</c> / <c>\P{…}</c> Unicode property escapes, resolved from the pinned
++/// Broiler.Unicode range tables. Before this they parsed and then threw
++/// <c>NotSupportedException</c>, so every pattern using one had to be handed back to the
++/// .NET translator (Broiler.JS gaps roadmap, track 2 action 1).
++/// </summary>
++public class UnicodePropertyEscapeTests
++{
++    private static string? Match(string pattern, string flags, string input)
++    {
++        var m = new BroilerRegex(pattern, flags).Match(input);
++        return m.Success ? m.Value : null;
++    }
++
++    [Theory]
++    // General_Category, as a lone value and through the gc= dimension.
++    [InlineData(@"\p{L}", "u", "a", "a")]
++    [InlineData(@"\p{L}", "u", "1", null)]
++    [InlineData(@"\p{Lu}", "u", "A", "A")]
++    [InlineData(@"\p{Lu}", "u", "a", null)]
++    [InlineData(@"\p{Lowercase_Letter}", "u", "a", "a")]
++    [InlineData(@"\p{General_Category=Letter}", "u", "a", "a")]
++    [InlineData(@"\p{gc=Nd}", "u", "7", "7")]
++    // Binary properties, canonical name and ECMAScript alias.
++    [InlineData(@"\p{Alphabetic}", "u", "a", "a")]
++    [InlineData(@"\p{Alpha}", "u", "a", "a")]
++    [InlineData(@"\p{ASCII}", "u", "a", "a")]
++    [InlineData(@"\p{ASCII}", "u", "é", null)]
++    // Script and Script_Extensions.
++    [InlineData(@"\p{Script=Greek}", "u", "α", "α")]
++    [InlineData(@"\p{sc=Greek}", "u", "a", null)]
++    [InlineData(@"\p{Script_Extensions=Greek}", "u", "α", "α")]
++    [InlineData(@"\p{scx=Latin}", "u", "a", "a")]
++    // A property escape is a set, so it complements and combines like any other.
++    [InlineData(@"\P{L}", "u", "1", "1")]
++    [InlineData(@"\P{L}", "u", "a", null)]
++    [InlineData(@"[\p{L}\p{Nd}]+", "u", "a1", "a1")]
++    [InlineData(@"[\P{L}]", "u", "1", "1")]
++    [InlineData(@"[\P{L}]", "u", "a", null)]
++    [InlineData(@"[^\p{L}]", "u", "1", "1")]
++    [InlineData(@"[^\p{L}]", "u", "a", null)]
++    public void PropertyEscape_MatchesItsSet(string pattern, string flags, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, flags, input));
++
++    [Theory]
++    // A property escape is code-point based, so a supplementary-plane member matches as
++    // one unit rather than as two code units.
++    [InlineData(@"\p{Script=Deseret}", "\U00010400")]
++    [InlineData(@"\p{Script=Osage}", "\U000104B0")]
++    [InlineData(@"\p{Script=Adlam}", "\U0001E900")]
++    public void PropertyEscape_MatchesAstralMembersAsOneCodePoint(string pattern, string input)
++    {
++        var m = new BroilerRegex(pattern, "u").Match(input);
++        Assert.True(m.Success);
++        Assert.Equal(input, m.Value);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void PropertyEscape_QuantifiesOverCodePoints()
++        => Assert.Equal("\U00010400\U00010401", Match(@"\p{Script=Deseret}+", "u", "\U00010400\U00010401x"));
++
++    [Theory]
++    // Case closure runs over the property's set, so an `i` match reaches the other case
++    // even though the set itself holds only one of them.
++    [InlineData(@"\p{Lu}", "ui", "a", "a")]
++    [InlineData(@"\p{Ll}", "ui", "A", "A")]
++    [InlineData(@"\P{Lu}", "ui", "a", "a")]
++    [InlineData(@"[^\p{Lu}]", "ui", "a", null)]
++    public void PropertyEscape_UnderIgnoreCase(string pattern, string flags, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, flags, input));
++
++    [Theory]
++    [InlineData(@"\p{Bogus_Property}")]
++    [InlineData(@"\p{Script=Nonesuch}")]
++    [InlineData(@"\p{gc=Nonesuch}")]
++    [InlineData(@"\p{L")]
++    [InlineData(@"\pL")]
++    public void UnknownOrMalformedProperty_IsASyntaxError(string pattern)
++        => Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, "u"));
++
++    [Fact(Timeout = 600000)]
++    public void PropertyOfStrings_NeedsTheVFlag()
++    {
++        // \p{RGI_Emoji} matches multi-code-point sequences, which only a `v`-mode class
++        // can hold — under `u` it is a SyntaxError rather than a silent mis-match.
++        Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(@"\p{RGI_Emoji}", "u"));
++        Assert.NotNull(Match(@"\p{RGI_Emoji}", "v", "\U0001F600"));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void WithoutUnicodeFlag_BackslashPIsAnIdentityEscape()
++    {
++        // Annex B: outside Unicode mode `\p` is the character `p`, so the pattern is the
++        // literal text "p{L}" — not a property escape and not an error.
++        Assert.Equal("p{L}", Match(@"\p{L}", "", "p{L}"));
++        Assert.Null(Match(@"\p{L}", "", "a"));
++    }
++}
+diff --git a/Broiler.Regex.Tests/UnicodeSetsTests.cs b/Broiler.Regex.Tests/UnicodeSetsTests.cs
+new file mode 100644
+index 0000000..e425cb2
+--- /dev/null
++++ b/Broiler.Regex.Tests/UnicodeSetsTests.cs
+@@ -0,0 +1,210 @@
++namespace Broiler.Regex.Tests;
++
++/// <summary>
++/// <c>v</c>-mode (UnicodeSets) class-set expressions: nesting, <c>&amp;&amp;</c>
++/// intersection, <c>--</c> subtraction, <c>\q{…}</c> string alternatives and properties
++/// of strings. These were previously parsed and then ignored — the operators were skipped
++/// and the class matched the union of its operands — so every <c>v</c> pattern using one
++/// had to be refused by the router (Broiler.JS gaps roadmap, track 2 action 2).
++/// </summary>
++public class UnicodeSetsTests
++{
++    private static string? Match(string pattern, string flags, string input)
++    {
++        var m = new BroilerRegex(pattern, flags).Match(input);
++        return m.Success ? m.Value : null;
++    }
++
++    [Theory]
++    // Subtraction.
++    [InlineData(@"[\p{L}--[a-z]]", "v", "A", "A")]
++    [InlineData(@"[\p{L}--[a-z]]", "v", "a", null)]
++    [InlineData(@"[\d--[0-5]]", "v", "7", "7")]
++    [InlineData(@"[\d--[0-5]]", "v", "3", null)]
++    [InlineData(@"[\w--\d]", "v", "a", "a")]
++    [InlineData(@"[[\w]--[\d]]", "v", "a", "a")]
++    // Intersection.
++    [InlineData(@"[\w&&\d]", "v", "5", "5")]
++    [InlineData(@"[\w&&\d]", "v", "a", null)]
++    [InlineData(@"[a&&b]", "v", "a", null)]
++    [InlineData(@"[\p{L}&&\p{ASCII}]", "v", "a", "a")]
++    [InlineData(@"[\p{L}&&\p{ASCII}]", "v", "α", null)]
++    // Nesting and plain union.
++    [InlineData(@"[[a-c][x-z]]", "v", "y", "y")]
++    [InlineData(@"[[a][b]]", "v", "b", "b")]
++    [InlineData(@"[a-c]", "v", "b", "b")]
++    [InlineData(@"[^\d]", "v", "a", "a")]
++    public void SetOperators_AreEvaluated(string pattern, string flags, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, flags, input));
++
++    [Theory]
++    [InlineData(@"[\q{abc|d}]", "abc", "abc")]
++    [InlineData(@"[\q{abc|d}]", "d", "d")]
++    [InlineData(@"[\q{abc|d}]", "ab", null)]
++    [InlineData(@"[\q{a}]", "a", "a")]
++    [InlineData(@"[\d\q{ab}]", "ab", "ab")]
++    // A string alternative and a quantifier: the class is an alternation, so the repeat
++    // consumes whole alternatives rather than single code points.
++    [InlineData(@"[\q{abc|d}]+", "abcd", "abcd")]
++    public void StringDisjunction_MatchesWholeAlternatives(string pattern, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, "v", input));
++
++    [Fact(Timeout = 600000)]
++    public void StringDisjunction_MayContainTheEmptyString()
++    {
++        Assert.Equal("", Match(@"[\q{}]", "v", ""));
++        Assert.Equal("a", Match(@"[\q{}]a", "v", "a"));
++        Assert.Equal("ab", Match(@"[\q{|ab}]", "v", "ab"));
++    }
++
++    [Theory]
++    // Set operations apply to the string members too.
++    [InlineData(@"[\q{a|bc}&&\q{bc|d}]", "bc", "bc")]
++    [InlineData(@"[\q{a|bc}&&\q{bc|d}]", "a", null)]
++    [InlineData(@"[\q{ab}--\q{ab}]", "ab", null)]
++    public void SetOperators_ApplyToStringMembers(string pattern, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, "v", input));
++
++    [Theory]
++    // A property of strings expands to its sequences, longest first.
++    [InlineData(@"[\p{RGI_Emoji}]", "\U0001F468‍\U0001F469‍\U0001F467")]
++    [InlineData(@"[\p{RGI_Emoji}]", "\U0001F600")]
++    [InlineData(@"[\p{Basic_Emoji}]", "❤️")]
++    [InlineData(@"\p{RGI_Emoji}", "\U0001F600")]
++    public void PropertyOfStrings_MatchesWholeSequences(string pattern, string input)
++        => Assert.Equal(input, Match(pattern, "v", input));
++
++    [Theory]
++    // §22.2.1 MaybeSimpleCaseFolding folds each operand BEFORE the complement is taken,
++    // and §22.2.2.9 AllCharacters restricts that complement to the code points which fold
++    // to themselves. Together they are why `v` and `u` disagree here: /[^\p{Lu}]/ui
++    // matches nothing an uppercase letter folds from, while /[^\p{Lu}]/vi additionally
++    // rejects the uppercase letters themselves.
++    [InlineData(@"[^\p{Lu}]", "A", null)]
++    [InlineData(@"[^\p{Lu}]", "a", null)]
++    [InlineData(@"[^\p{Lu}]", "1", "1")]
++    [InlineData(@"[^\P{Lu}]", "A", "A")]
++    [InlineData(@"[^\P{Lu}]", "a", "a")]
++    [InlineData(@"[^\P{Lu}]", "1", null)]
++    [InlineData(@"[\p{Lu}]", "a", "a")]
++    [InlineData(@"[\p{Lu}]", "A", "A")]
++    [InlineData(@"[\P{Lu}]", "A", null)]
++    [InlineData(@"[\P{Lu}]", "1", "1")]
++    [InlineData(@"[^a-z]", "A", null)]
++    [InlineData(@"[^a]", "A", null)]
++    [InlineData(@"[\w&&\p{L}]", "A", "A")]
++    [InlineData(@"[\p{Lu}--\p{Ll}]", "A", null)]
++    [InlineData(@"[\W]", "A", null)]
++    [InlineData(@"[\W]", "!", "!")]
++    [InlineData(@"[^\W]", "A", "A")]
++    [InlineData(@"[^\d]", "5", null)]
++    [InlineData(@"[^\D]", "5", "5")]
++    [InlineData(@"[\q{ab}]", "AB", "AB")]
++    [InlineData(@"[\q{ab}]", "aB", "aB")]
++    public void IgnoreCase_FoldsOperandsBeforeComplementing(string pattern, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, "vi", input));
++
++    [Theory]
++    // The same rule reaches a standalone escape, which under `v` is a class-set operand
++    // of its own: /\P{Lu}/vi rejects both cases where /\P{Lu}/ui accepts the lowercase.
++    [InlineData(@"\P{Lu}", "a", null)]
++    [InlineData(@"\P{Lu}", "A", null)]
++    [InlineData(@"\P{Lu}", "1", "1")]
++    [InlineData(@"\p{Lu}", "a", "a")]
++    [InlineData(@"\W", "A", null)]
++    [InlineData(@"\W", "!", "!")]
++    [InlineData(@"\D", "a", "a")]
++    [InlineData(@"\S", "a", "a")]
++    public void IgnoreCase_ReachesStandaloneEscapes(string pattern, string input, string? expected)
++        => Assert.Equal(expected, Match(pattern, "vi", input));
++
++    [Fact(Timeout = 600000)]
++    public void KelvinSign_FoldsWithTheAsciiLetter()
++    {
++        // The class folds to {k}, so both spellings match it and neither matches the
++        // complement — the uppercase K is not even in the universe the complement is
++        // taken against.
++        Assert.Equal("k", Match(@"[K]", "vi", "k"));
++        Assert.Equal("K", Match(@"[K]", "vi", "K"));
++        Assert.Null(Match(@"[^K]", "vi", "k"));
++        Assert.Null(Match(@"[^K]", "vi", "K"));
++    }
++
++    [Theory]
++    [InlineData("a", "A")]
++    [InlineData("A", "a")]
++    [InlineData("k", "K")]
++    public void SingleCharacterStringAlternative_FoldsUnlikeV8(string member, string input)
++    {
++        // A second DELIBERATE divergence from V8, pinned for the same reason.
++        // §22.2.2.9 folds a ClassStringDisjunction operand and its one-character elements
++        // stay ordinary single-character CharSetElements, so §22.2.2.10 canonicalizes the
++        // subject against them like any other member.
++        //
++        // V8 folds the member but not the subject when the alternative is one character:
++        // `/[\q{A}]/vi` matches `a` (the member folded) yet not `A` (the subject did not),
++        // while a two-character alternative canonicalizes both — `/[\q{ab}]/vi` matches
++        // `aB`. The two cannot both be right, and a plain member folds either way.
++        Assert.Equal(input, Match("[\\q{" + member + "}]", "vi", input));
++        Assert.Equal(member, Match("[\\q{" + member + "}]", "vi", member));
++        // Where V8 agrees: a longer alternative, and a plain class member.
++        Assert.Equal("aB", Match(@"[\q{ab}]", "vi", "aB"));
++        Assert.Equal("A", Match("[" + member.ToLowerInvariant() + "A]", "vi", "A"));
++    }
++
++    [Theory]
++    [InlineData("ſ")]
++    [InlineData("K")]
++    public void PropertyOfBinaryName_FoldsUnlikeV8(string input)
++    {
++        // A DELIBERATE divergence from V8, pinned here so it cannot drift silently.
++        // §22.2.2.9 returns MaybeSimpleCaseFolding of a lone BINARY property's set (only a
++        // lone General_Category value is exempt), so `\p{ASCII}` under `vi` holds `s`, and
++        // §22.2.2.10 then matches ſ against it because ſ canonicalizes to `s`.
++        //
++        // V8 answers "no match" for `\p{ASCII}` while agreeing on the equivalent literal
++        // range `[\u0000-\u007F]` and on every other property tested, which reads as an
++        // unfolded fast path for ASCII rather than a different reading of the spec.
++        Assert.Equal(input, Match(@"\p{ASCII}", "vi", input));
++        Assert.Equal(input, Match(@"[\u0000-\u007F]", "vi", input));
++        // Without `v` the two agree: case closure runs over the unfolded set.
++        Assert.Equal(input, Match(@"\p{ASCII}", "ui", input));
++    }
++
++    [Theory]
++    // §22.2.1 early errors and reserved syntax.
++    [InlineData(@"[a~~b]")]          // reserved double punctuator
++    [InlineData(@"[a##b]")]
++    [InlineData(@"[\w&&\d--a]")]     // an expression may not mix operators
++    [InlineData(@"[a--b&&c]")]
++    [InlineData(@"[(]")]             // a syntax character must be escaped
++    [InlineData(@"[)]")]
++    [InlineData(@"[{]")]
++    [InlineData(@"[^\q{ab}]")]       // a negated class may not contain strings
++    [InlineData(@"[^\p{RGI_Emoji}]")]
++    [InlineData(@"[\P{RGI_Emoji}]")] // nor may a property of strings be complemented
++    [InlineData(@"[\q{ab}")]         // unterminated
++    [InlineData(@"[[a]")]
++    public void InvalidClassSet_IsASyntaxError(string pattern)
++        => Assert.Throws<RegexSyntaxException>(() => new BroilerRegex(pattern, "v"));
++
++    [Theory]
++    // An escaped syntax character or reserved punctuator is itself.
++    [InlineData(@"[\(]", "(")]
++    [InlineData(@"[\-]", "-")]
++    [InlineData(@"[\&]", "&")]
++    [InlineData(@"[\|]", "|")]
++    [InlineData(@"[\]]", "]")]
++    public void EscapedPunctuator_IsALiteralMember(string pattern, string input)
++        => Assert.Equal(input, Match(pattern, "v", input));
++
++    [Fact(Timeout = 600000)]
++    public void NestedClassDoesNotEndTheGroupCount()
++    {
++        // The pre-scan counts capturing groups before parsing; a `v`-mode class nests, so
++        // the ']' of an inner class must not put the scan back outside the class.
++        var re = new BroilerRegex(@"([[a-c][x-z]])", "v");
++        Assert.Equal(1, re.CaptureCount);
++        Assert.Equal("y", re.Match("y").Groups[1].Value);
++    }
++}
+diff --git a/Broiler.Regex/Ast/CharSet.cs b/Broiler.Regex/Ast/CharSet.cs
+index 7ff7033..ec3e3ba 100644
+--- a/Broiler.Regex/Ast/CharSet.cs
++++ b/Broiler.Regex/Ast/CharSet.cs
+@@ -1,3 +1,4 @@
++using System;
+ using System.Collections.Generic;
+ using Broiler.Regex.Unicode;
+ 
+@@ -5,63 +6,130 @@ namespace Broiler.Regex.Ast;
+ 
+ /// <summary>
+ /// The model of a character class (<c>[...]</c>) or a standalone class escape
+-/// (<c>\d</c>, <c>\w</c>, …). Built up by the parser as a union of code-point
+-/// ranges plus built-in class escapes, optionally negated as a whole
+-/// (ECMA-262 §22.2.1 CharacterClass / ClassRanges).
++/// (<c>\d</c>, <c>\p{L}</c>, …). Every member kind — literal, range, built-in
++/// escape, Unicode property, or the result of a <c>v</c>-mode set operation —
++/// reduces to one <see cref="CodePointSet"/>, optionally negated as a whole
++/// (ECMA-262 §22.2.1 CharacterClass / ClassSetExpression).
+ /// </summary>
+ public sealed class CharSet
+ {
+-    private readonly List<(int Lo, int Hi)> _ranges = [];
+-    private readonly List<ClassEscape> _escapes = [];
++    private readonly CodePointSet _set = new();
++    private List<string> _strings;
++    private HashSet<string> _members;
+ 
+     /// <summary>True for a negated class <c>[^…]</c>.</summary>
+     public bool Negated { get; set; }
+ 
+     /// <summary>
+-    /// Set when the class uses a <c>v</c>-mode set operation (<c>&amp;&amp;</c>,
+-    /// <c>--</c>) or a <c>\q{…}</c> string disjunction. Currently parsed but not
+-    /// evaluated — see the README's "Known limitations".
++    /// Set when the class used a <c>v</c>-mode set operation (<c>&amp;&amp;</c>,
++    /// <c>--</c>), a nested class, or a <c>\q{…}</c> string disjunction. The set is
++    /// fully evaluated either way; this only records how it was written, for the
++    /// integration layer's routing decision.
+     /// </summary>
+     public bool UsesSetOperations { get; set; }
+ 
+-    public IReadOnlyList<(int Lo, int Hi)> Ranges => _ranges;
+-    public IReadOnlyList<ClassEscape> Escapes => _escapes;
++    /// <summary>
++    /// Set when a <c>\p{…}</c> / <c>\P{…}</c> escape appeared as a member of a bracketed
++    /// class rather than standing alone. Also for the integration layer's routing
++    /// decision: a class is the shape the JavaScript layer's .NET translator cannot
++    /// express, since it can neither nest a complemented fragment nor put a
++    /// supplementary-plane range inside <c>[…]</c>.
++    /// </summary>
++    public bool UsesPropertyEscape { get; set; }
++
++    /// <summary>
++    /// True when the members were already case-folded at parse time — the <c>v</c>-mode
++    /// <c>MaybeSimpleCaseFolding</c>, which folds each operand <i>before</i> complementing
++    /// it. Matching then folds the subject and tests membership directly instead of
++    /// walking the subject's fold orbit.
++    /// </summary>
++    public bool CaseFolded { get; set; }
++
++    /// <summary>The code points this class accepts, before <see cref="Negated"/>.</summary>
++    public CodePointSet CodePoints => _set;
+ 
+-    public void AddCodePoint(int codePoint) => _ranges.Add((codePoint, codePoint));
++    /// <summary>
++    /// Multi-code-point members contributed by <c>\q{…}</c> or by a property of strings
++    /// (<c>\p{RGI_Emoji}</c>), longest first. Empty for every non-<c>v</c> class.
++    /// </summary>
++    public IReadOnlyList<string> Strings => _strings ?? (IReadOnlyList<string>)Array.Empty<string>();
++
++    public bool HasStrings => _strings is { Count: > 0 };
++
++    /// <summary>
++    /// True when the class holds the empty string — only <c>\q{}</c> can put it there.
++    /// It is the one character class that matches without consuming a code point, which
++    /// the quantifier's empty-iteration guard has to know about.
++    /// </summary>
++    public bool MatchesEmptyString => _members?.Contains("") == true;
++
++    public void AddCodePoint(int codePoint) => _set.AddCodePoint(codePoint);
+ 
+     public void AddRange(int lo, int hi)
+     {
+         if (lo > hi)
+             throw new RegexSyntaxException($"Range out of order in character class: U+{lo:X}-U+{hi:X}");
+-        _ranges.Add((lo, hi));
++        _set.AddRange(lo, hi);
++    }
++
++    public void AddEscape(ClassEscape escape, bool ignoreCase, bool unicode)
++        => _set.AddAll(UnicodeCharSets.EscapeSet(escape, ignoreCase, unicode));
++
++    public void AddSet(CodePointSet set) => _set.AddAll(set);
++
++    /// <summary>
++    /// Adds a multi-code-point member. A one-code-point string is an ordinary member of
++    /// the code-point set, per <c>ClassStringDisjunction</c>'s handling of a single
++    /// <c>ClassSetCharacter</c>.
++    /// </summary>
++    public void AddString(string value)
++    {
++        if (CodePointLength(value) == 1)
++        {
++            AddCodePoint(value.Length == 1 ? value[0] : char.ConvertToUtf32(value, 0));
++            return;
++        }
++
++        _strings ??= [];
++        _members ??= new HashSet<string>(StringComparer.Ordinal);
++        if (_members.Add(value))
++            _strings.Add(value);
+     }
+ 
+-    public void AddEscape(ClassEscape escape) => _escapes.Add(escape);
++    /// <summary>Orders the string members longest first, as leftmost-longest matching needs.</summary>
++    public void SortStrings()
++        => _strings?.Sort(static (a, b) =>
++        {
++            var byLength = b.Length.CompareTo(a.Length);
++            return byLength != 0 ? byLength : string.CompareOrdinal(a, b);
++        });
+ 
+     /// <summary>
+-    /// Tests whether <paramref name="codePoint"/> is a member of this class.
+-    /// Case folding is applied by the caller's <paramref name="canonicalize"/>
+-    /// (so the same set logic serves both case-sensitive and <c>i</c> matching).
++    /// Tests whether <paramref name="codePoint"/> is a member of this class
++    /// (§22.2.2.10 CharacterSetMatcher).
+     /// </summary>
+     public bool Contains(int codePoint, bool ignoreCase, bool unicode)
+     {
+-        var member = ContainsRaw(codePoint);
++        // A `v`-mode class folded its operands during construction and complemented the
++        // folded set, so the subject only has to be folded the same way.
++        if (CaseFolded)
++            return _set.Contains(CaseFolding.Canonicalize(codePoint, unicode));
++
++        var member = _set.Contains(codePoint);
+ 
+-        // Under `i`, a class also matches any code point that case-folds to a
+-        // member (and vice-versa). Check the canonical form too.
++        // Otherwise the spec asks whether the class holds ANY member that canonicalizes
++        // to the subject's canonical form. Testing every member is impossible for a set
++        // the size of `\p{L}`, so the orbit of the subject's canonical form — never more
++        // than a handful of code points — is tested against the class instead.
+         if (!member && ignoreCase)
+         {
+-            var folded = CaseFolding.Canonicalize(codePoint, unicode);
+-            if (folded != codePoint)
+-                member = ContainsRaw(folded);
+-
+-            if (!member)
++            var canonical = CaseFolding.Canonicalize(codePoint, unicode);
++            foreach (var sibling in CaseFolding.Orbit(canonical, unicode))
+             {
+-                // Reverse direction: does any simple-fold sibling of codePoint fall
+-                // inside the class? Covered by the small sibling table.
+-                foreach (var sibling in CaseFolding.SimpleSiblings(codePoint, unicode))
++                if (_set.Contains(sibling))
+                 {
+-                    if (ContainsRaw(sibling)) { member = true; break; }
++                    member = true;
++                    break;
+                 }
+             }
+         }
+@@ -69,21 +137,16 @@ public sealed class CharSet
+         return Negated ? !member : member;
+     }
+ 
+-    private bool ContainsRaw(int codePoint)
++    private static int CodePointLength(string value)
+     {
+-        foreach (var (lo, hi) in _ranges)
++        var count = 0;
++        for (var i = 0; i < value.Length; i++)
+         {
+-            if (codePoint >= lo && codePoint <= hi)
+-                return true;
++            if (char.IsHighSurrogate(value[i]) && i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
++                i++;
++            count++;
+         }
+-
+-        foreach (var escape in _escapes)
+-        {
+-            if (UnicodeCharSets.MatchesEscape(escape, codePoint))
+-                return true;
+-        }
+-
+-        return false;
++        return count;
+     }
+ }
+ 
+diff --git a/Broiler.Regex/Ast/CodePointSet.cs b/Broiler.Regex/Ast/CodePointSet.cs
+new file mode 100644
+index 0000000..6f54c5f
+--- /dev/null
++++ b/Broiler.Regex/Ast/CodePointSet.cs
+@@ -0,0 +1,201 @@
++using System;
++using System.Collections.Generic;
++
++namespace Broiler.Regex.Ast;
++
++/// <summary>
++/// A set of Unicode code points held as sorted, non-overlapping, non-adjacent
++/// ranges. This is the value type of every character class: the built-in escapes
++/// (<c>\d \w \s</c>), Unicode property escapes, and the <c>v</c>-mode class-set
++/// expressions all reduce to one of these, so union, intersection, difference and
++/// complement (ECMA-262 §22.2.1 <c>ClassSetExpression</c>) are plain set algebra
++/// rather than a special case per operand kind.
++/// </summary>
++public sealed class CodePointSet
++{
++    /// <summary>The highest Unicode code point; the universe complements are taken against.</summary>
++    public const int MaxCodePoint = 0x10FFFF;
++
++    private readonly List<(int Lo, int Hi)> _ranges;
++    private bool _normalized;
++
++    public CodePointSet() => _ranges = [];
++
++    private CodePointSet(List<(int Lo, int Hi)> ranges, bool normalized)
++    {
++        _ranges = ranges;
++        _normalized = normalized;
++    }
++
++    public static CodePointSet Empty() => new();
++
++    public static CodePointSet Of(int lo, int hi)
++    {
++        var set = new CodePointSet();
++        set.AddRange(lo, hi);
++        return set;
++    }
++
++    /// <summary>The normalized ranges. Enumerating normalizes the set in place.</summary>
++    public IReadOnlyList<(int Lo, int Hi)> Ranges
++    {
++        get
++        {
++            Normalize();
++            return _ranges;
++        }
++    }
++
++    public bool IsEmpty
++    {
++        get
++        {
++            Normalize();
++            return _ranges.Count == 0;
++        }
++    }
++
++    public void AddCodePoint(int codePoint) => AddRange(codePoint, codePoint);
++
++    public void AddRange(int lo, int hi)
++    {
++        if (lo > hi)
++            throw new ArgumentException($"Range out of order: U+{lo:X}-U+{hi:X}");
++        _ranges.Add((lo, hi));
++        _normalized = false;
++    }
++
++    public void AddAll(CodePointSet other)
++    {
++        foreach (var (lo, hi) in other.Ranges)
++            AddRange(lo, hi);
++    }
++
++    public CodePointSet Clone()
++    {
++        Normalize();
++        return new CodePointSet([.. _ranges], normalized: true);
++    }
++
++    public bool Contains(int codePoint)
++    {
++        Normalize();
++        var lo = 0;
++        var hi = _ranges.Count - 1;
++        while (lo <= hi)
++        {
++            var mid = (lo + hi) >> 1;
++            var range = _ranges[mid];
++            if (codePoint < range.Lo)
++                hi = mid - 1;
++            else if (codePoint > range.Hi)
++                lo = mid + 1;
++            else
++                return true;
++        }
++        return false;
++    }
++
++    /// <summary>Every code point in <c>0..<see cref="MaxCodePoint"/></c> that is not in this set.</summary>
++    public CodePointSet Complement()
++    {
++        Normalize();
++        var result = new CodePointSet();
++        var next = 0;
++        foreach (var (lo, hi) in _ranges)
++        {
++            if (lo > next)
++                result.AddRange(next, lo - 1);
++            next = hi + 1;
++            if (next > MaxCodePoint)
++                break;
++        }
++        if (next <= MaxCodePoint)
++            result.AddRange(next, MaxCodePoint);
++        result._normalized = true;
++        return result;
++    }
++
++    public CodePointSet Union(CodePointSet other)
++    {
++        var result = Clone();
++        result.AddAll(other);
++        result.Normalize();
++        return result;
++    }
++
++    public CodePointSet Intersect(CodePointSet other)
++    {
++        Normalize();
++        other.Normalize();
++
++        var result = new CodePointSet();
++        int i = 0, j = 0;
++        while (i < _ranges.Count && j < other._ranges.Count)
++        {
++            var a = _ranges[i];
++            var b = other._ranges[j];
++            var lo = Math.Max(a.Lo, b.Lo);
++            var hi = Math.Min(a.Hi, b.Hi);
++            if (lo <= hi)
++                result._ranges.Add((lo, hi));
++
++            if (a.Hi < b.Hi)
++                i++;
++            else
++                j++;
++        }
++        result._normalized = true;
++        return result;
++    }
++
++    public CodePointSet Subtract(CodePointSet other) => Intersect(other.Complement());
++
++    /// <summary>
++    /// Maps every member through <paramref name="fold"/>, used for the <c>v</c>-mode
++    /// <c>MaybeSimpleCaseFolding</c> of a class-set operand (ECMA-262 §22.2.1). Folding
++    /// a set before complementing it is what makes <c>[^\P{Lowercase_Letter}]</c> under
++    /// <c>vi</c> mean something other than <c>\p{Lowercase_Letter}</c>.
++    /// </summary>
++    public CodePointSet Map(Func<int, int> fold)
++    {
++        Normalize();
++        var result = new CodePointSet();
++        foreach (var (lo, hi) in _ranges)
++        {
++            for (var cp = lo; cp <= hi; cp++)
++                result.AddCodePoint(fold(cp));
++        }
++        result.Normalize();
++        return result;
++    }
++
++    private void Normalize()
++    {
++        if (_normalized)
++            return;
++
++        _ranges.Sort(static (a, b) => a.Lo != b.Lo ? a.Lo.CompareTo(b.Lo) : a.Hi.CompareTo(b.Hi));
++
++        var write = 0;
++        for (var read = 0; read < _ranges.Count; read++)
++        {
++            var current = _ranges[read];
++            if (write > 0)
++            {
++                var previous = _ranges[write - 1];
++                // Merge overlapping AND adjacent ranges, so a set built from single code
++                // points compares equal to the same set built from one range.
++                if (current.Lo <= previous.Hi + 1)
++                {
++                    if (current.Hi > previous.Hi)
++                        _ranges[write - 1] = (previous.Lo, current.Hi);
++                    continue;
++                }
++            }
++            _ranges[write++] = current;
++        }
++        _ranges.RemoveRange(write, _ranges.Count - write);
++        _normalized = true;
++    }
++}
+diff --git a/Broiler.Regex/Broiler.Regex.csproj b/Broiler.Regex/Broiler.Regex.csproj
+index 5caa0e6..f931d20 100644
+--- a/Broiler.Regex/Broiler.Regex.csproj
++++ b/Broiler.Regex/Broiler.Regex.csproj
+@@ -4,10 +4,11 @@
+     Broiler.Regex — a from-scratch, ECMAScript-conformant regular-expression
+     engine for the Broiler.JS runtime.
+ 
+-    It is intentionally dependency-free (no reference to the JS engine, runtime,
+-    or System.Text.RegularExpressions). That keeps it independently testable and
+-    lets the JavaScript layer adopt it incrementally — see README.md for the
+-    motivation, the JS/.NET gap analysis, and the integration plan.
++    It references no JS engine, runtime, or System.Text.RegularExpressions type.
++    That keeps it independently testable and lets the JavaScript layer adopt it
++    incrementally — see README.md for the motivation, the JS/.NET gap analysis,
++    and the integration plan. Its only dependency is the generated Unicode data
++    below, which `\p{…}` and the `v`-mode class sets resolve against.
+   -->
+   <PropertyGroup>
+     <TargetFramework>net10.0</TargetFramework>
+@@ -19,4 +20,22 @@
+     <AssemblyName>Broiler.Regex</AssemblyName>
+   </PropertyGroup>
+ 
++  <!--
++    Unicode property data. Broiler.Regex carries its own Broiler.Unicode submodule so it
++    builds and tests standalone, but when it is nested inside Broiler.JS that repository
++    has its own checkout of the same pin, and every other project there references THAT
++    one. Referencing both would put two projects with the assembly name
++    `Broiler.Unicode.Properties` in one build, so the outer checkout wins whenever it
++    exists. Set `BroilerUnicodeRoot` on the command line to point somewhere else.
++  -->
++  <PropertyGroup>
++    <BroilerUnicodeRoot Condition="'$(BroilerUnicodeRoot)' == '' And Exists('$(MSBuildThisFileDirectory)..\..\Broiler.Unicode\src\UnicodeProperties\UnicodeProperties.csproj')">$(MSBuildThisFileDirectory)..\..\Broiler.Unicode\</BroilerUnicodeRoot>
++    <BroilerUnicodeRoot Condition="'$(BroilerUnicodeRoot)' == ''">$(MSBuildThisFileDirectory)..\Broiler.Unicode\</BroilerUnicodeRoot>
++  </PropertyGroup>
++
++  <ItemGroup>
++    <ProjectReference Include="$(BroilerUnicodeRoot)src\UnicodeProperties\UnicodeProperties.csproj" />
++    <ProjectReference Include="$(BroilerUnicodeRoot)src\UnicodeEmoji.StringProperties\UnicodeEmoji.StringProperties.csproj" />
++  </ItemGroup>
++
+ </Project>
+diff --git a/Broiler.Regex/Matching/Matcher.cs b/Broiler.Regex/Matching/Matcher.cs
+index bce6664..c23c844 100644
+--- a/Broiler.Regex/Matching/Matcher.cs
++++ b/Broiler.Regex/Matching/Matcher.cs
+@@ -323,8 +323,8 @@ internal sealed class Matcher
+             AnchorKind.EndOfInput => (s, c) =>
+                 (s.Position == s.Input.Length || (multiline && IsLineTerminator(CodePointAt(s.Input, s.Position).cp)))
+                     ? c(s) : null,
+-            AnchorKind.WordBoundary => (s, c) => IsWordBoundary(s) ? c(s) : null,
+-            AnchorKind.NonWordBoundary => (s, c) => !IsWordBoundary(s) ? c(s) : null,
++            AnchorKind.WordBoundary => (s, c) => IsWordBoundary(s, flags) ? c(s) : null,
++            AnchorKind.NonWordBoundary => (s, c) => !IsWordBoundary(s, flags) ? c(s) : null,
+             _ => throw new InvalidOperationException(),
+         };
+     }
+@@ -379,8 +379,42 @@ internal sealed class Matcher
+     {
+         var ignoreCase = flags.IgnoreCase;
+         var unicode = _unicode;
++
++        if (set.HasStrings)
++            return CompileCharClassWithStrings(set, dir, ignoreCase, unicode);
++
++        return (s, c) =>
++        {
++            if (!ReadCodePoint(s, dir, out var actual, out var nextPos))
++                return null;
++            return set.Contains(actual, ignoreCase, unicode)
++                ? c(s.WithPosition(nextPos)) : null;
++        };
++    }
++
++    /// <summary>
++    /// A <c>v</c>-mode class holding multi-code-point members (<c>\q{…}</c> or a property
++    /// of strings) is the one CharSet that is not a single-character matcher: §22.2.2.9
++    /// compiles it to the alternation of its strings followed by its code points, longest
++    /// alternative first, and each alternative is a backtracking point of its own.
++    /// </summary>
++    private CompiledMatcher CompileCharClassWithStrings(CharSet set, Direction dir, bool ignoreCase, bool unicode)
++    {
++        var strings = new string[set.Strings.Count];
++        for (var i = 0; i < strings.Length; i++)
++            strings[i] = set.Strings[i];
++
+         return (s, c) =>
+         {
++            foreach (var candidate in strings)
++            {
++                if (!TryMatchLiteral(s, dir, candidate, ignoreCase, unicode, out var after))
++                    continue;
++                var result = c(s.WithPosition(after));
++                if (result != null)
++                    return result;
++            }
++
+             if (!ReadCodePoint(s, dir, out var actual, out var nextPos))
+                 return null;
+             return set.Contains(actual, ignoreCase, unicode)
+@@ -388,6 +422,32 @@ internal sealed class Matcher
+         };
+     }
+ 
++    /// <summary>Matches a literal string at the cursor in <paramref name="dir"/>.</summary>
++    private static bool TryMatchLiteral(MatchState s, Direction dir, string literal,
++        bool ignoreCase, bool unicode, out int after)
++    {
++        int from;
++        if (dir == Direction.Forward)
++        {
++            from = s.Position;
++            after = from + literal.Length;
++            if (after > s.Input.Length)
++                return false;
++        }
++        else
++        {
++            after = s.Position - literal.Length;
++            from = after;
++            if (from < 0)
++                return false;
++        }
++
++        // A `v`-mode class folded its string members at parse time and the fold is
++        // idempotent, so canonicalizing both sides here still compares the subject
++        // against the folded member.
++        return RegionEquals(s.Input, from, literal, 0, literal.Length, ignoreCase, unicode);
++    }
++
+     /// <summary>Reads the code point in <paramref name="dir"/>, yielding the next position.</summary>
+     private bool ReadCodePoint(MatchState s, Direction dir, out int codePoint, out int nextPos)
+     {
+@@ -438,14 +498,19 @@ internal sealed class Matcher
+     private static bool IsLineTerminator(int cp)
+         => cp is 0x000A or 0x000D or 0x2028 or 0x2029;
+ 
+-    private bool IsWordBoundary(MatchState s)
++    private bool IsWordBoundary(MatchState s, Flags flags)
+     {
+-        var before = s.Position > 0 && IsWordChar(CodePointBefore(s.Input, s.Position).cp);
+-        var after = s.Position < s.Input.Length && IsWordChar(CodePointAt(s.Input, s.Position).cp);
++        var before = s.Position > 0 && IsWordChar(CodePointBefore(s.Input, s.Position).cp, flags);
++        var after = s.Position < s.Input.Length && IsWordChar(CodePointAt(s.Input, s.Position).cp, flags);
+         return before != after;
+     }
+ 
+-    private static bool IsWordChar(int cp) => UnicodeCharSets.IsWord(cp);
++    /// <summary>
++    /// §22.2.2.5 IsWordChar reads WordCharacters, which under <c>iu</c> also holds every
++    /// code point that folds into the basic set — so <c>ſ</c> and <c>K</c> are word
++    /// characters for <c>\b</c> exactly when they are members of <c>\w</c>.
++    /// </summary>
++    private bool IsWordChar(int cp, Flags flags) => UnicodeCharSets.IsWord(cp, flags.IgnoreCase, _unicode);
+ 
+     /// <summary>Code-point-aware, case-fold-aware comparison of two equal-length regions.</summary>
+     private static bool RegionEquals(string a, int aStart, string b, int bStart, int len,
+diff --git a/Broiler.Regex/Parsing/RegexParser.cs b/Broiler.Regex/Parsing/RegexParser.cs
+index 891e481..d81ce1c 100644
+--- a/Broiler.Regex/Parsing/RegexParser.cs
++++ b/Broiler.Regex/Parsing/RegexParser.cs
+@@ -14,9 +14,18 @@ public sealed class RegexParser
+ {
+     private readonly string _src;
+     private readonly bool _unicode;
++    private readonly bool _unicodeSets;
+     private int _pos;
+     private int _captureCount;
+ 
++    /// <summary>
++    /// The effective <c>i</c> flag at the cursor. A <c>v</c>-mode class folds its operands
++    /// while it is being built (§22.2.1 MaybeSimpleCaseFolding), and <c>\w</c>'s set widens
++    /// under <c>iu</c> (§22.2.2.9.2), so both need the flag as an inline modifier group
++    /// leaves it — not only as the pattern's own flags set it.
++    /// </summary>
++    private readonly Stack<bool> _ignoreCase = new();
++
+     /// <summary>Total number of capturing groups, available after parsing.</summary>
+     public int CaptureCount { get; private set; }
+ 
+@@ -31,8 +40,12 @@ public sealed class RegexParser
+     {
+         _src = pattern ?? "";
+         _unicode = flags.IsUnicodeMode();
++        _unicodeSets = (flags & RegexFlags.UnicodeSets) != 0;
++        _ignoreCase.Push((flags & RegexFlags.IgnoreCase) != 0);
+     }
+ 
++    private bool IgnoreCase => _ignoreCase.Peek();
++
+     public static RegexNode Parse(string pattern, RegexFlags flags, out int captureCount,
+         out IReadOnlyDictionary<string, int> groupNames)
+     {
+@@ -61,7 +74,9 @@ public sealed class RegexParser
+ 
+     private void PreScan()
+     {
+-        var inClass = false;
++        // A `v`-mode class nests, so the depth — not a single in-class flag — is what says
++        // whether a '(' is a group or a literal inside a class.
++        var depth = 0;
+         for (var i = 0; i < _src.Length; i++)
+         {
+             var c = _src[i];
+@@ -70,9 +85,9 @@ public sealed class RegexParser
+                 i++; // skip escaped char
+                 continue;
+             }
+-            if (c == '[') { inClass = true; continue; }
+-            if (c == ']') { inClass = false; continue; }
+-            if (inClass || c != '(')
++            if (c == '[') { if (_unicodeSets || depth == 0) depth++; continue; }
++            if (c == ']') { if (depth > 0) depth--; continue; }
++            if (depth > 0 || c != '(')
+                 continue;
+ 
+             // '(' — capturing unless it begins a (?: (?= (?! (?<= (?<! (?flags …) group.
+@@ -116,7 +131,7 @@ public sealed class RegexParser
+         var terms = new List<RegexNode>();
+         while (true)
+         {
+-            if (AtEnd || Peek() is '|' or ')')
++            if (AtEnd || Peek() is '|' or ')')
+                 break;
+             terms.Add(ParseTerm());
+         }
+@@ -133,16 +148,32 @@ public sealed class RegexParser
+ 
+     private RegexNode ParseTerm()
+     {
+-        var assertion = TryParseAssertion();
++        var assertion = TryParseAssertion(out var quantifiable);
+         if (assertion != null)
+-            return assertion;
++        {
++            if (!HasQuantifier())
++                return assertion;
++
++            // Annex B `ExtendedTerm :: QuantifiableAssertion Quantifier`: outside Unicode
++            // mode a look-AHEAD may carry a quantifier. Every other assertion — a
++            // look-behind, `^`, `$`, `\b`, `\B` — may not, and in Unicode mode none may.
++            if (!quantifiable || _unicode)
++                throw new RegexSyntaxException("Nothing to repeat before quantifier", _pos);
++
++            return TryApplyQuantifier(assertion);
++        }
+ 
+         var atom = ParseAtom();
+         return TryApplyQuantifier(atom);
+     }
+ 
+-    private RegexNode? TryParseAssertion()
++    /// <summary>
++    /// Parses an assertion, reporting through <paramref name="quantifiable"/> whether
++    /// Annex B admits a quantifier after it.
++    /// </summary>
++    private RegexNode? TryParseAssertion(out bool quantifiable)
+     {
++        quantifiable = false;
+         var c = Peek();
+         switch (c)
+         {
+@@ -157,8 +188,7 @@ public sealed class RegexParser
+             return new AnchorNode(kind);
+         }
+ 
+-        // Look-around groups (?= (?! (?<= (?<!  — these are assertions, not atoms,
+-        // and a quantifier on them is a syntax error in Unicode mode.
++        // Look-around groups (?= (?! (?<= (?<!  — these are assertions, not atoms.
+         if (c == '(' && PeekAt(1) == '?')
+         {
+             var third = PeekAt(2);
+@@ -167,6 +197,7 @@ public sealed class RegexParser
+                 _pos += 3;
+                 var body = ParseDisjunction();
+                 Expect(')');
++                quantifiable = true;
+                 return new LookaroundNode(body, behind: false, negative: third == '!');
+             }
+             if (third == '<' && PeekAt(3) is '=' or '!')
+@@ -182,6 +213,24 @@ public sealed class RegexParser
+         return null;
+     }
+ 
++    /// <summary>
++    /// True when a well-formed quantifier starts at the cursor. A `{` that does not open
++    /// one is an ordinary character, so `/^{a}/` is the anchor followed by literal text
++    /// while `/^{2}/` is a quantified assertion — a syntax error.
++    /// </summary>
++    private bool HasQuantifier()
++    {
++        if (Peek() is '*' or '+' or '?')
++            return true;
++        if (Peek() != '{')
++            return false;
++
++        var save = _pos;
++        var found = TryParseBraceQuantifier(out _, out _);
++        _pos = save;
++        return found;
++    }
++
+     private RegexNode TryApplyQuantifier(RegexNode atom)
+     {
+         var c = Peek();
+@@ -253,9 +302,9 @@ public sealed class RegexParser
+ 
+     private RegexNode ParseAtom()
+     {
+-        if (AtEnd)
+-            throw new RegexSyntaxException("Unexpected end of atom", _pos);
+-
++        if (AtEnd)
++            throw new RegexSyntaxException("Unexpected end of atom", _pos);
++
+         var c = Peek();
+         switch (c)
+         {
+@@ -275,6 +324,15 @@ public sealed class RegexParser
+             case '+':
+             case '?':
+                 throw new RegexSyntaxException($"Nothing to repeat before '{c}'", _pos);
++            case ']':
++            case '{':
++            case '}':
++                // Annex B lets these stand for themselves; Unicode mode drops that
++                // extension, so an unescaped one (including a '{' that did not open a
++                // valid quantifier) is a syntax error rather than a literal.
++                if (_unicode)
++                    throw new RegexSyntaxException($"'{c}' must be escaped in Unicode mode", _pos);
++                break;
+         }
+ 
+         // PatternCharacter — a single source character (or astral code point in u-mode).
+@@ -341,7 +399,10 @@ public sealed class RegexParser
+             throw new RegexSyntaxException("A modifier flag may not be both added and removed", _pos);
+ 
+         Expect(':');
++        _ignoreCase.Push(
++            (IgnoreCase || (added & RegexFlags.IgnoreCase) != 0) && (removed & RegexFlags.IgnoreCase) == 0);
+         var body = ParseDisjunction();
++        _ignoreCase.Pop();
+         Expect(')');
+         return new ModifierGroupNode(body, added, removed);
+     }
+@@ -390,8 +451,10 @@ public sealed class RegexParser
+             return new CharNode(ReadLegacyOctalOrIdentity());
+         }
+ 
+-        // Named back-reference \k<name>
+-        if (c == 'k')
++        // Named back-reference \k<name>. Outside Unicode mode `\k` only introduces one
++        // when the pattern declares a group name somewhere; with none, Annex B reads it
++        // as the identity escape `k`, so /\k<n>/ is the literal text "k<n>".
++        if (c == 'k' && (_unicode || _declaredNames.Count > 0))
+         {
+             _pos++;
+             if (Peek() != '<')
+@@ -405,14 +468,27 @@ public sealed class RegexParser
+         var classEscape = TryReadClassEscape();
+         if (classEscape.HasValue)
+         {
++            // Under `v` even a standalone escape is a class-set operand: `\W` is the
++            // complement of the FOLDED word set within the canonical universe, which is
++            // why /\W/vi rejects `A` where /\W/ui accepts it.
++            if (_unicodeSets)
++                return new CharClassNode(ToCharSet(ReadClassEscapeOperand(classEscape.Value)));
++
+             var set = new CharSet();
+-            set.AddEscape(classEscape.Value);
++            set.AddEscape(classEscape.Value, IgnoreCase, _unicode);
+             return new CharClassNode(set);
+         }
+ 
+         // Unicode property escape \p{…} / \P{…}
+         if (c is 'p' or 'P' && _unicode)
+-            return new CharClassNode(ParsePropertyEscape());
++        {
++            if (_unicodeSets)
++                return new CharClassNode(ToCharSet(ReadPropertyOperand(allowStrings: true)));
++
++            var set = new CharSet();
++            AddPropertyEscape(set, allowStrings: false);
++            return new CharClassNode(set);
++        }
+ 
+         // Otherwise a single escaped code point (\n, \xHH, \uHHHH, \u{…}, identity).
+         return new CharNode(ReadCharacterEscape());
+@@ -422,6 +498,9 @@ public sealed class RegexParser
+ 
+     private CharSet ParseCharacterClass()
+     {
++        if (_unicodeSets)
++            return ParseClassSet();
++
+         _pos++; // consume '['
+         var set = new CharSet();
+         if (Peek() == '^')
+@@ -432,40 +511,44 @@ public sealed class RegexParser
+ 
+         while (true)
+         {
+-            if (AtEnd)
++            if (AtEnd)
+                 throw new RegexSyntaxException("Unterminated character class", _pos);
+-
+-            var c = Peek();
++
++            var c = Peek();
+             if (c == ']')
+             {
+                 _pos++;
+                 return set;
+             }
+ 
+-            // v-mode set operators are recognised but not yet evaluated.
+-            if (c is '&' or '-' && PeekAt(1) == c)
+-            {
+-                set.UsesSetOperations = true;
+-                _pos += 2;
+-                continue;
+-            }
+-
+             var first = ReadClassAtom(set, out var firstIsLiteral);
+ 
+-            // A range "a-z": only when '-' is followed by another class atom (not
+-            // the closing ']') and both ends are literal code points.
+-            if (firstIsLiteral && Peek() == '-' && HasAt(1) && PeekAt(1) != ']')
++            // A range "a-z": only when '-' is followed by another class atom rather than
++            // by the closing ']'.
++            if (Peek() == '-' && HasAt(1) && PeekAt(1) != ']')
+             {
++                var dash = _pos;
+                 _pos++; // consume '-'
+                 var second = ReadClassAtom(set, out var secondIsLiteral);
+                 if (firstIsLiteral && secondIsLiteral)
++                {
+                     set.AddRange(first, second);
++                }
++                else if (_unicode)
++                {
++                    // §22.2.1 early error: an endpoint that is itself a class (\d, \p{L})
++                    // is a syntax error. Only Annex B's non-Unicode grammar rescues it as
++                    // a literal '-'.
++                    throw new RegexSyntaxException(
++                        "A character-class escape may not be an endpoint of a range", dash);
++                }
+                 else
+                 {
+-                    // One side was a class escape (\d etc.) — '-' is then a literal.
+-                    set.AddCodePoint(first);
++                    if (firstIsLiteral)
++                        set.AddCodePoint(first);
+                     set.AddCodePoint('-');
+-                    set.AddCodePoint(second);
++                    if (secondIsLiteral)
++                        set.AddCodePoint(second);
+                 }
+             }
+             else if (firstIsLiteral)
+@@ -488,21 +571,21 @@ public sealed class RegexParser
+             var classEscape = TryReadClassEscape();
+             if (classEscape.HasValue)
+             {
+-                set.AddEscape(classEscape.Value);
++                set.AddEscape(classEscape.Value, IgnoreCase, _unicode);
+                 isLiteral = false;
+                 return -1;
+             }
+             if (Peek() is 'p' or 'P' && _unicode)
+             {
+-                var prop = ParsePropertyEscape();
+-                foreach (var (lo, hi) in prop.Ranges)
+-                    set.AddRange(lo, hi);
+-                foreach (var esc in prop.Escapes)
+-                    set.AddEscape(esc);
++                AddPropertyEscape(set, allowStrings: false);
++                set.UsesPropertyEscape = true;
+                 isLiteral = false;
+                 return -1;
+             }
+             if (Peek() == 'b') { _pos++; isLiteral = true; return '\b'; } // \b is backspace in a class
++            // `ClassEscape :: -` — inside a class `\-` is a literal hyphen even in Unicode
++            // mode, where the standalone IdentityEscape would reject it.
++            if (Peek() == '-') { _pos++; isLiteral = true; return '-'; }
+             isLiteral = true;
+             return ReadCharacterEscape();
+         }
+@@ -511,6 +594,397 @@ public sealed class RegexParser
+         return ReadSourceCodePoint();
+     }
+ 
++    // ----- v-mode class set expressions --------------------------------------
++    //
++    // Under the `v` flag a class is a ClassSetExpression (ECMA-262 §22.2.1): operands
++    // that are nested classes, `\q{…}` string disjunctions, property escapes or single
++    // characters, combined by union, `&&` intersection or `--` subtraction. Every
++    // operand reduces to a CodePointSet plus a set of multi-code-point strings, so the
++    // operators are the plain set algebra of CodePointSet.
++    //
++    // With `i`, MaybeSimpleCaseFolding folds each operand as it is produced — before any
++    // complement is taken. That ordering is the whole observable difference between
++    // `[^\p{Lu}]` under `vi` (matches neither `A` nor `a`) and under `ui` (matches `a`).
++
++    /// <summary>One evaluated class-set operand: code points plus string members.</summary>
++    private sealed class ClassSetValue
++    {
++        public CodePointSet Set = new();
++        public List<string> Strings = [];
++    }
++
++    private bool _usedSetOperations;
++    private bool _usedPropertyEscape;
++
++    private CharSet ParseClassSet()
++    {
++        _usedSetOperations = false;
++        _usedPropertyEscape = false;
++        var set = ToCharSet(ParseNestedClass());
++        set.UsesSetOperations = _usedSetOperations;
++        set.UsesPropertyEscape = _usedPropertyEscape;
++        return set;
++    }
++
++    /// <summary>
++    /// Wraps an evaluated class-set value as a matchable <see cref="CharSet"/>. Under
++    /// <c>i</c> the members are already folded, so the matcher folds the subject and tests
++    /// membership directly rather than walking the subject's fold orbit.
++    /// </summary>
++    private CharSet ToCharSet(ClassSetValue value)
++    {
++        var set = new CharSet { CaseFolded = IgnoreCase };
++        set.AddSet(value.Set);
++        foreach (var member in value.Strings)
++            set.AddString(member);
++        set.SortStrings();
++        return set;
++    }
++
++    /// <summary>
++    /// §22.2.2.9 CharacterComplement: the complement is taken against AllCharacters, which
++    /// under <c>v</c> with <c>i</c> holds only the code points that fold to themselves.
++    /// </summary>
++    private CodePointSet ComplementOperand(CodePointSet set)
++        => UnicodeCharSets.AllCharacters(_unicodeSets, IgnoreCase).Subtract(set);
++
++    /// <summary>Reads <c>\d \D \w \W \s \S</c> as a class-set operand: fold, then complement.</summary>
++    private ClassSetValue ReadClassEscapeOperand(ClassEscape escape)
++    {
++        var value = new ClassSetValue();
++        value.Set.AddAll(UnicodeCharSets.EscapeSet(UnicodeCharSets.PositiveEscape(escape), IgnoreCase, _unicode));
++        Fold(value);
++        if (UnicodeCharSets.IsComplementEscape(escape))
++            value.Set = ComplementOperand(value.Set);
++        return value;
++    }
++
++    /// <summary>Reads <c>\p{…}</c> / <c>\P{…}</c> as a class-set operand: fold, then complement.</summary>
++    private ClassSetValue ReadPropertyOperand(bool allowStrings)
++    {
++        var property = new CharSet();
++        var negated = AddPropertyEscape(property, allowStrings, complement: false);
++        var value = new ClassSetValue { Set = property.CodePoints, Strings = [.. property.Strings] };
++        Fold(value);
++        if (negated)
++            value.Set = ComplementOperand(value.Set);
++        return value;
++    }
++
++    /// <summary>Parses <c>[ ^? ClassContents ]</c>, the cursor sitting on the <c>'['</c>.</summary>
++    private ClassSetValue ParseNestedClass()
++    {
++        var start = _pos;
++        _pos++; // consume '['
++
++        var negated = false;
++        if (Peek() == '^')
++        {
++            negated = true;
++            _pos++;
++        }
++
++        var value = ParseClassSetExpression();
++
++        if (AtEnd)
++            throw new RegexSyntaxException("Unterminated character class", start);
++        _pos++; // consume ']'
++
++        if (!negated)
++            return value;
++
++        // §22.2.1 early error: a complemented class may not contain strings, because the
++        // complement of a set of strings is not a set this grammar can describe.
++        if (value.Strings.Count > 0)
++            throw new RegexSyntaxException("A negated 'v'-mode class may not contain strings", start);
++
++        return new ClassSetValue { Set = ComplementOperand(value.Set) };
++    }
++
++    private ClassSetValue ParseClassSetExpression()
++    {
++        if (AtEnd || Peek() == ']')
++            return new ClassSetValue();
++
++        var start = _pos;
++        var accumulated = ParseClassSetRangeOrOperand();
++
++        if (Peek() == '&' && PeekAt(1) == '&')
++            return ParseClassIntersection(accumulated, start);
++        if (Peek() == '-' && PeekAt(1) == '-')
++            return ParseClassSubtraction(accumulated, start);
++
++        while (!AtEnd && Peek() != ']')
++        {
++            RejectMixedOperator(start);
++            var operand = ParseClassSetRangeOrOperand();
++            accumulated.Set.AddAll(operand.Set);
++            foreach (var member in operand.Strings)
++            {
++                if (!accumulated.Strings.Contains(member))
++                    accumulated.Strings.Add(member);
++            }
++        }
++
++        return accumulated;
++    }
++
++    private ClassSetValue ParseClassIntersection(ClassSetValue first, int start)
++    {
++        _usedSetOperations = true;
++        var accumulated = first;
++        while (Peek() == '&' && PeekAt(1) == '&')
++        {
++            _pos += 2;
++            if (Peek() == '&')
++                throw new RegexSyntaxException("'&&&' is not a class-set operator", _pos);
++            var operand = ParseClassSetOperand(out _);
++            accumulated = new ClassSetValue
++            {
++                Set = accumulated.Set.Intersect(operand.Set),
++                Strings = [.. accumulated.Strings.FindAll(operand.Strings.Contains)],
++            };
++        }
++
++        RejectMixedOperator(start);
++        return accumulated;
++    }
++
++    private ClassSetValue ParseClassSubtraction(ClassSetValue first, int start)
++    {
++        _usedSetOperations = true;
++        var accumulated = first;
++        while (Peek() == '-' && PeekAt(1) == '-')
++        {
++            _pos += 2;
++            var operand = ParseClassSetOperand(out _);
++            accumulated = new ClassSetValue
++            {
++                Set = accumulated.Set.Subtract(operand.Set),
++                Strings = [.. accumulated.Strings.FindAll(member => !operand.Strings.Contains(member))],
++            };
++        }
++
++        RejectMixedOperator(start);
++        return accumulated;
++    }
++
++    /// <summary>
++    /// A class-set expression is a union, an intersection or a subtraction — never a
++    /// mixture, so an operator (or trailing operand) left over after one of them is a
++    /// syntax error rather than a silently reassociated expression.
++    /// </summary>
++    private void RejectMixedOperator(int start)
++    {
++        if (AtEnd || Peek() == ']')
++            return;
++        if ((Peek() == '&' && PeekAt(1) == '&') || (Peek() == '-' && PeekAt(1) == '-'))
++            throw new RegexSyntaxException(
++                "A class-set expression may not mix union, '&&' and '--' without nesting", start);
++    }
++
++    private ClassSetValue ParseClassSetRangeOrOperand()
++    {
++        var start = _pos;
++        var operand = ParseClassSetOperand(out var single);
++
++        // A range needs a single character on both sides; `a--b` is a subtraction and
++        // `a-]` ends the class, so neither starts one.
++        if (single == null || Peek() != '-' || PeekAt(1) == '-' || PeekAt(1) == ']' || !HasAt(1))
++            return operand;
++
++        _pos++; // consume '-'
++        _ = ParseClassSetOperand(out var highSingle);
++        if (highSingle == null)
++            throw new RegexSyntaxException("A class-set range needs a single character on both sides", start);
++        if (single.Value > highSingle.Value)
++            throw new RegexSyntaxException(
++                $"Range out of order in character class: U+{single.Value:X}-U+{highSingle.Value:X}", start);
++
++        return Fold(new ClassSetValue { Set = CodePointSet.Of(single.Value, highSingle.Value) });
++    }
++
++    /// <summary>
++    /// Parses one <c>ClassSetOperand</c>. <paramref name="single"/> receives the code
++    /// point when the operand was a lone character, which is the only shape a range end
++    /// may take.
++    /// </summary>
++    private ClassSetValue ParseClassSetOperand(out int? single)
++    {
++        single = null;
++        if (AtEnd)
++            throw new RegexSyntaxException("Unterminated character class", _pos);
++
++        var c = Peek();
++        if (c == '[')
++        {
++            _usedSetOperations = true;
++            return ParseNestedClass();
++        }
++
++        if (c == '\\')
++        {
++            _pos++;
++            if (Peek() == 'q')
++                return ParseClassStringDisjunction();
++
++            var classEscape = TryReadClassEscape();
++            if (classEscape.HasValue)
++                return ReadClassEscapeOperand(classEscape.Value);
++
++            if (Peek() is 'p' or 'P')
++            {
++                _usedPropertyEscape = true;
++                return ReadPropertyOperand(allowStrings: true);
++            }
++
++            if (Peek() == 'b')
++            {
++                _pos++;
++                single = '\b';
++                return Fold(SingleCodePoint('\b'));
++            }
++
++            // `\` followed by one of the reserved punctuators is that punctuator; every
++            // other escape is an ordinary CharacterEscape.
++            if (IsClassSetReservedPunctuator(Peek()))
++            {
++                single = _src[_pos++];
++                return Fold(SingleCodePoint(single.Value));
++            }
++
++            single = ReadCharacterEscape();
++            return Fold(SingleCodePoint(single.Value));
++        }
++
++        // ClassSetCharacter: a source character that is neither a syntax character nor
++        // half of a reserved double punctuator.
++        if (IsClassSetSyntaxCharacter(c))
++            throw new RegexSyntaxException($"'{c}' must be escaped inside a 'v'-mode class", _pos);
++        if (IsClassSetReservedDoublePunctuator(c) && PeekAt(1) == c)
++            throw new RegexSyntaxException($"'{c}{c}' is reserved inside a 'v'-mode class", _pos);
++
++        single = ReadSourceCodePoint();
++        return Fold(SingleCodePoint(single.Value));
++    }
++
++    /// <summary>Parses <c>\q{ ClassString (| ClassString)* }</c>, the cursor on the <c>'q'</c>.</summary>
++    private ClassSetValue ParseClassStringDisjunction()
++    {
++        _usedSetOperations = true;
++        var start = _pos;
++        _pos++; // consume 'q'
++        if (Peek() != '{')
++            throw new RegexSyntaxException("Expected '{' after \\q", _pos);
++        _pos++;
++
++        var value = new ClassSetValue();
++        var current = new StringBuilder();
++
++        void Flush()
++        {
++            var text = current.ToString();
++            current.Clear();
++            // A one-character alternative is an ordinary member of the code-point set;
++            // only longer (and empty) alternatives need string matching.
++            if (text.Length == 1 || (text.Length == 2 && char.IsSurrogatePair(text, 0)))
++                value.Set.AddCodePoint(char.ConvertToUtf32(text, 0));
++            else if (!value.Strings.Contains(text))
++                value.Strings.Add(text);
++        }
++
++        while (true)
++        {
++            if (AtEnd)
++                throw new RegexSyntaxException("Unterminated \\q{…}", start);
++
++            var c = Peek();
++            if (c == '}')
++            {
++                _pos++;
++                Flush();
++                break;
++            }
++            if (c == '|')
++            {
++                _pos++;
++                Flush();
++                continue;
++            }
++
++            if (c == '\\')
++            {
++                _pos++;
++                if (IsClassSetReservedPunctuator(Peek()))
++                {
++                    current.Append(_src[_pos++]);
++                    continue;
++                }
++                current.Append(FromCodePoint(ReadCharacterEscape()));
++                continue;
++            }
++
++            if (IsClassSetSyntaxCharacter(c))
++                throw new RegexSyntaxException($"'{c}' must be escaped inside \\q{{…}}", _pos);
++
++            current.Append(FromCodePoint(ReadSourceCodePoint()));
++        }
++
++        return Fold(value);
++    }
++
++    private static ClassSetValue SingleCodePoint(int codePoint)
++    {
++        var value = new ClassSetValue();
++        value.Set.AddCodePoint(codePoint);
++        return value;
++    }
++
++    /// <summary>§22.2.1 MaybeSimpleCaseFolding — a no-op unless <c>i</c> is in effect.</summary>
++    private ClassSetValue Fold(ClassSetValue value)
++    {
++        if (!IgnoreCase)
++            return value;
++
++        value.Set = value.Set.Map(static cp => CaseFolding.Canonicalize(cp, unicode: true));
++        for (var i = 0; i < value.Strings.Count; i++)
++            value.Strings[i] = FoldString(value.Strings[i]);
++        return value;
++    }
++
++    private static string FoldString(string value)
++    {
++        var sb = new StringBuilder(value.Length);
++        for (var i = 0; i < value.Length; i++)
++        {
++            var cp = (int)value[i];
++            if (char.IsHighSurrogate(value[i]) && i + 1 < value.Length && char.IsLowSurrogate(value[i + 1]))
++            {
++                cp = char.ConvertToUtf32(value[i], value[i + 1]);
++                i++;
++            }
++            sb.Append(FromCodePoint(CaseFolding.Canonicalize(cp, unicode: true)));
++        }
++        return sb.ToString();
++    }
++
++    /// <summary>
++    /// The UTF-16 text of one code point. Unlike <see cref="char.ConvertFromUtf32"/> this
++    /// accepts a lone surrogate, which is a perfectly ordinary member of a class.
++    /// </summary>
++    private static string FromCodePoint(int codePoint)
++        => codePoint <= 0xFFFF ? ((char)codePoint).ToString() : char.ConvertFromUtf32(codePoint);
++
++    private static bool IsClassSetSyntaxCharacter(char c)
++        => c is '(' or ')' or '[' or ']' or '{' or '}' or '/' or '-' or '\\' or '|';
++
++    private static bool IsClassSetReservedPunctuator(char c)
++        => c is '&' or '-' or '!' or '#' or '%' or ',' or ':' or ';' or '<' or '=' or '>' or '@' or '`' or '~';
++
++    private static bool IsClassSetReservedDoublePunctuator(char c)
++        => c is '&' or '!' or '#' or '$' or '%' or '*' or '+' or ',' or '.' or ':' or ';'
++            or '<' or '=' or '>' or '?' or '@' or '^' or '`' or '~';
++
+     // ----- Shared escape readers ---------------------------------------------
+ 
+     private ClassEscape? TryReadClassEscape()
+@@ -530,13 +1004,13 @@ public sealed class RegexParser
+     /// <summary>Reads a CharacterEscape (the '\' already consumed): \n \r \xHH \uHHHH \u{…} \cX \0 identity.</summary>
+     private int ReadCharacterEscape()
+     {
+-        // A '\' with nothing after it: \ is never a pattern character of its own
+-        // (ECMA-262 §22.2.1 — every production that admits it consumes a second
+-        // character). Reported as a syntax error rather than running off the end of
+-        // the string in ReadSourceCodePoint below.
+-        if (AtEnd)
+-            throw new RegexSyntaxException("Trailing '\\' at end of pattern", _pos);
+-
++        // A '\' with nothing after it: \ is never a pattern character of its own
++        // (ECMA-262 §22.2.1 — every production that admits it consumes a second
++        // character). Reported as a syntax error rather than running off the end of
++        // the string in ReadSourceCodePoint below.
++        if (AtEnd)
++            throw new RegexSyntaxException("Trailing '\\' at end of pattern", _pos);
++
+         var c = Peek();
+         switch (c)
+         {
+@@ -546,11 +1020,20 @@ public sealed class RegexParser
+             case 'f': _pos++; return '\f';
+             case 'v': _pos++; return '\v';
+             case '0' when !char.IsDigit(PeekAt(1)): _pos++; return 0;
+-            case 'x': return ReadHexEscape(2);
+-            case 'u': return ReadUnicodeEscape();
++            case 'x' when _unicode || HasHexDigits(1, 2): return ReadHexEscape(2);
++            case 'u' when _unicode || HasHexDigits(1, 4): return ReadUnicodeEscape();
+             case 'c': return ReadControlEscape();
+         }
+ 
++        // Annex B: outside Unicode mode a `\x`/`\u` that does not introduce a well-formed
++        // escape is the identity escape of that letter, so /\u{2}/ is "uu" and
++        // /[\u{1F600}-\u{1F64F}]/ is a class over `u{1F60}`… with an out-of-order range.
++        if (c is 'x' or 'u')
++        {
++            _pos++;
++            return c;
++        }
++
+         // IdentityEscape: in Unicode mode only syntax characters and '/' may be
+         // escaped; outside Unicode mode any non-IdentifierPart char is allowed.
+         if (_unicode && !IsSyntaxChar(c) && c != '/')
+@@ -610,10 +1093,23 @@ public sealed class RegexParser
+         return value;
+     }
+ 
++    /// <summary>True when <paramref name="count"/> hexadecimal digits sit at the given offset.</summary>
++    private bool HasHexDigits(int offset, int count)
++    {
++        for (var i = 0; i < count; i++)
++        {
++            if (HexValue(PeekAt(offset + i)) < 0)
++                return false;
++        }
++        return true;
++    }
++
+     private int ReadUnicodeEscape()
+     {
+-        // Caller is positioned at 'u'.
+-        if (PeekAt(1) == '{')
++        // Caller is positioned at 'u'. The braced form exists only in Unicode mode; the
++        // Annex B grammar reads `\u{…}` as the identity escape `u` followed by a literal
++        // brace (or a quantifier), which the caller has already decided.
++        if (_unicode && PeekAt(1) == '{')
+         {
+             _pos += 2; // consume 'u{'
+             var value = 0;
+@@ -649,15 +1145,26 @@ public sealed class RegexParser
+         return hi;
+     }
+ 
+-    private CharSet ParsePropertyEscape()
++    /// <summary>
++    /// Reads a <c>\p{…}</c> / <c>\P{…}</c> escape (the <c>'\'</c> already consumed) and
++    /// adds what it matches to <paramref name="set"/>.
++    /// </summary>
++    /// <remarks>
++    /// <c>\P{X}</c> is not "the class is negated": §22.2.2.9 gives it the CharSet that is
++    /// the complement of <c>X</c>, and the ordinary case closure then runs over that
++    /// complement. Adding the complement as a positive member keeps
++    /// <c>[\P{L}\p{Nd}]</c> — where only one member is complemented — expressible.
++    /// </remarks>
++    private bool AddPropertyEscape(CharSet set, bool allowStrings, bool complement = true)
+     {
++        var start = _pos;
+         var negated = Peek() == 'P';
+         _pos++; // consume 'p'/'P'
+         if (Peek() != '{')
+             throw new RegexSyntaxException("Expected '{' after \\p", _pos);
+         _pos++;
+         var sb = new StringBuilder();
+-        while (!AtEnd && Peek() != '}')
++        while (!AtEnd && Peek() != '}')
+             sb.Append(_src[_pos++]);
+         if (Peek() != '}')
+             throw new RegexSyntaxException("Unterminated \\p{…}", _pos);
+@@ -677,18 +1184,30 @@ public sealed class RegexParser
+             name = spec;
+         }
+ 
+-        // Resolution is currently a stub (throws NotSupportedException). We still
+-        // build the node so callers see a clear, located error rather than a
+-        // mis-match. See UnicodeCharSets.ResolveProperty.
+-        _ = UnicodeCharSets.ResolveProperty(name, value);
+-        var set = new CharSet { Negated = negated };
+-        return set;
++        var resolved = UnicodeCharSets.ResolveProperty(name, value)
++            ?? throw new RegexSyntaxException($"Unknown Unicode property escape \\p{{{spec}}}", start);
++
++        if (resolved.IsStringProperty)
++        {
++            // A property of strings can only widen a match, so the spec forbids both
++            // complementing it and putting it anywhere a complement will be taken.
++            if (negated)
++                throw new RegexSyntaxException($"\\P{{{spec}}} may not negate a property of strings", start);
++            if (!allowStrings)
++                throw new RegexSyntaxException(
++                    $"\\p{{{spec}}} matches strings, so it needs the 'v' flag and an un-negated class", start);
++            foreach (var sequence in resolved.Strings)
++                set.AddString(sequence);
++        }
++
++        set.AddSet(negated && complement ? resolved.CodePoints.Complement() : resolved.CodePoints);
++        return negated;
+     }
+ 
+     private string ReadGroupName()
+     {
+         var sb = new StringBuilder();
+-        while (!AtEnd && Peek() != '>')
++        while (!AtEnd && Peek() != '>')
+         {
+             // RegExpIdentifierName allows \u escapes; decode them so the stored
+             // name matches a JS string key.
+@@ -711,17 +1230,17 @@ public sealed class RegexParser
+ 
+     // ----- Low-level cursor helpers ------------------------------------------
+ 
+-    /// <summary>
+-    /// True once the cursor is past the last character. Every end-of-pattern test
+-    /// goes through this rather than through <see cref="Peek"/>'s <c>'\0'</c>: U+0000
+-    /// is a perfectly ordinary pattern character, so comparing against the sentinel
+-    /// would end the parse in the middle of a pattern that merely contains one.
+-    /// </summary>
+-    private bool AtEnd => _pos >= _src.Length;
+-
+-    /// <summary>True when a character exists <paramref name="offset"/> ahead of the cursor.</summary>
+-    private bool HasAt(int offset) => _pos + offset < _src.Length;
+-
++    /// <summary>
++    /// True once the cursor is past the last character. Every end-of-pattern test
++    /// goes through this rather than through <see cref="Peek"/>'s <c>'\0'</c>: U+0000
++    /// is a perfectly ordinary pattern character, so comparing against the sentinel
++    /// would end the parse in the middle of a pattern that merely contains one.
++    /// </summary>
++    private bool AtEnd => _pos >= _src.Length;
++
++    /// <summary>True when a character exists <paramref name="offset"/> ahead of the cursor.</summary>
++    private bool HasAt(int offset) => _pos + offset < _src.Length;
++
+     private char Peek() => _pos < _src.Length ? _src[_pos] : '\0';
+     private char PeekAt(int offset) => _pos + offset < _src.Length ? _src[_pos + offset] : '\0';
+ 
+diff --git a/Broiler.Regex/README.md b/Broiler.Regex/README.md
+index c1a46dc..dfa85c0 100644
+--- a/Broiler.Regex/README.md
++++ b/Broiler.Regex/README.md
+@@ -24,13 +24,13 @@ are correct *by construction* rather than by patch.
+ 
+ > **Status: working core, wired into `JSRegExp`.** The parser and the backtracking
+ > matcher implement the common grammar and the gap cases below. Unicode property
+-> escapes (`\p{…}`), `v`-mode set operations, and full `Canonicalize` case-folding
+-> tables are stubbed with clear `TODO`s and documented limitations (see
+-> [Unicode/UnicodeCharSets.cs](Unicode/UnicodeCharSets.cs)). As of issue #923 the
+-> engine is **wired into `JSRegExp`** behind a conservative gap-feature router
++> escapes (`\p{…}`), `v`-mode class-set expressions and the `Canonicalize` case-fold
++> tables are implemented and resolve against the pinned
++> [Broiler.Unicode](../Broiler.Unicode) data. As of issue #923 the engine is **wired
++> into `JSRegExp`** behind a conservative gap-feature router
+ > (`JSRegExp.TryBuildBroilerForGaps`): only patterns that hit a documented JS/.NET
+-> gap *and* use no stubbed feature are matched here; everything else still uses the
+-> .NET translator unchanged — see *Integration plan* below.
++> gap are matched here; everything else still uses the .NET translator unchanged —
++> see *Integration plan* below.
+ 
+ ---
+ 
+@@ -82,8 +82,17 @@ pattern string ──▶ RegexParser ──▶ RegexNode AST ──▶ Matcher (
+     (fixes #6, #7).
+ * **`BroilerRegex.cs`** — the public façade (`Match` / `IsMatch`), mirroring the
+   shape `JSRegExp` needs (`Success`, `Index`, `Length`, indexed + named groups).
+-* **`Unicode/UnicodeCharSets.cs`** — `\d \D \w \W \s \S` sets and the
+-  *stubbed* property-escape / case-fold hooks.
++* **`Ast/CodePointSet.cs`** — sorted code-point ranges with union, intersection,
++  difference and complement. Every class member kind reduces to one of these, so
++  `v`-mode `&&` / `--` / nesting is plain set algebra rather than a case per operand.
++* **`Unicode/UnicodeCharSets.cs`** — the `\d \D \w \W \s \S` sets, `AllCharacters`,
++  and `\p{…}` resolution against the generated `Broiler.Unicode` property tables
++  (General_Category, binary properties, `Script`, `Script_Extensions`, and the UTS #51
++  properties of strings).
++* **`Unicode/CaseFolding.cs`** + **`Unicode/Generated/CaseFoldingData.g.cs`** — both
++  branches of `Canonicalize`, table-driven from the Unicode Character Database, plus the
++  inverse fold orbits the class-membership test walks. Regenerate with
++  [`Unicode/tools/generate-case-folding.py`](Unicode/tools/generate-case-folding.py).
+ 
+ ## What works today
+ 
+@@ -96,24 +105,44 @@ pattern string ──▶ RegexParser ──▶ RegexNode AST ──▶ Matcher (
+   preserved capture order
+ - `u`-mode code-point semantics: `\u{…}`, astral atoms as single units,
+   code-point back-references
+-- Flags `g i m s u y d v` parsed; `i` case-folding (ASCII + simple-fold subset)
++- Flags `g i m s u y d v`; `i` case-folding from the full UCD tables in both the
++  Unicode and the non-Unicode mode, including the supplementary-plane scripts
++- `\p{…}` / `\P{…}` property escapes: General_Category, binary properties, `Script`,
++  `Script_Extensions`, and the UTS #51 properties of strings under `v`
++- `v`-mode class-set expressions: nesting, `&&`, `--`, `\q{…}` string alternatives,
++  and the fold-then-complement ordering that makes `[^\p{Lu}]` mean something
++  different under `vi` than under `ui`
++- The Annex B / Unicode-mode grammar split: `\u{…}`, a bare `]`/`{`/`}`, a class escape
++  as a range endpoint, a quantified look-ahead, and `\k<n>` in a pattern that declares no
++  group name are each a literal or a legal term in one mode and a syntax error in the
++  other
+ 
+ ## Known limitations (stubbed / TODO)
+ 
+-- `\p{…}` / `\P{…}` Unicode property escapes — parsed, resolution throws
+-  `NotSupportedException` (needs the `Broiler.Unicode` property tables).
+-- `v`-mode set operations (`[a&&b]`, `[a--b]`, `\q{…}`) — parsed only.
+-- Full ECMAScript `Canonicalize` case-folding — current `i` folding covers ASCII
+-  plus a documented subset; the complete fold table is a TODO.
++- `Split`, `Replace` and `IJSRegExp.Value` on the JavaScript side still use the .NET
++  backend; only `RegExpBuiltinExec` consumes Broiler match data.
++- Two deliberate divergences from V8, both under `vi` and both pinned by a test:
++  - `\p{ASCII}` follows §22.2.2.9, which folds a lone binary property's set, so `ſ`
++    (which folds to `s`) matches. V8 answers "no match" here while agreeing on
++    `[\u0000-\u007F]` and on every other property tested —
++    `UnicodeSetsTests.PropertyOfBinaryName_FoldsUnlikeV8`.
++  - A one-character `\q{…}` alternative folds like any other class member, so
++    `/[\q{A}]/vi` matches `A`. V8 folds the member but not the subject at that length —
++    it matches `a` and not `A` — while canonicalizing both for a longer alternative —
++    `UnicodeSetsTests.SingleCharacterStringAlternative_FoldsUnlikeV8`.
+ - Performance: the matcher is a clarity-first interpreter (per-step capture
+-  cloning, no DFA/JIT). Correctness first; optimisation later.
++  cloning, no DFA/JIT), and a `v`-mode class under `i` folds its whole operand set at
++  compile time — measurable for an operand the size of `\p{L}`. Correctness first;
++  optimisation later.
+ 
+ ## Integration status
+ 
+ `JSRegExp` currently routes a conservative set of patterns with known .NET
+-semantic gaps through Broiler.Regex. `RegExpBuiltinExec` consumes common match
+-data from either backend; `Split`, `Replace`, and `IJSRegExp.Value` still use
+-the .NET backend.
++semantic gaps through Broiler.Regex — look-behind captures and back-references,
++nullable quantifiers, code-point back-references, astral atoms, and now `v`-mode
++class-set expressions and property escapes used as class members.
++`RegExpBuiltinExec` consumes common match data from either backend; `Split`,
++`Replace`, and `IJSRegExp.Value` still use the .NET backend.
+ 
+ The remaining correctness and adoption gates are tracked in the
+ [repository roadmap](../docs/roadmap.md).
+diff --git a/Broiler.Regex/Unicode/CaseFolding.cs b/Broiler.Regex/Unicode/CaseFolding.cs
+index 6f14070..3f25abb 100644
+--- a/Broiler.Regex/Unicode/CaseFolding.cs
++++ b/Broiler.Regex/Unicode/CaseFolding.cs
+@@ -1,5 +1,5 @@
++using System;
+ using System.Collections.Generic;
+-using System.Text;
+ 
+ namespace Broiler.Regex.Unicode;
+ 
+@@ -8,173 +8,216 @@ namespace Broiler.Regex.Unicode;
+ /// (ECMA-262 §22.2.2.9.4 Canonicalize).
+ /// </summary>
+ /// <remarks>
+-/// The spec distinguishes two modes:
++/// The spec distinguishes two modes, and both are table-driven here from the
++/// Unicode Character Database revision named by
++/// <see cref="CaseFoldingData.UnicodeVersion"/>:
+ /// <list type="bullet">
+-/// <item><b>non-Unicode</b>: canonicalize via <c>toUppercase</c>, but a multi-char
+-/// uppercasing or a result that leaves the ASCII range when the input was ASCII is
+-/// rejected (so <c>ſ</c> does NOT fold to <c>s</c>).</item>
++/// <item><b>non-Unicode</b>: canonicalize via <c>toUppercase</c> of the single code
++/// unit, discarding a multi-code-unit uppercasing and a result that would leave a
++/// non-ASCII input inside ASCII (so <c>ſ</c> does NOT fold to <c>s</c>).</item>
+ /// <item><b>Unicode (<c>u</c>/<c>v</c>)</b>: canonicalize via the Unicode
+ /// <c>CaseFolding.txt</c> "common + simple" mapping (so <c>ſ→s</c>, <c>K→k</c>).</item>
+ /// </list>
+-/// This implementation covers ASCII fully plus a documented subset of the
+-/// non-ASCII simple folds that test262 exercises (the Greek/Latin special cases
+-/// the .NET translator also special-cased). TODO: replace with the full
+-/// <c>Broiler.Unicode</c> simple-fold table for complete conformance.
++/// The generated tables replace the earlier <c>char</c>/<see cref="System.Text.Rune"/>
++/// casing round trip, which had no mapping at all for supplementary code points and
++/// disagreed with <c>scf</c> wherever a script's uppercase and folding directions
++/// differ (Cherokee, Deseret, Adlam, Vithkuqi, Garay, Old Hungarian, Warang Citi).
+ /// </remarks>
+ public static class CaseFolding
+ {
+     /// <summary>
+     /// Returns the canonical representative of <paramref name="codePoint"/> for the
+     /// given mode. Two code points are case-equivalent iff their canonical forms are
+-    /// equal.
++    /// equal, and the mapping is idempotent, so a canonical form canonicalizes to
++    /// itself.
+     /// </summary>
+     public static int Canonicalize(int codePoint, bool unicode)
+     {
+-        if (unicode)
+-            return SimpleFold(codePoint);
++        if (!unicode)
++        {
++            // The non-Unicode branch is defined on a single UTF-16 code unit; a
++            // supplementary code point can only reach here through a `u`-less pattern
++            // that already matches per code unit, so it is left alone.
++            if (codePoint is < 0 or > 0xFFFF)
++                return codePoint;
++            return UpperTable.Map(codePoint);
++        }
+ 
+-        // Non-Unicode Canonicalize: ToUppercase of the single code unit, with the
+-        // ASCII guard (a non-ASCII char must not fold into the ASCII range).
+-        if (codePoint > 0xFFFF)
+-            return codePoint;
++        return codePoint < 0 ? codePoint : SimpleTable.Map(codePoint);
++    }
+ 
+-        var ch = (char)codePoint;
+-        var upper = char.ToUpperInvariant(ch);
+-        if (upper == ch)
+-            return codePoint;
++    /// <summary>
++    /// Returns every code point whose canonical form is <paramref name="canonical"/> —
++    /// the fold orbit of a canonical representative, always including
++    /// <paramref name="canonical"/> itself.
++    /// </summary>
++    /// <remarks>
++    /// §22.2.2.10 CharacterSetMatcher asks whether the class holds <i>any</i> member
++    /// that canonicalizes to the input's canonical form. Canonicalizing every member of
++    /// a class is impossible for a set the size of <c>\p{L}</c>, so the test runs the
++    /// other way: the orbit is small (rarely more than four code points) and membership
++    /// of each orbit element is a plain range lookup.
++    /// </remarks>
++    public static IReadOnlyList<int> Orbit(int canonical, bool unicode)
++        => (unicode ? SimpleTable : UpperTable).Orbit(canonical);
+ 
+-        // Reject a fold that crosses into ASCII from a non-ASCII source.
+-        if (codePoint >= 0x80 && upper < 0x80)
+-            return codePoint;
++    /// <summary>
++    /// The code-point runs that have a simple case fold — every code point <c>c</c> with
++    /// <c>scf(c) ≠ c</c>. §22.2.2.9 AllCharacters excludes exactly these from the universe
++    /// a <c>v</c>-mode complement is taken against when <c>i</c> is on.
++    /// </summary>
++    public static IEnumerable<(int Lo, int Hi)> SimpleFoldSources => SimpleTable.Sources;
+ 
+-        return upper;
++    /// <summary>True when the two code points are case-equivalent in the given mode.</summary>
++    public static bool Equal(int a, int b, bool ignoreCase, bool unicode)
++    {
++        if (a == b)
++            return true;
++        if (!ignoreCase)
++            return false;
++        return Canonicalize(a, unicode) == Canonicalize(b, unicode);
+     }
+ 
++    private static readonly FoldTable SimpleTable = new(CaseFoldingData.SimpleFold);
++    private static readonly FoldTable UpperTable = new(CaseFoldingData.UpperFold);
++
+     /// <summary>
+-    /// Unicode "simple" case fold: lower-cases the code point, with a few
+-    /// special-cased folds that <c>ToLowerInvariant</c> alone gets wrong for
+-    /// regex equivalence.
++    /// One generated fold table: runs of <c>lo..hi</c> that all shift by the same delta,
++    /// searched forward, plus the inverse (orbit) map built on first use.
+     /// </summary>
+-    private static int SimpleFold(int codePoint)
++    private sealed class FoldTable
+     {
+-        switch (codePoint)
+-        {
+-            case 0x017F: return 's';    // ſ LATIN SMALL LETTER LONG S → s
+-            case 0x212A: return 'k';    // K KELVIN SIGN → k
+-            case 0x212B: return 0x00E5; // Å ANGSTROM SIGN → å
+-            case 0x2126: return 0x03C9; // Ω OHM SIGN → ω
+-            case 0x1E9E: return 0x00DF; // ẞ LATIN CAPITAL SHARP S → ß
+-        }
++        private readonly int[] _lo;
++        private readonly int[] _hi;
++        private readonly int[] _delta;
+ 
+-        if (codePoint > 0xFFFF)
+-            return AstralFold(codePoint);
++        private Dictionary<int, int[]> _orbits;
++        private readonly object _gate = new();
+ 
+-        var lower = char.ToLowerInvariant((char)codePoint);
+-        if (lower != (char)codePoint)
+-            return lower;
++        public FoldTable(string encoded)
++        {
++            var runs = CountRuns(encoded);
++            _lo = new int[runs];
++            _hi = new int[runs];
++            _delta = new int[runs];
++
++            var index = 0;
++            var pos = 0;
++            while (pos < encoded.Length)
++            {
++                var lo = ReadHex(encoded, ref pos);
++                var hi = lo;
++                if (pos < encoded.Length && encoded[pos] == '.')
++                {
++                    pos++;
++                    hi = ReadHex(encoded, ref pos);
++                }
++                pos++; // ':'
++                var negative = encoded[pos] == '-';
++                if (negative)
++                    pos++;
++                var delta = ReadHex(encoded, ref pos);
++                if (pos < encoded.Length)
++                    pos++; // ','
++
++                _lo[index] = lo;
++                _hi[index] = hi;
++                _delta[index] = negative ? -delta : delta;
++                index++;
++            }
++        }
+ 
+-        // Some letters only have an upper form whose lower we want as the rep.
+-        var upper = char.ToUpperInvariant((char)codePoint);
+-        if (upper != (char)codePoint)
++        public IEnumerable<(int Lo, int Hi)> Sources
+         {
+-            var upperLower = char.ToLowerInvariant(upper);
+-            if (upperLower != (char)codePoint)
+-                return upperLower;
++            get
++            {
++                for (var run = 0; run < _lo.Length; run++)
++                    yield return (_lo[run], _hi[run]);
++            }
+         }
+ 
+-        return codePoint;
+-    }
++        /// <summary>The canonical form of <paramref name="codePoint"/>, or itself when unmapped.</summary>
++        public int Map(int codePoint)
++        {
++            var lo = 0;
++            var hi = _lo.Length - 1;
++            while (lo <= hi)
++            {
++                var mid = (lo + hi) >> 1;
++                if (codePoint < _lo[mid])
++                    hi = mid - 1;
++                else if (codePoint > _hi[mid])
++                    lo = mid + 1;
++                else
++                    return codePoint + _delta[mid];
++            }
++            return codePoint;
++        }
+ 
+-    /// <summary>
+-    /// Simple fold of a supplementary-plane code point. <see cref="char"/> casing is
+-    /// defined on single UTF-16 code units and leaves every astral code point alone, so
+-    /// the bicameral supplementary scripts — Deseret, Osage, Warang Citi, Medefaidrin,
+-    /// Adlam, Vithkuqi, Old Hungarian — folded to themselves and <c>/𐐀/iu</c> matched
+-    /// only the capital. <see cref="Rune"/> casing is defined on code points and has the
+-    /// mappings; the upper-then-lower round trip is the same representative the JS layer's
+-    /// astral fold table uses, so both engines answer one equivalence class.
+-    /// </summary>
+-    private static int AstralFold(int codePoint)
+-    {
+-        // Garay (Unicode 16.0) is assigned but carries no simple case mapping in .NET's
+-        // tables yet, so the round trip below leaves each letter in a class of its own.
+-        // Fold its capitals (U+10D50..U+10D65) onto their small letters (U+10D70..U+10D85)
+-        // explicitly; the day the tables catch up this agrees with them.
+-        if (codePoint >= GarayCapitalFirst && codePoint <= GarayCapitalLast)
+-            return codePoint + GarayCapitalToSmall;
+-
+-        var rune = new Rune(codePoint);
+-        return Rune.ToLowerInvariant(Rune.ToUpperInvariant(rune)).Value;
+-    }
++        public IReadOnlyList<int> Orbit(int canonical)
++        {
++            var orbits = _orbits;
++            if (orbits == null)
++            {
++                lock (_gate)
++                    _orbits = orbits = BuildOrbits();
++            }
+ 
+-    private const int GarayCapitalFirst = 0x10D50;
+-    private const int GarayCapitalLast = 0x10D65;
+-    private const int GaraySmallFirst = 0x10D70;
+-    private const int GarayCapitalToSmall = GaraySmallFirst - GarayCapitalFirst;
++            return orbits.TryGetValue(canonical, out var members) ? members : [canonical];
++        }
+ 
+-    /// <summary>
+-    /// Yields the small set of code points known to be case-fold siblings of
+-    /// <paramref name="codePoint"/> (used to test class membership in both
+-    /// directions). This is the inverse of the special-case table above.
+-    /// </summary>
+-    public static IEnumerable<int> SimpleSiblings(int codePoint, bool unicode)
+-    {
+-        if (!unicode)
++        private Dictionary<int, int[]> BuildOrbits()
+         {
+-            if (codePoint <= 0xFFFF)
++            var pending = new Dictionary<int, List<int>>();
++            for (var run = 0; run < _lo.Length; run++)
+             {
+-                var ch = (char)codePoint;
+-                var upper = char.ToUpperInvariant(ch);
+-                if (upper != ch && !(codePoint < 0x80 && upper >= 0x80))
+-                    yield return upper;
+-                var lower = char.ToLowerInvariant(ch);
+-                if (lower != ch && !(codePoint < 0x80 && lower >= 0x80))
+-                    yield return lower;
++                for (var cp = _lo[run]; cp <= _hi[run]; cp++)
++                {
++                    var target = cp + _delta[run];
++                    if (!pending.TryGetValue(target, out var members))
++                        pending[target] = members = [target];
++                    members.Add(cp);
++                }
+             }
+-            yield break;
++
++            var result = new Dictionary<int, int[]>(pending.Count);
++            foreach (var (target, members) in pending)
++                result[target] = [.. members];
++            return result;
+         }
+ 
+-        switch (codePoint)
++        private static int CountRuns(string encoded)
+         {
+-            case 's': yield return 0x017F; break;
+-            case 'k': yield return 0x212A; break;
+-            case 0x00E5: yield return 0x212B; break;
+-            case 0x03C9: yield return 0x2126; break;
+-            case 0x00DF: yield return 0x1E9E; break;
++            if (encoded.Length == 0)
++                return 0;
++            var count = 1;
++            foreach (var ch in encoded)
++            {
++                if (ch == ',')
++                    count++;
++            }
++            return count;
+         }
+ 
+-        if (codePoint > 0xFFFF)
++        private static int ReadHex(string encoded, ref int pos)
+         {
+-            // Same reason AstralFold exists: char casing has no mapping for a
+-            // supplementary code point, so the siblings have to come from Rune casing
+-            // (plus Garay, which .NET has no mapping for either).
+-            if (codePoint >= GarayCapitalFirst && codePoint <= GarayCapitalLast)
+-                yield return codePoint + GarayCapitalToSmall;
+-            else if (codePoint >= GaraySmallFirst && codePoint <= GaraySmallFirst + (GarayCapitalLast - GarayCapitalFirst))
+-                yield return codePoint - GarayCapitalToSmall;
+-
+-            var rune = new Rune(codePoint);
+-            var upperRune = Rune.ToUpperInvariant(rune).Value;
+-            if (upperRune != codePoint) yield return upperRune;
+-            var lowerRune = Rune.ToLowerInvariant(rune).Value;
+-            if (lowerRune != codePoint) yield return lowerRune;
+-            yield break;
++            var value = 0;
++            while (pos < encoded.Length)
++            {
++                var digit = HexValue(encoded[pos]);
++                if (digit < 0)
++                    break;
++                value = value * 16 + digit;
++                pos++;
++            }
++            return value;
+         }
+ 
+-        var bmp = (char)codePoint;
+-        var bmpUpper = char.ToUpperInvariant(bmp);
+-        if (bmpUpper != bmp) yield return bmpUpper;
+-        var bmpLower = char.ToLowerInvariant(bmp);
+-        if (bmpLower != bmp) yield return bmpLower;
+-    }
+-
+-    /// <summary>True when the two code points are case-equivalent in the given mode.</summary>
+-    public static bool Equal(int a, int b, bool ignoreCase, bool unicode)
+-    {
+-        if (a == b)
+-            return true;
+-        if (!ignoreCase)
+-            return false;
+-        return Canonicalize(a, unicode) == Canonicalize(b, unicode);
++        private static int HexValue(char c) => c switch
++        {
++            >= '0' and <= '9' => c - '0',
++            >= 'A' and <= 'F' => c - 'A' + 10,
++            _ => -1,
++        };
+     }
+ }
+diff --git a/Broiler.Regex/Unicode/Generated/CaseFoldingData.g.cs b/Broiler.Regex/Unicode/Generated/CaseFoldingData.g.cs
+new file mode 100644
+index 0000000..f914db0
+--- /dev/null
++++ b/Broiler.Regex/Unicode/Generated/CaseFoldingData.g.cs
+@@ -0,0 +1,125 @@
++// <auto-generated>
++//     Generated from the Unicode Character Database 17.0.0
++//     by Unicode/tools/generate-case-folding.py. Do not edit by hand.
++// </auto-generated>
++
++namespace Broiler.Regex.Unicode;
++
++/// <summary>Generated case-fold tables for ECMA-262 §22.2.2.9.4 Canonicalize.</summary>
++internal static class CaseFoldingData
++{
++    /// <summary>The Unicode revision these tables were generated from.</summary>
++    public const string UnicodeVersion = "17.0.0";
++
++    /// <summary>CaseFolding.txt "common + simple" folding — the u/v-mode branch.</summary>
++    public const string SimpleFold =
++        "41.5A:20,B5:307,C0.D6:20,D8.DE:20,100:1,102:1,104:1,106:1,108:1,10A:1,10C:1,10E:1,110:1,112:1,114:1," +
++        "116:1,118:1,11A:1,11C:1,11E:1,120:1,122:1,124:1,126:1,128:1,12A:1,12C:1,12E:1,132:1,134:1,136:1,139:" +
++        "1,13B:1,13D:1,13F:1,141:1,143:1,145:1,147:1,14A:1,14C:1,14E:1,150:1,152:1,154:1,156:1,158:1,15A:1,15" +
++        "C:1,15E:1,160:1,162:1,164:1,166:1,168:1,16A:1,16C:1,16E:1,170:1,172:1,174:1,176:1,178:-79,179:1,17B:" +
++        "1,17D:1,17F:-10C,181:D2,182:1,184:1,186:CE,187:1,189.18A:CD,18B:1,18E:4F,18F:CA,190:CB,191:1,193:CD," +
++        "194:CF,196:D3,197:D1,198:1,19C:D3,19D:D5,19F:D6,1A0:1,1A2:1,1A4:1,1A6:DA,1A7:1,1A9:DA,1AC:1,1AE:DA,1" +
++        "AF:1,1B1.1B2:D9,1B3:1,1B5:1,1B7:DB,1B8:1,1BC:1,1C4:2,1C5:1,1C7:2,1C8:1,1CA:2,1CB:1,1CD:1,1CF:1,1D1:1" +
++        ",1D3:1,1D5:1,1D7:1,1D9:1,1DB:1,1DE:1,1E0:1,1E2:1,1E4:1,1E6:1,1E8:1,1EA:1,1EC:1,1EE:1,1F1:2,1F2:1,1F4" +
++        ":1,1F6:-61,1F7:-38,1F8:1,1FA:1,1FC:1,1FE:1,200:1,202:1,204:1,206:1,208:1,20A:1,20C:1,20E:1,210:1,212" +
++        ":1,214:1,216:1,218:1,21A:1,21C:1,21E:1,220:-82,222:1,224:1,226:1,228:1,22A:1,22C:1,22E:1,230:1,232:1" +
++        ",23A:2A2B,23B:1,23D:-A3,23E:2A28,241:1,243:-C3,244:45,245:47,246:1,248:1,24A:1,24C:1,24E:1,345:74,37" +
++        "0:1,372:1,376:1,37F:74,386:26,388.38A:25,38C:40,38E.38F:3F,391.3A1:20,3A3.3AB:20,3C2:1,3CF:8,3D0:-1E" +
++        ",3D1:-19,3D5:-F,3D6:-16,3D8:1,3DA:1,3DC:1,3DE:1,3E0:1,3E2:1,3E4:1,3E6:1,3E8:1,3EA:1,3EC:1,3EE:1,3F0:" +
++        "-36,3F1:-30,3F4:-3C,3F5:-40,3F7:1,3F9:-7,3FA:1,3FD.3FF:-82,400.40F:50,410.42F:20,460:1,462:1,464:1,4" +
++        "66:1,468:1,46A:1,46C:1,46E:1,470:1,472:1,474:1,476:1,478:1,47A:1,47C:1,47E:1,480:1,48A:1,48C:1,48E:1" +
++        ",490:1,492:1,494:1,496:1,498:1,49A:1,49C:1,49E:1,4A0:1,4A2:1,4A4:1,4A6:1,4A8:1,4AA:1,4AC:1,4AE:1,4B0" +
++        ":1,4B2:1,4B4:1,4B6:1,4B8:1,4BA:1,4BC:1,4BE:1,4C0:F,4C1:1,4C3:1,4C5:1,4C7:1,4C9:1,4CB:1,4CD:1,4D0:1,4" +
++        "D2:1,4D4:1,4D6:1,4D8:1,4DA:1,4DC:1,4DE:1,4E0:1,4E2:1,4E4:1,4E6:1,4E8:1,4EA:1,4EC:1,4EE:1,4F0:1,4F2:1" +
++        ",4F4:1,4F6:1,4F8:1,4FA:1,4FC:1,4FE:1,500:1,502:1,504:1,506:1,508:1,50A:1,50C:1,50E:1,510:1,512:1,514" +
++        ":1,516:1,518:1,51A:1,51C:1,51E:1,520:1,522:1,524:1,526:1,528:1,52A:1,52C:1,52E:1,531.556:30,10A0.10C" +
++        "5:1C60,10C7:1C60,10CD:1C60,13F8.13FD:-8,1C80:-184E,1C81:-184D,1C82:-1844,1C83.1C84:-1842,1C85:-1843," +
++        "1C86:-183C,1C87:-1824,1C88:89C3,1C89:1,1C90.1CBA:-BC0,1CBD.1CBF:-BC0,1E00:1,1E02:1,1E04:1,1E06:1,1E0" +
++        "8:1,1E0A:1,1E0C:1,1E0E:1,1E10:1,1E12:1,1E14:1,1E16:1,1E18:1,1E1A:1,1E1C:1,1E1E:1,1E20:1,1E22:1,1E24:" +
++        "1,1E26:1,1E28:1,1E2A:1,1E2C:1,1E2E:1,1E30:1,1E32:1,1E34:1,1E36:1,1E38:1,1E3A:1,1E3C:1,1E3E:1,1E40:1," +
++        "1E42:1,1E44:1,1E46:1,1E48:1,1E4A:1,1E4C:1,1E4E:1,1E50:1,1E52:1,1E54:1,1E56:1,1E58:1,1E5A:1,1E5C:1,1E" +
++        "5E:1,1E60:1,1E62:1,1E64:1,1E66:1,1E68:1,1E6A:1,1E6C:1,1E6E:1,1E70:1,1E72:1,1E74:1,1E76:1,1E78:1,1E7A" +
++        ":1,1E7C:1,1E7E:1,1E80:1,1E82:1,1E84:1,1E86:1,1E88:1,1E8A:1,1E8C:1,1E8E:1,1E90:1,1E92:1,1E94:1,1E9B:-" +
++        "3A,1E9E:-1DBF,1EA0:1,1EA2:1,1EA4:1,1EA6:1,1EA8:1,1EAA:1,1EAC:1,1EAE:1,1EB0:1,1EB2:1,1EB4:1,1EB6:1,1E" +
++        "B8:1,1EBA:1,1EBC:1,1EBE:1,1EC0:1,1EC2:1,1EC4:1,1EC6:1,1EC8:1,1ECA:1,1ECC:1,1ECE:1,1ED0:1,1ED2:1,1ED4" +
++        ":1,1ED6:1,1ED8:1,1EDA:1,1EDC:1,1EDE:1,1EE0:1,1EE2:1,1EE4:1,1EE6:1,1EE8:1,1EEA:1,1EEC:1,1EEE:1,1EF0:1" +
++        ",1EF2:1,1EF4:1,1EF6:1,1EF8:1,1EFA:1,1EFC:1,1EFE:1,1F08.1F0F:-8,1F18.1F1D:-8,1F28.1F2F:-8,1F38.1F3F:-" +
++        "8,1F48.1F4D:-8,1F59:-8,1F5B:-8,1F5D:-8,1F5F:-8,1F68.1F6F:-8,1F88.1F8F:-8,1F98.1F9F:-8,1FA8.1FAF:-8,1" +
++        "FB8.1FB9:-8,1FBA.1FBB:-4A,1FBC:-9,1FBE:-1C05,1FC8.1FCB:-56,1FCC:-9,1FD3:-1C43,1FD8.1FD9:-8,1FDA.1FDB" +
++        ":-64,1FE3:-1C33,1FE8.1FE9:-8,1FEA.1FEB:-70,1FEC:-7,1FF8.1FF9:-80,1FFA.1FFB:-7E,1FFC:-9,2126:-1D5D,21" +
++        "2A:-20BF,212B:-2046,2132:1C,2160.216F:10,2183:1,24B6.24CF:1A,2C00.2C2F:30,2C60:1,2C62:-29F7,2C63:-EE" +
++        "6,2C64:-29E7,2C67:1,2C69:1,2C6B:1,2C6D:-2A1C,2C6E:-29FD,2C6F:-2A1F,2C70:-2A1E,2C72:1,2C75:1,2C7E.2C7" +
++        "F:-2A3F,2C80:1,2C82:1,2C84:1,2C86:1,2C88:1,2C8A:1,2C8C:1,2C8E:1,2C90:1,2C92:1,2C94:1,2C96:1,2C98:1,2" +
++        "C9A:1,2C9C:1,2C9E:1,2CA0:1,2CA2:1,2CA4:1,2CA6:1,2CA8:1,2CAA:1,2CAC:1,2CAE:1,2CB0:1,2CB2:1,2CB4:1,2CB" +
++        "6:1,2CB8:1,2CBA:1,2CBC:1,2CBE:1,2CC0:1,2CC2:1,2CC4:1,2CC6:1,2CC8:1,2CCA:1,2CCC:1,2CCE:1,2CD0:1,2CD2:" +
++        "1,2CD4:1,2CD6:1,2CD8:1,2CDA:1,2CDC:1,2CDE:1,2CE0:1,2CE2:1,2CEB:1,2CED:1,2CF2:1,A640:1,A642:1,A644:1," +
++        "A646:1,A648:1,A64A:1,A64C:1,A64E:1,A650:1,A652:1,A654:1,A656:1,A658:1,A65A:1,A65C:1,A65E:1,A660:1,A6" +
++        "62:1,A664:1,A666:1,A668:1,A66A:1,A66C:1,A680:1,A682:1,A684:1,A686:1,A688:1,A68A:1,A68C:1,A68E:1,A690" +
++        ":1,A692:1,A694:1,A696:1,A698:1,A69A:1,A722:1,A724:1,A726:1,A728:1,A72A:1,A72C:1,A72E:1,A732:1,A734:1" +
++        ",A736:1,A738:1,A73A:1,A73C:1,A73E:1,A740:1,A742:1,A744:1,A746:1,A748:1,A74A:1,A74C:1,A74E:1,A750:1,A" +
++        "752:1,A754:1,A756:1,A758:1,A75A:1,A75C:1,A75E:1,A760:1,A762:1,A764:1,A766:1,A768:1,A76A:1,A76C:1,A76" +
++        "E:1,A779:1,A77B:1,A77D:-8A04,A77E:1,A780:1,A782:1,A784:1,A786:1,A78B:1,A78D:-A528,A790:1,A792:1,A796" +
++        ":1,A798:1,A79A:1,A79C:1,A79E:1,A7A0:1,A7A2:1,A7A4:1,A7A6:1,A7A8:1,A7AA:-A544,A7AB:-A54F,A7AC:-A54B,A" +
++        "7AD:-A541,A7AE:-A544,A7B0:-A512,A7B1:-A52A,A7B2:-A515,A7B3:3A0,A7B4:1,A7B6:1,A7B8:1,A7BA:1,A7BC:1,A7" +
++        "BE:1,A7C0:1,A7C2:1,A7C4:-30,A7C5:-A543,A7C6:-8A38,A7C7:1,A7C9:1,A7CB:-A567,A7CC:1,A7CE:1,A7D0:1,A7D2" +
++        ":1,A7D4:1,A7D6:1,A7D8:1,A7DA:1,A7DC:-A641,A7F5:1,AB70.ABBF:-97D0,FB05:1,FF21.FF3A:20,10400.10427:28," +
++        "104B0.104D3:28,10570.1057A:27,1057C.1058A:27,1058C.10592:27,10594.10595:27,10C80.10CB2:40,10D50.10D6" +
++        "5:20,118A0.118BF:20,16E40.16E5F:20,16EA0.16EB8:1B,1E900.1E921:22";
++
++    /// <summary>Per-code-unit toUppercase canonicalization — the non-Unicode branch.</summary>
++    public const string UpperFold =
++        "61.7A:-20,B5:2E7,E0.F6:-20,F8.FE:-20,FF:79,101:-1,103:-1,105:-1,107:-1,109:-1,10B:-1,10D:-1,10F:-1,1" +
++        "11:-1,113:-1,115:-1,117:-1,119:-1,11B:-1,11D:-1,11F:-1,121:-1,123:-1,125:-1,127:-1,129:-1,12B:-1,12D" +
++        ":-1,12F:-1,133:-1,135:-1,137:-1,13A:-1,13C:-1,13E:-1,140:-1,142:-1,144:-1,146:-1,148:-1,14B:-1,14D:-" +
++        "1,14F:-1,151:-1,153:-1,155:-1,157:-1,159:-1,15B:-1,15D:-1,15F:-1,161:-1,163:-1,165:-1,167:-1,169:-1," +
++        "16B:-1,16D:-1,16F:-1,171:-1,173:-1,175:-1,177:-1,17A:-1,17C:-1,17E:-1,180:C3,183:-1,185:-1,188:-1,18" +
++        "C:-1,192:-1,195:61,199:-1,19A:A3,19B:A641,19E:82,1A1:-1,1A3:-1,1A5:-1,1A8:-1,1AD:-1,1B0:-1,1B4:-1,1B" +
++        "6:-1,1B9:-1,1BD:-1,1BF:38,1C5:-1,1C6:-2,1C8:-1,1C9:-2,1CB:-1,1CC:-2,1CE:-1,1D0:-1,1D2:-1,1D4:-1,1D6:" +
++        "-1,1D8:-1,1DA:-1,1DC:-1,1DD:-4F,1DF:-1,1E1:-1,1E3:-1,1E5:-1,1E7:-1,1E9:-1,1EB:-1,1ED:-1,1EF:-1,1F2:-" +
++        "1,1F3:-2,1F5:-1,1F9:-1,1FB:-1,1FD:-1,1FF:-1,201:-1,203:-1,205:-1,207:-1,209:-1,20B:-1,20D:-1,20F:-1," +
++        "211:-1,213:-1,215:-1,217:-1,219:-1,21B:-1,21D:-1,21F:-1,223:-1,225:-1,227:-1,229:-1,22B:-1,22D:-1,22" +
++        "F:-1,231:-1,233:-1,23C:-1,23F.240:2A3F,242:-1,247:-1,249:-1,24B:-1,24D:-1,24F:-1,250:2A1F,251:2A1C,2" +
++        "52:2A1E,253:-D2,254:-CE,256.257:-CD,259:-CA,25B:-CB,25C:A54F,260:-CD,261:A54B,263:-CF,264:A567,265:A" +
++        "528,266:A544,268:-D1,269:-D3,26A:A544,26B:29F7,26C:A541,26F:-D3,271:29FD,272:-D5,275:-D6,27D:29E7,28" +
++        "0:-DA,282:A543,283:-DA,287:A52A,288:-DA,289:-45,28A.28B:-D9,28C:-47,292:-DB,29D:A515,29E:A512,345:54" +
++        ",371:-1,373:-1,377:-1,37B.37D:82,3AC:-26,3AD.3AF:-25,3B1.3C1:-20,3C2:-1F,3C3.3CB:-20,3CC:-40,3CD.3CE" +
++        ":-3F,3D0:-3E,3D1:-39,3D5:-2F,3D6:-36,3D7:-8,3D9:-1,3DB:-1,3DD:-1,3DF:-1,3E1:-1,3E3:-1,3E5:-1,3E7:-1," +
++        "3E9:-1,3EB:-1,3ED:-1,3EF:-1,3F0:-56,3F1:-50,3F2:7,3F3:-74,3F5:-60,3F8:-1,3FB:-1,430.44F:-20,450.45F:" +
++        "-50,461:-1,463:-1,465:-1,467:-1,469:-1,46B:-1,46D:-1,46F:-1,471:-1,473:-1,475:-1,477:-1,479:-1,47B:-" +
++        "1,47D:-1,47F:-1,481:-1,48B:-1,48D:-1,48F:-1,491:-1,493:-1,495:-1,497:-1,499:-1,49B:-1,49D:-1,49F:-1," +
++        "4A1:-1,4A3:-1,4A5:-1,4A7:-1,4A9:-1,4AB:-1,4AD:-1,4AF:-1,4B1:-1,4B3:-1,4B5:-1,4B7:-1,4B9:-1,4BB:-1,4B" +
++        "D:-1,4BF:-1,4C2:-1,4C4:-1,4C6:-1,4C8:-1,4CA:-1,4CC:-1,4CE:-1,4CF:-F,4D1:-1,4D3:-1,4D5:-1,4D7:-1,4D9:" +
++        "-1,4DB:-1,4DD:-1,4DF:-1,4E1:-1,4E3:-1,4E5:-1,4E7:-1,4E9:-1,4EB:-1,4ED:-1,4EF:-1,4F1:-1,4F3:-1,4F5:-1" +
++        ",4F7:-1,4F9:-1,4FB:-1,4FD:-1,4FF:-1,501:-1,503:-1,505:-1,507:-1,509:-1,50B:-1,50D:-1,50F:-1,511:-1,5" +
++        "13:-1,515:-1,517:-1,519:-1,51B:-1,51D:-1,51F:-1,521:-1,523:-1,525:-1,527:-1,529:-1,52B:-1,52D:-1,52F" +
++        ":-1,561.586:-30,10D0.10FA:BC0,10FD.10FF:BC0,13F8.13FD:-8,1C80:-186E,1C81:-186D,1C82:-1864,1C83.1C84:" +
++        "-1862,1C85:-1863,1C86:-185C,1C87:-1825,1C88:89C2,1C8A:-1,1D79:8A04,1D7D:EE6,1D8E:8A38,1E01:-1,1E03:-" +
++        "1,1E05:-1,1E07:-1,1E09:-1,1E0B:-1,1E0D:-1,1E0F:-1,1E11:-1,1E13:-1,1E15:-1,1E17:-1,1E19:-1,1E1B:-1,1E" +
++        "1D:-1,1E1F:-1,1E21:-1,1E23:-1,1E25:-1,1E27:-1,1E29:-1,1E2B:-1,1E2D:-1,1E2F:-1,1E31:-1,1E33:-1,1E35:-" +
++        "1,1E37:-1,1E39:-1,1E3B:-1,1E3D:-1,1E3F:-1,1E41:-1,1E43:-1,1E45:-1,1E47:-1,1E49:-1,1E4B:-1,1E4D:-1,1E" +
++        "4F:-1,1E51:-1,1E53:-1,1E55:-1,1E57:-1,1E59:-1,1E5B:-1,1E5D:-1,1E5F:-1,1E61:-1,1E63:-1,1E65:-1,1E67:-" +
++        "1,1E69:-1,1E6B:-1,1E6D:-1,1E6F:-1,1E71:-1,1E73:-1,1E75:-1,1E77:-1,1E79:-1,1E7B:-1,1E7D:-1,1E7F:-1,1E" +
++        "81:-1,1E83:-1,1E85:-1,1E87:-1,1E89:-1,1E8B:-1,1E8D:-1,1E8F:-1,1E91:-1,1E93:-1,1E95:-1,1E9B:-3B,1EA1:" +
++        "-1,1EA3:-1,1EA5:-1,1EA7:-1,1EA9:-1,1EAB:-1,1EAD:-1,1EAF:-1,1EB1:-1,1EB3:-1,1EB5:-1,1EB7:-1,1EB9:-1,1" +
++        "EBB:-1,1EBD:-1,1EBF:-1,1EC1:-1,1EC3:-1,1EC5:-1,1EC7:-1,1EC9:-1,1ECB:-1,1ECD:-1,1ECF:-1,1ED1:-1,1ED3:" +
++        "-1,1ED5:-1,1ED7:-1,1ED9:-1,1EDB:-1,1EDD:-1,1EDF:-1,1EE1:-1,1EE3:-1,1EE5:-1,1EE7:-1,1EE9:-1,1EEB:-1,1" +
++        "EED:-1,1EEF:-1,1EF1:-1,1EF3:-1,1EF5:-1,1EF7:-1,1EF9:-1,1EFB:-1,1EFD:-1,1EFF:-1,1F00.1F07:8,1F10.1F15" +
++        ":8,1F20.1F27:8,1F30.1F37:8,1F40.1F45:8,1F51:8,1F53:8,1F55:8,1F57:8,1F60.1F67:8,1F70.1F71:4A,1F72.1F7" +
++        "5:56,1F76.1F77:64,1F78.1F79:80,1F7A.1F7B:70,1F7C.1F7D:7E,1FB0.1FB1:8,1FBE:-1C25,1FD0.1FD1:8,1FE0.1FE" +
++        "1:8,1FE5:7,214E:-1C,2170.217F:-10,2184:-1,24D0.24E9:-1A,2C30.2C5F:-30,2C61:-1,2C65:-2A2B,2C66:-2A28," +
++        "2C68:-1,2C6A:-1,2C6C:-1,2C73:-1,2C76:-1,2C81:-1,2C83:-1,2C85:-1,2C87:-1,2C89:-1,2C8B:-1,2C8D:-1,2C8F" +
++        ":-1,2C91:-1,2C93:-1,2C95:-1,2C97:-1,2C99:-1,2C9B:-1,2C9D:-1,2C9F:-1,2CA1:-1,2CA3:-1,2CA5:-1,2CA7:-1," +
++        "2CA9:-1,2CAB:-1,2CAD:-1,2CAF:-1,2CB1:-1,2CB3:-1,2CB5:-1,2CB7:-1,2CB9:-1,2CBB:-1,2CBD:-1,2CBF:-1,2CC1" +
++        ":-1,2CC3:-1,2CC5:-1,2CC7:-1,2CC9:-1,2CCB:-1,2CCD:-1,2CCF:-1,2CD1:-1,2CD3:-1,2CD5:-1,2CD7:-1,2CD9:-1," +
++        "2CDB:-1,2CDD:-1,2CDF:-1,2CE1:-1,2CE3:-1,2CEC:-1,2CEE:-1,2CF3:-1,2D00.2D25:-1C60,2D27:-1C60,2D2D:-1C6" +
++        "0,A641:-1,A643:-1,A645:-1,A647:-1,A649:-1,A64B:-1,A64D:-1,A64F:-1,A651:-1,A653:-1,A655:-1,A657:-1,A6" +
++        "59:-1,A65B:-1,A65D:-1,A65F:-1,A661:-1,A663:-1,A665:-1,A667:-1,A669:-1,A66B:-1,A66D:-1,A681:-1,A683:-" +
++        "1,A685:-1,A687:-1,A689:-1,A68B:-1,A68D:-1,A68F:-1,A691:-1,A693:-1,A695:-1,A697:-1,A699:-1,A69B:-1,A7" +
++        "23:-1,A725:-1,A727:-1,A729:-1,A72B:-1,A72D:-1,A72F:-1,A733:-1,A735:-1,A737:-1,A739:-1,A73B:-1,A73D:-" +
++        "1,A73F:-1,A741:-1,A743:-1,A745:-1,A747:-1,A749:-1,A74B:-1,A74D:-1,A74F:-1,A751:-1,A753:-1,A755:-1,A7" +
++        "57:-1,A759:-1,A75B:-1,A75D:-1,A75F:-1,A761:-1,A763:-1,A765:-1,A767:-1,A769:-1,A76B:-1,A76D:-1,A76F:-" +
++        "1,A77A:-1,A77C:-1,A77F:-1,A781:-1,A783:-1,A785:-1,A787:-1,A78C:-1,A791:-1,A793:-1,A794:30,A797:-1,A7" +
++        "99:-1,A79B:-1,A79D:-1,A79F:-1,A7A1:-1,A7A3:-1,A7A5:-1,A7A7:-1,A7A9:-1,A7B5:-1,A7B7:-1,A7B9:-1,A7BB:-" +
++        "1,A7BD:-1,A7BF:-1,A7C1:-1,A7C3:-1,A7C8:-1,A7CA:-1,A7CD:-1,A7CF:-1,A7D1:-1,A7D3:-1,A7D5:-1,A7D7:-1,A7" +
++        "D9:-1,A7DB:-1,A7F6:-1,AB53:-3A0,AB70.ABBF:-97D0,FF41.FF5A:-20";
++}
+diff --git a/Broiler.Regex/Unicode/UnicodeCharSets.cs b/Broiler.Regex/Unicode/UnicodeCharSets.cs
+index 874cf6b..cb54d34 100644
+--- a/Broiler.Regex/Unicode/UnicodeCharSets.cs
++++ b/Broiler.Regex/Unicode/UnicodeCharSets.cs
+@@ -1,36 +1,44 @@
+ using System;
++using System.Collections.Generic;
+ using Broiler.Regex.Ast;
++using Broiler.Unicode.Properties;
++using UnicodeEmoji.StringProperties;
+ 
+ namespace Broiler.Regex.Unicode;
+ 
+ /// <summary>
+-/// Membership tests for the built-in ECMAScript character-class escapes
+-/// (<c>\d \D \w \W \s \S</c>) and the entry point for Unicode property escapes
+-/// (<c>\p{…}</c>), per ECMA-262 §22.2.1 / Table 64.
++/// The code-point sets behind the built-in ECMAScript character-class escapes
++/// (<c>\d \D \w \W \s \S</c>) and behind Unicode property escapes
++/// (<c>\p{…}</c> / <c>\P{…}</c>), per ECMA-262 §22.2.1 / Table 64.
+ /// </summary>
++/// <remarks>
++/// Property data comes from the pinned <c>Broiler.Unicode</c> range tables — the same
++/// generated UCD revision the JavaScript layer's translator reads — so both engines
++/// answer one set for a given property name.
++/// </remarks>
+ public static class UnicodeCharSets
+ {
+-    public static bool MatchesEscape(ClassEscape escape, int codePoint) => escape switch
++    /// <summary>The set matched by one built-in class escape.</summary>
++    /// <remarks>
++    /// <paramref name="ignoreCase"/> and <paramref name="unicode"/> only matter for
++    /// <c>\w</c>/<c>\W</c>: §22.2.2.9.2 WordCharacters widens the basic word set with
++    /// every code point that case-folds into it when both flags are on, which is why
++    /// <c>/\W/iu</c> must NOT match <c>ſ</c> even though <c>ſ</c> is not a word character.
++    /// </remarks>
++    public static CodePointSet EscapeSet(ClassEscape escape, bool ignoreCase, bool unicode) => escape switch
+     {
+-        ClassEscape.Digit => IsDigit(codePoint),
+-        ClassEscape.NonDigit => !IsDigit(codePoint),
+-        ClassEscape.Word => IsWord(codePoint),
+-        ClassEscape.NonWord => !IsWord(codePoint),
+-        ClassEscape.Space => IsSpace(codePoint),
+-        ClassEscape.NonSpace => !IsSpace(codePoint),
+-        _ => false,
++        ClassEscape.Digit => DigitSet.Clone(),
++        ClassEscape.NonDigit => DigitSet.Complement(),
++        ClassEscape.Word => WordSet(ignoreCase, unicode).Clone(),
++        ClassEscape.NonWord => WordSet(ignoreCase, unicode).Complement(),
++        ClassEscape.Space => SpaceSet.Clone(),
++        ClassEscape.NonSpace => SpaceSet.Complement(),
++        _ => CodePointSet.Empty(),
+     };
+ 
+     /// <summary><c>\d</c> — exactly ASCII <c>0-9</c> (§22.2.1).</summary>
+     public static bool IsDigit(int cp) => cp >= '0' && cp <= '9';
+ 
+-    /// <summary><c>\w</c> — ASCII letters, digits, and underscore (§22.2.1).</summary>
+-    public static bool IsWord(int cp)
+-        => (cp >= 'a' && cp <= 'z')
+-        || (cp >= 'A' && cp <= 'Z')
+-        || (cp >= '0' && cp <= '9')
+-        || cp == '_';
+-
+     /// <summary>
+     /// <c>\s</c> — WhiteSpace ∪ LineTerminator (§22.2.1 / Table 36 + §12.2).
+     /// This is the full ECMAScript white-space set, broader than .NET's <c>\s</c>.
+@@ -50,18 +58,224 @@ public static class UnicodeCharSets
+         _ => false,
+     };
+ 
++    /// <summary>§22.2.2.9.2 WordCharacters — <c>\w</c>'s set for the given mode.</summary>
++    public static CodePointSet WordSet(bool ignoreCase, bool unicode)
++    {
++        if (!ignoreCase || !unicode)
++            return BasicWordSet;
++
++        return FoldedWordSet;
++    }
++
++    /// <summary>§22.2.2.5 IsWordChar, used by <c>\b</c> / <c>\B</c>.</summary>
++    public static bool IsWord(int cp, bool ignoreCase, bool unicode)
++        => WordSet(ignoreCase, unicode).Contains(cp);
++
++    /// <summary>The positive counterpart of a complementing escape (<c>\D</c> → <c>\d</c>).</summary>
++    public static ClassEscape PositiveEscape(ClassEscape escape) => escape switch
++    {
++        ClassEscape.NonDigit => ClassEscape.Digit,
++        ClassEscape.NonWord => ClassEscape.Word,
++        ClassEscape.NonSpace => ClassEscape.Space,
++        _ => escape,
++    };
++
++    /// <summary>True for <c>\D</c>, <c>\W</c> and <c>\S</c>.</summary>
++    public static bool IsComplementEscape(ClassEscape escape)
++        => escape is ClassEscape.NonDigit or ClassEscape.NonWord or ClassEscape.NonSpace;
++
+     /// <summary>
+-    /// Resolves a Unicode property escape such as <c>\p{Letter}</c> /
+-    /// <c>\p{Script=Greek}</c> to a membership predicate.
++    /// §22.2.2.9 AllCharacters — the universe a complement is taken against. Under
++    /// <c>v</c> with <c>i</c> that universe holds only the code points that fold to
++    /// themselves, which is why <c>[^\p{Lu}]</c> excludes <c>A</c> as well as <c>a</c>:
++    /// <c>A</c> is not in the universe at all, having folded to <c>a</c>.
++    /// </summary>
++    public static CodePointSet AllCharacters(bool unicodeSets, bool ignoreCase)
++        => unicodeSets && ignoreCase ? CanonicalCharacters : FullRange;
++
++    // ----- Unicode property escapes -------------------------------------------
++
++    /// <summary>The resolution of one <c>\p{…}</c> escape.</summary>
++    public sealed class PropertyMatch(CodePointSet codePoints, IReadOnlyList<string> strings)
++    {
++        /// <summary>The code points the property matches.</summary>
++        public readonly CodePointSet CodePoints = codePoints;
++
++        /// <summary>
++        /// The multi-code-point sequences a property of strings (UTS #51) matches; empty
++        /// for an ordinary property. A property of strings may only be used in a
++        /// <c>v</c>-mode class and may never be negated (§22.2.1 early errors).
++        /// </summary>
++        public readonly IReadOnlyList<string> Strings = strings;
++
++        public bool IsStringProperty => Strings.Count > 0;
++    }
++
++    /// <summary>
++    /// Resolves a Unicode property escape such as <c>\p{Letter}</c>,
++    /// <c>\p{Script=Greek}</c> or <c>\p{RGI_Emoji}</c>, or returns <c>null</c> when the
++    /// name is not one ECMAScript recognises (which the caller reports as a SyntaxError).
+     /// </summary>
+     /// <remarks>
+-    /// TODO: back this with the <c>Broiler.Unicode</c> property tables (the same
+-    /// data the translator's <c>TransformUnicodePropertyEscapes</c> uses). Until
+-    /// then it is a recognised-but-unimplemented stub so the parser can accept the
+-    /// syntax without silently mis-matching.
++    /// ECMAScript admits three shapes (§22.2.1 UnicodePropertyValueExpression): the
++    /// <c>General_Category=…</c>, <c>Script=…</c> and <c>Script_Extensions=…</c>
++    /// name/value forms, a lone General_Category value, and a lone binary property or
++    /// property of strings. Names are matched loosely — case-insensitively and ignoring
++    /// <c>_</c>, <c>-</c> and spaces — by the Broiler.Unicode tables, so the canonical
++    /// names and the ECMAScript aliases both resolve.
+     /// </remarks>
+-    public static Func<int, bool> ResolveProperty(string name, string? value)
+-        => throw new NotSupportedException(
+-            $"Unicode property escape \\p{{{(value is null ? name : $"{name}={value}")}}} " +
+-            "is not yet implemented in Broiler.Regex (see README 'Known limitations').");
++    public static PropertyMatch ResolveProperty(string name, string value)
++    {
++        if (string.IsNullOrEmpty(name))
++            return null;
++
++        if (value != null)
++        {
++            var key = Normalize(name);
++            var ranges = key switch
++            {
++                "gc" or "generalcategory" => UnicodeProperties.GetGeneralCategory(value),
++                "sc" or "script" => UnicodeProperties.GetScript(value),
++                "scx" or "scriptextensions" => UnicodeProperties.GetScriptExtensions(value),
++                _ => null,
++            };
++            return ranges == null ? null : new PropertyMatch(FromRanges(ranges), []);
++        }
++
++        // A lone name is a General_Category value, a binary property, or a property of
++        // strings — in that order, which is how the spec's tables are laid out.
++        var category = UnicodeProperties.GetGeneralCategory(name);
++        if (category != null)
++            return new PropertyMatch(FromRanges(category), []);
++
++        var binary = UnicodeProperties.GetBinaryProperty(name);
++        if (binary != null)
++            return new PropertyMatch(FromRanges(binary), []);
++
++        if (StringPropertyNames.TryGetValue(Normalize(name), out var emoji))
++            return ResolveStringProperty(emoji);
++
++        return null;
++    }
++
++    private static PropertyMatch ResolveStringProperty(EmojiSequenceProperties property)
++    {
++        lock (StringPropertyCache)
++        {
++            if (StringPropertyCache.TryGetValue(property, out var cached))
++                return cached;
++
++            // A property of strings still contributes its single-code-point members to the
++            // code-point set; only the longer sequences need string matching.
++            var codePoints = new CodePointSet();
++            var strings = new List<string>();
++            foreach (var sequence in EmojiStringProperties.GetSequences(property))
++            {
++                if (sequence.Length == 1)
++                    codePoints.AddCodePoint(sequence[0]);
++                else if (sequence.Length == 2 && char.IsHighSurrogate(sequence[0]) && char.IsLowSurrogate(sequence[1]))
++                    codePoints.AddCodePoint(char.ConvertToUtf32(sequence[0], sequence[1]));
++                else
++                    strings.Add(sequence);
++            }
++
++            var match = new PropertyMatch(codePoints, strings);
++            StringPropertyCache[property] = match;
++            return match;
++        }
++    }
++
++    private static CodePointSet FromRanges((int Lo, int Hi)[] ranges)
++    {
++        var set = new CodePointSet();
++        foreach (var (lo, hi) in ranges)
++            set.AddRange(lo, hi);
++        return set;
++    }
++
++    private static string Normalize(string s)
++    {
++        var buffer = new char[s.Length];
++        var n = 0;
++        foreach (var ch in s)
++        {
++            if (ch is '_' or ' ' or '-')
++                continue;
++            buffer[n++] = char.ToLowerInvariant(ch);
++        }
++        return new string(buffer, 0, n);
++    }
++
++    // ----- Built-in sets ------------------------------------------------------
++
++    private static readonly CodePointSet FullRange = CodePointSet.Of(0, CodePointSet.MaxCodePoint);
++
++    private static readonly CodePointSet CanonicalCharacters = BuildCanonicalCharacters();
++
++    private static readonly CodePointSet DigitSet = CodePointSet.Of('0', '9');
++
++    private static readonly CodePointSet SpaceSet = BuildSpaceSet();
++
++    private static readonly CodePointSet BasicWordSet = BuildBasicWordSet();
++
++    private static readonly CodePointSet FoldedWordSet = BuildFoldedWordSet();
++
++    private static readonly Dictionary<string, EmojiSequenceProperties> StringPropertyNames = new(StringComparer.Ordinal)
++    {
++        ["rgiemoji"] = EmojiSequenceProperties.RgiEmoji,
++        ["rgiemojiflagsequence"] = EmojiSequenceProperties.RgiEmojiFlagSequence,
++        ["rgiemojimodifiersequence"] = EmojiSequenceProperties.RgiEmojiModifierSequence,
++        ["rgiemojitagsequence"] = EmojiSequenceProperties.RgiEmojiTagSequence,
++        ["rgiemojizwjsequence"] = EmojiSequenceProperties.RgiEmojiZwjSequence,
++        ["basicemoji"] = EmojiSequenceProperties.BasicEmoji,
++        ["emojikeycapsequence"] = EmojiSequenceProperties.EmojiKeycapSequence,
++    };
++
++    private static readonly Dictionary<EmojiSequenceProperties, PropertyMatch> StringPropertyCache = [];
++
++    private static CodePointSet BuildCanonicalCharacters()
++    {
++        var folding = new CodePointSet();
++        foreach (var (lo, hi) in CaseFolding.SimpleFoldSources)
++            folding.AddRange(lo, hi);
++        return FullRange.Subtract(folding);
++    }
++
++    private static CodePointSet BuildSpaceSet()
++    {
++        var set = new CodePointSet();
++        for (var cp = 0; cp <= 0xFEFF; cp++)
++        {
++            if (IsSpace(cp))
++                set.AddCodePoint(cp);
++        }
++        return set;
++    }
++
++    private static CodePointSet BuildBasicWordSet()
++    {
++        var set = new CodePointSet();
++        set.AddRange('a', 'z');
++        set.AddRange('A', 'Z');
++        set.AddRange('0', '9');
++        set.AddCodePoint('_');
++        return set;
++    }
++
++    private static CodePointSet BuildFoldedWordSet()
++    {
++        // extraWordChars: every code point outside the basic set whose canonical form is
++        // inside it. Reading the fold orbits gives the whole answer from the pinned table
++        // rather than the two code points (ſ, K) the ASCII-only special cases named.
++        var set = BasicWordSet.Clone();
++        foreach (var (lo, hi) in BasicWordSet.Ranges)
++        {
++            for (var cp = lo; cp <= hi; cp++)
++            {
++                foreach (var sibling in CaseFolding.Orbit(CaseFolding.Canonicalize(cp, unicode: true), unicode: true))
++                    set.AddCodePoint(sibling);
++            }
++        }
++        return set;
++    }
+ }
+diff --git a/Broiler.Regex/Unicode/tools/README.md b/Broiler.Regex/Unicode/tools/README.md
+new file mode 100644
+index 0000000..06e27dc
+--- /dev/null
++++ b/Broiler.Regex/Unicode/tools/README.md
+@@ -0,0 +1,31 @@
++# Case-fold data generation
++
++`generate-case-folding.py` regenerates `../Generated/CaseFoldingData.g.cs` from the
++Unicode Character Database. It is pinned to the same UCD revision as the property tables
++in the nested `Broiler.Unicode` component, so `\p{…}` and `Canonicalize` cannot disagree
++about which Unicode version they describe.
++
++```sh
++base=https://www.unicode.org/Public/17.0.0/ucd
++for f in CaseFolding UnicodeData SpecialCasing; do curl -sO "$base/$f.txt"; done
++python generate-case-folding.py
++mv CaseFoldingData.g.cs ../Generated/
++rm CaseFolding.txt UnicodeData.txt SpecialCasing.txt
++```
++
++Two tables come out, one per branch of ECMA-262 §22.2.2.9.4 Canonicalize:
++
++- `SimpleFold` — the "common + simple" case folding (`CaseFolding.txt` status `C` and
++  `S`), which is what Canonicalize returns under `u`/`v` with `i`.
++- `UpperFold` — the non-Unicode branch, precomputed per UTF-16 code unit: the Default
++  Case Conversion `toUppercase` of the single code unit, dropped when it is not a single
++  code unit or when a non-ASCII input would fold into ASCII. `toUppercase` is the
++  unconditional `SpecialCasing.txt` mapping where one exists, otherwise the simple
++  uppercase of `UnicodeData.txt` field 12.
++
++Both are emitted as one string of comma-separated `lo[.hi]:[-]delta` runs in hexadecimal.
++The inverse (fold orbit) map is rebuilt at run time from these runs, so it is not
++generated here.
++
++The generated table and the UCD files it reads are covered by the repository's
++[third-party notices](../../../THIRD_PARTY_NOTICES.md).
+diff --git a/Broiler.Regex/Unicode/tools/generate-case-folding.py b/Broiler.Regex/Unicode/tools/generate-case-folding.py
+new file mode 100644
+index 0000000..e0075cc
+--- /dev/null
++++ b/Broiler.Regex/Unicode/tools/generate-case-folding.py
+@@ -0,0 +1,183 @@
++#!/usr/bin/env python3
++"""Regenerates ../Generated/CaseFoldingData.g.cs from the Unicode Character Database.
++
++Two tables are produced, one per mode of ECMA-262 §22.2.2.9.4 Canonicalize:
++
++* ``SimpleFold`` — the "common + simple" case folding of ``CaseFolding.txt``
++  (status ``C`` and ``S``). This is exactly what Canonicalize returns when either
++  Unicode flag is set and ``i`` is on.
++* ``UpperFold`` — the non-Unicode branch, precomputed per UTF-16 code unit: the
++  Default Case Conversion ``toUppercase`` of the single code unit, discarded when
++  it is not a single code unit or when a non-ASCII input would fold into ASCII.
++  ``toUppercase`` here is the unconditional ``SpecialCasing.txt`` mapping when one
++  exists, otherwise the simple uppercase of ``UnicodeData.txt`` field 12.
++
++Both are emitted as one string of comma-separated runs, ``lo[.hi]:[-]delta`` in
++hexadecimal, where every code point in ``lo..hi`` canonicalizes to itself plus
++``delta``. The inverse (fold orbit) map is rebuilt at run time, so it is not
++emitted here.
++
++Usage:
++
++    base=https://www.unicode.org/Public/17.0.0/ucd
++    for f in CaseFolding UnicodeData SpecialCasing; do curl -sO "$base/$f.txt"; done
++    python generate-case-folding.py
++    mv CaseFoldingData.g.cs ../Generated/
++"""
++
++import os
++import sys
++
++UNICODE_VERSION = "17.0.0"
++
++
++def fields(line):
++    line = line.split("#", 1)[0]
++    if not line.strip():
++        return None
++    return [f.strip() for f in line.split(";")]
++
++
++def read_case_folding(path):
++    """code point -> simple/common case fold target."""
++    fold = {}
++    with open(path, encoding="utf-8") as handle:
++        for line in handle:
++            parts = fields(line)
++            if not parts or len(parts) < 3:
++                continue
++            code, status, mapping = parts[0], parts[1], parts[2]
++            if status not in ("C", "S"):
++                continue
++            targets = mapping.split()
++            if len(targets) != 1:
++                continue  # a C/S entry is single-valued by definition; be safe
++            fold[int(code, 16)] = int(targets[0], 16)
++    return fold
++
++
++def read_simple_uppercase(path):
++    """code point -> simple uppercase (UnicodeData.txt field 12), ranges included."""
++    upper = {}
++    with open(path, encoding="utf-8") as handle:
++        for line in handle:
++            parts = fields(line)
++            if not parts or len(parts) < 13:
++                continue
++            if not parts[12]:
++                continue
++            upper[int(parts[0], 16)] = int(parts[12], 16)
++    return upper
++
++
++def read_unconditional_uppercase(path):
++    """code point -> full uppercase, for the unconditional SpecialCasing.txt entries."""
++    special = {}
++    with open(path, encoding="utf-8") as handle:
++        for line in handle:
++            parts = fields(line)
++            if not parts or len(parts) < 4:
++                continue
++            # A conditional entry carries a non-empty fifth field (the condition list);
++            # Default Case Conversion uses the unconditional ones only.
++            if len(parts) >= 5 and parts[4]:
++                continue
++            special[int(parts[0], 16)] = [int(c, 16) for c in parts[3].split()]
++    return special
++
++
++def build_upper_fold(simple_upper, special_upper):
++    """The non-Unicode Canonicalize, precomputed for every UTF-16 code unit."""
++    fold = {}
++    for ch in range(0x10000):
++        mapped = special_upper.get(ch)
++        if mapped is None:
++            single = simple_upper.get(ch)
++            mapped = [single] if single is not None else [ch]
++        if len(mapped) != 1:
++            continue  # step 4: a multi-code-unit uppercasing leaves ch alone
++        cu = mapped[0]
++        if cu == ch:
++            continue
++        if ch >= 128 and cu < 128:
++            continue  # step 6: a non-ASCII code unit never folds into ASCII
++        fold[ch] = cu
++    return fold
++
++
++def encode(fold):
++    """Packs a code-point -> code-point map into comma-separated `lo[.hi]:[-]delta` runs."""
++    runs = []
++    for code in sorted(fold):
++        delta = fold[code] - code
++        if runs and runs[-1][1] == code - 1 and runs[-1][2] == delta:
++            runs[-1][1] = code
++            continue
++        runs.append([code, code, delta])
++
++    parts = []
++    for lo, hi, delta in runs:
++        span = f"{lo:X}" if lo == hi else f"{lo:X}.{hi:X}"
++        sign = "-" if delta < 0 else ""
++        parts.append(f"{span}:{sign}{abs(delta):X}")
++    return ",".join(parts)
++
++
++def chunk(text, width=100):
++    return [text[i:i + width] for i in range(0, len(text), width)]
++
++
++def emit(simple, upper, out_path):
++    with open(out_path, "w", encoding="utf-8", newline="\n") as handle:
++        handle.write(
++            "// <auto-generated>\n"
++            f"//     Generated from the Unicode Character Database {UNICODE_VERSION}\n"
++            "//     by Unicode/tools/generate-case-folding.py. Do not edit by hand.\n"
++            "// </auto-generated>\n"
++            "\n"
++            "namespace Broiler.Regex.Unicode;\n"
++            "\n"
++            "/// <summary>Generated case-fold tables for ECMA-262 §22.2.2.9.4 Canonicalize.</summary>\n"
++            "internal static class CaseFoldingData\n"
++            "{\n"
++            f"    /// <summary>The Unicode revision these tables were generated from.</summary>\n"
++            f"    public const string UnicodeVersion = \"{UNICODE_VERSION}\";\n"
++            "\n"
++            "    /// <summary>CaseFolding.txt \"common + simple\" folding — the u/v-mode branch.</summary>\n"
++            "    public const string SimpleFold =\n"
++        )
++        write_string(handle, simple)
++        handle.write(
++            "\n"
++            "    /// <summary>Per-code-unit toUppercase canonicalization — the non-Unicode branch.</summary>\n"
++            "    public const string UpperFold =\n"
++        )
++        write_string(handle, upper)
++        handle.write("}\n")
++
++
++def write_string(handle, text):
++    lines = chunk(text)
++    for index, line in enumerate(lines):
++        terminator = ";" if index == len(lines) - 1 else " +"
++        handle.write(f"        \"{line}\"{terminator}\n")
++
++
++def main():
++    here = os.path.dirname(os.path.abspath(__file__))
++    for name in ("CaseFolding.txt", "UnicodeData.txt", "SpecialCasing.txt"):
++        if not os.path.exists(os.path.join(here, name)):
++            sys.exit(f"missing {name}; see the module docstring for the download commands")
++
++    simple = read_case_folding(os.path.join(here, "CaseFolding.txt"))
++    simple_upper = read_simple_uppercase(os.path.join(here, "UnicodeData.txt"))
++    special_upper = read_unconditional_uppercase(os.path.join(here, "SpecialCasing.txt"))
++    upper = build_upper_fold(simple_upper, special_upper)
++
++    out_path = os.path.join(here, "CaseFoldingData.g.cs")
++    emit(encode(simple), encode(upper), out_path)
++    print(f"{len(simple)} simple folds, {len(upper)} uppercase folds -> {out_path}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/Broiler.Regex/docs/ecmascript-mapping.md b/Broiler.Regex/docs/ecmascript-mapping.md
+index 89c6717..16c6be4 100644
+--- a/Broiler.Regex/docs/ecmascript-mapping.md
++++ b/Broiler.Regex/docs/ecmascript-mapping.md
+@@ -20,6 +20,10 @@ code in this project. Section numbers refer to ECMA-262 (2024+).
+ | `CharacterClass` `[ … ]` | `ParseCharacterClass` | `CharClassNode` + `CharSet` |
+ | `AtomEscape` back-reference | `ParseAtomEscape` | `BackreferenceNode` |
+ | `CharacterClassEscape` `\d \w \s …` | `TryReadClassEscape` | `CharClassNode` / `CharSet` |
++| `CharacterClassEscape` `\p{…}` / `\P{…}` | `AddPropertyEscape` | `CharClassNode` / `CharSet` |
++| `ClassSetExpression` (`v` mode) | `ParseClassSetExpression` | `CharClassNode` / `CharSet` |
++| `ClassSetOperand`, `NestedClass` | `ParseClassSetOperand`, `ParseNestedClass` | `CodePointSet` |
++| `ClassStringDisjunction` `\q{…}` | `ParseClassStringDisjunction` | `CharSet.Strings` |
+ | `CharacterEscape` `\n \xHH \uHHHH \u{…} \cX` | `ReadCharacterEscape` | `CharNode` |
+ 
+ ## §22.2.2 Pattern semantics (the matcher) → `Matching/Matcher.cs`
+@@ -38,6 +42,11 @@ Broiler.Regex models these directly:
+ | §22.2.2.4 Assertions / look-around | `CompileAnchor`, `CompileLookaround` |
+ | §22.2.2.7 AtomEscape (character) | `CompileChar` |
+ | §22.2.2.9 BackreferenceMatcher | `CompileBackreference` |
++| §22.2.2.9 CompileToCharSet | `RegexParser` class parsing → `CharSet` |
++| §22.2.2.9.2 WordCharacters | `UnicodeCharSets.WordSet` |
++| §22.2.2.9.4 AllCharacters | `UnicodeCharSets.AllCharacters` |
++| §22.2.2.9.5 MaybeSimpleCaseFolding | `RegexParser.Fold` / `CodePointSet.Map` |
++| §22.2.2.9.6 CharacterComplement | `RegexParser.ComplementOperand` |
+ | §22.2.2.9.4 Canonicalize | `Unicode/CaseFolding.cs` |
+ | §22.2.2.10 CharacterSetMatcher | `CompileCharClass` / `CharSet.Contains` |
+ 
+@@ -63,14 +72,23 @@ loops forever nor terminates one iteration too early.
+ `d g i m s u v y` parse to `RegexFlags`; `i`/`m`/`s` are the only flags an inline
+ modifier group may toggle (`ModifierGroupNode`).
+ 
++### Why the fold order matters (`v` mode)
++
++§22.2.2.9.5 folds each class-set operand through `scf` **before** §22.2.2.9.6 complements
++it, and §22.2.2.9.4 makes that complement's universe the code points that fold to
++themselves. `RegexParser.Fold` and `ComplementOperand` keep exactly that order, which is
++the whole reason `[^\p{Lu}]` matches neither `A` nor `a` under `vi` while it matches `a`
++under `ui`. Because every operand is folded, `CharSet.CaseFolded` lets the matcher
++canonicalize the subject and test membership directly instead of walking its fold orbit —
++the two are equivalent once the set holds only canonical members.
++
+ ## Not yet mapped
+ 
+-- §22.2.1 `CharacterClassEscape :: p{…}` Unicode property escapes
+-  (`Unicode/UnicodeCharSets.ResolveProperty` — stub).
+-- §22.2.1 `v`-mode `ClassSetExpression` set operations and `\q{…}`
+-  (`CharSet.UsesSetOperations` — parsed, not evaluated).
+-- The complete §22.2.2.9.4 case-fold table (current coverage: ASCII + a
+-  documented subset of non-ASCII simple folds).
++- §22.2.6.11 `RegExp.prototype[@@replace]` and §22.2.6.14 `[@@split]` on the JavaScript
++  side still build a .NET `Regex`; only `RegExpBuiltinExec` reads Broiler match data.
++- Two deliberate divergences from V8 under `vi` — a lone binary property's set and a
++  one-character `\q{…}` alternative — recorded in
++  [the engine README](../README.md#known-limitations-stubbed--todo).
+ 
+ These implementation gates are tracked in the
+ [repository roadmap](../../docs/roadmap.md).
+diff --git a/THIRD_PARTY_NOTICES.md b/THIRD_PARTY_NOTICES.md
+new file mode 100644
+index 0000000..a53d5fa
+--- /dev/null
++++ b/THIRD_PARTY_NOTICES.md
+@@ -0,0 +1,15 @@
++# Third-party notices
++
++`Broiler.Regex/Unicode/Generated/CaseFoldingData.g.cs` is a generated table derived from
++the Unicode Character Database (`CaseFolding.txt`, `UnicodeData.txt` and
++`SpecialCasing.txt`); the generator is
++[`Broiler.Regex/Unicode/tools/generate-case-folding.py`](Broiler.Regex/Unicode/tools/generate-case-folding.py).
++The nested [`Broiler.Unicode`](Broiler.Unicode) component, whose property tables this
++engine resolves `\p{…}` against, carries [its own notice](Broiler.Unicode/THIRD_PARTY_NOTICES.md)
++for the data it generates.
++
++Those data files and the tables derived from them remain subject to the
++[Unicode Terms of Use](https://www.unicode.org/terms_of_use.html).
++
++The Apache License 2.0 in [`LICENSE`](LICENSE) applies to Broiler's source code and does
++not replace the Unicode Terms of Use for Unicode-provided data.
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index a954585..dceded1 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -6,14 +6,23 @@ milestones are represented by code and tests.
+ 
+ ## 1. Complete Unicode semantics
+ 
+-- Resolve `\p{...}` and `\P{...}` from the pinned Broiler.Unicode property data instead
+-  of throwing `NotSupportedException`.
+-- Implement `v`-mode class-set intersection, subtraction, nested operands, and
+-  `\q{...}` string alternatives.
+-- Implement the full ECMAScript `Canonicalize` case-fold mapping for Unicode and
+-  UnicodeSets modes.
+-- Cover lone surrogates, astral code points, complements, aliases, ignore-case
+-  expansion, and forward/backward matching.
++Implemented: `\p{…}`/`\P{…}` resolve from the pinned Broiler.Unicode property tables
++(General_Category, binary properties, `Script`, `Script_Extensions`, and the UTS #51
++properties of strings); `v`-mode class-set intersection, subtraction, nesting and
++`\q{…}` string alternatives are evaluated; and both branches of `Canonicalize` are
++table-driven from the UCD revision named by `CaseFoldingData.UnicodeVersion`, including
++`AllCharacters` and the fold-then-complement ordering `v` mode needs.
++
++Remaining:
++
++- Run the pinned test262 RegExp and UnicodeSets paths in CI under the expanded routing.
++  Local evidence is `Broiler.Regex.Tests` plus 219,252 differential pattern/flag/input
++  cases against V8 — two hand-built corpora and one seeded fuzz — compared on match index
++  and every capture. The only remaining mismatches are the two deliberate divergences
++  recorded in `Broiler.Regex/README.md`.
++- Decide whether to keep following §22.2.2.9 under `vi` for a lone binary property's set
++  and for a one-character `\q{…}` alternative, or to match V8, which folds neither
++  consistently.
+ 
+ Exit gate: the relevant pinned test262 RegExp and UnicodeSets paths pass without routing
+ to .NET for unsupported Broiler features.
+@@ -33,9 +42,14 @@ source; do not duplicate its changing list here.
+ 
+ ## 3. Replace the translator
+ 
+-Expand routing only as implemented syntax and semantics become test-clean:
++Routing now also covers `v`-mode class-set expressions and property escapes used as
++class members — the two shapes the translator has to approximate. Expand it further only
++as implemented syntax and semantics become test-clean:
+ 
+-- use the shared match-data path for `Exec`, `Split`, and `Replace`;
++- use the shared match-data path for `Exec`, `Split`, and `Replace`. This is the gate on
++  everything else: `Split`/`Replace` still build a .NET `Regex`, so a pattern the
++  translator cannot represent at all cannot be routed even when Broiler.Regex matches it
++  correctly;
+ - preserve global/sticky `lastIndex`, captures, named groups, indices, replacement
+   substitutions, and species behavior;
+ - compare Broiler and .NET results during each routing expansion;
+@@ -48,8 +62,11 @@ and no production path constructs a .NET `Regex` for ECMAScript matching.
+ ## 4. Performance after correctness
+ 
+ The matcher currently clones capture state on backtracking and has no compiled/DFA
+-path. Profile representative successful, failing, catastrophic, lookaround,
+-backreference, and UnicodeSet patterns before changing the model. Any optimization must
++path. Compilation has a second cost now: a `v`-mode class under `i` applies
++MaybeSimpleCaseFolding by walking every code point of each operand, so an operand the
++size of `\p{L}` is measurable per `new BroilerRegex`. Profile representative successful,
++failing, catastrophic, lookaround, backreference, and UnicodeSet patterns before
++changing the model. Any optimization must
+ retain explicit timeout/backtracking limits and identical capture/ordering semantics.
+ 
+ ## 5. Preview gate
+-- 
+2.43.0
+

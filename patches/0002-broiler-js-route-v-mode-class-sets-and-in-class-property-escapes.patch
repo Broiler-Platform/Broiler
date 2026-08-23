@@ -1,0 +1,138 @@
+From 0b87501f9a7e3727fd8ab33b26552bc024f84fdc Mon Sep 17 00:00:00 2001
+From: MaiRat <enrico.bartky@gmail.com>
+Date: Sun, 23 Aug 2026 23:12:34 +0000
+Subject: [PATCH] Route v-mode class sets and in-class property escapes to
+ Broiler.Regex
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Two shapes the source-to-source translator can only approximate now go to the engine
+that evaluates them directly.
+
+A v-mode class-set expression — `[a&&b]`, `[a--b]`, `[[a][b]]`, `\q{…}` — has to be
+evaluated by whoever compiles it, and the translator evaluates it itself and emits a
+.NET fragment for the result. A property escape used as a class member is worse: the
+in-class form can neither nest a complemented fragment nor hold a supplementary-plane
+range, so the translator falls back to .NET's `\p{Lu}`, which is code-unit based and
+cannot match an astral member at all.
+
+Broiler.Regex now implements both, so `UsesUnsupported` — which existed to refuse
+routing a class-set pattern the matcher would have silently mis-matched — has nothing
+left to refuse and is gone. The same change makes property escapes reach the router at
+all: they used to throw during the routing re-parse, so a pattern like `(?<=(\p{L}))b`
+was handed back to .NET despite hitting a documented look-behind capture gap.
+
+The quantifier's empty-iteration test also learns that `[\q{}]` matches without
+advancing; it is the one character class that can.
+
+Requires the matching Broiler.Regex revision (its `CharSet.UsesPropertyEscape` and
+`MatchesEmptyString`).
+---
+ .../RegExp/JSRegExp.Broiler.cs                | 39 +++++++++++--------
+ 1 file changed, 23 insertions(+), 16 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs
+index ab81fe77..73efb853 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs
+@@ -20,12 +20,16 @@ namespace Broiler.JavaScript.BuiltIns.RegExp;
+ //     RepeatMatcher abandons an empty iteration, .NET does not, so the match comes
+ //     out short (problem 8 — e.g. /(a?b??)*/ on "ab");
+ //   * code-point back-references and astral / lone-surrogate atoms under the `u`
+-//     flag, where .NET matches per UTF-16 code unit (problems 6 & 7).
++//     flag, where .NET matches per UTF-16 code unit (problems 6 & 7);
++//   * a v-mode class-set expression (`[a&&b]`, `[a--b]`, `[[a][b]]`, `\q{…}`) or a
++//     property escape used as a class member: the translator has to evaluate the set
++//     itself and emit an approximation, and inside `[…]` it can only fall back to
++//     .NET's code-unit-based `\p{Lu}`.
+ //
+ // Broiler.Regex implements the §22.2.2 continuation-passing matcher directly, so it
+ // is correct by construction for exactly these cases. JSRegExp keeps the mature
+ // .NET translator as the default engine and routes ONLY gap-feature patterns that
+-// Broiler.Regex can fully handle through it (see ShouldRouteToBroiler). Everything
++// Broiler.Regex can fully handle through it (see TryBuildBroilerForGaps). Everything
+ // else continues to use .NET unchanged, keeping the blast radius minimal.
+ public partial class JSRegExp
+ {
+@@ -38,8 +42,8 @@ public partial class JSRegExp
+     /// Attempts to build a <see cref="BroilerRegex"/> for <paramref name="pattern"/>
+     /// when, and only when, the pattern exercises a JS/.NET semantic gap that
+     /// Broiler.Regex resolves and the translator cannot. Returns null to keep using
+-    /// the .NET engine (the pattern is either not a gap case, or uses a Broiler
+-    /// feature that is not yet implemented — property escapes, v-mode set ops).
++    /// the .NET engine, either because the pattern is not a gap case or because
++    /// Broiler.Regex cannot parse it.
+     /// </summary>
+     internal static BroilerRegex TryBuildBroilerForGaps(string pattern, string flags, bool unicodeMode)
+     {
+@@ -51,9 +55,8 @@ public partial class JSRegExp
+         {
+             brFlags = RegexFlagsParser.Parse(flags);
+             // Re-parse with Broiler so the routing decision sees the real grammar
+-            // (not a textual heuristic). A parse failure here — including the
+-            // not-yet-implemented \p{…} stub — means Broiler can't own the pattern,
+-            // so fall back to the .NET translator.
++            // (not a textual heuristic). A parse failure here means Broiler can't own
++            // the pattern, so fall back to the .NET translator.
+             ast = BRegex::Broiler.Regex.Parsing.RegexParser.Parse(pattern, brFlags, out _, out _);
+         }
+         catch
+@@ -64,7 +67,7 @@ public partial class JSRegExp
+         var scan = new GapScan(unicodeMode);
+         scan.Walk(ast, insideLookbehind: false);
+ 
+-        if (scan.UsesUnsupported || !scan.HasGap)
++        if (!scan.HasGap)
+             return null;
+ 
+         try
+@@ -78,14 +81,12 @@ public partial class JSRegExp
+     }
+ 
+     // Walks a Broiler.Regex AST to decide whether the pattern is a gap case worth
+-    // routing (HasGap) and whether it uses a feature Broiler.Regex cannot yet match
+-    // correctly (UsesUnsupported — in which case routing is abandoned).
++    // routing (HasGap).
+     private sealed class GapScan(bool unicodeMode)
+     {
+         private readonly bool _unicode = unicodeMode;
+ 
+         public bool HasGap;
+-        public bool UsesUnsupported;
+ 
+         public void Walk(RegexNode node, bool insideLookbehind)
+         {
+@@ -106,10 +107,14 @@ public partial class JSRegExp
+                     break;
+ 
+                 case CharClassNode cls:
+-                    // v-mode set operations / \q{…} are parsed but not yet evaluated
+-                    // by the matcher — never route such a pattern.
+-                    if (cls.Set.UsesSetOperations)
+-                        UsesUnsupported = true;
++                    // A v-mode class-set expression (`[a&&b]`, `[a--b]`, `[[a][b]]`,
++                    // `\q{…}`) and a property escape used as a class member are both
++                    // shapes the translator cannot hand to .NET as written: it evaluates
++                    // the set itself and emits an approximation, and inside `[…]` it falls
++                    // back to .NET's code-unit-based `\p{Lu}`, which cannot match a
++                    // supplementary-plane member. Broiler.Regex evaluates both directly.
++                    if (cls.Set.UsesSetOperations || cls.Set.UsesPropertyEscape)
++                        HasGap = true;
+                     break;
+ 
+                 case GroupNode grp:
+@@ -153,7 +158,9 @@ public partial class JSRegExp
+             EmptyNode => true,
+             CharNode => false,
+             AnyCharNode => false,
+-            CharClassNode => false,
++            // A v-mode class can hold the empty string (`[\q{}]`), which is the one
++            // character class that matches without advancing.
++            CharClassNode c => c.Set.MatchesEmptyString,
+             AnchorNode => true,
+             LookaroundNode => true,
+             BackreferenceNode => true, // an unset back-reference matches the empty string
+-- 
+2.43.0
+
