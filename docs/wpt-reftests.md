@@ -267,6 +267,30 @@ So the rule the streak taught still holds — **do not start at the top of the l
 but the refinement is that the entries worth starting from are the ones a previous
 triage has already reduced, wherever they sit in the ranking.
 
+**The better entry point is the run's own manifest, not its issue.**
+`tests/wpt-baseline/failed-reftests.json` records every failure, so grouping it by
+directory ranks *families* rather than individual severities — and a family that
+fails uniformly is one bug however mild each instance looks. Two rows of that
+grouping paid for themselves on #1788. `css/css-backgrounds/background-size` (65
+failures, three rows below `grid-lanes`) turned out to be a single wrong reading of
+`preserveAspectRatio`, worth
+[+68 / −0](wpt-rendering-gaps-fixed.md#an-svgs-viewbox-stopped-giving-it-an-intrinsic-ratio-when-preserveaspectratio-none)
+over the whole suite; `css/css-display` had just 9, of which the top-thirty entry
+`display-contents-root-background` was
+[the root element never being blockified](wpt-rendering-gaps-fixed.md#display-contents-on-the-root-element-took-the-canvas-with-it).
+Neither is visible as a *cluster* from the severity ranking, which by design shows
+one line per test.
+
+```sh
+python3 - <<'PY'
+import json, collections
+d = json.load(open('tests/wpt-baseline/failed-reftests.json'))
+paths = [x['relativeTestPath'] for x in d['results']]
+for k, v in collections.Counter('/'.join(p.split('/')[:3]) for p in paths).most_common(25):
+    print(f"{v:5d}  {k}")
+PY
+```
+
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
   a *different document*. Two distinct versions of this, and the fix for the

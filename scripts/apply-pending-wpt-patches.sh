@@ -367,7 +367,16 @@ set -euo pipefail
 # declares the same origin as its test, so the error cancels there and only stops cancelling
 # against a reference browser's screenshot. 272 tests in the corpus declare `transform-origin`.
 
+# The SVG intrinsic-ratio patch (Broiler.HTML, "image: an SVG's viewBox gives an
+# intrinsic ratio whatever preserveAspectRatio says") is listed because it decides
+# the concrete size of every SVG background image, and there is no main-repo half
+# to compensate while it is pending: the sizing arithmetic lives in the
+# submodule's PaintWalker and what this patch changes is the intrinsic data fed
+# into it, so nothing here can be unit-tested into standing in for it. Measured
+# over the full 26 366-test reftest suite it is +68 / -0 (18 776 -> 18 844
+# passing); without it those 68 css-backgrounds/background-size tests stay red.
 PENDING_PATCHES=(
+  "Broiler.HTML|patches/0001-html-svg-viewbox-intrinsic-ratio.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

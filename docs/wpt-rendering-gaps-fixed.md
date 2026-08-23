@@ -1211,6 +1211,45 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   on its own: `css/css-page`, `css/CSS2/margin-padding-clear`, `css/css-position` and
   `css/css-anchor-position` together go **968 → 972 passing, +4 / −0**.
 
+### An SVG's `viewBox` stopped giving it an intrinsic ratio when `preserveAspectRatio: none`
+
+- **Tests:** the whole `css/css-backgrounds/background-size` directory, **146 → 214 of 217**.
+  Owner: `Broiler.HTML` (`Source/Broiler.HTML.Image.Compat/Adapters/StubImageAdapter.cs`) —
+  **submodule**, so it ships as the patch named
+  "image: an SVG's viewBox gives an intrinsic ratio whatever preserveAspectRatio says"
+  (push denied, 403), listed in `scripts/apply-pending-wpt-patches.sh`.
+- **The wrong question was being asked.** `RasterizeSvg` read `preserveAspectRatio="none"`
+  as removing the image's intrinsic aspect ratio, reasoning that an image willing to scale
+  non-uniformly does not insist on a shape. SVG 2 §8.2 derives the intrinsic sizing
+  properties from `width`/`height`/`viewBox` alone; `preserveAspectRatio` governs how the
+  content is fitted *once the viewport size is known*, which is a later question than what
+  size the image asks to be. Reading it the other way made such an image report no ratio at
+  all, so CSS sized it to the whole background positioning area.
+- **The directory was failing by construction, which is why it was worth looking at.** Every
+  SVG in `background-size/vector` carries `preserveAspectRatio="none"`, so all 60 of its
+  failures were one bug — a ratio-only image stretched to 768×256 where the test asks for
+  16×256. The same flag also hid dimensions the SVG states outright: with `width="8px"` and a
+  `viewBox`, `background-size: auto` sized to 24×384 in a 128×384 box instead of the 8×128 the
+  stated width and the ratio ask for. It survives under a name that says what it now decides
+  (`renderOversizedAndCrop`) — an SVG that gives one dimension and stretches to the other has
+  no viewport of its own to draw into, so it is rendered oversized and cropped to its content.
+- **Measured over the full 26 366-test reftest suite**, baseline and change on the same build
+  against the same checkout: **18 776 → 18 844 passing, +68 / −0**, average match 98.42% →
+  98.46%. All 68 wins are in `css/css-backgrounds/background-size`; nothing anywhere else in
+  the suite moved in either direction. The blast radius is small by construction — only 43
+  standalone SVGs in the whole corpus carry `preserveAspectRatio="none"` — but the sweep was
+  run rather than argued.
+- **Three stragglers remain in the directory**, and none is this bug:
+  `background-size-cover-svg` (74.5%) uses a `viewBox`-only SVG with *default*
+  `preserveAspectRatio`, so its ratio was never suppressed — it rasterises at the 300×150
+  default object size and is then scaled to 4923×400, which is a rasterisation-resolution
+  question; and `background-size-025`/`-031` are raster-image tests unrelated to SVG sizing.
+- **How it was found is the transferable part.** It is not on
+  [#1788](https://github.com/Broiler-Platform/Broiler/issues/1788)'s top-thirty list at all.
+  It came from reading `tests/wpt-baseline/failed-reftests.json` — the run's own failure
+  manifest — and grouping by directory, which puts a 65-test single-feature cluster three rows
+  below `grid-lanes` and well above anything the severity ranking surfaces.
+
 ### `display: contents` on the root element took the canvas with it
 
 - **Test:** `css/css-display/display-contents-root-background` (reftest suite,

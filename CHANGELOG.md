@@ -303,6 +303,24 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- An SVG used as an image keeps the intrinsic aspect ratio its `viewBox` gives it
+  even when it declares `preserveAspectRatio="none"`, and reports an absolute
+  `width` or `height` it states even when the other one is missing. SVG 2 §8.2
+  derives the intrinsic sizing properties from `width`/`height`/`viewBox` alone —
+  `preserveAspectRatio` governs how the content is fitted once the viewport size
+  is known, which is a later question than what size the image asks to be. Reading
+  `none` as "no intrinsic ratio" made every such image size to the whole
+  background positioning area, so a `background-size: contain` that should paint a
+  16×256 strip stretched across the full 768×256 box instead. Measured over the
+  full WPT reftest suite: 18 776 → 18 844 passing, +68 / −0.
+
+- `display: contents` on the root element no longer takes the page's canvas with
+  it. The root element is blockified (CSS Display 3 §2.3) and the rule was
+  implemented, but it was applied to the anonymous document box the parse creates
+  rather than to the `<html>` box beneath it — so the real root element was
+  spliced out like any other wrapper, and the canvas background, which is the root
+  element's, went with it.
+
 - A `<link rel="stylesheet" href="data:text/css,…">` now contributes its rules to
   the cascade and the CSSOM, and fires `load` rather than `error`. The sheet is in
   the URL, so there is nothing to fetch — but the href went to the resource loader
