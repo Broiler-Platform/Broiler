@@ -64,6 +64,39 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 - **No effect on the standard suite**, which renders at the default size: `quirks` holds at
   21 of 25 before and after.
 
+### A nested scroll container's clipped content inflated its ancestor's scrollable overflow
+
+- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom/DomBridge/LayoutMetrics.cs` and
+  `LayoutMetrics.ScrollGeometry.cs`.
+- **The rule.** CSS Overflow 3 §3.1: a box's scrollable overflow region is the union of its own
+  content and its descendants' *scrollable overflow* — and a descendant that is itself a scroll
+  container has **already scrolled** its own overflow, so what it contributes upward is its
+  border box. Its clipped content is reachable by scrolling *it*, not the ancestor.
+  `TryGetSharedScrollExtent` unioned every rendered descendant's border box with no such stop,
+  so a 400×400 block inside a 120×100 `overflow: auto` box made the **document** report
+  `scrollHeight` **401** for a page whose content is 102px tall.
+- **It was invisible until the viewport was fixed**, and that is the useful part. While the
+  bridge held its viewport at
+  [1024×768](#the-bridge-resolved-every-viewport-question-against-1024768-whatever-the-run-rendered-at),
+  401 is under 768 — the maximum scroll came out 0 either way and nothing moved. Giving the
+  bridge the real size turned it into a 271px scroll range that does not exist, and
+  `scrollIntoView` on content inside one of those containers scrolled the whole document to
+  reach it. **Two bugs had been cancelling.**
+- **Measured** on that page at 280×130: `scrollHeight` **401 → 105.8**,
+  `documentElement.scrollTop` **1 → 0**, with both containers still landing on `(40, 300)` —
+  the reference's own values.
+- **One test changed for a real reason, and it is worth reading.**
+  `Wpt_CssViewport_ZoomScrollIntoViewAlignmentOptions` has a `zoom: 2` container that is 244px
+  tall in a 240px viewport, so that document genuinely *does* have 13.6px of scrollable overflow
+  and `scrollIntoView` correctly continues outward into it. Its container scrolls are exactly
+  the reference's `(180, 190)`; only the incidental viewport scroll differs, and the reference
+  does not model it. It now resets the document scroll the same way — and for the same stated
+  reason — as the sibling fixture directly above it, which has carried that reset all along.
+- **Whole-suite evidence:** `Broiler.Wpt.Tests` goes **56 failures → 54** against the pre-change
+  tree, with **no new failures**; the two remaining are the new `ScrollClampingTests` cases now
+  passing. Reftests are unmoved on every subset available in this checkout — `quirks` 21/25,
+  `css-view-transitions` 181/305, `css-masking/clip-path` 157/227, `html-ruby-extensions` 49/84.
+
 ### The run reported correct renders as its worst failures
 
 - **Owner:** the WPT runner (`src/Broiler.Wpt`), the shard merger
