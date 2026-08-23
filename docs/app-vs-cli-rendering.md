@@ -22,7 +22,13 @@ That explains the size and the softness, not the gaps. See
 [A separate Windows defect](#a-separate-windows-defect-the-app-ships-dpi-unaware).
 
 Reproduced headlessly on Linux — see [Reproduction](#reproduction) — so the text
-half can be fixed and verified without a Windows machine.
+half could be fixed and verified without a Windows machine.
+
+**All of it is fixed**; see [Resolution](#resolution). The sections below
+describe each defect as it was found, in the past tense where the code has since
+changed. On the same reproduction, the total advance the app draws now matches
+the advance layout reserved to within 0.02 px across a whole page, on both
+reported pages, where it was 15% short before.
 
 | observed symptom | cause |
 | --- | --- |
@@ -417,106 +423,120 @@ is enough to see both pipelines side by side:
    (what the app will draw). Print `item.FontSize`, `item.FontFamily` and
    `((ILayoutFont)item.FontHandle).Size` beside them.
 
-Results on a bare Linux container:
+Results on a bare Linux container, before and after:
 
-| page | total advance layout reserved | total advance the app draws | ratio |
+| page | advance layout reserved | drawn, before | drawn, after |
 | --- | --- | --- | --- |
-| `acid/acid1/acid1.html` | 2134 px | 1910 px | 0.895 |
-| `https://www.7-zip.org/` (CSS inlined) | 10779 px | 9168 px | 0.851 |
+| `acid/acid1/acid1.html` | 2134.00 px | 1909.87 px (0.895) | 2133.96 px (1.000) |
+| `https://www.7-zip.org/` (CSS inlined) | 10779.21 px | 9167.95 px (0.851) | 10779.23 px (1.000) |
 
-The 7-Zip render reproduces the reported screenshot exactly, `7- Zip`,
-`64- bit x64`, `2026- 06- 25` and all — `7-` and `Zip` are separate
-`DrawTextItem`s (break opportunity after the hyphen), so the deficit between
-the reserved and the drawn advance opens up between them.
+Mean per-run error went from 0.145 and 0.149 to 0.000 on both. The 7-Zip render
+reproduced the reported screenshot exactly, `7- Zip`, `64- bit x64`,
+`2026- 06- 25` and all — `7-` and `Zip` are separate `DrawTextItem`s (break
+opportunity after the hyphen), so the deficit between the reserved and the drawn
+advance opened up between them.
 
-Note that "fix the units, keep everything else" does **not** fix it — measured
-on the same container, converting `FontSize` pt→px and taking the first family
-name leaves the mean per-run error at 0.15 rather than improving it, because on
-Linux the drawing side ignores the family and uses one host face regardless.
-The unit bug is real and provable from the code, but on its own it only changes
-which direction the drift goes.
+Worth recording, because it shaped the fix: **"convert the units and stop"
+does not work.** Measured on the same container, converting `FontSize` pt→px and
+taking the first family name left the mean per-run error at 0.15 rather than
+improving it, because the Linux drawing side ignored the family and used one
+host face regardless. The unit bug is real and provable from the code, but on
+its own it only changes which direction the drift goes. Both halves — describing
+the font correctly *and* resolving it to the same face — are needed, which is
+why the fix spans two submodules.
 
-## Remediation
+## Resolution
 
-Ranked smallest-first. Steps 1-2 remove the gross error; step 4 is what makes
-the app match the CLI for good.
+| defect | fix | where |
+| --- | --- | --- |
+| `FontSize` is a point count drawn as pixels | describe the run by `DrawTextItem.FontHandle` — the font that measured it — instead of the CSS strings | `Broiler.HTML`, `HtmlGraphicsRenderList.ResolveFont` |
+| CSS family list passed as a family name | take the resolved family off the handle; split a list defensively at both remaining sinks | `Broiler.HTML` + `Broiler.Graphics` |
+| `RFont` did not publish its family or style | `RFont.Family` and `RFont.Style`, overridden by `FontAdapter` | `Broiler.Graphics` + `Broiler.HTML` |
+| `ILayoutFont.Size` documented as CSS pixels, is points | corrected, with the consequence spelled out | `Broiler.Graphics` |
+| slant dropped, weight quantized differently | both taken from the handle, so the drawn face is the measured one | `Broiler.HTML` |
+| software rasterizer ignored the family | `BSystemFontFiles` takes a resolver; `SystemFontIndex` registers itself; `BImageRenderer` and `BTextMeasurer` resolve through the same call | `Broiler.Graphics` + `Broiler.Layout` |
+| `FillRect` flattened a rotated rect to its bounding box | fills the transformed quad through the canvas's polygon fill | `Broiler.Graphics` |
+| items dropped in silence | `default:` arm; omissions reported on `HtmlGraphicsRenderList.UnsupportedItems` | `Broiler.HTML` |
+| SVG ellipse dropped | rounded rect whose radii are its semi-axes — exact, not an approximation | `Broiler.HTML` |
+| diagonal lines dropped | rotated into the axis-aligned case | `Broiler.HTML` |
+| dashed/dotted borders drawn solid | drawn as fitted dash runs | `Broiler.HTML` |
+| `border-radius` ignored | uniform borders stroke as a rounded rect | `Broiler.HTML` |
+| gradients flattened to their first stop | linear gradients band across the gradient line | `Broiler.HTML` |
+| app ships DPI-unaware | manifest declares `PerMonitorV2`; the runtime call documented as the `dotnet x.dll` fallback | main repo |
 
-1. **Take the size from `FontHandle`, not from the CSS string** —
-   `Broiler.HTML`, `HtmlGraphicsRenderList.cs:188`. `DrawTextItem.FontHandle`
-   already carries the `RFont` layout measured with, whose `Size` is in points:
+Two of these were found while fixing the others and are not in the diagnosis
+above, because nothing pointed at them until the text was right:
 
-   ```csharp
-   double sizePx = item.FontHandle is RFont f
-       ? f.Size * (96.0 / 72.0)   // RFont.Size is POINTS
-       : item.FontSize;           // SVG path: already CSS px, no handle
-   ```
+- **The software rasterizer ignored the requested family.** Fixing the font
+  description alone moved the Linux error from 15% short to 14% long, because
+  `BImageRenderer` drew every run with one discovered face. That is the correct
+  last resort on a font-less box and wrong whenever the family really is
+  installed. `Broiler.Layout.Text.SystemFontIndex` already answers "which file is
+  this family"; Graphics cannot reference Layout, so it is handed over through
+  `BSystemFontFiles` the way image codecs arrive through `BImageCodecs`, and the
+  renderer and the measurer resolve through the same call so they cannot
+  disagree.
+- **`BImageRenderer.FillRect` flattened a rotated rectangle to its bounding
+  box.** The first attempt at diagonal lines drew a solid block, which exposed
+  it. It also means any CSS-rotated element filled its whole bounding box in the
+  app. The canvas has had a polygon fill all along; a non-axis-aligned transform
+  now uses it, and the upright fast path is untouched.
 
-   **The conditional is not optional.** The same `DrawText` helper is also the
-   sink for `DrawSvgTextItem` (`HtmlGraphicsRenderList.cs:91-103`), which builds
-   a synthetic `DrawTextItem` with **no `FontHandle`** and a `FontSize` that is
-   already in px user units (`SvgRenderer.Text.cs:110`). A blanket `× 4/3` would
-   break every SVG text run.
+### Verification
 
-2. **Carry the resolved family, not the CSS list.** Prefer the family the
-   handle already resolved (`FontsHandler.GetCachedFont` computes it at
-   `FontsHandler.cs:65-67`; exposing it needs a `Family` accessor on `RFont`, in
-   `Broiler.Graphics`). Independently useful stopgap: make
-   `DirectWriteText.ResolveFontFamily`
-   (`Broiler.Graphics/Broiler.Graphics.Windows/DirectWriteTextMetricsProvider.cs:144-158`)
-   split the comma list, strip quotes, and pick the first family present in the
-   DWrite system font collection before falling back to the generic map. Assert
-   on the render list, not on pixels — the Linux renderer ignores family, so a
-   pixel test will not catch a regression here.
+- `src/Broiler.Browser.Core.Tests/RenderListTextFidelityTests.cs` — six tests
+  over the app's real path: lay out, `CreateDisplayList`, translate, then assert
+  each emitted `BFontStyle` against the `RFont` that measured the run. Covers
+  `medium`, `pt`, `%`, `em`, `rem`, `px`, `smaller`/`larger` and absolute units,
+  italic and weight, SVG text (which must *not* be scaled twice), and that a
+  page of gradients, dashed borders, ellipses and diagonals reports nothing
+  unsupported. Four of the six fail against the old translation, which is what
+  makes them worth having.
+- Full suites: `Broiler.Layout.Tests` 1317/1317, `Broiler.Graphics.Tests`
+  99/99, `Broiler.Browser.Core.Tests` 113/113.
+- `Broiler.Cli.Tests` is unchanged at 51 failures / 3519 passed, verified by
+  stashing every change and re-running: the same 51, including all eight
+  render-adjacent ones. They are pre-existing and none is attributable here.
 
-3. **Put the used size and the slant *in* the display list**, so no consumer
-   re-parses CSS: add `FontSizePx` and a slant field to `DrawTextItem`
-   (`Broiler.Layout/Broiler.Layout/IR/DisplayList.cs`, **main repo**) and
-   populate them from `inline.FontHandle` at `PaintWalker.Text.cs:86-90`
-   (**submodule**, two lines). That is `CLAUDE.md`'s "type in the main repo, call
-   in the submodule" idiom and keeps the submodule patch tiny.
+### What is deliberately left
 
-   **Regression trap — do not simply change `ParseFontSize`'s return unit.**
-   Its other caller, `PaintWalker.Background.cs:321`, already multiplies by
-   `96.0/72.0` itself; changing the helper without editing that line in the same
-   commit double-converts every em-based background position and *will* move
-   CLI and WPT output. Add a new field rather than repurposing `FontSize`, or
-   fix both call sites atomically.
+Each of these needs a new `BRenderList` primitive, which means a command in a
+closed hierarchy plus an implementation in all five backends — two of which
+(Android, WebAssembly) cannot be compiled in this environment, so adding a
+command they silently ignore would recreate the very silent-drop problem this
+change removes. They are listed on `UnsupportedItems` at runtime rather than
+disappearing.
 
-4. **Give `BRenderList` a positioned glyph run** — `Broiler.Graphics`
-   (`BRenderCommand`, `IBroilerRenderer`, each backend). A command carrying the
-   typeface identity, the size in px and per-glyph ids and offsets — produced by
-   the shaper that already measured the line — is the only construction under
-   which the app cannot drift, and it is how the CLI gets it right today.
-   Direct2D has `DrawGlyphRun` (or `IDWriteTextLayout` + `SetCharacterSpacing`);
-   `BImageRenderer` already fills TrueType contours. It also lets the app place
-   the baseline explicitly, closing Defect 3. Until this exists, steps 1-3
-   shrink the error but cannot eliminate it — see
-   [the residual](#the-residual-two-shapers-that-would-still-disagree).
+| gap | primitive it needs |
+| --- | --- |
+| SVG `<polygon>`, `<polyline>`, `<path>` | a polygon/path fill |
+| `filter` and blend-mode layers | compositing layers |
+| opacity as a *group* rather than per-primitive alpha | compositing layers |
+| rounded and polygon clips (a rounded box's *background* is still square) | `PushClipRounded` / `PushClipPolygon` |
+| radial and conic gradients | a gradient brush, or an accepted banding scheme |
+| per-corner radii and non-uniform rounded borders | a path stroke |
 
-5. **Stop the silent drops** — add a `default:` arm to the item switch that
-   traces or asserts on an unhandled `DisplayItem` (five types are dropped
-   today), then close the gaps in the table above. Lowest priority for this
-   bug; highest for preventing the next one.
+The residual **shaper** difference also remains by design: the measuring side
+sums raw `hmtx` advances with no kerning unless shaping is required, while
+DirectWrite shapes with `kern`/`liga`/`clig`. With the face and size now equal
+this is sub-pixel within a word and cannot reopen the reported gaps, which fall
+between words at layout-assigned origins. Removing it entirely needs a
+positioned glyph run in `BRenderList` — the same project as the table above.
 
-**Regression coverage.** A test in `src/Broiler.Browser.Core.Tests` (main repo,
-runs headless on Linux) that lays a fixture out through `HtmlContainer`, walks
-`CreateDisplayList()`, and asserts for every `DrawTextItem` that the resulting
-`BFontStyle.SizeInPixels == ((ILayoutFont)item.FontHandle).Size * 96.0/72.0`,
-covering `medium`, `Npt`, `N%`, `Nem`, `Nrem`, `Npx`, `smaller` and a `zoom`ed
-subtree. It would be the first test to touch this path at all.
+### Delivery
 
-**Delivery.** `HtmlGraphicsRenderList.cs` and `PaintWalker.Text.cs` are in the
-`Broiler.HTML` submodule; `BFontStyle.cs`, `Direct2DRenderer.cs`,
-`DirectWriteTextMetricsProvider.cs` and `BImageRenderer.cs` are in
-`Broiler.Graphics`. Per `CLAUDE.md`, attempt the submodule push first and bump
-the pointer only if it succeeds. Note a conflict to settle with a maintainer
-before relying on the fallback: `CLAUDE.md` says a denied push falls back to a
-patch under `patches/`, but `docs/ROADMAP.md` declares that ledger retired and
-"not a delivery path" (lines 25, 1116, 1450) and the directory does not exist on
-disk. A 403 today means recording a blocker, not recreating `patches/`.
+`Broiler.HTML` and `Broiler.Graphics` are submodules. Both were pushed to their
+own remotes on branch `claude/render-list-text-fidelity` and the parent's
+gitlinks bumped to those commits, which is the workflow `CLAUDE.md` asks for and
+is only allowed because the pushes succeeded. No `patches/` entry was needed —
+which is just as well, because `CLAUDE.md` still describes that fallback while
+`docs/ROADMAP.md` declares the ledger retired and the directory does not exist.
+That contradiction is still worth settling for the next contributor who hits a
+denied push.
 
-The DPI manifest fix (`src/Broiler.Browser.Windows/app.manifest`) is main-repo
-and independent of all of the above.
+Note that the submodule commits sit on a branch, not on `main`. The gitlinks
+point at reachable SHAs, but they should be merged rather than left indefinitely
+on a branch that could be deleted out from under them.
 
 ## Open questions that need a Windows machine
 
