@@ -77,15 +77,15 @@ its own `fetch()` reports gets one answer. The value is unchanged; only the numb
 
 ## What the header does not fix
 
-The three submodule loaders are delivered as a patch under `patches/` (the submodule remote is
-outside this session's push scope — see `patches/README.md`), so until a maintainer applies it and
-bumps the pointer, a build against the pinned pointer still fetches `<link>` sheets, images and web
-fonts unidentified. Concretely, on `mediawiki.org` that is the difference between a styled render
-and a bare document flow — `HtmlRender` fetches the page's stylesheets through the submodule's
-`StylesheetLoadHandler`, not through the bridge's `ResourceLoader`.
+This section's former patch-handoff warning is superseded. The pinned `Broiler.HTML` component now
+applies `BroilerUserAgent` in `StylesheetLoadHandler`, `ImageDownloader.SharedHttpClient`, and
+`HtmlContainerInt.TryLoadRemoteFont`; the root `patches/` ledger no longer exists. The document,
+external scripts, `fetch()`/XHR, `<link>` stylesheets, images, and web fonts therefore use the same
+request identity in the current aggregate tree.
 
-The document, the external scripts, `fetch()` and XHR are all in the main repository and are fixed
-without the patch, which is what makes the reported failure go away.
+That fixes request identity, not the broader rendering differences tracked in
+[the MediaWiki/Vector rendering report](mediawiki-vector-rendering.md). Reopen this incident only
+if a current pinned loader is shown to emit an absent or divergent `User-Agent`.
 
 ## It was not only mediawiki.org
 

@@ -49,8 +49,8 @@ being hidden by [a missing check in the runner](wpt-rendering-gaps-fixed.md#--ve
    ParseToPixels*, but it belongs to the
    [reftest suite's](wpt-reftests.md#border-72pt-solid-red-painted-a-3px-black-line)
    work rather than to these pages.) That is the whole problem with numbering them:
-   [`patches/`](../patches/README.md) is a
-   backlog rather than an archive — a file is deleted once its fix is upstream and
+   the former `patches/` directory was a
+   backlog rather than an archive — a file was deleted once its fix was upstream and
    numbering restarts from `0001` — so the same number names different changes at
    different times, and a `patches/NNNN` reference in an older commit or comment is
    almost always dangling. Fixes are identified here by **commit subject**:

@@ -191,9 +191,10 @@ normal`, and `calc()` in `font-size`.
 
 ## Where the fixes live
 
-The renderer, CSS engine and graphics core are git submodules, and this session's GitHub scope does
-not include them, so six of the fixes are patch files under [`patches/`](../patches/README.md)
-rather than pointer bumps. They are listed in `scripts/apply-pending-wpt-patches.sh`, so a WPT or
-real-world run exercises them; a maintainer applies them and bumps the pointers. Everything else is
+**Historical delivery note.** The renderer, CSS engine and graphics core are git submodules, and
+the session that produced this evidence recorded six fixes in the former root `patches/` ledger.
+That directory is retired and `scripts/apply-pending-wpt-patches.sh` currently has an empty
+`PENDING_PATCHES` list. Treat the fix names below as provenance and verify the pinned component
+commits before rerunning the comparison; no current run applies them out of tree. Everything else is
 in `Broiler.Layout` and `src/`, with regression tests in
 `Broiler.Layout/Broiler.Layout.Tests/VectorSkinLayoutTests.cs`.

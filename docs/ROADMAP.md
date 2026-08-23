@@ -2,7 +2,7 @@
 
 - **Status:** Active preview
 - **Scope:** Only unfinished work that crosses component or application boundaries
-- **Last reconciled:** 2026-08-12
+- **Last reconciled:** 2026-08-22
 
 Component-local work is tracked in the roadmaps linked from
 [the documentation index](README.md). This file does not repeat completed
@@ -21,8 +21,9 @@ commit-scoped human-review records.
 
 1. Validate installation from an isolated package feed without relying on the
    aggregate checkout.
-2. Ensure every release submodule pointer contains, or is paired with, every
-   required pending patch recorded in [`patches/README.md`](../patches/README.md).
+2. Ensure every release submodule pointer contains every required component commit. The
+   former root `patches/` handoff ledger is retired; a release cannot depend on an
+   out-of-tree patch.
 3. Complete exact-commit human, dependency, license, static-analysis, and
    vulnerability review for the release graph.
 4. Configure the protected release environment and publishing credentials.
@@ -140,13 +141,11 @@ names the component that decides, not the directory a file sits in: the Skia and
 geometry test files live in `src/Broiler.Cli.Tests` and `src/Broiler.HtmlBridge.Dom`
 in this repository even though Broiler.HTML and HtmlBridge own the decision.
 
-**Where each batch can land.** `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`,
-`Broiler.JS`, and `Broiler.Graphics` are git submodules with their own remotes. A
-session scoped to this repository cannot push to them — the git proxy answers
-**403** — so submodule-resident work ships as a patch file under
-[`patches/`](../patches/README.md) with the gitlink left unbumped, and a
-maintainer applies it separately. Batches 1, 4, 5, and 6 are entirely
-main-repo. Batches 2 and 3 straddle the boundary and must be split:
+**Historical delivery note, superseded.** On 2026-08-12 this work used a root
+`patches/` handoff because the session could not push component remotes. That directory no
+longer exists and the listed component patches have either landed or been retired. Current
+component work follows the active submodule workflow and must not recreate this ledger from
+the table below. The table remains provenance for why batches 2 and 3 were split:
 
 | Batch | Main repo (pushable) | Submodule (patch only) |
 | --- | --- | --- |
@@ -253,7 +252,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
    fails if its retained coverage regresses.
 
 2. **Remove tests with no effective coverage (root and Broiler.JS).**
-   *2a landed; 2b shipped as the Broiler.JS patch "Retire the Repro scratch tests and the legacy solution" in [the patch backlog](../patches/README.md).*
+   *2a and 2b landed. The former patch handoff is retired.*
 
    *2a — this repository.*
    - Delete `HttpClientMigrationTests`, `Acid3DebugTest`, `Acid3CascadeDebugTests`,
@@ -275,24 +274,14 @@ names a `dotnet`/`git`/`grep` command that does run locally.
      allowance — it belongs to `Acid3CssComplianceTests`, which stays and is
      currently red.
 
-   *2b — Broiler.JS, patch only.*
-   - Delete `ReproTests`, `ReproT`, and the broken legacy `BroilerJS.sln`. Before
-     deleting `ReproTests`, promote its `super`-in-class-field-initializer probes
-     into an asserting test in the owning Broiler.JS suite; `ReproT`'s six regex
-     probes are already covered there.
-   - Retain the JInt script corpus: `OtherTests/JIntPerfTests/Scripts/*.js` is
-     hard-referenced by
-     `benchmarks/Broiler.JavaScript.Engine.Benchmarks/Broiler.JavaScript.Engine.Benchmarks.csproj:25`.
-     Remove only the standalone `JIntPerfTests` `Program.cs` and `.csproj`, and
-     only after confirming the benchmark runner owns every scenario.
-   - Before deleting `BroilerJS.sln`, decide where `Broiler.JavaScript.Network`
-     and `Broiler.JavaScript.NodePollyfill` land: both exist on disk and are in
-     the sln but in no `.slnx`, so deleting the sln orphans them from every
-     solution.
-   - Reconcile Broiler.JS's current status counts and leave its archive as
-     historical evidence. Note that `ReproTests.Repro` is recorded there as a
-     failure but passes on Linux, where the `D:\…` string is treated as a
-     relative filename.
+   *2b — Broiler.JS, landed.* `ReproTests`, `ReproT`, the standalone JInt runner,
+   and the broken legacy `BroilerJS.sln` are gone; the asserting class-field probes and
+   benchmark script corpus remain. `Broiler.JavaScript.Network` and
+   `Broiler.JavaScript.NodePollyfill` are intentionally in no solution because both still
+   fail against the removed `Broiler.JavaScript.Core` namespace. Their repair/registration
+   or deletion is a separate product decision recorded in
+   [`Roadmap.status.md`](../Broiler.JS/docs/roadmap/Roadmap.status.md), not unfinished batch
+   2 cleanup.
 
    **Gate:** focused JavaScript, CSS cascade, Acid, flex, and CLI tests match or
    improve on the recorded baseline, and no supported solution, workflow, or
@@ -301,8 +290,9 @@ names a `dotnet`/`git`/`grep` command that does run locally.
 
 3. **Finish the Skia-era test transition (Broiler.HTML and root tests).**
    *3a landed; 3b shipped as the Broiler.HTML patch "Drop the deleted WPF adapter from the public surface",
-   and the rendering defect it uncovered as "Keep dashed and dotted strokes on the raster path" — both in
-   [the patch backlog](../patches/README.md).*
+   and the rendering defect it uncovered as "Keep dashed and dotted strokes on the raster path" — both
+   recorded in the now-retired historical `patches/` ledger. Reverify their current component state before
+   using this paragraph as a next action.*
    Coordinate this batch with
    [Broiler.HTML's compatibility-seam retirement](../Broiler.HTML/docs/roadmap.md#4-retire-the-skia-era-compatibility-seam).
 
@@ -333,8 +323,8 @@ names a `dotnet`/`git`/`grep` command that does run locally.
      `solid`, `double`, and `groove` painted normally. The fix keeps such strokes
      on the raster path by reducing them to solid runs
      ([`DashedStrokeGeometry`](../Broiler.Layout/Broiler.Layout/IR/DashedStrokeGeometry.cs),
-     with the call site in the Broiler.HTML patch "Keep dashed and dotted strokes on the raster path"
-     in [the patch backlog](../patches/README.md)). The eleven were
+     with the call site recorded historically as the Broiler.HTML patch "Keep dashed and dotted strokes on
+     the raster path"). The eleven were
      asserting the plumbing of a stub rather than any rendered result, so they go;
      what replaces them as coverage is the 17-case `DashedStrokeGeometryTests` plus
      the fix itself.
@@ -527,8 +517,9 @@ unconditional.
 WebAssembly solution match or improve on their recorded baselines; no orphan
 project or smoke script, obsolete assembly reference, dead test-only flag,
 committed generated WPT output, duplicate diagnostic wrapper, or broken legacy
-solution remains; and every submodule-resident change is either merged upstream
-or recorded as a pending patch in [`patches/README.md`](../patches/README.md).
+solution remains; and every required submodule-resident change is merged upstream and
+present in the pinned component commit. A blocked component change names its owner and
+reopening condition; it is not smuggled into a release through a retired patch ledger.
 Remove this roadmap item after durable test ownership and result-location rules
 have been folded into [the documentation index's test-evidence
 section](README.md#test-evidence) and the relevant component roadmaps — and fix
@@ -689,9 +680,13 @@ non-desktop head with its own SDK, backend, and host.
    and the Play target-API requirement in force at release, plus the shipped ABI
    set (`android-arm64` required, `android-x64` for emulator CI).
 2. Freeze the managed runtime and the linker/AOT mode, and record the
-   consequence for JS execution: `Broiler.JavaScript.ExpressionCompiler` uses
-   `System.Reflection.Emit` and cannot run under full AOT, while
-   `Broiler.JavaScript.Portable` can. Writer may adopt a stricter mode than
+   consequence for JS execution: the IL emitter uses `System.Reflection.Emit` and cannot
+   serve a dynamic-code-prohibited profile. The current Native AOT sample proves only the
+   numeric **execution-only** portable seed with precompiled bytecode; it does not prove a
+   general JavaScript runtime or in-process source compiler. Android must select one of the
+   terminal capability profiles in the
+   [JavaScript modernization roadmap](../Broiler.JS/docs/roadmap/Modernization.md) instead
+   of treating “Portable” as a complete engine. Writer may adopt a stricter mode than
    Browser.
 3. Define the Android workspace topology for
    [`eng/solutions.json`](../eng/solutions.json) — the intended roots and the
@@ -711,15 +706,13 @@ every later Android phase cites it instead of re-deciding.
 
 **Owner:** `Broiler.Graphics` (submodule).
 
-**Historical evidence (superseded 2026-08-01):** the backend is written and unit-tested, and is **pending as
-[`patches/0040-graphics-android-opengles-backend.patch`](../patches/README.md)**.
-The push to the `Broiler.Graphics` remote returned 403 — it is outside this
-session's GitHub scope — so the submodule pointer is deliberately unchanged and
-the assembly is absent from every build until a maintainer applies the patch.
-There is no main-repo fallback for this one: the backend is a submodule assembly,
-so unlike the HtmlBridge-shaped patches nothing covers it in the meantime.
+**Historical evidence, corrected 2026-08-22:** this was formerly pending as
+`patches/0040-graphics-android-opengles-backend.patch`; it has landed in
+`Broiler.Graphics` as `d051d57` (`android: EGL / OpenGL ES presentation backend`). The
+former 403/patch-handoff state is superseded; release use still depends on the aggregate
+repository pinning a component commit that contains it.
 
-The patch adds `Broiler.Graphics.Android` — EGL/GLES3 context, off-screen pbuffer
+The landed commit adds `Broiler.Graphics.Android` — EGL/GLES3 context, off-screen pbuffer
 surface, on-screen `ANativeWindow` surface, the CPU-frame upload-and-blit present,
 readback, and a dependency probe — plus the `/system/fonts` roots and
 Roboto/Noto/Droid pairs `FallbackSystemFont` was missing, without which an Android
@@ -1118,9 +1111,10 @@ started by promoting the current synthetic `#shadow-root`.
 **Submodule mechanics.** `Broiler.DOM` is a submodule, so every wave is two
 changes: the component commit, then the parent pointer bump plus the bridge
 adapter. Follow the documented order in [CLAUDE.md](../CLAUDE.md) — push the
-component commit first and bump the pointer only if the push succeeded; on a 403,
-capture the change under [`patches/`](../patches/README.md) with an index entry
-and leave the pointer untouched. Two additional constraints apply here:
+component commit first and bump the pointer only if the push succeeded. If component
+publication is unavailable, leave the pointer untouched and record a blocker with its
+owner/reopening condition; the retired root `patches/` ledger is not a delivery path. Two
+additional constraints apply here:
 
 - `Broiler.CSS` nests its own `Broiler.DOM` submodule pointer. Wave 1 is consumed
   by `CssSelectorMatcher`, so it requires bumping the nested pointer as well as
@@ -1451,8 +1445,8 @@ security, interoperability, and clearance gates pass.
 
 - Completed implementation records are removed after durable decisions and open
   work have moved to their owners.
-- Pending submodule changes are tracked in
-  [`patches/README.md`](../patches/README.md), not duplicated in incident
-  roadmaps.
+- A required submodule change must be merged and present in the pinned component commit.
+  Blocked work is recorded once in its owning roadmap/status record with a reopening
+  condition; the former root `patches/` ledger is retired.
 - New work enters this file only when at least two components or a root
   application/release workflow must coordinate to close it.

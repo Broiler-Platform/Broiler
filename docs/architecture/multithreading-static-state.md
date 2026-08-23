@@ -1,6 +1,6 @@
 # Shared mutable state on the render path
 
-The P0-c audit from the [multithreading roadmap](multithreading.md#p0-c--shared-cache-thread-safety-audit):
+The P0-c audit from the [multithreading roadmap](multithreading.md#p0-c--shared-cache-thread-safety-audit--done):
 what a second thread running layout or paint would reach, what it must establish
 before it may run, and which of it is actually a race.
 
@@ -12,6 +12,13 @@ python3 scripts/audit-mutable-statics.py --json /tmp/statics.json
 
 The script is syntactic and deliberately over-reports; the classification below is
 the judgement it cannot make.
+
+> **Scope boundary.** This is the completed render-path audit for the nine projects named
+> below. It is not the JavaScript optimizer/cache ownership census required by modernization
+> MOD-M5/MOD-M6. Process-global site tables, inline caches, feedback, compiled artifacts, context
+> entry routes, and reclamation are owned by the
+> [Broiler.JS concurrency plan](../../Broiler.JS/docs/roadmap/Concurrency.md) and remain open
+> in its [status record](../../Broiler.JS/docs/roadmap/Concurrency.status.md).
 
 ## What the enumeration found
 

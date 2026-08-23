@@ -11,7 +11,10 @@ conformance, and implementation work belongs with that component.
 | --- | --- |
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
 | [Broiler Code roadmap](broiler-code-roadmap.md) | The phased plan for a shared C#/.NET IDE, multi-project editing, diagnostics, and .NET/Android/WebAssembly builds |
-| [Performance and benchmark roadmap](../Broiler.JS/docs/roadmap/Roadmap.md) | **Moved into the `Broiler.JS` submodule on 2026-08-07** — it was `docs/performance-roadmap.md` with its detail in `docs/performance/`, and it is now [`Broiler.JS/docs/roadmap/`](../Broiler.JS/docs/roadmap/) in full. JavaScript execution speed: the phased plan, the Octane and probe metrics it is judged on, and the evidence each phase still owes. It spans the main-repo `tests/octane` harness and the engine, and the harness half is reached by name rather than by link — a submodule cannot link to its parent. It moved because every *item* in it changes engine source |
+| [JavaScript modernization roadmap](../Broiler.JS/docs/roadmap/Modernization.md) | Current cross-track execution authority for JavaScript performance, assembly/AOT boundaries, package decomposition, compile-ahead, context isolation, Workers, profile-led optimization, and the terminal bytecode capability decision |
+| [JavaScript modernization delivery roadmap](../Broiler.JS/docs/roadmap/ModernizationDelivery.md) | **Subordinate delivery/reference view, not a sequencing or state authority.** Groups multi-phase waves, handoffs, and first increments under the authoritative modernization and owning plan/status gates |
+| [Performance campaign crosswalk](../Broiler.JS/docs/roadmap/Roadmap.md) | **Moved into the `Broiler.JS` submodule on 2026-08-07.** Preserves the IL campaign, Octane/probe history, optimization catalogue, and phase crosswalk. Where sequencing conflicts, the modernization roadmap and the owning phase plan/status pair take precedence |
+| [JavaScript concurrency plan](../Broiler.JS/docs/roadmap/Concurrency.md) | Component-owned MOD-M5–MOD-M7 gates for compile-ahead, optimizer/cache ownership, independent contexts, Worker agents, resource caps, and the separate shared-memory decision |
 | [WPT rendering gaps](wpt-rendering-gaps.md) | Index for the worst-scoring WPT pixel mismatches, the capability each one is missing, and its owning component. **Split by verdict on 2026-08-13** into [not fixed](wpt-rendering-gaps-open.md), [won't fix](wpt-rendering-gaps-wont-fix.md) and [fixed](wpt-rendering-gaps-fixed.md); the index carries the shared warnings, the reproduction commands, and a table of every test |
 | [WPT timeout causes](wpt-timeout-causes.md) | What the WPT `Timeout` category actually turns out to be — the per-iteration full-document pass that produced six of the seven causes in the 2026-08-16 run, which clusters are fixed, and the two whose cause is established but unfixed. A timeout is invisible to the pixel suites, since the run is aborted before anything renders |
 | [Real-world website render tests](real-world-render-tests.md) | The public-site visual corpus, its live and recorded-DOM comparison lanes, metrics, CI workflow, and reproducible local command |
@@ -27,7 +30,7 @@ conformance, and implementation work belongs with that component.
 | [HtmlBridge architecture](architecture/htmlbridge.md) | Current bridge assemblies, ownership boundaries, and public seams |
 | [Browser WebAssembly architecture](architecture/browser-webassembly.md) | Current browser-host, rendering, input, and support decisions |
 | [Android application architecture](architecture/android.md) | Proposed Android host topology, platform baseline, and ownership boundaries |
-| [Multithreading analysis and roadmap](architecture/multithreading.md) | Where concurrency can and cannot speed up each component, and the order the work has to happen in |
+| [Multithreading analysis and roadmap](architecture/multithreading.md) | Cross-component integration and historical host measurements. JavaScript-local implementation and acceptance are delegated to the component concurrency plan above |
 
 Completed migration plans, delivery logs, and investigation journals remain
 available in Git history. They are not the current backlog; durable decisions
@@ -44,12 +47,14 @@ The component roadmaps are the source of truth for component-local work:
 - [Broiler.Graphics](../Broiler.Graphics/docs/roadmap.md)
 - [Broiler.HTML](../Broiler.HTML/docs/roadmap.md)
 - [Broiler.Input](../Broiler.Input/docs/roadmap.md)
-- [Broiler.JS](../Broiler.JS/docs/roadmap/) — all three of its plans, indexed; the
-  component roadmap is [`component.md`](../Broiler.JS/docs/roadmap/Component.md) and the
-  performance campaign is
-  [`performance.md`](../Broiler.JS/docs/roadmap/Roadmap.md)
-- [Broiler.JS performance acceptance](../Broiler.JS/docs/roadmap/Measurement.md) — the gate
-  every performance claim in this repository passes, engine or harness
+- [Broiler.JS](../Broiler.JS/docs/roadmap/) — indexed component-owned plans for
+  modernization, the IL performance campaign and phases, assemblies, bytecode phases,
+  concurrency, and component capability work. Start with
+  [`Modernization.md`](../Broiler.JS/docs/roadmap/Modernization.md) for cross-track order
+  and [`Component.md`](../Broiler.JS/docs/roadmap/Component.md) for non-performance work
+- [Broiler.JS performance acceptance](../Broiler.JS/docs/roadmap/Measurement.md) — the
+  fail-closed evidence-class, A/A, candidate/control, source-identity, resource, and
+  semantic gate for JavaScript-engine and harness performance claims
 - [Broiler.Regex](../Broiler.JS/Broiler.Regex/docs/roadmap.md)
 - [Broiler.Layout](../Broiler.Layout/docs/roadmap.md)
 - [Broiler.Media](../Broiler.Media/docs/roadmap.md)

@@ -438,10 +438,9 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 - **Tests:** `css-page/page-name-img-003` and `-004` — both **0.0% → pass at
   100%** under `BROILER_WPT_PAGED_PRINT=1`.
-- **Owner:** `Broiler.HTML` (`DomParser.CorrectImgBoxes`) — **a pending submodule
-  patch**, `patches/0003`, because the push to `Broiler-Platform/Broiler.HTML`
-  answers 403. Nothing in this repository references anything new, so the build is
-  unaffected while it waits, and the WPT shard actions apply it for a run.
+- **Owner:** `Broiler.HTML` (`DomParser.CorrectImgBoxes`) — landed as `f97ece1`,
+  *Carry a block image's page name onto the box that replaces it*, and is an ancestor
+  of the current pointer. The former `patches/0003` handoff is historical only.
 - **It was diagnosed in the wrong component first.** The symptom is that
   `CssBox.Display` reads `inline` for an `<img>` whose author style says
   `display: block`, so `TakesAPageName` drops the image's `page` name. The cascade
@@ -534,21 +533,21 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 - **Test:** `css-page/media-queries-001-print` — `rel=match` **0.0% → passes at
   100%**, measured 2026-08-20. It was the 5th-biggest problem in the
   [#1726 reftest run](https://github.com/Broiler-Platform/Broiler/issues/1726).
-- **Owner:** `Broiler.CSS` (`CssPagedMedia`, `CssStyleEngine.Values`) — **a
-  pending submodule patch**, `patches/0002`, because the push to
-  `Broiler-Platform/Broiler.CSS` answers 403. The call sites are in the main repo
-  (`Broiler.Layout/Engine/EmbeddedCanvas.cs`, `src/Broiler.Wpt/WptTestRunner.cs`)
-  behind the `BROILER_CSS_PAGED_MEDIA` file-existence probe, so the repo builds
-  and renders identically against the pinned pointer and switches on when the
-  patch lands. The WPT shard actions run `scripts/apply-pending-wpt-patches.sh`,
-  so it reaches a CI run without waiting for the pointer.
+- **Owner:** `Broiler.CSS` (`CssPagedMedia`, `CssStyleEngine.Values`) — landed as
+  `c9d4f92`, *Give a media query a paged formatting context*, and is an ancestor of
+  the current pointer. The main-repository call sites
+  (`Broiler.Layout/Engine/EmbeddedCanvas.cs`, `src/Broiler.Wpt/WptTestRunner.cs`) now
+  enable `BROILER_CSS_PAGED_MEDIA` through the existing file-existence probe; no
+  out-of-tree patch is applied.
 - **Two bugs met in one test, and only one of them was about paged media.**
 - **The first was a length parser.** `CssLengthParser.ParseToPixels` handled
   `px`, the font-relative units and the viewport family, and none of the absolute
   ones — `in`, `cm`, `mm`, `pt`, `pc`, `q` all answered `NaN`, which every caller
   reads as "not a length". That is
-  [`patches/0001`](../patches/README.md), already pending before this work and
-  found independently; this entry does not duplicate it. `media-queries-001-print`
+  the historical patch numbered `0001`, since landed as `Broiler.CSS` `8db920a`,
+  *Resolve the absolute length units in ParseToPixels*; the former number is not a
+  current file or durable identity.
+  `media-queries-001-print`
   writes its whole assertion in inches, so it needs that patch too — **neither
   patch fixes the test alone**.
 - **The second is that a formatting context has media-query answers of its own.**
@@ -1085,8 +1084,8 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   **272 tests in the corpus declare `transform-origin`** and every one of them painted
   about the wrong point.
 - **Owner:** `Broiler.Layout` for the grammar (`IR/CssTransformOrigin.cs`),
-  `Broiler.HTML` for the two lines in `PaintWalker` that call it — patch
-  *"paint: apply a CSS transform about its transform-origin"*.
+  `Broiler.HTML` for the two lines in `PaintWalker` that call it — landed as
+  `9d40189`, *paint: apply a CSS transform about its transform-origin*.
 - **Root cause.** `PaintWalker` hardcoded the origin to `bounds.X + bounds.Width * 0.5f`
   with the comment "(default: center center)", and never read the property. The centre
   *is* the initial value, so this was right for every element that declares nothing and
@@ -1120,12 +1119,10 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   which is now a parameter: `50% 50%` for a CSS box, `0 0` for an SVG element, which has
   no CSS layout box.
 - **Checks:** `Broiler.Layout.Tests.CssTransformOriginTests` (30 cases over the grammar,
-  main-repo and unconditional) and `src/Broiler.Wpt.Tests/TransformOriginPaintTests.cs`
-  (8 painted cases, which probe the pinned pointer and self-skip until the patch lands).
-- **Reach on CI:** the main-repo half ships now and is a measured no-op on the reftest
-  suite. The paint half reaches the privacy-test-page and real-world-render workflows
-  through `apply-pending-wpt-patches.sh`, and the WPT suite only once a maintainer lands
-  it upstream and bumps the pointer.
+  main-repository and unconditional) and `src/Broiler.Wpt.Tests/TransformOriginPaintTests.cs`
+  (8 painted cases; their compatibility probe still lets an older pointer self-skip).
+- **Reach on CI:** both halves are present in the current aggregate tree through the
+  pinned component; `apply-pending-wpt-patches.sh` is not involved.
 
 ### A broken image drew a 2px frame, and reported it as part of its box
 
@@ -1295,7 +1292,8 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
   numbered family in `css/CSS2`. On the family's own `rel=match` references: 46 → **48
   passing**, 60 tests improved against 7 regressed.
 - **Owner:** `Broiler.Layout` for the pass, `Broiler.HTML` for the one line that calls
-  it (patch: *"parse: generate the anonymous table a misparented table box needs"*).
+  it — landed as `994e46e`, *parse: generate the anonymous table a misparented table
+  box needs*.
 - **CSS 2.1 §17.2.1 has two halves, and only one was implemented.**
   `CssLayoutEngineTable` generates the missing *children* — an anonymous row for a
   stray cell in a table or a row group, an anonymous cell for stray content in a row.
@@ -2078,14 +2076,14 @@ the test that exposed it.
 - **Tests:** `css-break/break-inside-avoid-min-block-size-1` **82.0% → 96.3%** and
   both `css-sizing/aspect-ratio/fieldset-element-001` and `-002` to **exactly
   100%** (from 99.0% and 99.9%) — all three from this repository alone. With
-  `patches/0004` and `0005` applied, `css-break/fieldset-004` 84.4% → **88.5%**
+  the now-landed user-agent additions applied, `css-break/fieldset-004` 84.4% → **88.5%**
   and `fieldset-003` 91.3% → **92.1%**. **No test changes state**, and
   `fieldset-001` — the test this started from — goes 78.0% → 77.7% and still
   fails; why is below.
 - **Owner:** `Broiler.Layout` (`CssBox.Fieldset`, `CssBox.Layout`,
-  `CssBoxProperties`, `CssUtils`) plus a one-line user-agent addition in each of
-  `Broiler.CSS` and `Broiler.HTML` — **pending patches**, because the push to
-  either submodule answers 403.
+  `CssBoxProperties`, `CssUtils`) plus one-line user-agent additions now landed as
+  `Broiler.CSS` `befabc7` and `Broiler.HTML` `5a3c002`, both titled *Give
+  <legend> the user-agent display: block it has in HTML*.
 - **The core, and it is one line twice over.** HTML's rendering section makes a
   `<legend>` a block box. Neither user-agent source said so: `Broiler.CSS`'s
   `CssUserAgentDefaults.DisplayValues` lists `fieldset` and every other
@@ -2147,7 +2145,7 @@ the test that exposed it.
   `css/css-break` holds at 92 of 204 with the average 87.38% → **87.45%**,
   `css/css-sizing` at 74 of 112, and paged `css/css-page` (135), default
   `css/css-page` (142), `css/CSS2` (96), `css/css-backgrounds` (424) and
-  `css/css-values` (104) are byte-identical test-for-test. With the two patches
+  `css/css-values` (104) are byte-identical test-for-test. With the two component commits
   applied the css-break average reaches 87.47% and the three `fieldset-*` moves
   above appear; nothing else changes.
 

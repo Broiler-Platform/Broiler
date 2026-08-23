@@ -950,15 +950,14 @@ render to judge. `css-break/flexbox/multi-line-row-flex-fragmentation-080-print`
 is the same shape with `border: 0.25in solid black`. Neither was measuring
 anything while the border was missing.
 
-**This one ships as a patch, not as a commit.** `CssLengthParser` is in the
-`Broiler.CSS` submodule and the push is a 403, so it is
-`patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch` and is
-listed in `scripts/apply-pending-wpt-patches.sh` — which the reftest shard action
-runs, so a CI run exercises it on top of the pinned pointer. There is no
-main-repo half to fall back on: the shorthand expansion is entirely inside
-`Broiler.CSS`. Identify it by its commit subject, *Resolve the absolute length
-units in ParseToPixels*, not by the number — see
-[`patches/README.md`](../patches/README.md) on why the number means nothing.
+**Historical delivery record, superseded.** At measurement time this shipped as
+`patches/0001-resolve-the-absolute-length-units-in-parsetopixels.patch` because the
+`Broiler.CSS` push returned 403, and the WPT helper applied it over the then-pinned
+component. It has since landed in `Broiler.CSS` as `8db920a` (*Resolve the absolute
+length units in ParseToPixels*), is an ancestor of the current pointer, and the helper's
+`PENDING_PATCHES` list is empty. There is no main-repository half: the shorthand
+expansion is entirely inside `Broiler.CSS`. Use the commit subject/hash as the durable
+identity; the retired patch ledger reused numbers whenever its backlog emptied.
 
 ## A grid built from implicit columns was as wide as its border
 
@@ -1176,10 +1175,11 @@ with no body.
 
 - **A parser callback.** `HtmlDocumentParser` would have to invoke the host when
   it inserts a `<script>` and resume afterwards. That change is small, but the
-  parser is in the `Broiler.DOM` submodule — so it ships as a patch, and the
-  first call to the new overload stops the main repository compiling against the
-  pinned pointer. Every other fix on this path was kept main-repo-only precisely
-  to avoid that coupling.
+  parser is in the `Broiler.DOM` submodule, so its component commit, publication,
+  aggregate pointer bump, and the first call to the new overload must land as one
+  coordinated change. Otherwise the main repository stops compiling against the
+  pinned pointer. Every other fix on this path was kept main-repository-only precisely
+  to avoid that coupling; the retired root patch ledger is not a delivery fallback.
 - **The runner's script sequencing, re-derived.** Stub injection, external
   `src=` resolution, deferred and module scripts, microtask draining, the
   `window`→global promotion and the load event are all ordered around "parse
