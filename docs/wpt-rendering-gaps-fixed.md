@@ -2988,6 +2988,79 @@ the test that exposed it.
   last) and the page is then blank white against a lime reference, because the image the
   sheet names still does not load. The two together are what pass it.
 
+### A rotated element and its whole subtree were not painted at all
+
+- **Owner:** `Broiler.Layout` (`IR/AffineLayerMap.cs`, main repo) and `Broiler.HTML`
+  (`Broiler.HTML.Image/BCanvas.cs`, `Adapters/GraphicsAdapter.cs`, **submodule — the
+  call ships as a patch**).
+- **The bug.** `transform: rotate(45deg)` on a green square painted a **blank page**.
+  Broiler's raster canvas maps a point per axis — `p → p·scale + translation` — so
+  translation and axis-aligned scale (mirrors included, and therefore `rotate(180deg)`)
+  fold straight into its own state, and anything carrying a `b` or `c` term does not.
+  Those fell through to a compat backend that on a headless host is an inert stub, and
+  the fall-through also switches `CanUseRaster` off for **every draw the group encloses**
+  — so the element and its entire subtree landed nowhere. The three neighbouring layer
+  kinds had already been moved off that same fall-through by degrading gracefully
+  (opacity draws at full opacity, a filter draws unfiltered, a blend draws unblended);
+  the transform one had not, and for it the fall-through was not an inaccuracy but a
+  disappearance.
+- **It was never a `transform-box` bug, which is how it was found.**
+  `css/css-transforms/transform-box` was failing 33 of 34 — the highest failure rate of
+  any directory in the corpus outside the deliberate ones — and reducing its first test
+  to a plain `<div>` showed the same blank output with the property deleted. The
+  directory is uniform because *every* test in it rotates.
+- **What landed: the finished layer is warped, rather than every primitive taught a
+  matrix.** The contents draw into a full-surface offscreen with the mapping unchanged —
+  fills, text, images, clips all keep the arithmetic they already have — and one resample
+  puts the result where the transform says. `Broiler.Layout.IR.AffineLayerMap` is the
+  arithmetic: it conjugates the CSS matrix by the surface mapping (`B = S·A·S⁻¹`, exact
+  when the axes differ rather than assuming one zoom factor), and answers where a layer
+  point lands and, for the resample, which layer point lands on a destination pixel.
+  Inverse mapping is what makes it hole-free — scattering the source forward leaves gaps
+  wherever the transform magnifies.
+  - **Nearest sample, not bilinear.** A quarter turn maps pixel centres onto pixel
+    centres, so nearest is exact for the axis-swapping rotations most of the corpus uses,
+    and it cannot fringe a hard edge the way interpolating against transparent black
+    does. A diagonal rotation gets hard edges instead of antialiased ones; both sides of
+    a reftest are rendered here, so they get the same ones.
+  - **The clips in force are suspended while the layer fills and applied at the
+    composite.** An ancestor's `overflow` or `clip-path` bounds where the element *ends
+    up* (CSS Transforms 1 §3), and the tile clip of a parallel replay bounds which slice
+    of the surface the canvas may write. Leaving either in force while the layer filled
+    would clip in pre-transform space — wrong for the first, and for the second a seam,
+    because content just outside a tile that rotates into it would be clipped away before
+    it could.
+- **Measured over the full 26 366-test reftest suite: 18 776 → 18 771 passing, +22 / −27**,
+  average match unchanged at 98.42%, run time unchanged (22:04 → 21:5x). **The score
+  going down is the honest result**, and the shape of it is the one
+  [this suite is built to produce](wpt-reftests.md#the-bug-is-as-likely-to-be-in-the-reference-and-that-inverts-the-scoreboard):
+  25 of the 27 losses rotate on *both* sides, so both used to render blank and match at
+  100%, and the other two were checked by rendering them — their references transform
+  too, through spellings a grep for `rotate` misses. 13 of the 22 wins transform on only
+  one side and could not have passed before at all. **The upside is in the golden suite,
+  which this one structurally cannot show**: 192 of its 6 914 failures declare a rotation
+  or skew, and a blank render can only lose against a Chromium reference that shows the
+  rotated content.
+- **A first cut cost a factor of ten and is worth not repeating.** Suspending the clips
+  by emptying the stack is correct and unaffordable: `_clipBounds` is what bounds a
+  rasterizer's loops, so with nothing in it every fill inside a warp layer walked the
+  whole surface. Replacing them with the *pre-image of what is still visible* — the part
+  of the layer that can land inside the suspended clip — keeps both properties, because
+  content outside it cannot reach the surface however it is transformed.
+- **Verified:** 20 `AffineLayerMapTests` in the main repo pin the arithmetic — the fixed
+  point is `transform-origin`, a quarter turn sends the x axis to y, the worked
+  `cssbox-content-box-001` box lands where its reference states, a diagonal turn grows
+  the destination box by root two, the inverse undoes the forward for rotation, skew and
+  a rotation composed with a scale, a non-uniform surface scale is conjugated rather than
+  averaged, and every axis-aligned, singular or malformed matrix is declined so exactly
+  one of the two paths claims a given matrix.
+- **What this exposes rather than fixes.** `transform-box` itself is still unimplemented:
+  `cssbox-content-box-001` now renders the right shape in the wrong place, offset by
+  exactly the 50px left border, because the reference box is always the border box
+  (`PaintWalker.Stacking` passes `bounds` to both the matrix and
+  `CssTransformOrigin.Resolve`). That is the next thing in this directory, and it is a
+  smaller job than this was.
+
 ### `transform: scale()` with percentages
 
 - **Test:** `css/css-transforms/transform-scale-percent-001`, 0.5% → **99.99%**.

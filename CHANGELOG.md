@@ -303,6 +303,18 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A rotated or skewed element is painted. `transform: rotate(45deg)` on a green
+  square produced a **blank page** — and took its whole subtree with it, so a page
+  that rotates a wrapper lost everything inside it. The raster canvas maps a point
+  per axis, so translation and axis-aligned scale fold into its own state and a
+  rotation does not; those fell through to a compat backend that on a headless host
+  is an inert stub, and the fall-through also stops every draw the group encloses
+  from reaching the canvas at all. Such a transform now opens a layer the contents
+  draw into untransformed, resampled through the matrix on the way out — so every
+  primitive keeps the arithmetic it already has. Ancestor clips are applied to the
+  transformed result rather than to the content on its way in, which is where
+  CSS Transforms 1 §3 puts them.
+
 - An SVG used as an image keeps the intrinsic aspect ratio its `viewBox` gives it
   even when it declares `preserveAspectRatio="none"`, and reports an absolute
   `width` or `height` it states even when the other one is missing. SVG 2 §8.2

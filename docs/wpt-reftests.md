@@ -291,6 +291,27 @@ for k, v in collections.Counter('/'.join(p.split('/')[:3]) for p in paths).most_
 PY
 ```
 
+
+## The 98–99% band is not a work queue either, and it is a trap that looks like one
+
+Ranking the reftest failures by match percentage puts **3 207 of 7 373 — 44% — in a single
+98–99% bucket**, just under the gate, with another 1 193 in 97–98%. That reads like one
+systematic near-miss with one cause behind it, and it is not: it is a property of the
+*canvas*, not of the engine. A reftest's subject is usually a small box on a 1024×768
+viewport, and a 100×100 square is 1.27% of it — so a test whose square is **completely
+wrong** still scores 98.7%.
+
+Sampled across the ten directories that band is thickest in, the failures had nothing in
+common: `CSS2/selectors/default-attribute-selector-003` is a 100×100 square painted where
+no square belongs, `css-text/shaping/shaping-005` is Arabic characters that do not join.
+Two unrelated bugs, one number.
+
+**Rank by what a directory's pass rate says instead.** A directory failing 97% of its tests
+is one feature nobody implemented; a directory failing 20% is twenty unrelated bugs, and no
+amount of sorting by percentage separates them. That is what found the rotation defect:
+`css-transforms/transform-box` at 33 of 34 failing, reduced to a plain `<div>`, showed a
+blank page with the property deleted.
+
 - **The runner cannot represent what the test builds.** The rarest answer and
   the hardest to see, because the render is neither wrong nor honest — it is of
   a *different document*. Two distinct versions of this, and the fix for the

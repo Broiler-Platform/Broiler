@@ -377,6 +377,7 @@ set -euo pipefail
 # passing); without it those 68 css-backgrounds/background-size tests stay red.
 PENDING_PATCHES=(
   "Broiler.HTML|patches/0001-html-svg-viewbox-intrinsic-ratio.patch"
+  "Broiler.HTML|patches/0002-html-affine-transform-layer.patch"
 )
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -1213,31 +1213,50 @@ Worth separating from the rest, because the test itself may be at fault:
 
 ## Transforms
 
-### Nothing with a rotation or a skew in it paints at all
+### Nothing with a rotation or a skew in it paints at all — **fixed**
 
-- **Tests:** `css-transforms/animation/transform-interpolation-005`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).23) and every test whose
-  transform is not axis-aligned.
-- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Image/BCanvas.cs`,
-  `Adapters/GraphicsAdapter.cs`). **Submodule** — a fix ships as a patch.
-- **Root cause.** `BCanvas.TrySaveTransform` returns false when the affine's `b` or `c` is
-  non-zero, i.e. for any rotation or skew — including every `matrix()` with non-zero b/c.
-  `GraphicsAdapter` then routes the layer to `_canvasCompat`, whose only implementation in
-  the tree is `StubCanvasCompat`, **every method of which is a no-op**, and
-  `CanUseRaster` sends every enclosed draw there too. So the content does not paint
-  mis-rotated; it does not paint.
-- **What it needs:** `BCanvas` keeps `_translation`, `_scaleX`, `_scaleY` and maps points
-  per axis. That has to become a real 2×3 matrix, composed in
-  `TrySaveTransform`/`Translate`/`Scale` and applied at the ~12 mapping call sites; a
-  rect-shaped primitive under a rotation has to go out as the polygon primitive the backend
-  already draws, and `PushClip` has to become the polygon clip that already exists.
-- **`perspective-split-by-zero-w`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).22) is a tier beyond
-  that** and belongs with
-  [the 3D entry below](#a-perspective-transformed-box-is-not-rasterised-in-3d): there is no
-  `w` to split against because there is no 3D pipeline at all —
-  `ParseCssTransformMatrix` reduces the whole list to a 2D affine and silently drops
-  `rotateX`, `rotateY`, off-Z `rotate3d` and genuinely-3D `matrix3d`.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-rotated-element-and-its-whole-subtree-were-not-painted-at-all).
+**Not by the route this entry proposed**, which is worth recording. It asked for
+`BCanvas`'s per-axis mapping to become a real 2×3 matrix, composed in
+`TrySaveTransform`/`Translate`/`Scale` and applied at a dozen call sites, with rect
+primitives going out as polygons under a rotation and `PushClip` becoming a polygon clip.
+What landed instead leaves every primitive exactly as it was: the contents draw into an
+offscreen with the mapping unchanged, and the *finished layer* is resampled through the
+matrix (`Broiler.Layout.IR.AffineLayerMap` in the main repo, the call as a submodule
+patch). Same result for one tenth of the surface area, and the arithmetic ends up on the
+side of the boundary this session can test.
+
+**What is still open here is the 3D half**, which that entry already separated out:
+`perspective-split-by-zero-w` belongs with
+[the 3D entry below](#a-perspective-transformed-box-is-not-rasterised-in-3d), because
+`ParseCssTransformMatrix` reduces the whole list to a 2D affine and silently drops
+`rotateX`, `rotateY`, off-Z `rotate3d` and genuinely-3D `matrix3d`. A 2D warp cannot
+express those, and does not claim to.
+
+### `transform-box` is not read at all
+
+- **Tests:** `css-transforms/transform-box` — 33 of 34 failing, the highest failure rate of
+  any directory in the corpus outside the deliberate ones. The whole directory rotates, so
+  it read as a rotation bug and
+  [was one](wpt-rendering-gaps-fixed.md#a-rotated-element-and-its-whole-subtree-were-not-painted-at-all);
+  what is left underneath is the property itself.
+- **Owner:** `Broiler.HTML` (`Source/Broiler.HTML.Orchestration/IR/PaintWalker.Stacking.cs`)
+  for the call, with the box choice belonging in `Broiler.Layout` beside
+  `CssTransformOrigin` — the same split the rotation fix used. Needs
+  `ComputedStyle.TransformBox` plumbed through first, which is main repo.
+- **What it is.** The reference box for a CSS transform is always the border box:
+  `PaintWalker.Stacking` passes `bounds` to both `ParseCssTransformMatrix` (which resolves
+  percentage translations against it) and `CssTransformOrigin.Resolve`. CSS Transforms 1 §6
+  makes that a choice of five — `content-box`, `border-box`, `fill-box`, `stroke-box`,
+  `view-box` — and on a non-SVG element `fill-box`/`stroke-box`/`view-box` behave as
+  `content-box`/`border-box`/`border-box`.
+- **Measured:** `cssbox-content-box-001` now renders the correct shape in the wrong place,
+  offset by exactly the 50px left border its `content-box` reference box would have removed.
+  The SVG half is partly there already — `SvgRenderer.TransformOrigin` reads
+  `transform-box` for the box-relative values — so this is the CSS-layout half.
+- **Exit gate:** the eight `cssbox-*` tests match, and the `*-mutation-*` ones follow, with
+  a `Broiler.Layout` test over the five keywords against a box with a border and padding.
 
 ### Transform interpolation has no matrix fallback
 
