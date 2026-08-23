@@ -31,6 +31,43 @@ public sealed partial class DomBridge
         }
     }
 
+    /// <summary>
+    /// The descendants that contribute to <paramref name="element"/>'s <em>scrollable overflow
+    /// region</em>: every rendered descendant, except that a descendant which clips its own
+    /// overflow contributes its border box and nothing beneath it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// CSS Overflow 3 §3.1: a box's scrollable overflow region is the union of its own content and
+    /// its descendants' scrollable overflow — and a descendant that is itself a scroll container
+    /// has *already scrolled* its own overflow, so what it contributes upward is its border box.
+    /// Its clipped content is reachable by scrolling *it*, not by scrolling the ancestor.
+    /// </para>
+    /// <para>
+    /// The plain subtree walk unioned everything, so a 400×400 block inside a 120×100
+    /// <c>overflow: auto</c> box made the *document* report <c>scrollHeight</c> 401 for a page
+    /// whose content is 102px tall. That stayed invisible while the bridge held its viewport at
+    /// 1024×768 — 401 is under 768, so the maximum scroll came out 0 either way and nothing
+    /// moved. Once the bridge was given the size the run actually renders at, a 280×130 render had
+    /// a 271px scroll range that does not exist, and <c>scrollIntoView</c> on content inside one of
+    /// those containers scrolled the whole document to reach it.
+    /// </para>
+    /// </remarks>
+    private IEnumerable<DomElement> EnumerateScrollableOverflowDescendants(DomElement element)
+    {
+        foreach (var child in EnumerateRenderedChildren(element))
+        {
+            yield return child;
+
+            // The border box is the contribution; the subtree under it is not.
+            if (CssOverflow.ClipsOverflow(GetComputedProps(child)))
+                continue;
+
+            foreach (var descendant in EnumerateScrollableOverflowDescendants(child))
+                yield return descendant;
+        }
+    }
+
     private IEnumerable<DomElement> EnumerateRenderedChildren(DomElement element)
     {
         if (string.Equals(element.TagName, "slot", StringComparison.OrdinalIgnoreCase))

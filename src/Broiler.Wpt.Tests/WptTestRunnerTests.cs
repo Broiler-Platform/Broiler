@@ -101,9 +101,15 @@ public class WptTestRunnerTests : IDisposable
         object? executed;
         try
         {
+            // Reflection binds positionally and does not fill in optional parameters, so every
+            // argument has to be passed — including the viewport, which the runner supplies from
+            // the size it is about to render at. These script-only cases never render, so they
+            // take the runner's own defaults.
             executed = method!.Invoke(
                 null,
-                [testHtml, new Uri(Path.GetFullPath(testFile)).AbsoluteUri, _tempDir, false]);
+                [testHtml, new Uri(Path.GetFullPath(testFile)).AbsoluteUri, _tempDir, false,
+                 Broiler.HtmlBridge.DomBridge.DefaultViewportWidth,
+                 Broiler.HtmlBridge.DomBridge.DefaultViewportHeight]);
         }
         finally
         {
@@ -3268,6 +3274,15 @@ input {
     for (const match of document.querySelectorAll('.target')) {
       match.scrollIntoView({ block: 'center', inline: 'end' });
     }
+    // Same reset, and for the same reason, as the percentage/absolute fixture above: the
+    // zoom: 2 container is 244px tall in a 240px viewport, so the document genuinely has
+    // 13.6px of scrollable overflow and scrollIntoView correctly continues outward into it
+    // (the root is a scroll container even under overflow: hidden -- CSS Overflow 3 SS3.3).
+    // That viewport scroll is incidental to the container alignment math being compared and
+    // the reference does not model it. It only became visible once the bridge was given the
+    // size the run actually renders at: while it held its own 1024x768 default, 253.6 was
+    // under 768 and the document could not scroll at all.
+    document.documentElement.scrollTo(0, 0);
   </script>
 </body>
 </html>";

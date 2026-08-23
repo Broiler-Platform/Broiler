@@ -380,7 +380,7 @@ public sealed partial class DomBridge
         var includeEndMargins = IsViewportElementForMetrics(element);
         var marginPercentageBasis = (double)contentBox.Width;
 
-        foreach (var descendant in EnumerateRenderedDescendants(element))
+        foreach (var descendant in EnumerateScrollableOverflowDescendants(element))
         {
             if (!TryGetSharedLayoutGeometry(descendant, out var childBox))
                 continue;
