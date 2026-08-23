@@ -148,6 +148,23 @@ public sealed partial class DomBridge
             function SVGElement() { throw new TypeError('Illegal constructor'); }
             function CanvasRenderingContext2D() { throw new TypeError('Illegal constructor'); }
 
+            // The object document.startViewTransition() returns has always existed here; the
+            // *interface* did not, and a page that probes it paid more than a missing feature
+            // costs. css-view-transitions/view-transition-waituntil-animation-manipulation opens
+            // with `failIfNot(ViewTransition.prototype.waitUntil, ...)`, so evaluating the
+            // *argument* threw ReferenceError before failIfNot was ever entered: the whole inline
+            // script aborted, including the onload assignment at the bottom of it, and
+            // startViewTransition was never called at all. The failure then reads as a compositing
+            // bug and is not one. With the interface present, `ViewTransition.prototype.waitUntil`
+            // is a plain undefined, the precondition is *reached*, and the page reports the
+            // precondition failure it was written to report.
+            //
+            // waitUntil is deliberately not defined. It is a proposal, not shipped here, and
+            // faking one would let the test past its own guard and into Web Animations calls this
+            // engine cannot answer either (there is no Animation constructor and no
+            // Element.prototype.animate) — a worse answer than an honest precondition failure.
+            function ViewTransition() { throw new TypeError('Illegal constructor'); }
+
             // ImageData, unlike the interfaces above, *is* constructible — HTML defines
             // new ImageData(w, h) and new ImageData(data, w, h) — so it gets a real body rather
             // than an illegal-constructor throw.
@@ -244,6 +261,16 @@ public sealed partial class DomBridge
                         && typeof o.getImageData === 'function'
                         && typeof o.fillRect === 'function'
                         && typeof o.fillStyle === 'string';
+                });
+
+                // A view transition is not a node either, and the bridge builds it as a plain
+                // object, so it answers from the members the interface is defined by. `types` and
+                // `skipTransition` together are what separate it from any other thenable-bearing
+                // object a page might hold.
+                define(ViewTransition, function (o) {
+                    return !!o && typeof o === 'object'
+                        && typeof o.skipTransition === 'function'
+                        && !!o.ready && !!o.finished && !!o.updateCallbackDone;
                 });
 
                 // Accepts an ImageData this constructor produced and one getImageData returned,
