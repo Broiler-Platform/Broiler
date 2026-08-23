@@ -454,24 +454,15 @@ other direction. None is a sizing bug.
 - **Exit gate:** a 2D canvas context that paints, at which point the first two
   become ordinary comparisons.
 
-### A column flex container destroys an inline replaced item when it stretches it
+### A column flex container destroys an inline replaced item — **fixed**
 
-- **Test:** `css-flexbox/aspect-ratio-intrinsic-size-007`
-  ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).28), 35.4% against its
-  own reference, `MissingContent` over a 1008×10 strip.
-- **Owner:** `Broiler.Layout` (`Engine/CssBox.Flex.cs`). Main repo.
-- **Root cause.** A column flex container whose only child is inline-level takes the
-  `ContainsInlinesOnly` branch: the line boxes are built first, and the cross-axis stretch
-  is then applied as a *post*-pass that re-lays the item out at a target width. That is
-  destructive for an inline replaced `<img>`, which never goes through
-  `ResolveBlockUsedWidth` on the inline path, so the re-layout does not resize it the way
-  the pass assumes.
-- **The fix is to make the stretch width definite *before* the inline formatting context
-  runs** rather than re-running layout after it: a pre-pass over the in-flow items that
-  resolve to `stretch`, have no specified width and no auto inline margin, and are
-  replaced.
-- **Exit gate:** the test matches, and `css/css-flexbox/aspect-ratio` does not move
-  elsewhere.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-column-flex-items-stretch-never-reached-the-image-inside-it).
+The diagnosis in this entry was right about the symptom and wrong about the mechanism. The
+stretch is not destructive; it simply never reaches the image, because a block-level image
+in a flex container is wrapped in an anonymous block and for a *column* container that
+wrapper becomes the item. `aspect-ratio-intrinsic-size-007` painted the 300×150 default
+object size and now matches at 100%; `css/css-flexbox` goes 436 → 438, +2 / −0.
 
 ### A size-contained `<svg>`, `<video>` or `<iframe>` still reports a size
 
@@ -493,28 +484,21 @@ containment**.
     `wpt-tests.yml` does not run `apply-pending-wpt-patches.sh` — so landing it upstream
     and bumping the pointer is the route.
 
-### An inline element's three box-model rects are all the same rectangle
+### An inline element's three box-model rects are all the same rectangle — **fixed**
 
-- **Tests:** the six `<img>` assertions still failing in
-  `contain-intrinsic-size-logical-003`, and — more to the point — `clientWidth` and
-  `clientHeight` on **every** inline element that has a border or padding.
-  `<img style="width: 50px; height: 30px; border: 3px solid">` reports
-  `getBoundingClientRect` 56×36 (right) and `clientWidth`/`clientHeight` 56×36 (wrong:
-  the client box excludes the border, so 50×30). The same declarations on a `<div>` or
-  an `inline-block` report 50×30 correctly.
-- **Owner:** `Broiler.HTML` (`HtmlContainerInt.CollectLayoutGeometry`).
-- **Root cause.** A `display: inline` box lays out as one rectangle per line box rather
-  than a single border box, so `box.Location`/`box.Size` are unset and the collector
-  rebuilds the border box from the union of the line rectangles — then sets all three
-  levels of `BoxGeometry` to that same rectangle, on the stated grounds that "inline
-  boxes contribute no box-model padding/border to line geometry in this engine". That
-  premise does not hold for a **replaced** inline: `CssLineBox.UpdateRectangle` adds the
-  box's border and padding to an image's line rectangle explicitly, and
-  `MeasureImageSize` adds them in the block axis, so the union genuinely *is* the border
-  box and the other two levels have to be deflated out of it.
-- **Exit gate:** an inline `<img>` with a border reports a client box smaller than its
-  border box by exactly that border. Submodule-side, so the same routing as the entry
-  above.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#an-inline-replaced-elements-three-box-model-rects-were-all-the-same-rectangle).
+`clientWidth`/`clientHeight` on a bordered or padded inline `<img>` reported the border box
+and now report the padding box, agreeing with what a `<div>` carrying the same declarations
+always reported.
+
+**It moves no WPT test, and this entry was wrong about why it would.** The six `<img>`
+assertions of `contain-intrinsic-size-logical-003` named here are unchanged — the test holds
+at 42/96 — and reading them shows why: `client-width: expected 50, actual 0` beside
+`client-height: expected 0, actual 50` is a logical/physical axis transposition under
+`contain-intrinsic-size`'s logical properties, not a border deflation. Those six belong with
+[the size-containment entry](#a-size-contained-svg-video-or-iframe-still-reports-a-size)
+above, not here.
 
 ### A sticky box contributes its *stuck* position to the scroll container's overflow
 
@@ -1080,8 +1064,13 @@ the other five are unexamined.
     black. Only `flood-opacity` on an `feFlood` is read today.
   - **`mix-blend-mode` on a shape is unhandled**, so the `screen` compositing the reference relies on
     does not happen.
-  - **`style="background: …"` on the root `<svg>` is not painted**, leaving white where the reference
-    wants black.
+  - **`style="background: …"` on the root `<svg>` — fixed.** See
+    [the fixed entry](wpt-rendering-gaps-fixed.md#an-svg-images-root-background-was-never-painted).
+    It is painted for an SVG used *as an image*, which is where the canvas is the destination box;
+    an inline `<svg>` is left alone because its own CSS box already paints it. The other two on
+    this list landed with
+    [the SVG shape opacity and blend work](#fill-opacity-stroke-opacity-and-mix-blend-mode-on-an-svg-shape--fixed),
+    so all three are now closed and this entry is down to `cross-fade()` itself.
 
   Those three are worth more than this test: they apply to every SVG document Broiler renders, inline
   or as an image. They are the reason `Broiler reference vs Chromium reference` is only 67.4%.
@@ -1390,18 +1379,17 @@ express those, and does not claim to.
 - **Exit gate:** the three tests match, with a `Broiler.Layout` test over an intrinsic size scaled
   by a non-1x selection.
 
-### An invalid `image-set()` does not drop its declaration
+### An invalid `image-set()` does not drop its declaration — **fixed**
 
-- **Tests:** `css-images/image-set/image-set-negative-resolution-rendering` and `-2`.
-- **Owner:** `Broiler.CSS` (`CssDeclarationValidator`). **Submodule** — a fix ships as a patch.
-- **What it is.** A negative resolution is a parse error, so CSS Syntax 3 §9 drops the declaration
-  whole and the one cascaded under it applies; `-2` puts a green `url()` there and expects green.
-  The renderer sees only the winning value, so refusing it there leaves the property at its
-  *initial* value rather than at the previous declaration — the fallback has to happen in the
-  cascade. `CssImageSet.TryResolveLayers` already reports the parse error separately from a
-  function that validly selects nothing, so the validator has something to call.
-- **Deliberately not fixed yet:** two tests against a third pending submodule patch is the wrong
-  trade while the first two are still waiting to be applied.
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#a-declaration-whose-image-set-carried-a-negative-resolution-was-not-dropped).
+Both tests match at 100%; `css/css-images/image-set` goes 26 → 28 of 31.
+
+**The split this entry proposed is not available, and that is worth recording.** It read
+*"`CssImageSet.TryResolveLayers` already reports the parse error … so the validator has
+something to call"* — but `CssImageSet` lives in `Broiler.Layout`, which **references**
+`Broiler.CSS` and not the other way round. The check is self-contained in the cascade, so
+this one is a submodule patch with no main-repo half.
 
 ---
 
@@ -1460,8 +1448,24 @@ express those, and does not claim to.
   the border-box origin after the translate, so two errors cancel. And
   `visibility: hidden` takes an early return above the flood branch entirely, where an
   `feFlood` ignores its input and must still paint.
+- **Re-measured on 2026-08-23, and it is not the small job the split makes it sound.** The
+  main-repo/submodule shape is right — the region type and resolver here, a two-line call
+  there — but the *resolver* is the work, and the targets are near-misses rather than
+  blanks: `svg-filter-filter-units-user-space` **95.3%**, `svg-feflood-001` **97.6%**,
+  `empty-element-with-filter-002`/`-004` **98.7%** each, with
+  `feflood-with-filter-reference` already passing. `css/filter-effects` is 185 of 318.
+- **And one of its own tests is held up by the errors cancelling.**
+  `svg-filter-primitive-units-user-space` **passes today** because the correct local region
+  happens to land on the border-box origin after the translate — so fixing the region
+  without also moving the flood inside the transform layer is likely to *lose* it. The two
+  halves have to land together, which is what the exit gate says and what makes this a
+  feature rather than a patch. Its semantics are the real cost: `filterUnits` percentages
+  resolve against the *referencing element's* viewport (the test references one filter from
+  three different contexts, including an HTML `<div>` with a `transform`), and the primitive
+  subregion defaults to the filter region.
 - **Exit gate:** `filterUnits`/`primitiveUnits` resolve on both paths, and the flood is
-  emitted inside the transform layer.
+  emitted inside the transform layer — with `svg-filter-primitive-units-user-space` and the
+  185 currently passing staying passing.
 
 ## Dynamic stylesheets
 

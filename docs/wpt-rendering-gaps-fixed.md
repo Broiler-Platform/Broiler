@@ -763,6 +763,30 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## CSS engine
 
+### A declaration whose `image-set()` carried a negative resolution was not dropped
+
+- **Tests:** `css-images/image-set/image-set-negative-resolution-rendering` and `-2`, both
+  **98.7% → 100%, passing**.
+- **Owner:** `Broiler.CSS` (`CssStyleEngine.Values.cs`). **Submodule, and with no main-repo
+  half** — `patches/0005`.
+- **The rule.** CSS Images 4 §5.4 makes a `<resolution>` non-negative, so
+  `image-set(url(a) -1x, …)` is a parse error and CSS Syntax 3 §9 drops the **whole
+  declaration**, letting the one cascaded under it apply. `-2` puts a green `url()` behind it
+  and expects green.
+- **It has to be refused in the cascade, not at the renderer.** Only the winning value reaches
+  the renderer, so declining it there leaves the property at its *initial* value rather than at
+  the previous declaration — which is why the main-repo half already in `CssUtils` (leave the
+  property alone when `TryResolveLayers` reports a parse error) could not close these two.
+- **The open entry proposed a split that does not exist.** It read "`CssImageSet.TryResolveLayers`
+  already reports the parse error … so the validator has something to call". `CssImageSet` lives
+  in `Broiler.Layout`, which **references** `Broiler.CSS` and not the other way round, so the
+  validator cannot call it. The check is self-contained.
+- Scanning ignores anything inside `url()` or quotes, so a file genuinely named
+  `sprite-1x.png` does not invalidate the declaration that loads it. A **zero** resolution is
+  deliberately still accepted: it parses and selects nothing, a different outcome from being
+  dropped.
+- **Measured: `css/css-images/image-set` 26 → 28 of 31, +2 / −0**; `css/css-images` 271 → 273.
+
 ### Every CSS Color 4 colour function painted opaque black
 
 - **Tests:** `css-images/gradient/gradient-single-stop-none-interpolation`
@@ -999,6 +1023,59 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 ---
 
 ## Layout
+
+### A column flex item's stretch never reached the image inside it
+
+- **Test:** `css-flexbox/aspect-ratio-intrinsic-size-007`, **41.1% → 100%, passing**.
+- **Owner:** main repo (`Broiler.Layout/Engine/FlexGridItemBlockification.cs`) with a
+  `Broiler.HTML` call — `patches/0003`, the push to that remote being outside session scope.
+- **The previous diagnosis named the wrong mechanism.** It read "a column flex container
+  whose only child is inline-level takes the `ContainsInlinesOnly` branch … the cross-axis
+  stretch is then applied as a *post*-pass that re-lays the item out at a target width. That
+  is destructive for an inline replaced `<img>`." The stretch is not destructive; it simply
+  never reaches the image. A block-level image inside a flex container is wrapped in an
+  anonymous block (`CorrectImgBoxes`), and for a **column** container that wrapper becomes
+  the flex item — `IsRowFlexItem` exempts only *row* containers, deliberately, because block
+  flow cannot position a block-level replaced box on its own. So the stretch lands on the
+  wrapper and the image keeps an `auto` width, which for an inline replaced box with no
+  intrinsic size means the 300×150 default object size. To the spec the image **is** the item.
+- **What landed.** `IsStretchedColumnFlexItem`, beside the `IsRowFlexItem` the fix-up already
+  asks, so the two readings of "what is the item" cannot drift apart. It is asked *before* the
+  reparent, while the image is still the container's own child and still carries the width,
+  margins and alignment CSS Flexbox §9.4 step 11 turns on.
+- **Two conditions exist because the first attempt lost two tests**, and they are the reusable
+  part. A percentage width sizes the *content* box while a stretch sizes the *border* box, so
+  `width: 100%` is exact only with no inline-axis padding or border —
+  `flex-aspect-ratio-intrinsic-padding-001`, whose assertion names the content box outright,
+  overflowed by exactly its `padding: 20px`. And an `inline-flex` column container shrink-wraps
+  to its items, so an item declared `100%` of it contributes nothing to the size it is a
+  percentage of and the container collapses (`inline-flex-column-image-load`).
+- **Outside those conditions the stretch still belongs on the replaced element and is still not
+  applied.** That general form wants the cross size pushed onto the box during flex layout, not
+  a declaration rewritten before it.
+- **Measured over `css/css-flexbox`, 644 reftests: 436 → 438, +2 / −0**, with the failing-test
+  *lists* diffed rather than the totals compared — the first run's totals were identical while
+  hiding a +2/−2. `css/css-images`, `css/css-masking/clip-path` and `quirks` do not move.
+
+### An inline replaced element's three box-model rects were all the same rectangle
+
+- **Owner:** main repo (`Broiler.Layout/BoxGeometry.cs`) with a `Broiler.HTML` call —
+  `patches/0004`.
+- **The bug.** A `display: inline` box lays out as one rectangle per line rather than as a
+  single border box, so the geometry collector rebuilds its border box from the union of those
+  rectangles — and then set **all three** levels to that same rectangle, on the stated grounds
+  that inline boxes contribute no box-model padding or border to line geometry here. That holds
+  for a non-replaced inline and not for a replaced one: `CssLineBox.UpdateRectangle` adds an
+  image's border and padding to its line rectangle explicitly, so the union really *is* the
+  border box.
+- **Measured:** `<img style="width:50px;height:30px;border:3px solid;padding:4px">` reported
+  `getBoundingClientRect` 64×44 — right — and `clientWidth`/`clientHeight` **64×44 → 58×38**.
+  A `<div>` with the same declarations already reported 58×38, so the two paths disagreed with
+  each other as well as with the spec. A non-replaced `<span>` is untouched.
+- **It moves no WPT test, and the open entry was wrong about why it would** — see
+  [that entry](wpt-rendering-gaps-open.md#an-inline-elements-three-box-model-rects-are-all-the-same-rectangle--fixed)
+  for the six `contain-intrinsic-size-logical-003` assertions, which are an axis transposition
+  rather than a deflation. What this closes is the general API defect.
 
 ### Every CSS transform was applied about the box centre, whatever `transform-origin` said
 
@@ -2077,6 +2154,25 @@ the test that exposed it.
 ---
 
 ## Paint and the renderer
+
+### An SVG image's root background was never painted
+
+- **Owner:** main repo (`Broiler.Layout/IR/SvgImageRaster.cs` and `IR/SvgRenderer.cs`). No patch.
+- **The rule.** CSS Backgrounds §2.11.2 makes the root element's background the canvas's, and
+  for an SVG document used *as an image* that canvas is the destination box. Nothing painted it:
+  a file opening `<svg style="background: black">` came back transparent, so a document drawing
+  tinted shapes over a dark ground rendered them on white.
+- **Measured** on a 50%-alpha green rect over a black root: **(127,255,127) → (0,127,0)**, which
+  is what compositing that rect over black gives.
+- **Why it is in `SvgImageRaster` rather than `SvgRenderer`.** `SvgRenderer` serves both callers
+  and the *inline* one must not do this: an inline `<svg>` is an ordinary element whose CSS box
+  already paints its background, so painting it again would double a translucent colour over
+  itself. A test pins that the inline path still leaves it alone.
+- **No WPT test in the available subsets moves**, and that is expected — almost no WPT file
+  declares a root background. The one this came from does, and it is a *reference*
+  (`css-images/cross-fade-natural-size`, which both engines fail on the test side). So it is
+  pinned by unit tests instead: three cases that fail against the unmodified build, plus the
+  transparent/absent and inline cases, which must not change and do not.
 
 ### Six SVG shape elements were never drawn when an attribute held a slash
 
