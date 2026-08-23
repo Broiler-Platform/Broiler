@@ -125,4 +125,48 @@ document.getElementById('result').textContent = outcome;
         Assert.Contains("removed", result);
         Assert.DoesNotContain("threw:", result);
     }
+
+    /// <summary>
+    /// CSSOM §2.2: <c>document.styleSheets</c> is every sheet associated with the document, so a
+    /// <c>&lt;link rel=stylesheet&gt;</c> belongs in it beside a <c>&lt;style&gt;</c>, in document
+    /// order. A disabled <c>&lt;link&gt;</c> has no associated sheet and stays out (HTML §4.2.4).
+    /// </summary>
+    /// <remarks>
+    /// The main-document binding used to filter the element list to tag <c>style</c>, so an
+    /// external sheet was absent however well it loaded, while the sub-document collection counted
+    /// it — the same tree answered two different things depending on which document was asked. Both
+    /// now share one predicate, which is what this pins. Identity across two reads is here because
+    /// the collection is specified to be live and scripts compare sheet objects.
+    /// </remarks>
+    [Fact(Timeout = 600000)]
+    public void StyleSheets_Includes_Linked_Sheets_In_Document_Order_And_Excludes_A_Disabled_Link()
+    {
+        var html = @"<!DOCTYPE html>
+<html><head>
+<link rel=""stylesheet"" href=""first.css"">
+<style>.x{color:red}</style>
+<link rel=""stylesheet"" href=""off.css"" disabled>
+<link rel=""icon"" href=""favicon.ico"">
+<a href=""not-a-sheet.css""></a>
+</head><body>
+<script>
+var s = document.styleSheets;
+var tags = [];
+for (var i = 0; i < s.length; i++) tags.push(s[i].ownerNode.tagName.toLowerCase());
+var out = document.createElement('div');
+out.id = 'result';
+out.textContent =
+  'sheets=' + s.length +
+  '|order=' + tags.join(',') +
+  '|identity=' + (s[0] === document.styleSheets[0] ? 'same' : 'different');
+document.body.appendChild(out);
+</script>
+</body></html>";
+
+        var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
+
+        // The enabled <link> and the <style>; the disabled <link>, the rel=icon <link> and the
+        // <a href> are all excluded.
+        Assert.Contains("sheets=2|order=link,style|identity=same", result);
+    }
 }

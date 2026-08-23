@@ -118,16 +118,16 @@ internal static class DocumentCollectionBinding
 
     public static JSValue GetStyleSheets(IDocumentCollectionHost host, in Arguments a)
     {
-        var styleEls = new List<DomElement>();
+        // CSSOM §2.2: every sheet associated with the document, which is a `<style>` *and* a
+        // `<link rel=stylesheet>`. This filtered to tag `style`, so an external sheet was missing
+        // however well it loaded. `host.Elements` is already in document order, which is the order
+        // the collection is defined in.
+        var arr = new JSArray();
         foreach (var el in host.Elements)
         {
-            if (string.Equals(el.TagName, "style", StringComparison.OrdinalIgnoreCase))
-                styleEls.Add(el);
+            if (host.HasAssociatedStyleSheet(el))
+                arr.Add(host.BuildStyleSheetObject(el));
         }
-
-        var arr = new JSArray();
-        foreach (var styleEl in styleEls)
-            arr.Add(host.BuildStyleSheetObject(styleEl));
         return arr;
     }
 }
