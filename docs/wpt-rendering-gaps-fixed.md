@@ -35,6 +35,35 @@ git -C <Submodule> merge-base --is-ancestor <sha> HEAD
 
 ## The runner and the report
 
+### The bridge resolved every viewport question against 1024×768, whatever the run rendered at
+
+- **Owner:** main repo — `src/Broiler.HtmlBridge.Dom/DomBridge.cs` with the runner
+  (`src/Broiler.Wpt/WptTestRunner.cs`).
+- **The bug, and it is exactly as blunt as it sounds.** `DomBridge` held
+  `_viewportWidth`/`_viewportHeight` at 1024×768 and **nothing ever assigned them** — a grep
+  finds the two initialisers and no write anywhere in the tree. Everything the bridge resolves
+  against the viewport read those: `window.innerWidth`/`innerHeight`, `vw`/`vh` lengths,
+  media-query evaluation and the maximum scroll offset. A run at any other size therefore
+  produced a document whose script-visible geometry disagreed with its own pixels: a page built
+  to be "taller than the viewport" at 200×200 scrolled to somewhere that was not the bottom of
+  the canvas, and a test asserting on what is on screen then failed for a reason that had
+  nothing to do with what it was testing.
+- **Layout was never wrong**, and that split is what made it hard to see. The engine is handed
+  the real width and height, so a `vh` length in a *stylesheet* already resolved correctly. The
+  page looks right; the script reading its geometry is told something else.
+- **What landed.** `ViewportWidth`/`ViewportHeight` are settable on the bridge, defaulting to
+  the same 1024×768 so every existing host is unchanged, and the runner passes the size it is
+  about to render at into both bridges it builds.
+- **The old tests passed for the wrong reason.** `ScrollClampingTests` rendered only at
+  1024×768 — the bridge's own default — so it agreed by coincidence;
+  `docs` recorded that it and `ViewTransitionOldCaptureScrollTests` "pin their renders to the
+  default size to work around it". Two new cases render at **200×200**, where the two sizes
+  disagree: one on the scroll clamp, one on `window.innerWidth`/`innerHeight` directly. Both
+  were run against the unmodified build first and **fail there** (2 failed / 5 passed), and pass
+  with the fix (7 passed).
+- **No effect on the standard suite**, which renders at the default size: `quirks` holds at
+  21 of 25 before and after.
+
 ### The run reported correct renders as its worst failures
 
 - **Owner:** the WPT runner (`src/Broiler.Wpt`), the shard merger
@@ -2550,6 +2579,54 @@ the test that exposed it.
 ---
 
 ## DOM and the bridge
+
+### `document.styleSheets` listed no `<link>` sheet at all
+
+- **Owner:** main repo (`src/Broiler.HtmlBridge.Dom` — `Features/DocumentCollectionBinding.cs`
+  and `DomBridge/StyleSheets.cs`).
+- **The bug.** CSSOM §2.2 makes the collection every sheet associated with the document, a
+  `<link rel=stylesheet>` included. The main-document binding filtered the element list to
+  tag `style`, so an external sheet was absent however well it loaded — while the
+  *sub*-document collection (`DomBridge.BuildStyleSheetsCollection`) counted it. The same
+  tree answered two different things depending on which document was asked.
+- **What landed.** One predicate, `HasAssociatedStyleSheet`, reached from the binding through
+  `IDocumentCollectionHost`. Factoring it out rather than copying the condition across is the
+  point of the fix: the two readings drifting apart *was* the defect.
+- **Measured** on a served page carrying an enabled `<link>`, a `<style>` and a
+  `<link disabled>`: the collection goes **1 → 2**, in document order, with object identity
+  holding across two reads. `Broiler.Cli.Tests/DocumentCollectionBindingModuleTests` pins all
+  three, plus the `rel=icon` link and a bare `<a href>` staying out.
+- **Two adjacent gaps it makes visible**, both separate and neither introduced by it — see
+  [the open entry](wpt-rendering-gaps-open.md#a-linked-sheet-is-listed-and-carries-no-rules):
+  the listed link sheet reports **zero `cssRules`**, and `getComputedStyle` does not reflect
+  its declarations. The sheet does reach the cascade — the same page *renders* the linked
+  colour — so it is the CSSOM projection that stops short, not the loader.
+
+### `ViewTransition` was not an interface object, and a page probing it lost its whole script
+
+- **Test:** `css-view-transitions/view-transition-waituntil-animation-manipulation`.
+- **Owner:** main repo (`src/Broiler.HtmlBridge.Dom/DomBridge/Utilities.DomInterfaces.cs`).
+- **The bug, and why it was worth more than the missing feature.** The object
+  `document.startViewTransition()` returns has always existed here; the *interface* did not.
+  The test opens with `failIfNot(ViewTransition.prototype.waitUntil, …)`, so evaluating the
+  **argument** threw `ReferenceError` before `failIfNot` was entered — the whole inline script
+  aborted, including the `onload` assignment at the bottom of it, and `startViewTransition`
+  was never called at all. The failure read as a compositing bug and was not one.
+- **What landed.** `ViewTransition` joins the illegal-constructor interfaces beside `Element`
+  and `CanvasRenderingContext2D`, with a `Symbol.hasInstance` recognising the object the bridge
+  builds. The probe reads `undefined`, the statements after it run, and
+  `t instanceof ViewTransition` answers true.
+- **`waitUntil` is deliberately not defined.** It is a proposal this engine does not implement,
+  and faking one would carry the test past its own guard into Web Animations calls that are not
+  there either (no `Animation` constructor, no `Element.prototype.animate`) — a worse answer
+  than an honest precondition failure.
+- **Measured over `css/css-view-transitions`, 305 reftests, before and after: 181 passed / 123
+  failed both ways — no test moves.** The one visible change is the subject test going
+  **1.3% → 0.0%** against its own reference, and that is the artifact ending rather than a
+  regression: `failIfNot` sets the body's `textContent` to *"Precondition Failed: …"*, so the
+  green square the crashed script used to leave on screen is correctly gone. Rendering the test
+  confirms it now paints that sentence. **The page says what is missing instead of accidentally
+  scoring for it**, which is the same shape as every other fake pass this document records.
 
 ### A root-relative frame `src` resolved against the wrong directory
 

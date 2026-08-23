@@ -19,6 +19,18 @@ measured 2026-08-13; CI is the golden-image score from the
    [the false negative](#the-flag-can-be-a-false-negative) — and it can fail its
    own reference while passing CI, which is the newer and more interesting case:
    four tests below are green on CI and demonstrably wrong.
+3. **Re-measure the entry before you believe its diagnosis.** An entry is written at a
+   moment; the tree moves under it, and the *stalest part is usually the "what is left"
+   line*, because that is the part written from inference rather than from a run. Working
+   through the readiest-looking entries on 2026-08-23 turned up three in a row where the
+   remaining-work sentence was wrong:
+   [the quirks table colour](#a-table-inherits-color-where-it-must-not) is not the quirk
+   (which is implemented and unit-tested) but scripts running after the parse;
+   [the `clipPath`](#svg-clippath-referenced-by-url) is not `userSpaceOnUse` units (also
+   implemented) but a 512px offset; and
+   [`document.styleSheets`](#a-linked-sheet-is-listed-and-carries-no-rules) was reported as
+   a page "whose linked sheet demonstrably applies", which `getComputedStyle` does not
+   agree with. Each cost a few minutes to check and would have cost far more to act on.
 
 ## Contents
 
@@ -171,7 +183,7 @@ The largest remaining cluster, and it reduces to three causes.
   were written to verify are still untested here**; a future reader must not take these two
   passing as evidence that scrollbars in a snapshot work.
 
-### `ViewTransition` is not an interface object, and has no `waitUntil`
+### `ViewTransition` has no `waitUntil` — the interface object is **fixed**
 
 - **Test:** `css-view-transitions/view-transition-waituntil-animation-manipulation`
   ([#1670](https://github.com/Broiler-Platform/Broiler/issues/1670).4), 1.3% against its
@@ -193,8 +205,18 @@ The largest remaining cluster, and it reduces to three causes.
   `waitUntil` on its prototype is small. Making `waitUntil` *mean* something — the test then
   manipulates the pseudo-element animations through the Web Animations API — needs
   `document.getAnimations()` over the pseudo tree, which does not exist.
-- **Exit gate:** the interface object exists, and a focused test pins that a page probing
-  `ViewTransition.prototype` no longer aborts.
+- **The interface object landed** — see
+  [the fixed entry](wpt-rendering-gaps-fixed.md#viewtransition-was-not-an-interface-object-and-a-page-probing-it-lost-its-whole-script).
+  The probe now reads `undefined` instead of throwing, so the script runs and the page paints
+  *"Precondition Failed: ViewTransition.waitUntil is not available"*. That took the test
+  **1.3% → 0.0%** against its own reference, which is the crashed-script artifact ending, not a
+  regression: the green square it used to leave on screen was never something the engine earned.
+  `css/css-view-transitions` is 181 of 305 before and after.
+- **What is still open is the half with the feature in it.** `waitUntil` is deliberately not
+  defined: faking one carries the test past its own guard into Web Animations calls that are not
+  there either. Implementing it for real needs `document.getAnimations()` over the pseudo tree.
+- **Exit gate:** `waitUntil` defers the transition's completion and `document.getAnimations()`
+  returns the pseudo tree's animations, so the test manipulates them and reaches its screenshot.
 
 ### Two tests are green on CI and wrong
 
@@ -1391,10 +1413,20 @@ express those, and does not claim to.
   **82.6%** against its own reference.
 - The [path-clip work](wpt-rendering-gaps-fixed.md#clip-path-modelled-only-inset)
   landed `polygon()`, `circle()`, `ellipse()` and `url(#…)` resolution, and took this
-  test from 2.9% to 82.6% — but not over the line. `userSpaceOnUse` units on the
-  referenced `<clipPath>` are the remaining piece.
-- **Exit gate:** the test matches, with the two `clip-path-document-element` tests
-  staying passing.
+  test from 2.9% to 82.6% — but not over the line.
+- **"`userSpaceOnUse` units are the remaining piece" is stale, and re-measuring the family
+  is what shows it.** `userSpaceOnUse` is implemented and covered by
+  `Broiler.Cli.Tests/ClipPathShapeTests` for `-001`, `-003` and `-004`. Measured over
+  `css/css-masking/clip-path` on 2026-08-23: **157 of 227 pass, average 98.35%**, and the two
+  that name this entry fail with signatures that are not a units gap —
+  `userSpaceOnUse-003` at **50.0%** with *"content shifted right ~512px"*, and `-004` at
+  **83.3%** with *"extra content present in output, blank in reference"*. A shift of half the
+  1024px viewport and an over-large clip are two different bugs, and neither is "the units are
+  not read".
+- **So this is not the one-piece fix it was filed as.** Start from `-003`'s 512px offset,
+  which is the larger and the more legible of the two.
+- **Exit gate:** `-003` and `-004` match, with the two `clip-path-document-element` tests and
+  the 157 currently passing staying passing.
 
 ---
 
@@ -1441,24 +1473,26 @@ Closed: see
 fix beside the data: one — the runner could not read a corpus path back out of the
 `file:///…` URL a script builds from `location.href`.
 
-### `document.styleSheets` lists no `<link>` sheet at all
+### A linked sheet is listed, and carries no rules
 
-- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom/Features/DocumentCollectionBinding.cs`.
-  No test on any current list is known to turn on it; it was found while fixing the entry
-  above and is recorded rather than fixed, because widening what that collection returns
-  changes what every script iterating it sees.
-- **What it is.** `GetStyleSheets` filters the document's elements to tag `style`, so an
-  external sheet is absent from `document.styleSheets` however well it loaded — measured
-  on a page whose linked sheet demonstrably applies (`getComputedStyle` reads the linked
-  colour, `document.styleSheets.length` reads `0`). CSSOM §2.2 makes the collection every
-  sheet associated with the document, `<link rel=stylesheet>` included.
-- **The fix is already written, one layer over.** A sub-document's `styleSheets` goes
-  through `DomBridge.BuildStyleSheetsCollection`, which collects `<style>` *and*
-  `IsExternalStylesheet` links, skips a disabled `<link>`, and caches per element for
-  identity. The main-document binding predates it and never adopted it, so the two
-  disagree about what a document's stylesheets are.
-- **Exit gate:** both bindings return the same collection for the same tree, with a test
-  covering a linked sheet, a `<link disabled>`, and object identity across two reads.
+- **Owner:** main repo, `src/Broiler.HtmlBridge.Dom` (the `CSSStyleSheet` projection in
+  `DomBridge/StyleSheets.cs`, and the computed-style path).
+- **The collection itself is
+  [fixed](wpt-rendering-gaps-fixed.md#documentstylesheets-listed-no-link-sheet-at-all)** —
+  `document.styleSheets` now lists a `<link rel=stylesheet>` beside a `<style>`, in document
+  order, with a disabled `<link>` correctly out. What that made visible is two further gaps,
+  found by measuring the fixed behaviour rather than assumed:
+  1. **The listed link sheet reports zero `cssRules`.** `document.styleSheets[0].cssRules.length`
+     is `0` for a sheet that loaded and applied.
+  2. **`getComputedStyle` does not reflect a linked sheet's declarations.** On a served page
+     whose `linked.css` says `p { color: rgb(0,128,0) }`, `getComputedStyle(p).color` reads
+     `rgb(0, 0, 0)` — while the `<style>` element's own rule on the same page reads back
+     correctly.
+- **The loader is not the problem, which is the useful half.** *Rendering* the same page paints
+  the linked colour — the green pixels are there — so the sheet reaches the cascade and it is
+  the CSSOM projection that stops at the element. Do not start by looking at fetching.
+- **Exit gate:** a linked sheet's `cssRules` enumerate its rules, and `getComputedStyle` reads a
+  value the linked sheet alone supplies.
 
 ---
 
@@ -1475,12 +1509,26 @@ fix beside the data: one — the runner could not read a corpus path back out of
   5.1% square against a reference that is 94.6% `rgb(18,18,18)` + the same 5.1%
   square. **The page renders and the document element is installed.**
 - **The entire difference is the square's colour** — ours `rgb(255,0,0)`, the
-  reference's `rgb(0,0,0)`. So it is the quirk the test is named for after all: the
-  table inherits `color: red` from the `<div>` instead of falling back to the initial
-  colour, and the test says so outright — *"Test passes if there is a square filled
-  with initial color and no red"*.
-- **Exit gate:** a table does not inherit `color` from a non-body ancestor in quirks
-  mode, and the square paints the initial colour.
+  reference's `rgb(0,0,0)`.
+- **And the second diagnosis was wrong too. It is not the quirk.** The quirk is implemented
+  (`Broiler.Layout/Engine/TablesInheritColorFromBodyQuirk.cs`), including the no-body arm, and
+  `TablesInheritColorFromBodyQuirkTests.With_No_Body_Element_A_Table_Takes_The_Initial_Colour`
+  passes. Probing the real document is what settles it: after the test's script runs,
+  `document.documentElement.children` is **`HEAD,BODY,DIV`**. A `<body>` exists — and the
+  stylesheet says `body { color: red }`, which is exactly the 40 000 red pixels the runner
+  reports (a 200×200 Ahem square, `006` and `007` alike).
+- **The real cause is script timing, and it is general.** The test's comment says *"At this
+  point, the `<body>` has not been created yet"* — it removes `documentElement` mid-parse so no
+  body is ever created. Broiler runs inline scripts **after** the parse, so the body already
+  exists and is cloned along with everything else. Reproduced directly, independently of this
+  test: a script in the `<head>` reports `document.body` already present, and a script reports
+  a `<p>` that appears *after* it in the source. Both are impossible during a real parse.
+- **So this is not a quirks fix and not a small one.** Nothing in the quirk can distinguish a
+  body the document has from a body the test prevented; closing it means running scripts at
+  their position in the parse.
+- **Exit gate:** an inline script observes the document as it stands at its own position — no
+  `document.body` before the body is open, and no elements that follow it — after which
+  `006`/`007` should follow from the quirk that is already there.
 
 ---
 
@@ -1674,16 +1722,16 @@ None of the four declares a `rel=match`.
 
 ## Runner and harness
 
-### The runner resolves scroll metrics against the wrong viewport
+### The runner resolves scroll metrics against the wrong viewport — **fixed**
 
-`new WptTestRunner(w, h)` renders at the given size, but the scroll metrics — `vh`
-lengths and the maximum scroll offset — resolve against the default 1024×768
-regardless. A page built to be "taller than the viewport" at 200×200 therefore
-scrolls to somewhere that is not the bottom of the canvas, and a test asserting on
-what is on screen fails for a reason that has nothing to do with what it is testing.
-`ScrollClampingTests` and `ViewTransitionOldCaptureScrollTests` pin their renders to
-the default size to work around it. **A real defect in the runner, not just a
-test-authoring trap.**
+Closed: see
+[the fixed entry](wpt-rendering-gaps-fixed.md#the-bridge-resolved-every-viewport-question-against-1024768-whatever-the-run-rendered-at).
+`DomBridge` held its viewport at 1024×768 and nothing ever assigned it, so
+`window.innerWidth`/`innerHeight`, `vw`/`vh`, media queries and the maximum scroll offset
+all answered for a viewport the render did not use. The size the runner renders at is now
+carried onto the bridge, and `ScrollClampingTests` gained two cases at 200×200 — the sizes
+the old ones could not tell apart. Layout was never affected, which is why this only ever
+showed up through a script.
 
 ### `?pipe=` is not emulated
 
