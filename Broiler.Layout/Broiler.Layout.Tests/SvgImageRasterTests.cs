@@ -487,4 +487,79 @@ public sealed class SvgImageRasterTests
         Assert.Throws<ArgumentNullException>(
             () => SvgImageRaster.Render(svg, Bounds, new RecordingBackend(), null!));
     }
+
+    /// <summary>
+    /// CSS Backgrounds §2.11.2: the root element's background is the canvas's, and for an SVG used
+    /// as an image that canvas is the destination box. It is painted first, behind the document.
+    /// </summary>
+    /// <remarks>
+    /// Nothing painted it, so a file drawing tinted shapes over a dark ground rendered them on
+    /// white. Asserted on the display list rather than on pixels because that is where the ordering
+    /// lives — a background emitted after the shapes would cover them.
+    /// </remarks>
+    [Theory(Timeout = 600000)]
+    [InlineData("background: black")]
+    [InlineData("background-color: black")]
+    [InlineData("background: url(none.png) black")]
+    public void A_Root_Background_Paints_The_Canvas_Behind_The_Document(string declaration)
+    {
+        var svg = $"<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' " +
+                  $"viewBox='0 0 100 100' style='{declaration}'>" +
+                  "<rect fill='blue' x='10' y='10' width='20' height='20' /></svg>";
+
+        var items = SvgImageRaster.BuildDisplayList(svg, Bounds).Items;
+
+        var first = Assert.IsType<DrawSvgRectItem>(items[0]);
+        Assert.Equal(0, first.Fill.R);
+        Assert.Equal(0, first.Fill.G);
+        Assert.Equal(0, first.Fill.B);
+        Assert.Equal(255, first.Fill.A);
+
+        // It covers the whole destination box, not the shape's bounds.
+        Assert.Equal(Bounds.Width, first.Width);
+        Assert.Equal(Bounds.Height, first.Height);
+
+        // And the document is still drawn, over it.
+        Assert.Contains(items.Skip(1), i => i is DrawSvgRectItem { Fill.B: 255 });
+    }
+
+    /// <summary>
+    /// A root that declares no background, or a fully transparent one, adds nothing — an SVG image
+    /// is transparent where it paints nothing, and stamping an opaque rect would hide whatever the
+    /// image is composited over.
+    /// </summary>
+    [Theory(Timeout = 600000)]
+    [InlineData("")]
+    [InlineData("style='background: transparent'")]
+    [InlineData("style='background: none'")]
+    [InlineData("style='fill: black'")]
+    public void No_Root_Background_Paints_No_Canvas(string attribute)
+    {
+        var svg = $"<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' " +
+                  $"viewBox='0 0 100 100' {attribute}>" +
+                  "<rect fill='blue' x='10' y='10' width='20' height='20' /></svg>";
+
+        var items = SvgImageRaster.BuildDisplayList(svg, Bounds).Items;
+
+        var first = Assert.IsType<DrawSvgRectItem>(items[0]);
+        Assert.Equal(20, first.Width);
+    }
+
+    /// <summary>
+    /// The inline path must <em>not</em> paint it: an inline <c>&lt;svg&gt;</c> is an ordinary
+    /// element whose CSS box already paints its background, and doing it again would double a
+    /// translucent colour over itself.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void The_Inline_Renderer_Leaves_The_Root_Background_To_The_Css_Box()
+    {
+        var svg = "<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' " +
+                  "viewBox='0 0 100 100' style='background: black'>" +
+                  "<rect fill='blue' x='10' y='10' width='20' height='20' /></svg>";
+
+        var inline = SvgRenderer.RenderSvgContent(svg, Bounds);
+
+        var first = Assert.IsType<DrawSvgRectItem>(inline[0]);
+        Assert.Equal(20, first.Width);
+    }
 }

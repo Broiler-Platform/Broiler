@@ -1,4 +1,5 @@
 using System.Drawing;
+using Broiler.Graphics;
 
 namespace Broiler.Layout.IR;
 
@@ -76,7 +77,35 @@ public static class SvgImageRaster
         SvgTextEnvironment.Reset(null);
         try
         {
-            return new() { Items = SvgRenderer.RenderSvgContent(svgXml, bounds, effectiveZoom) };
+            var items = SvgRenderer.RenderSvgContent(svgXml, bounds, effectiveZoom);
+
+            // CSS Backgrounds §2.11.2: the root element's background paints the canvas, and for an
+            // SVG document used as an image that canvas is the destination box. Nothing painted it:
+            // `<svg style="background: black">` came back transparent, so a file that draws tinted
+            // shapes over a dark ground rendered them on white.
+            //
+            // It belongs here rather than in SvgRenderer because SvgRenderer serves both callers,
+            // and the *inline* one must not do this: an inline <svg> is an ordinary element whose
+            // CSS box already paints its background, so painting it again would double a
+            // translucent colour over itself. Only an image has no box to have done it.
+            // Emitted as the same rect primitive every other shape uses, so it replays through the
+            // backend arm that is already there rather than needing a new one.
+            if (SvgRenderer.TryGetRootBackgroundColor(svgXml, out var canvas))
+            {
+                items.Insert(0, new DrawSvgRectItem
+                {
+                    Bounds = bounds,
+                    X = bounds.X,
+                    Y = bounds.Y,
+                    Width = bounds.Width,
+                    Height = bounds.Height,
+                    Fill = canvas,
+                    Stroke = BColor.Empty,
+                    StrokeWidth = 0,
+                });
+            }
+
+            return new() { Items = items };
         }
         finally
         {
