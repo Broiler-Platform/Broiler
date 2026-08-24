@@ -72,9 +72,48 @@ Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2214) an
 `dotnet test Broiler.JS/Broiler.JavaScript.Integration.Tests` (the new `Track1LanguageTests`
 async/generator cases; M8 the only, pre-existing, failure).
 
+### `Raise the missing early SyntaxErrors for var/lexical conflicts, labelled-function loop bodies, and script exports`
+
+- **Target:** `Broiler.JS` (`Broiler-Platform/Broiler.JS`)
+- **Apply onto:** `d20e506abbccad675fdb50b660e8417028f698b6`, **after** the symbol-order and
+  async/generator patches above (all three add cases to `Track1LanguageTests.cs`, so applied
+  in that order — 0001, 0002, 0003 — they do not conflict)
+- **File:** `0003-broiler-js-early-errors.patch`
+
+Track 1 of [the Broiler.JS gaps roadmap](../docs/broiler-js-gaps-roadmap.md#track-1--core-language-and-built-in-correctness).
+Three families of ECMAScript early SyntaxError were not raised, so the engine accepted — or,
+in one case, crashed on — code the specification rejects at parse time:
+
+- **VarDeclaredNames ∩ LexicallyDeclaredNames must be empty at every scope.** The parser only
+  detected a `var`/lexical collision order-dependently and lost the information once a `var`
+  hoisted out of the block it was written in, so `var x; let x;`, `let x; { var x; }`,
+  `for (let x of []) { var x; }`, `try {} catch ([e]) { var e; }` and their siblings were
+  accepted (the later declaration winning). Each `FastScopeItem` now records its own
+  VarDeclaredNames as a `var` hoists through it, and rejects both a `var` hoisting into a
+  lexical binding and a lexical declared where a `var` has hoisted through — at every scope
+  level, in either order, and across a for-head, switch, or destructured catch parameter. A
+  block-nested function declaration is lexical for this, so it conflicts with a same-named
+  `var` while two block functions of one name still coexist in sloppy mode.
+- **A labelled function declaration is never a legal loop body.** It was caught for a
+  non-lexical head, but a `let`/`const` for-in/for-of/C-style head rewrites its body into a
+  synthetic per-iteration block (`Desugar`), hiding the labelled statement from validation.
+  The loop parser now rejects a labelled-function body on the statement as written, before
+  that rewrite.
+- **`export` in script code is an early error.** Its bindings target the host-injected module
+  `exports` object, absent in a plain script; `export default <expr>` dereferenced the missing
+  binding and surfaced a `NullReferenceException`. Every export form in a script now raises a
+  clean `SyntaxError`.
+
+Verify with `dotnet test Broiler.JS/Broiler.JavaScript.Integration.Tests` (the new
+`Track1LanguageTests` early-error cases, with guards that valid var/lexical combinations in
+different scopes, a `var` deduping against a parameter, a labelled function at statement
+position, and duplicate sloppy block functions are all still accepted; M8 the only,
+pre-existing, failure) and `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2214,
+unchanged).
+
 ## No main-repo fallback is needed
 
-Neither patch changes behaviour the main repository depends on: without them the pinned
-`Broiler.JS` submodule behaves exactly as it does today, so CI is unaffected until they are
-applied. The parent build names none of the changed members, so leaving the submodule tree
+None of the three patches change behaviour the main repository depends on: without them the
+pinned `Broiler.JS` submodule behaves exactly as it does today, so CI is unaffected until they
+are applied. The parent build names none of the changed members, so leaving the submodule tree
 at its pinned commit — as this branch does — leaves everything compiling.
