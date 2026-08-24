@@ -498,6 +498,28 @@ the native backend, and all public RegExp operations consume the same conforming
 
 ## Track 3 — Scripts, tasks, and modules
 
+### Module syntax
+
+- The `export { … }` clause was rejected in every form, so the commonest way to export — declare
+  a binding, then publish it — did not work: `const x = 1; export { x }` failed as "x is already
+  defined in current scope", `var x = 1; export { x }` as "Expecting keyword from",
+  `export { a } from './m.js'` as "Cannot convert undefined or null", and `export * from './m.js'`
+  with a `NullReferenceException`. Only `export <declaration>` and `export default` worked.
+  **Fixed:** the parser had no ExportClause production at all — it read the braces as an object
+  *destructuring pattern* that declared each name as a `var` and then demanded a `from`, which is
+  exactly why a `const`/`let` collided while a `var` fell through to the missing keyword. A clause
+  is not a declaration. There is now a real clause reader (the mirror of the import side, which the
+  grammar makes symmetric), specifier pairs on `AstExportStatement`, and a compiler path that
+  publishes each local binding onto `exports` — or, with `from`, imports the source once and copies
+  the specifiers off it. Reserved words follow the grammar rather than a special case: a
+  ModuleExportName is an IdentifierName, so any reserved word is legal after `as`, while the local
+  name of a clause without `from` is an IdentifierReference and may not be one. Exporting an
+  undeclared name is now an early error naming it, and `export * from` — still unimplemented —
+  fails deterministically instead of crashing (`export * as ns from` is a different production and
+  works). Landed in the pinned `Broiler.JS` submodule (`51e3830`); regressions in
+  `ExportClauseTests`, which assert the exported value reaches an importer rather than only that
+  the source parses.
+
 ### Confirmed host-semantic gaps
 
 - Parser-blocking scripts execute after the complete document is parsed, so they cannot observe
