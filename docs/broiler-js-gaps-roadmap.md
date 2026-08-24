@@ -253,6 +253,21 @@ Evidence:
   and Proxy-created results retain confirmed failure paths. **Largely does not reproduce:** all
   four directories pass except `slice/create-proto-from-ctor-realm-array.js`, a cross-realm
   species case.
+- A constructor's cached `prototype` and its observable `prototype` property could disagree, so
+  `new f()` built instances on an object the property never held. **Fixed** (arrived from the
+  retest queue, where it was recorded as a suspected "rejected `prototype` write changes later
+  `[[Construct]]`"; it reproduced, and turned out to be two defects pointing opposite ways).
+  `[[Construct]]` reads a cached field rather than re-reading the property, and: the indexer
+  cached the value a write *attempted*, before the store and with no success test — but the write
+  is rejected outright when `prototype` is non-writable (a class constructor, a frozen function,
+  an explicit `writable: false`), so a *refused* change took effect for `new` while the property
+  kept its old object, and in strict mode the write threw and still took effect; and
+  `DefineProperty` tested its result for a truthy value, where `[[DefineOwnProperty]]` reports
+  success as `undefined` and failure as `false`, so every *accepted* `defineProperty` was read as
+  a failure and `new` ignored it. Both paths now re-cache from what the property currently holds.
+  `Reflect.construct`, which reads the property, was correct throughout and disagreed with `new`
+  on the same function — the regressions assert the two now agree. Landed in the pinned
+  `Broiler.JS` submodule (`3d8b456`); regressions in `FunctionPrototypeWriteConstructTests`.
 - `Reflect.set(base, key, value, receiver)` gives a new receiver property the base property's
   attributes instead of the all-true descriptor required by `CreateDataProperty`. **Fixed:**
   the receiver-create paths in `JSObject.PropertyStorage` use the CreateDataProperty
@@ -717,9 +732,15 @@ Do not schedule fixes for these until the smallest current-pointer reproduction 
   [gate](../Broiler.JS/docs/roadmap/Component.md#immediate-correctness-gate-typedarrayprototypeset)
   records the full case list;
 - older `Intl.DateTimeFormat` range/parts, SameValue, and Proxy-ordering reports;
-- historical M0 failures where `JSON.stringify` ignored a `toJSON` result and
-  `Array.isArray(new Proxy([], {}))` returned false;
-- a rejected function-`prototype` write historically changing later `[[Construct]]` behavior;
+- ~~historical M0 failures where `JSON.stringify` ignored a `toJSON` result and
+  `Array.isArray(new Proxy([], {}))` returned false~~ — **retired: neither reproduces.**
+  `toJSON` is honoured for a plain object, a nested value, an array element (receiving its
+  index as the key), a `Date`, and a `toJSON` returning an object, and it composes with a
+  replacer; `Array.isArray` answers through a proxy, a proxy of a proxy and a non-array proxy,
+  throws for a revoked one, and `Object.prototype.toString` and `JSON.stringify` agree with it;
+- ~~a rejected function-`prototype` write historically changing later `[[Construct]]`
+  behavior~~ — **reproduced and fixed**; moved to
+  [track 1](#objects-arrays-symbols-and-proxy-sensitive-behavior);
 - the archived observation that async continuations did not run under in-process `Eval` or
   `Execute`;
 - an unreproduced module-initializer-ordering failure; and
