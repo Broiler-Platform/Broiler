@@ -277,14 +277,26 @@ submodule and carries a minimal regression in `Broiler.Regex.Tests`.
   matches (exec/test/split/replace) in agreement with V8. A pattern invalid in *both* engines
   is not routed (Broiler rejects it, so the fallback is skipped) and still throws.
   Regressions: `BuiltIns.Tests/RegExpTranslatorFallbackTests`.
+- **Routing widened to all of Unicode mode (action 6, first tranche).** Routing no longer
+  triggers only on the gap *shapes*: every `u`/`v` pattern Broiler can build now runs on
+  Broiler, because Unicode mode is where the .NET translation is most complex and fragile.
+  A JSRegExp-level differential against V8 found the bugs this fixes — a standalone `\p{…}`
+  under `i` **threw** a SyntaxError, and in-class case folding was missed (`[α-ω]/iu` did
+  not match `µ`, which folds to `µ`→`μ`). Non-Unicode patterns stay on the mature, far
+  faster .NET engine (the common ASCII/hot-loop case) until the matcher is optimized.
+  Because the continuation-passing matcher recurses once per quantifier iteration, a repeat
+  over a long subject would overflow the stack; the matcher now checks the stack and throws
+  `RegexOverflowException` instead of crashing, and `RunMatch` catches it and falls back to
+  the iterative .NET engine for that subject. Regressions:
+  `BuiltIns.Tests/RegExpUnicodeRoutingTests` and `Broiler.Regex.Tests/StackDepthGuardTests`.
 
-Evidence: `dotnet test Broiler.Regex.slnx` — 247 tests, up from 57; the Broiler.JS
-`BuiltIns` (2191) and `Integration` (5024 of 5025) suites pass, the one failure being the
+Evidence: `dotnet test Broiler.Regex.slnx` — 250 tests, up from 57; the Broiler.JS
+`BuiltIns` (2204) and `Integration` (5024 of 5025) suites pass, the one failure being the
 pre-existing `M8_DocumentationFiles_Exist`, which asserts a `docs/roadmap.md` that the
 component's own reorganisation replaced with `docs/roadmap/`. Plus 220,172 differential
-pattern/flag/input cases run against V8 — three hand-built corpora and one seeded fuzz —
-compared on match index and every capture. Those corpora are what surfaced the Annex B
-cluster above; the roadmap's own bullets would not have found it.
+Broiler.Regex cases and a 12,792-case JSRegExp-level differential — both against V8 — whose
+only remaining mismatches are the two documented deliberate `vi` divergences. The
+JSRegExp-level corpus includes long subjects that exercise the stack-guard fallback.
 
 The engine and routing changes live in submodules whose remotes are outside this session's
 GitHub scope, so both pushes returned 403 and the submodule pointers were deliberately not
@@ -294,13 +306,15 @@ patch introduces.
 
 ### Remaining work
 
-1. **Action 6 — widen routing, then retire the translator.** A routed pattern can now run
-   without a .NET translation, but routing still triggers only on the gap *shapes*
-   (`TryBuildBroilerForGaps`), so a pattern outside those shapes is still matched by .NET.
-   Widening routing toward every supported pattern — and confirming captures, named groups,
-   indices, `lastIndex`, species, replacement substitutions, and observable property order
-   stay clean through the shared path — is what finally lets the source-to-source translator
-   be removed.
+1. **Finish action 6 — an iterative matcher, then non-Unicode routing, then retire the
+   translator.** All of Unicode mode now routes to Broiler, but two things keep the .NET
+   translator alive. First, the matcher recurses per quantifier iteration, so a repeat over
+   a long subject falls back to .NET; making the repeat iterative removes that dependency.
+   Second, non-Unicode patterns are still matched by .NET on purpose — the clarity-first
+   interpreter is much slower than .NET for the common ASCII/hot-loop case — so routing them
+   waits on that same performance work. Only once both hold, and captures, named groups,
+   indices, `lastIndex`, species, replacement substitutions, and property order are confirmed
+   clean through the shared path, can the source-to-source translator be removed.
 2. **The pinned corpus in CI.** The focused test262 RegExp and UnicodeSets paths have not
    been run under the expanded routing; `scripts/compliance/test262-failures.txt` stays the
    path source and must not be reduced before CI confirms.
@@ -331,10 +345,13 @@ See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.m
    replaced by an engine-agnostic `IsMatch`, and a routed pattern no longer needs a .NET
    translation (`value` is null when the translator cannot represent it).
 5. ~~Expand native routing only for syntax and semantics covered by focused and pinned
-   corpus tests.~~ Done for the class-set and in-class property shapes.
+   corpus tests.~~ Done — every Unicode-mode (`u`/`v`) pattern Broiler can build now routes,
+   validated by a JSRegExp-level differential against V8. Non-Unicode routing is deferred to
+   the matcher-performance work.
 6. Retire the translator only after captures, named groups, indices, `lastIndex`, species,
-   replacement substitutions, and observable property order are clean — gated on widening
-   routing beyond the gap shapes (remaining work item 1).
+   replacement substitutions, and observable property order are clean — now gated on an
+   iterative matcher (so the stack-guard's .NET fallback is not needed) and non-Unicode
+   routing (remaining work item 1).
 
 **Exit gate:** the pinned supported RegExp corpus is clean without sending unsupported syntax to
 the native backend, and all public RegExp operations consume the same conforming match data.

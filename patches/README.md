@@ -23,9 +23,11 @@ Track 2 of [the Broiler.JS gaps roadmap](../docs/broiler-js-gaps-roadmap.md#trac
 actions 1–3: `\p{…}` resolves against the pinned `Broiler.Unicode` tables, `v`-mode
 class-set expressions and `\q{…}` are evaluated instead of skipped, and both branches of
 `Canonicalize` become table-driven from the Unicode Character Database. Also six Annex B
-grammar boundaries that differential testing against V8 turned up.
+grammar boundaries that differential testing against V8 turned up, and a stack-depth guard
+(`RegexOverflowException`) so a quantifier over a long subject signals instead of crashing
+the process — the JavaScript layer catches it and falls back to .NET.
 
-Verify with `dotnet test Broiler.Regex.slnx` inside the submodule — 247 tests, up from 57.
+Verify with `dotnet test Broiler.Regex.slnx` inside the submodule — 250 tests, up from 57.
 
 ### `Route v-mode class sets and in-class property escapes to Broiler.Regex`
 
@@ -45,12 +47,21 @@ This patch carries both track-2 Broiler.JS changes:
   `IJSRegExp.Value` is replaced by an engine-agnostic `IsMatch`, and `CreateRegex` lets a
   routed pattern run with a null `value` when the translator cannot represent it — so a
   `v`-mode set operation over `\s`/`\S`/`\d` (valid ECMAScript the .NET UnicodeSets
-  translator rejects) now constructs and matches through Broiler. This part needs only the
-  types already present in `a98619ab`, but it is bundled here because it shares
-  `JSRegExp.Broiler.cs` and `JSRegExp.cs`.
+  translator rejects) now constructs and matches through Broiler.
+- **Action 6 — widen routing.** `TryBuildBroilerForGaps` becomes `TryRouteToBroiler`, which
+  routes **every Unicode-mode (`u`/`v`) pattern Broiler can build** (not just the gap
+  shapes), fixing real .NET-translation bugs for non-gap Unicode patterns — a standalone
+  `\p{…}` under `i` threw, in-class case folding was missed. Non-Unicode patterns keep the
+  faster .NET engine. `RunMatch` catches `RegexOverflowException` from the Broiler patch and
+  falls back to .NET for a subject that would overflow the recursive matcher.
 
-Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2191 pass, up from
-2173 — the new `RegExpEngineConsistencyTests` and `RegExpTranslatorFallbackTests`) and
+  All three parts need only the types already present in `a98619ab` plus `RegexOverflowException`
+  and `CharSet.UsesPropertyEscape`/`MatchesEmptyString` from the Broiler.Regex patch, so
+  applying this before that patch will not compile.
+
+Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2204 pass, up from
+2173 — the new `RegExpEngineConsistencyTests`, `RegExpTranslatorFallbackTests` and
+`RegExpUnicodeRoutingTests`) and
 `dotnet test Broiler.JS/Broiler.JavaScript.Integration.Tests` (5024 of 5025 — the one
 failure, `M8ValidationTests.M8_DocumentationFiles_Exist`, is pre-existing and unrelated:
 it asserts a `docs/roadmap.md` that the component's own reorganisation replaced with
