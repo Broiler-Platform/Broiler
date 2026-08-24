@@ -278,7 +278,7 @@ public sealed partial class DomBridge
         if (IsText(element) || IsComment(element))
         {
             obj.FastAddValue((KeyString)"substringData",
-                new DomFunction((in a) => Dom.Features.CharacterDataBinding.SubstringData(element, in a), "substringData", 2),
+                new DomFunction((in a) => Dom.Features.CharacterDataBinding.SubstringData(this, element, in a), "substringData", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             obj.FastAddValue((KeyString)"appendData",

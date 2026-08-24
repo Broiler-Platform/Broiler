@@ -482,6 +482,27 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- CharacterData failures were not proper `DOMException` objects. All four mutation methods —
+  `substringData`, `insertData`, `deleteData`, `replaceData` — plus `Text.splitText` threw a plain
+  error for an out-of-range offset, and the message was the string `"INDEX_SIZE_ERR"`: the legacy
+  constant's *name*, used as prose. Nothing a page can branch on came out of that.
+  `e instanceof DOMException` was false, `e.name` was `"Error"` and `e.code` was `0`, so both checks
+  a caller actually writes failed, and a specified, recoverable condition read as an internal fault.
+  **Fixed:** all five raise a real `IndexSizeError` `DOMException` (`code` 1) carrying a message that
+  names the method and the offending offset — DOM §4.10 opens each of these methods with "If offset
+  is greater than length, throw an IndexSizeError DOMException", and §4.11 gives `splitText` the same
+  rule. This is wiring rather than a new mechanism: the bridge's `ThrowDOMException` helper already
+  minted correct exceptions for `appendChild`'s `HierarchyRequestError` and `createElement`'s
+  `InvalidCharacterError`, and the CharacterData methods simply were not reaching it — they had no
+  `JSContext` to mint one in, so the binding's host contract now exposes it exactly as
+  `INodeMutationHost` already did. A `DOMException` is still an `Error`, so existing
+  `catch (e) { e.message }` handling is unaffected, and every in-range operation is unchanged
+  (including the `offset == length` boundary, which is in range and returns the empty string).
+  Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/CharacterDataBinding.cs`,
+  `Features/ICharacterDataHost.cs` and its bridge implementation), landed directly rather than as a
+  submodule patch; regressions in `CharacterDataExceptionTests`. The same sweep found the tree-mutation
+  half of this family still open — `insertBefore`/`removeChild`/`setAttribute`/`querySelector` — which
+  is recorded in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - The six `Node.DOCUMENT_POSITION_*` constants were `undefined` everywhere — on the `Node` global,
   on its prototype, and on every node instance — while the node-type constants beside them were
   defined. `compareDocumentPosition` returned a correct DOM §4.4 bitmask (this was checked and is

@@ -86,7 +86,7 @@ public sealed partial class DomBridge
         }
 
         obj.FastAddValue((KeyString)"substringData",
-            new DomFunction((in a) => Dom.Features.CharacterDataBinding.SubstringData(node, in a), "substringData", 2),
+            new DomFunction((in a) => Dom.Features.CharacterDataBinding.SubstringData(this, node, in a), "substringData", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         obj.FastAddValue((KeyString)"appendData",

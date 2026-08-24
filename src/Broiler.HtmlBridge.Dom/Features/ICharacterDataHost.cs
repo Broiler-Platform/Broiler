@@ -1,5 +1,6 @@
 using Broiler.Dom;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -16,4 +17,11 @@ internal interface ICharacterDataHost
     DomText CreateBridgeTextNode(string data);
     JSObject ToJSObject(DomNode node);
     void RemoveJsObject(DomNode node);
+
+    /// <summary>
+    /// The attached JS context, used only to construct the <c>DOMException</c> an out-of-bounds
+    /// offset must throw — the same way <see cref="INodeMutationHost.JsContext"/> is used. Null
+    /// before the bridge is attached, in which case the binding falls back to a plain error.
+    /// </summary>
+    JSContext? JsContext { get; }
 }
