@@ -455,6 +455,30 @@ were deleted and the gitlinks point at commits that contain them. See
   queue drains and still asserts LOADING arrives, in order, before DONE. Main-repo
   `Broiler.HtmlBridge.Dom` fix (`Features/FetchBinding.cs`, `Features/FetchBinding.Callbacks.cs`),
   landed directly rather than as a submodule patch; regressions in `FetchPromiseConformanceTests`.
+- Window and screen geometry plus the `BarProp` objects were absent: `window.screenX`/`screenY` (and
+  the `screenLeft`/`screenTop` spellings), `window.devicePixelRatio`, `screen.availLeft`/`availTop`,
+  and all six of `locationbar`, `menubar`, `personalbar`, `scrollbars`, `statusbar`, `toolbar`.
+  `innerWidth`/`outerWidth`/`screen.width` already answered, so this was the remainder of the pairs
+  around them. **Fixed**, each with the value that follows from what a capture is rather than a
+  placeholder: the viewport *is* the screen (`screen.width` is the viewport's own width), so the
+  window sits at the screen origin and all four position members are `0`, and nothing — no dock, no
+  taskbar — is reserved out of the available area, so `availLeft`/`availTop` are `0` beside the
+  avail sizes that already equalled the full screen. `devicePixelRatio` is `1` because the renderer
+  has no device-scale or backing-store-scale concept at all, so a CSS pixel is a rendered pixel;
+  page zoom is a separate axis and is already reported by `visualViewport.scale`. Every `BarProp`
+  reports `visible: false` because no browser user interface is painted and no scrollbar is painted
+  either — which the already-published `outerWidth == innerWidth` asserts independently, so the two
+  agree rather than contradict.
+  <br>The absence mattered most inside arithmetic, which is how these members are usually read: an
+  absent member is `undefined`, so the centre-on-parent popup idiom
+  (`screenX + (outerWidth - w) / 2`), the canvas backing-store idiom
+  (`width * devicePixelRatio`) and `availLeft + availWidth` each produced **NaN** rather than a
+  coordinate — silently, with no error to trace. A `BarProp` was worse than a wrong boolean: the
+  objects are containers, so the documented `window.locationbar.visible` threw "Cannot get property
+  visible of undefined", aborting the rest of the calling function. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`DomBridge/Registration/Window.cs` and the new
+  `Features/WindowBarPropBinding.cs`), landed directly rather than as a submodule patch; regressions
+  in `WindowScreenGeometryTests`.
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
@@ -496,7 +520,19 @@ carried again as an asserted gap.
   specific non-special scheme still answers empty, it needs naming, because the general claim is not
   current.
 
-### Track 6 — DOM
+### Track 6 — DOM and CSSOM
+
+- Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio` and `xlink:href` can be
+  inaccessible through canonical DOM lookup. **Does not reproduce.** Checked through a
+  DomBridge-attached capture over inline SVG carrying all three:
+  `svg.getAttribute('viewBox')` → `"0 0 10 10"`, `svg.getAttribute('preserveAspectRatio')` →
+  `"xMidYMid"`, and `a.getAttribute('xlink:href')` → `"#z"`. Each returned the authored value under
+  its authored spelling. Narrowed rather than retained: if a specific qualified name is still
+  unreachable it needs naming, because the general claim is not current.
+- `getComputedStyle().display` can report `inline` for every element. **Does not reproduce.** Checked
+  through a DomBridge-attached capture with a stylesheet setting `#a{display:block}` and
+  `.f{display:flex}`: `getComputedStyle` reported `block` for the block element and `flex` for the
+  flex one, so the computed value tracks the cascade rather than collapsing to `inline`.
 
 - `compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.
   **Does not reproduce.** Checked through a DomBridge-attached capture over a document with a

@@ -355,6 +355,28 @@ public sealed partial class DomBridge
         window.FastAddProperty((KeyString)"pageXOffset", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         window.FastAddProperty((KeyString)"pageYOffset", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // The window's position on the screen (CSSOM View §4). Zero, and not as a placeholder: the
+        // capture's viewport IS its screen — `screen.width`/`height` below are the viewport's own
+        // dimensions — so the window is flush with the screen origin. `screenLeft`/`screenTop` are the
+        // older spelling of the same pair and must agree with it. Absent, all four read `undefined`,
+        // and the popup-positioning arithmetic that reads them (`screenX + (outerWidth - w) / 2`, the
+        // standard centre-on-parent idiom) produced NaN rather than a coordinate.
+        window.FastAddProperty((KeyString)"screenX", new DomFunction((in _) => new JSNumber(0), "get screenX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"screenY", new DomFunction((in _) => new JSNumber(0), "get screenY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"screenLeft", new DomFunction((in _) => new JSNumber(0), "get screenLeft"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"screenTop", new DomFunction((in _) => new JSNumber(0), "get screenTop"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // window.devicePixelRatio — physical pixels per CSS pixel. One, because that is what this
+        // renderer does: it has no device-scale or backing-store-scale concept at all, so a CSS pixel
+        // is a rendered pixel. (Page zoom is a separate axis and is reported by
+        // `visualViewport.scale` below, which is where a page should read it.) Absent, the near-universal
+        // `devicePixelRatio || 1` fallback happened to survive, but the equally common
+        // `canvas.width = rect.width * devicePixelRatio` produced NaN and collapsed the canvas.
+        window.FastAddProperty((KeyString)"devicePixelRatio", new DomFunction((in _) => new JSNumber(1), "get devicePixelRatio"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // The six BarProp objects. See WindowBarPropBinding for why every one reports not-visible.
+        Dom.Features.WindowBarPropBinding.Install(window);
+
         // window scroll / scrollTo / scrollBy, co-located in the WindowScrollBinding feature module (Phase 3).
         window.FastAddValue((KeyString)"scroll", new DomFunction((in a) => Dom.Features.WindowScrollBinding.Scroll(this, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"scrollTo", new DomFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -383,6 +405,13 @@ public sealed partial class DomBridge
         screenObj.FastAddValue((KeyString)"height", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"availWidth", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"availHeight", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // The origin of the available area (CSSOM View §5). Zero for the same reason the avail sizes
+        // above equal the full screen: nothing — no dock, no taskbar — is reserved out of a capture's
+        // screen, so the available rectangle starts at the screen origin. They complete the pair the
+        // avail sizes belong to; a page computing `availLeft + availWidth` was getting NaN.
+        screenObj.FastAddValue((KeyString)"availLeft", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"availTop", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"colorDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"pixelDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
 

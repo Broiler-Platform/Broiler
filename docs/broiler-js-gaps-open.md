@@ -142,7 +142,8 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 
 - Navigator identity, hardware, connection, permissions, storage, media-device, media-capability,
   and user-agent-data surfaces remain incomplete.
-- Window and screen geometry plus `BarProp` objects are absent.
+- ~~Window and screen geometry plus `BarProp` objects are absent.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - `window.trustedTypes` is absent — a **capability decision**, not an omission: Trusted Types is an
   enforcement API (policy creation, sink guarding, CSP integration), and a shape-only stub would
   claim a policy mechanism that does not exist. The rest of that audit line —
@@ -183,8 +184,9 @@ and deterministic detection behavior.
 - DOM wrappers do not consistently use genuine interface/prototype chains.
 - `Blob`, `FileList`, `NodeList`, `HTMLCollection`, and per-tag `HTML*Element` constructors remain
   undefined; `childNodes` returns a JavaScript array instead of `NodeList`.
-- Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
-  be inaccessible through canonical DOM lookup.
+- ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
+  be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
 - CharacterData failures are not proper `DOMException` objects.
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
@@ -211,7 +213,8 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 
 - A linked stylesheet can report zero `cssRules`, while `getComputedStyle` ignores its
   declarations.
-- `getComputedStyle().display` can report `inline` for every element.
+- ~~`getComputedStyle().display` can report `inline` for every element.~~ **Does not reproduce** — see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
 - Font Loading is a synchronous compatibility facade and accepts malformed non-empty shorthands.
 - SVG lacks conforming live DOM integration for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
