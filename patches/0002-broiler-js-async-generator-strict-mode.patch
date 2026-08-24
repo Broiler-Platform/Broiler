@@ -1,0 +1,230 @@
+From 9df39118b14582f5a46be90b292956413e40d179 Mon Sep 17 00:00:00 2001
+From: MaiRat <enrico.bartky@gmail.com>
+Date: Mon, 24 Aug 2026 09:24:20 +0000
+Subject: [PATCH] Run async and generator bodies under the strict-mode runtime
+ flag
+
+An async or generator body runs during its rewritten driver's steps, not during
+the JSFunction.InvokeFunction call that created it, so it never inherited the
+EnterStrictMode scope ordinary calls establish. A failing [[Set]] inside a
+'use strict' async/generator body therefore did not throw (it silently did
+nothing), even in the async function's synchronous prefix or a generator before
+its first yield; and a strict async function's "this" was coerced to the global
+object instead of left undefined.
+
+ClrGeneratorV2 now carries the function's strict flag and re-enters it around
+each body step (its Next), so the body observes strict [[Set]] semantics on
+every step and across yields/awaits. The compiler sets IsStrictMode on the
+generator and on the async function's inner generator, and passes
+coerceThis:!isStrictFunction to the async inner generator so a strict async
+function's "this" is left undefined.
+
+Updates the StrictModeFlowTests KnownGap test (which pinned the old no-throw
+behaviour) to assert TypeError, and adds Track1LanguageTests regressions,
+including sloppy-body guards. BuiltIns 2214 green, Integration 5032 of 5033
+(pre-existing M8 only).
+---
+ .../StrictModeFlowTests.cs                    | 26 ++++-----
+ .../Function/JSGeneratorFunctionV2.cs         |  2 +-
+ .../FastCompiler.CreateFunction.cs            | 20 ++++++-
+ .../Track1LanguageTests.cs                    | 57 +++++++++++++++++++
+ .../GeneratorsV2/GeneratorTypes.cs            | 13 ++++-
+ 5 files changed, 100 insertions(+), 18 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/StrictModeFlowTests.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/StrictModeFlowTests.cs
+index b6391738..5b483b74 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/StrictModeFlowTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/StrictModeFlowTests.cs
+@@ -100,20 +100,16 @@ public class StrictModeFlowTests
+     }
+ 
+     [Fact(Timeout = 600000)]
+-    public void KnownGap_AsyncAndGeneratorBodiesDoNotEnterRuntimeStrictMode()
++    public void AsyncAndGeneratorBodiesEnterRuntimeStrictMode()
+     {
+-        // KNOWN GAP, pinned so it cannot change silently. An async or generator body never
+-        // enters the runtime strict-mode scope: JSFunction.InvokeFunction wraps ordinary
+-        // calls in EnterStrictMode, but the rewritten async/generator drivers do not, so a
+-        // failing [[Set]] inside a 'use strict' async or generator body does not throw —
+-        // even in the async function's SYNCHRONOUS prefix, before any await, and in a
+-        // generator before any yield.
+-        //
+-        // This predates and is independent of the P0-2 change, which is strictness-neutral
+-        // (it only skips redundant AsyncLocal writes and is asserted by the tests above).
+-        // Verified identical on the unmodified engine. Tracked in
+-        // docs/performance-roadmap.md; when it is fixed, these expectations become
+-        // "TypeError" and this test should be renamed.
++        // An async or generator body runs its code during the rewritten driver's steps, not
++        // during the JSFunction.InvokeFunction call that created it, so it does not inherit
++        // the EnterStrictMode scope that ordinary calls establish. ClrGeneratorV2.Next now
++        // re-enters the function's own strict-mode flag around each body step, so a failing
++        // [[Set]] inside a 'use strict' async or generator body throws — in the async
++        // function's SYNCHRONOUS prefix, before any await, and in a generator before any
++        // yield — exactly as an ordinary strict function does. (This was the KnownGap this
++        // test pinned before the fix; the expectations are now "TypeError".)
+         var async = Eval("""
+             var log = [];
+             var frozen = Object.freeze({ x: 1 });
+@@ -149,8 +145,8 @@ public class StrictModeFlowTests
+             strictFn();
+             """);
+ 
+-        Assert.Equal("no-throw", async);
+-        Assert.Equal("no-throw", generator);
++        Assert.Equal("TypeError", async);
++        Assert.Equal("TypeError", generator);
+         Assert.Equal("TypeError", ordinary);
+     }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSGeneratorFunctionV2.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSGeneratorFunctionV2.cs
+index e190d92f..435000e4 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSGeneratorFunctionV2.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Function/JSGeneratorFunctionV2.cs
+@@ -212,7 +212,7 @@ public class JSGeneratorFunctionV2 : JSFunction
+             ? a.OverrideThis(CoerceNonStrictThis(a.This))
+             : a;
+ 
+-        var generator = JSGeneratorBuilder.CreateFromClrV2(new ClrGeneratorV2(this, @delegate, args, asyncGenerator));
++        var generator = JSGeneratorBuilder.CreateFromClrV2(new ClrGeneratorV2(this, @delegate, args, asyncGenerator, IsStrictMode));
+ 
+         // Priming runs FunctionDeclarationInstantiation (and so the default-parameter
+         // initializers) and suspends the body at its start. Per §27.4.10/§27.5.3.x
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+index 3da30b0c..5ff66aa4 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Declarations/FastCompiler.CreateFunction.cs
+@@ -489,6 +489,14 @@ partial class FastCompiler
+                     replaceContext: cs.Context, replaceScriptInfo: scriptInfo);
+ 
+                 jsf = JSGeneratorFunctionBuilderV2.New(lambda, fxName, code, functionLength, functionDeclaration.Async, primeOnInvoke: true, coerceThis: !isStrictFunction);
++
++                // A strict generator runs its body under the strict-mode runtime flag (a failed
++                // [[Set]] throws, `caller`/`arguments` are poisoned). The flag is carried into
++                // the body's execution by ClrGeneratorV2; setting it on the function is where
++                // that carry begins. `coerceThis` (strict `this` is left undefined) is already
++                // handled above by the builder argument.
++                if (isStrictFunction)
++                    jsf = JSFunctionBuilder.EnableStrictMode(jsf);
+             }
+             else if (functionDeclaration.Async)
+             {
+@@ -502,7 +510,17 @@ partial class FastCompiler
+                 // mismatch at IL-gen). See LambdaRewriter.rewriteNestedLambdas.
+                 ExpressionCompiler.LambdaRewriter.RewriteRootOnly(lambda);
+ 
+-                jsf = JSAsyncFunctionBuilder.Create(JSGeneratorFunctionBuilderV2.New(lambda, fxName, code, functionLength));
++                // An async function runs its body through an inner generator (see
++                // JSAsyncFunction), so the strict flag and the `this` treatment must be set on
++                // THAT generator — its InvokeFunction is what builds the ClrGeneratorV2 whose
++                // Next carries strict mode into the body, and whose coerceThis leaves a strict
++                // async function's `this` undefined rather than coercing it to the global object.
++                var innerGenerator = JSGeneratorFunctionBuilderV2.New(
++                    lambda, fxName, code, functionLength, coerceThis: !isStrictFunction);
++                if (isStrictFunction)
++                    innerGenerator = JSFunctionBuilder.EnableStrictMode(innerGenerator);
++
++                jsf = JSAsyncFunctionBuilder.Create(innerGenerator);
+             }
+             else
+             {
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
+index 0dd25f3e..2419a192 100644
+--- a/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
+@@ -258,4 +258,61 @@ public class Track1LanguageTests
+             ThreeSymbolsInsertedCAB
+             + "var t = Object.assign({}, o);"
+             + "Reflect.ownKeys(t).filter(k => typeof k === 'symbol').map(s => s.description).join(',')"));
++    // ---- Async and generator bodies run under the strict-mode runtime flag ----
++    //
++    // An async or generator body runs during the rewritten driver's steps, not during the
++    // call that created it, so it did not inherit the strict-mode scope an ordinary call
++    // establishes: a failing [[Set]] inside a 'use strict' async/generator body did not throw
++    // (it silently did nothing), and a strict async function's `this` was the global object
++    // instead of undefined. The body now re-enters the function's own strict flag on each
++    // step, and a strict async function's `this` is left uncoerced.
++
++    private const string FrozenSetInBody =
++        "try { Object.freeze({ x: 1 }).x = 2; r = 'no-throw'; } catch (e) { r = e.name; }";
++
++    [Fact(Timeout = 600000)]
++    public void AFailedStrictSetInAGeneratorBodyThrows()
++        => Assert.Equal("TypeError", Eval(
++            "var r; (function* () { 'use strict'; " + FrozenSetInBody + " })().next(); r"));
++
++    [Fact(Timeout = 600000)]
++    public void AFailedStrictSetInAnAsyncBodyThrows()
++        => Assert.Equal("TypeError", Eval(
++            "var r; (async function () { 'use strict'; " + FrozenSetInBody + " })(); r"));
++
++    // The function inherits strictness from an outer directive too, not only its own.
++    [Fact(Timeout = 600000)]
++    public void AFailedSetInAGeneratorInsideStrictCodeThrows()
++        => Assert.Equal("TypeError", Eval(
++            "'use strict'; var r; (function* () { " + FrozenSetInBody + " })().next(); r"));
++
++    [Fact(Timeout = 600000)]
++    public void AFailedSetInAnAsyncGeneratorBodyThrows()
++        => Assert.Equal("TypeError", Eval(
++            "var r; (async function* () { 'use strict'; " + FrozenSetInBody + " })().next(); r"));
++
++    // The strict effect still applies after a yield resumes the body on a later step.
++    [Fact(Timeout = 600000)]
++    public void AFailedStrictSetAfterAYieldThrows()
++        => Assert.Equal("TypeError", Eval(
++            "var r; var g = (function* () { 'use strict'; yield 1; " + FrozenSetInBody + " })();"
++            + "g.next(); g.next(); r"));
++
++    // A strict async function's `this` is undefined (an ordinary strict function's is), not
++    // the global object a sloppy async function would coerce it to.
++    [Fact(Timeout = 600000)]
++    public void AStrictAsyncFunctionsThisIsUndefined()
++        => Assert.Equal("undefined", Eval(
++            "var r; (async function () { 'use strict'; r = typeof this; })(); r"));
++
++    // Regression guard: a SLOPPY async/generator body keeps lenient [[Set]] semantics.
++    [Fact(Timeout = 600000)]
++    public void AFailedSetInASloppyGeneratorBodyIsSilent()
++        => Assert.Equal("no-throw", Eval(
++            "var r; (function* () { " + FrozenSetInBody + " })().next(); r"));
++
++    [Fact(Timeout = 600000)]
++    public void AFailedSetInASloppyAsyncBodyIsSilent()
++        => Assert.Equal("no-throw", Eval(
++            "var r; (async function () { " + FrozenSetInBody + " })(); r"));
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorTypes.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorTypes.cs
+index 76498bc3..fe08e949 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorTypes.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/GeneratorsV2/GeneratorTypes.cs
+@@ -51,8 +51,15 @@ public class TryBlock
+     public Exception PendingError;
+ }
+ 
+-public class ClrGeneratorV2(JSValue generator, JSGeneratorDelegateV2 @delegate, Arguments arguments, bool asyncGenerator = false)
++public class ClrGeneratorV2(JSValue generator, JSGeneratorDelegateV2 @delegate, Arguments arguments, bool asyncGenerator = false, bool strict = false)
+ {
++    // A generator or async function runs its body during Next (initial priming and every
++    // resume), not during the InvokeFunction call that created it, so the strict-mode runtime
++    // flag the base JSFunction.InvokeFunction would establish is not in effect here. Carry the
++    // function's own strict flag and re-enter it around each body step, so a failed [[Set]]
++    // inside a strict generator/async body throws as it must (§10.1.11 sink, ordinary [[Set]]).
++    private readonly bool strict = strict;
++
+     public FrameToken StackItem;
+ 
+     private Exception injectedException = null;
+@@ -115,6 +122,10 @@ public class ClrGeneratorV2(JSValue generator, JSGeneratorDelegateV2 @delegate,
+ 
+     internal void Next(JSValue next, out JSValue value, out bool done)
+     {
++        // Run this body step under the function's own strict-mode flag (see `strict`). A
++        // suspension at `yield`/`await` returns out of here and disposes the scope, so the
++        // consumer's code between steps keeps its own strictness; the next step re-enters.
++        using var strictScope = JSEngine.EnterStrictMode(strict);
+         try
+         {
+             NextCore(next, out value, out done);
+-- 
+2.43.0
+

@@ -151,7 +151,15 @@ the ones marked **fixed** carry a minimal regression in
   folded every identifier of that name to the undefined value; it now folds only a reference
   that resolves to no binding.
 - Async and generator bodies do not enter the runtime strict-mode scope, so a failed strict
-  `[[Set]]` may not throw. **Still reproduces.**
+  `[[Set]]` may not throw. **Fixed:** such a body runs during its rewritten driver's steps,
+  not during the `InvokeFunction` call that created it, so it never inherited the
+  `EnterStrictMode` scope ordinary calls establish — a failing `[[Set]]` in a `'use strict'`
+  async/generator body silently did nothing (even in the async synchronous prefix / before a
+  generator's first `yield`), and a strict async function's `this` was the global object.
+  `ClrGeneratorV2` now re-enters the function's own strict flag around each body step, and the
+  compiler sets `IsStrictMode` (and `coerceThis`) on the generator and the async inner
+  generator. Ships as a Broiler.JS patch; regressions in `Track1LanguageTests` and the updated
+  `StrictModeFlowTests`.
 - **Early errors that never fire** — the cluster the modes and the named-error reporting made
   visible, and the largest one here. `for (const x;;)`, a body `var` shadowing the head's
   lexical name, a labelled function declaration as a loop body, `export` inside `eval`, and a
