@@ -48,5 +48,28 @@ building. Until the patch is applied upstream and the gitlink bumped, CI clones 
 submodule commit, which does not yet contain it, so the module scope-isolation cases stay red on
 CI.
 
-Apply with `git -C Broiler.JS am ../patches/0001-module-top-level-lexical-own-environment.patch`,
-push `Broiler.JS`, then bump the gitlink.
+### `Broiler.JS` — Make an imported binding immutable
+
+Target submodule: **`Broiler.JS`** (compiler). Push to `Broiler-Platform/Broiler.JS` returned 403
+(outside this session's scope), so the gitlink is **not** bumped.
+
+An `ImportedBinding` is immutable (ES2024 16.2.1.5 creates it as an immutable binding), but the
+engine seeded each import into an ordinary mutable local, so `import { x } from 'm'; x = 2;` quietly
+overwrote the local snapshot and ran on. The patch seals every import binding — named, default,
+namespace, and renamed — read-only right after it is seeded, so a later assignment throws in the
+strict module code, the same runtime read-only TypeError a reassigned `const` gives. The spec makes
+assignment to an import an early SyntaxError; this engine cannot raise that phase without
+whole-module scope analysis across its deferred function bodies, so it matches its own `const`
+treatment instead. Regressions live in the patch's `ModuleImportImmutabilityTests`.
+
+No active main-repo fallback and none is needed — the change is internal to the `Broiler.JS`
+compiler and names no type the parent references.
+
+Apply the two patches in order — they touch disjoint files and both apply on the pinned commit:
+
+```sh
+git -C Broiler.JS am ../patches/0001-module-top-level-lexical-own-environment.patch
+git -C Broiler.JS am ../patches/0002-make-an-imported-binding-immutable.patch
+```
+
+then push `Broiler.JS` and bump the gitlink.

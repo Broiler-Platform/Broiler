@@ -38,8 +38,11 @@ documented separately and do not appear as ordinary failures.
 ## Track 3 — Scripts, tasks, and modules
 
 Module *syntax* is closed — see
-[closed](broiler-js-gaps-closed.md#track-3--module-syntax). What remains is host semantics and
-two decisions.
+[closed](broiler-js-gaps-closed.md#track-3--module-syntax). Module *binding* semantics are
+part-landed — scope isolation and import immutability are fixed in patches and live bindings are
+characterized-not-fixed, in
+[in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics). What remains
+below is host semantics and two decisions.
 
 ### Confirmed host-semantic gaps
 
