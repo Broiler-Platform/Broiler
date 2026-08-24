@@ -565,13 +565,23 @@ the native backend, and all public RegExp operations consume the same conforming
   left for one. Characterized, not guessed at.
 - **Still open — `import.meta`** reports "import.meta not supported" (deterministic, not a crash),
   and `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
-- **Still open — needs a module parse goal.** `await` as a module-level identifier (`var await`,
-  `function await`, `let await`, a parameter, a class name, `import { a as await }`) is accepted;
-  it is reserved from a module's first token, before any import or export is seen, so it cannot be
-  inferred from the AST the way the duplicate rules can. Module-ness is currently expressed only by
-  the CommonJS-style `argsList` wrapper the module host passes to `CoreScript.Compile`, so a real
-  goal would have to be threaded through `JSCode`/the code-cache key as well — a script and a
-  module with identical text must not share a compile.
+- `await` as a module-level identifier was accepted in every binding position (`var await`,
+  `let`/`const`, a function name, a parameter, a class name, a catch parameter, a destructuring
+  target, a label, and every ImportedBinding shape). **Fixed — the parser now has a module goal.**
+  This is the one module early error that could not be inferred from the AST the way the
+  duplicate-name rules were: `await` is reserved from a module's first token, before any import or
+  export has been seen. The goal travels in `JSCompilationOptions.IsModule`, which is deliberate —
+  those options *are* the code-cache key, and the goal changes what the text means, so a module and
+  a script with identical source must not share a compile entry. The parser reads it through an
+  ambient `CoreScript` scope (the mechanism `AllowTopLevelAwait` already uses, since the parser is
+  several assemblies from the host and `IJSCompiler.Compile` carries no options), and that scope is
+  entered from the *same* resolved options value that goes into the key, so the two cannot drift
+  apart; it wraps the compile factory, so a cache hit never pays for it. Blast radius outside module
+  code is nil by construction — every new rejection is gated on the goal, which is false for every
+  script compile, and the tests assert that scripts still treat `await` as an ordinary name. Inside
+  modules the rule is about bindings only: `await` stays legal as a property name, a method name and
+  the operator, including top-level await. Landed in `8e745b4`; regressions in
+  `ModuleAwaitReservedTests`.
 
 ### Confirmed host-semantic gaps
 
