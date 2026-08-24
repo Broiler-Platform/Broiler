@@ -266,9 +266,20 @@ submodule and carries a minimal regression in `Broiler.Regex.Tests`.
   handed callers the raw .NET `Regex` (and would be `null` once a Broiler-only pattern is
   routed), is retired for an engine-agnostic `IsMatch`, so `assert.match` routes too.
   Regressions: `BuiltIns.Tests/RegExpEngineConsistencyTests`.
+- **A routed pattern no longer needs a .NET translation (the tail of action 4).**
+  `CreateRegex` compiled the .NET `Regex` for every pattern, so one the translator could not
+  represent failed to construct even though Broiler would match it. Now that no supported
+  operation reads the .NET engine for a routed pattern, the translation is wrapped so that,
+  *for a routed pattern only*, a transform's "not supported" error or a `new Regex` rejection
+  falls back to a null `value` and the RegExp runs on Broiler alone. A `v`-mode set operation
+  over a built-in class escape — `[\s&&\S]`, `[\d&&\s]`, `[\s--\d]` — is the concrete case:
+  valid ECMAScript that the .NET UnicodeSets translator rejects, and that now constructs and
+  matches (exec/test/split/replace) in agreement with V8. A pattern invalid in *both* engines
+  is not routed (Broiler rejects it, so the fallback is skipped) and still throws.
+  Regressions: `BuiltIns.Tests/RegExpTranslatorFallbackTests`.
 
 Evidence: `dotnet test Broiler.Regex.slnx` — 247 tests, up from 57; the Broiler.JS
-`BuiltIns` (2180) and `Integration` (5024 of 5025) suites pass, the one failure being the
+`BuiltIns` (2191) and `Integration` (5024 of 5025) suites pass, the one failure being the
 pre-existing `M8_DocumentationFiles_Exist`, which asserts a `docs/roadmap.md` that the
 component's own reorganisation replaced with `docs/roadmap/`. Plus 220,172 differential
 pattern/flag/input cases run against V8 — three hand-built corpora and one seeded fuzz —
@@ -283,20 +294,17 @@ patch introduces.
 
 ### Remaining work
 
-1. **Let a routed pattern skip the .NET build (the tail of action 4).** Action 4 unified the
-   match data — every operation now reads the routed engine — but `CreateRegex` still
-   compiles the .NET `Regex` for *every* pattern, so one the translator cannot represent
-   still fails to construct even though Broiler would match it. Now that no supported
-   operation reads the .NET engine for a routed pattern, `value` can become nullable and the
-   translation can be skipped (or allowed to fail) when a pattern is routed. That is the step
-   that finally lets a Broiler-only pattern through, and the gate on retiring the translator.
+1. **Action 6 — widen routing, then retire the translator.** A routed pattern can now run
+   without a .NET translation, but routing still triggers only on the gap *shapes*
+   (`TryBuildBroilerForGaps`), so a pattern outside those shapes is still matched by .NET.
+   Widening routing toward every supported pattern — and confirming captures, named groups,
+   indices, `lastIndex`, species, replacement substitutions, and observable property order
+   stay clean through the shared path — is what finally lets the source-to-source translator
+   be removed.
 2. **The pinned corpus in CI.** The focused test262 RegExp and UnicodeSets paths have not
    been run under the expanded routing; `scripts/compliance/test262-failures.txt` stays the
    path source and must not be reduced before CI confirms.
-3. **Action 6 — retire the translator** once captures, named groups, indices, `lastIndex`,
-   species, replacement substitutions, and observable property order are clean through the
-   shared path.
-4. **Two deliberate divergences to settle,** both under `vi`, both pinned by a test in
+3. **Two deliberate divergences to settle,** both under `vi`, both pinned by a test in
    `UnicodeSetsTests`. For a lone *binary* property §22.2.2.9 folds the set (only a lone
    General_Category value is exempt), so `\p{ASCII}` holds `s` and matches `ſ`; V8 answers
    "no match" while agreeing on the equivalent literal range and on every other property.
@@ -304,7 +312,7 @@ patch introduces.
    matches `A`; V8 folds the member but not the subject at that length — it matches `a`,
    not `A` — while canonicalizing both for a longer alternative. Broiler.Regex follows the
    spec in both; the product decision is whether to keep doing so.
-5. **Human review.** `Broiler.Regex/HUMAN_REVIEW.md` is revision-scoped and its approval
+4. **Human review.** `Broiler.Regex/HUMAN_REVIEW.md` is revision-scoped and its approval
    named a commit two changes ago; it needs re-running against the current revision.
 
 See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.md#known-limitations-stubbed--todo),
@@ -319,13 +327,14 @@ See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.m
 3. ~~Implement complete mode-sensitive canonicalization and pin astral and multi-script
    cases.~~ Done.
 4. ~~Move `Exec`, `Split`, and `Replace` to one match-data abstraction.~~ Done — all three
-   read the routed engine through `EnumerateMatches`/`RunMatch`, and `IJSRegExp.Value` is
-   replaced by an engine-agnostic `IsMatch`. The remaining step is making `value` nullable so
-   a routed pattern need not also be translatable to .NET (remaining work item 1).
+   read the routed engine through `EnumerateMatches`/`RunMatch`, `IJSRegExp.Value` is
+   replaced by an engine-agnostic `IsMatch`, and a routed pattern no longer needs a .NET
+   translation (`value` is null when the translator cannot represent it).
 5. ~~Expand native routing only for syntax and semantics covered by focused and pinned
    corpus tests.~~ Done for the class-set and in-class property shapes.
 6. Retire the translator only after captures, named groups, indices, `lastIndex`, species,
-   replacement substitutions, and observable property order are clean.
+   replacement substitutions, and observable property order are clean — gated on widening
+   routing beyond the gap shapes (remaining work item 1).
 
 **Exit gate:** the pinned supported RegExp corpus is clean without sending unsupported syntax to
 the native backend, and all public RegExp operations consume the same conforming match data.

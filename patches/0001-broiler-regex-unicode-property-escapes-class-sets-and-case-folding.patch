@@ -1,6 +1,6 @@
-From 32a0b12a887fa289fffd0dabfcc169725268e8ac Mon Sep 17 00:00:00 2001
+From aa1d1d928c76751249f7334240d05cc6bb0fbfb0 Mon Sep 17 00:00:00 2001
 From: MaiRat <enrico.bartky@gmail.com>
-Date: Mon, 24 Aug 2026 05:43:22 +0000
+Date: Mon, 24 Aug 2026 06:04:30 +0000
 Subject: [PATCH] Resolve property escapes, evaluate v-mode class sets, and
  fold from the UCD
 MIME-Version: 1.0
@@ -49,9 +49,10 @@ seeded fuzz. Two mismatches remain, both deliberate and both recorded in the REA
 a test that pins them: under `vi` the spec folds a lone binary property's set and a
 one-character `\q{…}` alternative, and V8 folds neither consistently.
 
-The roadmap's "Replace the translator" section also records action 4 (the Broiler.JS-side
-match-data unification) and narrows what is left before the source-to-source translator
-can be dropped.
+The roadmap's "Replace the translator" section records the Broiler.JS-side integration
+work (action 4: one match-data abstraction, and a routed pattern that no longer needs a
+.NET translation) and narrows what is left before the source-to-source translator can be
+dropped.
 ---
  Broiler.Regex.Tests/AnnexBGrammarTests.cs     | 151 ++++
  Broiler.Regex.Tests/CanonicalizeTests.cs      | 119 ++++
@@ -71,8 +72,8 @@ can be dropped.
  .../Unicode/tools/generate-case-folding.py    | 183 +++++
  Broiler.Regex/docs/ecmascript-mapping.md      |  30 +-
  THIRD_PARTY_NOTICES.md                        |  15 +
- docs/roadmap.md                               |  53 +-
- 19 files changed, 2453 insertions(+), 317 deletions(-)
+ docs/roadmap.md                               |  51 +-
+ 19 files changed, 2452 insertions(+), 316 deletions(-)
  create mode 100644 Broiler.Regex.Tests/AnnexBGrammarTests.cs
  create mode 100644 Broiler.Regex.Tests/CanonicalizeTests.cs
  create mode 100644 Broiler.Regex.Tests/UnicodePropertyEscapeTests.cs
@@ -3363,7 +3364,7 @@ index 0000000..a53d5fa
 +The Apache License 2.0 in [`LICENSE`](LICENSE) applies to Broiler's source code and does
 +not replace the Unicode Terms of Use for Unicode-provided data.
 diff --git a/docs/roadmap.md b/docs/roadmap.md
-index a954585..7dfa023 100644
+index a954585..29593d8 100644
 --- a/docs/roadmap.md
 +++ b/docs/roadmap.md
 @@ -6,14 +6,23 @@ milestones are represented by code and tests.
@@ -3403,20 +3404,18 @@ index a954585..7dfa023 100644
  ## 3. Replace the translator
  
 -Expand routing only as implemented syntax and semantics become test-clean:
--
--- use the shared match-data path for `Exec`, `Split`, and `Replace`;
 +Routing covers `v`-mode class-set expressions and property escapes used as class members
 +— the two shapes the translator has to approximate — and `Exec`, `Split` and `Replace`
-+now consume one match-data abstraction (`JSRegExp.EnumerateMatches` over `RunMatch`), so
-+the legacy `String.prototype.split`/`replace` fallback and `assert.match` answer through
-+the routed engine, not the .NET translation. `IJSRegExp.Value` is retired, replaced by an
-+engine-agnostic `IsMatch`. Remaining before the translator can be dropped:
-+
-+- **Let a routed pattern skip the .NET build.** `CreateRegex` still constructs the .NET
-+  `Regex` for every pattern, so one the translator cannot represent still fails to
-+  construct even though the Broiler backend would match it. Now that no supported
-+  operation reads the .NET engine for a routed pattern, `value` can become nullable and
-+  the translation attempt can be skipped (or allowed to fail) when the pattern is routed.
++consume one match-data abstraction (`JSRegExp.EnumerateMatches` over `RunMatch`), so the
++legacy `String.prototype.split`/`replace` fallback and `assert.match` answer through the
++routed engine, not the .NET translation. `IJSRegExp.Value` is retired, replaced by an
++engine-agnostic `IsMatch`. And a routed pattern no longer has to be translatable to .NET:
++`CreateRegex` runs with a null `value` when a transform or `new Regex` cannot represent it,
++so a valid pattern the translator rejects — a `v`-mode set operation over `\s`/`\S`/`\d`,
++for one — now constructs and matches through Broiler instead of throwing a SyntaxError.
++Remaining before the translator can be dropped:
+ 
+-- use the shared match-data path for `Exec`, `Split`, and `Replace`;
  - preserve global/sticky `lastIndex`, captures, named groups, indices, replacement
 -  substitutions, and species behavior;
 +  substitutions, and species behavior — the shared path leaves `lastIndex` untouched for
@@ -3424,7 +3423,8 @@ index a954585..7dfa023 100644
  - compare Broiler and .NET results during each routing expansion;
 -- remove `IJSRegExp.Value` and the source-to-source translator only after no supported
 -  operation needs them.
-+- remove the source-to-source translator only after no supported operation needs it.
++- widen routing to every supported pattern, not just the gap shapes, and then remove the
++  source-to-source translator once no supported operation needs it.
  
  Exit gate: all supported patterns use Broiler.Regex, the pinned RegExp corpus is green,
  and no production path constructs a .NET `Regex` for ECMAScript matching.

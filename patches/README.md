@@ -41,13 +41,16 @@ This patch carries both track-2 Broiler.JS changes:
   `CharSet.MatchesEmptyString`, which the Broiler.Regex patch introduces, so applying it
   before that patch will not compile.
 - **Action 4 — one match-data abstraction.** `JSRegExp.Split`/`Replace` and `assert.match`
-  now match through the routed engine (a shared `EnumerateMatches` over `RunMatch`), and
-  `IJSRegExp.Value` is replaced by an engine-agnostic `IsMatch`. This part needs only the
+  now match through the routed engine (a shared `EnumerateMatches` over `RunMatch`),
+  `IJSRegExp.Value` is replaced by an engine-agnostic `IsMatch`, and `CreateRegex` lets a
+  routed pattern run with a null `value` when the translator cannot represent it — so a
+  `v`-mode set operation over `\s`/`\S`/`\d` (valid ECMAScript the .NET UnicodeSets
+  translator rejects) now constructs and matches through Broiler. This part needs only the
   types already present in `a98619ab`, but it is bundled here because it shares
-  `JSRegExp.Broiler.cs`.
+  `JSRegExp.Broiler.cs` and `JSRegExp.cs`.
 
-Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2180 pass, up from
-2173 — the seven new `RegExpEngineConsistencyTests`) and
+Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2191 pass, up from
+2173 — the new `RegExpEngineConsistencyTests` and `RegExpTranslatorFallbackTests`) and
 `dotnet test Broiler.JS/Broiler.JavaScript.Integration.Tests` (5024 of 5025 — the one
 failure, `M8ValidationTests.M8_DocumentationFiles_Exist`, is pre-existing and unrelated:
 it asserts a `docs/roadmap.md` that the component's own reorganisation replaced with
