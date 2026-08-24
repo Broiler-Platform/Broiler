@@ -1,4 +1,5 @@
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.BuiltIns.Promise;
 using System.Text;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Number;
@@ -68,19 +69,29 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
             return null;
         }
+        /// <summary>
+        /// A settled native Promise for a body value that is already in hand — what
+        /// <c>response.text()</c>, <c>.json()</c>, <c>.arrayBuffer()</c>, <c>.blob()</c>,
+        /// <c>.formData()</c> and a stream reader's <c>read()</c> return.
+        /// </summary>
+        /// <remarks>
+        /// This used to be a hand-rolled object carrying one <c>then</c> that invoked the callback and
+        /// returned <b>itself</b>. Returning itself is what broke chaining: <c>.then(a).then(b)</c> ran
+        /// <c>b</c> against the ORIGINAL value rather than <c>a</c>'s result, so a mapping chain read
+        /// the unmapped value — a silently wrong answer rather than an error. It also had no
+        /// <c>catch</c> and no <c>finally</c> (so <c>.finally()</c> was a TypeError), was not
+        /// <c>instanceof Promise</c>, and had no rejection path at all, so a resolver that threw — a
+        /// <c>.json()</c> over a malformed body, say — threw synchronously out of <c>.then</c> instead
+        /// of rejecting the promise.
+        /// <para>
+        /// A real <see cref="JSPromise"/> fixes all of it at once, and the engine's microtask queue is
+        /// pumped in a capture (a plain <c>Promise.resolve().then(...)</c> callback runs), so settling
+        /// through the real machinery still delivers the callback. The executor constructor also turns a
+        /// throwing <paramref name="resolver"/> into a rejection, which is the conforming outcome.
+        /// </para>
+        /// </remarks>
         static JSObject CreateThenable(Func<JSValue> resolver)
-        {
-            var thenable = new JSObject();
-            JSValue JsRegistrationThen077(in Arguments a)
-            {
-                if (a.Length > 0 && a[0] is JSFunction cb)
-                    cb.InvokeFunction(new Arguments(cb, resolver()));
-                return thenable;
-            }
-            thenable.FastAddValue((KeyString)"then", new JSFunction(JsRegistrationThen077, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            return thenable;
-        }
+            => new JSPromise((resolve, reject) => resolve(resolver()));
         static JSObject CreateHeadersObject(JSValue? initValue = null)
         {
             var headersObject = new JSObject();

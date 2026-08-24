@@ -126,7 +126,9 @@ shared-memory claim is made before the complete memory-model gate passes.
 
 ### Fetch, navigation, storage, and networking
 
-- `fetch()` returns a self-returning thenable rather than a conforming chainable Promise.
+- ~~`fetch()` returns a self-returning thenable rather than a conforming chainable Promise.~~
+  **Fixed** — `fetch()` and the body methods return real Promises; see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - `location.assign`, `replace`, `reload`, and `href=` record requests but do not navigate.
 - Some HTTP subresource, iframe, worker, socket, and navigation attempts never complete or call
   back to the probing script.
@@ -159,8 +161,8 @@ See [the privacy inventory](privacy-test-page-gaps.md),
 
 ### Actions
 
-1. Replace the fetch thenable with Promise-conforming settlement and chaining while retaining
-   correct `await` behavior.
+1. ~~Replace the fetch thenable with Promise-conforming settlement and chaining while retaining
+   correct `await` behavior.~~ **Done.**
 2. Define capture-mode navigation semantics and a complete callback/error contract; do not expose
    browser-like methods whose only observable effect is silent non-navigation.
 3. Implement storage and networking APIs in independently testable slices with origin, lifetime,

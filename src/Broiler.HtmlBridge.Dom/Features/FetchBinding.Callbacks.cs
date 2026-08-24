@@ -8,6 +8,7 @@ using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Json;
 using Broiler.JavaScript.BuiltIns.Null;
+using Broiler.JavaScript.BuiltIns.Promise;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
@@ -199,45 +200,29 @@ internal sealed partial class FetchBinding
             responseObj = createResponse(string.Empty, 0, ex.Message, fetchUrl, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
         }
 
-        // Return a thenable (Promise-like) that resolves immediately
-        var promise = new JSObject();
-        JSValue JsRegistrationThen118(in Arguments thenArgs)
+        // The outcome is settled by this point — an aborted request set `rejected`, everything else
+        // produced a `responseObj` — so hand it back as a real, already-settled Promise.
+        //
+        // This used to be a hand-rolled object with a `then` and a `catch` that each invoked their
+        // callback and returned THEMSELVES. Four things were wrong with it, and returning `this` was
+        // the worst: `.then(a).then(b)` ran `b` against the original Response rather than `a`'s result,
+        // so a mapping chain — the ordinary `fetch(u).then(r => r.json()).then(useData)` shape — handed
+        // the second callback the Response instead of the parsed body. That is a silently wrong value,
+        // not an error. Beyond it: `.then`'s second (onRejected) argument was ignored entirely;
+        // `.finally` did not exist, so calling it was a TypeError; and a callback that threw was caught
+        // and logged rather than rejecting the derived promise, so an error inside a handler vanished.
+        // The object was also not `instanceof Promise`, which feature-detecting code checks.
+        //
+        // A real JSPromise gets all of that from the engine. The capture pumps the microtask queue (a
+        // plain `Promise.resolve().then(...)` callback runs), so settling through the real machinery
+        // still delivers the callbacks.
+        return new JSPromise((resolve, reject) =>
         {
-            if (!rejected && thenArgs.Length > 0 && thenArgs[0] is JSFunction cb)
-            {
-                try
-                {
-                    cb.InvokeFunction(new Arguments(cb, responseObj));
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.then", $"Callback error: {ex.Message}", ex);
-                }
-            }
-
-            return promise;
-        }
-
-        promise.FastAddValue((KeyString)"then", new DomFunction(JsRegistrationThen118, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        JSValue JsRegistrationCatch119(in Arguments catchArgs)
-        {
-            if (rejected && catchArgs.Length > 0 && catchArgs[0] is JSFunction cb)
-            {
-                try
-                {
-                    cb.InvokeFunction(new Arguments(cb, rejectedValue));
-                }
-                catch (Exception ex)
-                {
-                    RenderLogger.LogWarning(LogCategory.JavaScript, "DomBridge.fetch.catch", $"Callback error: {ex.Message}", ex);
-                }
-            }
-
-            return promise;
-        }
-
-        promise.FastAddValue((KeyString)"catch", new DomFunction(JsRegistrationCatch119, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        return promise;
+            if (rejected)
+                reject(rejectedValue);
+            else
+                resolve(responseObj);
+        });
     }
 
     /// <summary>

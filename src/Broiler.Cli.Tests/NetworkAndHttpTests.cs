@@ -988,17 +988,28 @@ firstRead.then(function(text) {
         Assert.Contains("true|Failed to execute body reader on 'Response': body is already used.|", result);
     }
 
+    // `.json()` over a malformed body REJECTS its promise; it does not throw synchronously out of
+    // `.then`. This test asserted the synchronous throw, which was an artifact of the body methods
+    // returning a hand-rolled thenable that ran the resolver inside `then` — per Fetch §5.2 the method
+    // returns a promise and a parse failure rejects it. The assertions that carry the intent are
+    // unchanged: the error still names the parse failure, and the body is still marked used.
     [Fact(Timeout = 600000)]
-    public void Fetch_Response_Json_InvalidJson_Throws_Clear_Error()
+    public void Fetch_Response_Json_InvalidJson_Rejects_With_A_Clear_Error()
     {
         using var context = new JSContext();
         var bridge = new DomBridge();
         bridge.Attach(context, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
 
-        var exception = Assert.Throws<JSException>(() =>
-            context.Eval("var response = new Response('{invalid json'); response.json().then(function() {});"));
+        context.Eval(@"
+            var settled = '', message = '';
+            var response = new Response('{invalid json');
+            response.json()
+                .then(function () { settled = 'resolved'; })
+                .catch(function (e) { settled = 'rejected'; message = String(e && e.message ? e.message : e); });
+        ");
 
-        Assert.Contains("Failed to parse response body as JSON:", exception.Message);
+        Assert.Equal("rejected", context.Eval("settled").ToString());
+        Assert.Contains("Failed to parse response body as JSON:", context.Eval("message").ToString());
         Assert.True(context.Eval("response.bodyUsed").BooleanValue);
     }
 
@@ -1489,7 +1500,13 @@ xhr.onreadystatechange = function() {
 xhr.open('GET', 'http://example.com/data');
 xhr.send();
 fetch = window.fetch = originalFetch;
-document.getElementById('result').textContent = readyStates.join(',');
+// The polyfill reads the body through response.text(), which is a real Promise, so readyState 3 and
+// 4 are delivered on a microtask rather than inside send() — the same asynchrony a browser has for
+// an async XHR. Observe after the queue drains; the assertion is still that LOADING arrives, in
+// order, before DONE.
+Promise.resolve().then(function () {}).then(function () {
+    document.getElementById('result').textContent = readyStates.join(',');
+});
 </script>
 </body></html>";
 

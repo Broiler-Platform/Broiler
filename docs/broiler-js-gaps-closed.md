@@ -428,6 +428,33 @@ were deleted and the gitlinks point at commits that contain them. See
   not exist. Main-repo `Broiler.HtmlBridge.Dom` fix
   (`Registration/Document.cs`, `Features/WindowDocumentMiscBinding.cs`), landed directly rather than as
   a submodule patch; regressions in `DocumentSurfaceTests`.
+- `fetch()` returned a self-returning thenable rather than a conforming Promise — track 5's action 1.
+  There were two such hand-rolled objects: the one `fetch()` returned, and the one behind every body
+  method (`.text()`, `.json()`, `.arrayBuffer()`, `.blob()`, `.formData()`, and a stream reader's
+  `read()`). Both carried a `then` that invoked the callback and returned **themselves**, and that is
+  the defect worth naming: `.then(a).then(b)` ran `b` against the ORIGINAL value instead of `a`'s
+  result, so the ordinary `fetch(u).then(r => r.json()).then(useData)` shape handed the second
+  callback the Response rather than the parsed body — a **silently wrong value, not an error**.
+  Alongside it: `.then`'s second (onRejected) argument was ignored entirely; `.finally` did not exist,
+  so calling it was a TypeError; a callback that threw was caught and logged rather than rejecting the
+  derived promise, so an error inside a handler vanished; the body thenable had no rejection path at
+  all, so a resolver that threw (`.json()` over a malformed body) threw synchronously out of `.then`
+  instead of rejecting; and neither object was `instanceof Promise`, which feature-detecting code
+  checks. **Fixed:** both are now real `JSPromise`s, settled from the outcome already in hand. The
+  engine's microtask queue is pumped in a capture — a plain `Promise.resolve().then(...)` callback
+  runs, which was verified before the change — so settling through the real machinery still delivers
+  the callbacks.
+  <br>Two existing tests asserted the **old** behavior and were updated with their intent preserved,
+  which is worth flagging rather than burying: `Fetch_Response_Json_InvalidJson_Throws_Clear_Error`
+  asserted the synchronous throw and now asserts the rejection (still checking the same clear message
+  and that `bodyUsed` is set) — renamed to `…_Rejects_With_A_Clear_Error`; and
+  `XHR_ReadyStateChange_Fires_For_Loading_State_Before_Done` read `readyState` history synchronously
+  after `send()`, which only worked because the polyfill's `response.text()` resolved synchronously.
+  XHR still reaches readyState 4 and delivers status and body — verified end to end — it now does so
+  on a microtask, the same asynchrony a browser has for an async XHR, so the test observes after the
+  queue drains and still asserts LOADING arrives, in order, before DONE. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`Features/FetchBinding.cs`, `Features/FetchBinding.Callbacks.cs`),
+  landed directly rather than as a submodule patch; regressions in `FetchPromiseConformanceTests`.
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
