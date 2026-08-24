@@ -123,7 +123,8 @@ and [the component host-mode plan](../Broiler.JS/docs/roadmap/Component.md#2-exp
      → track 3;
    - 22 NullReferenceException crashes in module namespace and ambiguous-export paths →
      track 3;
-   - 12 "invalid program" IL failures on top-level `for await` → track 1;
+   - 12 "invalid program" IL failures on top-level `for await` → track 1, **fixed** (see
+     track 1's async/generator entry); re-measure this line on the next corpus run;
    - the `$262` remainder, mostly cross-realm identity and missing-throw cases → track 1.
 2. Record product decisions for the three excluded `$262` hooks: `$262.agent` (112 files,
    multi-agent Atomics — owned by track 4), `$262.IsHTMLDDA` (42 files) and
@@ -156,6 +157,17 @@ the ones marked **fixed** carry a minimal regression in
 - An empty statement does not correctly terminate a Directive Prologue. **Fixed:** a statement
   that already ended at its own `;` was consuming a second one, deleting exactly the empty
   statement that ends the prologue.
+- A top-level `for await` fails with an internal error instead of running — the "invalid
+  program" cluster track 0 measured in the module corpus. **Fixed:** a program holding a
+  top-level `AwaitExpression` is flagged async by the parser, and that flag is what routes it
+  through the generator rewrite that implements suspension. The `for await` head only
+  *validated* that the construct was legal at that position and never set the flag, so the
+  program was compiled straight to IL and the await its desugaring emits reached
+  `ILCodeGenerator.VisitYield` as a raw yield node it cannot emit (a leaked
+  `NotImplementedException`). The head now sets the same flag `AwaitExpression` does when the
+  loop is at function depth 0; `for await` where no await is allowed — an ordinary script's top
+  level, a non-async function body — stays the SyntaxError it was. Landed in the pinned
+  `Broiler.JS` submodule (`98db1fc`); regressions in `Track1LanguageTests`.
 - A parameter named `undefined` does not shadow the global binding. **Fixed:** the compiler
   folded every identifier of that name to the undefined value; it now folds only a reference
   that resolves to no binding.
