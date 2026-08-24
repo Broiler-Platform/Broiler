@@ -104,6 +104,19 @@ run in CI and the product decisions for three `$262` hooks.**
   the diagnostic while rejecting the program correctly.
 - **Per-mode totals** (selected, executed, passed, failed, skipped, timed out) ride on every
   shard report, survive the shard merge, and appear in both CI summaries.
+- **Two Broiler.JS xUnit suites could not run at all**, which is the same kind of untrustworthy
+  evidence as a test that cannot fail. Every `Modules.Tests` case that compiles script, and most
+  of `Core.Tests`, threw `No compilation back end is registered for 'DynamicMethod'` — while the
+  assembly implementing it sat in each suite's own output directory. The DynamicMethod and
+  CollectibleAssembly back ends register themselves from a `[ModuleInitializer]`, and .NET loads
+  assemblies lazily, so that ran only if the host happened to touch a type in the emitter
+  assembly: registration followed incidental load order rather than configuration (a
+  `ProjectReference` does not fix it — a reference is not a load). `LinqExpressions`, the
+  assembly that genuinely needs the emitter and is loaded while a compilation's tree is being
+  built, now forces that load, the same remedy `CompilerAssemblyInitializer` already documents
+  for its own assembly. `Modules.Tests` went 3/13 → 13/13 and `Core.Tests` to 32/32, with every
+  other suite unchanged and `Portable.Tests` — the profile that prohibits dynamic code emission —
+  still green.
 
 See [the host-coverage inventory](../Broiler.JS/docs/compliance/known-gaps.md#host-coverage-gaps)
 and [the component host-mode plan](../Broiler.JS/docs/roadmap/Component.md#2-expand-host-mode-coverage).
@@ -757,7 +770,14 @@ Do not schedule fixes for these until the smallest current-pointer reproduction 
   by the time the call returns, so a later `Eval` on the same context observes its effect; the
   same holds through `EvalWithTopLevelAwaitAsync`. Both halves of the contract are pinned: the
   reaction is not run inline during the script that queues it, and it is not lost either;
-- an unreproduced module-initializer-ordering failure; and
+- an unreproduced module-initializer-ordering failure — **narrowed, still open.** It is a single
+  recorded `ModuleExtensions.Tests` failure whose first test is order-dependent by construction
+  ("before the BuiltIns `[ModuleInitializer]` that wires it had run"); 12 further runs are clean,
+  which with the 9 already on record is 21 without a recurrence — but the owning record's own
+  point stands, that a handful of runs cannot separate a 1-in-10 flake from a 1-in-10 regression,
+  so it is not retired. One *related* order dependence has been removed since: compilation
+  back ends registered from a `[ModuleInitializer]` that only ran if the host happened to load
+  the emitter assembly, which is now forced (below); and
 - form-control dirty/default/reset/radio semantics, which remain uncharacterized.
 
 Sources:
