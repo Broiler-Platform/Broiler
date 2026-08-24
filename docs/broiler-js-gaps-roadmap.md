@@ -179,8 +179,14 @@ Evidence:
 ### Objects, arrays, symbols, and Proxy-sensitive behavior
 
 - Symbol own keys enumerate by Symbol-creation order rather than property-creation order.
-  **Still reproduces**; fixing it needs a per-object record of the order symbol properties
-  were added, so it is a property-storage change rather than a sort to delete.
+  **Fixed:** it was a property-storage gap, not a sort to delete — symbol properties lived in
+  a hash map keyed by the symbol's creation id, which records no insertion order, so
+  `getOwnPropertySymbols` sorted by creation id, `Reflect.ownKeys` used raw hash order, and
+  `Object.assign` copied in hash order, all disagreeing. Each object now records its symbol
+  keys' insertion order (as `PropertySequence` does for string keys — appended on first add,
+  dropped on delete, re-added at the end, position kept on update), and every enumeration path
+  reads it through `JSObject.SymbolsInInsertionOrder`. Ships as a Broiler.JS patch (submodule
+  remote out of scope); regressions in `Track1LanguageTests`.
 - `slice`, `unshift`, `toReversed`, `reduceRight`, array mutation limits, near-maximum lengths,
   and Proxy-created results retain confirmed failure paths. **Largely does not reproduce:** all
   four directories pass except `slice/create-proto-from-ctor-realm-array.js`, a cross-realm
