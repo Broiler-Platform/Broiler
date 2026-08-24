@@ -41,7 +41,7 @@ found either by status or by track.
 | 0 | Conformance evidence | Coverage gaps closed; pinned-corpus CI run outstanding | in progress · closed | Test failures and timeouts are trustworthy |
 | 1 | Core language and built-ins | Named clusters fixed; Annex B and cross-realm remain | open · closed | Supported Test262 language clusters are clean |
 | 2 | RegExp | Engine gaps closed; matcher performance then non-Unicode routing | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
-| 3 | Scripts, tasks, and modules | Module syntax closed; host task model and two decisions open | open · closed | Parsing and task ordering match observable browser behavior |
+| 3 | Scripts, tasks, and modules | Module syntax closed; scope isolation fixed in a patch; host task model and two decisions open | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | Worker first slice; shared memory not started | open | Claimed agent capabilities are complete and deterministic |
 | 5 | Essential browser JavaScript APIs | Mixed partial, absent, and stubbed surfaces | open | A tested support matrix replaces accidental omissions |
 | 6 | DOM, CSSOM, and SVG from JavaScript | Partial object and tree models | open | Script-visible objects and algorithms meet their claimed standards |
