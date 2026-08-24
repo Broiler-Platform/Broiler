@@ -37,3 +37,4 @@ Broiler.UI decisions, not product decisions: the product context is in
 | [0022](0022-virtualized-text-semantics-and-ime.md) | Virtualized text semantics and bounded IME queries |
 | [0023](0023-tree-view-control.md) | TreeView control |
 | [0024](0024-tab-view-document-behavior.md) | TabView document behavior |
+| [0025](0025-host-window-breakout.md) | Host-window break-out for secondary windows |

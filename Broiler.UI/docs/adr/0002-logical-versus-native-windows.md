@@ -21,4 +21,8 @@ and destruction stay in the application host.
   default.
 - A host may map a logical window to a native window, but that mapping is not a
   Broiler.UI API.
+- A secondary logical window may additionally *break out* into its own native
+  top-level window through the `IUiWindowHost` host capability, still without
+  exposing a native handle. See ADR
+  [0025](0025-host-window-breakout.md).
 

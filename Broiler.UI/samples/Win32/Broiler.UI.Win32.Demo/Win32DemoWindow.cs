@@ -219,6 +219,7 @@ internal sealed class Win32DemoWindow : Direct2DWindow
         if (disposing)
         {
             StopCameraPreview();
+            _host.DisposeHostWindows();
             _animationRegistration.Dispose();
             ReleaseDemoImage();
             _session.Dispose();
@@ -750,10 +751,16 @@ internal sealed class Win32DemoWindow : Direct2DWindow
         };
         var ok = new StandardButton { Text = "Accept", IsDefault = true, PreferredSize = new BSize(90, 32) };
         var cancel = new StandardButton { Text = "Cancel", IsCancel = true, PreferredSize = new BSize(90, 32) };
+        var breakOut = new StandardButton { Text = "Break out", PreferredSize = new BSize(104, 32) };
         ok.Clicked += (_, _) => dialog.Accept("button");
         cancel.Clicked += (_, _) => dialog.Cancel();
+        breakOut.Clicked += (_, _) =>
+            SetStatus(dialog.BreakOut()
+                ? "Dialog broke out into its own window. Close it to dismiss the dialog."
+                : "Break out unavailable (host window support required).");
         row.AddChild(ok);
         row.AddChild(cancel);
+        row.AddChild(breakOut);
         body.AddChild(row);
         dialog.AddChild(body);
         dialog.ResultCompleted += (_, e) => SetStatus("Dialog result: " + e.Result.Kind);
@@ -1679,9 +1686,10 @@ internal sealed class Win32DemoWindow : Direct2DWindow
         return new BPixelBuffer(width, height, rgba);
     }
 
-    private sealed class DemoUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost
+    private sealed class DemoUiHost : IUiHost, IUiClipboardHost, IUiTextInputHost, IUiWindowHost
     {
         private readonly Win32DemoWindow _window;
+        private readonly List<BreakoutHostWindow> _hostWindows = [];
         private string _clipboard = string.Empty;
         private UiTextCaretInfo? _caret;
 
@@ -1716,6 +1724,22 @@ internal sealed class Win32DemoWindow : Direct2DWindow
         {
             if (_caret?.Owner == owner)
                 _caret = null;
+        }
+
+        public IUiHostWindow CreateHostWindow(UiHostWindowRequest request)
+        {
+            var window = new BreakoutHostWindow(request);
+            _hostWindows.Add(window);
+            window.Closed += (_, _) => _hostWindows.Remove(window);
+            window.Show();
+            return window;
+        }
+
+        public void DisposeHostWindows()
+        {
+            foreach (BreakoutHostWindow window in _hostWindows.ToArray())
+                window.Dispose();
+            _hostWindows.Clear();
         }
 
         public void Update(BSize viewportSize, double scale)

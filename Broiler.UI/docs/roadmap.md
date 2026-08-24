@@ -22,8 +22,11 @@ that is still open.
 - Produce evidence for Windows IME candidate placement, clipboard, cursor,
   drag/drop, accessibility bridge, screen-reader, keyboard-only, high-contrast,
   text-scale, reduced-motion, and RTL behavior.
-- Decide and document whether secondary logical windows may map to native
-  top-level windows.
+- ~~Decide and document whether secondary logical windows may map to native
+  top-level windows.~~ Decided: they may *break out* into their own native
+  top-level window via the `IUiWindowHost` host capability (one-way, modality
+  preserved), without exposing a native handle. See ADR
+  [0025](adr/0025-host-window-breakout.md).
 - Replace the pending Phase-0-era human review with a review of a named current
   revision before expanding the preview claim.
 
