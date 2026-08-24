@@ -11,8 +11,13 @@ public abstract class UiWindow : UiElement
     private UiWindowState _state;
     private BRect _placement = BRect.Empty;
     private UiViewportBinding _viewportBinding;
+    private IUiHostWindow? _hostWindow;
+    private UiSession? _hostedSession;
     private bool _isActive;
     private bool _isClosed;
+    private bool _isBrokenOut;
+    private bool _isReparenting;
+    private bool _isTearingDownBreakOut;
 
     public event EventHandler? Activated;
 
@@ -75,6 +80,124 @@ public abstract class UiWindow : UiElement
     public bool IsActive => _isActive;
 
     public bool IsClosed => _isClosed;
+
+    /// <summary>
+    /// True once this window has broken out into its own native host window via
+    /// <see cref="BreakOut"/>. Break-out is one-way for the window's lifetime.
+    /// </summary>
+    public bool IsBrokenOut => _isBrokenOut;
+
+    /// <summary>
+    /// True when this window can break out into its own native top-level host window: it is an
+    /// attached owned/dialog subwindow, is not already broken out, and its session host supports
+    /// the <see cref="IUiWindowHost"/> capability.
+    /// </summary>
+    public bool CanBreakOut =>
+        !IsDisposed && !_isClosed && !_isBrokenOut && Owner is not null && Session?.Host is IUiWindowHost;
+
+    /// <summary>
+    /// Promotes this owned/dialog subwindow into its own native top-level host window. The window
+    /// is detached from its owner and re-rooted in a fresh <see cref="UiSession"/> bound to a host
+    /// window created by the session host's <see cref="IUiWindowHost"/> capability. Returns false
+    /// when <see cref="CanBreakOut"/> is false. Break-out is one-way; closing the window disposes
+    /// the host window.
+    /// </summary>
+    /// <param name="placement">
+    /// Requested initial placement in device-independent pixels. When empty, the window's current
+    /// bounds (or placement) seed the new window, and the host may pick a default.
+    /// </param>
+    public bool BreakOut(BRect placement = default)
+    {
+        ThrowIfDisposed();
+        if (!CanBreakOut)
+            return false;
+
+        UiSession origin = Session!;
+        var windowHost = (IUiWindowHost)origin.Host;
+        UiWindow owner = Owner!;
+        string title = _title;
+        bool isModal = BreakOutIsModal;
+        BRect requested = placement.IsEmpty ? ResolveBreakOutPlacement() : placement;
+
+        // Detach from the owner: clears Owner/Kind/Placement and detaches from the origin session.
+        // The reparenting guard keeps this transient detach from finalizing a live dialog.
+        _isReparenting = true;
+        owner.RemoveChild(this);
+
+        IUiHostWindow hostWindow = windowHost.CreateHostWindow(new UiHostWindowRequest(title, requested, isModal));
+        var hosted = new UiSession(hostWindow, origin.Dispatcher, origin.Clock, origin.Factories);
+
+        _hostWindow = hostWindow;
+        _hostedSession = hosted;
+        _isBrokenOut = true;
+
+        hostWindow.CloseRequested += HandleHostWindowCloseRequested;
+        Closed += HandleBrokenOutClosed;
+
+        hosted.AddRoot(this);
+        _isReparenting = false;
+        hostWindow.Bind(hosted);
+        OnBrokenOut(origin, hosted);
+        hostWindow.Activate();
+        Activate();
+        return true;
+    }
+
+    /// <summary>
+    /// Whether a break-out of this window is application-modal to its origin window. The base
+    /// window is modeless; <c>UiDialog</c> overrides this to report its presentation mode.
+    /// </summary>
+    protected virtual bool BreakOutIsModal => false;
+
+    /// <summary>
+    /// True while this window is being detached from one session and re-attached to another during
+    /// a break-out. Subclasses use it to skip teardown that a permanent detach would trigger.
+    /// </summary>
+    protected bool IsReparenting => _isReparenting;
+
+    /// <summary>
+    /// Called after this window has been re-rooted into <paramref name="hostedSession"/> during a
+    /// break-out. <paramref name="originSession"/> is the session it left. Subclasses migrate
+    /// cross-window state (e.g. modality) here.
+    /// </summary>
+    protected virtual void OnBrokenOut(UiSession originSession, UiSession hostedSession)
+    {
+    }
+
+    private BRect ResolveBreakOutPlacement()
+    {
+        if (!_placement.IsEmpty)
+            return _placement;
+        if (!Bounds.IsEmpty)
+            return new BRect(0, 0, Bounds.Width, Bounds.Height);
+        return BRect.Empty;
+    }
+
+    private void HandleHostWindowCloseRequested(object? sender, EventArgs e) =>
+        Close(UiWindowCloseReason.User);
+
+    private void HandleBrokenOutClosed(object? sender, UiWindowClosedEventArgs e) =>
+        TearDownBreakOut();
+
+    private void TearDownBreakOut()
+    {
+        if (_isTearingDownBreakOut || !_isBrokenOut)
+            return;
+
+        _isTearingDownBreakOut = true;
+        IUiHostWindow? hostWindow = _hostWindow;
+        UiSession? hosted = _hostedSession;
+        _hostWindow = null;
+        _hostedSession = null;
+
+        if (hostWindow is not null)
+            hostWindow.CloseRequested -= HandleHostWindowCloseRequested;
+
+        // The base close/dispose already removed this window from the hosted session as a root.
+        if (hosted is not null && !hosted.IsDisposed)
+            hosted.Dispose();
+        hostWindow?.Dispose();
+    }
 
     public void SetPlacement(BRect placement)
     {

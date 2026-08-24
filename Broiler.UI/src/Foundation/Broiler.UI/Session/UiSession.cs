@@ -11,6 +11,7 @@ public sealed class UiSession : IDisposable
     private readonly List<UiElement> _modalElements = [];
     private readonly Dictionary<long, TouchRoute> _touchRoutes = [];
     private UiElement? _lastPointerTarget;
+    private int _externalModalDepth;
     private bool _isDisposed;
 
     public UiSession(IUiHost host, IUiDispatcher dispatcher, IUiClock clock, UiFactorySet? factories = null)
@@ -40,6 +41,13 @@ public sealed class UiSession : IDisposable
     public IReadOnlyList<UiElement> ModalElements => _modalElements;
 
     public UiElement? ModalElement => _modalElements.Count == 0 ? null : _modalElements[^1];
+
+    /// <summary>
+    /// True while at least one modal window that broke out into another host window is blocking
+    /// this session. Its input is swallowed (application-modal) even though the modal now lives
+    /// in a different session; rendering continues.
+    /// </summary>
+    public bool IsBlockedByExternalModal => _externalModalDepth > 0;
 
     public bool IsDisposed => _isDisposed;
 
@@ -159,6 +167,25 @@ public sealed class UiSession : IDisposable
             _modalElements.RemoveAt(index);
     }
 
+    /// <summary>
+    /// Registers a modal window that has broken out into another host window. While any external
+    /// modal is active, this session ignores input to its own tree (application-modal behavior
+    /// across host windows). Balanced by <see cref="PopExternalModal"/>.
+    /// </summary>
+    public void PushExternalModal()
+    {
+        ThrowIfDisposed();
+        _externalModalDepth++;
+    }
+
+    /// <summary>Removes one external modal registered by <see cref="PushExternalModal"/>.</summary>
+    public void PopExternalModal()
+    {
+        ThrowIfDisposed();
+        if (_externalModalDepth > 0)
+            _externalModalDepth--;
+    }
+
     public void Invalidate(UiElement element, UiInvalidationKind kind)
     {
         if (_isDisposed || kind == UiInvalidationKind.None)
@@ -195,6 +222,10 @@ public sealed class UiSession : IDisposable
     {
         ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(input);
+
+        // A modal window that broke out into another host window blocks this window's input.
+        if (_externalModalDepth > 0)
+            return false;
 
         if (input.Kind == UiInputEventKind.TouchContact)
             return DispatchTouchContact(input);

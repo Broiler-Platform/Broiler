@@ -13,6 +13,7 @@ public abstract class UiDialog : UiWindow
     private UiDialogResult _completedResult = UiDialogResult.None;
     private UiElement? _restoreFocusElement;
     private UiSession? _presentationSession;
+    private UiSession? _externalModalOrigin;
     private BPoint _moveStartPointer;
     private BRect _moveStartPlacement;
     private bool _isMoving;
@@ -65,6 +66,27 @@ public abstract class UiDialog : UiWindow
         return closed;
     }
 
+    protected override bool BreakOutIsModal => PresentationMode == UiDialogPresentationMode.Modal;
+
+    protected override void OnBrokenOut(UiSession originSession, UiSession hostedSession)
+    {
+        // The dialog no longer lives in the origin session; drop its modal registration there.
+        originSession.PopModalElement(this);
+        if (originSession.FocusedElement == this)
+            originSession.SetFocus(null);
+
+        if (PresentationMode == UiDialogPresentationMode.Modal)
+        {
+            // Keep the origin window blocked (application-modal) even though the dialog now
+            // renders in another host window, and re-establish modality within the new session.
+            originSession.PushExternalModal();
+            _externalModalOrigin = originSession;
+            hostedSession.PushModalElement(this);
+        }
+
+        hostedSession.SetFocus(this);
+    }
+
     protected override UiSemanticNode GetSemanticNodeCore()
     {
         UiSemanticNode node = base.GetSemanticNodeCore();
@@ -87,7 +109,9 @@ public abstract class UiDialog : UiWindow
 
     protected override void OnDetached()
     {
-        if (!_isResultCompleted)
+        // A break-out detaches then immediately re-attaches the dialog into another session; that
+        // transient move must not finalize a dialog that is still live.
+        if (!_isResultCompleted && !IsReparenting)
             FinishPresentation(UiDialogResult.Closed(UiWindowCloseReason.Programmatic));
 
         base.OnDetached();
@@ -247,6 +271,17 @@ public abstract class UiDialog : UiWindow
                 session.SetFocus(_restoreFocusElement);
             else if (ReferenceEquals(session.FocusedElement, this))
                 session.SetFocus(null);
+        }
+
+        // If this dialog broke out into another host window, release the application-modal block
+        // on its origin session and restore the origin window's focus there.
+        UiSession? externalOrigin = _externalModalOrigin;
+        _externalModalOrigin = null;
+        if (externalOrigin is not null && !externalOrigin.IsDisposed && !ReferenceEquals(externalOrigin, session))
+        {
+            externalOrigin.PopExternalModal();
+            if (_restoreFocusElement is not null && _restoreFocusElement.Session == externalOrigin && !ReferenceEquals(_restoreFocusElement, this))
+                externalOrigin.SetFocus(_restoreFocusElement);
         }
 
         _resultSource?.TrySetResult(result);
