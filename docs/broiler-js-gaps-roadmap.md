@@ -2,7 +2,7 @@
 
 - **Status:** Active
 - **Scope:** Missing, incomplete, unsupported, or observably incorrect JavaScript behavior
-- **Last reconciled:** 2026-08-23
+- **Last reconciled:** 2026-08-24
 - **Evidence basis:** Repository-wide Markdown audit plus the current component revisions
 
 This document consolidates JavaScript gaps recorded anywhere in the Broiler repository, not
@@ -158,8 +158,8 @@ the ones marked **fixed** carry a minimal regression in
   generator's first `yield`), and a strict async function's `this` was the global object.
   `ClrGeneratorV2` now re-enters the function's own strict flag around each body step, and the
   compiler sets `IsStrictMode` (and `coerceThis`) on the generator and the async inner
-  generator. Ships as a Broiler.JS patch; regressions in `Track1LanguageTests` and the updated
-  `StrictModeFlowTests`.
+  generator. Landed in the pinned `Broiler.JS` submodule (`f1b78df`); regressions in
+  `Track1LanguageTests` and the updated `StrictModeFlowTests`.
 - **Early errors that never fire** — the cluster the modes and the named-error reporting made
   visible, and the largest one here: a body `var` shadowing the head's lexical name, a labelled
   function declaration as a loop body, `export` in non-module code, and a `var` colliding with a
@@ -185,8 +185,8 @@ the ones marked **fixed** carry a minimal regression in
     host-injected module `exports` object, absent in a plain script, so every export form now
     raises a clean `SyntaxError`.
 
-  Ships as a Broiler.JS patch; regressions (and the accept-guards for valid neighbours) in
-  `Track1LanguageTests`.
+  Landed in the pinned `Broiler.JS` submodule (`f1b78df`); regressions (and the accept-guards
+  for valid neighbours) in `Track1LanguageTests`.
 - `new.target` is rejected in a direct eval nested inside an eval-compiled function.
   **Does not reproduce**; `staging/sm/class/newTargetEval.js` passes. It is in the failure
   manifest from an older run — confirm against a current CI run before removing the path.
@@ -214,8 +214,8 @@ Evidence:
   `Object.assign` copied in hash order, all disagreeing. Each object now records its symbol
   keys' insertion order (as `PropertySequence` does for string keys — appended on first add,
   dropped on delete, re-added at the end, position kept on update), and every enumeration path
-  reads it through `JSObject.SymbolsInInsertionOrder`. Ships as a Broiler.JS patch (submodule
-  remote out of scope); regressions in `Track1LanguageTests`.
+  reads it through `JSObject.SymbolsInInsertionOrder`. Landed in the pinned `Broiler.JS`
+  submodule (`f1b78df`); regressions in `Track1LanguageTests`.
 - `slice`, `unshift`, `toReversed`, `reduceRight`, array mutation limits, near-maximum lengths,
   and Proxy-created results retain confirmed failure paths. **Largely does not reproduce:** all
   four directories pass except `slice/create-proto-from-ctor-realm-array.js`, a cross-realm
@@ -373,11 +373,10 @@ multi-capture, look-behind bodies), and 2,478 cases re-run after the allocation 
 (struct state, fast path, per-start reuse, atom-run folding) — all against V8 with zero
 mismatches.
 
-The engine and routing changes live in submodules whose remotes are outside this session's
-GitHub scope, so both pushes returned 403 and the submodule pointers were deliberately not
-bumped. They ship as patch files instead — see [`patches/README.md`](../patches/README.md)
-for the apply order, which matters: the Broiler.JS patch names types the Broiler.Regex
-patch introduces.
+The engine and routing changes have landed in the pinned submodules: the `Broiler.Regex`
+work reached `4df3fb8` and the `Broiler.JS` routing reached `d20e506`, so their patch files
+were deleted and the gitlinks point at commits that contain them. See
+[`patches/README.md`](../patches/README.md) for the current (now empty) patch backlog.
 
 ### Remaining work
 
