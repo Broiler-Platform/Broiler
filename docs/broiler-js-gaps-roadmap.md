@@ -309,6 +309,22 @@ submodule and carries a minimal regression in `Broiler.Regex.Tests`.
   subject, so the `RegexOverflowException` backstop is no longer reachable by input size — it
   remains only for a pathologically nested pattern. Regressions:
   `Broiler.Regex.Tests/StackDepthGuardTests` and `BuiltIns.Tests/RegExpUnicodeRoutingTests`.
+- **A first matcher-performance pass, ahead of non-Unicode routing (action 6, fourth
+  tranche).** Routing the non-Unicode hot path was measured against the compiled .NET engine
+  first: the interpreter was ~10× slower on average (up to 24× for `\d`/`\w`-heavy patterns),
+  which would be a large regression for no correctness gain — so, as the roadmap's own
+  ordering requires, the routing flip is deferred and the performance work comes first. A
+  first allocation pass is done and measured: `MatchState` is a `readonly struct` (deriving a
+  state per code point no longer allocates); the single-code-point quantifier fast path scans
+  and backtracks with no per-iteration list; one budget and one capture array are reused
+  across a run's start positions; and a run of ≥2 single-code-point atoms in a forward
+  sequence folds into one loop rather than a continuation closure per term. That takes simple
+  patterns (`\d+`, `[a-z]+`, `\w+`, class scans) to ~2–3× the compiled .NET engine and the
+  microbenchmark mean from ~10× to ~6×, with identical results. What remains is structural —
+  a sequence with capturing groups or nested quantifiers still allocates a continuation-closure
+  chain per invocation, and each capture write clones the capture array — and needs the
+  compiled/bytecode path (defunctionalised continuations, explicit backtrack stack), which is
+  what makes non-Unicode routing viable.
 
 Evidence: `dotnet test Broiler.Regex.slnx` — 253 tests, up from 57; the Broiler.JS
 `BuiltIns` (2214) and `Integration` (5024 of 5025) suites pass, the one failure being the
@@ -316,9 +332,11 @@ pre-existing `M8_DocumentationFiles_Exist`, which asserts a `docs/roadmap.md` th
 component's own reorganisation replaced with `docs/roadmap/`. Plus 220,172 differential
 Broiler.Regex cases and a 12,792-case JSRegExp-level differential — both against V8 — whose
 only remaining mismatches are the two documented deliberate `vi` divergences, a further
-1,534 quantifier-focused cases for the single-char fast path, and 3,008 complex-body cases
+1,534 quantifier-focused cases for the single-char fast path, 3,008 complex-body cases
 for the general driver (nested quantifiers, empty-capable bodies, backreferences, lazy,
-multi-capture, look-behind bodies) — all against V8 with zero mismatches.
+multi-capture, look-behind bodies), and 2,478 cases re-run after the allocation pass
+(struct state, fast path, per-start reuse, atom-run folding) — all against V8 with zero
+mismatches.
 
 The engine and routing changes live in submodules whose remotes are outside this session's
 GitHub scope, so both pushes returned 403 and the submodule pointers were deliberately not
@@ -328,15 +346,19 @@ patch introduces.
 
 ### Remaining work
 
-1. **Finish action 6 — non-Unicode routing, then retire the translator.** All of Unicode mode
-   now routes to Broiler, and quantifier repetition is iterative for *every* body shape, so no
-   Unicode-mode pattern falls back on overflow — the matcher is the sole engine for Unicode
-   mode. One thing still keeps the .NET translator alive: non-Unicode patterns are matched by
-   .NET on purpose, because the clarity-first interpreter is much slower than .NET for the
-   common ASCII/hot-loop case, so routing them waits on the matcher-performance work (§4 of
-   the component roadmap). Only once that holds, and captures, named groups, indices,
-   `lastIndex`, species, replacement substitutions, and property order are confirmed clean
-   through the shared path, can the source-to-source translator be removed.
+1. **Finish action 6 — matcher performance, then non-Unicode routing, then retire the
+   translator.** All of Unicode mode routes to Broiler and quantifier repetition is iterative
+   for *every* body shape, so no Unicode-mode pattern falls back on overflow — the matcher is
+   the sole engine for Unicode mode. Non-Unicode patterns are still matched by .NET on purpose:
+   a benchmark put the interpreter ~10× behind the compiled .NET engine, so routing the hot
+   ASCII path now would regress it for no correctness gain (the non-Unicode *gap shapes* that
+   .NET gets wrong already route). The first allocation pass has taken simple patterns to
+   ~2–3× and the mean to ~6×; closing the rest is the compiled/bytecode path — defunctionalised
+   continuations and an explicit backtrack stack so a capturing sequence stops allocating a
+   closure chain per invocation and captures stop cloning the array. Once that lands and the
+   hot path is competitive, routing non-Unicode — with captures, named groups, indices,
+   `lastIndex`, species, replacement substitutions, and property order confirmed clean through
+   the shared path — is what lets the source-to-source translator be removed.
 2. **The pinned corpus in CI.** The focused test262 RegExp and UnicodeSets paths have not
    been run under the expanded routing; `scripts/compliance/test262-failures.txt` stays the
    path source and must not be reduced before CI confirms.

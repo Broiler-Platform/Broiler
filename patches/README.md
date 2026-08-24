@@ -13,7 +13,7 @@ by its number.
 
 ## Open patches
 
-### `Resolve property escapes, evaluate v-mode class sets, fold from the UCD, iterate all quantifier repeats`
+### `Resolve property escapes, evaluate v-mode class sets, fold from the UCD, iterate repeats, cut per-match allocation`
 
 - **Target:** `Broiler.JS/Broiler.Regex` (`Broiler-Platform/Broiler.Regex`)
 - **Apply onto:** `56c660701457a7e23f17f95ec82af7c75bee2723`
@@ -30,7 +30,11 @@ explicit-stack RepeatMatcher — so a repeat over a subject of any length matche
 without recursing. Native recursion is bounded by the pattern's nesting depth (like the
 parser), never by the subject, so a `RegexOverflowException` backstop remains only for a
 pathologically nested pattern (the JavaScript layer catches it and falls back to .NET) and
-input length no longer reaches it.
+input length no longer reaches it. A first allocation pass — `MatchState` as a `readonly
+struct`, an allocation-free single-char fast path, one budget/capture array reused across a
+run's start positions, and forward atom-run folding — takes simple patterns to ~2–3× the
+compiled .NET engine (from up to 24×) ahead of the eventual non-Unicode routing; capture-heavy
+patterns still need the compiled path (§4).
 
 Verify with `dotnet test Broiler.Regex.slnx` inside the submodule — 253 tests, up from 57.
 
