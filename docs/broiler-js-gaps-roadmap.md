@@ -704,7 +704,18 @@ claim.
 
 Do not schedule fixes for these until the smallest current-pointer reproduction exists:
 
-- suspected overlap or offset wrong answers in `TypedArray.prototype.set`;
+- ~~suspected overlap or offset wrong answers in `TypedArray.prototype.set`~~ — **retired: does
+  not reproduce.** `TypedArraySetOverlapTests` (21 cases) is the minimal current-pointer
+  reproduction the gate asked for and every case already answers as §23.2.3.26 requires. The
+  three that constrain an implementation are the different-element-type overlaps on one buffer,
+  where a naive in-place loop reads bytes it has already overwritten: a `Uint16`, `Uint32` and
+  `Int16` source copied over an overlapping `Uint8` target each gave the clone-source-first
+  answer, not the naive one. Same-type overlap in both directions, offsets (including a
+  fractional one), the `RangeError` cases, the offset-before-element-read ordering rule, and
+  element conversion are pinned alongside them. The tests stay as the guard for the optional
+  fast copy path (MOD-M8-5), which is what would reintroduce the hazard; the
+  [gate](../Broiler.JS/docs/roadmap/Component.md#immediate-correctness-gate-typedarrayprototypeset)
+  records the full case list;
 - older `Intl.DateTimeFormat` range/parts, SameValue, and Proxy-ordering reports;
 - historical M0 failures where `JSON.stringify` ignored a `toJSON` result and
   `Array.isArray(new Proxy([], {}))` returned false;
