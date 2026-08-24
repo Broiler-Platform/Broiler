@@ -151,13 +151,42 @@ the ones marked **fixed** carry a minimal regression in
   folded every identifier of that name to the undefined value; it now folds only a reference
   that resolves to no binding.
 - Async and generator bodies do not enter the runtime strict-mode scope, so a failed strict
-  `[[Set]]` may not throw. **Still reproduces.**
+  `[[Set]]` may not throw. **Fixed:** such a body runs during its rewritten driver's steps,
+  not during the `InvokeFunction` call that created it, so it never inherited the
+  `EnterStrictMode` scope ordinary calls establish — a failing `[[Set]]` in a `'use strict'`
+  async/generator body silently did nothing (even in the async synchronous prefix / before a
+  generator's first `yield`), and a strict async function's `this` was the global object.
+  `ClrGeneratorV2` now re-enters the function's own strict flag around each body step, and the
+  compiler sets `IsStrictMode` (and `coerceThis`) on the generator and the async inner
+  generator. Ships as a Broiler.JS patch; regressions in `Track1LanguageTests` and the updated
+  `StrictModeFlowTests`.
 - **Early errors that never fire** — the cluster the modes and the named-error reporting made
-  visible, and the largest one here. `for (const x;;)`, a body `var` shadowing the head's
-  lexical name, a labelled function declaration as a loop body, `export` inside `eval`, and a
-  direct `var` colliding with a global lexical binding are accepted and RUN: each test reaches
-  its `$DONOTEVALUATE()`. About 30 files across `test/language/statements/{for,if,labeled}`,
-  `test/language/eval-code` and `test/language/global-code`.
+  visible, and the largest one here: a body `var` shadowing the head's lexical name, a labelled
+  function declaration as a loop body, `export` in non-module code, and a `var` colliding with a
+  lexical binding of the same name were accepted and RUN (or, for `export default <expr>`,
+  crashed with a `NullReferenceException`) instead of reaching each test's `$DONOTEVALUATE()`.
+  About 30 files across `test/language/statements/{for,if,labeled}`, `test/language/eval-code`
+  and `test/language/global-code`. **Fixed** (three mechanisms):
+  - **VarDeclaredNames ∩ LexicallyDeclaredNames must be empty at every scope.** The collision
+    was detected only order-dependently and lost once a `var` hoisted out of the block it was
+    written in, so `var x; let x;`, `let x; { var x; }`, `for (let x of []) { var x; }`,
+    `try {} catch ([e]) { var e; }` and their siblings ran with the later declaration winning.
+    Each `FastScopeItem` now records its own VarDeclaredNames as a `var` hoists through it, and
+    rejects both a `var` hoisting into a lexical binding and a lexical declared where a `var`
+    has hoisted through — at every scope, in either order, and across a for-head, switch, or
+    destructured catch parameter (a block-nested function declaration counts as lexical, so it
+    conflicts with a same-named `var` while two sloppy block functions of one name still
+    coexist).
+  - **A labelled function declaration is never a legal loop body.** A `let`/`const`
+    for-in/for-of/C-style head rewrites its body into a synthetic per-iteration block, hiding
+    the labelled statement from validation; the loop parser now rejects it on the statement as
+    written, before that rewrite.
+  - **`export` in script code is an early error**, not a crash: its bindings target the
+    host-injected module `exports` object, absent in a plain script, so every export form now
+    raises a clean `SyntaxError`.
+
+  Ships as a Broiler.JS patch; regressions (and the accept-guards for valid neighbours) in
+  `Track1LanguageTests`.
 - `new.target` is rejected in a direct eval nested inside an eval-compiled function.
   **Does not reproduce**; `staging/sm/class/newTargetEval.js` passes. It is in the failure
   manifest from an older run — confirm against a current CI run before removing the path.
@@ -179,8 +208,14 @@ Evidence:
 ### Objects, arrays, symbols, and Proxy-sensitive behavior
 
 - Symbol own keys enumerate by Symbol-creation order rather than property-creation order.
-  **Still reproduces**; fixing it needs a per-object record of the order symbol properties
-  were added, so it is a property-storage change rather than a sort to delete.
+  **Fixed:** it was a property-storage gap, not a sort to delete — symbol properties lived in
+  a hash map keyed by the symbol's creation id, which records no insertion order, so
+  `getOwnPropertySymbols` sorted by creation id, `Reflect.ownKeys` used raw hash order, and
+  `Object.assign` copied in hash order, all disagreeing. Each object now records its symbol
+  keys' insertion order (as `PropertySequence` does for string keys — appended on first add,
+  dropped on delete, re-added at the end, position kept on update), and every enumeration path
+  reads it through `JSObject.SymbolsInInsertionOrder`. Ships as a Broiler.JS patch (submodule
+  remote out of scope); regressions in `Track1LanguageTests`.
 - `slice`, `unshift`, `toReversed`, `reduceRight`, array mutation limits, near-maximum lengths,
   and Proxy-created results retain confirmed failure paths. **Largely does not reproduce:** all
   four directories pass except `slice/create-proto-from-ctor-realm-array.js`, a cross-realm

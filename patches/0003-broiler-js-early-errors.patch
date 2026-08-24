@@ -1,0 +1,322 @@
+From f5f44cb0175ad2767b0152c0e1fc52bc15630330 Mon Sep 17 00:00:00 2001
+From: MaiRat <enrico.bartky@gmail.com>
+Date: Mon, 24 Aug 2026 10:20:13 +0000
+Subject: [PATCH] Raise the missing early SyntaxErrors for var/lexical
+ conflicts, labelled-function loop bodies, and script exports
+
+Three families of parse-time early error were not being raised, so the
+engine accepted (or, in one case, crashed on) code the specification
+rejects at compile time.
+
+VarDeclaredNames and LexicallyDeclaredNames of a scope must be disjoint.
+The parser tracked var/let collisions only order-dependently and lost the
+information once a var hoisted out of the block it was written in, so
+`var x; let x;`, `let x; { var x; }`, `for (let x of []) { var x; }`,
+`try {} catch ([e]) { var e; }` and their siblings were all silently
+accepted, the later declaration winning. Each scope now records its own
+VarDeclaredNames as a var hoists through it, and both a var hoisting into a
+lexical binding and a lexical declared where a var has hoisted through are
+rejected -- at every scope level, in either declaration order, and across a
+for-head, switch or destructured catch parameter. A block-nested function
+declaration is lexical for this purpose, so it conflicts with a same-named
+var while two block functions of one name still coexist in sloppy mode.
+
+A labelled function declaration is never a legal loop body. It was caught
+for a non-lexical head, but a let/const for-in/for-of/C-style head rewrites
+its body into a synthetic per-iteration block, which hid the labelled
+statement from validation. The loop parser now rejects a labelled-function
+body on the statement as written, before that rewrite.
+
+An `export` in script code is an early error -- its bindings target the
+host-injected module `exports` object, which a plain script does not have.
+`export default <expr>` dereferenced the absent binding and surfaced a
+NullReferenceException; every export form in a script now raises a clean
+SyntaxError instead.
+
+Track1LanguageTests covers all three families, including guards that valid
+var/lexical combinations in different scopes, a var deduping against a
+parameter, a labelled function at statement position, and duplicate sloppy
+block functions are all still accepted.
+---
+ .../FastCompiler.VisitExportStatement.cs      |   9 ++
+ .../Track1LanguageTests.cs                    | 104 ++++++++++++++++++
+ .../FastParser.ForStatement.cs                |  26 +++++
+ .../FastScopeItem.cs                          |  65 +++++++++++
+ 4 files changed, 204 insertions(+)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs
+index ed2fe283..580ebdab 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs
+@@ -66,6 +66,15 @@ partial class FastCompiler
+         var declaration = exportStatement.Declaration;
+         BExpression left;
+ 
++        // An ExportDeclaration is only legal in module code (its bindings target the
++        // host-injected `exports` object). In a plain script `exports` is absent, so
++        // an `export` here is an early SyntaxError — the same verdict V8 gives an
++        // export in a non-module. Reject it cleanly rather than dereferencing the
++        // null `exports` below (which previously surfaced as a NullReferenceException,
++        // notably for `export default <expr>`).
++        if (exports == null)
++            throw new FastParseException(exportStatement.Start, "'export' is only valid inside a module");
++
+         if (exportStatement.IsDefault)
+         {
+             var defExports = JSValueBuilder.Index(exports.Expression, KeyOfName("default"));
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
+index 2419a192..d3036b1b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
+@@ -1,4 +1,5 @@
+ using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
+ 
+ namespace Broiler.JavaScript.Integration.Tests;
+ 
+@@ -315,4 +316,107 @@ public class Track1LanguageTests
+     public void AFailedSetInASloppyAsyncBodyIsSilent()
+         => Assert.Equal("no-throw", Eval(
+             "var r; (async function () { " + FrozenSetInBody + " })(); r"));
++
++    // ---- Early SyntaxErrors that the engine used to accept (or crash on) ----
++    //
++    // Three families of parse-time error were not raised. (A) VarDeclaredNames and
++    // LexicallyDeclaredNames of a scope must be disjoint: a `var` and a `let`/`const`/
++    // class/block-function of the same name conflict even when the `var` hoists out of
++    // an inner block, and the check must hold in either declaration order and across a
++    // for-head vs body and a destructured catch param vs body. The engine silently let
++    // the later declaration win. (B) A labelled function declaration is never a legal
++    // loop body; a `let`/`const` for-in/for-of/C-style head hid the labelled statement
++    // behind a per-iteration block, so it slipped past validation. (C) An `export` in a
++    // script (no module `exports` binding) is an early error; `export default <expr>`
++    // dereferenced the absent binding and surfaced a NullReferenceException instead.
++
++    private static void AssertSyntaxError(string code)
++        => Assert.Throws<JSException>(() => Eval(code));
++
++    // (A) A `var` collides with a lexical binding of the same name declared FIRST,
++    // wherever the `var` hoists to.
++    [Theory(Timeout = 600000)]
++    [InlineData("let a; var a;")]
++    [InlineData("const a = 1; var a;")]
++    [InlineData("let a; { var a; }")]
++    [InlineData("{ let a; { var a; } }")]
++    [InlineData("function f() { let a; var a; }")]
++    [InlineData("for (let a of []) { var a; }")]
++    [InlineData("for (let a in {}) { var a; }")]
++    [InlineData("for (let a = 0; false; ) { var a; }")]
++    [InlineData("try {} catch ([a]) { var a; }")]
++    [InlineData("try {} catch ({ a }) { var a; }")]
++    [InlineData("switch (0) { case 1: let a; case 2: var a; }")]
++    public void ALexicalThenVarOfTheSameNameIsASyntaxError(string code)
++        => AssertSyntaxError(code);
++
++    // (A) The same conflict when the `var` is declared FIRST and the lexical second —
++    // even after the `var` has hoisted out of the block the lexical sits in.
++    [Theory(Timeout = 600000)]
++    [InlineData("var a; let a;")]
++    [InlineData("var a; const a = 1;")]
++    [InlineData("{ var a; let a; }")]
++    [InlineData("switch (0) { case 1: var a; case 2: let a; }")]
++    public void AVarThenLexicalOfTheSameNameIsASyntaxError(string code)
++        => AssertSyntaxError(code);
++
++    // (A) A block-nested function declaration is lexical, so it conflicts with a `var`
++    // of the same name in that block (in either order), while two block functions of
++    // one name still coexist in sloppy mode (Annex B 3.3.4).
++    [Theory(Timeout = 600000)]
++    [InlineData("{ function a() {} var a; }")]
++    [InlineData("{ var a; function a() {} }")]
++    public void ABlockFunctionAndVarOfTheSameNameConflict(string code)
++        => AssertSyntaxError(code);
++
++    // (A) Guard against over-rejecting: a `var` and a lexical of the same name in
++    // DIFFERENT scopes, or a `var` deduping against a same-named parameter, are legal.
++    // Each snippet ends in an expression that evaluates to "ok" once it is accepted.
++    [Theory(Timeout = 600000)]
++    [InlineData("var a; { let a; } 'ok'")]
++    [InlineData("{ var a; } { let a; } 'ok'")]
++    [InlineData("{ var a; { let a; } } 'ok'")]
++    [InlineData("(function (a) { var a; return a; })(1); 'ok'")]
++    [InlineData("for (var a of [1]) { var a; } 'ok'")]
++    [InlineData("for (let a of []) { let b; } 'ok'")]
++    [InlineData("try {} catch (e) { var e; } 'ok'")]
++    [InlineData("{ function a() {} function a() {} } 'ok'")]
++    public void ValidVarAndLexicalCombinationsAreStillAccepted(string code)
++        => Assert.Equal("ok", Eval(code));
++
++    // (B) A labelled function declaration as a loop body is an early error for every
++    // loop head, including the `let`/`const` heads whose body is rewritten to a block.
++    [Theory(Timeout = 600000)]
++    [InlineData("for (let x of []) label: function h() {}")]
++    [InlineData("for (const x of []) label: function h() {}")]
++    [InlineData("for (let x in {}) label: function h() {}")]
++    [InlineData("for (let x = 0; false; ) label: function h() {}")]
++    [InlineData("for (var x of []) label: function h() {}")]
++    [InlineData("for (;;) label: function h() {}")]
++    [InlineData("while (0) label: function h() {}")]
++    [InlineData("for (let x of []) a: b: function h() {}")]
++    public void ALabelledFunctionLoopBodyIsASyntaxError(string code)
++        => AssertSyntaxError(code);
++
++    // (B) Guard: a labelled function is fine at statement/block position, and an
++    // ordinary or labelled non-function loop body is unaffected.
++    [Theory(Timeout = 600000)]
++    [InlineData("label: function top() {} 'ok'")]
++    [InlineData("{ label: function b() {} } 'ok'")]
++    [InlineData("for (let x of []) { label: function h() {} } 'ok'")]
++    [InlineData("for (let x of [1]) label: x; 'ok'")]
++    public void ValidLabelledFunctionsAndLoopBodiesAreStillAccepted(string code)
++        => Assert.Equal("ok", Eval(code));
++
++    // (C) An `export` in script code is an early SyntaxError, not a crash — for every
++    // export form, including the `export default <expr>` that used to throw a
++    // NullReferenceException.
++    [Theory(Timeout = 600000)]
++    [InlineData("export default 1;")]
++    [InlineData("export default function g() {}")]
++    [InlineData("export const e = 1;")]
++    [InlineData("export var v = 2;")]
++    [InlineData("export { };")]
++    public void ExportInAScriptIsASyntaxError(string code)
++        => AssertSyntaxError(code);
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs
+index b9d15d88..17c792b8 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.ForStatement.cs
+@@ -283,6 +283,15 @@ partial class FastParser
+             }
+             else if (NonDeclarativeStatement(out statement))
+             {
++                // A LabelledStatement whose item is a FunctionDeclaration is never a
++                // legal loop body (`for (…) label: function f(){}`), in either strict
++                // or sloppy mode. SyntaxValidation catches this for a non-lexical head,
++                // but a let/const/using for-in/for-of/C-style head is rewritten by
++                // Desugar below into a synthetic per-iteration block, hiding the raw
++                // labelled statement from the validator — so reject it here, on the
++                // body as written, before that rewrite.
++                ThrowIfLabelledFunctionLoopBody(statement);
++
+                 if (newScope && declaration != null && !cStyleUsing)
+                     (beginNode, statement, update, test) = Desugar(declaration, new Sequence<AstStatement>(1) { statement }, update, test,
+                         cStyle: !@in && !of, bodyContainsContinue: ParsedContinueCount != continuesBeforeBody);
+@@ -1115,6 +1124,23 @@ partial class FastParser
+ 
+             return merged;
+         }
++
++        // Rejects a LabelledStatement whose (possibly multiply-labelled) item is a
++        // FunctionDeclaration when it appears as a loop body. `label: function f(){}`
++        // is a legal statement at the top level of a script, block, or function body,
++        // but never as the body of a for/for-in/for-of loop, in either mode.
++        static void ThrowIfLabelledFunctionLoopBody(AstStatement body)
++        {
++            if (body is not AstLabeledStatement)
++                return;
++
++            var current = body;
++            while (current is AstLabeledStatement labeled)
++                current = labeled.Body;
++
++            if (current is AstExpressionStatement { Expression: AstFunctionExpression { IsStatement: true } func })
++                throw new FastParseException(func.Start, "In strict mode code, functions can only be declared at top level or inside a block");
++        }
+     }
+ 
+     private static bool IsEscapedKeyword(FastToken token, string keyword)
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastScopeItem.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastScopeItem.cs
+index 247e475e..b89513bf 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastScopeItem.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastScopeItem.cs
+@@ -16,6 +16,34 @@ public partial class FastScopeItem(FastNodeType nodeType) : LinkedStackItem<Fast
+ 
+     private List<StringSpan> annexBFunctionNames;
+ 
++    // The VarDeclaredNames of this scope: every `var`-declared name declared
++    // textually within this scope, including names that hoist up through it
++    // from a nested block/for scope. A name is recorded here as a `var` passes
++    // through this scope on its way to the function/program hoisting scope, so
++    // that a later lexical (let/const/class or block-nested function) declared
++    // directly in THIS scope can be rejected — VarDeclaredNames and
++    // LexicallyDeclaredNames must not intersect at any single scope, even when
++    // the `var` binding itself lives higher up after hoisting.
++    private HashSet<string> varDeclaredNames;
++
++    /// <summary>
++    /// Records <paramref name="name"/> as a VarDeclaredName of this scope (a
++    /// `var` declared in, or hoisted through, this scope).
++    /// </summary>
++    public void MarkVarDeclaredName(string name)
++    {
++        varDeclaredNames ??= [];
++        varDeclaredNames.Add(name);
++    }
++
++    /// <summary>
++    /// Returns true if a `var` of <paramref name="name"/> was declared in or
++    /// hoisted through this scope (i.e. the name is in this scope's
++    /// VarDeclaredNames).
++    /// </summary>
++    public bool HasVarDeclaredName(string name)
++        => varDeclaredNames != null && varDeclaredNames.Contains(name);
++
+     /// <summary>
+     /// Records a block-nested function declaration name that must be var-hoisted
+     /// to this (function/program body) scope per Annex B 3.3.
+@@ -113,6 +141,20 @@ public partial class FastScopeItem(FastNodeType nodeType) : LinkedStackItem<Fast
+             return;
+         }
+ 
++        // VarDeclaredNames ∩ LexicallyDeclaredNames must be empty at each scope.
++        // A lexical binding (let/const/class, or a block-nested function
++        // declaration) in this scope conflicts with a `var` of the same name
++        // declared in or hoisted through this scope — even one whose binding
++        // hoisted to an enclosing function/program scope, leaving this scope's
++        // Variables map empty. `this` scope's VarDeclaredNames still records it.
++        if (kind is FastVariableKind.Let or FastVariableKind.Const or FastVariableKind.Function
++            && HasVarDeclaredName(name.Value))
++        {
++            if (throwError)
++                throw new FastParseException(token, $"{name} has already been declared");
++            return;
++        }
++
+         n = this;
+ 
+         // all `var` variables must be hoisted to
+@@ -134,7 +176,30 @@ public partial class FastScopeItem(FastNodeType nodeType) : LinkedStackItem<Fast
+             while (it != null)
+             {
+                 if (it.Variables.TryGetValue(name.Value, out var v))
++                {
++                    // A lexical binding of the same name in a scope this `var`
++                    // hoists through is a VarDeclaredNames ∩ LexicallyDeclaredNames
++                    // conflict (e.g. `let x; { var x; }`, `for (let x of []) { var x; }`,
++                    // `try {} catch ([e]) { var e; }`). Reject it rather than letting
++                    // the `var` silently dedupe against the lexical binding.
++                    if (v.kind is FastVariableKind.Let or FastVariableKind.Const or FastVariableKind.Function)
++                    {
++                        if (throwError)
++                            throw new FastParseException(token, $"{name} has already been declared");
++                        return;
++                    }
++
++                    // Existing `var` or parameter of the same name: dedupe. The
++                    // VarDeclaredName marks recorded below on the way here keep a
++                    // later lexical in an intervening scope in conflict.
+                     return;
++                }
++
++                // Record this name as a VarDeclaredName of every scope the `var`
++                // hoists through, so a lexical declared later directly in one of
++                // those scopes is rejected even after the `var` binding has hoisted
++                // past it.
++                it.MarkVarDeclaredName(name.Value);
+ 
+                 // The FunctionExpression scope (which owns the parameters) is the
+                 // outermost scope of the current function; checking it lets a `var`
+-- 
+2.43.0
+

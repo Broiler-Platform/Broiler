@@ -1,0 +1,322 @@
+From e15120979fded1c576ca012aa0c0c49dfd21ef56 Mon Sep 17 00:00:00 2001
+From: MaiRat <enrico.bartky@gmail.com>
+Date: Mon, 24 Aug 2026 08:59:01 +0000
+Subject: [PATCH] =?UTF-8?q?Enumerate=20symbol-keyed=20own=20properties=20i?=
+ =?UTF-8?q?n=20insertion=20order=20(=C2=A710.1.11.1)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+OrdinaryOwnPropertyKeys lists symbol keys last, in the order the property
+was added to the object. Integer and string keys get that order from the
+element array and the ownProperties sequence, but symbols lived in a bare
+hash map keyed by the symbol's creation id, which records no insertion order
+-- so getOwnPropertySymbols sorted by creation id, Reflect.ownKeys returned
+raw hash order, and Object.assign copied in hash order. All three disagreed
+with each other and with the spec.
+
+Each object now records its symbol keys' insertion order (mirroring how
+PropertySequence orders string keys): a key is appended when first added,
+dropped on delete, and a deleted-then-readded key lands at the end while an
+in-place update keeps its position. SymbolsInInsertionOrder reads that record
+(reconciling any untracked symbol so a key is never dropped), and every
+observable enumeration path -- getOwnPropertySymbols, Reflect.ownKeys,
+Object.assign/CopyDataProperties -- goes through it.
+
+Regressions in Track1LanguageTests; BuiltIns 2214 green, Integration 5030 of
+5031 (pre-existing M8 only).
+---
+ .../Objects/JSReflect.cs                      |  5 +-
+ .../Track1LanguageTests.cs                    | 58 +++++++++++++++++++
+ .../JSObject.PropertyStorage.cs               | 49 +++++++++++++++-
+ .../Broiler.JavaScript.Runtime/JSObject.cs    |  7 +++
+ .../JSObjectStatic.Construction.cs            |  8 ++-
+ .../JSObjectStatic.Introspection.cs           | 23 +++-----
+ 6 files changed, 127 insertions(+), 23 deletions(-)
+
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/Objects/JSReflect.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/Objects/JSReflect.cs
+index 4ca8eeb5..71fdd80e 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/Objects/JSReflect.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/Objects/JSReflect.cs
+@@ -181,11 +181,8 @@ public partial class JSReflect : JSObject
+         // A Proxy's GetAllKeys already included them via the trap, so skip it.
+         if (@object is not JSProxy)
+         {
+-            foreach (var (key, property) in @object.GetSymbols().AllValues())
++            foreach (var (key, _) in @object.SymbolsInInsertionOrder())
+             {
+-                if (property.IsEmpty)
+-                    continue;
+-
+                 var symbol = GetSymbolByKeyFactory?.Invoke(key);
+                 if (symbol != null)
+                     r.Add((JSValue)symbol);
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
+index 3cea2e29..0dd25f3e 100644
+--- a/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs
+@@ -200,4 +200,62 @@ public class Track1LanguageTests
+             "var base = { x: 1 };"
+             + "var receiver = Object.preventExtensions({});"
+             + "[Reflect.set(base, 'x', 2, receiver), 'x' in receiver].join(',')"));
++
++    // ---- Symbol-keyed own properties enumerate in property-insertion order ----
++    //
++    // OrdinaryOwnPropertyKeys (§10.1.11.1) lists symbol keys last, in the order the property
++    // was ADDED to the object. The symbol map is keyed by the symbol's creation id and does
++    // not record that order, so `getOwnPropertySymbols` sorted by creation id (`a,b,c` for
++    // symbols made in that order however they were assigned) and `Reflect.ownKeys` returned
++    // the map's raw hash order — both wrong. The object now tracks symbol insertion order and
++    // every enumeration path reads it. Symbols are created a,b,c and assigned c,a,b, so the
++    // correct order (c,a,b) differs from both creation order and any hash order.
++
++    private const string ThreeSymbolsInsertedCAB =
++        "var a = Symbol('a'), b = Symbol('b'), c = Symbol('c');"
++        + "var o = {}; o[c] = 1; o[a] = 2; o[b] = 3;";
++
++    [Fact(Timeout = 600000)]
++    public void GetOwnPropertySymbolsUsesInsertionOrder()
++        => Assert.Equal("c,a,b", Eval(
++            ThreeSymbolsInsertedCAB + "Object.getOwnPropertySymbols(o).map(s => s.description).join(',')"));
++
++    [Fact(Timeout = 600000)]
++    public void ReflectOwnKeysUsesInsertionOrderForSymbols()
++        => Assert.Equal("c,a,b", Eval(
++            ThreeSymbolsInsertedCAB
++            + "Reflect.ownKeys(o).filter(k => typeof k === 'symbol').map(s => s.description).join(',')"));
++
++    [Fact(Timeout = 600000)]
++    public void ReflectOwnKeysOrdersIntegersThenStringsThenSymbolsEachInInsertionOrder()
++        => Assert.Equal("0,2,y,x,b,a", Eval(
++            "var a = Symbol('a'), b = Symbol('b');"
++            + "var o = {}; o[b] = 1; o.y = 1; o[2] = 1; o.x = 1; o[0] = 1; o[a] = 1;"
++            + "Reflect.ownKeys(o).map(k => typeof k === 'symbol' ? k.description : k).join(',')"));
++
++    // A deleted symbol that is added again is a NEW property: it goes to the end, not back to
++    // its old slot (same rule as string keys).
++    [Fact(Timeout = 600000)]
++    public void AReaddedSymbolMovesToTheEnd()
++        => Assert.Equal("b,c,a", Eval(
++            "var a = Symbol('a'), b = Symbol('b'), c = Symbol('c');"
++            + "var o = {}; o[a] = 1; o[b] = 2; o[c] = 3; delete o[a]; o[a] = 9;"
++            + "Object.getOwnPropertySymbols(o).map(s => s.description).join(',')"));
++
++    // Redefining an existing symbol key keeps its position.
++    [Fact(Timeout = 600000)]
++    public void RedefiningASymbolKeepsItsPosition()
++        => Assert.Equal("a,b,c", Eval(
++            "var a = Symbol('a'), b = Symbol('b'), c = Symbol('c');"
++            + "var o = {}; o[a] = 1; o[b] = 2; o[c] = 3; Object.defineProperty(o, b, { value: 9 });"
++            + "Object.getOwnPropertySymbols(o).map(s => s.description).join(',')"));
++
++    // Object.assign copies symbol keys in the source's insertion order, so the copy's own
++    // symbol order matches the source's rather than the symbol map's hash order.
++    [Fact(Timeout = 600000)]
++    public void ObjectAssignCopiesSymbolsInInsertionOrder()
++        => Assert.Equal("c,a,b", Eval(
++            ThreeSymbolsInsertedCAB
++            + "var t = Object.assign({}, o);"
++            + "Reflect.ownKeys(t).filter(k => typeof k === 'symbol').map(s => s.description).join(',')"));
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs
+index b1220dcb..edc2167a 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.PropertyStorage.cs
+@@ -308,6 +308,47 @@ public partial class JSObject
+     public ref ElementArray GetElements(bool create = true) => ref elements;
+     public ref SAUint32Map<JSProperty> GetSymbols() => ref symbols;
+ 
++    // ----- Symbol insertion order (§10.1.11.1 OrdinaryOwnPropertyKeys) ---------------------
++    //
++    // The `symbols` map cannot report insertion order on its own, so every write of a symbol
++    // property records the key here and every delete drops it. A key already present keeps its
++    // position (an update does not move it); a key added after a delete lands at the end
++    // (it was dropped on delete, so it is appended fresh) — the same rule PropertySequence
++    // applies to string keys.
++
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    private void TrackSymbolInsertion(uint key)
++    {
++        symbolOrder ??= new List<uint>(4);
++        if (!symbolOrder.Contains(key))
++            symbolOrder.Add(key);
++    }
++
++    [MethodImpl(MethodImplOptions.AggressiveInlining)]
++    private void UntrackSymbol(uint key) => symbolOrder?.Remove(key);
++
++    /// <summary>
++    /// The object's live symbol properties in property-insertion order. A live symbol that the
++    /// order record somehow missed — which should not happen — is still returned, after the
++    /// tracked ones, so a key is never dropped from enumeration; only its order would be off.
++    /// </summary>
++    public List<(uint Key, JSProperty Property)> SymbolsInInsertionOrder()
++    {
++        var ordered = new List<(uint, JSProperty)>(symbolOrder?.Count ?? 0);
++        if (symbolOrder != null)
++        {
++            foreach (var key in symbolOrder)
++                if (symbols.TryGetValue(key, out var property) && !property.IsEmpty)
++                    ordered.Add((key, property));
++        }
++
++        foreach (var (key, property) in symbols.AllValues())
++            if (!property.IsEmpty && (symbolOrder == null || !symbolOrder.Contains(key)))
++                ordered.Add((key, property));
++
++        return ordered;
++    }
++
+     internal void AllocateElements(uint size)
+     {
+         size = size > 1024 ? 1024 : size;
+@@ -416,6 +457,7 @@ public partial class JSObject
+     {
+         ref var pr = ref GetSymbols();
+         pr.Put(key.Key) = new JSProperty(key.Key, value, attributes);
++        TrackSymbolInsertion(key.Key);
+         NotifyNamedPropertyMutation();
+     }
+ 
+@@ -425,6 +467,7 @@ public partial class JSObject
+     {
+         ref var pr = ref GetSymbols();
+         pr.Put(key.Key) = new JSProperty(key.Key, getter, setter, getter, attributes);
++        TrackSymbolInsertion(key.Key);
+         NotifyNamedPropertyMutation();
+     }
+ 
+@@ -507,7 +550,7 @@ public partial class JSObject
+         while (properties.MoveNext(out var name, out _))
+             keys.Add(new OrdinaryOwnKey(KeyType.String, 0, name));
+ 
+-        foreach (var (symbol, _) in target.symbols.AllValues())
++        foreach (var (symbol, _) in target.SymbolsInInsertionOrder())
+             keys.Add(new OrdinaryOwnKey(KeyType.Symbol, symbol, KeyString.Empty));
+ 
+         return keys;
+@@ -588,6 +631,7 @@ public partial class JSObject
+                     break;
+                 case KeyType.Symbol:
+                     symbols.Put(key.Index) = JSProperty.Property(key.Index, value);
++                    TrackSymbolInsertion(key.Index);
+                     break;
+             }
+         }
+@@ -1480,6 +1524,7 @@ public partial class JSObject
+         if (ReferenceEquals(target, this))
+         {
+             target.symbols.Put(name.Key) = new JSProperty(name.Key, value, attributes);
++            target.TrackSymbolInsertion(name.Key);
+             target.NotifyNamedPropertyMutation();
+             target.PropertyChanged?.Invoke(target, (uint.MaxValue, uint.MaxValue, name));
+             return true;
+@@ -1648,6 +1693,7 @@ public partial class JSObject
+         }
+ 
+         symbols.Put(key) = ToPropertyPreservingLazyValue(pd, key, in old, preserveCurrentValue);
++        TrackSymbolInsertion(key);
+         NotifyNamedPropertyMutation();
+         PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, name));
+         return UndefinedValue;
+@@ -1975,6 +2021,7 @@ public partial class JSObject
+ 
+         if (symbols.RemoveAt(symbol.Key))
+         {
++            UntrackSymbol(symbol.Key);
+             NotifyNamedPropertyMutation();
+             PropertyChanged?.Invoke(this, (uint.MaxValue, uint.MaxValue, symbol));
+             return BooleanTrue;
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+index 6c2dd58a..1c463ee7 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObject.cs
+@@ -104,6 +104,13 @@ public partial class JSObject : JSValue
+     private ElementArray elements;
+     private PropertySequence ownProperties;
+     private SAUint32Map<JSProperty> symbols;
++
++    // Insertion order of the symbol keys held in `symbols`. That map is a sparse hash keyed
++    // by the symbol's creation id, which is NOT the order OrdinaryOwnPropertyKeys (§10.1.11.1)
++    // must report — that is the order in which the property was ADDED to this object. Integer
++    // and string keys get their order from `elements` / `ownProperties`; symbols are tracked
++    // here. Null until the first symbol property is added. See SymbolsInInsertionOrder.
++    private List<uint> symbolOrder;
+     private ObjectShape objectShape = ObjectShape.Empty;
+     private JSValue[] shapeSlots = Array.Empty<JSValue>();
+     private long? uid;
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Construction.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Construction.cs
+index be3484ad..993d46af 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Construction.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Construction.cs
+@@ -298,9 +298,13 @@ public partial class JSObject
+                     target.SetPropertyOrThrow(propertyKey, source[key.KeyString]);
+             }
+ 
+-            foreach (var (key, property) in source.GetSymbols().AllValues())
++            // §7.3.25 CopyDataProperties copies keys in [[OwnPropertyKeys]] order; the
++            // string/integer keys came from GetAllKeys above, and the symbol keys are copied
++            // here in the source's property-insertion order (not the symbol map's hash order),
++            // so the target's own symbol order matches the source's.
++            foreach (var (key, property) in source.SymbolsInInsertionOrder())
+             {
+-                if (!property.IsEmpty && property.IsEnumerable && (copiedSymbols == null || !copiedSymbols.Contains(key)))
++                if (property.IsEnumerable && (copiedSymbols == null || !copiedSymbols.Contains(key)))
+                     target.SetPropertyOrThrow((JSValue)(GetSymbolByKeyFactory?.Invoke(key)
+                         ?? throw new InvalidOperationException($"Unknown symbol key {key}")), source.GetValue(property));
+             }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Introspection.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Introspection.cs
+index d4235e76..339b38b6 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Introspection.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSObjectStatic.Introspection.cs
+@@ -33,7 +33,6 @@ public partial class JSObject
+     private static List<JSValue> GetOwnPropertyKeysInListOrder(JSObject @object)
+     {
+         var keys = new List<JSValue>();
+-        List<(uint Key, JSValue Value)> symbolKeys = null;
+ 
+         if (!@object.IsArray)
+         {
+@@ -53,22 +52,12 @@ public partial class JSObject
+             keys.Add(value);
+         }
+ 
+-        foreach (var (key, property) in @object.GetSymbols().AllValues())
++        // §10.1.11.1: symbol keys come last, in the order the properties were added.
++        foreach (var (key, _) in @object.SymbolsInInsertionOrder())
+         {
+-            if (property.IsEmpty)
+-                continue;
+-
+             var symbol = GetSymbolByKeyFactory?.Invoke(key)
+                 ?? throw new InvalidOperationException($"Unknown symbol key {key}");
+-            symbolKeys ??= [];
+-            symbolKeys.Add((key, (JSValue)symbol));
+-        }
+-
+-        if (symbolKeys != null)
+-        {
+-            symbolKeys.Sort(static (left, right) => left.Key.CompareTo(right.Key));
+-            for (var i = 0; i < symbolKeys.Count; i++)
+-                keys.Add(symbolKeys[i].Value);
++            keys.Add((JSValue)symbol);
+         }
+ 
+         return keys;
+@@ -335,9 +324,11 @@ public partial class JSObject
+             }
+         }
+ 
+-        foreach (var (key, property) in jobj.GetSymbols().AllValues())
++        // Any symbol GetOwnPropertyKeysInListOrder did not already emit (it now emits them all
++        // in insertion order, so this is a guard), still in insertion order.
++        foreach (var (key, _) in jobj.SymbolsInInsertionOrder())
+         {
+-            if (property.IsEmpty || (emittedSymbols != null && emittedSymbols.Contains(key)))
++            if (emittedSymbols != null && emittedSymbols.Contains(key))
+                 continue;
+ 
+             var symbol = GetSymbolByKeyFactory?.Invoke(key)
+-- 
+2.43.0
+
