@@ -1,68 +1,38 @@
-From 3f16507eff3224533823899f2cdca09082a55df0 Mon Sep 17 00:00:00 2001
+From b7cc70480de0a93dbfccb595a22414ad3a8a3996 Mon Sep 17 00:00:00 2001
 From: MaiRat <enrico.bartky@gmail.com>
 Date: Mon, 24 Aug 2026 06:41:48 +0000
 Subject: [PATCH] Resolve property escapes, evaluate v-mode class sets, fold
- from the UCD, guard recursion
+ from the UCD, iterate single-char repeats
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Track 2 of the Broiler.JS gaps roadmap asks for three things Broiler.Regex parsed but
-did not implement, and they turn out to be one problem: every character class is a set,
-and the engine had no set.
+Adds \p{…} resolution against the pinned Broiler.Unicode tables, v-mode
+class-set evaluation and \q{…} strings, table-driven Canonicalize, and six
+Annex B grammar boundaries found by differential testing against V8.
 
-`\p{…}` / `\P{…}` now resolve against the pinned Broiler.Unicode range tables — the same
-generated UCD revision the JavaScript layer's translator reads, so the two cannot
-disagree about a property's members. General_Category (lone value and the `gc=`
-dimension), binary properties with their ECMAScript aliases, `Script`,
-`Script_Extensions`, and the UTS #51 properties of strings all resolve; an unknown name
-is a located syntax error rather than a silent mis-match.
-
-`v`-mode class-set expressions are evaluated rather than skipped: nesting, `&&`, `--`
-and `\q{…}` string alternatives, over a new CodePointSet that carries the union,
-intersection, difference and complement the grammar needs. The ordering that matters is
-§22.2.1 MaybeSimpleCaseFolding *before* §22.2.2.9 CharacterComplement, whose universe under
-`vi` is only the code points that fold to themselves — the reason `[^\p{Lu}]` matches
-neither `A` nor `a` under `vi` while it matches `a` under `ui`.
-
-Canonicalize is table-driven from the Unicode Character Database instead of `char`/`Rune`
-casing plus five hand-written special cases. `İ` and `ı` have no simple case folding, so
-neither is case-equivalent to an ASCII `i` any more; and WordCharacters widens `\w` under
-`iu` from the fold table, so `/\W/iu` rejects `ſ` and `\b` agrees with `\w` about it.
-
-Six Annex B boundaries came out of differential testing rather than the roadmap: `\u{…}`
-without the `u` flag, a bare `]`/`{`/`}` in Unicode mode, a class escape as a range
-endpoint, `\-` inside a class, a quantifier after an assertion, and `\k<n>` in a pattern
-that declares no group name.
-
-A stack-depth guard makes the matcher crash-safe. The continuation-passing matcher
-recurses once per quantifier iteration, so a repeat over a long subject would overflow the
-runtime stack. Repeat now checks the remaining stack (RuntimeHelpers.TryEnsureSufficient-
-ExecutionStack) and throws RegexOverflowException — which unwinds cleanly — instead of
-crashing the process; a host may catch it and fall back to an iterative engine. This
-matters once the JavaScript layer routes every Unicode-mode pattern here.
-
-250 tests, up from 57. Beyond those, 220,172 differential pattern/flag/input cases against
-V8 on match index and every capture. Two mismatches remain, both deliberate `vi`
-divergences pinned by a test, both recorded in the README.
-
-The roadmap's "Replace the translator" section records the Broiler.JS-side integration
-work — one match-data abstraction, a routed pattern that needs no .NET translation, and
-routing widened to all of Unicode mode — and narrows what is left before the translator
-can be dropped.
+The continuation-passing matcher recurses once per quantifier iteration, so
+a repeat over a long subject would overflow the stack. A quantifier whose
+body consumes exactly one code point -- a literal, ., or a character class --
+now repeats through an iterative fast path (a linear scan with an index-based
+backtrack, provably equivalent to RepeatMatcher for such a body), so .*, \d+
+and [^"]* match a subject of any length without recursing. A body the fast
+path cannot take still recurses; there the matcher checks the remaining stack
+and throws RegexOverflowException (which unwinds cleanly) instead of crashing,
+and the caller falls back to the iterative .NET engine for that subject.
 ---
  Broiler.Regex.Tests/AnnexBGrammarTests.cs     | 151 ++++
  Broiler.Regex.Tests/CanonicalizeTests.cs      | 119 ++++
- Broiler.Regex.Tests/StackDepthGuardTests.cs   |  37 +
+ Broiler.Regex.Tests/StackDepthGuardTests.cs   |  63 ++
  Broiler.Regex.Tests/SyntaxTests.cs            |  12 +-
  .../UnicodePropertyEscapeTests.cs             | 100 +++
  Broiler.Regex.Tests/UnicodeSetsTests.cs       | 210 ++++++
  Broiler.Regex/Ast/CharSet.cs                  | 143 ++--
  Broiler.Regex/Ast/CodePointSet.cs             | 201 ++++++
  Broiler.Regex/Broiler.Regex.csproj            |  27 +-
- Broiler.Regex/Matching/Matcher.cs             |  83 ++-
+ Broiler.Regex/Matching/Matcher.cs             | 233 +++++-
  Broiler.Regex/Parsing/RegexParser.cs          | 661 ++++++++++++++++--
- Broiler.Regex/README.md                       |  69 +-
+ Broiler.Regex/README.md                       |  73 +-
  Broiler.Regex/RegexOverflowException.cs       |  27 +
  Broiler.Regex/Unicode/CaseFolding.cs          | 297 ++++----
  .../Unicode/Generated/CaseFoldingData.g.cs    | 125 ++++
@@ -71,8 +41,8 @@ can be dropped.
  .../Unicode/tools/generate-case-folding.py    | 183 +++++
  Broiler.Regex/docs/ecmascript-mapping.md      |  30 +-
  THIRD_PARTY_NOTICES.md                        |  15 +
- docs/roadmap.md                               |  59 +-
- 21 files changed, 2533 insertions(+), 317 deletions(-)
+ docs/roadmap.md                               |  61 +-
+ 21 files changed, 2713 insertions(+), 319 deletions(-)
  create mode 100644 Broiler.Regex.Tests/AnnexBGrammarTests.cs
  create mode 100644 Broiler.Regex.Tests/CanonicalizeTests.cs
  create mode 100644 Broiler.Regex.Tests/StackDepthGuardTests.cs
@@ -369,33 +339,54 @@ index 0000000..f7640e2
 +}
 diff --git a/Broiler.Regex.Tests/StackDepthGuardTests.cs b/Broiler.Regex.Tests/StackDepthGuardTests.cs
 new file mode 100644
-index 0000000..c538be7
+index 0000000..3b6e11c
 --- /dev/null
 +++ b/Broiler.Regex.Tests/StackDepthGuardTests.cs
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,63 @@
 +namespace Broiler.Regex.Tests;
 +
 +/// <summary>
-+/// The continuation-passing matcher recurses once per quantifier iteration, so a repeat
-+/// over a long subject would overflow the runtime stack. The matcher checks the remaining
-+/// stack before each recursion and throws <see cref="RegexOverflowException"/> — which
-+/// unwinds cleanly — instead of crashing the process. A short subject never trips it.
++/// A quantifier whose body consumes exactly one code point (`a*`, `.*`, `[ab]+`) repeats
++/// through the iterative fast path, so even a very long subject matches natively without
++/// recursing. A body the fast path cannot take — a capturing group, an alternation of
++/// sequences — still runs through the recursive RepeatMatcher, which recurses once per
++/// iteration; there the matcher checks the remaining stack and throws
++/// <see cref="RegexOverflowException"/> (which unwinds cleanly) instead of crashing the
++/// process. A short subject never trips the guard.
 +/// </summary>
 +public class StackDepthGuardTests
 +{
 +    [Fact(Timeout = 600000)]
-+    public void GreedyStarOverALongSubject_ThrowsInsteadOfOverflowing()
++    public void GreedyStarOverALongSubject_MatchesViaTheIterativePath()
 +    {
 +        var re = new BroilerRegex("a*");
 +        var subject = new string('a', 500_000);
-+        Assert.Throws<RegexOverflowException>(() => re.Match(subject));
++        Assert.Equal(subject, re.Match(subject).Value);
 +    }
 +
 +    [Fact(Timeout = 600000)]
-+    public void PlusQuantifierOverALongSubject_Throws()
++    public void PlusClassOverALongSubject_MatchesViaTheIterativePath()
 +    {
 +        var re = new BroilerRegex("[ab]+", "u");
 +        var subject = new string('b', 500_000);
++        Assert.Equal(subject, re.Match(subject).Value);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void DotStarOverALongSubject_MatchesViaTheIterativePath()
++    {
++        var re = new BroilerRegex(".*");
++        var subject = new string('x', 500_000);
++        Assert.Equal(subject, re.Match(subject).Value);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void CapturingGroupBodyOverALongSubject_ThrowsInsteadOfOverflowing()
++    {
++        // A capturing-group body is not eligible for the iterative fast path, so it
++        // still recurses once per iteration — the guard turns that into a signal.
++        var re = new BroilerRegex("(a)*");
++        var subject = new string('a', 500_000);
 +        Assert.Throws<RegexOverflowException>(() => re.Match(subject));
 +    }
 +
@@ -408,6 +399,11 @@ index 0000000..c538be7
 +        // A few thousand iterations is deep but well within the stack.
 +        var subject = new string('a', 5_000) + "b";
 +        Assert.Equal(subject, re.Match(subject).Value);
++
++        // The recursive path handles a moderately long capturing-group repeat too.
++        var captured = new BroilerRegex("(ab)*");
++        var abs = string.Concat(System.Linq.Enumerable.Repeat("ab", 2_000));
++        Assert.Equal(abs, captured.Match(abs).Value);
 +    }
 +}
 diff --git a/Broiler.Regex.Tests/SyntaxTests.cs b/Broiler.Regex.Tests/SyntaxTests.cs
@@ -1208,10 +1204,38 @@ index 5caa0e6..f931d20 100644
 +
  </Project>
 diff --git a/Broiler.Regex/Matching/Matcher.cs b/Broiler.Regex/Matching/Matcher.cs
-index bce6664..eff302d 100644
+index bce6664..d597346 100644
 --- a/Broiler.Regex/Matching/Matcher.cs
 +++ b/Broiler.Regex/Matching/Matcher.cs
-@@ -238,6 +238,12 @@ internal sealed class Matcher
+@@ -225,12 +225,25 @@ internal sealed class Matcher
+ 
+     private CompiledMatcher CompileQuantifier(QuantifierNode q, Direction dir, Flags flags)
+     {
+-        var inner = Compile(q.Child, dir, flags);
+-        var capIndices = CollectCaptureIndices(q.Child);
+         var min = q.Min;
+         var max = q.Max;
+         var greedy = q.Greedy;
+ 
++        // Iterative fast path (§22.2.2.3.1 without the recursion): a body that
++        // consumes exactly one code point, sets no captures, and matches at most
++        // one way at each position — a literal char, `.`, or a character class —
++        // repeats deterministically, so its repetition is a linear scan with an
++        // index-based backtrack rather than one native stack frame per iteration.
++        // This is the common quantifier (`.*`, `\d+`, `[^"]*`) and the one that
++        // would otherwise overflow the stack on a long subject; handling it here
++        // is what lets a repeat over a long input match natively instead of
++        // signalling RegexOverflowException and falling back to .NET.
++        if (TryGetSingleCharPredicate(q.Child, flags, out var predicate))
++            return CompileSingleCharQuantifier(predicate, min, max, greedy, dir);
++
++        var inner = Compile(q.Child, dir, flags);
++        var capIndices = CollectCaptureIndices(q.Child);
++
+         // RepeatMatcher (§22.2.2.3.1). The empty-iteration guard — abandoning a
+         // min=0 iteration that consumed nothing — is what makes a nullable
+         // quantifier match the JS-correct (longer) string (fixes #8).
+@@ -238,6 +251,12 @@ internal sealed class Matcher
          {
              if (!x.Budget.Step())
                  return null;
@@ -1224,7 +1248,147 @@ index bce6664..eff302d 100644
              if (remMax == 0)
                  return c(x);
  
-@@ -323,8 +329,8 @@ internal sealed class Matcher
+@@ -264,6 +283,139 @@ internal sealed class Matcher
+         return (s, c) => Repeat(min, max, s, c);
+     }
+ 
++    /// <summary>A single-code-point membership test with the atom's flags baked in.</summary>
++    private delegate bool CharPredicate(int codePoint);
++
++    /// <summary>
++    /// Recognises a quantifier body that consumes exactly one code point, sets no
++    /// captures, and matches at most one way per position — a literal char, <c>.</c>,
++    /// or a character class without <c>\q{…}</c> string members — and, when so, hands
++    /// back a predicate identical to the atom's own matcher. Such a body cannot match
++    /// the empty string and has no internal backtracking, so <see cref="CompileSingleCharQuantifier"/>
++    /// can iterate it instead of recursing. A class carrying string members is not
++    /// eligible: it is an alternation, not a single-character matcher.
++    /// </summary>
++    private bool TryGetSingleCharPredicate(RegexNode child, Flags flags, out CharPredicate predicate)
++    {
++        var ignoreCase = flags.IgnoreCase;
++        var unicode = _unicode;
++        switch (child)
++        {
++            case CharNode ch:
++                var target = ch.CodePoint;
++                predicate = cp => CaseFolding.Equal(cp, target, ignoreCase, unicode);
++                return true;
++            case AnyCharNode:
++                var dotAll = flags.DotAll;
++                predicate = cp => dotAll || !IsLineTerminator(cp);
++                return true;
++            case CharClassNode cls when !cls.Set.HasStrings:
++                var set = cls.Set;
++                predicate = cp => set.Contains(cp, ignoreCase, unicode);
++                return true;
++            default:
++                predicate = null;
++                return false;
++        }
++    }
++
++    /// <summary>
++    /// Iterative RepeatMatcher for a single-code-point body. Scans the body greedily
++    /// forward (or backward inside a look-behind) recording the cursor after each
++    /// iteration, then hands the recorded positions to the continuation — furthest
++    /// first for a greedy quantifier, nearest first for a lazy one. This is exactly
++    /// what the recursive <c>Repeat</c> computes for such a body, but in O(iterations)
++    /// heap rather than one native stack frame per iteration, so a repeat over a long
++    /// subject cannot overflow the stack.
++    /// </summary>
++    private CompiledMatcher CompileSingleCharQuantifier(CharPredicate predicate, int min, int max, bool greedy, Direction dir)
++    {
++        return (s, c) =>
++        {
++            // positions[k] is the cursor after k successful iterations; [0] is the start.
++            var positions = new List<int> { s.Position };
++            var pos = s.Position;
++            var count = 0;
++            while (max == QuantifierNode.Unbounded || count < max)
++            {
++                // Keep the shared catastrophic-backtracking budget honest: each
++                // iteration is one step, as it is in the recursive Repeat.
++                if (!s.Budget.Step())
++                    break;
++                if (!TryReadMatching(s.Input, dir, pos, predicate, out var nextPos))
++                    break;
++                pos = nextPos;
++                positions.Add(pos);
++                count++;
++            }
++
++            if (count < min)
++                return null;
++
++            if (greedy)
++            {
++                for (var k = count; k >= min; k--)
++                {
++                    var r = c(s.WithPosition(positions[k]));
++                    if (r != null)
++                        return r;
++                }
++            }
++            else
++            {
++                for (var k = min; k <= count; k++)
++                {
++                    var r = c(s.WithPosition(positions[k]));
++                    if (r != null)
++                        return r;
++                }
++            }
++            return null;
++        };
++    }
++
++    /// <summary>
++    /// Reads one code point at <paramref name="pos"/> in <paramref name="dir"/> and, if it
++    /// satisfies <paramref name="predicate"/>, yields the cursor past it. Mirrors
++    /// <see cref="ReadCodePoint"/> but works from an explicit position so the iterative
++    /// quantifier need not thread a <see cref="MatchState"/> through the scan.
++    /// </summary>
++    private bool TryReadMatching(string input, Direction dir, int pos, CharPredicate predicate, out int nextPos)
++    {
++        if (dir == Direction.Forward)
++        {
++            if (pos >= input.Length)
++            {
++                nextPos = pos;
++                return false;
++            }
++            var (cp, width) = CodePointAt(input, pos);
++            if (!predicate(cp))
++            {
++                nextPos = pos;
++                return false;
++            }
++            nextPos = pos + width;
++            return true;
++        }
++        else
++        {
++            if (pos <= 0)
++            {
++                nextPos = pos;
++                return false;
++            }
++            var (cp, width) = CodePointBefore(input, pos);
++            if (!predicate(cp))
++            {
++                nextPos = pos;
++                return false;
++            }
++            nextPos = pos - width;
++            return true;
++        }
++    }
++
+     private CompiledMatcher CompileBackreference(BackreferenceNode br, Direction dir, Flags flags)
+     {
+         var index = br.Name != null
+@@ -323,8 +475,8 @@ internal sealed class Matcher
              AnchorKind.EndOfInput => (s, c) =>
                  (s.Position == s.Input.Length || (multiline && IsLineTerminator(CodePointAt(s.Input, s.Position).cp)))
                      ? c(s) : null,
@@ -1235,7 +1399,7 @@ index bce6664..eff302d 100644
              _ => throw new InvalidOperationException(),
          };
      }
-@@ -379,8 +385,42 @@ internal sealed class Matcher
+@@ -379,8 +531,42 @@ internal sealed class Matcher
      {
          var ignoreCase = flags.IgnoreCase;
          var unicode = _unicode;
@@ -1278,7 +1442,7 @@ index bce6664..eff302d 100644
              if (!ReadCodePoint(s, dir, out var actual, out var nextPos))
                  return null;
              return set.Contains(actual, ignoreCase, unicode)
-@@ -388,6 +428,32 @@ internal sealed class Matcher
+@@ -388,6 +574,32 @@ internal sealed class Matcher
          };
      }
  
@@ -1311,7 +1475,7 @@ index bce6664..eff302d 100644
      /// <summary>Reads the code point in <paramref name="dir"/>, yielding the next position.</summary>
      private bool ReadCodePoint(MatchState s, Direction dir, out int codePoint, out int nextPos)
      {
-@@ -438,14 +504,19 @@ internal sealed class Matcher
+@@ -438,14 +650,19 @@ internal sealed class Matcher
      private static bool IsLineTerminator(int cp)
          => cp is 0x000A or 0x000D or 0x2028 or 0x2029;
  
@@ -2231,7 +2395,7 @@ index 891e481..d81ce1c 100644
      private char PeekAt(int offset) => _pos + offset < _src.Length ? _src[_pos + offset] : '\0';
  
 diff --git a/Broiler.Regex/README.md b/Broiler.Regex/README.md
-index c1a46dc..899e5f3 100644
+index c1a46dc..da3e201 100644
 --- a/Broiler.Regex/README.md
 +++ b/Broiler.Regex/README.md
 @@ -24,13 +24,13 @@ are correct *by construction* rather than by patch.
@@ -2274,7 +2438,7 @@ index c1a46dc..899e5f3 100644
  
  ## What works today
  
-@@ -96,24 +105,48 @@ pattern string ──▶ RegexParser ──▶ RegexNode AST ──▶ Matcher (
+@@ -96,24 +105,52 @@ pattern string ──▶ RegexParser ──▶ RegexNode AST ──▶ Matcher (
    preserved capture order
  - `u`-mode code-point semantics: `\u{…}`, astral atoms as single units,
    code-point back-references
@@ -2298,12 +2462,16 @@ index c1a46dc..899e5f3 100644
 -- `v`-mode set operations (`[a&&b]`, `[a--b]`, `\q{…}`) — parsed only.
 -- Full ECMAScript `Canonicalize` case-folding — current `i` folding covers ASCII
 -  plus a documented subset; the complete fold table is a TODO.
-+- Recursion depth: the continuation-passing matcher recurses once per quantifier
-+  iteration, so a repeat over a long subject exhausts the stack. The matcher checks the
++- Recursion depth for complex quantifier bodies: a quantifier whose body consumes exactly
++  one code point — a literal, `.`, or a character class — repeats through an iterative fast
++  path, so `.*`, `\d+`, `[^"]*` and the like match a subject of any length without
++  recursing. A body the fast path cannot take (a capturing group, an alternation of
++  sequences) still uses the continuation-passing `RepeatMatcher`, which recurses once per
++  iteration and would exhaust the stack over a long subject; there the matcher checks the
 +  remaining stack before it recurses and throws `RegexOverflowException` — which unwinds
-+  cleanly — rather than crashing the process; the JavaScript layer catches it and falls
-+  back to the .NET engine (iterative) for that subject. Making the repeat iterative would
-+  remove the fallback dependency.
++  cleanly — rather than crashing the process, and the JavaScript layer catches it and falls
++  back to the .NET engine for that subject. Making the general repeat iterative too would
++  remove the remaining fallback dependency.
 +- Two deliberate divergences from V8, both under `vi` and both pinned by a test:
 +  - `\p{ASCII}` follows §22.2.2.9, which folds a lone binary property's set, so `ſ`
 +    (which folds to `s`) matches. V8 answers "no match" here while agreeing on
@@ -3458,7 +3626,7 @@ index 0000000..a53d5fa
 +The Apache License 2.0 in [`LICENSE`](LICENSE) applies to Broiler's source code and does
 +not replace the Unicode Terms of Use for Unicode-provided data.
 diff --git a/docs/roadmap.md b/docs/roadmap.md
-index a954585..994a529 100644
+index a954585..7ffadc9 100644
 --- a/docs/roadmap.md
 +++ b/docs/roadmap.md
 @@ -6,14 +6,23 @@ milestones are represented by code and tests.
@@ -3493,7 +3661,7 @@ index a954585..994a529 100644
  
  Exit gate: the relevant pinned test262 RegExp and UnicodeSets paths pass without routing
  to .NET for unsupported Broiler features.
-@@ -33,14 +42,29 @@ source; do not duplicate its changing list here.
+@@ -33,14 +42,31 @@ source; do not duplicate its changing list here.
  
  ## 3. Replace the translator
  
@@ -3508,9 +3676,11 @@ index a954585..994a529 100644
 +fixed real match bugs the .NET translation had for non-gap patterns — a standalone
 +`\p{…}` under `i` threw, and in-class case folding (`[α-ω]/iu` against `µ`) was missed —
 +validated by 12,792 differential cases against V8 whose only mismatches are the two
-+documented `vi` divergences. Because the matcher recurses per quantifier iteration, a
-+repeat over a long subject is guarded (`RegexOverflowException`) and the JavaScript layer
-+falls back to the iterative .NET engine for that subject.
++documented `vi` divergences. A quantifier over a single-code-point body (`.*`, `\d+`,
++`[^"]*`) now repeats through an iterative fast path, so a long subject matches natively;
++only a quantifier over a complex body (a capturing group, an alternation of sequences)
++still recurses per iteration, and there the guard (`RegexOverflowException`) and the
++JavaScript layer's .NET fallback keep it from overflowing.
 +
 +Remaining before the translator can be dropped:
  
@@ -3522,14 +3692,14 @@ index a954585..994a529 100644
 -  operation needs them.
 +  substitutions, and species behavior — the shared path leaves `lastIndex` untouched for
 +  the legacy helpers, exactly as the .NET path did;
-+- make the quantifier repeat iterative so the stack guard needs no .NET fallback, which is
-+  the last dependency on the translator for Unicode mode;
++- make the *complex-body* quantifier repeat iterative too, so the stack guard needs no .NET
++  fallback for any Unicode-mode pattern (the single-code-point body is already iterative);
 +- widen routing to non-Unicode patterns (currently kept on the faster .NET engine for the
 +  common ASCII/hot-loop case) once the matcher is optimized, then remove the translator.
  
  Exit gate: all supported patterns use Broiler.Regex, the pinned RegExp corpus is green,
  and no production path constructs a .NET `Regex` for ECMAScript matching.
-@@ -48,8 +72,11 @@ and no production path constructs a .NET `Regex` for ECMAScript matching.
+@@ -48,8 +74,11 @@ and no production path constructs a .NET `Regex` for ECMAScript matching.
  ## 4. Performance after correctness
  
  The matcher currently clones capture state on backtracking and has no compiled/DFA
