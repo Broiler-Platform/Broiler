@@ -143,7 +143,16 @@ the ones marked **fixed** carry a minimal regression in
 `Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs`.
 
 - A captured read after deleting an eval-introduced `var` retains the torn-down cell instead of
-  re-resolving the name outward. **Still reproduces.**
+  re-resolving the name outward. **Fixed:** a sloppy direct eval's `var` is a deletable binding
+  of the caller's variable environment, and when a nested closure captures the name the compiler
+  binds the function and the closure to one shared `EvalShadowVariable`. `delete` of such a name
+  was constant-folded to `false` (the delete-of-identifier path read a non-deletable captured
+  binding as a genuine local), so the binding survived and every later read — the function's own
+  and the closure's — still saw the eval's value. An eval-shadow binding's deletability is not
+  statically known, so `delete` now defers to `JSContext.DeleteIdentifier`, which resolves the
+  shadow and tears down only an owned one (giving up ownership so the name forwards to the outer
+  binding again). Landed in the pinned `Broiler.JS` submodule (`2b8ef06`); regressions in
+  `Track1LanguageTests`.
 - An empty statement does not correctly terminate a Directive Prologue. **Fixed:** a statement
   that already ended at its own `;` was consuming a second one, deleting exactly the empty
   statement that ends the prologue.
