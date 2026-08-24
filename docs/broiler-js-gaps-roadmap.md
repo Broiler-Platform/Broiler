@@ -546,6 +546,25 @@ the native backend, and all public RegExp operations consume the same conforming
 - `export class C {}` never worked: the compiler cast the class declaration to
   `AstFunctionExpression`, which is null for a class node, and reading its name threw a
   `NullReferenceException`. **Fixed** in `fdbc2c0` alongside the above.
+- Import attributes were rejected where the grammar allows them. `AttributeKey` is
+  `IdentifierName | StringLiteral` and only the identifier half was implemented, so
+  `with { "type": "json" }` — the quoted form the proposal's own examples use — was an unexpected
+  token; and an `ExportDeclaration` with a `FromClause` takes a `WithClause` exactly as an
+  `ImportDeclaration` does, but none of the three export `from` forms accepted one. **Fixed** in
+  `2f226ef`; regressions in `ModuleAttributeClauseTests`. Note this fixes valid source failing to
+  compile, not attribute *enforcement*: attributes are parsed and not acted on, as they already
+  were for imports (nothing reads `AstImportStatement.Attributes`). Rejecting a module whose type
+  does not match its attribute is a separate capability decision.
+- **Still open — a JSON module's default import is `undefined`.** `import d from './data.json'`
+  yields `undefined`, so JSON modules are effectively unusable. The module host wraps a `.json`
+  file as `module.exports = <json>`, which replaces the exports object with the parsed value, and
+  a default import then reads `.default` off that value and finds nothing. Per ES2025 a JSON
+  module has exactly one export, `default`, and no named exports — but this engine serves both
+  `require` (which wants the object itself) and `import` from the same wrapper, so making the two
+  agree is a product decision about the CommonJS/ESM boundary rather than a mechanical fix, and is
+  left for one. Characterized, not guessed at.
+- **Still open — `import.meta`** reports "import.meta not supported" (deterministic, not a crash),
+  and `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
 - **Still open — needs a module parse goal.** `await` as a module-level identifier (`var await`,
   `function await`, `let await`, a parameter, a class name, `import { a as await }`) is accepted;
   it is reserved from a module's first token, before any import or export is seen, so it cannot be
