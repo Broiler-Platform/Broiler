@@ -514,11 +514,21 @@ the native backend, and all public RegExp operations consume the same conforming
   the specifiers off it. Reserved words follow the grammar rather than a special case: a
   ModuleExportName is an IdentifierName, so any reserved word is legal after `as`, while the local
   name of a clause without `from` is an IdentifierReference and may not be one. Exporting an
-  undeclared name is now an early error naming it, and `export * from` — still unimplemented —
-  fails deterministically instead of crashing (`export * as ns from` is a different production and
-  works). Landed in the pinned `Broiler.JS` submodule (`51e3830`); regressions in
-  `ExportClauseTests`, which assert the exported value reaches an importer rather than only that
-  the source parses.
+  undeclared name is now an early error naming it. Landed in the pinned `Broiler.JS` submodule
+  (`51e3830`); regressions in `ExportClauseTests`, which assert the exported value reaches an
+  importer rather than only that the source parses.
+- `export * from './m.js'` — the form barrel files are built on — was unimplemented and crashed
+  with a `NullReferenceException` (it carries no declaration, so it reached a switch on
+  `Declaration.Type`). **Fixed:** unlike `export { a } from`, its names cannot be emitted specifier
+  by specifier, because which names exist is a property of the *source* module rather than of this
+  module's text — so the module is imported once and its own enumerable keys are republished at run
+  time. `default` is excluded, per the star entry's `all-but-default` `[[ImportName]]`, which is
+  what stops a barrel file re-exporting several modules from having their defaults collide. The
+  parser's bare-star branch also never set `isAsync`, latent while the form could not compile at
+  all and load-bearing once the emitted code awaits the import. Landed in `7835604`; regressions in
+  `ExportClauseTests` cover republication, namespace visibility, the excluded default, and
+  composition with the module's own exports. (`export * as ns from` is a separate production and
+  already worked.)
 
 ### Confirmed host-semantic gaps
 
