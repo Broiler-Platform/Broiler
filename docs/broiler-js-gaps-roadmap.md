@@ -731,7 +731,16 @@ Do not schedule fixes for these until the smallest current-pointer reproduction 
   fast copy path (MOD-M8-5), which is what would reintroduce the hazard; the
   [gate](../Broiler.JS/docs/roadmap/Component.md#immediate-correctness-gate-typedarrayprototypeset)
   records the full case list;
-- older `Intl.DateTimeFormat` range/parts, SameValue, and Proxy-ordering reports;
+- ~~older `Intl.DateTimeFormat` range/parts, SameValue, and Proxy-ordering reports~~ —
+  **retired: none of the three reproduces**, pinned by `IntlDateTimeFormatRangeTests`. The
+  options bag is read in exactly the `InitializeDateTimeFormat` order (observed through a
+  `Proxy`: `localeMatcher` through `timeStyle`, 20 keys); `formatToParts` splits a rendering
+  into typed parts and `formatRangeToParts` marks the start components `startRange`, the
+  separator `shared` and the end components `endRange`; two equal instants collapse to the
+  single non-range rendering (`formatRange(d, d) === format(d)`, every part then `shared`); an
+  invalid date is a `RangeError` and an undefined endpoint a `TypeError`; and `resolvedOptions`
+  returns a fresh object with stable contents. The tests assert structure rather than rendered
+  separator text, which is ICU-version dependent;
 - ~~historical M0 failures where `JSON.stringify` ignored a `toJSON` result and
   `Array.isArray(new Proxy([], {}))` returned false~~ — **retired: neither reproduces.**
   `toJSON` is honoured for a plain object, a nested value, an array element (receiving its
@@ -741,8 +750,13 @@ Do not schedule fixes for these until the smallest current-pointer reproduction 
 - ~~a rejected function-`prototype` write historically changing later `[[Construct]]`
   behavior~~ — **reproduced and fixed**; moved to
   [track 1](#objects-arrays-symbols-and-proxy-sensitive-behavior);
-- the archived observation that async continuations did not run under in-process `Eval` or
-  `Execute`;
+- ~~the archived observation that async continuations did not run under in-process `Eval` or
+  `Execute`~~ — **retired: does not reproduce**, pinned by `AsyncContinuationDrainTests`. A job
+  queued by script during an in-process `Eval` — a promise reaction, a chain of them, a
+  rejection handler, or an async function's resumption after one or several `await`s — has run
+  by the time the call returns, so a later `Eval` on the same context observes its effect; the
+  same holds through `EvalWithTopLevelAwaitAsync`. Both halves of the contract are pinned: the
+  reaction is not run inline during the script that queues it, and it is not lost either;
 - an unreproduced module-initializer-ordering failure; and
 - form-control dirty/default/reset/radio semantics, which remain uncharacterized.
 
