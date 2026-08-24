@@ -1,0 +1,461 @@
+# Broiler.JS gaps — closed
+
+> Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
+> **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
+> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names the pinned
+> `Broiler.JS` commit that carries it and the regression that holds it.
+
+Gaps that are resolved, in two kinds. **Fixed** entries were real defects and each keeps its root
+cause, what landed, and the evidence. **Retired** entries were investigated against the current
+pointer and did not reproduce; they keep the exact cases tried, because the roadmap's retest rule
+requires a non-reproduction to be recorded rather than silently dropped. Both kinds are closed, and
+neither should be reopened without new evidence.
+
+## Fixed
+
+### Track 0 — Conformance evidence
+
+- **Async results follow test262's marker protocol.** `$DONE` is upstream
+  `doneprintHandle.js`, injected into every `flags: [async]` test, and it prints
+  `Test262:AsyncTestComplete` / `Test262:AsyncTestFailure:`. No marker, two markers, or a
+  failure marker are each a failure with the kind recorded (`asyncCompletion`); a test that
+  neither settles nor returns is ended by the per-test timeout. Measured correction over a
+  seeded 400-file sample of the 5487 script-goal async files: 10.3% of async results were
+  passes that are not passes (~560 across the corpus).
+- **Fixtures that must fail.** `Broiler.JS/scripts/compliance/fixtures/async-protocol/`
+  holds deliberately failing, rejecting, never-settling, double-completing,
+  dying-after-completing and never-returning tests with the verdict each must produce;
+  `run_test262.py --self-check` enforces them, and every CI shard runs it first.
+- **`module` and `raw` are executed, not skipped.** A module test runs in place under
+  `--module-host` with its harness preloaded as a script (so `assert` and `$DONE` are
+  globals its body and its `_FIXTURE.js` imports can see); a raw test is handed the file's
+  own unmodified bytes. 824 module and 30 raw files were previously reported as skipped.
+- **`$262` is defined** for `global`, `createRealm`, `detachArrayBuffer`, `evalScript` and
+  `gc`, and a test is excluded for the exact hook it needs and lacks rather than for
+  mentioning `$262` — 640 more files now run.
+- **An uncaught error is reported by its JavaScript name** (`Uncaught SyntaxError: …`), so
+  `negative: phase: parse` tests are matched on the type they raise instead of failing on
+  the diagnostic while rejecting the program correctly.
+- **Per-mode totals** (selected, executed, passed, failed, skipped, timed out) ride on every
+  shard report, survive the shard merge, and appear in both CI summaries.
+- **Two Broiler.JS xUnit suites could not run at all**, which is the same kind of untrustworthy
+  evidence as a test that cannot fail. Every `Modules.Tests` case that compiles script, and most
+  of `Core.Tests`, threw `No compilation back end is registered for 'DynamicMethod'` — while the
+  assembly implementing it sat in each suite's own output directory. The DynamicMethod and
+  CollectibleAssembly back ends register themselves from a `[ModuleInitializer]`, and .NET loads
+  assemblies lazily, so that ran only if the host happened to touch a type in the emitter
+  assembly: registration followed incidental load order rather than configuration (a
+  `ProjectReference` does not fix it — a reference is not a load). `LinqExpressions`, the
+  assembly that genuinely needs the emitter and is loaded while a compilation's tree is being
+  built, now forces that load, the same remedy `CompilerAssemblyInitializer` already documents
+  for its own assembly. `Modules.Tests` went 3/13 → 13/13 and `Core.Tests` to 32/32, with every
+  other suite unchanged and `Portable.Tests` — the profile that prohibits dynamic code emission —
+  still green.
+
+See [the host-coverage inventory](../Broiler.JS/docs/compliance/known-gaps.md#host-coverage-gaps)
+and [the component host-mode plan](../Broiler.JS/docs/roadmap/Component.md#2-expand-host-mode-coverage).
+
+### Track 1 — Direct eval, parser, scope, and control flow
+
+Each bullet below was reproduced against the pinned ref before being worked on or retired;
+the ones marked **fixed** carry a minimal regression in
+`Broiler.JavaScript.Integration.Tests/Track1LanguageTests.cs`.
+
+- A captured read after deleting an eval-introduced `var` retains the torn-down cell instead of
+  re-resolving the name outward. **Fixed:** a sloppy direct eval's `var` is a deletable binding
+  of the caller's variable environment, and when a nested closure captures the name the compiler
+  binds the function and the closure to one shared `EvalShadowVariable`. `delete` of such a name
+  was constant-folded to `false` (the delete-of-identifier path read a non-deletable captured
+  binding as a genuine local), so the binding survived and every later read — the function's own
+  and the closure's — still saw the eval's value. An eval-shadow binding's deletability is not
+  statically known, so `delete` now defers to `JSContext.DeleteIdentifier`, which resolves the
+  shadow and tears down only an owned one (giving up ownership so the name forwards to the outer
+  binding again). Landed in the pinned `Broiler.JS` submodule (`2b8ef06`); regressions in
+  `Track1LanguageTests`.
+- An empty statement does not correctly terminate a Directive Prologue. **Fixed:** a statement
+  that already ended at its own `;` was consuming a second one, deleting exactly the empty
+  statement that ends the prologue.
+- A top-level `for await` fails with an internal error instead of running — the "invalid
+  program" cluster track 0 measured in the module corpus. **Fixed:** a program holding a
+  top-level `AwaitExpression` is flagged async by the parser, and that flag is what routes it
+  through the generator rewrite that implements suspension. The `for await` head only
+  *validated* that the construct was legal at that position and never set the flag, so the
+  program was compiled straight to IL and the await its desugaring emits reached
+  `ILCodeGenerator.VisitYield` as a raw yield node it cannot emit (a leaked
+  `NotImplementedException`). The head now sets the same flag `AwaitExpression` does when the
+  loop is at function depth 0; `for await` where no await is allowed — an ordinary script's top
+  level, a non-async function body — stays the SyntaxError it was. Landed in the pinned
+  `Broiler.JS` submodule (`98db1fc`); regressions in `Track1LanguageTests`.
+- A parameter named `undefined` does not shadow the global binding. **Fixed:** the compiler
+  folded every identifier of that name to the undefined value; it now folds only a reference
+  that resolves to no binding.
+- Async and generator bodies do not enter the runtime strict-mode scope, so a failed strict
+  `[[Set]]` may not throw. **Fixed:** such a body runs during its rewritten driver's steps,
+  not during the `InvokeFunction` call that created it, so it never inherited the
+  `EnterStrictMode` scope ordinary calls establish — a failing `[[Set]]` in a `'use strict'`
+  async/generator body silently did nothing (even in the async synchronous prefix / before a
+  generator's first `yield`), and a strict async function's `this` was the global object.
+  `ClrGeneratorV2` now re-enters the function's own strict flag around each body step, and the
+  compiler sets `IsStrictMode` (and `coerceThis`) on the generator and the async inner
+  generator. Landed in the pinned `Broiler.JS` submodule (`f1b78df`); regressions in
+  `Track1LanguageTests` and the updated `StrictModeFlowTests`.
+- **Early errors that never fire** — the cluster the modes and the named-error reporting made
+  visible, and the largest one here: a body `var` shadowing the head's lexical name, a labelled
+  function declaration as a loop body, `export` in non-module code, and a `var` colliding with a
+  lexical binding of the same name were accepted and RUN (or, for `export default <expr>`,
+  crashed with a `NullReferenceException`) instead of reaching each test's `$DONOTEVALUATE()`.
+  About 30 files across `test/language/statements/{for,if,labeled}`, `test/language/eval-code`
+  and `test/language/global-code`. **Fixed** (three mechanisms):
+  - **VarDeclaredNames ∩ LexicallyDeclaredNames must be empty at every scope.** The collision
+    was detected only order-dependently and lost once a `var` hoisted out of the block it was
+    written in, so `var x; let x;`, `let x; { var x; }`, `for (let x of []) { var x; }`,
+    `try {} catch ([e]) { var e; }` and their siblings ran with the later declaration winning.
+    Each `FastScopeItem` now records its own VarDeclaredNames as a `var` hoists through it, and
+    rejects both a `var` hoisting into a lexical binding and a lexical declared where a `var`
+    has hoisted through — at every scope, in either order, and across a for-head, switch, or
+    destructured catch parameter (a block-nested function declaration counts as lexical, so it
+    conflicts with a same-named `var` while two sloppy block functions of one name still
+    coexist).
+  - **A labelled function declaration is never a legal loop body.** A `let`/`const`
+    for-in/for-of/C-style head rewrites its body into a synthetic per-iteration block, hiding
+    the labelled statement from validation; the loop parser now rejects it on the statement as
+    written, before that rewrite.
+  - **`export` in script code is an early error**, not a crash: its bindings target the
+    host-injected module `exports` object, absent in a plain script, so every export form now
+    raises a clean `SyntaxError`.
+  - **A direct eval's global `var`/function may not collide with a global lexical.** The
+    var/lexical mechanism above catches a collision with a function- or block-local lexical
+    (the direct-eval validator carries those names at compile time), but a top-level
+    `let`/`const`/class lives in the runtime global lexical environment and was not among them.
+    `JSContext.Register` rejected the collision for an indirect eval, yet a direct eval binds the
+    name as a captured lexical and skips that registration, so `let g = 1; eval('var g;')` ran
+    with the eval's `var` aliasing the lexical. The compiler now emits
+    `EnsureNoGlobalLexicalConflictForEvalVar` in the eval's hoisting prelude for a
+    skip-registration program-scope var/function, covering `let`/`const`/class, a function
+    declaration, a non-first declarator and a block-hoisted var, in both direct and indirect eval.
+
+  The first three mechanisms landed in the pinned `Broiler.JS` submodule (`f1b78df`); the
+  global-lexical direct-eval case in `943b94d`. Regressions (and the accept-guards for valid
+  neighbours) in `Track1LanguageTests`; the `BuiltInsTests` that pinned the old shadowing
+  behaviour now assert the SyntaxError.
+
+Evidence:
+
+- [Active semantic clusters](../Broiler.JS/docs/compliance/known-gaps.md#active-semantic-clusters)
+- [Current component failure clusters](../Broiler.JS/docs/roadmap/Component.md#1-close-the-supported-test262-failure-set)
+- [Parameter-shadowing record](../Broiler.JS/docs/roadmap/Phase-3.status.md)
+- [Strict async/generator record](../Broiler.JS/docs/roadmap/Archive.md), retained by
+  [Measurement.md](../Broiler.JS/docs/roadmap/Measurement.md)
+
+### Track 1 — Objects, arrays, symbols, and Proxy-sensitive behavior
+
+- Symbol own keys enumerate by Symbol-creation order rather than property-creation order.
+  **Fixed:** it was a property-storage gap, not a sort to delete — symbol properties lived in
+  a hash map keyed by the symbol's creation id, which records no insertion order, so
+  `getOwnPropertySymbols` sorted by creation id, `Reflect.ownKeys` used raw hash order, and
+  `Object.assign` copied in hash order, all disagreeing. Each object now records its symbol
+  keys' insertion order (as `PropertySequence` does for string keys — appended on first add,
+  dropped on delete, re-added at the end, position kept on update), and every enumeration path
+  reads it through `JSObject.SymbolsInInsertionOrder`. Landed in the pinned `Broiler.JS`
+  submodule (`f1b78df`); regressions in `Track1LanguageTests`.
+- A constructor's cached `prototype` and its observable `prototype` property could disagree, so
+  `new f()` built instances on an object the property never held. **Fixed** (arrived from the
+  retest queue, where it was recorded as a suspected "rejected `prototype` write changes later
+  `[[Construct]]`"; it reproduced, and turned out to be two defects pointing opposite ways).
+  `[[Construct]]` reads a cached field rather than re-reading the property, and: the indexer
+  cached the value a write *attempted*, before the store and with no success test — but the write
+  is rejected outright when `prototype` is non-writable (a class constructor, a frozen function,
+  an explicit `writable: false`), so a *refused* change took effect for `new` while the property
+  kept its old object, and in strict mode the write threw and still took effect; and
+  `DefineProperty` tested its result for a truthy value, where `[[DefineOwnProperty]]` reports
+  success as `undefined` and failure as `false`, so every *accepted* `defineProperty` was read as
+  a failure and `new` ignored it. Both paths now re-cache from what the property currently holds.
+  `Reflect.construct`, which reads the property, was correct throughout and disagreed with `new`
+  on the same function — the regressions assert the two now agree. Landed in the pinned
+  `Broiler.JS` submodule (`3d8b456`); regressions in `FunctionPrototypeWriteConstructTests`.
+- `Reflect.set(base, key, value, receiver)` gives a new receiver property the base property's
+  attributes instead of the all-true descriptor required by `CreateDataProperty`. **Fixed:**
+  the receiver-create paths in `JSObject.PropertyStorage` use the CreateDataProperty
+  attributes. No test262 file at the pinned ref reaches the case, so
+  `ReflectSetReceiverAttributesTests` — which pinned the deviation and now pins the fix — is
+  the only evidence there is.
+
+Evidence:
+
+- [Symbol and array gaps](../Broiler.JS/docs/compliance/known-gaps.md#active-semantic-clusters)
+- [Reflect.set known deviation](../Broiler.JS/docs/roadmap/Phase-2.status.md)
+
+### Track 2 — RegExp
+
+Each bullet below was the state of `Broiler.Regex` before this work; the fix lives in the
+submodule and carries a minimal regression in `Broiler.Regex.Tests`.
+
+- **`\p{...}` / `\P{...}` resolved.** `UnicodeCharSets.ResolveProperty` reads the pinned
+  `Broiler.Unicode` range tables — the same generated UCD revision the JavaScript layer's
+  translator uses, so the two cannot disagree about a property's members. General_Category
+  (lone value and the `gc=` dimension), binary properties with their ECMAScript aliases,
+  `Script`, `Script_Extensions`, and the UTS #51 properties of strings all resolve; an
+  unknown name is a located `RegexSyntaxException` rather than a mis-match. Regressions:
+  `UnicodePropertyEscapeTests`.
+- **`v`-mode class sets evaluated, not just parsed.** Nesting, `&&`, `--` and `\q{…}`
+  string alternatives are evaluated against a new `CodePointSet` with real set algebra, and
+  a class holding multi-code-point members compiles to a longest-first alternation in the
+  matcher. The ordering that matters is §22.2.1 MaybeSimpleCaseFolding *before* §22.2.2.9
+  CharacterComplement, whose universe under `vi` is only the code points that fold to
+  themselves — that is the entire reason `[^\p{Lu}]` matches neither `A` nor `a` under
+  `vi` while it matches `a` under `ui`. Regressions: `UnicodeSetsTests`.
+- **`Canonicalize` is table-driven.** Both branches now come from the Unicode Character
+  Database (`Unicode/Generated/CaseFoldingData.g.cs`, regenerated by
+  `Unicode/tools/generate-case-folding.py`) instead of `char`/`Rune` casing plus five
+  hand-written special cases. Two consequences are observable: `İ` and `ı` have no simple
+  case folding, so neither is case-equivalent to an ASCII `i` any more — the old
+  `ToLowerInvariant` derivation folded both to `i`; and §22.2.2.9.2 WordCharacters now
+  widens `\w` under `iu` from the fold table, so `/\W/iu` correctly rejects `ſ`.
+  Regressions: `CanonicalizeTests`.
+- **The Annex B / Unicode-mode grammar split.** Six boundaries, all found by differential
+  testing rather than by the roadmap: `\u{…}` was being read as a code point without the
+  `u` flag (it is the identity escape `u` there); a bare `]`/`{`/`}` was a literal in
+  Unicode mode; a class escape was accepted as a range endpoint in Unicode mode; `\-` was
+  rejected inside a class; a quantifier was silently dropped after every assertion, where
+  Annex B admits one after a look-ahead (`/(?!a)+/`) and forbids it everywhere else
+  (`/^{2}/`, `/(?<=a)*/`); and `\k<n>` was a broken reference in a pattern that declares
+  no group name, where it is the literal text `k<n>`. Regressions: `AnnexBGrammarTests`.
+- **Routing expanded (action 5).** `JSRegExp`'s gap scan now routes `v`-mode class-set
+  expressions and property escapes used as class members — the two shapes the translator
+  has to approximate, since it evaluates the set itself and can only fall back to .NET's
+  code-unit-based `\p{Lu}` inside `[…]`. Property escapes reaching the parser without
+  throwing also means a pattern such as `(?<=(\p{L}))b`, refused before, now routes.
+- **One match-data abstraction (action 4).** `exec` already read either backend through
+  `RunMatch`; now `Split` and `Replace` do too, via a shared `EnumerateMatches` iterator
+  over `RunMatch` (code-point-aware empty-match advance, `lastIndex` left untouched exactly
+  as the .NET path left it). So the legacy `String.prototype.split`/`replace` fallback —
+  reached when a RegExp's `@@split`/`@@replace` is removed — answers a routed gap pattern
+  with Broiler's match data instead of the .NET translation's, which is wrong for exactly
+  those patterns (e.g. `(a?b??)*` on "ab" matches "ab", not "a"). `IJSRegExp.Value`, which
+  handed callers the raw .NET `Regex` (and would be `null` once a Broiler-only pattern is
+  routed), is retired for an engine-agnostic `IsMatch`, so `assert.match` routes too.
+  Regressions: `BuiltIns.Tests/RegExpEngineConsistencyTests`.
+- **A routed pattern no longer needs a .NET translation (the tail of action 4).**
+  `CreateRegex` compiled the .NET `Regex` for every pattern, so one the translator could not
+  represent failed to construct even though Broiler would match it. Now that no supported
+  operation reads the .NET engine for a routed pattern, the translation is wrapped so that,
+  *for a routed pattern only*, a transform's "not supported" error or a `new Regex` rejection
+  falls back to a null `value` and the RegExp runs on Broiler alone. A `v`-mode set operation
+  over a built-in class escape — `[\s&&\S]`, `[\d&&\s]`, `[\s--\d]` — is the concrete case:
+  valid ECMAScript that the .NET UnicodeSets translator rejects, and that now constructs and
+  matches (exec/test/split/replace) in agreement with V8. A pattern invalid in *both* engines
+  is not routed (Broiler rejects it, so the fallback is skipped) and still throws.
+  Regressions: `BuiltIns.Tests/RegExpTranslatorFallbackTests`.
+- **Routing widened to all of Unicode mode (action 6, first tranche).** Routing no longer
+  triggers only on the gap *shapes*: every `u`/`v` pattern Broiler can build now runs on
+  Broiler, because Unicode mode is where the .NET translation is most complex and fragile.
+  A JSRegExp-level differential against V8 found the bugs this fixes — a standalone `\p{…}`
+  under `i` **threw** a SyntaxError, and in-class case folding was missed (`[α-ω]/iu` did
+  not match `µ`, which folds to `µ`→`μ`). Non-Unicode patterns stay on the mature, far
+  faster .NET engine (the common ASCII/hot-loop case) until the matcher is optimized.
+  Regressions: `BuiltIns.Tests/RegExpUnicodeRoutingTests`.
+- **Single-code-point quantifiers repeat iteratively (action 6, second tranche).** The
+  continuation-passing matcher recurses once per quantifier iteration, so a repeat over a
+  long subject would overflow the stack. A quantifier whose body consumes exactly one code
+  point — a literal, `.`, or a character class — is now repeated by an iterative fast path
+  (a linear scan with an index-based backtrack, provably equivalent to RepeatMatcher for
+  such a body), so `.*`, `\d+` and `[^"]*` match a subject of any length natively. A body
+  the fast path cannot take (a capturing group, an alternation of sequences) still recurses;
+  there the matcher checks the stack and throws `RegexOverflowException` instead of crashing,
+  and `RunMatch` catches it and falls back to the iterative .NET engine for that subject.
+  Regressions: `Broiler.Regex.Tests/StackDepthGuardTests` and
+  `BuiltIns.Tests/RegExpUnicodeRoutingTests`.
+- **Complex-body quantifiers repeat iteratively too (action 6, third tranche).** A body the
+  fast path cannot take — a capturing group, an alternation of sequences — no longer recurses
+  per iteration: it runs through an explicit-stack RepeatMatcher where each iteration level is
+  a heap frame and each level's body matches are enumerated in the body's own backtracking
+  order (by re-running the body with a continuation that fails N times then succeeds). Greedy
+  tries every body-match subtree before the stop branch, lazy the reverse, and the
+  empty-iteration guard is preserved — exactly what the recursive form computed, with only the
+  iteration dimension moved off the call stack. So a repeat over a subject of any length now
+  matches natively for *every* body shape. Native recursion is bounded by the pattern's
+  nesting depth (like the recursive-descent parser that accepted the pattern), never by the
+  subject, so the `RegexOverflowException` backstop is no longer reachable by input size — it
+  remains only for a pathologically nested pattern. Regressions:
+  `Broiler.Regex.Tests/StackDepthGuardTests` and `BuiltIns.Tests/RegExpUnicodeRoutingTests`.
+- **A first matcher-performance pass, ahead of non-Unicode routing (action 6, fourth
+  tranche).** Routing the non-Unicode hot path was measured against the compiled .NET engine
+  first: the interpreter was ~10× slower on average (up to 24× for `\d`/`\w`-heavy patterns),
+  which would be a large regression for no correctness gain — so, as the roadmap's own
+  ordering requires, the routing flip is deferred and the performance work comes first. A
+  first allocation pass is done and measured: `MatchState` is a `readonly struct` (deriving a
+  state per code point no longer allocates); the single-code-point quantifier fast path scans
+  and backtracks with no per-iteration list; one budget and one capture array are reused
+  across a run's start positions; and a run of ≥2 single-code-point atoms in a forward
+  sequence folds into one loop rather than a continuation closure per term. That takes simple
+  patterns (`\d+`, `[a-z]+`, `\w+`, class scans) to ~2–3× the compiled .NET engine and the
+  microbenchmark mean from ~10× to ~6×, with identical results. What remains is structural —
+  a sequence with capturing groups or nested quantifiers still allocates a continuation-closure
+  chain per invocation, and each capture write clones the capture array — and needs the
+  compiled/bytecode path (defunctionalised continuations, explicit backtrack stack), which is
+  what makes non-Unicode routing viable.
+
+Evidence: `dotnet test Broiler.Regex.slnx` — 253 tests, up from 57; the Broiler.JS
+`BuiltIns` (2214) and `Integration` (5024 of 5025) suites pass, the one failure being the
+pre-existing `M8_DocumentationFiles_Exist`, which asserts a `docs/roadmap.md` that the
+component's own reorganisation replaced with `docs/roadmap/`. Plus 220,172 differential
+Broiler.Regex cases and a 12,792-case JSRegExp-level differential — both against V8 — whose
+only remaining mismatches are the two documented deliberate `vi` divergences, a further
+1,534 quantifier-focused cases for the single-char fast path, 3,008 complex-body cases
+for the general driver (nested quantifiers, empty-capable bodies, backreferences, lazy,
+multi-capture, look-behind bodies), and 2,478 cases re-run after the allocation pass
+(struct state, fast path, per-start reuse, atom-run folding) — all against V8 with zero
+mismatches.
+
+The engine and routing changes have landed in the pinned submodules: the `Broiler.Regex`
+work reached `4df3fb8` and the `Broiler.JS` routing reached `d20e506`, so their patch files
+were deleted and the gitlinks point at commits that contain them. See
+[`patches/README.md`](../patches/README.md) for the current (now empty) patch backlog.
+
+
+### Track 3 — Module syntax
+
+- The `export { … }` clause was rejected in every form, so the commonest way to export — declare
+  a binding, then publish it — did not work: `const x = 1; export { x }` failed as "x is already
+  defined in current scope", `var x = 1; export { x }` as "Expecting keyword from",
+  `export { a } from './m.js'` as "Cannot convert undefined or null", and `export * from './m.js'`
+  with a `NullReferenceException`. Only `export <declaration>` and `export default` worked.
+  **Fixed:** the parser had no ExportClause production at all — it read the braces as an object
+  *destructuring pattern* that declared each name as a `var` and then demanded a `from`, which is
+  exactly why a `const`/`let` collided while a `var` fell through to the missing keyword. A clause
+  is not a declaration. There is now a real clause reader (the mirror of the import side, which the
+  grammar makes symmetric), specifier pairs on `AstExportStatement`, and a compiler path that
+  publishes each local binding onto `exports` — or, with `from`, imports the source once and copies
+  the specifiers off it. Reserved words follow the grammar rather than a special case: a
+  ModuleExportName is an IdentifierName, so any reserved word is legal after `as`, while the local
+  name of a clause without `from` is an IdentifierReference and may not be one. Exporting an
+  undeclared name is now an early error naming it. Landed in the pinned `Broiler.JS` submodule
+  (`51e3830`); regressions in `ExportClauseTests`, which assert the exported value reaches an
+  importer rather than only that the source parses.
+- `export * from './m.js'` — the form barrel files are built on — was unimplemented and crashed
+  with a `NullReferenceException` (it carries no declaration, so it reached a switch on
+  `Declaration.Type`). **Fixed:** unlike `export { a } from`, its names cannot be emitted specifier
+  by specifier, because which names exist is a property of the *source* module rather than of this
+  module's text — so the module is imported once and its own enumerable keys are republished at run
+  time. `default` is excluded, per the star entry's `all-but-default` `[[ImportName]]`, which is
+  what stops a barrel file re-exporting several modules from having their defaults collide. The
+  parser's bare-star branch also never set `isAsync`, latent while the form could not compile at
+  all and load-bearing once the emitted code awaits the import. Landed in `7835604`; regressions in
+  `ExportClauseTests` cover republication, namespace visibility, the excluded default, and
+  composition with the module's own exports. (`export * as ns from` is a separate production and
+  already worked.)
+- The module duplicate-name early errors (§16.2.1.5) never fired, so `import { a, a } from 'm'`,
+  `import { a } from 'm'; var a;`, two imports binding one name, and a second `export default` all
+  ran with one binding quietly winning. **Fixed:** a collision between an ImportedBinding and a
+  top-level `let`/`const`/class was already caught by the scope machinery, and that masked the
+  rest. ImportedBoundNames are now collected across the module's imports, rejected on duplication,
+  and intersected with the hoisting scope — the right source for VarDeclaredNames, since a `var`
+  in a nested block still declares a name at the module's top level. For exports the rule
+  implemented is the general one (ExportedNames must contain no duplicates) rather than a narrow
+  "one default export" check: `default` is just an exported name, so the same rule catches
+  `export { x as default }` beside an `export default`, and `export { x }; export { y as x }`
+  besides. None of it needs the module parse goal — an ImportDeclaration is only legal in module
+  code, so the check is inert for a script. Landed in `fdbc2c0`; regressions in
+  `ModuleDuplicateBindingTests`.
+- `export class C {}` never worked: the compiler cast the class declaration to
+  `AstFunctionExpression`, which is null for a class node, and reading its name threw a
+  `NullReferenceException`. **Fixed** in `fdbc2c0` alongside the above.
+- Import attributes were rejected where the grammar allows them. `AttributeKey` is
+  `IdentifierName | StringLiteral` and only the identifier half was implemented, so
+  `with { "type": "json" }` — the quoted form the proposal's own examples use — was an unexpected
+  token; and an `ExportDeclaration` with a `FromClause` takes a `WithClause` exactly as an
+  `ImportDeclaration` does, but none of the three export `from` forms accepted one. **Fixed** in
+  `2f226ef`; regressions in `ModuleAttributeClauseTests`. Note this fixes valid source failing to
+  compile, not attribute *enforcement*: attributes are parsed and not acted on, as they already
+  were for imports (nothing reads `AstImportStatement.Attributes`). Rejecting a module whose type
+  does not match its attribute is a separate capability decision.
+- `await` as a module-level identifier was accepted in every binding position (`var await`,
+  `let`/`const`, a function name, a parameter, a class name, a catch parameter, a destructuring
+  target, a label, and every ImportedBinding shape). **Fixed — the parser now has a module goal.**
+  This is the one module early error that could not be inferred from the AST the way the
+  duplicate-name rules were: `await` is reserved from a module's first token, before any import or
+  export has been seen. The goal travels in `JSCompilationOptions.IsModule`, which is deliberate —
+  those options *are* the code-cache key, and the goal changes what the text means, so a module and
+  a script with identical source must not share a compile entry. The parser reads it through an
+  ambient `CoreScript` scope (the mechanism `AllowTopLevelAwait` already uses, since the parser is
+  several assemblies from the host and `IJSCompiler.Compile` carries no options), and that scope is
+  entered from the *same* resolved options value that goes into the key, so the two cannot drift
+  apart; it wraps the compile factory, so a cache hit never pays for it. Blast radius outside module
+  code is nil by construction — every new rejection is gated on the goal, which is false for every
+  script compile, and the tests assert that scripts still treat `await` as an ordinary name. Inside
+  modules the rule is about bindings only: `await` stays legal as a property name, a method name and
+  the operator, including top-level await. Landed in `8e745b4`; regressions in
+  `ModuleAwaitReservedTests`.
+
+## Retired — did not reproduce
+
+Each was checked against the current pointer; the cases tried are recorded so the note is not
+carried again as an asserted gap.
+
+### Track 1 — language and built-ins
+
+- `new.target` is rejected in a direct eval nested inside an eval-compiled function.
+  **Does not reproduce**; `staging/sm/class/newTargetEval.js` passes. It is in the failure
+  manifest from an older run — confirm against a current CI run before removing the path.
+- Comment and regular-expression-literal lexical edge cases, labeled and unlabeled `continue`,
+  and block-scoped loop bindings. **Do not reproduce:** `test/language/comments`,
+  `test/language/asi` and the `for`/`if`/`while`/`do-while`/`labeled` directories pass apart
+  from the early-error cluster above.
+- `slice`, `unshift`, `toReversed`, `reduceRight`, array mutation limits, near-maximum lengths,
+  and Proxy-created results retain confirmed failure paths. **Largely does not reproduce:** all
+  four directories pass except `slice/create-proto-from-ctor-realm-array.js`, a cross-realm
+  species case.
+
+  The one remaining case is [open](broiler-js-gaps-open.md#track-1--core-language-and-built-ins).
+
+### From the retest queue
+
+- ~~suspected overlap or offset wrong answers in `TypedArray.prototype.set`~~ — **retired: does
+  not reproduce.** `TypedArraySetOverlapTests` (21 cases) is the minimal current-pointer
+  reproduction the gate asked for and every case already answers as §23.2.3.26 requires. The
+  three that constrain an implementation are the different-element-type overlaps on one buffer,
+  where a naive in-place loop reads bytes it has already overwritten: a `Uint16`, `Uint32` and
+  `Int16` source copied over an overlapping `Uint8` target each gave the clone-source-first
+  answer, not the naive one. Same-type overlap in both directions, offsets (including a
+  fractional one), the `RangeError` cases, the offset-before-element-read ordering rule, and
+  element conversion are pinned alongside them. The tests stay as the guard for the optional
+  fast copy path (MOD-M8-5), which is what would reintroduce the hazard; the
+  [gate](../Broiler.JS/docs/roadmap/Component.md#immediate-correctness-gate-typedarrayprototypeset)
+  records the full case list;
+- ~~older `Intl.DateTimeFormat` range/parts, SameValue, and Proxy-ordering reports~~ —
+  **retired: none of the three reproduces**, pinned by `IntlDateTimeFormatRangeTests`. The
+  options bag is read in exactly the `InitializeDateTimeFormat` order (observed through a
+  `Proxy`: `localeMatcher` through `timeStyle`, 20 keys); `formatToParts` splits a rendering
+  into typed parts and `formatRangeToParts` marks the start components `startRange`, the
+  separator `shared` and the end components `endRange`; two equal instants collapse to the
+  single non-range rendering (`formatRange(d, d) === format(d)`, every part then `shared`); an
+  invalid date is a `RangeError` and an undefined endpoint a `TypeError`; and `resolvedOptions`
+  returns a fresh object with stable contents. The tests assert structure rather than rendered
+  separator text, which is ICU-version dependent;
+- ~~historical M0 failures where `JSON.stringify` ignored a `toJSON` result and
+  `Array.isArray(new Proxy([], {}))` returned false~~ — **retired: neither reproduces.**
+  `toJSON` is honoured for a plain object, a nested value, an array element (receiving its
+  index as the key), a `Date`, and a `toJSON` returning an object, and it composes with a
+  replacer; `Array.isArray` answers through a proxy, a proxy of a proxy and a non-array proxy,
+  throws for a revoked one, and `Object.prototype.toString` and `JSON.stringify` agree with it;
+- ~~the archived observation that async continuations did not run under in-process `Eval` or
+  `Execute`~~ — **retired: does not reproduce**, pinned by `AsyncContinuationDrainTests`. A job
+  queued by script during an in-process `Eval` — a promise reaction, a chain of them, a
+  rejection handler, or an async function's resumption after one or several `await`s — has run
+  by the time the call returns, so a later `Eval` on the same context observes its effect; the
+  same holds through `EvalWithTopLevelAwaitAsync`. Both halves of the contract are pinned: the
+  reaction is not run inline during the script that queues it, and it is not lost either;
+- ~~a rejected function-`prototype` write historically changing later `[[Construct]]`
+  behavior~~ — **reproduced and fixed**; see
+  [Track 1 — Objects, arrays, symbols](#track-1--objects-arrays-symbols-and-proxy-sensitive-behavior)
+  above.
+
+Sources:
+
+- [TypedArray gate](../Broiler.JS/docs/roadmap/Component.md#immediate-correctness-gate-typedarrayprototypeset)
+- [Older compliance triage](../Broiler.JS/docs/compliance/known-gaps.md)
+- [M0 Test262 subset](../tests/m0-baseline/conformance/test262-subset/test262-subset-summary.md)
+- [Historical status reconciliation](../Broiler.JS/docs/roadmap/Roadmap.status.md)
+- [Archived async observation](../Broiler.JS/docs/roadmap/Archive.md)
+- [Module initialization record](../Broiler.JS/docs/roadmap/Phase-1.status.md)
+- [DOM form roadmap](../Broiler.DOM/docs/roadmap.md)
