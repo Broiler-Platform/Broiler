@@ -34,10 +34,20 @@ Verify with `dotnet test Broiler.Regex.slnx` inside the submodule — 247 tests,
   patch above has been pushed and this repository's `Broiler.Regex` gitlink bumped to it
 - **File:** `0002-broiler-js-route-v-mode-class-sets-and-in-class-property-escapes.patch`
 
-Track 2 action 5. It uses `CharSet.UsesPropertyEscape` and `CharSet.MatchesEmptyString`,
-which the Broiler.Regex patch introduces, so applying it first will not compile.
+This patch carries both track-2 Broiler.JS changes:
 
-Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2173 pass) and
+- **Action 5 — routing.** `JSRegExp`'s gap scan routes `v`-mode class-set expressions and
+  property escapes used as class members. It uses `CharSet.UsesPropertyEscape` and
+  `CharSet.MatchesEmptyString`, which the Broiler.Regex patch introduces, so applying it
+  before that patch will not compile.
+- **Action 4 — one match-data abstraction.** `JSRegExp.Split`/`Replace` and `assert.match`
+  now match through the routed engine (a shared `EnumerateMatches` over `RunMatch`), and
+  `IJSRegExp.Value` is replaced by an engine-agnostic `IsMatch`. This part needs only the
+  types already present in `a98619ab`, but it is bundled here because it shares
+  `JSRegExp.Broiler.cs`.
+
+Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2180 pass, up from
+2173 — the seven new `RegExpEngineConsistencyTests`) and
 `dotnet test Broiler.JS/Broiler.JavaScript.Integration.Tests` (5024 of 5025 — the one
 failure, `M8ValidationTests.M8_DocumentationFiles_Exist`, is pre-existing and unrelated:
 it asserts a `docs/roadmap.md` that the component's own reorganisation replaced with

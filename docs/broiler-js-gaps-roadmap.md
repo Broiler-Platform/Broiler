@@ -256,9 +256,19 @@ submodule and carries a minimal regression in `Broiler.Regex.Tests`.
   has to approximate, since it evaluates the set itself and can only fall back to .NET's
   code-unit-based `\p{Lu}` inside `[…]`. Property escapes reaching the parser without
   throwing also means a pattern such as `(?<=(\p{L}))b`, refused before, now routes.
+- **One match-data abstraction (action 4).** `exec` already read either backend through
+  `RunMatch`; now `Split` and `Replace` do too, via a shared `EnumerateMatches` iterator
+  over `RunMatch` (code-point-aware empty-match advance, `lastIndex` left untouched exactly
+  as the .NET path left it). So the legacy `String.prototype.split`/`replace` fallback —
+  reached when a RegExp's `@@split`/`@@replace` is removed — answers a routed gap pattern
+  with Broiler's match data instead of the .NET translation's, which is wrong for exactly
+  those patterns (e.g. `(a?b??)*` on "ab" matches "ab", not "a"). `IJSRegExp.Value`, which
+  handed callers the raw .NET `Regex` (and would be `null` once a Broiler-only pattern is
+  routed), is retired for an engine-agnostic `IsMatch`, so `assert.match` routes too.
+  Regressions: `BuiltIns.Tests/RegExpEngineConsistencyTests`.
 
 Evidence: `dotnet test Broiler.Regex.slnx` — 247 tests, up from 57; the Broiler.JS
-`BuiltIns` (2173) and `Integration` (5024 of 5025) suites pass, the one failure being the
+`BuiltIns` (2180) and `Integration` (5024 of 5025) suites pass, the one failure being the
 pre-existing `M8_DocumentationFiles_Exist`, which asserts a `docs/roadmap.md` that the
 component's own reorganisation replaced with `docs/roadmap/`. Plus 220,172 differential
 pattern/flag/input cases run against V8 — three hand-built corpora and one seeded fuzz —
@@ -273,11 +283,13 @@ patch introduces.
 
 ### Remaining work
 
-1. **Action 4 — one match-data abstraction.** `RegExpBuiltinExec` reads either backend, but
-   `Split`, `Replace` and `IJSRegExp.Value` still build a .NET `Regex`. This is the gate on
-   everything else: a pattern the translator cannot represent at all still cannot be routed,
-   however correctly Broiler.Regex matches it, and a routed pattern answers `exec` from one
-   engine and `replace` from the other.
+1. **Let a routed pattern skip the .NET build (the tail of action 4).** Action 4 unified the
+   match data — every operation now reads the routed engine — but `CreateRegex` still
+   compiles the .NET `Regex` for *every* pattern, so one the translator cannot represent
+   still fails to construct even though Broiler would match it. Now that no supported
+   operation reads the .NET engine for a routed pattern, `value` can become nullable and the
+   translation can be skipped (or allowed to fail) when a pattern is routed. That is the step
+   that finally lets a Broiler-only pattern through, and the gate on retiring the translator.
 2. **The pinned corpus in CI.** The focused test262 RegExp and UnicodeSets paths have not
    been run under the expanded routing; `scripts/compliance/test262-failures.txt` stays the
    path source and must not be reduced before CI confirms.
@@ -306,10 +318,12 @@ See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.m
    patterns.~~ Done.
 3. ~~Implement complete mode-sensitive canonicalization and pin astral and multi-script
    cases.~~ Done.
-4. Move `Exec`, `Split`, and `Replace` to one match-data abstraction.
+4. ~~Move `Exec`, `Split`, and `Replace` to one match-data abstraction.~~ Done — all three
+   read the routed engine through `EnumerateMatches`/`RunMatch`, and `IJSRegExp.Value` is
+   replaced by an engine-agnostic `IsMatch`. The remaining step is making `value` nullable so
+   a routed pattern need not also be translatable to .NET (remaining work item 1).
 5. ~~Expand native routing only for syntax and semantics covered by focused and pinned
-   corpus tests.~~ Done for the class-set and in-class property shapes; further expansion
-   waits on action 4.
+   corpus tests.~~ Done for the class-set and in-class property shapes.
 6. Retire the translator only after captures, named groups, indices, `lastIndex`, species,
    replacement substitutions, and observable property order are clean.
 

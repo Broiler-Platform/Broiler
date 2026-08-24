@@ -1,39 +1,179 @@
-From 0b87501f9a7e3727fd8ab33b26552bc024f84fdc Mon Sep 17 00:00:00 2001
+From ef8fe65f9c42b93c130c968507970a6c4fbe6160 Mon Sep 17 00:00:00 2001
 From: MaiRat <enrico.bartky@gmail.com>
-Date: Sun, 23 Aug 2026 23:12:34 +0000
-Subject: [PATCH] Route v-mode class sets and in-class property escapes to
- Broiler.Regex
+Date: Mon, 24 Aug 2026 05:43:45 +0000
+Subject: [PATCH] Route v-mode class sets and property escapes, and unify
+ Split/Replace match data
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
 
-Two shapes the source-to-source translator can only approximate now go to the engine
-that evaluates them directly.
+Two track-2 changes on the Broiler.JS side of the RegExp integration.
 
-A v-mode class-set expression — `[a&&b]`, `[a--b]`, `[[a][b]]`, `\q{…}` — has to be
-evaluated by whoever compiles it, and the translator evaluates it itself and emits a
-.NET fragment for the result. A property escape used as a class member is worse: the
-in-class form can neither nest a complemented fragment nor hold a supplementary-plane
-range, so the translator falls back to .NET's `\p{Lu}`, which is code-unit based and
-cannot match an astral member at all.
+Routing (action 5): the gap scan now routes a v-mode class-set expression — `[a&&b]`,
+`[a--b]`, `[[a][b]]`, `\q{…}` — and a property escape used as a class member. Both are
+shapes the source-to-source translator can only approximate: it has to evaluate the set
+itself, and inside `[…]` it falls back to .NET's code-unit-based `\p{Lu}`, which cannot
+match a supplementary-plane member. Broiler.Regex evaluates both directly. Property
+escapes reaching the parser without throwing also means a pattern like `(?<=(\p{L}))b`,
+refused before, now routes. `UsesUnsupported` — which existed to refuse a class-set
+pattern the matcher would have mis-matched — has nothing left to refuse and is gone.
 
-Broiler.Regex now implements both, so `UsesUnsupported` — which existed to refuse
-routing a class-set pattern the matcher would have silently mis-matched — has nothing
-left to refuse and is gone. The same change makes property escapes reach the router at
-all: they used to throw during the routing re-parse, so a pattern like `(?<=(\p{L}))b`
-was handed back to .NET despite hitting a documented look-behind capture gap.
+Match data (action 4): `exec` already read either engine through `RunMatch`; now `Split`
+and `Replace` do too, via a shared `EnumerateMatches` iterator over `RunMatch`
+(code-point-aware empty-match advance, `lastIndex` left untouched exactly as the .NET
+path left it). So the legacy `String.prototype.split`/`replace` fallback — reached when a
+RegExp's `@@split`/`@@replace` is removed — answers a routed gap pattern with Broiler's
+match data instead of the .NET translation's, which is wrong for exactly those patterns
+(`(a?b??)*` on "ab" matches "ab", not "a"). `IJSRegExp.Value`, which handed callers the
+raw .NET `Regex` — the wrong engine for a routed pattern, and null once a Broiler-only
+pattern is routed — is retired for an engine-agnostic `IsMatch`, so `assert.match` routes
+too.
 
-The quantifier's empty-iteration test also learns that `[\q{}]` matches without
-advancing; it is the one character class that can.
+Regressions in RegExpEngineConsistencyTests prove the legacy split/replace and
+`IJSRegExp.IsMatch` give the routed engine's answer for a gap pattern, and that a
+non-routed pattern's result is unchanged. BuiltIns.Tests 2180 (up from 2173); the
+Integration suite's one failure, M8_DocumentationFiles_Exist, is pre-existing and
+unrelated.
 
-Requires the matching Broiler.Regex revision (its `CharSet.UsesPropertyEscape` and
-`MatchesEmptyString`).
+Requires the matching Broiler.Regex revision (its CharSet.UsesPropertyEscape and
+MatchesEmptyString).
 ---
- .../RegExp/JSRegExp.Broiler.cs                | 39 +++++++++++--------
- 1 file changed, 23 insertions(+), 16 deletions(-)
+ .../RegExpEngineConsistencyTests.cs           | 120 ++++++++++++++++++
+ .../RegExp/JSRegExp.Broiler.cs                |  83 +++++++++---
+ .../RegExp/JSRegExp.cs                        | 113 +++++++++--------
+ .../Broiler.JavaScript.Modules/JSAssert.cs    |   2 +-
+ .../Broiler.JavaScript.Runtime/IJSRegExp.cs   |  13 +-
+ 5 files changed, 258 insertions(+), 73 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpEngineConsistencyTests.cs
 
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpEngineConsistencyTests.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpEngineConsistencyTests.cs
+new file mode 100644
+index 00000000..01344caf
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpEngineConsistencyTests.cs
+@@ -0,0 +1,120 @@
++using System.Runtime.CompilerServices;
++using Broiler.JavaScript.Engine;
++using Broiler.JavaScript.Runtime;
++
++namespace Broiler.JavaScript.BuiltIns.Tests;
++
++/// <summary>
++/// Action 4 of the Broiler.JS gaps roadmap, track 2: the legacy
++/// <c>String.prototype.split</c>/<c>replace</c> fallback (reached when a RegExp's
++/// <c>@@split</c>/<c>@@replace</c> is removed) and <c>assert.match</c> now drive matching
++/// through the same <c>RunMatch</c> abstraction <c>exec</c> uses, so a pattern routed to
++/// the Broiler.Regex backend answers every operation with the same match data — not the
++/// .NET translation, which is wrong for exactly the gap patterns that get routed.
++///
++/// The distinguishing pattern is <c>(a?b??)*</c> on "ab": ECMAScript's RepeatMatcher
++/// abandons an empty iteration and matches the whole "ab", while .NET keeps looping and
++/// matches only "a" (issue #923 problem 8). Each case below is the answer that follows
++/// from the "ab"-long match; the .NET-span answer it replaces is noted beside it.
++/// </summary>
++public class RegExpEngineConsistencyTests
++{
++    private static void Load() => RuntimeHelpers.RunClassConstructor(typeof(Clr.DefaultClrInterop).TypeHandle);
++
++    private static string Eval(string body)
++    {
++        Load();
++        using var ctx = new JSContext();
++        return ctx.Eval(body).ToString();
++    }
++
++    [Fact(Timeout = 600000)]
++    public void LegacyStringReplace_UsesTheRoutedEngine()
++    {
++        // Broiler match is "ab" → "[ab]"; the .NET translation matched "a" → "[a]b".
++        var result = Eval(@"
++            delete RegExp.prototype[Symbol.replace];
++            'ab'.replace(/(a?b??)*/, '[$&]');
++        ");
++        Assert.Equal("[ab]", result);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void LegacyStringReplace_Functional_UsesTheRoutedEngine()
++    {
++        // The functional replacer receives the Broiler match ("ab"), not the .NET one ("a").
++        var result = Eval(@"
++            delete RegExp.prototype[Symbol.replace];
++            'ab'.replace(/(a?b??)*/, function (m) { return '<' + m + '>'; });
++        ");
++        Assert.Equal("<ab>", result);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void LegacyStringReplace_CaptureSubstitution_UsesTheRoutedEngine()
++    {
++        // The whole match is "ab", but $1 is the LAST iteration's capture, "b" (matching
++        // V8) — the point is that the substitution reads Broiler's normalized capture
++        // array, so it agrees with exec's, not the .NET translation's.
++        var result = Eval(@"
++            delete RegExp.prototype[Symbol.replace];
++            'ab'.replace(/(a?b??)*/, '<$&|$1>');
++        ");
++        Assert.Equal("<ab|b>", result);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void LegacySplit_UsesTheRoutedEngine()
++    {
++        // The whole string is one "ab"-long match, so nothing but the empty edges remain:
++        // ["", ""]. The .NET span "a" left the trailing "b" behind: ["", "b"].
++        var result = Eval(@"
++            delete RegExp.prototype[Symbol.split];
++            JSON.stringify('ab'.split(/(?:a?b??)*/));
++        ");
++        Assert.Equal("[\"\",\"\"]", result);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void SymbolAndLegacyReplace_Agree_ForARoutedPattern()
++    {
++        // The spec @@replace path (exec-driven) and the legacy fallback must now give the
++        // same answer for a routed pattern, since both run the Broiler engine.
++        var viaSymbol = Eval("'ab'.replace(/(a?b??)*/, '[$&]');");
++        var viaLegacy = Eval(@"
++            delete RegExp.prototype[Symbol.replace];
++            'ab'.replace(/(a?b??)*/, '[$&]');
++        ");
++        Assert.Equal(viaSymbol, viaLegacy);
++        Assert.Equal("[ab]", viaSymbol);
++    }
++
++    [Fact(Timeout = 600000)]
++    public void IJSRegExp_IsMatch_RunsThroughTheRoutedEngine()
++    {
++        // The engine-agnostic IsMatch that replaced IJSRegExp.Value (which handed callers the
++        // .NET Regex directly). A routed pattern — a look-behind with a capture — answers the
++        // match test through Broiler.Regex, agreeing with RegExp.prototype.test.
++        Load();
++        using var ctx = new JSContext();
++
++        var routed = (IJSRegExp)ctx.Eval("/(?<=(a))b/");
++        Assert.True(routed.IsMatch("ab"));
++        Assert.False(routed.IsMatch("xb"));
++
++        // A non-routed pattern still answers through the .NET translation, unchanged.
++        var plain = (IJSRegExp)ctx.Eval("/\\d+/");
++        Assert.True(plain.IsMatch("x42"));
++        Assert.False(plain.IsMatch("abc"));
++    }
++
++    [Fact(Timeout = 600000)]
++    public void NonRoutedReplace_IsUnchanged()
++    {
++        // A pattern with no gap keeps using the .NET translation; the abstraction must not
++        // change its result. Global replace with a capture substitution.
++        Assert.Equal("[a]1[b]2", Eval("'a1b2'.replace(/([a-z])(\\d)/g, '[$1]$2');"));
++        Assert.Equal("X.X.X", Eval("'a.b.c'.replace(/[a-z]/g, 'X');"));
++        Assert.Equal("[\"a\",\"b\",\"c\"]", Eval("JSON.stringify('a,b,c'.split(/,/));"));
++    }
++}
 diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs
-index ab81fe77..73efb853 100644
+index ab81fe77..3d5f372e 100644
 --- a/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs
 +++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.Broiler.cs
 @@ -20,12 +20,16 @@ namespace Broiler.JavaScript.BuiltIns.RegExp;
@@ -133,6 +273,292 @@ index ab81fe77..73efb853 100644
              AnchorNode => true,
              LookaroundNode => true,
              BackreferenceNode => true, // an unset back-reference matches the empty string
+@@ -271,6 +278,50 @@ public partial class JSRegExp
+         return FromNet(value.Match(input, start));
+     }
+ 
++    /// <summary>
++    /// Enumerates the non-overlapping matches of this pattern in <paramref name="input"/>
++    /// through the active engine, advancing past an empty match by one code point (a
++    /// surrogate pair under <c>u</c>/<c>v</c>) as §22.2.6.9 iteration requires. This is the
++    /// engine-agnostic equivalent of a .NET <c>Match</c>/<c>NextMatch</c> loop, so a
++    /// Broiler-routed pattern drives <see cref="Split"/> and <see cref="Replace(string,string)"/>
++    /// with the same match data <c>exec</c> sees rather than the .NET translator's — which
++    /// is wrong for exactly the gap patterns that get routed.
++    /// </summary>
++    internal IEnumerable<RegexMatchData> EnumerateMatches(string input)
++    {
++        var pos = 0;
++        while (pos <= input.Length)
++        {
++            var match = RunMatch(input, pos);
++            if (!match.Success)
++                yield break;
++
++            yield return match;
++
++            var next = match.Index + match.Length;
++            if (match.Length == 0)
++            {
++                // Advance one position past an empty match so iteration terminates, keeping
++                // a surrogate pair whole under u/v (the same rule BroilerRegex.Matches uses).
++                next = match.Index + 1;
++                if ((unicode || unicodeSets) && match.Index < input.Length
++                    && char.IsHighSurrogate(input[match.Index])
++                    && match.Index + 1 < input.Length && char.IsLowSurrogate(input[match.Index + 1]))
++                    next++;
++            }
++            pos = next;
++        }
++    }
++
++    /// <summary>
++    /// True when this pattern matches anywhere in <paramref name="input"/>, through the
++    /// active engine. The engine-agnostic replacement for reaching a caller's own
++    /// <c>System.Text.RegularExpressions.Regex.IsMatch</c> off the retired
++    /// <c>IJSRegExp.Value</c>, so a routed pattern answers a match test the same way
++    /// <c>exec</c> does.
++    /// </summary>
++    internal bool IsMatch(string input) => RunMatch(input, 0).Success;
++
+     private static RegexMatchData FromBroiler(RegexMatch m)
+     {
+         if (!m.Success)
+diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.cs
+index 15768518..76285f76 100644
+--- a/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.cs
++++ b/Broiler.JS/Broiler.JavaScript.BuiltIns/RegExp/JSRegExp.cs
+@@ -19,7 +19,7 @@ public partial class JSRegExp : JSObject, IJSRegExp
+ {
+     string IJSRegExp.Pattern => pattern;
+     string IJSRegExp.Flags => flags;
+-    Regex IJSRegExp.Value => value;
++    bool IJSRegExp.IsMatch(string input) => IsMatch(input);
+ 
+     internal static bool IsRegExpLike(JSValue value)
+     {
+@@ -488,26 +488,21 @@ public partial class JSRegExp : JSObject, IJSRegExp
+         if (limit == 0)
+             return CreateArray();
+ 
+-        // Find the first match.
+-        Match match = value.Match(input, 0);
+-
+-
+         var results = CreateArray();
+         int startIndex = 0;
+-        Match lastMatch = null;
+ 
+-        while (match.Success == true)
++        // Iterate through the active engine (Broiler when the pattern was routed, .NET
++        // otherwise) rather than a .NET Match/NextMatch loop, so a gap pattern splits on
++        // the same matches exec reports. Groups is already the ECMAScript-order capture
++        // array; an unmatched group contributes undefined.
++        foreach (var match in EnumerateMatches(input))
+         {
+-            // Do not match the an empty substring at the start or end of the string or at the
++            // Do not split on an empty match at the start or end of the string or at the
+             // end of the previous match.
+             if (match.Length == 0 && (match.Index == 0 || match.Index == input.Length || match.Index == startIndex))
+-            {
+-                // Find the next match.
+-                match = match.NextMatch();
+                 continue;
+-            }
+ 
+-            // Add the match results to the array.
++            // Add the text preceding this match.
+             var element = input.Substring(startIndex, match.Index - startIndex);
+             results.AddArrayItem(CreateString(element));
+ 
+@@ -516,24 +511,17 @@ public partial class JSRegExp : JSObject, IJSRegExp
+ 
+             startIndex = match.Index + match.Length;
+ 
+-            for (int i = 1; i < match.Groups.Count; i++)
++            var groups = match.Groups;
++            for (int i = 1; i < groups.Length; i++)
+             {
+-                var group = match.Groups[i];
+-                if (group.Captures.Count == 0)
+-                    results.AddArrayItem(JSUndefined.Value);       // Non-capturing groups return "undefined".
+-                else
+-                    results.AddArrayItem(CreateString(match.Groups[i].Value));
++                var group = groups[i];
++                results.AddArrayItem(group.Success ? CreateString(group.Value) : JSUndefined.Value);
+ 
+                 if (results.Length >= limit)
+                     return results;
+             }
+-
+-            // Record the last match.
+-            lastMatch = match;
+-
+-            // Find the next match.
+-            match = match.NextMatch();
+         }
++
+         var ele = input.Substring(startIndex, input.Length - startIndex);
+         results.AddArrayItem(CreateString(ele));
+         return results;
+@@ -553,26 +541,47 @@ public partial class JSRegExp : JSObject, IJSRegExp
+             // throws for an object yielding no primitive — not the lenient CLR ToString.
+             return Replace(input, replaceFunction.StringValue);
+ 
+-        return value.Replace(input, match =>
++        return ReplaceMatches(input, match =>
+         {
+-            // Set the deprecated RegExp properties.
+-            //this.Engine.RegExp.SetDeprecatedProperties(input, match);
++            var groups = match.Groups;
++            JSValue[] parameters = new JSValue[groups.Length + 2];
++            for (int i = 0; i < groups.Length; i++)
++                parameters[i] = groups[i].Success ? CreateString(groups[i].Value) : JSUndefined.Value;
+ 
+-            JSValue[] parameters = new JSValue[match.Groups.Count + 2];
+-            for (int i = 0; i < match.Groups.Count; i++)
+-            {
+-                if (match.Groups[i].Success == false)
+-                    parameters[i] = JSUndefined.Value;
+-                else
+-                    parameters[i] = CreateString(match.Groups[i].Value);
+-            }
+-
+-            parameters[match.Groups.Count] = CreateNumber(match.Index);
+-            parameters[match.Groups.Count + 1] = CreateString(input);
++            parameters[groups.Length] = CreateNumber(match.Index);
++            parameters[groups.Length + 1] = CreateString(input);
+ 
+             var a = new Arguments(NullValue, parameters);
+             return replaceFunction.InvokeFunction(a).ToString();
+-        }, globalSearch == true ? int.MaxValue : 1);
++        });
++    }
++
++    /// <summary>
++    /// Builds the replacement result: each match up to the global/first-only limit has its
++    /// span replaced by <paramref name="evaluator"/>. Iterates the active engine through
++    /// <see cref="EnumerateMatches"/> — the .NET-agnostic equivalent of
++    /// <c>Regex.Replace(input, evaluator, count)</c> — so a routed pattern replaces on the
++    /// same matches <c>exec</c> reports.
++    /// </summary>
++    private string ReplaceMatches(string input, System.Func<RegexMatchData, string> evaluator)
++    {
++        var limit = globalSearch ? int.MaxValue : 1;
++        var builder = new StringBuilder(input.Length);
++        int last = 0;
++        int done = 0;
++
++        foreach (var match in EnumerateMatches(input))
++        {
++            if (done >= limit)
++                break;
++            builder.Append(input, last, match.Index - last);
++            builder.Append(evaluator(match));
++            last = match.Index + match.Length;
++            done++;
++        }
++
++        builder.Append(input, last, input.Length - last);
++        return builder.ToString();
+     }
+ 
+     /// <summary>
+@@ -586,16 +595,18 @@ public partial class JSRegExp : JSObject, IJSRegExp
+         // Check if the replacement string contains any patterns.
+         bool replaceTextContainsPattern = replaceText.IndexOf('$') >= 0;
+ 
+-        // Replace the input string with replaceText, recording the last match found.
+-        Match lastMatch = null;
+-        string result = value.Replace(input, match =>
++        return ReplaceMatches(input, match =>
+         {
+-            lastMatch = match;
+-
+             // If there is no pattern, replace the pattern as is.
+             if (replaceTextContainsPattern == false)
+                 return replaceText;
+ 
++            var groups = match.Groups;
++
++            // An unmatched capture substitutes the empty string, matching .NET's Group.Value
++            // for a non-participating group (RegexMatchData reports it as null).
++            string Capture(int n) => groups[n].Success ? groups[n].Value : string.Empty;
++
+             // Patterns
+             // $$	Inserts a "$".
+             // $&	Inserts the matched substring.
+@@ -627,16 +638,16 @@ public partial class JSRegExp : JSObject, IJSRegExp
+                             matchNumber2 = matchNumber1 * 10 + (replaceText[i + 1] - '0');
+ 
+                         // Try the two digit capture first.
+-                        if (matchNumber2 > 0 && matchNumber2 < match.Groups.Count)
++                        if (matchNumber2 > 0 && matchNumber2 < groups.Length)
+                         {
+                             // Two digit capture replacement.
+-                            replacementBuilder.Append(match.Groups[matchNumber2].Value);
++                            replacementBuilder.Append(Capture(matchNumber2));
+                             i++;
+                         }
+-                        else if (matchNumber1 > 0 && matchNumber1 < match.Groups.Count)
++                        else if (matchNumber1 > 0 && matchNumber1 < groups.Length)
+                         {
+                             // Single digit capture replacement.
+-                            replacementBuilder.Append(match.Groups[matchNumber1].Value);
++                            replacementBuilder.Append(Capture(matchNumber1));
+                         }
+                         else
+                         {
+@@ -657,9 +668,7 @@ public partial class JSRegExp : JSObject, IJSRegExp
+             }
+ 
+             return replacementBuilder.ToString();
+-        }, globalSearch == true ? -1 : 1);
+-
+-        return result;
++        });
+     }
+ 
+     /// <summary>
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules/JSAssert.cs b/Broiler.JS/Broiler.JavaScript.Modules/JSAssert.cs
+index 3068a86b..f0d7fa31 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules/JSAssert.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules/JSAssert.cs
+@@ -135,7 +135,7 @@ public partial class JSAssert : JSFunction
+         if (regex is not IJSRegExp match)
+             throw new JSException($"Second parameter must be regex");
+ 
+-        if (!match.Value.IsMatch(text.ToString()))
++        if (!match.IsMatch(text.ToString()))
+         {
+             var msg = !msgObj.IsUndefined ? msgObj.ToString() : $"Regex match failed of {text} with {regex}";
+             throw new JSException(msg);
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/IJSRegExp.cs b/Broiler.JS/Broiler.JavaScript.Runtime/IJSRegExp.cs
+index 16883d16..04c044ef 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/IJSRegExp.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/IJSRegExp.cs
+@@ -1,5 +1,3 @@
+-using System.Text.RegularExpressions;
+-
+ namespace Broiler.JavaScript.Runtime;
+ 
+ /// <summary>
+@@ -15,6 +13,13 @@ public interface IJSRegExp
+     /// <summary>Gets the flags string (e.g. "gi").</summary>
+     string Flags { get; }
+ 
+-    /// <summary>Gets the underlying .NET <see cref="Regex"/> instance.</summary>
+-    Regex Value { get; }
++    /// <summary>
++    /// True when the pattern matches anywhere in <paramref name="input"/>. Runs through
++    /// whichever engine the RegExp is bound to (the Broiler.Regex backend for a routed
++    /// gap pattern, the .NET translation otherwise), so callers see the same answer
++    /// <c>exec</c> would. Replaces the earlier <c>Regex Value</c> accessor, which exposed
++    /// the .NET engine directly and was wrong for a routed pattern (and null once a
++    /// pattern the translator cannot represent is routed).
++    /// </summary>
++    bool IsMatch(string input);
+ }
 -- 
 2.43.0
 
