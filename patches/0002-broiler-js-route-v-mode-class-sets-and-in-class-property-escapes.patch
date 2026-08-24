@@ -1,8 +1,8 @@
-From 4a3a9bfd629a99245b17ae10c988af9e16519a90 Mon Sep 17 00:00:00 2001
+From dba1f10636c418e64a46eebf6676ced716c7df7a Mon Sep 17 00:00:00 2001
 From: MaiRat <enrico.bartky@gmail.com>
 Date: Mon, 24 Aug 2026 06:42:19 +0000
 Subject: [PATCH] Route all Unicode-mode patterns to Broiler; unify match data;
- iterate long repeats
+ iterate all repeats
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -12,19 +12,20 @@ rather than the .NET translation, fixing real match bugs the translation had
 for non-gap Unicode patterns -- a standalone \p{…} under i threw, in-class
 case folding was missed. Non-Unicode patterns keep the faster .NET engine.
 
-A quantifier over a single-code-point body now repeats through Broiler's
-iterative fast path, so a long subject matches natively; a complex-body
-quantifier still recurses, and RunMatch catches RegexOverflowException and
-falls back to .NET for that subject.
+Quantifier repetition is iterative in Broiler.Regex for every body shape, so a
+repeat over a subject of any length -- single-code-point or complex body --
+matches natively with no recursion and no .NET fallback. RunMatch still catches
+RegexOverflowException as a defensive backstop for a pathologically nested
+pattern, but input length no longer reaches it.
 ---
  .../RegExpEngineConsistencyTests.cs           | 120 +++++++++++++++
  .../RegExpTranslatorFallbackTests.cs          |  96 ++++++++++++
- .../RegExpUnicodeRoutingTests.cs              |  77 ++++++++++
+ .../RegExpUnicodeRoutingTests.cs              |  80 ++++++++++
  .../RegExp/JSRegExp.Broiler.cs                | 142 +++++++++++++----
  .../RegExp/JSRegExp.cs                        | 145 +++++++++++-------
  .../Broiler.JavaScript.Modules/JSAssert.cs    |   2 +-
  .../Broiler.JavaScript.Runtime/IJSRegExp.cs   |  13 +-
- 7 files changed, 504 insertions(+), 91 deletions(-)
+ 7 files changed, 507 insertions(+), 91 deletions(-)
  create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpEngineConsistencyTests.cs
  create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpTranslatorFallbackTests.cs
  create mode 100644 Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpUnicodeRoutingTests.cs
@@ -259,10 +260,10 @@ index 00000000..0a62689c
 +}
 diff --git a/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpUnicodeRoutingTests.cs b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpUnicodeRoutingTests.cs
 new file mode 100644
-index 00000000..920035c7
+index 00000000..8ef04802
 --- /dev/null
 +++ b/Broiler.JS/Broiler.JavaScript.BuiltIns.Tests/RegExpUnicodeRoutingTests.cs
-@@ -0,0 +1,77 @@
+@@ -0,0 +1,80 @@
 +using System.Runtime.CompilerServices;
 +using Broiler.JavaScript.Engine;
 +
@@ -272,11 +273,11 @@ index 00000000..920035c7
 +/// Action 6 of the Broiler.JS gaps roadmap, track 2: routing is widened so every
 +/// Unicode-mode (`u`/`v`) pattern Broiler.Regex can build runs on Broiler, not the .NET
 +/// translation. This fixes real match bugs the .NET path had for non-gap Unicode patterns —
-+/// a standalone `\p{…}` under `i` threw, and in-class case folding was missed. A quantifier
-+/// over a single-code-point body (`a+`, `.*`, `[^"]*`) now repeats through Broiler's
-+/// iterative fast path, so even a very long subject matches natively; a body the fast path
-+/// cannot take (a capturing group) still recurses, and there the stack-depth guard plus a
-+/// .NET fallback keeps it from overflowing.
++/// a standalone `\p{…}` under `i` threw, and in-class case folding was missed. Quantifier
++/// repetition is iterative for every body shape — a single-code-point body (`a+`, `.*`)
++/// through a linear fast path, any other body (a capturing group, an alternation) through an
++/// explicit-stack RepeatMatcher — so a repeat over a subject of any length matches natively
++/// with no recursion and no .NET fallback.
 +/// </summary>
 +public class RegExpUnicodeRoutingTests
 +{
@@ -322,12 +323,15 @@ index 00000000..920035c7
 +    }
 +
 +    [Fact(Timeout = 600000)]
-+    public void ComplexBodyQuantifierOverALongSubject_FallsBackToNet()
++    public void ComplexBodyQuantifierOverALongSubject_MatchesNativelyViaTheIterativeDriver()
 +    {
-+        // A capturing-group body is not eligible for the iterative fast path, so it still
-+        // recurses; the guard trips and RunMatch falls back to the .NET engine, so the match
-+        // still completes and is correct.
++        // A capturing-group body is not eligible for the fast path; it runs through the
++        // explicit-stack RepeatMatcher, so a long subject matches natively — no recursion,
++        // no .NET fallback — and the capture is the last iteration's.
 +        Assert.Equal("100000", Eval("'a'.repeat(100000).match(/(a)+/u)[0].length + ''"));
++        Assert.Equal("a", Eval("'a'.repeat(100000).match(/(a)+/u)[1]"));
++        // An alternation body over a long subject likewise completes natively.
++        Assert.Equal("100000", Eval("'ab'.repeat(50000).match(/(?:ab|a)+/u)[0].length + ''"));
 +    }
 +
 +    [Fact(Timeout = 600000)]

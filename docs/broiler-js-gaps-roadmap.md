@@ -296,15 +296,29 @@ submodule and carries a minimal regression in `Broiler.Regex.Tests`.
   and `RunMatch` catches it and falls back to the iterative .NET engine for that subject.
   Regressions: `Broiler.Regex.Tests/StackDepthGuardTests` and
   `BuiltIns.Tests/RegExpUnicodeRoutingTests`.
+- **Complex-body quantifiers repeat iteratively too (action 6, third tranche).** A body the
+  fast path cannot take — a capturing group, an alternation of sequences — no longer recurses
+  per iteration: it runs through an explicit-stack RepeatMatcher where each iteration level is
+  a heap frame and each level's body matches are enumerated in the body's own backtracking
+  order (by re-running the body with a continuation that fails N times then succeeds). Greedy
+  tries every body-match subtree before the stop branch, lazy the reverse, and the
+  empty-iteration guard is preserved — exactly what the recursive form computed, with only the
+  iteration dimension moved off the call stack. So a repeat over a subject of any length now
+  matches natively for *every* body shape. Native recursion is bounded by the pattern's
+  nesting depth (like the recursive-descent parser that accepted the pattern), never by the
+  subject, so the `RegexOverflowException` backstop is no longer reachable by input size — it
+  remains only for a pathologically nested pattern. Regressions:
+  `Broiler.Regex.Tests/StackDepthGuardTests` and `BuiltIns.Tests/RegExpUnicodeRoutingTests`.
 
-Evidence: `dotnet test Broiler.Regex.slnx` — 252 tests, up from 57; the Broiler.JS
-`BuiltIns` (2213) and `Integration` (5024 of 5025) suites pass, the one failure being the
+Evidence: `dotnet test Broiler.Regex.slnx` — 253 tests, up from 57; the Broiler.JS
+`BuiltIns` (2214) and `Integration` (5024 of 5025) suites pass, the one failure being the
 pre-existing `M8_DocumentationFiles_Exist`, which asserts a `docs/roadmap.md` that the
 component's own reorganisation replaced with `docs/roadmap/`. Plus 220,172 differential
 Broiler.Regex cases and a 12,792-case JSRegExp-level differential — both against V8 — whose
-only remaining mismatches are the two documented deliberate `vi` divergences, and a further
-1,534 quantifier-focused cases (greedy/lazy, captures, look-behind bodies, long subjects)
-run against V8 for the iterative path with zero mismatches.
+only remaining mismatches are the two documented deliberate `vi` divergences, a further
+1,534 quantifier-focused cases for the single-char fast path, and 3,008 complex-body cases
+for the general driver (nested quantifiers, empty-capable bodies, backreferences, lazy,
+multi-capture, look-behind bodies) — all against V8 with zero mismatches.
 
 The engine and routing changes live in submodules whose remotes are outside this session's
 GitHub scope, so both pushes returned 403 and the submodule pointers were deliberately not
@@ -314,18 +328,15 @@ patch introduces.
 
 ### Remaining work
 
-1. **Finish action 6 — the complex-body iterative matcher, then non-Unicode routing, then
-   retire the translator.** All of Unicode mode now routes to Broiler, and a quantifier over
-   a single-code-point body repeats iteratively, so the common long-subject case matches
-   natively. Two things still keep the .NET translator alive. First, a quantifier over a
-   *complex* body (a capturing group, an alternation of sequences) still recurses per
-   iteration and falls back to .NET on a long subject; making that repeat iterative too
-   removes the last fallback for Unicode mode. Second, non-Unicode patterns are still matched
-   by .NET on purpose — the clarity-first interpreter is much slower than .NET for the common
-   ASCII/hot-loop case — so routing them waits on that same performance work. Only once both
-   hold, and captures, named groups, indices, `lastIndex`, species, replacement
-   substitutions, and property order are confirmed clean through the shared path, can the
-   source-to-source translator be removed.
+1. **Finish action 6 — non-Unicode routing, then retire the translator.** All of Unicode mode
+   now routes to Broiler, and quantifier repetition is iterative for *every* body shape, so no
+   Unicode-mode pattern falls back on overflow — the matcher is the sole engine for Unicode
+   mode. One thing still keeps the .NET translator alive: non-Unicode patterns are matched by
+   .NET on purpose, because the clarity-first interpreter is much slower than .NET for the
+   common ASCII/hot-loop case, so routing them waits on the matcher-performance work (§4 of
+   the component roadmap). Only once that holds, and captures, named groups, indices,
+   `lastIndex`, species, replacement substitutions, and property order are confirmed clean
+   through the shared path, can the source-to-source translator be removed.
 2. **The pinned corpus in CI.** The focused test262 RegExp and UnicodeSets paths have not
    been run under the expanded routing; `scripts/compliance/test262-failures.txt` stays the
    path source and must not be reduced before CI confirms.
@@ -360,10 +371,10 @@ See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.m
    validated by a JSRegExp-level differential against V8. Non-Unicode routing is deferred to
    the matcher-performance work.
 6. Retire the translator only after captures, named groups, indices, `lastIndex`, species,
-   replacement substitutions, and observable property order are clean — now gated on a
-   complex-body iterative matcher (single-code-point bodies already iterate, so the
-   stack-guard's .NET fallback is needed only for capturing-group/alternation bodies) and
-   non-Unicode routing (remaining work item 1).
+   replacement substitutions, and observable property order are clean — now gated solely on
+   non-Unicode routing (remaining work item 1). Quantifier repetition is iterative for every
+   body shape, so no Unicode-mode pattern falls back to .NET on overflow; the stack guard is
+   a defensive backstop for pathological pattern nesting, unreachable by input size.
 
 **Exit gate:** the pinned supported RegExp corpus is clean without sending unsupported syntax to
 the native backend, and all public RegExp operations consume the same conforming match data.

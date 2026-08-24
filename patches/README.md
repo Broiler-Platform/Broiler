@@ -13,7 +13,7 @@ by its number.
 
 ## Open patches
 
-### `Resolve property escapes, evaluate v-mode class sets, fold from the UCD, iterate single-char repeats`
+### `Resolve property escapes, evaluate v-mode class sets, fold from the UCD, iterate all quantifier repeats`
 
 - **Target:** `Broiler.JS/Broiler.Regex` (`Broiler-Platform/Broiler.Regex`)
 - **Apply onto:** `56c660701457a7e23f17f95ec82af7c75bee2723`
@@ -23,15 +23,18 @@ Track 2 of [the Broiler.JS gaps roadmap](../docs/broiler-js-gaps-roadmap.md#trac
 actions 1–3: `\p{…}` resolves against the pinned `Broiler.Unicode` tables, `v`-mode
 class-set expressions and `\q{…}` are evaluated instead of skipped, and both branches of
 `Canonicalize` become table-driven from the Unicode Character Database. Also six Annex B
-grammar boundaries that differential testing against V8 turned up. A quantifier over a
-single-code-point body (`.*`, `\d+`, `[^"]*`) now repeats through an iterative fast path,
-so a long subject matches natively without recursing; a complex-body quantifier still
-recurses, and there a stack-depth guard (`RegexOverflowException`) makes it signal instead
-of crashing the process — the JavaScript layer catches it and falls back to .NET.
+grammar boundaries that differential testing against V8 turned up. Quantifier repetition is
+iterative for every body shape — a single-code-point body (`.*`, `\d+`, `[^"]*`) through a
+linear fast path, any other body (a capturing group, an alternation) through an
+explicit-stack RepeatMatcher — so a repeat over a subject of any length matches natively
+without recursing. Native recursion is bounded by the pattern's nesting depth (like the
+parser), never by the subject, so a `RegexOverflowException` backstop remains only for a
+pathologically nested pattern (the JavaScript layer catches it and falls back to .NET) and
+input length no longer reaches it.
 
-Verify with `dotnet test Broiler.Regex.slnx` inside the submodule — 252 tests, up from 57.
+Verify with `dotnet test Broiler.Regex.slnx` inside the submodule — 253 tests, up from 57.
 
-### `Route all Unicode-mode patterns to Broiler; unify match data; iterate long repeats`
+### `Route all Unicode-mode patterns to Broiler; unify match data; iterate all repeats`
 
 - **Target:** `Broiler.JS` (`Broiler-Platform/Broiler.JS`)
 - **Apply onto:** `a98619abbbcdcd70dbafddc96924b9e46ee60e85`, **after** the Broiler.Regex
@@ -54,16 +57,16 @@ This patch carries both track-2 Broiler.JS changes:
   routes **every Unicode-mode (`u`/`v`) pattern Broiler can build** (not just the gap
   shapes), fixing real .NET-translation bugs for non-gap Unicode patterns — a standalone
   `\p{…}` under `i` threw, in-class case folding was missed. Non-Unicode patterns keep the
-  faster .NET engine. A quantifier over a single-code-point body matches natively via the
-  Broiler patch's iterative fast path; only a complex-body quantifier can still overflow, and
-  there `RunMatch` catches `RegexOverflowException` from the Broiler patch and falls back to
-  .NET for that subject.
+  faster .NET engine. With the Broiler patch's quantifier repetition now iterative for every
+  body shape, no Unicode-mode pattern falls back on overflow; `RunMatch` still catches
+  `RegexOverflowException` from the Broiler patch as a defensive backstop for a pathologically
+  nested pattern, but input length no longer reaches it.
 
   All three parts need only the types already present in `a98619ab` plus `RegexOverflowException`
   and `CharSet.UsesPropertyEscape`/`MatchesEmptyString` from the Broiler.Regex patch, so
   applying this before that patch will not compile.
 
-Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2213 pass, up from
+Verify with `dotnet test Broiler.JS/Broiler.JavaScript.BuiltIns.Tests` (2214 pass, up from
 2173 — the new `RegExpEngineConsistencyTests`, `RegExpTranslatorFallbackTests` and
 `RegExpUnicodeRoutingTests`) and
 `dotnet test Broiler.JS/Broiler.JavaScript.Integration.Tests` (5024 of 5025 — the one
