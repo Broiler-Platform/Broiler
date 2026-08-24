@@ -530,6 +530,30 @@ the native backend, and all public RegExp operations consume the same conforming
   composition with the module's own exports. (`export * as ns from` is a separate production and
   already worked.)
 
+- The module duplicate-name early errors (§16.2.1.5) never fired, so `import { a, a } from 'm'`,
+  `import { a } from 'm'; var a;`, two imports binding one name, and a second `export default` all
+  ran with one binding quietly winning. **Fixed:** a collision between an ImportedBinding and a
+  top-level `let`/`const`/class was already caught by the scope machinery, and that masked the
+  rest. ImportedBoundNames are now collected across the module's imports, rejected on duplication,
+  and intersected with the hoisting scope — the right source for VarDeclaredNames, since a `var`
+  in a nested block still declares a name at the module's top level. For exports the rule
+  implemented is the general one (ExportedNames must contain no duplicates) rather than a narrow
+  "one default export" check: `default` is just an exported name, so the same rule catches
+  `export { x as default }` beside an `export default`, and `export { x }; export { y as x }`
+  besides. None of it needs the module parse goal — an ImportDeclaration is only legal in module
+  code, so the check is inert for a script. Landed in `fdbc2c0`; regressions in
+  `ModuleDuplicateBindingTests`.
+- `export class C {}` never worked: the compiler cast the class declaration to
+  `AstFunctionExpression`, which is null for a class node, and reading its name threw a
+  `NullReferenceException`. **Fixed** in `fdbc2c0` alongside the above.
+- **Still open — needs a module parse goal.** `await` as a module-level identifier (`var await`,
+  `function await`, `let await`, a parameter, a class name, `import { a as await }`) is accepted;
+  it is reserved from a module's first token, before any import or export is seen, so it cannot be
+  inferred from the AST the way the duplicate rules can. Module-ness is currently expressed only by
+  the CommonJS-style `argsList` wrapper the module host passes to `CoreScript.Compile`, so a real
+  goal would have to be threaded through `JSCode`/the code-cache key as well — a script and a
+  module with identical text must not share a compile.
+
 ### Confirmed host-semantic gaps
 
 - Parser-blocking scripts execute after the complete document is parsed, so they cannot observe
