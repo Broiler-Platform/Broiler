@@ -193,9 +193,21 @@ the ones marked **fixed** carry a minimal regression in
   - **`export` in script code is an early error**, not a crash: its bindings target the
     host-injected module `exports` object, absent in a plain script, so every export form now
     raises a clean `SyntaxError`.
+  - **A direct eval's global `var`/function may not collide with a global lexical.** The
+    var/lexical mechanism above catches a collision with a function- or block-local lexical
+    (the direct-eval validator carries those names at compile time), but a top-level
+    `let`/`const`/class lives in the runtime global lexical environment and was not among them.
+    `JSContext.Register` rejected the collision for an indirect eval, yet a direct eval binds the
+    name as a captured lexical and skips that registration, so `let g = 1; eval('var g;')` ran
+    with the eval's `var` aliasing the lexical. The compiler now emits
+    `EnsureNoGlobalLexicalConflictForEvalVar` in the eval's hoisting prelude for a
+    skip-registration program-scope var/function, covering `let`/`const`/class, a function
+    declaration, a non-first declarator and a block-hoisted var, in both direct and indirect eval.
 
-  Landed in the pinned `Broiler.JS` submodule (`f1b78df`); regressions (and the accept-guards
-  for valid neighbours) in `Track1LanguageTests`.
+  The first three mechanisms landed in the pinned `Broiler.JS` submodule (`f1b78df`); the
+  global-lexical direct-eval case in `943b94d`. Regressions (and the accept-guards for valid
+  neighbours) in `Track1LanguageTests`; the `BuiltInsTests` that pinned the old shadowing
+  behaviour now assert the SyntaxError.
 - `new.target` is rejected in a direct eval nested inside an eval-compiled function.
   **Does not reproduce**; `staging/sm/class/newTargetEval.js` passes. It is in the failure
   manifest from an older run — confirm against a current CI run before removing the path.
