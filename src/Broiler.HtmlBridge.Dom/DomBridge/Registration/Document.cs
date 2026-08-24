@@ -107,13 +107,9 @@ public sealed partial class DomBridge
 
     private void RegisterDocumentNodeAndCollectionApis(JSContext context, JSObject document)
     {
-        // Node type constants on document
-        document.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"DOCUMENT_TYPE_NODE", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+        // Node interface constants on document (a Document IS a Node) — types and the
+        // DOCUMENT_POSITION_* bits.
+        Dom.Features.NodeConstantsBinding.Install(document);
 
         // document.nodeType = DOCUMENT_NODE (9)
         document.FastAddProperty((KeyString)"nodeType", new JSFunction((in _) => new JSNumber(9), "get nodeType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);

@@ -203,6 +203,22 @@ public sealed partial class DomBridge
             Node.prototype.DOCUMENT_TYPE_NODE = 10;
             Node.prototype.DOCUMENT_FRAGMENT_NODE = 11;
             Node.prototype.NOTATION_NODE = 12;
+            // The bits compareDocumentPosition ORs together (DOM 4.4). Without them,
+            // result & Node.DOCUMENT_POSITION_CONTAINED_BY is result & undefined, which is 0
+            // rather than an error - so a containment test silently reported no containment for
+            // every pair of nodes even though the bitmask coming back was correct.
+            Node.DOCUMENT_POSITION_DISCONNECTED = 0x01;
+            Node.DOCUMENT_POSITION_PRECEDING = 0x02;
+            Node.DOCUMENT_POSITION_FOLLOWING = 0x04;
+            Node.DOCUMENT_POSITION_CONTAINS = 0x08;
+            Node.DOCUMENT_POSITION_CONTAINED_BY = 0x10;
+            Node.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
+            Node.prototype.DOCUMENT_POSITION_DISCONNECTED = 0x01;
+            Node.prototype.DOCUMENT_POSITION_PRECEDING = 0x02;
+            Node.prototype.DOCUMENT_POSITION_FOLLOWING = 0x04;
+            Node.prototype.DOCUMENT_POSITION_CONTAINS = 0x08;
+            Node.prototype.DOCUMENT_POSITION_CONTAINED_BY = 0x10;
+            Node.prototype.DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20;
         ");
     }
 

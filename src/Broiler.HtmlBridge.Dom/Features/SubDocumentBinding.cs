@@ -224,13 +224,8 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => Prepend(docRoot, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // Node type constants
-        doc.FastAddValue((KeyString)"ELEMENT_NODE", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue((KeyString)"TEXT_NODE", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue((KeyString)"COMMENT_NODE", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue((KeyString)"DOCUMENT_NODE", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue((KeyString)"DOCUMENT_TYPE_NODE", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue((KeyString)"DOCUMENT_FRAGMENT_NODE", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+        // Node interface constants — types and the DOCUMENT_POSITION_* bits.
+        NodeConstantsBinding.Install(doc);
 
         // document.implementation on sub-documents
         var subImpl = new JSObject();

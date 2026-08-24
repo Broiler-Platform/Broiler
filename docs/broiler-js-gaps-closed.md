@@ -429,6 +429,31 @@ were deleted and the gitlinks point at commits that contain them. See
   (`Registration/Document.cs`, `Features/WindowDocumentMiscBinding.cs`), landed directly rather than as
   a submodule patch; regressions in `DocumentSurfaceTests`.
 
+### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
+
+- The six `Node.DOCUMENT_POSITION_*` constants were `undefined` everywhere — on the `Node` global,
+  on its prototype, and on every node instance — while the node-type constants beside them were
+  defined. `compareDocumentPosition` returned a correct DOM §4.4 bitmask (this was checked and is
+  recorded under *Retired* below), but with the names absent a page could not decode it:
+  `result & Node.DOCUMENT_POSITION_CONTAINED_BY` is `result & undefined`, which evaluates to `0`
+  rather than throwing — so a containment test did not fail loudly, it silently answered "not
+  contained" for **every** pair of nodes. A right answer that cannot be read is the failure mode
+  here, which is why the bitmask being correct was not enough to close the item.
+  **Fixed:** all six position bits are now installed with their specified values (`0x01`…`0x20`)
+  on the `Node` global and prototype and on every node object.
+  <br>The type constants were installed from five hand-copied blocks that had drifted to different
+  subsets — the element and non-element wrappers carried eight of the twelve, the document and
+  sub-document only six (no `ATTRIBUTE_NODE`, no `CDATA_SECTION_NODE`) — and none carried the
+  position bits, so the omission was identical everywhere by construction and a sixth copy would
+  have inherited it. The five blocks are replaced by one `NodeConstantsBinding.Install` installer
+  carrying the complete interface: twelve type values (adding the genuinely-missing
+  `PROCESSING_INSTRUCTION_NODE`, plus the legacy `ENTITY_REFERENCE_NODE`/`ENTITY_NODE`/
+  `NOTATION_NODE` the `Node` global polyfill already listed, so an instance and the global agree)
+  and the six position bits. Net effect on the touched files is 20 fewer lines.
+  Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/NodeConstantsBinding.cs` and its five call
+  sites, plus the `Node` polyfill in `DomBridge/Utilities.NameValidation.cs`), landed directly
+  rather than as a submodule patch; regressions in `NodeConstantsTests`.
+
 ## Retired — did not reproduce
 
 Each was checked against the current pointer; the cases tried are recorded so the note is not
@@ -453,9 +478,8 @@ carried again as an asserted gap.
   `a.compareDocumentPosition(c)` → `4`, `c.compareDocumentPosition(a)` → `2`
   (`DOCUMENT_POSITION_PRECEDING`), and `a.compareDocumentPosition(a)` → `0`. Those are the DOM §4.4
   bitmask values, not a `-1`/`0`/`1` comparator. The genuine remaining half — the
-  `Node.DOCUMENT_POSITION_*` constants being `undefined`, so the returned bits cannot be named — was
-  found by the same check and is carried in
-  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model) as a confirmed gap instead.
+  `Node.DOCUMENT_POSITION_*` constants being `undefined`, so the returned bits could not be named —
+  was found by the same check and has since been **fixed**; see the Track 6 entry above.
 
 ### Track 1 — language and built-ins
 
