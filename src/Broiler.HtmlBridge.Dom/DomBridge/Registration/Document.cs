@@ -226,6 +226,38 @@ public sealed partial class DomBridge
         // document.inputEncoding — alias for characterSet
         document.FastAddProperty((KeyString)"inputEncoding", new JSFunction((in _) => new JSString("UTF-8"), "get inputEncoding"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // document.charset — the other historical alias of characterSet (DOM §4.5). It reads the same
+        // value as the two above; it was simply not registered, so the oldest of the three spellings —
+        // and the one legacy encoding-sniffing code reaches for first — was the one that answered
+        // `undefined`.
+        document.FastAddProperty((KeyString)"charset", new JSFunction((in _) => new JSString("UTF-8"), "get charset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.referrer — the URL of the page that linked here (HTML §3.1.5). A capture navigates
+        // to its URL directly, with no referring document, and the empty string is precisely what the
+        // specification (and a browser following a typed URL or a bookmark) reports for that: "If the
+        // document has no referrer, return the empty string." Analytics and same-site-entry checks read
+        // it unguarded, where `undefined` stringifies into a bogus referrer rather than reading as none.
+        document.FastAddProperty((KeyString)"referrer", new JSFunction((in _) => new JSString(string.Empty), "get referrer"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.domain — the origin's effective domain, i.e. this document's host.
+        document.FastAddProperty((KeyString)"domain", new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.GetDocumentDomain(this, in a), "get domain"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.lastModified — MM/DD/YYYY hh:mm:ss in local time; the current time when the source's
+        // own modification date is unknown, which is the specification's stated fallback.
+        document.FastAddProperty((KeyString)"lastModified", new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.GetLastModified(in a), "get lastModified"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.activeElement — the focused element, or, when nothing is focused, the body element:
+        // HTML's algorithm ends "if candidate is null, set candidate to the body element", so `body` is
+        // the answer for an unfocused document rather than null. A capture focuses nothing, so it is
+        // always body. Returning it as a getter (not a stored reference) keeps it correct across
+        // document mutation. Scripts commonly walk up from it — `document.activeElement.tagName`,
+        // `.blur()` — which threw outright while the property was missing.
+        document.FastAddProperty((KeyString)"activeElement", new JSFunction((in a) => Dom.Features.DocumentStructureBinding.GetBody(this, in a), "get activeElement"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.hasFocus() — true; see the binding for why a capture's one document is always the
+        // focused one, matching visibilityState below.
+        document.FastAddValue((KeyString)"hasFocus", new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.HasFocus(in a), "hasFocus", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+
         // document.hidden / document.visibilityState (Page Visibility, HTML §6.6). A capture
         // renders one document in one viewport and never backgrounds it, so the answer is always
         // "visible" — but it has to be *an* answer. Absent, `document.hidden` reads `undefined`,
@@ -236,5 +268,14 @@ public sealed partial class DomBridge
         // docs/google-search-post-consent-challenge.md.
         document.FastAddProperty((KeyString)"hidden", new JSFunction((in _) => JavaScript.BuiltIns.Boolean.JSBoolean.False, "get hidden"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         document.FastAddProperty((KeyString)"visibilityState", new JSFunction((in _) => new JSString("visible"), "get visibilityState"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // document.onvisibilitychange — the event handler IDL attribute that completes the pair above,
+        // null until a page assigns one. Its event never fires here, and that is the accurate outcome
+        // rather than a missing implementation: the capture's document is visible for its whole life,
+        // so its visibility never *changes*. The slot has to exist all the same, because
+        // `'onvisibilitychange' in document` is the feature test pages use to decide whether the Page
+        // Visibility API is available at all — answering false sent them to legacy focus/blur polling
+        // even though `visibilityState` above answers correctly.
+        document.FastAddValue((KeyString)"onvisibilitychange", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
     }
 }

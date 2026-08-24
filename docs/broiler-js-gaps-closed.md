@@ -402,11 +402,60 @@ were deleted and the gitlinks point at commits that contain them. See
   fix (`WindowDocumentMiscBinding.PerformanceNow` / `Window.RegisterPerformanceObject`), landed
   directly rather than as a submodule patch; regression `Performance_Now_Is_Monotonic_And_SubMillisecond`
   in `GoogleSearchPolyfillTests`. Performance Navigation Timing marks remain a separate open gap.
+- Seven script-visible document surfaces were absent — `document.charset`, `referrer`, `domain`,
+  `lastModified`, `activeElement`, `hasFocus()`, and the `onvisibilitychange` handler slot — the
+  audit line that also named `window.trustedTypes`. Each read `undefined` (or, for `hasFocus`, was
+  missing outright), which is not the same as answering "none": a page comparing
+  `document.domain === location.hostname`, stringifying `document.referrer` into a beacon, or calling
+  `new Date(document.lastModified)` saw a third state it had no branch for, and
+  `document.activeElement.tagName` threw. **Fixed**, each with the value the specification gives for a
+  directly-navigated, permanently-visible capture rather than a placeholder: `charset` is the third
+  historical alias of `characterSet` (DOM §4.5) and returns the same `UTF-8`; `referrer` is the empty
+  string, which is what HTML defines for a document with no referrer; `domain` is the origin's
+  effective domain, i.e. the page URL's host, and the empty string for the opaque origin of a
+  host-less URL such as `data:`; `lastModified` is the current local time in the specified
+  `MM/DD/YYYY hh:mm:ss` shape, which is HTML's own stated fallback when the source's modification date
+  is unknown; `activeElement` is the `body` element, because HTML's algorithm ends "if candidate is
+  null, set candidate to the body element" and a capture focuses nothing; and `hasFocus()` is `true`
+  for the same reason `visibilityState` is `"visible"` — one document in one viewport, never
+  backgrounded and never defocused. `onvisibilitychange` is a handler slot defaulting to `null` whose
+  event never fires, which is the accurate outcome rather than a missing implementation (a
+  permanently-visible document's visibility never *changes*); it has to exist because
+  `'onvisibilitychange' in document` is the feature test that decides whether a page uses the Page
+  Visibility API at all. `window.trustedTypes` was deliberately **not** added and stays in
+  [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics) as a capability
+  decision: it is an enforcement API, and a shape-only stub would claim a policy mechanism that does
+  not exist. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Registration/Document.cs`, `Features/WindowDocumentMiscBinding.cs`), landed directly rather than as
+  a submodule patch; regressions in `DocumentSurfaceTests`.
 
 ## Retired — did not reproduce
 
 Each was checked against the current pointer; the cases tried are recorded so the note is not
 carried again as an asserted gap.
+
+### Track 5 — URL parsing
+
+- Non-special URLs such as `data:` can report an empty `.protocol`. **Does not reproduce.** Checked
+  through a DomBridge-attached capture: `new URL('data:text/plain,hi').protocol` → `"data:"`,
+  `new URL('blob:https://x/y').protocol` → `"blob:"`, `new URL('mailto:a@b.c').protocol` →
+  `"mailto:"`, and the special-scheme control `new URL('https://a.b/c').protocol` → `"https:"`. All
+  four carry the trailing colon the URL Standard requires. Narrowed rather than retained: if a
+  specific non-special scheme still answers empty, it needs naming, because the general claim is not
+  current.
+
+### Track 6 — DOM
+
+- `compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.
+  **Does not reproduce.** Checked through a DomBridge-attached capture over a document with a
+  containing `div#a > span#b` and a following `p#c`: `a.compareDocumentPosition(b)` → `20`
+  (`DOCUMENT_POSITION_CONTAINED_BY` 16 | `DOCUMENT_POSITION_FOLLOWING` 4),
+  `a.compareDocumentPosition(c)` → `4`, `c.compareDocumentPosition(a)` → `2`
+  (`DOCUMENT_POSITION_PRECEDING`), and `a.compareDocumentPosition(a)` → `0`. Those are the DOM §4.4
+  bitmask values, not a `-1`/`0`/`1` comparator. The genuine remaining half — the
+  `Node.DOCUMENT_POSITION_*` constants being `undefined`, so the returned bits cannot be named — was
+  found by the same check and is carried in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model) as a confirmed gap instead.
 
 ### Track 1 — language and built-ins
 

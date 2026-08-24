@@ -141,9 +141,14 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 - Navigator identity, hardware, connection, permissions, storage, media-device, media-capability,
   and user-agent-data surfaces remain incomplete.
 - Window and screen geometry plus `BarProp` objects are absent.
-- `document.hasFocus`, `referrer`, `domain`, `lastModified`, `charset`, `activeElement`,
-  `window.trustedTypes`, and `onvisibilitychange` remain unresolved in the current audit.
-- Non-special URLs such as `data:` can report an empty `.protocol`.
+- `window.trustedTypes` is absent — a **capability decision**, not an omission: Trusted Types is an
+  enforcement API (policy creation, sink guarding, CSP integration), and a shape-only stub would
+  claim a policy mechanism that does not exist. The rest of that audit line —
+  `document.hasFocus`, `referrer`, `domain`, `lastModified`, `charset`, `activeElement`, and
+  `onvisibilitychange` — was confirmed missing and is now implemented; see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+- ~~Non-special URLs such as `data:` can report an empty `.protocol`.~~ **Does not reproduce** — see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
 - Performance Navigation Timing exposes no timing marks. This is an API-semantic gap, not speed
   work. (`performance.now()` no longer reports a whole-millisecond wall clock — it is now monotonic
   and sub-millisecond; see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).)
@@ -179,7 +184,18 @@ and deterministic detection behavior.
 - Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
   be inaccessible through canonical DOM lookup.
 - CharacterData failures are not proper `DOMException` objects.
-- `compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.
+- ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
+  **Does not reproduce** — it returns the correct bitmask. What *is* missing is the companion
+  `Node.DOCUMENT_POSITION_*` constants, so a page cannot name the bits it gets back; see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce) for both halves.
+- **Confirmed, newly characterized:** the `Node.DOCUMENT_POSITION_*` constants are `undefined`, while
+  the node-type constants beside them (`Node.ELEMENT_NODE`, `TEXT_NODE`, `DOCUMENT_NODE`) are
+  defined. `compareDocumentPosition` therefore returns a correct bitmask that a page cannot decode by
+  name — `result & Node.DOCUMENT_POSITION_CONTAINED_BY` is `NaN`-free but always `0`, so a
+  containment test silently reports "not contained" rather than throwing. The constants are declared
+  at several sites (`JsObjects.cs`, `JsObjects.NonElementNodes.cs`, `Registration/Document.cs`,
+  `SubDocumentBinding.cs`, and the `Node` polyfill in `Utilities.NameValidation.cs`), so the fix is a
+  small change repeated across each rather than one edit.
 
 See [HTML5 exceptions](html5test-exceptions.md) and
 [the DOM bridge roadmap](../Broiler.DOM/docs/roadmap.md).
