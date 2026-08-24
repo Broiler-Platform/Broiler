@@ -144,9 +144,9 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 - `document.hasFocus`, `referrer`, `domain`, `lastModified`, `charset`, `activeElement`,
   `window.trustedTypes`, and `onvisibilitychange` remain unresolved in the current audit.
 - Non-special URLs such as `data:` can report an empty `.protocol`.
-- `performance.now()` uses a whole-millisecond wall clock rather than a monotonic source, and
-  Performance Navigation Timing exposes no timing marks. These are API-semantic gaps, not speed
-  work.
+- Performance Navigation Timing exposes no timing marks. This is an API-semantic gap, not speed
+  work. (`performance.now()` no longer reports a whole-millisecond wall clock — it is now monotonic
+  and sub-millisecond; see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).)
 
 See [the privacy inventory](privacy-test-page-gaps.md),
 [the Google current-script investigation](google-about-current-script.md), and

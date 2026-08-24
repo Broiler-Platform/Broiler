@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
@@ -31,8 +32,24 @@ internal static class WindowDocumentMiscBinding
         return JSUndefined.Value;
     }
 
-    public static JSValue PerformanceNow(long performanceTimeOrigin, in Arguments a)
-        => new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() - performanceTimeOrigin);
+    /// <summary>
+    /// <c>performance.now()</c> — a <c>DOMHighResTimeStamp</c> (HR-Time §3), the time elapsed since
+    /// the performance time origin. The value is read from a monotonic clock and reported as
+    /// fractional milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// It used to be <c>Date.now() - timeOrigin</c>: whole-millisecond wall-clock arithmetic, so it
+    /// had no sub-millisecond resolution and — being wall time — could run backwards when the system
+    /// clock was stepped (NTP, a manual change), which HR-Time forbids ("MUST be monotonically
+    /// increasing and not subject to system clock adjustments"). It now measures a
+    /// <see cref="Stopwatch"/> from the timestamp captured at the time origin, so it is monotonic and
+    /// carries the clock's real resolution. (Privacy coarsening of that resolution is a separate
+    /// decision; this only removes the whole-millisecond, wall-clock behavior.) The
+    /// <paramref name="monotonicOriginTimestamp"/> is a <see cref="Stopwatch.GetTimestamp"/> value
+    /// taken at the same instant as the wall-clock <c>timeOrigin</c>.
+    /// </remarks>
+    public static JSValue PerformanceNow(long monotonicOriginTimestamp, in Arguments a)
+        => new JSNumber(Stopwatch.GetElapsedTime(monotonicOriginTimestamp).TotalMilliseconds);
 
     public static JSValue SetVisualViewportScale(IWindowDocumentMiscHost host, in Arguments a)
     {

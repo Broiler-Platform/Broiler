@@ -145,11 +145,16 @@ public sealed partial class DomBridge
         //  Google Search Compliance: Phase 1 (P0) — Critical polyfills
         // ---------------------------------------------------------------
 
-        // TODO-G2: performance object with performance.now() and timeOrigin
+        // TODO-G2: performance object with performance.now() and timeOrigin.
+        // timeOrigin is a wall-clock estimate of this context's origin instant (HR-Time §5), while
+        // now() must be MONOTONIC and sub-millisecond (HR-Time §3). Capture the two together: the
+        // wall-clock unix-ms for timeOrigin, and a Stopwatch timestamp at the same instant that now()
+        // measures its monotonic elapsed time from.
         var performanceTimeOrigin = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var performanceMonotonicOrigin = System.Diagnostics.Stopwatch.GetTimestamp();
         var performanceObj = new JSObject();
         performanceObj.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
-        performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceTimeOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceMonotonicOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // The Performance Timeline getters (Performance Timeline §3), all three of which answer from
         // the one entry a document that has navigated once and loaded no instrumented resources has:

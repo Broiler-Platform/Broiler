@@ -2,8 +2,9 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names the pinned
-> `Broiler.JS` commit that carries it and the regression that holds it.
+> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names where it landed — the
+> pinned `Broiler.JS` commit, or the main-repo component for a host/DOM fix — and the regression that
+> holds it.
 
 Gaps that are resolved, in two kinds. **Fixed** entries were real defects and each keeps its root
 cause, what landed, and the evidence. **Retired** entries were investigated against the current
@@ -386,6 +387,21 @@ were deleted and the gitlinks point at commits that contain them. See
   modules the rule is about bindings only: `await` stays legal as a property name, a method name and
   the operator, including top-level await. Landed in `8e745b4`; regressions in
   `ModuleAwaitReservedTests`.
+
+### Track 5 — Essential browser JavaScript APIs
+
+- `performance.now()` returned `Date.now() - timeOrigin`: whole-millisecond wall-clock arithmetic. It
+  had no sub-millisecond resolution, and — being wall time — could run **backwards** when the system
+  clock was stepped (NTP, a manual change), which HR-Time §3 forbids (the value "MUST be monotonically
+  increasing and not subject to system clock adjustments"). **Fixed:** the `performance` object now
+  captures a `Stopwatch` timestamp at the same instant as the wall-clock `timeOrigin`, and
+  `performance.now()` measures monotonic elapsed time from it as fractional milliseconds. `timeOrigin`
+  stays the wall-clock estimate of the origin (HR-Time §5), so `timeOrigin + now()` still tracks
+  `Date.now()`, while `now()` itself is monotonic and sub-millisecond. Privacy coarsening of the
+  resolution is a separate decision and was not added. This is a main-repo `Broiler.HtmlBridge.Dom`
+  fix (`WindowDocumentMiscBinding.PerformanceNow` / `Window.RegisterPerformanceObject`), landed
+  directly rather than as a submodule patch; regression `Performance_Now_Is_Monotonic_And_SubMillisecond`
+  in `GoogleSearchPolyfillTests`. Performance Navigation Timing marks remain a separate open gap.
 
 ## Retired — did not reproduce
 
