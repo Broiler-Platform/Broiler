@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names where it landed — the
+> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names where it landed — the
 > pinned `Broiler.JS` commit, or the main-repo component for a host/DOM fix — and the regression that
 > holds it.
 
@@ -540,6 +540,40 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **A linked stylesheet's rules reached neither `cssRules` nor `getComputedStyle`, and the sheet
+  reported no `href`.** A `<link rel="stylesheet">` appeared in `document.styleSheets` as a sheet
+  with zero rules and a null location, and the elements it styled computed as if it were not there —
+  measured against an inline `<style>` control carrying identical CSS, which answered `cssRules
+  .length` 2, `display: flex`, `color: rgb(1, 2, 3)`, `marginTop: 7px` where the link answered 0,
+  `inline`, `rgb(0, 0, 0)`, `0px`. It is what made the retired *"`getComputedStyle().display`
+  reports `inline` for every element"* claim true after all for linked sheets.
+  <br>**The open question is answered: it was not a `file:`-scheme defect.** `file:` and `http(s):`
+  behaved *identically* — both failed for a relative `href` and both worked for an absolute one —
+  which is what identified the cause. `GetStyleElementSourceText` handed the **raw `href` content
+  attribute** to the resource loader, and the loader takes absolute URLs only
+  (`ResourceLoader.LoadTextDirect` opens with a `UriKind.Absolute` guard and returns `null` for
+  anything else). So the fetch was never issued for a relative href — the ordinary case — on any
+  scheme. The whole collect → prefetch → fetch pipeline was present and correct, as the earlier
+  characterization suspected; only the URL passed through it was.
+  <br>It was invisible as a rendering bug because `HtmlRender` resolves and applies the link itself:
+  paint and the CSSOM held two different stylesheet sets and only paint had the linked one, which is
+  why the green-pixel assertion in `StylesheetBaseHrefTests` passed throughout.
+  <br>**Fixed:** the href is resolved through `ResolveStyleSheetLinkUrl` before it reaches the
+  loader. The base it resolves against is the **document** base URL — the first `<base href>`
+  resolved against the page URL when the document declares one, the page URL otherwise — because a
+  `<base href>` relocates a linked sheet (HTML §4.2.3) and the render-bound `RewriteLinkStyleSheetHrefs`
+  pass already honours it; resolving against the page URL here would have read a *different* sheet
+  than the one that paints. `data:` hrefs still bypass the loader through the same seam as before.
+  Both prefetch sites move with the consuming path — `PrefetchExternalStylesheets` and the
+  speculative preload scan (`ResolvedUrls` rather than `RawUrls`) — since a prefetch keyed on a
+  differently-normalized URL is never consumed and would double the requests instead of overlapping
+  them. `CSSStyleSheet.href` was a hardcoded `null` for every sheet; it is now a live getter
+  reporting the same resolved location for a linked sheet and `null` for an inline `<style>`, per
+  CSSOM §2.1. Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/Css.cs`,
+  `DomBridge/StyleSheets.cs`, `DomBridge.PreloadScan.cs`); regressions in
+  `LinkedStylesheetCssomTests`, which pin relative and absolute hrefs over both `file:` and a local
+  `http:` origin, and `<base href>` relocation, each against the inline control rather than against
+  transcribed values.
 - The **document-level** `removeChild`/`insertBefore` had the same defect on their own code path
   (`NodeMutationBinding`, reached by `document.removeChild(…)` / `document.insertBefore(…)`, distinct
   from the element methods above). `document.removeChild` returned the node unchanged — what a

@@ -359,12 +359,23 @@ public sealed partial class DomBridge
             {
                 try
                 {
-                    // Through the data:-aware seam, not the loader directly: a
-                    // <link rel="stylesheet" href="data:text/css,…"> carries its own sheet and
-                    // never goes on the wire. The loader only dispatches file/http(s), so a data:
-                    // href fetched as an ordinary URL came back empty and the sheet — the whole
-                    // sheet, for a link a script builds at run time — silently did not apply.
-                    var fetchedCss = FetchStyleSheetText(href);
+                    // Resolved against the document base URL first, then through the data:-aware
+                    // seam rather than the loader directly.
+                    //
+                    // The resolution is what makes a linked sheet reach the CSSOM at all. The
+                    // loader takes absolute URLs only (ResourceLoader.LoadTextDirect returns null
+                    // for anything else), so passing the raw content attribute meant every
+                    // *relative* href — the ordinary case — fetched nothing: the sheet's rules
+                    // reached neither cssRules nor getComputedStyle, on file: and http(s) alike,
+                    // while the renderer, which resolves the link itself, painted them. Paint and
+                    // CSSOM had two different stylesheet sets and only paint had the linked one.
+                    //
+                    // The data: seam matters separately: a <link rel="stylesheet"
+                    // href="data:text/css,…"> carries its own sheet and never goes on the wire.
+                    // The loader only dispatches file/http(s), so a data: href fetched as an
+                    // ordinary URL came back empty and the sheet — the whole sheet, for a link a
+                    // script builds at run time — silently did not apply.
+                    var fetchedCss = FetchStyleSheetText(ResolveStyleSheetLinkUrl(href));
                     if (!string.IsNullOrEmpty(fetchedCss))
                     {
                         StyleSheetStateFor(styleEl).FetchedCss.Set(fetchedCss);
@@ -739,24 +750,62 @@ public sealed partial class DomBridge
         }
     }
 
-    /// <summary>Resolves a content-attribute URL against the page URL, leaving it untouched when the
-    /// page URL is not usable as a base or the value is already absolute.</summary>
-    private string ResolveAgainstPageUrl(string url) =>
-        Uri.TryCreate(_pageUrl, UriKind.Absolute, out var baseUri) &&
-        Uri.TryCreate(baseUri, url, out var resolved)
-            ? resolved.AbsoluteUri
-            : url;
-
     /// <summary>
     /// The URL a <c>&lt;link rel="stylesheet"&gt;</c>'s sheet is read from: a <c>data:</c> href
-    /// verbatim, anything else resolved against the page URL. The verbatim case matters — round
-    /// tripping a data: URL through <see cref="Uri"/> normalizes the percent-escapes its payload is
-    /// made of, and the payload is the stylesheet.
+    /// verbatim, anything else resolved against the <em>document base URL</em>. The verbatim case
+    /// matters — round tripping a data: URL through <see cref="Uri"/> normalizes the percent-escapes
+    /// its payload is made of, and the payload is the stylesheet.
+    /// <para>
+    /// The base is the document's, not the page's: a <c>&lt;base href&gt;</c> relocates a linked
+    /// sheet (HTML §4.2.3), which is what the render-bound
+    /// <see cref="RewriteLinkStyleSheetHrefs"/> pass already honours on the serialization
+    /// projection. Resolving against the page URL here instead would read a *different* sheet than
+    /// the one that paints whenever the document declares a base.
+    /// </para>
     /// </summary>
     private string ResolveStyleSheetLinkUrl(string href) =>
         href.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
             ? href
-            : ResolveAgainstPageUrl(href);
+            : ResolveAgainstDocumentBaseUrl(href);
+
+    /// <summary>
+    /// Resolves a content-attribute URL against the document base URL — the document's first
+    /// <c>&lt;base href&gt;</c> resolved against the page URL when it declares one, the page URL
+    /// otherwise. Leaves the value untouched when neither is usable as a base.
+    /// </summary>
+    private string ResolveAgainstDocumentBaseUrl(string url) =>
+        Uri.TryCreate(DocumentBaseUrl(), UriKind.Absolute, out var baseUri) &&
+        Uri.TryCreate(baseUri, url, out var resolved)
+            ? resolved.AbsoluteUri
+            : url;
+
+    private ulong _documentBaseUrlVersion;
+    private string? _documentBaseUrlCache;
+
+    /// <summary>
+    /// The document base URL, cached against <see cref="DomDocument.Version"/>.
+    /// </summary>
+    /// <remarks>
+    /// Finding the <c>&lt;base href&gt;</c> means walking every descendant, and the overwhelming
+    /// majority of documents declare none — the same reason
+    /// <see cref="InlineStyleSheetImports(DomElement)"/> resolves its base lazily and at most once.
+    /// Here the callers are per-<c>&lt;link&gt;</c> rather than per-document, so without a cache a
+    /// page with many sheets pays that walk once for each of them. The version counter is bumped by
+    /// every tree edit and attribute write, so adding, removing or re-pointing a <c>&lt;base&gt;</c>
+    /// invalidates this on the next call.
+    /// </remarks>
+    private string DocumentBaseUrl()
+    {
+        var version = _document.Version;
+        if (_documentBaseUrlCache is null || _documentBaseUrlVersion != version)
+        {
+            _documentBaseUrlCache = HtmlBaseHref.ResolveDocumentBaseUrl(
+                _pageUrl, TryFindDocumentBaseHref(DocumentElement, out var baseHref) ? baseHref : null);
+            _documentBaseUrlVersion = version;
+        }
+
+        return _documentBaseUrlCache;
+    }
 
     /// <summary>Fires the stylesheet <c>load</c> event for <paramref name="element"/> and every
     /// <c>&lt;link rel="stylesheet"&gt;</c> beneath it — the subtree counterpart used when a whole
@@ -780,9 +829,11 @@ public sealed partial class DomBridge
     /// <remarks>
     /// <para>
     /// The URL handed over is the same string <see cref="GetStyleElementSourceText"/> will pass to
-    /// <see cref="FetchExternalStylesheet"/> — the raw <c>href</c> — because a prefetch keyed on a
-    /// differently-normalized URL would simply never be consumed, silently doubling the requests
-    /// instead of overlapping them.
+    /// <see cref="FetchExternalStylesheet"/> — the href resolved through
+    /// <see cref="ResolveStyleSheetLinkUrl"/> — because a prefetch keyed on a differently-normalized
+    /// URL would simply never be consumed, silently doubling the requests instead of overlapping
+    /// them. The two must be changed together; they were the raw <c>href</c> on both sides until the
+    /// consuming path started resolving it.
     /// </para>
     /// <para>
     /// The CSP check is applied here too: a sheet the policy blocks must not have a request put on
@@ -814,7 +865,7 @@ public sealed partial class DomBridge
             if (!IsExternalStyleAllowedByCsp(styleEl, href))
                 continue;
 
-            (urls ??= []).Add(href);
+            (urls ??= []).Add(ResolveStyleSheetLinkUrl(href));
         }
 
         if (urls is not null)

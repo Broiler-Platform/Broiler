@@ -69,11 +69,15 @@ public sealed partial class DomBridge
             // Runs on the worker: this is the call that puts the requests on the wire while the
             // parse is still running, and the only reason the scan is worth doing at all.
             //
-            // The RAW href is what is handed over, not the resolved URL, because the consuming site
-            // (`FetchExternalStylesheet`) passes the raw href to the loader — a prefetch stored
-            // under a normalized key would never be consumed and would double the requests instead
-            // of overlapping them. `minimumToOverlap: 1` because these requests overlap the parse
-            // rather than each other, so a document with one sheet still gains.
+            // The RESOLVED URL is what is handed over, because that is what the consuming site
+            // (`GetStyleElementSourceText` → `ResolveStyleSheetLinkUrl` → `FetchExternalStylesheet`)
+            // passes to the loader — a prefetch stored under a differently-keyed URL would never be
+            // consumed and would double the requests instead of overlapping them. The scanner
+            // resolves against the same document base URL (its `<base href>`, else the page URL), so
+            // the two keys agree. Both sides were the raw href until the consuming path started
+            // resolving it; they must keep moving together. `minimumToOverlap: 1` because these
+            // requests overlap the parse rather than each other, so a document with one sheet still
+            // gains.
             result =>
             {
                 // Best-effort, and a racy read of `_disposed` is the right strength for it: losing
@@ -81,6 +85,6 @@ public sealed partial class DomBridge
                 // a resource the document never reaches already costs. A lock here would be
                 // synchronising the main thread's teardown against a speculation.
                 if (!_disposed)
-                    _resources.Prefetch(result.RawUrls(PreloadKind.StyleSheet), minimumToOverlap: 1);
+                    _resources.Prefetch(result.ResolvedUrls(PreloadKind.StyleSheet), minimumToOverlap: 1);
             });
 }
