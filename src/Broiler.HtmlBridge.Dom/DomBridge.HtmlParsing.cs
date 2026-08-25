@@ -94,6 +94,12 @@ public sealed partial class DomBridge
 
         AttachDeclarativeShadowRoots(DocumentElement);
 
+        // After the shadow-root pass has consumed the templates that declare one: every
+        // remaining <template>'s children move into its contents fragment, which is where
+        // HTML §4.12.3 has the parser put them. Order matters — a declarative shadow root's
+        // template is not inert and its children belong in the shadow tree, not in a fragment.
+        DivertTemplateContents(DocumentElement);
+
 
         // Stylesheet discovery is document-scoped and lazy through the shared
         // CssStyleEngine. A rebuilt document must not retain the prior engines.

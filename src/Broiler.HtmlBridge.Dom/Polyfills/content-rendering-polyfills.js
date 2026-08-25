@@ -988,13 +988,140 @@ URL.prototype.toJSON = function() { return this.href; };
         FontFaceSet.prototype[Symbol.iterator] = function () { return this.values(); };
     }
 
-    // load()/check() take a CSS `font` shorthand. An absent or empty one is a SyntaxError, as the
-    // spec requires; beyond that Broiler does not parse the shorthand, so a malformed but non-empty
-    // font resolves rather than rejecting. That is the deliberate direction: a page's font string
-    // is rarely the thing it is testing, and rejecting one Broiler merely failed to parse would
-    // break pages over a diagnostic Broiler cannot actually produce.
+    // load()/check() take a CSS `font` shorthand, and css-font-loading-3 says an unparsable one is a
+    // SyntaxError. Only an absent or empty string used to throw: anything non-empty was waved
+    // through, so `document.fonts.check('not-a-font')` answered `true` where every browser throws.
+    // The reason given for that was risk — rejecting a shorthand Broiler merely failed to parse
+    // would break pages over a diagnostic it could not produce — and the answer to it is to parse
+    // the shorthand properly rather than to accept everything, which is what this does. The grammar
+    // is small and closed (CSS Fonts 4 §"font"), so accepting exactly it is not an approximation:
+    //
+    //     font = <system-family-name>
+    //          | [ <font-style> || <font-variant-css2> || <font-weight> || <font-stretch-css3> ]?
+    //            <font-size> [ / <line-height> ]? <font-family>
+    //
+    // What has NOT changed is the modelling: a shorthand that parses still answers `true` from
+    // check() and resolves from load(), because Broiler resolves fonts synchronously and there is
+    // never a load in flight. This only stops it claiming to understand strings that are not fonts.
+    var SYSTEM_FONTS = ['caption', 'icon', 'menu', 'message-box', 'small-caption', 'status-bar'];
+    var FONT_STYLES = ['normal', 'italic', 'oblique'];
+    var FONT_VARIANTS = ['normal', 'small-caps'];
+    var FONT_WEIGHTS = ['normal', 'bold', 'bolder', 'lighter'];
+    var FONT_STRETCHES = ['normal', 'ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed',
+                          'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'];
+    var ABSOLUTE_SIZES = ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large',
+                          'xxx-large', 'larger', 'smaller'];
+
+    // Whitespace-separated, but quotes and parentheses hold together: a family name may be quoted
+    // and a size may be `calc(1em + 2px)`, and neither survives a naive split.
+    function fontTokens(text) {
+        var tokens = [], current = '', quote = null, depth = 0;
+        for (var i = 0; i < text.length; i++) {
+            var ch = text[i];
+            if (quote) {
+                current += ch;
+                if (ch === quote) quote = null;
+                continue;
+            }
+            if (ch === '"' || ch === "'") { quote = ch; current += ch; continue; }
+            if (ch === '(') depth++;
+            if (ch === ')') depth--;
+            if (depth === 0 && /\s/.test(ch)) {
+                if (current !== '') { tokens.push(current); current = ''; }
+                continue;
+            }
+            current += ch;
+        }
+        if (current !== '') tokens.push(current);
+        return quote || depth !== 0 ? null : tokens;
+    }
+
+    function isFontSize(token) {
+        var lower = token.toLowerCase();
+        if (ABSOLUTE_SIZES.indexOf(lower) !== -1) return true;
+        if (/^calc\(.+\)$/i.test(token)) return true;
+        // A length or percentage: a number with a unit. A bare number is not a font-size.
+        return /^[+-]?(\d+\.?\d*|\.\d+)(%|[a-z]+)$/i.test(token);
+    }
+
+    function isFontWeight(token) {
+        if (FONT_WEIGHTS.indexOf(token.toLowerCase()) !== -1) return true;
+        return /^\d+(\.\d+)?$/.test(token);
+    }
+
+    // Each comma-separated family is either a quoted string or a run of identifiers. An identifier
+    // may not start with a digit, which is what makes `12px 12px serif` a malformed family rather
+    // than a family called "12px serif".
+    function isFontFamilyList(text) {
+        if (text.trim() === '') return false;
+        var families = [];
+        var current = '', quote = null;
+        for (var i = 0; i < text.length; i++) {
+            var ch = text[i];
+            if (quote) { current += ch; if (ch === quote) quote = null; continue; }
+            if (ch === '"' || ch === "'") { quote = ch; current += ch; continue; }
+            if (ch === ',') { families.push(current); current = ''; continue; }
+            current += ch;
+        }
+        if (quote) return false;
+        families.push(current);
+
+        for (var f = 0; f < families.length; f++) {
+            var name = families[f].trim();
+            if (name === '') return false;
+            if (/^"[^"]*"$/.test(name) || /^'[^']*'$/.test(name)) continue;
+            var words = name.split(/\s+/);
+            for (var w = 0; w < words.length; w++) {
+                if (!/^-?[A-Za-z_\u00a0-\uffff][A-Za-z0-9_\u00a0-\uffff-]*$/.test(words[w])) return false;
+            }
+        }
+        return true;
+    }
+
+    function isFontShorthand(font) {
+        if (font === undefined || font === null) return false;
+        var text = String(font).trim();
+        if (text === '') return false;
+        if (SYSTEM_FONTS.indexOf(text.toLowerCase()) !== -1) return true;
+
+        var tokens = fontTokens(text);
+        if (!tokens || tokens.length === 0) return false;
+
+        // The optional leading run, in any order and each at most once. `oblique` may carry an angle.
+        var seen = {}, index = 0;
+        for (; index < tokens.length; index++) {
+            var token = tokens[index], lower = token.toLowerCase();
+            var slot = FONT_STYLES.indexOf(lower) !== -1 ? 'style'
+                : FONT_VARIANTS.indexOf(lower) !== -1 ? 'variant'
+                : FONT_STRETCHES.indexOf(lower) !== -1 ? 'stretch'
+                : isFontWeight(token) ? 'weight'
+                : null;
+            // `normal` is legal in several slots and says nothing; it never blocks a later one.
+            if (slot === null) break;
+            if (lower !== 'normal') {
+                if (seen[slot]) return false;
+                seen[slot] = true;
+            }
+            if (lower === 'oblique' && index + 1 < tokens.length && /^[+-]?[\d.]+deg$/i.test(tokens[index + 1])) index++;
+        }
+
+        if (index >= tokens.length) return false;
+
+        // <font-size> [ / <line-height> ]?, which may be written glued together or spaced apart.
+        var size = tokens[index++];
+        var slash = size.indexOf('/');
+        if (slash !== -1) {
+            if (slash === 0 || slash === size.length - 1) return false;
+            if (!isFontSize(size.slice(0, slash))) return false;
+        } else if (!isFontSize(size)) {
+            return false;
+        }
+
+        return index < tokens.length && isFontFamilyList(tokens.slice(index).join(' '));
+    }
+
     function requireFontShorthand(font) {
-        if (font === undefined || String(font).trim() === '') {
+        if (!isFontShorthand(font)) {
             throw new DOMException("Failed to parse the 'font' property.", 'SyntaxError');
         }
     }

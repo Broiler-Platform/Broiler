@@ -10,6 +10,8 @@ namespace Broiler.HtmlBridge;
 // bridge in), so the module reaches no arbitrary bridge private field and the public surface is unchanged.
 public sealed partial class DomBridge : Dom.Features.ISelectorsHost
 {
+    Broiler.JavaScript.Engine.JSContext? Dom.Features.ISelectorsHost.JsContext => _jsContext;
+
     JSValue Dom.Features.ISelectorsHost.FindInDescendants(DomElement element, string selector, bool all)
         => FindInDescendants(element, selector, all, this);
 

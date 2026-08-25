@@ -55,7 +55,10 @@ public sealed partial class DomBridge
         }
 
         SearchDescendants(root, selector, results, bridge, all, scope);
-        if (all) return new JSArray(results);
+        // querySelectorAll is a STATIC NodeList (DOM §4.2.6) — the one collection the specification
+        // defines as a snapshot rather than live, so the list is handed the results it already has
+        // rather than the search that produced them.
+        if (all) return Dom.Features.DomCollectionBinding.NodeList(bridge._jsContext, () => results);
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
@@ -270,42 +273,6 @@ public sealed partial class DomBridge
         // `while ParentNode` climb); a connected node roots to its DomDocument, a detached one falls
         // back to the canonical owner-document set at construction/adoption.
         node.GetRootNode() as DomDocument ?? node.OwnerDocument;
-
-    /// <summary>Per-template contents fragment, minted on first access and kept stable
-    /// afterwards, so <c>t.content === t.content</c> and a mutation through it survives.</summary>
-    private readonly Dictionary<DomElement, DomDocumentFragment> _templateContents = new();
-
-    /// <summary>
-    /// The fragment behind <c>HTMLTemplateElement.content</c>.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// The spec has the parser put a template's children straight into this fragment, leaving the
-    /// element itself childless. Broiler's parser keeps them as ordinary children — that is what
-    /// lets a template round-trip through serialization — so the fragment is built here from a deep
-    /// copy of them, once, and cached.
-    /// </para>
-    /// <para>
-    /// The deviation that follows: the fragment is a snapshot, not a live view. Mutating
-    /// <c>t.content</c> does not rewrite the <c>&lt;template&gt;</c>'s own children, and mutating
-    /// those children afterwards does not show up in <c>content</c>. Every ordinary use — stamping
-    /// with <c>importNode</c>/<c>cloneNode</c>, querying it, populating it before stamping — is
-    /// unaffected, because each reads or writes one side only. Nothing renders either way: a
-    /// template's contents are inert.
-    /// </para>
-    /// </remarks>
-    private DomDocumentFragment GetTemplateContent(DomElement template)
-    {
-        if (_templateContents.TryGetValue(template, out var existing))
-            return existing;
-
-        var fragment = CreateBridgeDocumentFragment();
-        foreach (var child in template.ChildNodes.ToArray())
-            fragment.AppendChild(CloneDomElement(child, deep: true));
-
-        _templateContents[template] = fragment;
-        return fragment;
-    }
 
     /// <summary>
     /// Clones a <see cref="DomElement"/>. When <paramref name="deep"/> is true,

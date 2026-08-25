@@ -64,6 +64,33 @@ TYPE Broiler.HtmlBridge.Logging.RenderLogger
   method System.Void LogError(Broiler.HtmlBridge.Logging.LogCategory, System.String, System.String, System.Exception)
   method System.Void LogWarning(Broiler.HtmlBridge.Logging.LogCategory, System.String, System.String, System.Exception)
   property Broiler.HtmlBridge.Logging.LogLevel MinimumLevel { get; set; }
+TYPE Broiler.HtmlBridge.Net.DocumentFetchTiming
+  method Broiler.HtmlBridge.Net.DocumentFetchTiming StartNavigation()
+  method System.Void MarkConnectEnd()
+  method System.Void MarkConnectStart()
+  method System.Void MarkDomainLookupEnd()
+  method System.Void MarkDomainLookupStart()
+  method System.Void MarkFetchStart()
+  method System.Void MarkRequestStart()
+  method System.Void MarkResponseEnd()
+  method System.Void MarkResponseStart()
+  method System.Void MarkSecureConnectionStart()
+  method System.Void RecordBodySizes(System.Int64, System.Int64, System.Int64)
+  property System.Boolean IsComplete { get; }
+  property System.Double ConnectEnd { get; }
+  property System.Double ConnectStart { get; }
+  property System.Double DomainLookupEnd { get; }
+  property System.Double DomainLookupStart { get; }
+  property System.Double FetchStart { get; }
+  property System.Double RequestStart { get; }
+  property System.Double ResponseEnd { get; }
+  property System.Double ResponseStart { get; }
+  property System.Double SecureConnectionStart { get; }
+  property System.Int64 DecodedBodySize { get; }
+  property System.Int64 EncodedBodySize { get; }
+  property System.Int64 MonotonicOrigin { get; }
+  property System.Int64 TransferSize { get; }
+  property System.Int64 UnixTimeOriginMs { get; }
 TYPE Broiler.HtmlBridge.PreloadCandidate : System.IEquatable<Broiler.HtmlBridge.PreloadCandidate>
   ctor (Broiler.HtmlBridge.PreloadKind, System.String, System.String, System.String)
   method System.Boolean Equals(Broiler.HtmlBridge.PreloadCandidate)

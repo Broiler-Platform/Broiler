@@ -2,7 +2,7 @@
 
 - **Status:** Active
 - **Scope:** Missing, incomplete, unsupported, or observably incorrect JavaScript behavior
-- **Last reconciled:** 2026-08-24
+- **Last reconciled:** 2026-08-25
 - **Evidence basis:** Repository-wide Markdown audit plus the current component revisions
 
 This document consolidates JavaScript gaps recorded anywhere in the Broiler repository, not
@@ -41,10 +41,10 @@ found either by status or by track.
 | 0 | Conformance evidence | Coverage gaps closed; pinned-corpus CI run outstanding | in progress · closed | Test failures and timeouts are trustworthy |
 | 1 | Core language and built-ins | Named clusters fixed; Annex B and cross-realm remain | open · closed | Supported Test262 language clusters are clean |
 | 2 | RegExp | Engine gaps closed; matcher performance then non-Unicode routing | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
-| 3 | Scripts, tasks, and modules | Module syntax closed; scope isolation and import immutability fixed in patches; live bindings, host task model, and two decisions open | open · in progress · closed | Parsing and task ordering match observable browser behavior |
+| 3 | Scripts, tasks, and modules | Module syntax closed; scope isolation and import immutability landed upstream; live bindings, host task model, and two decisions open | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | Worker first slice; shared memory not started | open | Claimed agent capabilities are complete and deterministic |
-| 5 | Essential browser JavaScript APIs | Mixed partial, absent, and stubbed surfaces; fetch Promise conformance (action 1), `performance.now()`, the document-surface audit line, window/screen geometry, navigator identity and Navigation Timing marks fixed | open · closed | A tested support matrix replaces accidental omissions |
-| 6 | DOM, CSSOM, and SVG from JavaScript | Partial object and tree models; `Node` interface constants, CharacterData and tree-mutation `DOMException`s fixed; `compareDocumentPosition`, qualified attributes and computed `display` retired as not reproducing | open · closed | Script-visible objects and algorithms meet their claimed standards |
+| 5 | Essential browser JavaScript APIs | Mixed partial, absent, and stubbed surfaces; fetch Promise conformance (action 1), `performance.now()`, the document-surface audit line, window/screen geometry, navigator identity and the Navigation Timing marks — lifecycle and network — fixed | open · closed | A tested support matrix replaces accidental omissions |
+| 6 | DOM, CSSOM, and SVG from JavaScript | Partial object and tree models; `Node` interface constants, CharacterData and tree-mutation `DOMException`s and the linked-stylesheet CSSOM gap fixed; the form default/reset/radio family characterized and fixed; `NodeList`/`HTMLCollection` given real prototypes and correct liveness (action 1's collection half), form association implemented on top of them, `template.content` made the parser-owned fragment, Font Loading's shorthand validation implemented, and the non-element wrappers linked to their interface prototypes; `compareDocumentPosition`, qualified attributes and computed `display` retired as not reproducing | open · closed | Script-visible objects and algorithms meet their claimed standards |
 | 7 | Graphics, media, and advanced APIs | Large capability decisions | open | Each surface is implemented or explicitly excluded |
 | 8 | Portable/Native-AOT profile | Numeric seed only | open | Optional profile decision and, if approved, a truthful capability set |
 

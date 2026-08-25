@@ -1,8 +1,12 @@
 using System.Globalization;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge.Core.Diagnostics;
+using Broiler.HtmlBridge.Net;
 using Broiler.Layout.Net;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -368,15 +372,19 @@ public class CaptureService
         if (outputDir != null && !Directory.Exists(outputDir))
             Directory.CreateDirectory(outputDir);
 
-        using var httpClient = CreateHttpClient(options.TimeoutSeconds);
+        // Stamped before the client exists, let alone the request: this is the document's time
+        // origin, and everything the navigation entry reports is measured from it.
+        var fetchTiming = DocumentFetchTiming.StartNavigation();
+        using var httpClient = CreateHttpClient(options.TimeoutSeconds, fetchTiming);
         var startedAt = DateTimeOffset.UtcNow;
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        var html = await FetchDocumentAsync(httpClient, new Uri(options.Url));
+        var html = await FetchDocumentAsync(httpClient, new Uri(options.Url), fetchTiming);
 
         var evaluations = new List<PageEvaluation>();
         var serialized = ExecuteScriptsWithDom(html, options.Url, localResourceBasePath: null,
-            postScriptExpressions: options.Expressions, evaluations: evaluations);
+            postScriptExpressions: options.Expressions, evaluations: evaluations,
+            fetchTiming: fetchTiming);
         stopwatch.Stop();
 
         if (options.HtmlOutputPath is { Length: > 0 } htmlPath)
@@ -421,23 +429,140 @@ public class CaptureService
     /// answered every capture <c>403 Forbidden</c> — before a redirect, before any content
     /// negotiation — for want of this one header. See <see cref="BroilerUserAgent"/>.
     /// </remarks>
-    private static HttpClient CreateHttpClient(int timeoutSeconds) =>
-        BroilerHttpProtocol.Apply(BroilerUserAgent.Apply(new HttpClient
+    private static HttpClient CreateHttpClient(int timeoutSeconds, DocumentFetchTiming? timing = null) =>
+        BroilerHttpProtocol.Apply(BroilerUserAgent.Apply(new HttpClient(ConnectionHandler(timing))
         {
             Timeout = TimeSpan.FromSeconds(timeoutSeconds),
         }));
+
+    /// <summary>
+    /// The handler that opens the document's connection, instrumented to time the phases only it can
+    /// see — the DNS lookup, the transport connect, and the TLS handshake.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Navigation Timing wants <c>domainLookupStart</c>/<c>End</c>, <c>connectStart</c>/<c>End</c>
+    /// and <c>secureConnectionStart</c> separately, and <see cref="HttpClient"/> reports none of them
+    /// — from outside a request, the whole connection is one opaque prefix of the response.
+    /// <see cref="SocketsHttpHandler.ConnectCallback"/> is the seam that opens it: taking over the
+    /// connect means performing the lookup and the socket connect here, which is what makes their
+    /// boundaries observable. The socket is opened on the address family the lookup returned and with
+    /// <c>NoDelay</c> set, as the handler's own connect does, so what is measured is a connection and
+    /// not an artefact of measuring it.
+    /// </para>
+    /// <para>
+    /// TLS is negotiated by the handler on top of the stream returned here, so the end of this
+    /// callback is where the handshake <em>begins</em> — <c>secureConnectionStart</c> for an
+    /// <c>https</c> request, and <c>connectEnd</c> outright for one with no handshake to wait for.
+    /// <see cref="SocketsHttpHandler.PlaintextStreamFilter"/> then runs once the connection is
+    /// usable, which is <c>connectEnd</c> for the TLS case; the marks are idempotent, so the plain
+    /// case keeps the earlier value rather than being overwritten by it.
+    /// </para>
+    /// <para>
+    /// With no timing to fill in, neither callback is installed and this is a
+    /// <see cref="SocketsHttpHandler"/> with its default settings — the handler
+    /// <c>new HttpClient()</c> would have built for itself.
+    /// </para>
+    /// </remarks>
+    private static SocketsHttpHandler ConnectionHandler(DocumentFetchTiming? timing)
+    {
+        var handler = new SocketsHttpHandler();
+        if (timing is null)
+            return handler;
+
+        handler.ConnectCallback = async (context, cancellationToken) =>
+        {
+            timing.MarkConnectStart();
+            timing.MarkDomainLookupStart();
+            var addresses = await Dns.GetHostAddressesAsync(context.DnsEndPoint.Host, cancellationToken)
+                .ConfigureAwait(false);
+            timing.MarkDomainLookupEnd();
+
+            var socket = new Socket(addresses[0].AddressFamily, SocketType.Stream, ProtocolType.Tcp)
+            {
+                NoDelay = true,
+            };
+            try
+            {
+                await socket.ConnectAsync(addresses, context.DnsEndPoint.Port, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                socket.Dispose();
+                throw;
+            }
+
+            // https negotiates on top of this stream, so this instant is the start of the handshake;
+            // with no handshake coming, the connection is already usable and the request goes out
+            // next, which is connectEnd and requestStart together.
+            if (string.Equals(context.InitialRequestMessage.RequestUri?.Scheme, "https",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                timing.MarkSecureConnectionStart();
+            }
+            else
+            {
+                timing.MarkConnectEnd();
+                timing.MarkRequestStart();
+            }
+
+            return new NetworkStream(socket, ownsSocket: true);
+        };
+
+        // Runs once the connection is usable — after the TLS handshake where there was one — and
+        // immediately before the request is written, which is what makes this requestStart too. The
+        // marks are idempotent, so the plain case keeps the pair it already took above.
+        handler.PlaintextStreamFilter = (context, _) =>
+        {
+            timing.MarkConnectEnd();
+            timing.MarkRequestStart();
+            return ValueTask.FromResult(context.PlaintextStream);
+        };
+
+        return handler;
+    }
 
     /// <summary>
     /// Fetches the top-level document, recording it when a diagnostic run is listening. The page
     /// itself is the one resource nothing below the CLI ever sees — the bridge is handed HTML, not a
     /// URL — so it can only be archived from here.
     /// </summary>
-    private static async Task<string> FetchDocumentAsync(HttpClient httpClient, Uri uri)
+    /// <remarks>
+    /// It is also the only place the document's fetch can be <em>timed</em>, which is why
+    /// <paramref name="timing"/> is marked here rather than anywhere below. The request is sent with
+    /// <see cref="HttpCompletionOption.ResponseHeadersRead"/> so that <c>responseStart</c> — the
+    /// arrival of the headers — is a separate instant from <c>responseEnd</c>; buffering the whole
+    /// body first, as <c>GetStringAsync</c> does, collapses the two into one.
+    /// </remarks>
+    private static async Task<string> FetchDocumentAsync(
+        HttpClient httpClient, Uri uri, DocumentFetchTiming? timing = null)
     {
         var attempt = ResourceTrace.Begin(ResourceTraceKind.Document, uri.AbsoluteUri);
         try
         {
-            var html = await httpClient.GetStringAsync(uri);
+            timing?.MarkFetchStart();
+            if (timing is null)
+            {
+                var buffered = await httpClient.GetStringAsync(uri);
+                attempt.Completed(buffered);
+                return buffered;
+            }
+
+            // requestStart is NOT marked here. The connection is opened inside SendAsync, so a mark
+            // taken before the call precedes connectEnd — Navigation Timing puts requestStart
+            // immediately before the request is issued, which is after the connection is up. The
+            // connection handler takes it at that point instead; a reused connection opens none, and
+            // requestStart then resolves to connectEnd, which is where the specification collapses it.
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            timing.MarkResponseStart();
+            response.EnsureSuccessStatusCode();
+
+            var html = await response.Content.ReadAsStringAsync();
+            timing.MarkResponseEnd();
+            RecordResponseSizes(timing, response, html);
+
             attempt.Completed(html);
             return html;
         }
@@ -446,6 +571,41 @@ public class CaptureService
             attempt.Failed(ex);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Records Resource Timing's body-size trio for a fetched document (Resource Timing §4.1).
+    /// </summary>
+    /// <remarks>
+    /// The client applies no content coding — <see cref="SocketsHttpHandler.AutomaticDecompression"/>
+    /// is left off, as it always has been — so the payload on the wire and the payload after decoding
+    /// are the same bytes, and <c>encodedBodySize</c> and <c>decodedBodySize</c> are equal by
+    /// construction rather than by assumption. <c>Content-Length</c> is that count when the server
+    /// sent one; a chunked response has none, and the decoded text's UTF-8 length stands in.
+    /// <para>
+    /// <c>transferSize</c> is the payload <em>plus the response header fields</em>, and the header
+    /// bytes are reconstructed rather than counted: by the time a response object exists the bytes
+    /// that carried it are gone. The reconstruction is exact for the headers themselves — name,
+    /// <c>": "</c>, value, CRLF — and approximates only the status line, so it is within a handful of
+    /// octets rather than an order of magnitude. A page uses this to tell a large transfer from a
+    /// small one, which that supports; it is not a byte-accounting API.
+    /// </para>
+    /// </remarks>
+    private static void RecordResponseSizes(DocumentFetchTiming timing, HttpResponseMessage response, string html)
+    {
+        var bodyBytes = response.Content.Headers.ContentLength ?? Encoding.UTF8.GetByteCount(html);
+
+        var headerBytes = 0L;
+        foreach (var header in response.Headers.Concat(response.Content.Headers))
+            foreach (var value in header.Value)
+                headerBytes += header.Key.Length + 2 + value.Length + 2;
+        // "HTTP/1.1 200 OK\r\n" and the blank line that ends the field block.
+        headerBytes += 17 + 2;
+
+        timing.RecordBodySizes(
+            transferSize: headerBytes + bodyBytes,
+            encodedBodySize: bodyBytes,
+            decodedBodySize: bodyBytes);
     }
 
     /// <summary>
@@ -490,14 +650,31 @@ public class CaptureService
 
         string html;
         var uri = new Uri(options.Url);
-        using var httpClient = CreateHttpClient(options.TimeoutSeconds);
+        // Stamped before the fetch: the document's time origin (see DocumentFetchTiming).
+        var fetchTiming = DocumentFetchTiming.StartNavigation();
+        // The connection instrumentation belongs to the client only when the document comes over one.
+        // A file: page opens no connection for itself, but this same client goes on to serve
+        // FollowFirstLink — and a connection opened for *that* would stamp connect phases after the
+        // file read had already marked responseEnd, putting the entry out of order.
+        using var httpClient = CreateHttpClient(options.TimeoutSeconds, uri.IsFile ? null : fetchTiming);
 
         if (uri.IsFile)
         {
             var attempt = ResourceTrace.Begin(ResourceTraceKind.Document, uri.AbsoluteUri);
             try
             {
+                // A file: document looks up no host and opens no connection, so those phases are
+                // never marked and collapse onto fetchStart, which is what Navigation Timing asks
+                // for. The read itself is the request/response pair.
+                fetchTiming.MarkFetchStart();
+                fetchTiming.MarkRequestStart();
                 html = await File.ReadAllTextAsync(uri.LocalPath);
+                fetchTiming.MarkResponseStart();
+                fetchTiming.MarkResponseEnd();
+                // Nothing crossed a network, so transferSize is 0 — the value Resource Timing gives
+                // a resource that did not — while the body sizes are the file's own.
+                var fileBytes = Encoding.UTF8.GetByteCount(html);
+                fetchTiming.RecordBodySizes(transferSize: 0, encodedBodySize: fileBytes, decodedBodySize: fileBytes);
                 attempt.Completed(html);
             }
             catch (Exception ex)
@@ -508,7 +685,7 @@ public class CaptureService
         }
         else
         {
-            html = await FetchDocumentAsync(httpClient, uri);
+            html = await FetchDocumentAsync(httpClient, uri, fetchTiming);
         }
 
         // Follow the first link if requested (e.g. Acid2 landing page navigation).
@@ -519,7 +696,7 @@ public class CaptureService
 
         // Execute inline scripts via DomBridge so JS-generated content
         // is present before rendering.
-        html = ExecuteScriptsWithDom(html, options.Url);
+        html = ExecuteScriptsWithDom(html, options.Url, fetchTiming: fetchTiming);
 
         // Apply the production render-preparation pipeline (strip already-executed scripts, empty
         // iframe fallback, box replaced video/progress/meter/select-multiple, :root->html) so that
@@ -741,7 +918,8 @@ public class CaptureService
         string url,
         string? localResourceBasePath = null,
         IReadOnlyList<string>? postScriptExpressions = null,
-        IList<PageEvaluation>? evaluations = null)
+        IList<PageEvaluation>? evaluations = null,
+        DocumentFetchTiming? fetchTiming = null)
     {
         var hasExpressions = postScriptExpressions is { Count: > 0 };
         var scripts = new List<string>();
@@ -879,6 +1057,10 @@ public class CaptureService
         // HTML string outlives this scope, so there is nothing to keep the session alive for.
         using var bridge = new DomBridge();
         bridge.Csp = csp;
+        // Before Attach: the window registration reads this once, to take the navigation's start as
+        // the document's time origin and to give the PerformanceNavigationTiming entry its network
+        // phases. Null whenever this host did not fetch the document itself.
+        bridge.DocumentFetchTiming = fetchTiming;
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         // Attach enforces the CSP style-src family on the parsed DOM itself (it runs
         // when bridge.Csp is set), so blocked inline style attributes / <style> elements

@@ -1,5 +1,6 @@
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.Runtime;
@@ -118,6 +119,20 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// The CSSOM <c>StyleSheet.href</c> value for a style element: the linked sheet's location,
+    /// resolved the same way the sheet itself is read (<see cref="ResolveStyleSheetLinkUrl"/>), so
+    /// the URL a script reads is the URL the rules came from — including under a
+    /// <c>&lt;base href&gt;</c>. An inline <c>&lt;style&gt;</c>, and a <c>&lt;link&gt;</c> with a
+    /// blank href, have no location and answer <c>null</c>.
+    /// </summary>
+    private JSValue StyleSheetHrefValue(DomElement element) =>
+        IsExternalStylesheet(element) &&
+        TryGetAttribute(element, "href", out var href) &&
+        !string.IsNullOrWhiteSpace(href)
+            ? new JSString(ResolveStyleSheetLinkUrl(href))
+            : JSNull.Value;
+
+    /// <summary>
     /// Builds a CSSStyleSheet JSObject for a style element.
     /// Cached per style element to ensure identity (the same object is returned
     /// each time, making cssRules a live collection per the CSSOM spec).
@@ -133,8 +148,13 @@ public sealed partial class DomBridge
         sheet.FastAddProperty((KeyString)"ownerNode", new DomFunction((in _) => ToJSObject(styleElement), "get ownerNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // href — null for inline stylesheets
-        sheet.FastAddProperty((KeyString)"href", NullFunction("get href"),
+        // href — CSSOM §2.1 StyleSheet.href: the location of the sheet, null for an inline
+        // <style>. It was null for a linked sheet too, so a <link> presented itself in
+        // document.styleSheets as an inline sheet that happened to have no rules. A live getter
+        // rather than a captured value: the sheet object is cached per element for identity, and a
+        // script can re-point the link at another href afterwards.
+        sheet.FastAddProperty((KeyString)"href",
+            new DomFunction((in _) => StyleSheetHrefValue(styleElement), "get href"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // disabled — CSSOM StyleSheet.disabled. A true value prevents the sheet from

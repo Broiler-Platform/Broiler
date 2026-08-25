@@ -167,7 +167,8 @@ public sealed partial class DomBridge
         HtmlSerializer.Serialize(element, CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
-    private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
+    private string SerializeChildrenToHtml(DomElement element) =>
+        string.Concat(SerializationChildrenOf(element).OfType<DomElement>().Select(SerializeElementToHtml));
 
     private void ApplySerializationTransforms(DomElement root)
     {
@@ -750,7 +751,8 @@ public sealed partial class DomBridge
         // severed the #subdoc-root element); it is referenced off its <iframe>/<object>/<frame>
         // container and rasterised in isolation (srcdoc content round-trips via the srcdoc
         // attribute), so it can never appear in ChildNodes and needs no serialization skip.
-        GetChildren: static node => node.ChildNodes,
+        // Not node.ChildNodes: a <template> serializes its fragment (see TemplateContents.cs).
+        GetChildren: SerializationChildrenOf,
         GetAttributes: node => node is DomElement element
             ? GetSerializableAttributes(element, sourceResolver?.Invoke(element))
             : [],

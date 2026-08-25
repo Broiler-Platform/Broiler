@@ -181,9 +181,17 @@ Smaller, confirmed, and not fixed:
   opportunity only where the text allows one, and an inline box boundary is not one, so a
   nine-character run wraps to three lines and its float is 45px tall instead of 15px.
 * Grid named areas, and `margin: 0 auto` with `max-width`.
-* `getComputedStyle().display` answers `inline` for every element. It does not affect the render —
+* ~~`getComputedStyle().display` answers `inline` for every element. It does not affect the render —
   the box tree is right — but it made every DOM-side probe during this work untrustworthy, which
-  cost more time than any single defect here.
+  cost more time than any single defect here.~~ **Fixed (2026-08-25), and the cause explains the
+  shape of it.** Nothing was wrong with computed style as such: a `<link rel="stylesheet">` never
+  reached the bridge's CSSOM at all, because the raw `href` content attribute was handed to a
+  resource loader that takes absolute URLs only, so a relative href — every one of this page's —
+  fetched nothing. The elements were genuinely unstyled *to the CSSOM* while the renderer, which
+  resolves the link itself, painted them correctly: hence a right box tree beside a probe that
+  answers `inline` for everything. See
+  [the closed JS-gaps entry](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  A DOM-side probe of this page is trustworthy from that fix onwards.
 
 Refuted by adversarial verification, and listed so nobody chases them again: `place-*` shorthands,
 two-value `overflow`, flex auto widths, CSSOM `styleSheets`, `clamp()`, `srcset`, `line-height:

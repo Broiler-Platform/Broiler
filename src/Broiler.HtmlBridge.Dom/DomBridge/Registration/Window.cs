@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.HtmlBridge.Net;
 
 namespace Broiler.HtmlBridge;
 
@@ -139,6 +140,21 @@ public sealed partial class DomBridge
         context["cancelAnimationFrame"] = window[(KeyString)"cancelAnimationFrame"];
     }
 
+    /// <summary>
+    /// Optional measurements of the top-level document's fetch, taken by the host that performed it.
+    /// Set before <c>Attach</c>: the window registration reads it once, to fix the document's time
+    /// origin at the navigation's start and to give the <c>PerformanceNavigationTiming</c> entry its
+    /// network phases and body sizes.
+    /// </summary>
+    /// <remarks>
+    /// Null is the ordinary case, not an error: HTML handed to the bridge as a string never had a
+    /// fetch to measure, and neither the conformance runner nor a test performs one. The entry then
+    /// reports the specification's "not observed" <c>0</c> for each network mark, and the time origin
+    /// is this bridge's own start. See <see cref="DocumentFetchTiming"/> for why the origin is the
+    /// part that matters.
+    /// </remarks>
+    public DocumentFetchTiming? DocumentFetchTiming { get; set; }
+
     private void RegisterPerformanceObject(JSContext context, JSObject window)
     {
         // ---------------------------------------------------------------
@@ -150,8 +166,16 @@ public sealed partial class DomBridge
         // now() must be MONOTONIC and sub-millisecond (HR-Time §3). Capture the two together: the
         // wall-clock unix-ms for timeOrigin, and a Stopwatch timestamp at the same instant that now()
         // measures its monotonic elapsed time from.
-        var performanceTimeOrigin = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        var performanceMonotonicOrigin = System.Diagnostics.Stopwatch.GetTimestamp();
+        //
+        // The origin belongs to the NAVIGATION, not to this call (HR-Time §5). When the host measured
+        // the document's fetch it took that instant before the fetch began and hands it across here,
+        // and everything on this timeline — now(), the lifecycle marks, and the entry's network
+        // phases — is then measured from the same point, as a browser measures them. Without one this
+        // call is the earliest instant the bridge knows of, which is already after the fetch; that is
+        // exactly why an unmeasured network phase can only report 0 rather than a negative number.
+        var fetchTiming = DocumentFetchTiming;
+        var performanceTimeOrigin = fetchTiming?.UnixTimeOriginMs ?? DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var performanceMonotonicOrigin = fetchTiming?.MonotonicOrigin ?? System.Diagnostics.Stopwatch.GetTimestamp();
         var performanceObj = new JSObject();
         performanceObj.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
         performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceMonotonicOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -175,7 +199,8 @@ public sealed partial class DomBridge
         // It shares the monotonic origin with performance.now() above, so a mark and a now() reading
         // are two points on one timeline.
         _navigationTiming = new Dom.Features.NavigationTimingState(performanceMonotonicOrigin);
-        Dom.Features.NavigationTimingBinding.Install(performanceObj, _pageUrl, _pageProtocol, _navigationTiming);
+        Dom.Features.NavigationTimingBinding.Install(
+            performanceObj, _pageUrl, _pageProtocol, _navigationTiming, fetchTiming);
 
         // performance.memory — the same MemoryInfo console.memory reports (built with the console in
         // RegisterWindowBasics, which runs first).

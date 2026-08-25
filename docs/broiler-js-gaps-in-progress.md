@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · [open](broiler-js-gaps-open.md) · **in progress** · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names the pinned
+> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names the pinned
 > `Broiler.JS` commit that carries it and the regression that holds it.
 
 Tracks that are part-landed: the mechanism is in and the evidence is real, but named steps remain
@@ -112,15 +112,21 @@ the native backend, and all public RegExp operations consume the same conforming
 
 ## Track 3 — Module execution semantics
 
-**Status: two module-binding defects are root-caused and fixed, but both rides in `Broiler.JS`
-submodule patches that could not be pushed (the remote is outside this session's scope, so the push
-returned 403 and the gitlink was not bumped). A third, larger defect — imports are not live bindings
-— is newly characterized but not fixed, because it is an architectural change to how the engine
+**Status: two module-binding defects are root-caused, fixed, and now landed upstream — the pinned
+`Broiler.JS` gitlink carries both, so CI sees them. A third, larger defect — imports are not live
+bindings — is characterized but not fixed, because it is an architectural change to how the engine
 links modules. The rest of track 3 — the host task model and the JSON-module / `import.meta` /
 attribute-enforcement decisions — stays in
 [open](broiler-js-gaps-open.md#track-3--scripts-tasks-and-modules).**
 
-### Fixed in a patch awaiting upstream
+### Fixed
+
+Both were written as `Broiler.JS` submodule patches because the push to the submodule remote
+returned 403 (it is outside this session's GitHub scope). They have since been applied upstream and
+the gitlink bumped: `12839186` *Give a module's top-level lexicals their own environment* and
+`8b74d6c3` *Make an imported binding immutable* are both ancestors of the pinned pointer, and the
+`patches/` copies are deleted. Check either with
+`git -C Broiler.JS log --oneline --grep '<subject>'` rather than by patch number.
 
 - **A module's top-level `let`/`const`/`class` bindings shared one realm-wide slot per name.** They
   were published into the realm's global lexical environment exactly as a script's top-level
@@ -180,12 +186,8 @@ attribute-enforcement decisions — stays in
 
 ### Remaining work
 
-1. Land the two `Broiler.JS` patches — *Give a module's top-level lexicals their own environment* and
-   *Make an imported binding immutable* — on `Broiler-Platform/Broiler.JS` and bump the submodule
-   gitlink. They touch disjoint files and apply in order on the pinned commit. Until then CI clones
-   the pinned commit, which carries neither, so these cases stay red on CI and the files under
-   `patches/` are the only copies. There is no main-repo fallback and none is needed — both are
-   internal to the `Broiler.JS` compiler and runtime and name no type the parent references.
+1. ~~Land the two `Broiler.JS` patches and bump the submodule gitlink.~~ **Done** — see *Fixed*
+   above. CI now clones a pointer that carries both.
 2. Re-measure the module corpus against the landed fixes. Track 0's run recorded "22
    NullReferenceException crashes in module namespace and ambiguous-export paths" and "52 that hang";
    the scope-isolation fix targets a distinct read-only-write crash class (not those NREs), so its

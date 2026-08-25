@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
 using Broiler.Dom;
+using Broiler.JavaScript.BuiltIns.String;
+using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Boolean;
@@ -48,12 +51,48 @@ internal static class SelectorsBinding
         return JSNull.Value;
     }
 
+    /// <summary>
+    /// <c>element.getElementsByTagName(name)</c> — a <b>live</b> <c>HTMLCollection</c> (DOM §4.9). It
+    /// was a snapshot array, so the loop this method exists for —
+    /// <c>for (var i = 0; i &lt; items.length; i++)</c> over a list the body mutates — walked a
+    /// different collection than a browser walks.
+    /// </summary>
     public static JSValue GetElementsByTagName(ISelectorsHost host, DomElement element, in Arguments a)
     {
         var tagSearch = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
-        var results = new List<JSValue>();
-        host.CollectElementsByTagName(element, tagSearch, results);
-        return new JSArray(results);
+        return LiveCollection(host, () =>
+        {
+            var results = new List<JSValue>();
+            host.CollectElementsByTagName(element, tagSearch, results);
+            return results;
+        });
+    }
+
+    /// <summary>
+    /// An <c>HTMLCollection</c> over <paramref name="contents"/>, with the named getter DOM
+    /// §4.2.10.2 gives one: a lookup answers the first element whose <c>id</c> — or, for the
+    /// elements HTML names, whose <c>name</c> — matches.
+    /// </summary>
+    private static JSValue LiveCollection(ISelectorsHost host, Func<List<JSValue>> contents) =>
+        DomCollectionBinding.HtmlCollection(host.JsContext, contents, name => NamedItem(host, contents, name));
+
+    private static JSValue? NamedItem(ISelectorsHost host, Func<List<JSValue>> contents, string name)
+    {
+        if (name.Length == 0)
+            return null;
+
+        foreach (var candidate in contents())
+        {
+            if (candidate is JSObject wrapper &&
+                (Matches(wrapper, "id", name) || Matches(wrapper, "name", name)))
+                return wrapper;
+        }
+
+        return null;
+
+        static bool Matches(JSObject wrapper, string attribute, string name) =>
+            wrapper[(KeyString)attribute] is JSString value &&
+            string.Equals(value.ToString(), name, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -66,8 +105,11 @@ internal static class SelectorsBinding
     public static JSValue GetElementsByClassName(ISelectorsHost host, DomElement element, in Arguments a)
     {
         var classNames = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var results = new List<JSValue>();
-        host.CollectElementsByClassName(element, classNames, results);
-        return new JSArray(results);
+        return LiveCollection(host, () =>
+        {
+            var results = new List<JSValue>();
+            host.CollectElementsByClassName(element, classNames, results);
+            return results;
+        });
     }
 }

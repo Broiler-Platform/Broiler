@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.BuiltIns.String;
+using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Null;
 
@@ -28,17 +32,23 @@ internal static class DocumentQueryBinding
         return found != null ? host.ToJSObject(found) : JSNull.Value;
     }
 
+    /// <summary>
+    /// <c>document.getElementsByTagName(name)</c> — a <b>live</b> <c>HTMLCollection</c> (DOM §4.5).
+    /// </summary>
     public static JSValue GetElementsByTagName(IDocumentQueryHost host, in Arguments a)
     {
         var tag = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
-        var results = new List<JSValue>();
-        foreach (var el in host.Elements)
+        return LiveCollection(host, () =>
         {
-            if (tag == "*" || el.TagName == tag)
-                results.Add(host.ToJSObject(el));
-        }
+            var results = new List<JSValue>();
+            foreach (var el in host.Elements)
+            {
+                if (tag == "*" || el.TagName == tag)
+                    results.Add(host.ToJSObject(el));
+            }
 
-        return new JSArray(results);
+            return results;
+        });
     }
 
     /// <summary>
@@ -51,14 +61,17 @@ internal static class DocumentQueryBinding
     public static JSValue GetElementsByClassName(IDocumentQueryHost host, in Arguments a)
     {
         var wanted = ClassNameSet.Parse(a.Length > 0 ? a[0].ToString() : string.Empty);
-        var results = new List<JSValue>();
-        foreach (var el in host.Elements)
+        return LiveCollection(host, () =>
         {
-            if (ClassNameSet.Matches(el, wanted))
-                results.Add(host.ToJSObject(el));
-        }
+            var results = new List<JSValue>();
+            foreach (var el in host.Elements)
+            {
+                if (ClassNameSet.Matches(el, wanted))
+                    results.Add(host.ToJSObject(el));
+            }
 
-        return new JSArray(results);
+            return results;
+        });
     }
 
     /// <summary>
@@ -81,14 +94,19 @@ internal static class DocumentQueryBinding
     public static JSValue GetElementsByName(IDocumentQueryHost host, in Arguments a)
     {
         var name = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var results = new List<JSValue>();
-        foreach (var el in host.Elements)
+        // A live NodeList, not an HTMLCollection: HTML §3.1.5 is the one by-name lookup the
+        // specification types as a NodeList.
+        return DomCollectionBinding.NodeList(host.JsContext, () =>
         {
-            if (DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal))
-                results.Add(host.ToJSObject(el));
-        }
+            var results = new List<JSValue>();
+            foreach (var el in host.Elements)
+            {
+                if (DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal))
+                    results.Add(host.ToJSObject(el));
+            }
 
-        return new JSArray(results);
+            return results;
+        });
     }
 
     public static JSValue QuerySelector(IDocumentQueryHost host, in Arguments a)
@@ -103,6 +121,10 @@ internal static class DocumentQueryBinding
         return JSNull.Value;
     }
 
+    /// <summary>
+    /// <c>document.querySelectorAll(selector)</c> — a <b>static</b> <c>NodeList</c> (DOM §4.2.6),
+    /// the one collection the specification defines as a snapshot rather than live.
+    /// </summary>
     public static JSValue QuerySelectorAll(IDocumentQueryHost host, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
@@ -113,6 +135,28 @@ internal static class DocumentQueryBinding
                 results.Add(host.ToJSObject(el));
         }
 
-        return new JSArray(results);
+        return DomCollectionBinding.NodeList(host.JsContext, () => results);
     }
+
+    /// <summary>An <c>HTMLCollection</c> over <paramref name="contents"/>, with the named getter
+    /// DOM §4.2.10.2 gives one — by <c>id</c>, then by <c>name</c>.</summary>
+    private static JSValue LiveCollection(IDocumentQueryHost host, Func<List<JSValue>> contents) =>
+        DomCollectionBinding.HtmlCollection(host.JsContext, contents, name =>
+        {
+            if (name.Length == 0)
+                return null;
+
+            foreach (var candidate in contents())
+            {
+                if (candidate is JSObject wrapper &&
+                    (Named(wrapper, "id", name) || Named(wrapper, "name", name)))
+                    return wrapper;
+            }
+
+            return null;
+        });
+
+    private static bool Named(JSObject wrapper, string attribute, string name) =>
+        wrapper[(KeyString)attribute] is JSString value &&
+        string.Equals(value.ToString(), name, StringComparison.Ordinal);
 }

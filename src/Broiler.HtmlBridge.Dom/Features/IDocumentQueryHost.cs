@@ -11,6 +11,10 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal interface IDocumentQueryHost
 {
+    /// <summary>The realm holding <c>NodeList</c>/<c>HTMLCollection</c>, or <see langword="null"/>
+    /// before the bridge is attached.</summary>
+    Broiler.JavaScript.Engine.JSContext? JsContext { get; }
+
     JSObject ToJSObject(DomNode node);
     DomElement DocumentElement { get; }
     IReadOnlyList<DomElement> Elements { get; }

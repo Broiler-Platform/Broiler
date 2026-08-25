@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names where it landed — the
+> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names where it landed — the
 > pinned `Broiler.JS` commit, or the main-repo component for a host/DOM fix — and the regression that
 > holds it.
 
@@ -390,6 +390,64 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **A navigation entry's `duration` was a hardcoded `0`.** Navigation Timing §4 defines it as
+  `loadEventEnd - startTime`, and a navigation entry's `startTime` is `0` by definition, so it *is*
+  `loadEventEnd`. `entry.duration` is the shortest way a page writes "how long did this take", so a
+  `0` there is a plausible number rather than an absent one and nothing distinguishes the two —
+  which is what made this worse than the network phases it sat beside, where at least the whole
+  family read `0` together.
+  <br>The constant was right for exactly one case, which is what kept it looking correct: read
+  *before* the load event ends, `0` is the specified value for a moment not yet reached. It was
+  pinned by an assertion whose own comment said duration "is 0 *until* the load event ends" — and the
+  fixture read it from a `load` listener, where the mark has genuinely not been stamped. **Fixed** as
+  a live accessor over `loadEventEnd`, so the before-load `0` is unchanged and a read afterwards
+  reports the figure the entry already measures beside it. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Features/NavigationTimingBinding.cs`); regressions `The_Duration_Is_LoadEventEnd` — which reads
+  from a task the load handler schedules, since `loadEventEnd` is stamped when the dispatch returns,
+  the same reason analytics read this from a timeout rather than from `onload` — and
+  `The_Duration_Is_Zero_Before_The_Load_Event`, which keeps the case the constant got right.
+  Found while wiring the network phases below and deliberately left out of that change, so each
+  landed as its own.
+- **The navigation entry's network phases were not measured.** `fetchStart`, `domainLookup*`,
+  `connect*`, `secureConnectionStart`, `request*`, `response*` and the
+  `transferSize`/`encodedBodySize`/`decodedBodySize` trio existed and reported `0` — which in
+  Navigation Timing means "not observed", not "instantaneous". The arithmetic built on them yielded a
+  number rather than `NaN`, but not a measurement, and no feature test could tell the two apart.
+  <br>**The time origin is what the fix turns on, not the instrumentation.** A mark is milliseconds
+  since the document's time origin, and the origin is the navigation's start (HR-Time §5). The bridge
+  stamped its origin when it built the `performance` object — already *after* the fetch — so every
+  real network mark would have been negative and clamped to the specification's floor of `0`. Which
+  is to say the zeros were not laziness: they were the only expressible answer under that origin.
+  **Fixed** by having the host take the origin before the fetch begins and hand it across with the
+  measurements, so `performance.now()`, the lifecycle marks and the network phases are all measured
+  from one instant, as a browser measures them.
+  <br>The measuring is the host's because only the host can see it — the document is fetched before
+  the bridge exists. `CaptureService` marks `fetchStart` around its own fetch and reads the phases
+  only the connection can show from a `SocketsHttpHandler.ConnectCallback` (which performs the DNS
+  lookup and the socket connect itself, so their boundaries become observable) plus a
+  `PlaintextStreamFilter` for the instant the connection is usable after a TLS handshake. The request
+  goes out with `HttpCompletionOption.ResponseHeadersRead`, so `responseStart` — the headers
+  arriving — is a separate instant from `responseEnd`, which buffering the whole body first collapses
+  into one. `requestStart` is taken in the connection handler rather than before `SendAsync`: the
+  connection is opened *inside* that call, so a mark taken before it precedes `connectEnd`, which the
+  specification's ordering forbids.
+  <br>A phase a fetch did not perform reports the previous phase rather than `0`, which is what the
+  specification asks for: a `file:` document looks up no host and opens no connection, so its lookup
+  and connect marks collapse onto `fetchStart`. `secureConnectionStart` is the documented exception
+  and stays `0` when no handshake happened. `transferSize` is the payload plus the response header
+  fields, and the header bytes are reconstructed from the response rather than counted — the bytes
+  that carried them are gone by then — which is exact for the fields and approximate for the status
+  line. A host that fetched nothing supplies no timing at all, and the marks then keep reporting `0`:
+  HTML handed to the bridge as a string, the conformance runner, and almost every test take that
+  path, so their behaviour is unchanged.
+  <br>Main-repo fix: the `DocumentFetchTiming` type in `Broiler.HtmlBridge.Core` (the parent owns it,
+  so the measuring host and the reporting bridge share one contract), `DomBridge.DocumentFetchTiming`
+  and `Features/NavigationTimingBinding` in `Broiler.HtmlBridge.Dom`, and the instrumentation in
+  `Broiler.Cli`'s `CaptureService`; landed directly rather than as a submodule patch. Regressions in
+  `NavigationTimingNetworkPhasesTests`, which pin the supplied-timing, no-timing and collapsed-phase
+  cases, the shared timeline, and one end-to-end capture against a local origin that measures its own
+  fetch. The entry's `duration`, found here and deliberately left out of this change, is the entry
+  above.
 - `performance.now()` returned `Date.now() - timeOrigin`: whole-millisecond wall-clock arithmetic. It
   had no sub-millisecond resolution, and — being wall time — could run **backwards** when the system
   clock was stepped (NTP, a manual change), which HR-Time §3 forbids (the value "MUST be monotonically
@@ -401,7 +459,8 @@ were deleted and the gitlinks point at commits that contain them. See
   resolution is a separate decision and was not added. This is a main-repo `Broiler.HtmlBridge.Dom`
   fix (`WindowDocumentMiscBinding.PerformanceNow` / `Window.RegisterPerformanceObject`), landed
   directly rather than as a submodule patch; regression `Performance_Now_Is_Monotonic_And_SubMillisecond`
-  in `GoogleSearchPolyfillTests`. Performance Navigation Timing marks remain a separate open gap.
+  in `GoogleSearchPolyfillTests`. The Navigation Timing marks that measure against this same origin
+  are the entry above.
 - Seven script-visible document surfaces were absent — `document.charset`, `referrer`, `domain`,
   `lastModified`, `activeElement`, `hasFocus()`, and the `onvisibilitychange` handler slot — the
   audit line that also named `window.trustedTypes`. Each read `undefined` (or, for `hasFocus`, was
@@ -540,6 +599,216 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
+  `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
+  reads `nodeType`, which made the gap narrower than it looks and also more confusing:
+  `node instanceof Text` was `true` while `node.constructor.name` was `"Object"` and
+  `Object.getPrototypeOf(node) === Text.prototype` was `false`. Anything keyed on the constructor —
+  debugging output, logging, dispatch — read the wrong thing.
+  <br>**Fixed for the non-element wrappers**: `Text`, `Comment`, `DocumentFragment` and
+  `DocumentType` are linked to their interface prototypes at the single choke point that mints every
+  wrapper. `DocumentType` had no global and gained one. The gain is not only cosmetic — the
+  prototype is genuinely in the chain, so extending `Text.prototype`, the ordinary polyfill idiom,
+  now reaches instances where the assignment used to go to an object nothing inherited from.
+  <br>**The boundary is deliberate and is asserted, not just described.** Each of these node kinds
+  has exactly one interface fixed by its node type, so the mapping is a fact. An *element's* is a tag
+  question over a table whose entries overlap and which omits tags a browser still names, so a guess
+  would put a wrong name where `"Object"` is at least not misleading; `Attr` is not a canonical
+  `DomNode` and so is not minted where the link is applied. A regression asserts both still report
+  `"Object"`, so if either starts naming its interface the fixture is updated deliberately rather
+  than the change landing unnoticed. Members also stay own properties, leaving the interface
+  prototypes themselves empty — the larger object-model change, and what this item's remainder in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model) now names precisely.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/WrapperPrototypes.cs`, applied from
+  `DomBridge/JsObjects.cs`); regressions in `WrapperInterfacePrototypeTests`.
+- **`document.fonts.check()` accepted malformed shorthands**, answering `true` for strings that are
+  not fonts — `check('not-a-font')`, `check('12px')`, `check('px monospace')` — where every browser
+  throws a `SyntaxError` (css-font-loading-3). `true` is the answer that does the damage: a page
+  feature-testing a font it cannot have is told it has it. Only an absent or empty string threw.
+  <br>**The deviation was deliberate**, and the reason given for it was risk: rejecting a shorthand
+  Broiler merely failed to *parse* would break pages over a diagnostic it could not produce. The
+  answer to that is to parse the shorthand properly rather than to accept everything. The `font`
+  grammar is small and closed (CSS Fonts 4), so accepting exactly it is not an approximation —
+  a system-font keyword, or an optional unordered run of style/variant/weight/stretch, then a
+  font-size with an optional `/line-height`, then a family list.
+  <br>**Over-rejection is the failure mode**, so the regression is a *table* and every row of it is a
+  Chromium answer taken through Playwright — the 26 that must be accepted as much as the 18 that must
+  be rejected. The accepted half deliberately carries the awkward spellings: `oblique 40deg`,
+  `calc(1em + 2px)`, a glued `16px/2`, a quoted family, a bare `900` weight, runs of `normal`, and a
+  multi-name family list. The tokenizer is quote- and paren-aware for exactly those, and an unquoted
+  family name may not begin with a digit, which is what makes `12px 12px serif` a malformed family
+  rather than a family called "12px serif".
+  <br>What did **not** change is the modelling: a shorthand that parses still answers `true` and
+  `load()` still resolves, because Broiler resolves fonts synchronously and no load is ever in
+  flight. That half stays in [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms)
+  as a capability decision rather than a defect. Main-repo fix
+  (`Broiler.HtmlBridge.Dom/Polyfills/content-rendering-polyfills.js`); regressions in
+  `FontShorthandValidationTests`.
+- **`template.content` was a snapshot, not the parser-owned fragment** (HTML §4.12.3). The fragment
+  was built from a deep *copy* of children that stayed in the template's own child list, and the
+  consequences went well past the two sides disagreeing.
+  <br>A template's contents were **reachable from the document**: `t.querySelector('.row')` found
+  them where a browser answers `null`, and `document.querySelector`/`getElementsByTagName` saw them
+  too — so a page walking itself processed the markup it was meant to stamp later. And writing
+  `t.innerHTML` rewrote the element's children while `content` kept the cached copy, so the ordinary
+  way to build a template dynamically and then stamp it produced the **old** markup, with nothing to
+  indicate the write had gone somewhere else.
+  <br>**Fixed** by doing what the specification has the parser do: at the end of the parse every
+  remaining `<template>`'s children are moved into its contents fragment and the element is left
+  childless. Ordering matters — it runs *after* the declarative-shadow-root pass, because a
+  `<template shadowrootmode>` is not inert and its children belong in the shadow tree rather than in
+  a fragment. Two consumers follow the children: serialization reaches through to the fragment (a
+  browser's `outerHTML` emits template contents for the same reason, and without it a template's
+  markup would vanish from the serialized document), and `innerHTML` reads and writes the fragment.
+  A template built by `createElement` is deliberately *not* diverted — only the parser diverts — so
+  `t.appendChild(x)` appends to the element as it does in a browser while `t.innerHTML` still reaches
+  the fragment.
+  <br>The serializer needed no submodule change: it takes a bridge-supplied adapter, so which node
+  list it walks was already the parent's to decide. Nothing rendered differently either way — a
+  template's contents are inert, and `DeclarativeShadowDomTests` already pinned that.
+  <br>Every expectation is a Chromium answer taken through Playwright. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`DomBridge/Utilities.cs`, `DomBridge.HtmlParsing.cs`,
+  `DomBridge.Serialization.cs`, `DomBridge/HtmlFragmentMutation.cs`); regressions in
+  `TemplateContentTests`. One difference from the reference is left standing and recorded in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model): the fragment's wrapper reports
+  `constructor.name` of `"Object"`, which is the wrapper-prototype item, not this one.
+- **Form association was entirely absent** — `control.form`, `control.labels`, `label.control` and
+  `label.form` were all `undefined`. `control.form` is how a script reaches the form from a control
+  it was handed (an event target, a query result), so the ordinary `input.form.submit()` threw on the
+  property access rather than on the call; `control.labels` is how accessibility and validation code
+  finds the text describing a field, and `labels.length` threw rather than answering zero. Recorded
+  as open when the form default/reset family was closed and deliberately left for later, because
+  `labels` is a live `NodeList` and that did not exist yet — the entry above is what unblocked it.
+  <br>**Fixed:** the form owner resolves the `form` content attribute first (a control rendered
+  outside the form it submits is the whole point of it), then the nearest ancestor `<form>`;
+  `labels` is a live `NodeList` in tree order covering both spellings, `for` and wrapping;
+  `label.control` honours `for` even when it names nothing, so a label wrapping one control while
+  pointing at a missing id labels nothing rather than quietly labelling what it wraps.
+  <br>**Two reference answers contradict the plausible reading**, which is why they were checked
+  rather than reasoned about. `label.form` follows the label's *control*, not the label's own
+  ancestry — a label outside every form whose `for` points into one reports that form, where
+  treating the label as an ordinary form-associated element gives `null`. And **absence is specified
+  three distinguishable ways**: a `<div>` has no `labels` property *at all*, an
+  `<input type=hidden>` has one and it is `null`, and a labelable control with no labels has an
+  empty list. Answering an empty list everywhere would have been wrong in two of the three — which
+  is also why these members are installed per tag rather than on every element wrapper as the
+  bridge's other form members are.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/FormAssociationBinding.cs` and its host,
+  installed from `DomBridge/ElementInterfaces.cs`); regressions in `FormAssociationTests`.
+- **`NodeList` and `HTMLCollection` were plain JavaScript arrays**, which is wrong three ways — and
+  the third one changed results rather than raising errors.
+  <br>Neither interface was defined at all, so `instanceof` was a `ReferenceError` and
+  `childNodes.constructor.name` answered `"Array"`. `item()` and `namedItem()` did not exist, while
+  `map`, `filter` and `slice` did — the opposite of a browser in *both* directions, so a page
+  feature-detecting either way branched wrongly. And an array is a **snapshot**, so the collections
+  the specification defines as *live* were not: `var kids = el.childNodes; el.appendChild(x);
+  kids.length` grows in a browser and did not here. That last one returns a wrong number rather than
+  failing, which is how it sat under passing tests.
+  <br>**Fixed** as real interfaces with real prototypes, and with each collection live or static as
+  its own specification says: `childNodes` (DOM §4.4), `getElementsByTagName`/`ByClassName` (§4.5,
+  §4.9) and `getElementsByName` (HTML §3.1.5) are live; `querySelectorAll` (§4.2.6) is static, the
+  one the specification defines as a snapshot. A collection holds the *function* that produces its
+  contents rather than the contents, so one type serves both and the difference sits at the call
+  site. The prototype methods are plain JavaScript written against `this.length` and `this[i]`,
+  which keeps `Symbol.iterator`, `entries`/`keys`/`values` and correct `this` handling out of C#,
+  and puts them on the prototype where Web IDL wants them — `NodeList.prototype.item` is the
+  function the instance uses.
+  <br>This is track 6 **action 1**, "establish real interface prototypes and Web IDL collection
+  behavior *before* adding more compatibility-only constructor globals", so these two deliberately
+  are **not** the `@@hasInstance` shims the per-tag `HTML*Element` interfaces use: an instance's
+  prototype really is `NodeList.prototype`. Element wrappers still answer through the hook, and that
+  half stays [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Two mistakes are worth recording, because both looked like success.** Intercepting reads
+  alone was not enough: an array index does not arrive as a string key, so overriding only that
+  overload left `list[0]` answering `undefined` while `length`, `item()` and every method written
+  against `this[i]` worked — a collection that reports the right count and iterates correctly and
+  cannot be indexed. Fixing that exposed the deeper one: `Array.prototype.map.call(list, …)` read
+  `length` correctly and produced a hole for every element, because an array generic asks whether an
+  index is *present* before reading it, and an object with no own indexed properties says no — as do
+  `Object.keys`, `for…in` and spread. Presence, enumeration and retrieval are separate entry points
+  with no single hook, so the indices are **materialized** from the contents function on each read
+  instead, and generic algorithms then work on a collection without knowing what it is. That is the
+  shape the bridge's other live collection, the CSSOM `cssRules` list, already used.
+  <br>**Every expectation is a Chromium answer** taken through Playwright, including the three-way
+  liveness split, which is the assertion easiest to get subtly wrong. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`Features/DomCollectionBinding.cs` and the collection call sites in
+  `Features/NodeAccessorsBinding.cs`, `Features/SelectorsBinding.cs`,
+  `Features/DocumentQueryBinding.cs` and `DomBridge/Utilities.cs`); regressions in
+  `DomCollectionInterfaceTests`.
+- **Form-control default, reset and radio-group semantics** — the retest-queue entry that was carried
+  as *uncharacterized*. Characterizing it split the entry in two: **the dirty half was already
+  correct**, and the default and reset halves were absent outright.
+  <br>Correct, and now pinned so it stays that way: a property write does not reflect to the content
+  attribute, once the dirty value flag is set a later `setAttribute('value', …)` no longer moves the
+  value, dirty checkedness decouples from the `checked` attribute the same way, a `<select>` takes its
+  initial selection from the markup's `selected`, and setting `checked` through the property unchecks
+  the rest of that radio group and leaves other groups alone.
+  <br>**Absent, and fixed:** `input.defaultValue`, `textarea.defaultValue` and `input.defaultChecked`
+  were `undefined`, so a page comparing the current value against the original to decide whether a
+  field is unsaved compared against `undefined` and concluded "changed" for every field, including
+  ones it had just reset. `form.reset()` was `undefined`, so the call a "clear this form" control is
+  written as was a TypeError that aborted the handler rather than clearing anything. An untouched
+  `<textarea>` reported `""` rather than its child text, so a form read before the user typed
+  anything submitted an empty field. `option.defaultSelected` read the bridge's runtime slot alone
+  and was `false` for every option the markup had selected — including the one the select was
+  showing. And an already-checked radio *inserted* into a group left two members checked: the
+  property setter's exclusivity walk never runs for it, because it was checked while still detached
+  and in a group of one.
+  <br>The reset itself is small because the state model was already right: a reset is defined over
+  the dirty flags, and the bridge's per-element `FormControl` runtime slots *are* those flags, with
+  "unset" already meaning "tracks the markup" everywhere the IDL getters fall back through. So the
+  algorithm removes slots rather than computing replacement values. Fixing the textarea default
+  exposed one coupling: writing `textarea.value` had been storing a `value` content attribute that
+  nothing reads on a textarea — harmless while the getter read that same attribute back, a lost write
+  once the getter started falling back to the child text — so the setter now sets the dirty flag, as
+  HTML §4.10.11 specifies and as `<input>` already did.
+  <br>**Every expectation was taken from Chromium, not from a reading of the specification**, through
+  Playwright against the pinned browser. Two would plausibly have been got backwards otherwise:
+  whether appending an already-checked radio re-imposes exclusivity at all (it does), and which
+  member of a group with two `checked` attributes survives a reset (the last in tree order, because
+  the rule fires whenever a radio becomes checked, so restoring them in order leaves each unchecking
+  the ones before it).
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/FormReset.cs`, `Features/FormBinding.cs`,
+  `Features/FormControlBinding.cs`, `DomBridge.SelectHost.cs`, and the insertion hook in
+  `DomBridge/HtmlFragmentMutation.cs` — the one choke point every insertion path already reaches);
+  regressions in `FormDefaultsAndResetTests`. Still absent and *not* part of this entry:
+  `input.form` and `input.labels`, which are the form-association surface rather than the
+  dirty/default/reset family, recorded in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **A linked stylesheet's rules reached neither `cssRules` nor `getComputedStyle`, and the sheet
+  reported no `href`.** A `<link rel="stylesheet">` appeared in `document.styleSheets` as a sheet
+  with zero rules and a null location, and the elements it styled computed as if it were not there —
+  measured against an inline `<style>` control carrying identical CSS, which answered `cssRules
+  .length` 2, `display: flex`, `color: rgb(1, 2, 3)`, `marginTop: 7px` where the link answered 0,
+  `inline`, `rgb(0, 0, 0)`, `0px`. It is what made the retired *"`getComputedStyle().display`
+  reports `inline` for every element"* claim true after all for linked sheets.
+  <br>**The open question is answered: it was not a `file:`-scheme defect.** `file:` and `http(s):`
+  behaved *identically* — both failed for a relative `href` and both worked for an absolute one —
+  which is what identified the cause. `GetStyleElementSourceText` handed the **raw `href` content
+  attribute** to the resource loader, and the loader takes absolute URLs only
+  (`ResourceLoader.LoadTextDirect` opens with a `UriKind.Absolute` guard and returns `null` for
+  anything else). So the fetch was never issued for a relative href — the ordinary case — on any
+  scheme. The whole collect → prefetch → fetch pipeline was present and correct, as the earlier
+  characterization suspected; only the URL passed through it was.
+  <br>It was invisible as a rendering bug because `HtmlRender` resolves and applies the link itself:
+  paint and the CSSOM held two different stylesheet sets and only paint had the linked one, which is
+  why the green-pixel assertion in `StylesheetBaseHrefTests` passed throughout.
+  <br>**Fixed:** the href is resolved through `ResolveStyleSheetLinkUrl` before it reaches the
+  loader. The base it resolves against is the **document** base URL — the first `<base href>`
+  resolved against the page URL when the document declares one, the page URL otherwise — because a
+  `<base href>` relocates a linked sheet (HTML §4.2.3) and the render-bound `RewriteLinkStyleSheetHrefs`
+  pass already honours it; resolving against the page URL here would have read a *different* sheet
+  than the one that paints. `data:` hrefs still bypass the loader through the same seam as before.
+  Both prefetch sites move with the consuming path — `PrefetchExternalStylesheets` and the
+  speculative preload scan (`ResolvedUrls` rather than `RawUrls`) — since a prefetch keyed on a
+  differently-normalized URL is never consumed and would double the requests instead of overlapping
+  them. `CSSStyleSheet.href` was a hardcoded `null` for every sheet; it is now a live getter
+  reporting the same resolved location for a linked sheet and `null` for an inline `<style>`, per
+  CSSOM §2.1. Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/Css.cs`,
+  `DomBridge/StyleSheets.cs`, `DomBridge.PreloadScan.cs`); regressions in
+  `LinkedStylesheetCssomTests`, which pin relative and absolute hrefs over both `file:` and a local
+  `http:` origin, and `<base href>` relocation, each against the inline control rather than against
+  transcribed values.
 - The **document-level** `removeChild`/`insertBefore` had the same defect on their own code path
   (`NodeMutationBinding`, reached by `document.removeChild(…)` / `document.insertBefore(…)`, distinct
   from the element methods above). `document.removeChild` returned the node unchanged — what a

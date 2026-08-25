@@ -138,4 +138,61 @@ public sealed partial class DomBridge
     /// </summary>
     private string? ResolveUrlAgainstBaseHref(string rawUrl, string baseHref) =>
         HtmlBaseHref.Resolve(rawUrl, baseHref, _pageUrl);
+
+    /// <summary>
+    /// The URL a <c>&lt;link rel="stylesheet"&gt;</c>'s sheet is read from: a <c>data:</c> href
+    /// verbatim, anything else resolved against the <em>document base URL</em>. The verbatim case
+    /// matters — round tripping a data: URL through <see cref="Uri"/> normalizes the percent-escapes
+    /// its payload is made of, and the payload is the stylesheet.
+    /// <para>
+    /// The base is the document's, not the page's: a <c>&lt;base href&gt;</c> relocates a linked
+    /// sheet (HTML §4.2.3), which is what the render-bound
+    /// <see cref="RewriteLinkStyleSheetHrefs"/> pass already honours on the serialization
+    /// projection. Resolving against the page URL here instead would read a *different* sheet than
+    /// the one that paints whenever the document declares a base.
+    /// </para>
+    /// </summary>
+    private string ResolveStyleSheetLinkUrl(string href) =>
+        href.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+            ? href
+            : ResolveAgainstDocumentBaseUrl(href);
+
+    /// <summary>
+    /// Resolves a content-attribute URL against the document base URL — the document's first
+    /// <c>&lt;base href&gt;</c> resolved against the page URL when it declares one, the page URL
+    /// otherwise. Leaves the value untouched when neither is usable as a base.
+    /// </summary>
+    private string ResolveAgainstDocumentBaseUrl(string url) =>
+        Uri.TryCreate(DocumentBaseUrl(), UriKind.Absolute, out var baseUri) &&
+        Uri.TryCreate(baseUri, url, out var resolved)
+            ? resolved.AbsoluteUri
+            : url;
+
+    private ulong _documentBaseUrlVersion;
+    private string? _documentBaseUrlCache;
+
+    /// <summary>
+    /// The document base URL, cached against <see cref="DomDocument.Version"/>.
+    /// </summary>
+    /// <remarks>
+    /// Finding the <c>&lt;base href&gt;</c> means walking every descendant, and the overwhelming
+    /// majority of documents declare none — the same reason
+    /// <see cref="InlineStyleSheetImports(DomElement)"/> resolves its base lazily and at most once.
+    /// Here the callers are per-<c>&lt;link&gt;</c> rather than per-document, so without a cache a
+    /// page with many sheets pays that walk once for each of them. The version counter is bumped by
+    /// every tree edit and attribute write, so adding, removing or re-pointing a <c>&lt;base&gt;</c>
+    /// invalidates this on the next call.
+    /// </remarks>
+    private string DocumentBaseUrl()
+    {
+        var version = _document.Version;
+        if (_documentBaseUrlCache is null || _documentBaseUrlVersion != version)
+        {
+            _documentBaseUrlCache = HtmlBaseHref.ResolveDocumentBaseUrl(
+                _pageUrl, TryFindDocumentBaseHref(DocumentElement, out var baseHref) ? baseHref : null);
+            _documentBaseUrlVersion = version;
+        }
+
+        return _documentBaseUrlCache;
+    }
 }

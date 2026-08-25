@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · **open** · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names the pinned
+> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names the pinned
 > `Broiler.JS` commit that carries it and the regression that holds it.
 
 Gaps that are real and not started, plus the surfaces that need an explicit product decision
@@ -39,8 +39,8 @@ documented separately and do not appear as ordinary failures.
 
 Module *syntax* is closed — see
 [closed](broiler-js-gaps-closed.md#track-3--module-syntax). Module *binding* semantics are
-part-landed — scope isolation and import immutability are fixed in patches and live bindings are
-characterized-not-fixed, in
+part-landed — scope isolation and import immutability are fixed and landed upstream, live bindings
+are characterized-not-fixed, in
 [in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics). What remains
 below is host semantics and two decisions.
 
@@ -161,16 +161,13 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 - ~~Performance Navigation Timing exposes no timing marks.~~ **Fixed** for the document-lifecycle
   half — see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
   (`performance.now()` likewise no longer reports a whole-millisecond wall clock.)
-- **Confirmed, newly characterized — the navigation entry's network phases are not measured.**
-  `fetchStart`, `domainLookup*`, `connect*`, `secureConnectionStart`, `request*`, `response*` and the
-  `transferSize`/`encodedBodySize`/`decodedBodySize` trio now *exist* and report `0`, so the RUM
-  arithmetic built on them yields a number rather than `NaN`, but `0` there means "not observed"
-  rather than a measurement. Nothing at the bridge layer can observe them: the document is fetched by
-  the capture host (`CaptureService`/`LinkNavigator`) before the `DomBridge` exists, and the
-  `ResourceTrace` facility that does time that fetch is diagnostics-only and off by default.
-  Measuring them for real means plumbing the host's document-fetch timings — and the byte counts —
-  into the bridge so the entry can report them against the same time origin, which is a cross-layer
-  change rather than a binding fix.
+- ~~The navigation entry's network phases are not measured.~~ **Fixed** — the capture host measures
+  its own document fetch and hands the measurements, and the navigation start it took as the time
+  origin, to the bridge. See
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+- ~~A navigation entry's `duration` is a hardcoded `0` where Navigation Timing makes it
+  `loadEventEnd`.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 
 See [the privacy inventory](privacy-test-page-gaps.md),
 [the Google current-script investigation](google-about-current-script.md), and
@@ -197,9 +194,41 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- DOM wrappers do not consistently use genuine interface/prototype chains.
-- `Blob`, `FileList`, `NodeList`, `HTMLCollection`, and per-tag `HTML*Element` constructors remain
-  undefined; `childNodes` returns a JavaScript array instead of `NodeList`.
+- DOM wrappers do not consistently use genuine interface/prototype chains. **Narrowed twice.**
+  `NodeList` and `HTMLCollection` have real prototypes with their methods on them, and the
+  non-element node wrappers — `Text`, `Comment`, `DocumentFragment`, `DocumentType` — are now linked
+  to their interface prototypes, so `constructor.name` names the interface and extending a prototype
+  reaches instances. Both are in
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  <br>**What remains, precisely:**
+  - **Element wrappers report `constructor.name` of `"Object"`.** Their interface is a tag question:
+    the curated table's entries overlap (`HTMLMediaElement` covers `audio` and `video` while
+    `HTMLAudioElement` covers `audio` again) and a tag it omits has to fall back to something a
+    browser distinguishes — `HTMLSpanElement` from `HTMLElement` from `HTMLUnknownElement`. Guessing
+    would put a *wrong* name where `"Object"` is at least not misleading, so it was left rather than
+    approximated. `instanceof` already answers, through the `@@hasInstance` hook.
+  - **`Attr` likewise**, for a different reason: an attribute is not a `DomNode` in the canonical
+    DOM, so its wrapper is not minted at the choke point where the link is applied and needs its own
+    hook.
+  - **Members are still own properties of each wrapper**, so an interface prototype is empty:
+    `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)` lists the whole
+    interface. Relocating them is the larger object-model change, and the one that would let this
+    item close.
+  - **`document.constructor.name`** is `"Object"` where a browser says `"HTMLDocument"` — an
+    interface this engine does not register at all.
+- **Confirmed, newly characterized — `document.doctype` is `undefined`.** A document parsed from
+  `<!doctype html>` answers `undefined` where DOM §4.5 gives the `DocumentType` node, which the
+  bridge does build and can wrap (`document.implementation.createDocumentType` returns a correct one).
+  Found while linking the wrapper prototypes above and deliberately not fixed there; it is a missing
+  accessor rather than a missing mechanism.
+- ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
+  of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  (The claim that per-tag `HTML*Element` constructors are undefined was already stale when this was
+  checked: they exist, as `@@hasInstance` interfaces — see the bullet above.)
+- `Blob` and `FileList` remain undefined. They are File API surfaces rather than DOM collections —
+  `FileList` is reachable only through `<input type=file>.files`, which this engine has no file
+  selection for — so they did not come with the collection work and need their own decision.
 - ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
   be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
@@ -211,6 +240,9 @@ and deterministic detection behavior.
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~The document-level `document.removeChild`/`document.insertBefore` no-op (or append) silently
   where `NotFoundError` is required.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- ~~`input.form` and `input.labels` are `undefined`.~~ **Fixed** — the form-association surface,
+  which the `NodeList` work above unblocked (`labels` is a live one). See
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
   an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
@@ -234,7 +266,9 @@ See [HTML5 exceptions](html5test-exceptions.md) and
 ### Custom Elements, templates, and Shadow DOM
 
 - WPT currently relies on a `customElements` runner shim; there is no production implementation.
-- `template.content` is a snapshot rather than the parser-owned fragment required by HTML.
+- ~~`template.content` is a snapshot rather than the parser-owned fragment required by HTML.~~
+  **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - Shadow DOM uses synthetic markers, selector rewriting, and light-child hiding rather than a
   canonical shadow and composed tree with slot assignment, fallback, hit-testing, traversal, and
   event retargeting.
@@ -244,42 +278,31 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 
 ### CSSOM, fonts, SVG, and JS-visible layout algorithms
 
-- **Confirmed with evidence — a linked stylesheet's rules reach neither `cssRules` nor
-  `getComputedStyle`.** Checked through `bridge.Attach(context, html, pageUrl)` — the same shape the
-  passing `StylesheetBaseHrefTests` uses — over a `file:` page with `#a { display: flex; color:
-  rgb(1,2,3); }` and `.z { margin-top: 7px }` in the sheet, against an **inline `<style>` control
-  carrying the identical rules**:
-
-  | sheet | `cssRules.length` | `display` | `color` | `marginTop` |
-  |---|---|---|---|---|
-  | inline `<style>` | 2 | `flex` | `rgb(1, 2, 3)` | `7px` |
-  | linked `<link>` | 0 | `inline` | `rgb(0, 0, 0)` | `0px` |
-
-  The linked sheet also appears in `document.styleSheets` with **no `href`**, so it is presented as an
-  inline sheet that happens to have no rules. `bridge.SetLocalBasePath` makes no difference. Note
-  this is what makes the retired *"`getComputedStyle().display` reports `inline` for every element"*
-  claim true after all for linked sheets — that retirement covered the inline case only.
-
-  Why it is not visible as a rendering bug: `HtmlRender` resolves and applies the link itself, which
-  is why the green-pixel assertion in `StylesheetBaseHrefTests` passes while the bridge's own CSSOM
-  never sees the sheet. Serialization confirms the split — the fetched rules do not appear in
-  `SerializeToHtml()` output either. So paint and CSSOM have two different stylesheet sets, and only
-  paint has the linked one.
-
-  **Open question, not yet answered:** whether this also fails over `http(s):`. The
-  `FetchStyleSheetText` seam says the loader dispatches file and http(s) alike, and the whole
-  collect → prefetch → fetch pipeline is present and does include external links
-  (`CollectStyleSheetCandidatesInTree` tests `IsExternalStylesheet`), so the fetch is failing
-  somewhere inside that path rather than the path being absent. Answer that before attempting a fix,
-  because it decides whether this is a `file:`-scheme defect or a general one.
+- ~~A linked stylesheet's rules reach neither `cssRules` nor `getComputedStyle`, and the sheet
+  reports no `href`.~~ **Fixed** — the open question ("does it also fail over `http(s):`?") is
+  answered: it was never a `file:`-scheme defect. The raw `href` content attribute was handed to a
+  loader that takes absolute URLs only, so a *relative* href fetched nothing on either scheme. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`getComputedStyle().display` can report `inline` for every element.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
-- Font Loading is a synchronous compatibility facade and accepts malformed non-empty shorthands.
+- Font Loading is a synchronous compatibility facade; it no longer ~~accepts malformed non-empty
+  shorthands~~ — that half is **fixed**; see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  What remains is the facade itself, which is a modelling choice rather than a parsing defect:
+  Broiler resolves fonts synchronously against what it already has, so `status` is always
+  `"loaded"`, `ready` is already resolved and `check()` of a *parsable* shorthand is always `true`.
+  Whether to model a real load — which needs a font pipeline that can report one — is a capability
+  decision, not a bug fix.
 - SVG lacks conforming live DOM integration for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
 - Current tests retain JS-visible failures involving SVG `elementFromPoint`, writing-mode
-  `scrollIntoView`, keyframes read from style text, scroll clamping, and mutated iframe state.
+  `scrollIntoView`, and mutated iframe state. **Two of the five named here no longer reproduce** and
+  were checked against Chromium while the Font Loading entry above was being fixed: a `@keyframes`
+  rule read from style text answers the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`),
+  and out-of-range `scrollTop`/`scrollLeft` writes clamp identically. Both are recorded here rather
+  than retired outright because this was a spot check of one shape each, not the failing cases the
+  line was written from — the owning manifests are what should settle them.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),
@@ -289,15 +312,23 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 ### Actions
 
 1. Establish real interface prototypes and Web IDL collection behavior before adding more
-   compatibility-only constructor globals.
+   compatibility-only constructor globals. **Collection half done** — `NodeList` and
+   `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness; see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+   The element-wrapper half is what remains.
 2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
    focused DOM regressions.
-3. Implement production Custom Elements and parser-owned template contents.
+3. Implement production Custom Elements and ~~parser-owned template contents~~ (**template contents
+   done** — see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);
+   Custom Elements is what remains of this action).
 4. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
 5. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.
 6. Connect live SVG DOM mutations to cascade and paint.
-7. Characterize form dirty/default/reset/radio behavior before promoting it from the retest queue.
+7. ~~Characterize form dirty/default/reset/radio behavior before promoting it from the retest
+   queue.~~ **Done** — characterized against Chromium and fixed; see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 
 **Exit gate:** claimed DOM interfaces have correct prototypes, collections, exceptions, and
 algorithms; Custom Elements, templates, shadow/composed trees, CSSOM, computed style, and SVG
@@ -376,8 +407,12 @@ smallest current-pointer reproduction exists.
   point stands, that a handful of runs cannot separate a 1-in-10 flake from a 1-in-10 regression,
   so it is not retired. One *related* order dependence has been removed since: compilation
   back ends registered from a `[ModuleInitializer]` that only ran if the host happened to load
-  the emitter assembly, which is now forced (below); and
-- form-control dirty/default/reset/radio semantics, which remain uncharacterized.
+  the emitter assembly, which is now forced (below).
+
+~~form-control dirty/default/reset/radio semantics, which remain uncharacterized.~~ **Characterized
+and closed** — the dirty half was already correct, the default and reset halves were absent
+outright. See
+[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 
 **Retest rule:** add the minimal current-pointer reproduction first. If it reproduces, move it to
 the owning track and apply the normal closure gate. If it does not, record the exact cases and

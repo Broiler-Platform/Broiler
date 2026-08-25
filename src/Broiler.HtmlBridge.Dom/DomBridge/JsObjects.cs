@@ -51,6 +51,12 @@ public sealed partial class DomBridge
             : new JSObject();
         _jsObjects.Set(node, obj);
 
+        // Point the wrapper at its interface prototype before any member is installed, so
+        // constructor.name and Object.getPrototypeOf answer the interface rather than Object.
+        // Non-element nodes only — see WrapperPrototypes.cs for why an element's is a separate
+        // question.
+        ApplyInterfacePrototype(obj, node);
+
         // RF-BRIDGE-1c Phase F (F3c): canonical character-data nodes (DomText/DomComment) are not
         // Broiler.Dom.DomElement, so they receive a minimal Node/CharacterData wrapper instead of the full
         // element surface below. This branch is dead on today's homogeneous facade tree — facade

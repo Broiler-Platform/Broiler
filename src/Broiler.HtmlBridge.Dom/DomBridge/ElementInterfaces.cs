@@ -106,6 +106,11 @@ public sealed partial class DomBridge
         // shared with the MediaSource.isTypeSupported that answers it statically).
         Dom.Features.MediaCapabilityBinding.Install(obj, tag);
 
+        // Form association (HTML §4.10.2, §4.10.4): a control's `form` owner and `labels`, and a
+        // label's `control`. Installed per tag rather than on every wrapper, because their absence
+        // on a non-form element is observable — see FormAssociationBinding.
+        Dom.Features.FormAssociationBinding.Install(this, obj, element, tag);
+
         // HTMLLabelElement — htmlFor property (maps to 'for' content attribute)
         if (tag == "label")
         {

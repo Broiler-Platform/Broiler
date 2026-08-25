@@ -13,6 +13,10 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal interface ISelectorsHost
 {
+    /// <summary>The realm holding <c>NodeList</c>/<c>HTMLCollection</c>, or <see langword="null"/>
+    /// before the bridge is attached.</summary>
+    Broiler.JavaScript.Engine.JSContext? JsContext { get; }
+
     JSValue FindInDescendants(DomElement element, string selector, bool all);
     void CollectElementsByTagName(DomElement element, string tagName, List<JSValue> results);
     void CollectElementsByClassName(DomElement element, string classNames, List<JSValue> results);
