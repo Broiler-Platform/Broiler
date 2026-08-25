@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.BuiltIns.Function;
+using Broiler.HtmlBridge.Net;
 
 namespace Broiler.HtmlBridge;
 
@@ -138,6 +139,21 @@ public sealed partial class DomBridge
         context["requestAnimationFrame"] = window[(KeyString)"requestAnimationFrame"];
         context["cancelAnimationFrame"] = window[(KeyString)"cancelAnimationFrame"];
     }
+
+    /// <summary>
+    /// Optional measurements of the top-level document's fetch, taken by the host that performed it.
+    /// Set before <c>Attach</c>: the window registration reads it once, to fix the document's time
+    /// origin at the navigation's start and to give the <c>PerformanceNavigationTiming</c> entry its
+    /// network phases and body sizes.
+    /// </summary>
+    /// <remarks>
+    /// Null is the ordinary case, not an error: HTML handed to the bridge as a string never had a
+    /// fetch to measure, and neither the conformance runner nor a test performs one. The entry then
+    /// reports the specification's "not observed" <c>0</c> for each network mark, and the time origin
+    /// is this bridge's own start. See <see cref="DocumentFetchTiming"/> for why the origin is the
+    /// part that matters.
+    /// </remarks>
+    public DocumentFetchTiming? DocumentFetchTiming { get; set; }
 
     private void RegisterPerformanceObject(JSContext context, JSObject window)
     {

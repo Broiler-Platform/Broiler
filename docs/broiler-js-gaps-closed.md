@@ -599,6 +599,29 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`document.fonts.check()` accepted malformed shorthands**, answering `true` for strings that are
+  not fonts — `check('not-a-font')`, `check('12px')`, `check('px monospace')` — where every browser
+  throws a `SyntaxError` (css-font-loading-3). `true` is the answer that does the damage: a page
+  feature-testing a font it cannot have is told it has it. Only an absent or empty string threw.
+  <br>**The deviation was deliberate**, and the reason given for it was risk: rejecting a shorthand
+  Broiler merely failed to *parse* would break pages over a diagnostic it could not produce. The
+  answer to that is to parse the shorthand properly rather than to accept everything. The `font`
+  grammar is small and closed (CSS Fonts 4), so accepting exactly it is not an approximation —
+  a system-font keyword, or an optional unordered run of style/variant/weight/stretch, then a
+  font-size with an optional `/line-height`, then a family list.
+  <br>**Over-rejection is the failure mode**, so the regression is a *table* and every row of it is a
+  Chromium answer taken through Playwright — the 26 that must be accepted as much as the 18 that must
+  be rejected. The accepted half deliberately carries the awkward spellings: `oblique 40deg`,
+  `calc(1em + 2px)`, a glued `16px/2`, a quoted family, a bare `900` weight, runs of `normal`, and a
+  multi-name family list. The tokenizer is quote- and paren-aware for exactly those, and an unquoted
+  family name may not begin with a digit, which is what makes `12px 12px serif` a malformed family
+  rather than a family called "12px serif".
+  <br>What did **not** change is the modelling: a shorthand that parses still answers `true` and
+  `load()` still resolves, because Broiler resolves fonts synchronously and no load is ever in
+  flight. That half stays in [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms)
+  as a capability decision rather than a defect. Main-repo fix
+  (`Broiler.HtmlBridge.Dom/Polyfills/content-rendering-polyfills.js`); regressions in
+  `FontShorthandValidationTests`.
 - **`template.content` was a snapshot, not the parser-owned fragment** (HTML §4.12.3). The fragment
   was built from a deep *copy* of children that stayed in the template's own child list, and the
   consequences went well past the two sides disagreeing.

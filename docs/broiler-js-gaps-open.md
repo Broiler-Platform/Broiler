@@ -268,12 +268,24 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`getComputedStyle().display` can report `inline` for every element.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
-- Font Loading is a synchronous compatibility facade and accepts malformed non-empty shorthands.
+- Font Loading is a synchronous compatibility facade; it no longer ~~accepts malformed non-empty
+  shorthands~~ — that half is **fixed**; see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  What remains is the facade itself, which is a modelling choice rather than a parsing defect:
+  Broiler resolves fonts synchronously against what it already has, so `status` is always
+  `"loaded"`, `ready` is already resolved and `check()` of a *parsable* shorthand is always `true`.
+  Whether to model a real load — which needs a font pipeline that can report one — is a capability
+  decision, not a bug fix.
 - SVG lacks conforming live DOM integration for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
 - Current tests retain JS-visible failures involving SVG `elementFromPoint`, writing-mode
-  `scrollIntoView`, keyframes read from style text, scroll clamping, and mutated iframe state.
+  `scrollIntoView`, and mutated iframe state. **Two of the five named here no longer reproduce** and
+  were checked against Chromium while the Font Loading entry above was being fixed: a `@keyframes`
+  rule read from style text answers the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`),
+  and out-of-range `scrollTop`/`scrollLeft` writes clamp identically. Both are recorded here rather
+  than retired outright because this was a spot check of one shape each, not the failing cases the
+  line was written from — the owning manifests are what should settle them.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),
