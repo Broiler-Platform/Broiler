@@ -72,4 +72,13 @@ internal interface ITraversalHost
     /// <c>body</c>.
     /// </summary>
     DomElement CreateBridgeElement(string tagName);
+
+    /// <summary>
+    /// Whether <paramref name="documentRoot"/> is a nested browsing context's document — an
+    /// <c>&lt;iframe&gt;</c>/<c>&lt;object&gt;</c>/<c>&lt;frame&gt;</c> content document — rather than
+    /// a free-standing <c>createDocument</c>/<c>createHTMLDocument</c> result. It is what separates
+    /// the two for <c>getSelection()</c>, which a browser answers with <c>null</c> for a document that
+    /// is not being displayed anywhere.
+    /// </summary>
+    bool HasBrowsingContext(DomNode documentRoot);
 }

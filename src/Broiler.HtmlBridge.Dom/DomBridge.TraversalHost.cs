@@ -59,4 +59,8 @@ public sealed partial class DomBridge : ITraversalHost
         BuildAdjacentHtmlNodes(contextElement, html);
 
     DomElement ITraversalHost.CreateBridgeElement(string tagName) => CreateBridgeElement(tagName);
+
+    bool ITraversalHost.HasBrowsingContext(DomNode documentRoot) =>
+        documentRoot is DomDocument document &&
+        _browsingContexts.GetContainerForDocument(document) is not null;
 }

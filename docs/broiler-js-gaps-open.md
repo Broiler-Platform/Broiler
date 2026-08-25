@@ -248,11 +248,18 @@ and deterministic detection behavior.
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
   It is also the **first** interface here whose members really live on its prototype, so it is the
   worked example for the wrapper item above.
-  <br>**What the same work found beside it and did not do:** `StaticRange` — the other
-  `AbstractRange` subclass — is still undefined, and `window.getSelection` does not exist at all, so
-  a page cannot reach the ranges a selection would hold. Neither is part of Range's own gate;
-  `getSelection` in particular is a selection *model* rather than a missing name, since this engine
-  has no user selection to report.
+  <br>~~**What the same work found beside it and did not do:** `StaticRange` is still undefined and
+  `window.getSelection` does not exist at all.~~ **Both fixed** — `Selection`, `StaticRange` and the
+  `window`/`document` `getSelection()` pair are implemented; a frame gets its own selection and a
+  `createHTMLDocument` result correctly gets `null`. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  <br>**What that work left, deliberately, is the half that needs a user.** Nothing populates the
+  selection on its own, so it is always empty until a script fills it; no `selectionchange` fires,
+  because nothing can change it but script; and the selection is not painted, which is a rendering
+  question rather than a scripting one. `Selection.modify()` and `getComposedRanges()` are absent for
+  their own reasons — the first needs text segmentation this engine does not have, the second needs
+  the canonical shadow tree that is still open below — and both are pinned so implementing either is
+  a decision rather than a drift.
 - ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
   be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).

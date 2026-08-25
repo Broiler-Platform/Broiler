@@ -265,6 +265,13 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in _) => _host.BuildRange(docRoot), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // getSelection() — this document's own selection, distinct from the containing page's. The
+        // method exists on every document, but only one being displayed has a selection to report, so
+        // a createDocument/createHTMLDocument result answers null; the host draws that line.
+        doc.FastAddValue((KeyString)"getSelection",
+            new DomFunction((in _) => _host.GetSelection(docRoot), "getSelection", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         return doc;
     }
 

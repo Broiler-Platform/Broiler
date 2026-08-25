@@ -79,6 +79,10 @@ internal interface ISubDocumentHost
     bool HasAssociatedStyleSheet(DomElement element);
 
     JSObject BuildRange(DomNode docRoot);
+
+    /// <summary>This sub-document's own <c>Selection</c>, or <c>null</c> when the document has no
+    /// browsing context to be selected in.</summary>
+    JSValue GetSelection(DomNode docRoot);
     JSObject BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn);
     JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn);
     // The two tree-walking collectors this contract used to carry — CollectByTagName and

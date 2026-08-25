@@ -9,6 +9,44 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `window.getSelection()` and `document.getSelection()`, the `Selection`
+  interface behind them, and `StaticRange`.
+
+  None of the three existed, so `window.getSelection` read `undefined` and the
+  bare `Selection` and `StaticRange` were `ReferenceError`s — the kind that
+  aborts the script rather than the statement. That reaches ordinary pages and
+  not only editors: the copy-to-clipboard idiom every page shares is
+  `sel.removeAllRanges(); sel.addRange(range)`, and
+  `window.getSelection().toString()` is how a page reads what was picked.
+
+  Broiler has no user input and so no *user* selection — which is exactly the
+  state a browser is in on a freshly loaded page: `rangeCount` `0`, `type`
+  `"None"`, `anchorNode` `null`. Everything a script then does to it —
+  `addRange`, `collapse`, `extend`, `setBaseAndExtent`, `selectAllChildren`,
+  `containsNode`, `deleteFromDocument` — has an answer that does not depend on a
+  user, and that scripted half is implemented. What stays absent is the half
+  that does not: nothing populates the selection on its own, no
+  `selectionchange` fires, and the selection is not painted.
+
+  The selection holds the page's own range object, so `sel.getRangeAt(0) === r`
+  after `addRange(r)` and a later edit of that range moves the selection. A node
+  or range in another tree is silently ignored rather than rejected — and a
+  detached tree counts, so collapsing into an element built but not yet inserted
+  does nothing — while an out-of-range offset or a doctype in that same argument
+  still throws. A frame's document and window get their own selection; a
+  `createHTMLDocument` result has no browsing context and so answers `null`, as
+  a browser does.
+
+  `Selection.modify()` and `getComposedRanges()` are deliberately absent rather
+  than stubbed: the first moves the selection by character/word/line and needs a
+  text-segmentation model this engine does not have, the second is shadow-tree
+  composition. A page feature-detecting either takes its fallback, where a stub
+  would claim a movement that silently does nothing.
+
+  `StaticRange` shares `AbstractRange`'s boundary attributes with `Range`,
+  holding four values captured at construction where a range holds a live
+  boundary — so a tree mutation moves one and not the other.
+
 - `AbstractRange` and `Range` are real DOM interfaces, with the five operations
   that were missing from them and the exceptions their arguments owe the caller.
 

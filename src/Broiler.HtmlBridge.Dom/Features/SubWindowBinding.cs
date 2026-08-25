@@ -184,6 +184,15 @@ internal sealed class SubWindowBinding(
 
         subDocument.FastAddValue((KeyString)"defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // window.getSelection — the frame's own selection, distinct from the containing page's. It is
+        // literally the document's function rather than a second one over the same root, so
+        // `w.getSelection() === w.document.getSelection()` holds for a frame as it does for the page.
+        if (subDocument[(KeyString)"getSelection"] is { } documentGetSelection)
+        {
+            subWindow.FastAddValue(
+                (KeyString)"getSelection", documentGetSelection, JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
         // The frame's document shares its window's Location, as the main document shares the main
         // window's. A framed page reads `document.location` for its origin exactly as a top-level
         // one does, and undefined there throws rather than reading as absent.

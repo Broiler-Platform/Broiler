@@ -1247,6 +1247,48 @@ were deleted and the gitlinks point at commits that contain them. See
   subclass — and `window.getSelection` remain absent and are recorded in
   [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 
+- **`window.getSelection()` did not exist, and neither did `Selection` or `StaticRange`.** The
+  follow-up the `Range` work recorded beside itself. All three were absent, so `window.getSelection`
+  read `undefined` and the bare `Selection`/`StaticRange` were `ReferenceError`s — the kind that
+  aborts the script rather than the statement. That reaches ordinary pages and not only editors: the
+  copy-to-clipboard idiom every page shares is `sel.removeAllRanges(); sel.addRange(range)`, and
+  `window.getSelection().toString()` is how a page reads what was picked.
+  <br>**The open note said this was "a selection *model* rather than a missing name, since this
+  engine has no user selection to report", and that turned out to be half right.** There is no user
+  selection — but that is precisely the state a browser is in on a freshly loaded page: `rangeCount`
+  `0`, `type` `"None"`, `anchorNode` `null`. Everything a script then does to it — `addRange`,
+  `collapse`, `extend`, `setBaseAndExtent`, `selectAllChildren`, `deleteFromDocument` — has an answer
+  that does not depend on a user, and that scripted half is what is implemented. **Fixed** on the
+  prototype machinery the `Range` work built: `Selection` is a real interface with its members on its
+  prototype and its state in a weak table, and `StaticRange` shares `AbstractRange`'s five getters
+  with `Range` by holding four captured values where a range holds a live one.
+  <br>**Three details are measured rather than reasoned, and two contradict the specification's
+  wording.** A node or range belonging to another tree is silently **ignored** by `addRange`,
+  `collapse`, `selectAllChildren` and `setBaseAndExtent` rather than rejected — and "another tree"
+  includes a *detached* one, so collapsing into an element a page has built but not yet inserted does
+  nothing at all. Yet an out-of-range offset or a doctype in that same argument still throws, so the
+  argument is validated *before* the tree is consulted. And a selection carries exactly one range: a
+  second `addRange` is dropped, not added.
+  <br>The selection holds the page's **own** range object, so `sel.getRangeAt(0) === r` and a later
+  edit of that range moves the selection — which is what a browser means by the selection *being* the
+  range rather than a copy of it. `extend` is the one operation a bare `Range` cannot express, since
+  the focus may end up before the anchor; the range still runs low-to-high and the selection
+  remembers the direction.
+  <br>A document with no browsing context answers `null`, which is the browser's answer: a frame's
+  `contentDocument`/`contentWindow` gets its own `Selection`, a `createHTMLDocument` result gets
+  `null`. The bridge already knew the difference — `BrowsingContextManager` links exactly the
+  displayed documents — so the line is drawn from real state rather than guessed.
+  <br>**Two operations are deliberately absent rather than stubbed:** `modify()`, which moves the
+  selection by character/word/line and so needs the text-segmentation model this engine does not
+  have, and `getComposedRanges()`, which is shadow-tree composition. A page feature-detecting either
+  takes its fallback, where a stub would claim a movement that silently does nothing. They are the
+  only two of Chromium's 30 `Selection.prototype` members not present, and both are pinned.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/TraversalBinding.Selection.cs`,
+  `Features/TraversalBinding.RangeInterface.cs`, `Features/TraversalBinding.cs`,
+  `Features/SubDocumentBinding.cs`, `Features/SubWindowBinding.cs`); regressions in
+  `SelectionInterfaceTests`. What stays absent, and is not part of this gate, is the half that needs
+  a user: nothing populates the selection on its own, no `selectionchange` fires from input, and the
+  selection is not painted — see [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - **`innerHTML` dropped every text and comment child.** Found while measuring `Range`, from a probe
   that used `innerHTML` to read back what `insertNode` had done and got an answer with the text
   missing. The read side filtered its child list with `.OfType<DomElement>()`, so

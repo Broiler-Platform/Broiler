@@ -74,14 +74,14 @@ internal sealed partial class TraversalBinding
     /// type 'Node'" — and both used to return <c>undefined</c> here, leaving the range untouched and
     /// the caller none the wiser.
     /// </summary>
-    private DomNode NodeArgument(in Arguments a, int index, string member)
+    private DomNode NodeArgument(in Arguments a, int index, string member, string interfaceName = "Range")
     {
         if (index < a.Length && a[index] is JSObject candidate &&
             _host.FindDomNodeByJSObject(candidate) is { } node)
             return node;
 
         return JSException.ThrowTypeError<DomNode>(
-            $"Failed to execute '{member}' on 'Range': parameter {index + 1} is not of type 'Node'.");
+            $"Failed to execute '{member}' on '{interfaceName}': parameter {index + 1} is not of type 'Node'.");
     }
 
     /// <summary>
@@ -130,21 +130,21 @@ internal sealed partial class TraversalBinding
     /// and an offset past the container's length is an <c>IndexSizeError</c> rather than something to
     /// clamp.
     /// </summary>
-    private int ValidateBoundary(DomNode node, uint offset, string member)
+    private int ValidateBoundary(DomNode node, uint offset, string member, string interfaceName = "Range")
     {
         if (node is DomDocumentType)
             DomBridge.ThrowDOMException(
                 _host.JsContext,
-                $"Failed to execute '{member}' on 'Range': The node provided is of type '{NodeNameOf(node)}'.",
+                $"Failed to execute '{member}' on '{interfaceName}': The node provided is of type '{NodeNameOf(node)}'.",
                 "InvalidNodeTypeError");
 
         var length = NodeLength(node);
         if (offset > (uint)length)
             DomBridge.ThrowDOMException(
                 _host.JsContext,
-                node is DomCharacterData
-                    ? $"Failed to execute '{member}' on 'Range': The offset {offset} is larger than the node's length ({length})."
-                    : $"Failed to execute '{member}' on 'Range': There is no child at offset {offset}.",
+                node is DomCharacterData || interfaceName == "Selection"
+                    ? $"Failed to execute '{member}' on '{interfaceName}': The offset {offset} is larger than the node's length ({length})."
+                    : $"Failed to execute '{member}' on '{interfaceName}': There is no child at offset {offset}.",
                 "IndexSizeError");
 
         return (int)offset;
@@ -324,7 +324,7 @@ internal sealed partial class TraversalBinding
     private JSValue RangeCloneRange(BridgeDomRange state, in Arguments a)
     {
         var clone = BuildRange(state.Root);
-        if (_rangeStates.TryGetValue(clone, out var cloneState))
+        if (_rangeStates.TryGetValue(clone, out var boundaries) && boundaries is BridgeDomRange cloneState)
         {
             cloneState.SetStart(state.StartContainer, state.StartOffset);
             cloneState.SetEnd(state.EndContainer, state.EndOffset);
@@ -349,7 +349,11 @@ internal sealed partial class TraversalBinding
                 "Failed to execute 'compareBoundaryPoints' on 'Range': 2 arguments required, but only " +
                 $"{a.Length} present.");
 
-        if (a[1] is not JSObject sourceRangeObject || !_rangeStates.TryGetValue(sourceRangeObject, out var source))
+        // A StaticRange is deliberately not accepted here: the operation is Range-to-Range, and a
+        // static range's boundaries may be invalid by construction.
+        if (a[1] is not JSObject sourceRangeObject ||
+            !_rangeStates.TryGetValue(sourceRangeObject, out var sourceBoundaries) ||
+            sourceBoundaries is not BridgeDomRange source)
             return JSException.ThrowTypeError<JSValue>(
                 "Failed to execute 'compareBoundaryPoints' on 'Range': parameter 2 is not of type 'Range'.");
 
@@ -498,7 +502,14 @@ internal sealed partial class TraversalBinding
 
     // -------- Stringifier --------
 
-    private static JSValue RangeToString(BridgeDomRange state, in Arguments a)
+    private static JSValue RangeToString(BridgeDomRange state, in Arguments a) =>
+        new JSString(RangeText(state));
+
+    /// <summary>
+    /// The text a range selects. Shared with <c>Selection.toString()</c>, so the selection and the
+    /// range it holds can never disagree about their own text.
+    /// </summary>
+    private static string RangeText(DomRange state)
     {
         // A range within a single Comment node stringifies to the selected substring — a deliberate
         // deviation from the DOM §4.5 stringifier, which is Text-only (a Comment range would yield
@@ -510,10 +521,10 @@ internal sealed partial class TraversalBinding
             var text = DomBridge.BridgeText(state.StartContainer);
             var s = Math.Max(0, Math.Min(state.StartOffset, text.Length));
             var e = Math.Max(s, Math.Min(state.EndOffset, text.Length));
-            return new JSString(text.Substring(s, e - s));
+            return text.Substring(s, e - s);
         }
 
-        return new JSString(state.ToString());
+        return state.ToString();
     }
 
     private static (double Left, double Top, double Width, double Height) UnionClientRects(

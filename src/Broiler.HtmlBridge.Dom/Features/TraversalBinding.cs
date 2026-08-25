@@ -76,6 +76,15 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             (KeyString)"createComment",
             new DomFunction((in a) => CreateComment(in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // window.getSelection() and document.getSelection(), which answer the same object — the
+        // window is the global here, so one function installed in both places is what a browser has.
+        // The Selection interface itself is registered with the other DOM interface constructors;
+        // this is only reachable from page script, which runs after that.
+        var getSelection = new DomFunction((in _) => GetSelection(), "getSelection", 0);
+        document.FastAddValue(
+            (KeyString)"getSelection", getSelection, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["getSelection"] = getSelection;
     }
 
     private JSValue CreateTreeWalker(in Arguments a)
@@ -289,7 +298,7 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     /// bridge no longer drives a separate notification channel.
     /// </summary>
     private sealed class BridgeDomRange(ITraversalHost host, DomNode root)
-        : DomRange(root, trackMutations: true)
+        : DomRange(root, trackMutations: true), IRangeBoundaries
     {
         protected override DomNode CreateResultFragment() => host.CreateRangeResultFragment();
 
