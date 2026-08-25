@@ -18,11 +18,13 @@ public sealed class PdfPhaseZeroGuardTests
         "Broiler.Documents/docs/pdf-corpus-manifest.schema.json",
         "Broiler.Documents/docs/pdf-corpus-manifest.json",
         "Broiler.Documents/docs/pdf-phase0-status.md",
+        "Broiler.Documents/docs/pdf-extension-points.md",
         "Broiler.Documents/docs/adr/0007-pdf-component-scope-and-delivery.md",
         "Broiler.Documents/docs/adr/0008-pdf-codec-requests-results-and-commit.md",
         "Broiler.Documents/docs/adr/0009-pdf-security-resources-and-privacy.md",
         "Broiler.Documents/docs/adr/0010-pdf-pagination-units-fonts-and-platforms.md",
         "Broiler.Documents/docs/adr/0011-pdf-standards-ip-provenance-and-claims.md",
+        "Broiler.Documents/docs/adr/0012-pdf-base-implementation-and-composed-extensions.md",
     ];
 
     private static readonly string[] SharedSourceRoots =

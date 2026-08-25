@@ -1,10 +1,12 @@
 # PDF Support Roadmap for Broiler.Documents
 
-- **Status:** Proposed
+- **Status:** Base slice implemented; preview and release gates outstanding
 - **Component:** `Broiler.Documents`
 - **Target package:** `Broiler.Documents.Pdf`
 - **IP/legal review baseline:** 2026-08-11
 - **Architecture, security, delivery, and legal-scope review:** 2026-08-22
+- **Base implementation landed:** 2026-08-25 (see
+  [§2.5 Current implementation state](#25-current-implementation-state))
 
 The IP and licensing requirements below are engineering release controls, not a
 legal opinion. Patent freedom-to-operate, reciprocal-license decisions, and
@@ -124,6 +126,71 @@ binary-resource handling, WPT cases, PdfJS benchmarks, and HTML link-rectangle
 generation. These may remain test or benchmark infrastructure, but they are not
 approved sources for PDF implementation code or data.
 
+## 2.5 Current implementation state
+
+`Broiler.Documents.Pdf` and `Broiler.Documents.Pdf.Tests` exist and are built and
+tested by `Broiler.Documents.slnx`. The implemented slice is deliberately the
+part this repository can write for itself, with no third-party runtime
+dependency and no bundled font, glyph list, metric file, or codec asset. Every
+remaining PDF technology is recognized and skipped with its own stable
+diagnostic, and arrives later by composing a reviewed implementation into
+`PdfCodecServices` — see [PDF extension points](pdf-extension-points.md), which
+is authoritative for that boundary.
+
+**Implemented.**
+
+- Phase 2 in full: bounded tokenization of every object type, checked offset and
+  length arithmetic, classic cross-reference tables, trailers, `startxref`, and
+  incremental `/Prev` chains, with explicit stacks and cycle detection
+  throughout.
+- Phase 3 for the filters this build owns: a single production pipeline carrying
+  `FlateDecode` with PNG and TIFF predictors, `ASCIIHexDecode`, `ASCII85Decode`,
+  and `RunLengthDecode`, with per-stage and aggregate byte, expansion, chain-depth
+  and work accounting; cross-reference streams, object streams, and hybrid
+  `/XRefStm` resolved through that same pipeline with no bootstrap decoder;
+  `/Encrypt` detected from the trailers and the document rejected before any
+  object stream, Catalog, metadata, font, image, annotation, or content service is
+  invoked; Catalog, page tree, inherited attributes, boxes, rotation and
+  `UserUnit`; effective version resolution with `/Extensions` inventoried as
+  diagnostics only; `Info` parsed into the normalized allowlist with XMP detected
+  and dropped.
+- Phase 4 for text: the graphics and text state, all show-text operators, `Do`
+  for Form XObjects under bounded recursion with a visited set, length-bounded
+  inline-image consumption, marked-content `ActualText`, simple-font encodings
+  with `/Differences`, `ToUnicode` CMaps including `bfrange` and bounded
+  `usecmap`, composite fonts through `Identity-H`, subset-prefix removal from
+  structural metadata, deterministic geometric grouping into columns, lines and
+  paragraphs, list-marker recognition, and link annotations admitted by the
+  shared URI policy.
+- A Phase 7 writer subset: layout resolved exactly once into an immutable page
+  list that the serializer consumes without re-measuring; new PDF 1.7 files with
+  catalog, page tree, resources, Flate content streams, cross-reference table and
+  trailer; the fourteen standard font names with WinAnsi encoding and no embedded
+  program; colour, decorations, alignment, indentation and lists; link
+  annotations revalidated immediately before emission; caller-supplied normalized
+  metadata and a content-derived file identifier. Output is byte-identical across
+  runs and reads no clock, machine name, locale, or installed font.
+
+**Deliberately not implemented, and why.**
+
+- Every filter and codec with an open register row — `LZWDecode` (IP-010),
+  `DCTDecode` (IP-005/IP-006), `CCITTFaxDecode` (IP-009), `JPXDecode` (IP-007),
+  `JBIG2Decode` (IP-008) — plus embedded font programs (IP-012), image extraction
+  into the model, and encryption (IP-015). Each is detected and skipped, or in
+  encryption's case rejects the document.
+- The shared work the roadmap places in other owners: `Broiler.Documents`
+  request/result envelopes, `DocumentInput`, the conversion/resource context,
+  `Broiler.Documents.Pagination`, the Graphics font inspector and export
+  subsetting, and the Media image services. The PDF package composes none of them
+  today; its writer paginates internally against a replaceable metrics provider
+  rather than pre-empting the shared paginator's design.
+
+**Not advertised.** The package is `IsPackable=false`, absent from every
+application catalog and composition root, and guarded by tests that fail the
+build if either changes. Phase 5 and Phase 7 remain the publication boundaries,
+and no feature-matrix entry may reach `Supported` while its register row is
+pending.
+
 ## 3. Component ownership
 
 | Owner | Shared work placed there | Must remain PDF-specific |
@@ -192,17 +259,17 @@ Broiler.Documents.Pdf
 
 ## 4. Phase summary
 
-| Phase | Goal | Dependency | Estimated effort |
-|---|---|---|---:|
-| 0 | Reset authority, scope, IP/legal ADRs, cleanup | None | 3–4 engineer-weeks |
-| 1 | Shared contracts, read-safe shared services, approved corpus, CI/license foundation | Phase 0 | 7–10 |
-| 2 | PDF syntax and object store | Phase 1 | 4–6 |
-| 3 | Streamed xrefs/object store, structure, filters, security detection | Phase 2 | 6–9 |
-| 4 | Logical text/image/link import and minimum hostile-input gate | Phase 3 | 8–12 |
-| 5 | Read-preview integration | Phase 4 and Phase 1 unit/UI gate | 3–5 |
-| 6 | Shared pagination/font/export foundation | Phase 1; parallel with 2–5 | 10–16 |
-| 7 | Deterministic PDF writer and output integration | Core: Phases 3 and 6; write-preview publication: Phase 5 also | 7–12 |
-| 8 | Hardening, packaging, legal and stable-release evidence | Phases 5 and 7 | 6–10 |
+| Phase | Goal | Dependency | Estimated effort | State |
+|---|---|---|---:|---|
+| 0 | Reset authority, scope, IP/legal ADRs, cleanup | None | 3–4 engineer-weeks | Repository work done; external approvals outstanding |
+| 1 | Shared contracts, read-safe shared services, approved corpus, CI/license foundation | Phase 0 | 7–10 | Not started; the PDF package carries its own typed options, limits, results, and budgets in the meantime |
+| 2 | PDF syntax and object store | Phase 1 | 4–6 | Implemented |
+| 3 | Streamed xrefs/object store, structure, filters, security detection | Phase 2 | 6–9 | Implemented for the filters this build owns; the rest detected and skipped |
+| 4 | Logical text/image/link import and minimum hostile-input gate | Phase 3 | 8–12 | Text, links and structure implemented; images and embedded font programs detected and skipped; hostile-input gate covered by in-suite truncation and mutation campaigns, not yet by coverage-guided fuzzing |
+| 5 | Read-preview integration | Phase 4 and Phase 1 unit/UI gate | 3–5 | Not started; the package is unregistered by design |
+| 6 | Shared pagination/font/export foundation | Phase 1; parallel with 2–5 | 10–16 | Not started; the writer paginates internally against a replaceable metrics provider |
+| 7 | Deterministic PDF writer and output integration | Core: Phases 3 and 6; write-preview publication: Phase 5 also | 7–12 | Writer core implemented for the standard-font subset; integration and publication not started |
+| 8 | Hardening, packaging, legal and stable-release evidence | Phases 5 and 7 | 6–10 | Not started |
 
 Estimates assume one experienced contributor and are recalibrated after the
 Phase 1 option/input/result, script/shaping, image, and font-format decisions.
@@ -216,7 +283,11 @@ research, permissions, or commercial-license negotiation.
 
 - Phases 2–4 produce an internal parser/importer. The PDF project remains
   `IsPackable=false`,
-  absent from application catalogs, and excluded from release artifacts.
+  absent from application catalogs, and excluded from release artifacts. **This
+  is the state today**, enforced by `PdfDeliveryGuardTests`: the guards fail the
+  build if the project becomes packable, gains a third-party or non-Documents
+  reference, is referenced or registered anywhere under `src/`, or if a `.pdf`
+  fixture is committed outside the rights-aware corpus.
 - Phase 5 is the read-preview boundary. After the Phase 4 reader-core gate, a
   test-only candidate may expose `CanRead=true` and register PDF in open/import
   paths so integration checks can run. Publish that prerelease capability only
@@ -238,7 +309,9 @@ research, permissions, or commercial-license negotiation.
 ## 5. Phase 0 — Scope, standards/IP authority, and re-baseline
 
 Implementation status and external approvals are tracked separately in the
-[Phase 0 status record](pdf-phase0-status.md). The current decision/evidence set
+[Phase 0 status record](pdf-phase0-status.md). The boundary between the
+implemented base and each not-yet-cleared technology is specified in
+[PDF extension points](pdf-extension-points.md). The current decision/evidence set
 is indexed by the [ADR index](adr/README.md),
 [feature matrix](pdf-feature-matrix.md),
 [IP/licensing register](pdf-ip-licensing-register.md),

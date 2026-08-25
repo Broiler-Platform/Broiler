@@ -9,6 +9,48 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `Broiler.Documents.Pdf`, a base PDF codec: logical text import from ISO 32000-1
+  files and a deterministic PDF 1.7 writer. It is not a published capability —
+  the package is not packed and is registered in no application — and the
+  [feature matrix](Broiler.Documents/docs/pdf-feature-matrix.md) remains the
+  authority for what it may be described as.
+
+  The reader covers PDF syntax and object stores, classic cross-reference tables,
+  cross-reference streams, object streams, hybrid `/XRefStm`, incremental `/Prev`
+  chains and a reported scan-based recovery path; the catalog and page tree with
+  inherited attributes; effective version resolution with `/Extensions`
+  inventoried but never enabling behavior; `Info` metadata normalized to a fixed
+  allowlist; content interpretation covering the text and graphics state, all
+  show-text operators, Form XObjects, inline images and marked-content
+  `ActualText`; simple and composite font mappings through encodings,
+  `/Differences` and `ToUnicode` CMaps; geometric assembly into columns, lines,
+  paragraphs and lists; and link annotations admitted by a shared URI policy that
+  performs no I/O. The writer resolves layout once into an immutable page list
+  that the serializer consumes without re-measuring, and emits new files using
+  the standard font names with WinAnsi encoding and no embedded program, so its
+  output is byte-identical across runs and reads no clock, machine name, locale
+  or installed font.
+
+  What it deliberately does not do is the more interesting half. Only Flate,
+  ASCIIHex, ASCII85 and RunLength are implemented — everything with an open
+  IP-register row (LZW, JPEG, CCITT, JPEG 2000, JBIG2), along with embedded font
+  programs, image extraction and encryption, is *recognized* and skipped with its
+  own stable diagnostic, so a host can tell a policy decision from a corrupt
+  file. Each arrives later by composing a reviewed implementation into
+  `PdfCodecServices`, with no change to the parser, the interpreter or the
+  writer; see
+  [PDF extension points](Broiler.Documents/docs/pdf-extension-points.md). The
+  package therefore carries no third-party runtime dependency and bundles no
+  font, glyph list, metric file or codec asset: its encoding tables and metric
+  model are authored here, and Flate calls the runtime.
+
+  Encryption is settled from the trailers before any content-bearing object is
+  resolved, so an encrypted document is rejected without a single
+  decrypt-dependent object having been interpreted. Every budget is checked
+  before the allocation it guards, and exhausting one rejects the document rather
+  than truncating it. Diagnostics carry a code and a reason and never document
+  text, a metadata value or a path.
+
 - Fifteen platform surfaces a page probes and Broiler had none of. Each was an
   absence a script could not survive rather than one it could branch on: reading
   `performance.memory.usedJSHeapSize`, calling `video.canPlayType(type)` or
@@ -224,6 +266,10 @@ are versioned in lockstep during the preview.
 
 ### Changed
 
+- `DocumentReadOptions`, `DocumentWriteOptions`, `DocumentReadResult` and
+  `DocumentWriteResult` are no longer sealed, so a codec can carry typed options
+  and results through the shared `DocumentCodec` signature. Existing behavior and
+  members are unchanged.
 - The `Privacy Test Pages` workflow files what a run found as GitHub issues, the
   way the WPT runners do, instead of leaving it in an artifact that expires in 30
   days. Three of them, because ranking them together buries the two small ones
