@@ -158,9 +158,19 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
   [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - ~~Non-special URLs such as `data:` can report an empty `.protocol`.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
-- Performance Navigation Timing exposes no timing marks. This is an API-semantic gap, not speed
-  work. (`performance.now()` no longer reports a whole-millisecond wall clock — it is now monotonic
-  and sub-millisecond; see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).)
+- ~~Performance Navigation Timing exposes no timing marks.~~ **Fixed** for the document-lifecycle
+  half — see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+  (`performance.now()` likewise no longer reports a whole-millisecond wall clock.)
+- **Confirmed, newly characterized — the navigation entry's network phases are not measured.**
+  `fetchStart`, `domainLookup*`, `connect*`, `secureConnectionStart`, `request*`, `response*` and the
+  `transferSize`/`encodedBodySize`/`decodedBodySize` trio now *exist* and report `0`, so the RUM
+  arithmetic built on them yields a number rather than `NaN`, but `0` there means "not observed"
+  rather than a measurement. Nothing at the bridge layer can observe them: the document is fetched by
+  the capture host (`CaptureService`/`LinkNavigator`) before the `DomBridge` exists, and the
+  `ResourceTrace` facility that does time that fetch is diagnostics-only and off by default.
+  Measuring them for real means plumbing the host's document-fetch timings — and the byte counts —
+  into the bridge so the entry can report them against the same time origin, which is a cross-layer
+  change rather than a binding fix.
 
 See [the privacy inventory](privacy-test-page-gaps.md),
 [the Google current-script investigation](google-about-current-script.md), and

@@ -170,7 +170,12 @@ public sealed partial class DomBridge
         // "undefined is not a function" — taking the PerformanceObserver fallback in the same try
         // block with it, so the page never observed the paint it was asking about either. That name
         // is not the document's, so the pixel still finds nothing and still installs its observer.
-        Dom.Features.NavigationTimingBinding.Install(performanceObj, _pageUrl, _pageProtocol);
+        // The navigation entry's document-lifecycle marks are stamped by the load sequence, which
+        // runs after this, so the entry reads them through this holder rather than holding values.
+        // It shares the monotonic origin with performance.now() above, so a mark and a now() reading
+        // are two points on one timeline.
+        _navigationTiming = new Dom.Features.NavigationTimingState(performanceMonotonicOrigin);
+        Dom.Features.NavigationTimingBinding.Install(performanceObj, _pageUrl, _pageProtocol, _navigationTiming);
 
         // performance.memory — the same MemoryInfo console.memory reports (built with the console in
         // RegisterWindowBasics, which runs first).

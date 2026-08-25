@@ -46,9 +46,13 @@ internal static class NavigationTimingBinding
     /// The document URL's scheme with its colon (<c>"https:"</c>), as <c>location.protocol</c>
     /// reports it. It decides whether there was a network hop to name.
     /// </param>
-    public static void Install(JSObject performance, string pageUrl, string pageProtocol)
+    /// <param name="timing">
+    /// The document-lifecycle marks, stamped by the load sequence after this runs. Passed in rather
+    /// than read here because the entry is built before any of them has happened.
+    /// </param>
+    public static void Install(JSObject performance, string pageUrl, string pageProtocol, NavigationTimingState timing)
     {
-        var navigation = BuildNavigationEntry(pageUrl, pageProtocol);
+        var navigation = BuildNavigationEntry(pageUrl, pageProtocol, timing);
 
         performance.FastAddValue((KeyString)"getEntries",
             new DomFunction((in _) => new JSArray([navigation]), "getEntries", 0),
@@ -71,7 +75,7 @@ internal static class NavigationTimingBinding
     private static string NextHopProtocol(string pageProtocol) =>
         pageProtocol is "http:" or "https:" ? Layout.Net.BroilerHttpProtocol.NextHopProtocol : string.Empty;
 
-    private static JSObject BuildNavigationEntry(string pageUrl, string pageProtocol)
+    private static JSObject BuildNavigationEntry(string pageUrl, string pageProtocol, NavigationTimingState timing)
     {
         var entry = new JSObject();
 
@@ -97,6 +101,57 @@ internal static class NavigationTimingBinding
         // Redirects are followed inside the HTTP client, which does not report how many it took, so
         // this is the count Broiler can vouch for rather than a measurement.
         entry.FastAddValue((KeyString)"redirectCount", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // --- Timing attributes (Navigation Timing §4). ---
+        //
+        // These were absent entirely, and absent is the one thing they may not be: they are read
+        // inside subtraction far more often than alone, so the RUM idioms built on them
+        // (`responseEnd - requestStart`, `domComplete - domInteractive`) produced NaN rather than a
+        // duration, silently.
+        //
+        // The document-lifecycle half is MEASURED, from the same monotonic clock and time origin
+        // performance.now() uses, so a page can compare a mark against a now() reading and get two
+        // points on one timeline. Each reads 0 until its moment is reached, which is what the
+        // specification says an unreached mark reports.
+        AddTimingAccessor(entry, "domInteractive", () => timing.DomInteractive);
+        AddTimingAccessor(entry, "domContentLoadedEventStart", () => timing.DomContentLoadedEventStart);
+        AddTimingAccessor(entry, "domContentLoadedEventEnd", () => timing.DomContentLoadedEventEnd);
+        AddTimingAccessor(entry, "domComplete", () => timing.DomComplete);
+        AddTimingAccessor(entry, "loadEventStart", () => timing.LoadEventStart);
+        AddTimingAccessor(entry, "loadEventEnd", () => timing.LoadEventEnd);
+
+        // These are 0 because the phase genuinely did not happen, which is the value the
+        // specification gives for each: nothing redirected, there is no previous document to unload,
+        // and no service worker intercepted the navigation.
+        AddTimingConstant(entry, "redirectStart", 0);
+        AddTimingConstant(entry, "redirectEnd", 0);
+        AddTimingConstant(entry, "unloadEventStart", 0);
+        AddTimingConstant(entry, "unloadEventEnd", 0);
+        AddTimingConstant(entry, "workerStart", 0);
+
+        // The network phases are NOT measured, and these zeros say so rather than describing a
+        // fetch. The document is retrieved by the capture host before the bridge exists, so nothing
+        // at this layer observed the DNS, connect, request or response boundaries; the time origin
+        // is stamped when the performance object is built, which is already after them, so any real
+        // value would be negative and 0 is the floor the specification clamps to. They are present
+        // so the arithmetic above yields a number instead of NaN — a duration of 0 across an
+        // unmeasured phase, not a claim that it was instantaneous. Measuring them for real means
+        // plumbing the host's document-fetch timings into the bridge; see the roadmap entry.
+        AddTimingConstant(entry, "fetchStart", 0);
+        AddTimingConstant(entry, "domainLookupStart", 0);
+        AddTimingConstant(entry, "domainLookupEnd", 0);
+        AddTimingConstant(entry, "connectStart", 0);
+        AddTimingConstant(entry, "connectEnd", 0);
+        AddTimingConstant(entry, "secureConnectionStart", 0);
+        AddTimingConstant(entry, "requestStart", 0);
+        AddTimingConstant(entry, "responseStart", 0);
+        AddTimingConstant(entry, "responseEnd", 0);
+
+        // Resource Timing's body-size trio. 0 is its documented "not available" value, and the
+        // sizes are not available for the same reason the network phases are not.
+        AddTimingConstant(entry, "transferSize", 0);
+        AddTimingConstant(entry, "encodedBodySize", 0);
+        AddTimingConstant(entry, "decodedBodySize", 0);
 
         entry.FastAddValue((KeyString)"toJSON",
             new DomFunction((in _) => entry, "toJSON", 0),
@@ -127,4 +182,14 @@ internal static class NavigationTimingBinding
             ? new JSArray([navigation])
             : new JSArray();
     }
+
+    /// <summary>A live timing mark: an accessor so the entry reports the value at read time.</summary>
+    private static void AddTimingAccessor(JSObject entry, string name, Func<double> read)
+        => entry.FastAddProperty((KeyString)name,
+            new DomFunction((in _) => new JSNumber(read()), $"get {name}"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+    /// <summary>A mark whose value cannot change for this document.</summary>
+    private static void AddTimingConstant(JSObject entry, string name, double value)
+        => entry.FastAddValue((KeyString)name, new JSNumber(value), JSPropertyAttributes.EnumerableConfigurableValue);
 }

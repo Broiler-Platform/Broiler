@@ -455,6 +455,35 @@ were deleted and the gitlinks point at commits that contain them. See
   queue drains and still asserts LOADING arrives, in order, before DONE. Main-repo
   `Broiler.HtmlBridge.Dom` fix (`Features/FetchBinding.cs`, `Features/FetchBinding.Callbacks.cs`),
   landed directly rather than as a submodule patch; regressions in `FetchPromiseConformanceTests`.
+- The `PerformanceNavigationTiming` entry carried **no timing attributes at all**, and absent is the
+  one thing they may not be: these are read inside subtraction far more often than alone, so the
+  ubiquitous RUM idioms — `responseEnd - requestStart`, `domComplete - domInteractive` — produced
+  **NaN** rather than a duration, silently. **Fixed**, with the attribute set split by what this
+  engine can honestly observe.
+  <br>The **document-lifecycle marks are measured**: `domInteractive`,
+  `domContentLoadedEventStart`/`End`, `domComplete` and `loadEventStart`/`End` are stamped by the
+  bridge's own load sequence at the moments it genuinely reaches — `readyState` becoming
+  "interactive", the `DOMContentLoaded` dispatch, `readyState` becoming "complete", the `load`
+  dispatch — using the same monotonic clock and time origin `performance.now()` measures from, so a
+  mark and a `now()` reading are two points on one timeline (a regression asserts
+  `domComplete <= performance.now()`, and another asserts the marks advance in order). An ordering
+  wrinkle had to be solved for this: the entry is built while `performance` is registered, which is
+  *before* any of these happen, so the entry reads them through a small mutable holder
+  (`NavigationTimingState`) rather than holding values fixed at construction.
+  <br>`redirectStart`/`End`, `unloadEventStart`/`End` and `workerStart` are `0` because the phase
+  genuinely did not occur — nothing redirected, there is no previous document to unload, no service
+  worker intercepted — which is the value the specification gives each.
+  <br>The **network phases are not measured and the zeros say so**. `fetchStart`, `domainLookup*`,
+  `connect*`, `request*`, `response*` and the body-size trio report `0`, the specification's "no
+  information" value, because nothing at this layer observed them: the document is fetched by the
+  capture host before the bridge exists, and the time origin is stamped after that fetch, so any real
+  value would be negative and `0` is the floor. They are present so the arithmetic yields a number
+  instead of NaN — a duration of `0` across an unobserved phase, **not** a claim that it was
+  instantaneous. Measuring them properly is a cross-layer change and is recorded in
+  [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics). Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`Features/NavigationTimingBinding.cs`, the new
+  `Features/NavigationTimingState.cs`, and the stamp points in `DomBridge.WindowLoad.cs`), landed
+  directly rather than as a submodule patch; regressions in `NavigationTimingMarksTests`.
 - `navigator`'s identity and hardware surface was absent — the privacy inventory's #1748, ten probes.
   `appCodeName`, `appName`, `appVersion`, `product`, `productSub`, `webdriver`, `deviceMemory`,
   `hardwareConcurrency` and `maxTouchPoints` all read `undefined`, which is the one answer none of

@@ -218,6 +218,14 @@ public sealed partial class DomBridge : IDomBridgeRuntime
 
     // window.location fields
     private string _pageUrl = string.Empty;
+
+    /// <summary>
+    /// The document-lifecycle marks the <c>PerformanceNavigationTiming</c> entry reports. Created
+    /// with the performance object (which fixes the time origin they are measured against) and
+    /// stamped by the load sequence in <c>DomBridge.WindowLoad</c>. Null until the window is
+    /// registered, so every stamp site is null-guarded.
+    /// </summary>
+    private Dom.Features.NavigationTimingState? _navigationTiming;
     private string _pageProtocol = string.Empty;
     private string _pageHost = string.Empty;
     private string _pageHostName = string.Empty;
