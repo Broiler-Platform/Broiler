@@ -599,6 +599,46 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`NodeList` and `HTMLCollection` were plain JavaScript arrays**, which is wrong three ways — and
+  the third one changed results rather than raising errors.
+  <br>Neither interface was defined at all, so `instanceof` was a `ReferenceError` and
+  `childNodes.constructor.name` answered `"Array"`. `item()` and `namedItem()` did not exist, while
+  `map`, `filter` and `slice` did — the opposite of a browser in *both* directions, so a page
+  feature-detecting either way branched wrongly. And an array is a **snapshot**, so the collections
+  the specification defines as *live* were not: `var kids = el.childNodes; el.appendChild(x);
+  kids.length` grows in a browser and did not here. That last one returns a wrong number rather than
+  failing, which is how it sat under passing tests.
+  <br>**Fixed** as real interfaces with real prototypes, and with each collection live or static as
+  its own specification says: `childNodes` (DOM §4.4), `getElementsByTagName`/`ByClassName` (§4.5,
+  §4.9) and `getElementsByName` (HTML §3.1.5) are live; `querySelectorAll` (§4.2.6) is static, the
+  one the specification defines as a snapshot. A collection holds the *function* that produces its
+  contents rather than the contents, so one type serves both and the difference sits at the call
+  site. The prototype methods are plain JavaScript written against `this.length` and `this[i]`,
+  which keeps `Symbol.iterator`, `entries`/`keys`/`values` and correct `this` handling out of C#,
+  and puts them on the prototype where Web IDL wants them — `NodeList.prototype.item` is the
+  function the instance uses.
+  <br>This is track 6 **action 1**, "establish real interface prototypes and Web IDL collection
+  behavior *before* adding more compatibility-only constructor globals", so these two deliberately
+  are **not** the `@@hasInstance` shims the per-tag `HTML*Element` interfaces use: an instance's
+  prototype really is `NodeList.prototype`. Element wrappers still answer through the hook, and that
+  half stays [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Two mistakes are worth recording, because both looked like success.** Intercepting reads
+  alone was not enough: an array index does not arrive as a string key, so overriding only that
+  overload left `list[0]` answering `undefined` while `length`, `item()` and every method written
+  against `this[i]` worked — a collection that reports the right count and iterates correctly and
+  cannot be indexed. Fixing that exposed the deeper one: `Array.prototype.map.call(list, …)` read
+  `length` correctly and produced a hole for every element, because an array generic asks whether an
+  index is *present* before reading it, and an object with no own indexed properties says no — as do
+  `Object.keys`, `for…in` and spread. Presence, enumeration and retrieval are separate entry points
+  with no single hook, so the indices are **materialized** from the contents function on each read
+  instead, and generic algorithms then work on a collection without knowing what it is. That is the
+  shape the bridge's other live collection, the CSSOM `cssRules` list, already used.
+  <br>**Every expectation is a Chromium answer** taken through Playwright, including the three-way
+  liveness split, which is the assertion easiest to get subtly wrong. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`Features/DomCollectionBinding.cs` and the collection call sites in
+  `Features/NodeAccessorsBinding.cs`, `Features/SelectorsBinding.cs`,
+  `Features/DocumentQueryBinding.cs` and `DomBridge/Utilities.cs`); regressions in
+  `DomCollectionInterfaceTests`.
 - **Form-control default, reset and radio-group semantics** — the retest-queue entry that was carried
   as *uncharacterized*. Characterizing it split the entry in two: **the dirty half was already
   correct**, and the default and reset halves were absent outright.

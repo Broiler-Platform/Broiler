@@ -27,14 +27,21 @@ internal static class NodeAccessorsBinding
         return ReferenceEquals(root, host.DocumentNode) ? JSBoolean.True : JSBoolean.False;
     }
 
-    public static JSValue GetChildNodes(INodeAccessorsHost host, DomNode node, in Arguments a)
-    {
-        var children = new List<JSValue>();
-        foreach (var child in node.ChildNodes)
-            children.Add(host.ToJSObject(child));
+    /// <summary>
+    /// <c>node.childNodes</c> — a <b>live</b> <c>NodeList</c> (DOM §4.4). It used to be a plain
+    /// array, which is a snapshot: <c>var kids = el.childNodes; el.appendChild(x); kids.length</c>
+    /// grew in a browser and did not here, silently answering a stale number rather than failing.
+    /// The list holds the walk rather than its result, so every read sees the tree as it is now.
+    /// </summary>
+    public static JSValue GetChildNodes(INodeAccessorsHost host, DomNode node, in Arguments a) =>
+        DomCollectionBinding.NodeList(host.JsContext, () =>
+        {
+            var children = new List<JSValue>();
+            foreach (var child in node.ChildNodes)
+                children.Add(host.ToJSObject(child));
 
-        return new JSArray(children);
-    }
+            return children;
+        });
 
     public static JSValue GetFirstChild(INodeAccessorsHost host, DomNode node, in Arguments a)
     {

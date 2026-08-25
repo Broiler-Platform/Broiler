@@ -11,6 +11,8 @@ public sealed partial class DomBridge : Dom.Features.INodeAccessorsHost
 {
     JSObject Dom.Features.INodeAccessorsHost.ToJSObject(DomNode node) => ToJSObject(node);
 
+    Broiler.JavaScript.Engine.JSContext? Dom.Features.INodeAccessorsHost.JsContext => _jsContext;
+
     DomNode Dom.Features.INodeAccessorsHost.DocumentNode => _document;
 
     DomNode Dom.Features.INodeAccessorsHost.GetTreeRoot(DomNode node) => GetTreeRoot(node);

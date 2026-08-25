@@ -293,6 +293,14 @@ public sealed partial class DomBridge
         ");
 
         RegisterHtmlElementInterfaces(context);
+
+        // NodeList and HTMLCollection are the exception to everything above: they get real
+        // prototypes with real methods, and their instances really are instances of them, rather
+        // than an @@hasInstance hook over a foreign object. See DomCollectionBinding — they are
+        // track 6 action 1's "establish real interface prototypes and Web IDL collection behavior
+        // before adding more compatibility-only constructor globals", so adding them in the shape
+        // this file otherwise uses would have been the thing that action rules out.
+        Dom.Features.DomCollectionBinding.RegisterInterfaces(context);
     }
 
     /// <summary>

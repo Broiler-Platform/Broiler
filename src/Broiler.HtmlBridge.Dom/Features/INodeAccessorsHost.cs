@@ -13,6 +13,13 @@ namespace Broiler.HtmlBridge.Dom.Features;
 internal interface INodeAccessorsHost
 {
     JSObject ToJSObject(DomNode node);
+
+    /// <summary>
+    /// The realm the wrappers belong to, or <see langword="null"/> before the bridge is attached.
+    /// <c>childNodes</c> needs it to reach <c>NodeList.prototype</c>; a collection built without one
+    /// still answers its contents and only lacks the shared methods.
+    /// </summary>
+    Broiler.JavaScript.Engine.JSContext? JsContext { get; }
     DomNode DocumentNode { get; }
     DomNode GetTreeRoot(DomNode node);
     void SetCharacterData(DomNode node, string? value);

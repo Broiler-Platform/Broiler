@@ -194,9 +194,20 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- DOM wrappers do not consistently use genuine interface/prototype chains.
-- `Blob`, `FileList`, `NodeList`, `HTMLCollection`, and per-tag `HTML*Element` constructors remain
-  undefined; `childNodes` returns a JavaScript array instead of `NodeList`.
+- DOM wrappers do not consistently use genuine interface/prototype chains. **Narrowed:** the
+  collection interfaces now do — `NodeList` and `HTMLCollection` instances have real prototypes and
+  answer `instanceof` through the chain, which is action 1's "establish real interface prototypes"
+  for the two interfaces it names. The *element* wrappers still do not: `Element`, `HTMLElement` and
+  the per-tag `HTML*Element` interfaces answer through an `@@hasInstance` hook reading `tagName`,
+  and giving element objects genuine per-interface chains remains the larger open change.
+- ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
+  of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  (The claim that per-tag `HTML*Element` constructors are undefined was already stale when this was
+  checked: they exist, as `@@hasInstance` interfaces — see the bullet above.)
+- `Blob` and `FileList` remain undefined. They are File API surfaces rather than DOM collections —
+  `FileList` is reachable only through `<input type=file>.files`, which this engine has no file
+  selection for — so they did not come with the collection work and need their own decision.
 - ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
   be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
@@ -269,7 +280,10 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 ### Actions
 
 1. Establish real interface prototypes and Web IDL collection behavior before adding more
-   compatibility-only constructor globals.
+   compatibility-only constructor globals. **Collection half done** — `NodeList` and
+   `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness; see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+   The element-wrapper half is what remains.
 2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
    focused DOM regressions.
 3. Implement production Custom Elements and parser-owned template contents.

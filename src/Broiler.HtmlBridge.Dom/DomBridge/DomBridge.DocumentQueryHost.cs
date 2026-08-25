@@ -9,6 +9,8 @@ namespace Broiler.HtmlBridge;
 // the public surface is unchanged.
 public sealed partial class DomBridge : Dom.Features.IDocumentQueryHost
 {
+    Broiler.JavaScript.Engine.JSContext? Dom.Features.IDocumentQueryHost.JsContext => _jsContext;
+
     JSObject Dom.Features.IDocumentQueryHost.ToJSObject(DomNode node) => ToJSObject(node);
 
     DomElement Dom.Features.IDocumentQueryHost.DocumentElement => DocumentElement;

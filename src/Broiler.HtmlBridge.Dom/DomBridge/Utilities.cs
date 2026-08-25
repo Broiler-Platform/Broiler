@@ -55,7 +55,10 @@ public sealed partial class DomBridge
         }
 
         SearchDescendants(root, selector, results, bridge, all, scope);
-        if (all) return new JSArray(results);
+        // querySelectorAll is a STATIC NodeList (DOM §4.2.6) — the one collection the specification
+        // defines as a snapshot rather than live, so the list is handed the results it already has
+        // rather than the search that produced them.
+        if (all) return Dom.Features.DomCollectionBinding.NodeList(bridge._jsContext, () => results);
         return results.Count > 0 ? results[0] : JSNull.Value;
     }
 
