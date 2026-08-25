@@ -17,9 +17,13 @@ internal static class LinuxWriterRunner
     private static readonly TimeSpan OffscreenPollInterval = TimeSpan.FromMilliseconds(1);
     private static readonly BRenderOptions RenderOptions = new(Antialias: true, VSync: true, SubpixelText: true);
 
-    public static async Task<int> RunAsync(LinuxWriterOptions options, CancellationToken cancellationToken)
+    public static async Task<int> RunAsync(
+        LinuxWriterOptions options,
+        WriterDocumentFormats documentFormats,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(documentFormats);
 
         Console.WriteLine("Broiler Writer");
         Console.WriteLine();
@@ -63,7 +67,7 @@ internal static class LinuxWriterRunner
             () => clipboard is not null && clipboard.TryGetText(out string text) ? text : null,
             text => clipboard?.SetText(text),
             getRenderer: () => renderer);
-        using WriterApp app = new(host, () => closeRequested = true);
+        using WriterApp app = new(host, () => closeRequested = true, documentFormats: documentFormats);
 
         await using LinuxInputCoordinator input = new(canUseEvdev, Console.WriteLine, externalPointer: x11Window is not null);
         await input.InitializeAsync(cancellationToken).ConfigureAwait(false);

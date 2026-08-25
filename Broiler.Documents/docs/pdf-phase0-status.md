@@ -39,8 +39,10 @@ built deliberately inside the Phase 0 constraints rather than after them:
   [PDF extension points](pdf-extension-points.md));
 - no fixture is committed — every test PDF is generated in code — so the corpus
   manifest remains empty and no artifact needs a rights decision; and
-- the package is `IsPackable=false` and registered in no application, enforced by
-  `PdfDeliveryGuardTests`, so nothing is published or advertised.
+- the package is `IsPackable=false`, and its registration is confined to the
+  composition roots explicitly opened to it — none at Phase 0; since the §10.1
+  read-preview candidate, the Windows and Linux Writer heads, for opening only —
+  enforced by `PdfDeliveryGuardTests`, so nothing is published or advertised.
 
 Implementation is therefore not a claim. Nothing below becomes checked because
 code exists, and no feature-matrix entry may reach `Supported` until its register

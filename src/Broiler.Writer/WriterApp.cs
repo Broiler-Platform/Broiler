@@ -3,12 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Broiler.Documents;
-using Broiler.Documents.Docx;
 using Broiler.Documents.FormatCodes;
-using Broiler.Documents.Html;
-using Broiler.Documents.Markdown;
 using Broiler.Documents.Model;
-using Broiler.Documents.Rtf;
 using Broiler.Graphics;
 using Broiler.Input.Keyboard;
 using Broiler.UI;
@@ -53,13 +49,10 @@ internal sealed class WriterApp : IDisposable
     private readonly StandardToolbar _toolbar;
     private readonly StandardLabel _title;
     private readonly StandardLabel _status;
-    private readonly DocumentCodecCatalog _documentCatalog = new(new DocumentCodec[]
-    {
-        new RtfDocumentCodec(),
-        new DocxDocumentCodec(),
-        new HtmlDocumentCodec(),
-        new MarkdownDocumentCodec(),
-    });
+    private readonly WriterDocumentFormats _documentFormats;
+    private readonly DocumentCodecCatalog _documentCatalog;
+    private readonly UiFileDialogFilter[] _openDocumentFileFilters;
+    private readonly UiFileDialogFilter[] _saveDocumentFileFilters;
     private readonly List<(UiMenuItem Item, RichEditCommand Command)> _richEditMenuItems = [];
     private readonly List<(StandardButton Button, RichEditCommand Command)> _toolbarActionButtons = [];
     private readonly List<(StandardToggleButton Button, RichEditCommand Command)> _toolbarToggleButtons = [];
@@ -71,24 +64,8 @@ internal sealed class WriterApp : IDisposable
     private string _lastAction = "Ready";
     private IReadOnlyList<DocumentDiagnostic> _lastReadDiagnostics = Array.Empty<DocumentDiagnostic>();
 
-    private const string DefaultDocumentExtension = ".rtf";
     private static readonly BSize FileDialogPreferredSize = new(740, 430);
     private static readonly BSize FontDialogPreferredSize = new(520, 322);
-    private static readonly UiFileDialogFilter[] OpenDocumentFileFilters =
-    [
-        new("All supported documents", "*.rtf;*.docx;*.html;*.htm;*.md;*.markdown", DefaultDocumentExtension),
-        new("Rich Text Format (*.rtf)", "*.rtf", ".rtf"),
-        new("Word Document (*.docx)", "*.docx", ".docx"),
-        new("HTML (*.html, *.htm)", "*.html;*.htm", ".html"),
-        new("Markdown (*.md, *.markdown)", "*.md;*.markdown", ".md"),
-    ];
-    private static readonly UiFileDialogFilter[] SaveDocumentFileFilters =
-    [
-        new("Rich Text Format (*.rtf)", "*.rtf", ".rtf"),
-        new("Word Document (*.docx)", "*.docx", ".docx"),
-        new("HTML (*.html)", "*.html;*.htm", ".html"),
-        new("Markdown (*.md)", "*.md;*.markdown", ".md"),
-    ];
     private static readonly UiFileDialogFilter[] OpenPictureFileFilters =
     [
         new("Images", "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.webp", ".png"),
@@ -101,18 +78,30 @@ internal sealed class WriterApp : IDisposable
     /// <summary>The widest a freshly inserted picture is placed at, in editor units.</summary>
     private const double MaxInsertedPictureWidth = 420;
 
+    /// <param name="documentFormats">
+    /// The formats this Writer offers. Null composes
+    /// <see cref="WriterDocumentFormats.CreateDefault"/> — the RTF, DOCX, HTML and
+    /// Markdown set every head has always had. A head that carries more (the
+    /// desktop heads register the PDF codec for opening) passes its own set here,
+    /// which is what keeps that codec out of the heads that did not ask for it.
+    /// </param>
     public WriterApp(
         WriterUiHost host,
         Action requestClose,
         Action? requestOpenDocument = null,
         Action<string, bool>? requestSaveDocument = null,
-        bool compactMode = false)
+        bool compactMode = false,
+        WriterDocumentFormats? documentFormats = null)
     {
         _host = host ?? throw new ArgumentNullException(nameof(host));
         _requestClose = requestClose ?? throw new ArgumentNullException(nameof(requestClose));
         _requestOpenDocument = requestOpenDocument;
         _requestSaveDocument = requestSaveDocument;
         _compactMode = compactMode;
+        _documentFormats = documentFormats ?? WriterDocumentFormats.CreateDefault();
+        _documentCatalog = _documentFormats.CreateOpenCatalog();
+        _openDocumentFileFilters = _documentFormats.CreateOpenFilters();
+        _saveDocumentFileFilters = _documentFormats.CreateSaveFilters();
         _session = new StandardUiSessionBuilder()
             .WithDispatcher(new ImmediateUiDispatcher())
             .Build(_host);
@@ -231,6 +220,12 @@ internal sealed class WriterApp : IDisposable
     /// </summary>
     internal IReadOnlyList<DocumentDiagnostic> LastReadDiagnostics => _lastReadDiagnostics;
 
+    /// <summary>The formats this Writer was composed with.</summary>
+    internal WriterDocumentFormats DocumentFormats => _documentFormats;
+
+    /// <summary>The most recent status-bar line, which is where a refused open is reported.</summary>
+    internal string LastAction => _lastAction;
+
     public BRenderList RenderFrame() => _session.RenderFrame();
 
     public void Dispatch(UiInputEvent input)
@@ -254,13 +249,21 @@ internal sealed class WriterApp : IDisposable
 
         try
         {
-            using var copy = new MemoryStream();
-            stream.CopyTo(copy);
-            DocumentReadResult result = ReadDocument(displayName, copy.ToArray());
+            // The input replays the probed prefix ahead of the rest, so a stream
+            // the host cannot rewind is still probed and read exactly once.
+            using DocumentInput input = DocumentInput.FromStream(stream);
+            DocumentCodecSelection selection = ReadDocument(displayName, input);
+            if (!MayReplaceDocument(selection.Result))
+            {
+                _lastAction = DescribeRefusedOpen(Path.GetFileName(displayName), selection);
+                RefreshUi();
+                return false;
+            }
+
             _currentDocumentPath = displayName;
             _title.Text = Path.GetFileName(displayName);
-            _lastAction = DescribeOpen(Path.GetFileName(displayName), result);
-            _editor.Document = result.Document;
+            _lastAction = DescribeOpen(Path.GetFileName(displayName), selection.Result);
+            _editor.Document = selection.Result.Document;
             _editor.Selection = RichTextRange.Caret(_editor.Document.Start);
             _session.SetFocus(_editor);
             RefreshUi();
@@ -645,7 +648,7 @@ internal sealed class WriterApp : IDisposable
             FileName = _currentDocumentPath is null ? string.Empty : Path.GetFileName(_currentDocumentPath),
             PreferredSize = FileDialogPreferredSize,
         };
-        dialog.SetFileTypeFilters(OpenDocumentFileFilters);
+        dialog.SetFileTypeFilters(_openDocumentFileFilters);
         dialog.ResultCompleted += (_, e) =>
         {
             if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
@@ -698,8 +701,8 @@ internal sealed class WriterApp : IDisposable
             PreferredSize = FileDialogPreferredSize,
         };
         dialog.SetFileTypeFilters(
-            SaveDocumentFileFilters,
-            GetFileTypeFilterIndex(SaveDocumentFileFilters, _currentDocumentPath));
+            _saveDocumentFileFilters,
+            GetFileTypeFilterIndex(_saveDocumentFileFilters, _currentDocumentPath));
         dialog.ResultCompleted += (_, e) =>
         {
             if (e.Result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(e.Result.Value))
@@ -716,13 +719,25 @@ internal sealed class WriterApp : IDisposable
         try
         {
             string fullPath = ResolveDocumentPath(path);
-            byte[] bytes = File.ReadAllBytes(fullPath);
-            DocumentReadResult result = ReadDocument(fullPath, bytes);
+
+            // Streamed rather than File.ReadAllBytes: the read's own limits decide
+            // how much of a file is allowed into memory, so an oversized document
+            // is refused instead of being materialized and then measured.
+            using FileStream file = File.OpenRead(fullPath);
+            using DocumentInput input = DocumentInput.FromStream(file);
+            DocumentCodecSelection selection = ReadDocument(fullPath, input);
+            if (!MayReplaceDocument(selection.Result))
+            {
+                _lastAction = DescribeRefusedOpen(Path.GetFileName(fullPath), selection);
+                RefreshUi();
+                return;
+            }
+
             _currentDocumentPath = fullPath;
             _lastDirectory = Path.GetDirectoryName(fullPath) ?? _lastDirectory;
             _title.Text = Path.GetFileName(fullPath);
-            _lastAction = DescribeOpen(Path.GetFileName(fullPath), result);
-            _editor.Document = result.Document;
+            _lastAction = DescribeOpen(Path.GetFileName(fullPath), selection.Result);
+            _editor.Document = selection.Result.Document;
             _editor.Selection = RichTextRange.Caret(_editor.Document.Start);
             _session.SetFocus(_editor);
         }
@@ -977,24 +992,61 @@ internal sealed class WriterApp : IDisposable
     private string ResolveDocumentPath(string path)
     {
         string fullPath = Path.GetFullPath(path);
-        return Path.HasExtension(fullPath) ? fullPath : fullPath + DefaultDocumentExtension;
+        return Path.HasExtension(fullPath) ? fullPath : fullPath + _documentFormats.DefaultExtension;
     }
 
-    private DocumentReadResult ReadDocument(string fullPath, byte[] bytes)
+    /// <summary>
+    /// Selects a codec for <paramref name="input"/> and reads it through the one
+    /// authoritative catalog path, so the bytes the probe saw are the bytes the
+    /// codec reads and a source is never buffered twice to make that true.
+    /// </summary>
+    private DocumentCodecSelection ReadDocument(string fullPath, DocumentInput input)
     {
-        using var probeStream = new MemoryStream(bytes, writable: false);
-        DocumentCodecMatch? match = _documentCatalog.Select(
-            probeStream,
-            new DocumentSourceHints(fileName: fullPath));
+        DocumentCodecSelection selection = _documentCatalog.SelectAndRead(
+            input,
+            hints: new DocumentSourceHints(fileName: fullPath));
 
-        if (match is null || !match.Codec.CanRead)
-            throw new NotSupportedException("No readable document codec recognized '" + Path.GetExtension(fullPath) + "'.");
+        _lastReadDiagnostics = selection.Result.Diagnostics;
+        LogReadDiagnostics(selection.Codec?.Name ?? "no codec", fullPath, selection.Result);
+        return selection;
+    }
 
-        using var readStream = new MemoryStream(bytes, writable: false);
-        DocumentReadResult result = match.Codec.Read(readStream);
-        _lastReadDiagnostics = result.Diagnostics;
-        LogReadDiagnostics(match.Codec.Name, fullPath, result);
-        return result;
+    /// <summary>
+    /// Whether a read may replace what is in the editor.
+    /// </summary>
+    /// <remarks>
+    /// Two reads must never land in the editor. A <see cref="DocumentResultStatus.Rejected"/>
+    /// one carries a placeholder rather than content, and committing it would
+    /// throw away the open document in exchange for nothing. So would a read that
+    /// recovered no text at all and knows it is incomplete — a scanned PDF with no
+    /// text layer is the shape that produces it — where "empty" is a report about
+    /// the reader, not about the file. A read that produced text is committed even
+    /// when it is <see cref="DocumentResultStatus.Partial"/>; the status line says
+    /// so rather than passing it off as a clean open.
+    /// </remarks>
+    internal static bool MayReplaceDocument(DocumentReadResult result) =>
+        result.IsUsable &&
+        (result.Document.PlainText.Length > 0 || result.Status == DocumentResultStatus.Success);
+
+    /// <summary>Why a read was refused, for the status bar.</summary>
+    internal static string DescribeRefusedOpen(string fileName, DocumentCodecSelection selection)
+    {
+        string reason = FirstProblem(selection.Result) ?? (selection.Codec is null
+            ? "no registered format recognized it"
+            : "the " + selection.Codec.Name + " reader recovered no content from it");
+
+        return "Could not open " + fileName + ": " + reason.TrimEnd('.') + ". The open document is unchanged.";
+    }
+
+    private static string? FirstProblem(DocumentReadResult result)
+    {
+        foreach (DocumentDiagnostic diagnostic in result.Diagnostics)
+        {
+            if (diagnostic.Severity != DocumentDiagnosticSeverity.Info)
+                return diagnostic.Message;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1038,27 +1090,36 @@ internal sealed class WriterApp : IDisposable
                 notes++;
         }
 
-        return notes == 0
-            ? text
-            : text + " with " + notes.ToString(CultureInfo.InvariantCulture) + " note(s)";
+        if (notes > 0)
+            text += " with " + notes.ToString(CultureInfo.InvariantCulture) + " note(s)";
+
+        // A partial read is a different outcome from a clean one, not a clean one
+        // with footnotes, so it is never reported as undifferentiated success.
+        return result.Status == DocumentResultStatus.Partial
+            ? text + "; parts of it were skipped or approximated"
+            : text;
     }
 
-    private static DocumentWriteResult WriteDocument(
+    /// <summary>
+    /// Writes through the codec the host registered for the target extension.
+    /// A format registered for opening only has no entry here, so a save cannot
+    /// reach a writer the host did not enable — not through the Save dialog,
+    /// whose filters come from the same set, and not through a typed filename
+    /// either.
+    /// </summary>
+    private DocumentWriteResult WriteDocument(
         string fullPath,
         RichTextDocument document,
         out byte[] bytes)
     {
-        string extension = Path.GetExtension(fullPath).ToLowerInvariant();
-        using var stream = new MemoryStream();
-        DocumentWriteResult result = extension switch
-        {
-            ".rtf" => RtfWriter.Write(document, stream),
-            ".docx" => DocxWriter.Write(document, stream),
-            ".html" or ".htm" => HtmlWriter.Write(document, stream),
-            ".md" or ".markdown" => MarkdownWriter.Write(document, stream),
-            _ => throw new NotSupportedException("Unsupported save format '" + extension + "'. Use .rtf, .docx, .html, or .md."),
-        };
+        string extension = Path.GetExtension(fullPath);
+        WriterDocumentFormat format = _documentFormats.FindForSave(extension) ??
+            throw new NotSupportedException(
+                "Unsupported save format '" + extension + "'. Use " +
+                _documentFormats.DescribeSaveExtensions() + ".");
 
+        using var stream = new MemoryStream();
+        DocumentWriteResult result = format.Codec.Write(document, stream);
         bytes = stream.ToArray();
         return result;
     }

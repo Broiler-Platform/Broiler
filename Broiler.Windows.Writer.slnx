@@ -13,6 +13,7 @@
     <Project Path="Broiler.Documents/Broiler.Documents.Html/Broiler.Documents.Html.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.Markdown/Broiler.Documents.Markdown.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.Model/Broiler.Documents.Model.csproj" />
+    <Project Path="Broiler.Documents/Broiler.Documents.Pdf/Broiler.Documents.Pdf.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents.Rtf/Broiler.Documents.Rtf.csproj" />
     <Project Path="Broiler.Documents/Broiler.Documents/Broiler.Documents.csproj" />
   </Folder>
