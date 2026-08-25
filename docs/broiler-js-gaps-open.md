@@ -193,14 +193,18 @@ and deterministic detection behavior.
   `removeChild`/`replaceChild` silently no-opped, where DOM §4.2.3 requires `NotFoundError`.~~
   **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, still open — the rest of that family.** `setAttribute` with an invalid name and
-  `querySelector` with an invalid selector both return normally where `InvalidCharacterError` and
-  `SyntaxError` are required. The *document-level* `document.removeChild(notAChild)` and
-  `document.insertBefore(node, notAChild)` also still no-op silently (a separate code path from the
-  element-level ones now fixed — `NodeMutationBinding` rather than `TreeMutationBinding` — and
-  `document.insertBefore` additionally *appends* when the reference node is not found, where the spec
-  requires a throw). The DOMException machinery is sound, so each of these is a wiring gap rather
-  than a missing mechanism.
+- ~~The document-level `document.removeChild`/`document.insertBefore` no-op (or append) silently
+  where `NotFoundError` is required.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
+  an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
+  lives in **`Broiler.DOM`** (`DomNameValidation`, which deliberately owns these rules rather than
+  the bridge re-copying them), so it is the patch workflow, and it also carries real-page risk — a
+  browser does throw on `setAttribute('@click', …)`, so pages relying on the permissive behaviour
+  would begin to fail. `querySelector` with an invalid selector returns `null` where `SyntaxError` is
+  required; surfacing that needs parse errors out of **`Broiler.CSS`**'s `CssSelectorParser`, plus
+  main-repo wiring. The DOMException machinery itself is sound, so both are wiring gaps rather than
+  missing mechanisms.
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion

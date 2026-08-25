@@ -482,6 +482,20 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- The **document-level** `removeChild`/`insertBefore` had the same defect on their own code path
+  (`NodeMutationBinding`, reached by `document.removeChild(…)` / `document.insertBefore(…)`, distinct
+  from the element methods above). `document.removeChild` returned the node unchanged — what a
+  successful call returns — while mutating nothing. `document.insertBefore` was the worst shape in
+  the whole family: given a reference node that was *not* a child it fell through to **append**, so
+  the node was silently mutated into a position the caller never asked for, landing at the end of the
+  document instead of before the reference. **Fixed:** both raise `NotFoundError` (`code` 8) from the
+  pre-mutation validation point. The `insertBefore(node, null)` append is untouched and explicitly
+  pinned by a round-trip regression — a null reference *means* append per DOM §4.2.3, so the new
+  throw had to not swallow it. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Features/NodeMutationBinding.cs`), landed directly rather than as a submodule patch; regressions
+  in `DocumentMutationExceptionTests`. What remains of this family — `setAttribute` name validation
+  and `querySelector` selector validation — sits behind the `Broiler.DOM` and `Broiler.CSS`
+  submodules and stays in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - The element tree-mutation methods did not raise `NotFoundError` for a node that is not a child
   (DOM §4.2.3, which puts the same rule in the pre-insert, pre-remove and replace steps).
   `insertBefore` threw a plain error whose message merely *began* with the name — so
