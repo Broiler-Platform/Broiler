@@ -13,10 +13,11 @@ namespace Broiler.Cli.Tests;
 /// duration, silently.
 /// <para>
 /// The document-lifecycle marks are <b>measured</b> by the bridge's load sequence against the same
-/// monotonic origin <c>performance.now()</c> uses. The network-phase marks are <b>not</b> measured —
-/// the document is fetched by the capture host before the bridge exists — and report <c>0</c>, the
-/// specification's "no information" value, so the arithmetic yields a number rather than NaN without
-/// describing a fetch that was never observed.
+/// monotonic origin <c>performance.now()</c> uses. The network-phase marks are measured by whichever
+/// host performed the fetch and handed its measurements across; <b>this fixture supplies none</b> —
+/// it hands HTML to the bridge as a string, which is a document with no fetch to describe — so they
+/// report <c>0</c>, the specification's "no information" value. That case is pinned here; the
+/// measured one is pinned in <see cref="NavigationTimingNetworkPhasesTests"/>.
 /// </para>
 /// </remarks>
 public class NavigationTimingMarksTests
@@ -119,7 +120,8 @@ window.addEventListener('load', function () {{
         Assert.Contains("V:0,0,0,0,0", result);
     }
 
-    // The unmeasured network phases are present as numbers so the arithmetic works.
+    // The network phases are present as numbers so the arithmetic works, measured or not — this
+    // fixture measures none, having no fetch.
     [Fact(Timeout = 600000)]
     public void The_Network_Phase_Marks_Are_Present_As_Numbers()
     {

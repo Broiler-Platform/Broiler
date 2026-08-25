@@ -6,6 +6,8 @@ TYPE Broiler.HtmlBridge.DomBridge : Broiler.HtmlBridge.Dom.IDomBridgeRuntime, Sy
   ctor (Broiler.HtmlBridge.DomBridgeSessionOptions)
   field const System.Double AsyncDrainVirtualTimeBudgetMs
   field const System.Int32 AsyncDrainIterationLimit
+  field const System.Int32 DefaultViewportHeight
+  field const System.Int32 DefaultViewportWidth
   method Broiler.Dom.DomDocument GetRenderDocument()
   method System.Boolean FlushTimerStep()
   method System.Boolean HasPendingTimersDueBy(System.Double)
@@ -24,10 +26,13 @@ TYPE Broiler.HtmlBridge.DomBridge : Broiler.HtmlBridge.Dom.IDomBridgeRuntime, Sy
   method System.Void SyncWindowMembersOntoGlobal()
   property Broiler.Dom.DomDocument Document { get; }
   property Broiler.Dom.DomElement DocumentElement { get; }
+  property Broiler.HtmlBridge.Net.DocumentFetchTiming DocumentFetchTiming { get; set; }
   property Broiler.HtmlBridge.Scripting.ContentSecurityPolicy Csp { get; set; }
   property System.Action TaskCheckpointCallback { get; set; }
   property System.Boolean HasPendingTimers { get; }
   property System.Collections.Generic.IReadOnlyList<Broiler.Dom.DomElement> Elements { get; }
+  property System.Int32 ViewportHeight { get; set; }
+  property System.Int32 ViewportWidth { get; set; }
   property System.String Title { get; }
 TYPE Broiler.HtmlBridge.DomBridge+CheckLayoutAssertion : System.IEquatable<Broiler.HtmlBridge.DomBridge+CheckLayoutAssertion>
   ctor (System.String, System.String, System.Double, System.Double)

@@ -1,3 +1,4 @@
+using Broiler.HtmlBridge.Net;
 using Broiler.JavaScript.BuiltIns.Array;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
@@ -24,15 +25,21 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// instrumentation.
 /// </para>
 /// <para>
-/// <b>What this entry deliberately does not carry.</b> A navigation entry in a browser also
-/// carries some twenty timing marks — <c>requestStart</c>, <c>responseEnd</c>,
-/// <c>domContentLoadedEventEnd</c> and the rest. Broiler's loader does not record them, and
-/// publishing them as zeroes would be worse than leaving them out: a page differencing two of them
-/// would compute a plausible-looking <c>0 ms</c> where the honest answer is "not measured", and no
-/// feature test could tell the two apart. The members that are here are the ones the engine can
-/// actually answer. <c>startTime</c> and <c>duration</c> are not exceptions to that: a navigation
-/// entry's <c>startTime</c> is fixed at 0 by the specification, and its <c>duration</c> is 0 until
-/// the load event ends.
+/// <b>Where each mark comes from.</b> The document-lifecycle half — <c>domInteractive</c> through
+/// <c>loadEventEnd</c> — is stamped by the bridge's own load sequence through
+/// <see cref="NavigationTimingState"/>. The network half — <c>fetchStart</c> through
+/// <c>responseEnd</c>, and the body-size trio — cannot be observed from here at all, because the
+/// document is fetched before this bridge exists; it is measured by the host and handed across as a
+/// <see cref="DocumentFetchTiming"/>, along with the time origin taken at the navigation's start
+/// that makes the two halves one timeline. A host that measures no fetch supplies none, and the
+/// network marks then report the specification's "not observed" <c>0</c>.
+/// </para>
+/// <para>
+/// <b>What this entry deliberately does not carry.</b> <c>startTime</c> and <c>duration</c> are
+/// fixed rather than measured: a navigation entry's <c>startTime</c> is 0 by definition — the time
+/// origin <em>is</em> this navigation's start — and its <c>duration</c> is 0 until the load event
+/// ends. Paint timings, resource entries and user marks belong to buffers a capture does not keep,
+/// so the entry-list getters answer with an empty list for them rather than inventing one.
 /// </para>
 /// </remarks>
 internal static class NavigationTimingBinding
@@ -50,9 +57,20 @@ internal static class NavigationTimingBinding
     /// The document-lifecycle marks, stamped by the load sequence after this runs. Passed in rather
     /// than read here because the entry is built before any of them has happened.
     /// </param>
-    public static void Install(JSObject performance, string pageUrl, string pageProtocol, NavigationTimingState timing)
+    /// <param name="fetchTiming">
+    /// The host's measurements of the document fetch, or <see langword="null"/> when the document
+    /// did not come through a host that measures one (HTML handed to the bridge as a string, the
+    /// conformance runner, a test). Absent, the network phases keep reporting the specification's
+    /// "not observed" <c>0</c>.
+    /// </param>
+    public static void Install(
+        JSObject performance,
+        string pageUrl,
+        string pageProtocol,
+        NavigationTimingState timing,
+        DocumentFetchTiming? fetchTiming)
     {
-        var navigation = BuildNavigationEntry(pageUrl, pageProtocol, timing);
+        var navigation = BuildNavigationEntry(pageUrl, pageProtocol, timing, fetchTiming);
 
         performance.FastAddValue((KeyString)"getEntries",
             new DomFunction((in _) => new JSArray([navigation]), "getEntries", 0),
@@ -75,7 +93,11 @@ internal static class NavigationTimingBinding
     private static string NextHopProtocol(string pageProtocol) =>
         pageProtocol is "http:" or "https:" ? Layout.Net.BroilerHttpProtocol.NextHopProtocol : string.Empty;
 
-    private static JSObject BuildNavigationEntry(string pageUrl, string pageProtocol, NavigationTimingState timing)
+    private static JSObject BuildNavigationEntry(
+        string pageUrl,
+        string pageProtocol,
+        NavigationTimingState timing,
+        DocumentFetchTiming? fetchTiming)
     {
         var entry = new JSObject();
 
@@ -129,29 +151,38 @@ internal static class NavigationTimingBinding
         AddTimingConstant(entry, "unloadEventEnd", 0);
         AddTimingConstant(entry, "workerStart", 0);
 
-        // The network phases are NOT measured, and these zeros say so rather than describing a
-        // fetch. The document is retrieved by the capture host before the bridge exists, so nothing
-        // at this layer observed the DNS, connect, request or response boundaries; the time origin
-        // is stamped when the performance object is built, which is already after them, so any real
-        // value would be negative and 0 is the floor the specification clamps to. They are present
-        // so the arithmetic above yields a number instead of NaN — a duration of 0 across an
-        // unmeasured phase, not a claim that it was instantaneous. Measuring them for real means
-        // plumbing the host's document-fetch timings into the bridge; see the roadmap entry.
-        AddTimingConstant(entry, "fetchStart", 0);
-        AddTimingConstant(entry, "domainLookupStart", 0);
-        AddTimingConstant(entry, "domainLookupEnd", 0);
-        AddTimingConstant(entry, "connectStart", 0);
-        AddTimingConstant(entry, "connectEnd", 0);
-        AddTimingConstant(entry, "secureConnectionStart", 0);
-        AddTimingConstant(entry, "requestStart", 0);
-        AddTimingConstant(entry, "responseStart", 0);
-        AddTimingConstant(entry, "responseEnd", 0);
+        // The network phases, measured when the host handed its document-fetch timings across and
+        // 0 — the specification's "not observed" — when it did not.
+        //
+        // The document is retrieved by the capture host before the bridge exists, so nothing at this
+        // layer can observe the DNS, connect, request or response boundaries itself; the host that
+        // performs the fetch measures them and passes them in with the time origin it took at the
+        // navigation's start. Without that origin these could not be expressed at all: the bridge's
+        // own origin is stamped when the performance object is built, which is already after the
+        // fetch, so every real value would be negative and 0 is the floor the specification clamps
+        // to. That is why these were 0 rather than approximate — they are present so the arithmetic
+        // above yields a number instead of NaN, and a page cannot tell an unmeasured phase from an
+        // instantaneous one, which is the cost of the honest answer here.
+        //
+        // A phase a fetch did not perform reports the previous phase rather than 0 (see
+        // DocumentFetchTiming): a file: document does no DNS lookup and opens no connection, so its
+        // lookup and connect marks collapse onto fetchStart. secureConnectionStart is the exception
+        // and stays 0 when no TLS handshake happened.
+        AddTimingConstant(entry, "fetchStart", fetchTiming?.FetchStart ?? 0);
+        AddTimingConstant(entry, "domainLookupStart", fetchTiming?.DomainLookupStart ?? 0);
+        AddTimingConstant(entry, "domainLookupEnd", fetchTiming?.DomainLookupEnd ?? 0);
+        AddTimingConstant(entry, "connectStart", fetchTiming?.ConnectStart ?? 0);
+        AddTimingConstant(entry, "connectEnd", fetchTiming?.ConnectEnd ?? 0);
+        AddTimingConstant(entry, "secureConnectionStart", fetchTiming?.SecureConnectionStart ?? 0);
+        AddTimingConstant(entry, "requestStart", fetchTiming?.RequestStart ?? 0);
+        AddTimingConstant(entry, "responseStart", fetchTiming?.ResponseStart ?? 0);
+        AddTimingConstant(entry, "responseEnd", fetchTiming?.ResponseEnd ?? 0);
 
-        // Resource Timing's body-size trio. 0 is its documented "not available" value, and the
-        // sizes are not available for the same reason the network phases are not.
-        AddTimingConstant(entry, "transferSize", 0);
-        AddTimingConstant(entry, "encodedBodySize", 0);
-        AddTimingConstant(entry, "decodedBodySize", 0);
+        // Resource Timing's body-size trio, from the same measurement. 0 is its documented "not
+        // available" value, which is still the answer when no fetch was measured.
+        AddTimingConstant(entry, "transferSize", fetchTiming?.TransferSize ?? 0);
+        AddTimingConstant(entry, "encodedBodySize", fetchTiming?.EncodedBodySize ?? 0);
+        AddTimingConstant(entry, "decodedBodySize", fetchTiming?.DecodedBodySize ?? 0);
 
         entry.FastAddValue((KeyString)"toJSON",
             new DomFunction((in _) => entry, "toJSON", 0),

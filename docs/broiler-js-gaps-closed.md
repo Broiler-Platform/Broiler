@@ -390,6 +390,47 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **The navigation entry's network phases were not measured.** `fetchStart`, `domainLookup*`,
+  `connect*`, `secureConnectionStart`, `request*`, `response*` and the
+  `transferSize`/`encodedBodySize`/`decodedBodySize` trio existed and reported `0` — which in
+  Navigation Timing means "not observed", not "instantaneous". The arithmetic built on them yielded a
+  number rather than `NaN`, but not a measurement, and no feature test could tell the two apart.
+  <br>**The time origin is what the fix turns on, not the instrumentation.** A mark is milliseconds
+  since the document's time origin, and the origin is the navigation's start (HR-Time §5). The bridge
+  stamped its origin when it built the `performance` object — already *after* the fetch — so every
+  real network mark would have been negative and clamped to the specification's floor of `0`. Which
+  is to say the zeros were not laziness: they were the only expressible answer under that origin.
+  **Fixed** by having the host take the origin before the fetch begins and hand it across with the
+  measurements, so `performance.now()`, the lifecycle marks and the network phases are all measured
+  from one instant, as a browser measures them.
+  <br>The measuring is the host's because only the host can see it — the document is fetched before
+  the bridge exists. `CaptureService` marks `fetchStart` around its own fetch and reads the phases
+  only the connection can show from a `SocketsHttpHandler.ConnectCallback` (which performs the DNS
+  lookup and the socket connect itself, so their boundaries become observable) plus a
+  `PlaintextStreamFilter` for the instant the connection is usable after a TLS handshake. The request
+  goes out with `HttpCompletionOption.ResponseHeadersRead`, so `responseStart` — the headers
+  arriving — is a separate instant from `responseEnd`, which buffering the whole body first collapses
+  into one. `requestStart` is taken in the connection handler rather than before `SendAsync`: the
+  connection is opened *inside* that call, so a mark taken before it precedes `connectEnd`, which the
+  specification's ordering forbids.
+  <br>A phase a fetch did not perform reports the previous phase rather than `0`, which is what the
+  specification asks for: a `file:` document looks up no host and opens no connection, so its lookup
+  and connect marks collapse onto `fetchStart`. `secureConnectionStart` is the documented exception
+  and stays `0` when no handshake happened. `transferSize` is the payload plus the response header
+  fields, and the header bytes are reconstructed from the response rather than counted — the bytes
+  that carried them are gone by then — which is exact for the fields and approximate for the status
+  line. A host that fetched nothing supplies no timing at all, and the marks then keep reporting `0`:
+  HTML handed to the bridge as a string, the conformance runner, and almost every test take that
+  path, so their behaviour is unchanged.
+  <br>Main-repo fix: the `DocumentFetchTiming` type in `Broiler.HtmlBridge.Core` (the parent owns it,
+  so the measuring host and the reporting bridge share one contract), `DomBridge.DocumentFetchTiming`
+  and `Features/NavigationTimingBinding` in `Broiler.HtmlBridge.Dom`, and the instrumentation in
+  `Broiler.Cli`'s `CaptureService`; landed directly rather than as a submodule patch. Regressions in
+  `NavigationTimingNetworkPhasesTests`, which pin the supplied-timing, no-timing and collapsed-phase
+  cases, the shared timeline, and one end-to-end capture against a local origin that measures its own
+  fetch. The entry's `duration` is still a hardcoded `0` where the specification makes it
+  `loadEventEnd`; that was found here, deliberately left alone, and recorded in
+  [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics).
 - `performance.now()` returned `Date.now() - timeOrigin`: whole-millisecond wall-clock arithmetic. It
   had no sub-millisecond resolution, and — being wall time — could run **backwards** when the system
   clock was stepped (NTP, a manual change), which HR-Time §3 forbids (the value "MUST be monotonically
@@ -401,7 +442,8 @@ were deleted and the gitlinks point at commits that contain them. See
   resolution is a separate decision and was not added. This is a main-repo `Broiler.HtmlBridge.Dom`
   fix (`WindowDocumentMiscBinding.PerformanceNow` / `Window.RegisterPerformanceObject`), landed
   directly rather than as a submodule patch; regression `Performance_Now_Is_Monotonic_And_SubMillisecond`
-  in `GoogleSearchPolyfillTests`. Performance Navigation Timing marks remain a separate open gap.
+  in `GoogleSearchPolyfillTests`. The Navigation Timing marks that measure against this same origin
+  are the entry above.
 - Seven script-visible document surfaces were absent — `document.charset`, `referrer`, `domain`,
   `lastModified`, `activeElement`, `hasFocus()`, and the `onvisibilitychange` handler slot — the
   audit line that also named `window.trustedTypes`. Each read `undefined` (or, for `hasFocus`, was
