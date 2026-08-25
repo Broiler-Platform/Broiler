@@ -58,12 +58,14 @@ public static class RtfReader
         private bool _sawStar;
         private bool _reportedCodePage;
         private bool _reportedEmbedded;
+        private readonly bool _embeddedDecodingRequested;
 
         private State _state;
 
         public Worker(DocumentReadOptions options, IReadOnlyList<DocumentDiagnostic> tokenizerDiagnostics)
         {
             _diagnostics.AddRange(tokenizerDiagnostics);
+            _embeddedDecodingRequested = options.DecodeEmbeddedObjects;
             _builder = new Accumulator(options.Limits.MaxParagraphCount);
             _state = new State
             {
@@ -108,7 +110,7 @@ public static class RtfReader
             if (_builder.LimitHit)
                 _diagnostics.Add(DocumentDiagnostic.Warning("rtf.paragraphs", "Document exceeded MaxParagraphCount; extra paragraphs were dropped."));
 
-            return new DocumentReadResult(document, _diagnostics);
+            return new DocumentReadResult(document, _diagnostics, DocumentReadResult.StatusFrom(_diagnostics));
         }
 
         private void HandleGroupEnd()
@@ -162,7 +164,17 @@ public static class RtfReader
                     _state.Dest = RtfDestination.Skip;
                     if (!_reportedEmbedded)
                     {
-                        _diagnostics.Add(DocumentDiagnostic.Info("rtf.embedded", "Embedded pictures/objects are not imported and were skipped."));
+                        // A caller that asked for image decoding gets a warning under
+                        // the shared capability code, not the bland note: it asked for
+                        // something this reader cannot do, and the document it receives
+                        // is missing content it expected.
+                        _diagnostics.Add(_embeddedDecodingRequested
+                            ? DocumentDiagnostic.Warning(
+                                DocumentDiagnosticCodes.CapabilityNotComposed,
+                                "Embedded image decoding was requested, but this reader composes no image service; pictures and objects were skipped.")
+                            : DocumentDiagnostic.Info(
+                                "rtf.embedded",
+                                "Embedded pictures/objects are not imported and were skipped."));
                         _reportedEmbedded = true;
                     }
 

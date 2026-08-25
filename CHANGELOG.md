@@ -9,6 +9,36 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- The Phase 1 §6.1 document contracts in `Broiler.Documents`.
+
+  `DocumentInput` is the load-bearing one. Choosing a codec means reading a
+  prefix and then reading the document means reading that prefix again — a
+  rewind on a file, and impossible on a pipe or a browser upload, where the
+  usual fix is to buffer the whole source before probing and so turn a bounded
+  read into an unbounded one. `DocumentInput` holds the probed prefix and
+  replays it ahead of the rest, so a non-seekable source is probed and read
+  exactly once. Ownership is explicit (a caller's stream is not closed unless it
+  says so), and materialization is memory-only and always bounded: nothing opens
+  a temporary file or consults a temp directory, which keeps it usable in a
+  memory-only WebAssembly host and keeps document bytes out of any location with
+  no agreed retention policy.
+
+  `DocumentReadRequest`/`DocumentWriteRequest` carry the input, typed options,
+  limits and cancellation with exactly one owner per value — cancellation moved
+  off the PDF options onto the request for that reason. `DocumentCodec` gains
+  request and async entry points; the stream methods stay, and are what a codec
+  implements, so every existing codec keeps working through the new contract
+  unchanged. No adapter uses `.Result` or `.Wait()` in either direction.
+
+  `DocumentResultStatus` and `DocumentDestinationState` moved out of the PDF
+  package onto the shared results, where they were always format-neutral, and
+  every codec now reports them. Status and severity answer different questions:
+  a read can carry a dozen warnings and be complete, or carry none and be
+  missing a page, so hosts branch on the status rather than on a diagnostic
+  count. `DocumentCodecCatalog.SelectAndRead` is the one path that probes and
+  reads through the same replayable input, and diagnostics can now carry an
+  optional source location.
+
 - A required `Documents And PDF` CI workflow — the first pull-request-triggered
   workflow in the repository. Every other one is `workflow_dispatch` or
   tag-push, so the Documents solution had no CI at all and its suites were only
@@ -287,6 +317,26 @@ are versioned in lockstep during the preview.
     from a single-page evaluation, and `click-to-load` never settles.
 
 ### Changed
+
+- A codec handed another codec's option type now returns a structured
+  `document.options.invalid` rejection instead of silently ignoring it and
+  applying its own defaults — settings the caller never chose. The plain shared
+  option type is still always accepted.
+- `DocumentReadOptions.DecodeEmbeddedObjects` and `DocumentWriteOptions.AsciiOnly`
+  stop implying behavior that does not exist. Neither had a single consumer:
+  the RTF reader skipped pictures and objects whichever way the first was set,
+  and the writer always escaped non-ASCII whatever the second said. Both are now
+  documented as what they are, and a codec asked for the unimplemented behavior
+  reports `document.capability.not-composed` — the RTF reader escalating its
+  embedded-object note to that code only when the caller asked for decoding
+  *and* the document actually contains one. `RtfReadOptions`/`RtfWriteOptions`
+  name the RTF-specific settings.
+
+  `MaxGroupDepth` and `MaxBinBytes` were expected to move to an `RtfLimits`
+  alongside them and did not: DOCX enforces both — style-inheritance depth and
+  part size — so they already have the second consumer the containment rule
+  wants and belong where they are. Moving them would have forced DOCX to
+  duplicate them.
 
 - `DocumentReadOptions`, `DocumentWriteOptions`, `DocumentReadResult` and
   `DocumentWriteResult` are no longer sealed, so a codec can carry typed options

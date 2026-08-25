@@ -10,31 +10,30 @@ namespace Broiler.Documents.Pdf;
 /// learned about the file.
 /// </summary>
 /// <remarks>
-/// The status is the load-bearing field. <see cref="PdfResultStatus.Rejected"/>
-/// means the <see cref="DocumentReadResult.Document"/> is a placeholder that no
-/// host may present, and a rejected read never replaces an open document or
-/// produces an output file.
+/// <see cref="DocumentReadResult.Status"/> is the load-bearing field.
+/// <see cref="DocumentResultStatus.Rejected"/> means the document is a
+/// placeholder that no host may present, and a rejected read never replaces an
+/// open document or produces an output file. The status lives on the shared base
+/// so a host that only knows about <see cref="DocumentReadResult"/> still sees
+/// it — a PDF-local copy would shadow it and quietly report success.
 /// </remarks>
 public sealed class PdfReadResult : DocumentReadResult
 {
     public PdfReadResult(
         RichTextDocument document,
-        PdfResultStatus status,
+        DocumentResultStatus status,
         PdfDocumentMetadata metadata,
         PdfVersion declaredVersion,
         int pageCount,
         IReadOnlyList<PdfExtensionDeclaration> extensions,
         IEnumerable<DocumentDiagnostic>? diagnostics = null)
-        : base(document, diagnostics)
+        : base(document, diagnostics, status)
     {
-        Status = status;
         Metadata = metadata ?? PdfDocumentMetadata.Empty;
         DeclaredVersion = declaredVersion;
         PageCount = pageCount;
         Extensions = extensions ?? Array.Empty<PdfExtensionDeclaration>();
     }
-
-    public PdfResultStatus Status { get; }
 
     /// <summary>The normalized metadata allowlist; never raw Info or XMP data.</summary>
     public PdfDocumentMetadata Metadata { get; }
@@ -52,9 +51,6 @@ public sealed class PdfReadResult : DocumentReadResult
     /// diagnostics; no declaration here ever enabled a feature.
     /// </summary>
     public IReadOnlyList<PdfExtensionDeclaration> Extensions { get; }
-
-    /// <summary>True when a host may present the document to a user.</summary>
-    public bool IsUsable => Status != PdfResultStatus.Rejected;
 }
 
 /// <summary>The outcome of writing a PDF.</summary>
@@ -62,26 +58,14 @@ public sealed class PdfWriteResult : DocumentWriteResult
 {
     public PdfWriteResult(
         long bytesWritten,
-        PdfResultStatus status,
-        PdfDestinationState destinationState,
+        DocumentResultStatus status,
+        DocumentDestinationState destinationState,
         int pageCount,
         IEnumerable<DocumentDiagnostic>? diagnostics = null)
-        : base(bytesWritten, diagnostics)
+        : base(bytesWritten, diagnostics, status, destinationState)
     {
-        Status = status;
-        DestinationState = destinationState;
         PageCount = pageCount;
     }
-
-    public PdfResultStatus Status { get; }
-
-    /// <summary>
-    /// How far the destination got. <see cref="PdfResultStatus.Success"/> requires
-    /// <see cref="PdfDestinationState.Committed"/>; a rejection paired with
-    /// <see cref="PdfDestinationState.PartialDestination"/> tells a caller-owned
-    /// stream that an unusable prefix needs discarding.
-    /// </summary>
-    public PdfDestinationState DestinationState { get; }
 
     public int PageCount { get; }
 }

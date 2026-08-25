@@ -6,12 +6,17 @@ residual work is tracked here.
 
 ## API contract cleanup
 
-- Resolve `DocumentReadOptions.DecodeEmbeddedObjects` before the public API is
-  frozen. The option exists, but the RTF reader currently skips `\pict` and
-  object destinations regardless of its value. Either implement a bounded,
-  caller-composed image-import path or remove/replace the option so the public
-  contract cannot imply behavior that does not exist.
-- Re-review ADR 0004 and the read/write option surface after that decision.
+- `DocumentReadOptions.DecodeEmbeddedObjects` and `DocumentWriteOptions.AsciiOnly`
+  no longer imply behavior that does not exist. Both are documented as what they
+  actually are, and a codec asked for the unimplemented behavior reports
+  `document.capability.not-composed` rather than quietly doing something else —
+  the RTF reader escalates its embedded-object note to that code when, and only
+  when, the caller asked for decoding *and* the document really contains a
+  picture or object. Removing the members outright still waits on the
+  repository's deprecation policy, and the bounded caller-composed image-import
+  path is Phase 1 §6.2 work.
+- Re-review ADR 0004 and the read/write option surface once the §6.2 resource
+  context lands.
 - Freeze public names and XML documentation after a consumer review.
 
 ## Format fidelity
@@ -53,11 +58,15 @@ Residual work owned here:
   read-preview and write-preview gates pass. Implementation is not a capability
   claim, and no feature-matrix entry may reach `Supported` while its
   IP/licensing row is pending.
-- The Phase 1 shared contracts — request/result envelopes, `DocumentInput`, the
-  conversion and resource context, and `Broiler.Documents.Pagination` — are not
-  built. The PDF package carries its own typed options, limits, results, and
-  internal pagination in the meantime, and those move to their shared owners when
-  Phase 1 lands rather than being promoted piecemeal.
+- The Phase 1 §6.1 contracts are built: `DocumentInput` (replayable probing over
+  non-seekable sources, bounded memory-only materialization, explicit ownership),
+  the read/write request envelopes, the shared result status and destination
+  state, typed-option validation, async overloads, and one catalog
+  selection-and-read path. The conversion and resource context (§6.2), the model
+  unit review (§6.4), the Graphics font inspector and Media image services (§6.5),
+  and `Broiler.Documents.Pagination` remain outstanding; the PDF writer paginates
+  internally against a replaceable metrics provider until the shared paginator
+  exists.
 - Coverage-guided fuzzing and the pinned oracle, corpus and performance
   infrastructure remain outstanding; the current suite covers bounded truncation
   and mutation campaigns only.

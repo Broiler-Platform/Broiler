@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using Broiler.Documents.Model;
 using Broiler.Documents.Pdf.Filters;
 using Broiler.Documents.Pdf.Structure;
@@ -22,18 +23,22 @@ namespace Broiler.Documents.Pdf;
 /// </remarks>
 internal static class PdfReader
 {
-    public static PdfReadResult Read(byte[] data, PdfReadOptions options, PdfCodecServices services)
+    public static PdfReadResult Read(
+        byte[] data,
+        PdfReadOptions options,
+        PdfCodecServices services,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(services);
 
         var diagnostics = new PdfDiagnosticSink(options.PdfLimits.MaxDiagnostics);
-        var budget = new PdfWorkBudget(options.PdfLimits, options.CancellationToken);
+        var budget = new PdfWorkBudget(options.PdfLimits, cancellationToken);
 
         try
         {
-            return ReadCore(data, options, services, budget, diagnostics);
+            return ReadCore(data, options, services, budget, diagnostics, cancellationToken);
         }
         catch (PdfLimitExceededException e)
         {
@@ -52,7 +57,8 @@ internal static class PdfReader
         PdfReadOptions options,
         PdfCodecServices services,
         PdfWorkBudget budget,
-        PdfDiagnosticSink diagnostics)
+        PdfDiagnosticSink diagnostics,
+        CancellationToken cancellationToken)
     {
         if (data.LongLength > options.PdfLimits.MaxInputBytes)
         {
@@ -62,7 +68,7 @@ internal static class PdfReader
             return Rejected(diagnostics);
         }
 
-        var pipeline = new PdfFilterPipeline(services.StreamFilters, options.CancellationToken);
+        var pipeline = new PdfFilterPipeline(services.StreamFilters, cancellationToken);
         PdfObjectStore? store = PdfObjectStore.Load(data, budget, diagnostics, pipeline);
         if (store is null)
         {
@@ -150,11 +156,11 @@ internal static class PdfReader
             ? RichTextDocument.Empty
             : RichTextDocument.FromParagraphs(paragraphs);
 
-        PdfResultStatus status = paragraphs.Count == 0
-            ? PdfResultStatus.Partial
+        DocumentResultStatus status = paragraphs.Count == 0
+            ? DocumentResultStatus.Partial
             : diagnostics.HasSkips || diagnostics.HasErrors || store.WasRecovered
-                ? PdfResultStatus.Partial
-                : PdfResultStatus.Success;
+                ? DocumentResultStatus.Partial
+                : DocumentResultStatus.Success;
 
         return new PdfReadResult(
             document,
@@ -237,7 +243,7 @@ internal static class PdfReader
     private static PdfReadResult Rejected(PdfDiagnosticSink diagnostics) =>
         new(
             RichTextDocument.Empty,
-            PdfResultStatus.Rejected,
+            DocumentResultStatus.Rejected,
             PdfDocumentMetadata.Empty,
             PdfVersion.Unknown,
             0,

@@ -49,7 +49,7 @@ public static class DocxWriter
 
         byte[] bytes = package.ToArray();
         destination.Write(bytes, 0, bytes.Length);
-        return new DocumentWriteResult(bytes.Length, context.Diagnostics);
+        return new DocumentWriteResult(bytes.Length, context.Diagnostics, DocumentWriteResult.StatusFrom(context.Diagnostics));
     }
 
     public static byte[] WriteToArray(RichTextDocument document, DocumentWriteOptions? options = null)

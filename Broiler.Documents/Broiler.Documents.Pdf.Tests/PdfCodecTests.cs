@@ -82,11 +82,11 @@ public sealed class PdfRoundTripTests
         var codec = new PdfDocumentCodec();
         using var buffer = new MemoryStream();
         PdfWriteResult write = codec.WritePdf(document, buffer, options);
-        Assert.NotEqual(PdfResultStatus.Rejected, write.Status);
+        Assert.NotEqual(DocumentResultStatus.Rejected, write.Status);
 
         buffer.Position = 0;
         PdfReadResult read = codec.ReadPdf(buffer);
-        Assert.NotEqual(PdfResultStatus.Rejected, read.Status);
+        Assert.NotEqual(DocumentResultStatus.Rejected, read.Status);
         return read.Document;
     }
 

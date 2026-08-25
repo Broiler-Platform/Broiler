@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Text;
 using Broiler.Documents.Model;
 using Broiler.Documents.Pdf.Text;
@@ -43,19 +44,26 @@ internal sealed class PdfWriter
     private readonly PdfDiagnosticSink _diagnostics;
     private readonly List<long> _offsets = [];
     private readonly MemoryStream _buffer = new();
+    private readonly CancellationToken _cancellationToken;
 
-    private PdfWriter(PdfWriteOptions options, PdfCodecServices services, PdfDiagnosticSink diagnostics)
+    private PdfWriter(
+        PdfWriteOptions options,
+        PdfCodecServices services,
+        PdfDiagnosticSink diagnostics,
+        CancellationToken cancellationToken)
     {
         _options = options;
         _services = services;
         _diagnostics = diagnostics;
+        _cancellationToken = cancellationToken;
     }
 
     public static PdfWriteResult Write(
         RichTextDocument document,
         Stream destination,
         PdfWriteOptions options,
-        PdfCodecServices services)
+        PdfCodecServices services,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(destination);
@@ -63,7 +71,7 @@ internal sealed class PdfWriter
         ArgumentNullException.ThrowIfNull(services);
 
         var diagnostics = new PdfDiagnosticSink(options.PdfLimits.MaxDiagnostics);
-        var writer = new PdfWriter(options, services, diagnostics);
+        var writer = new PdfWriter(options, services, diagnostics, cancellationToken);
 
         byte[] bytes;
         int pageCount;
@@ -76,12 +84,12 @@ internal sealed class PdfWriter
         catch (PdfLimitExceededException e)
         {
             diagnostics.Error(PdfDiagnosticCodes.Limit, e.Message);
-            return new PdfWriteResult(0, PdfResultStatus.Rejected, PdfDestinationState.NotStarted, 0, diagnostics.Build());
+            return new PdfWriteResult(0, DocumentResultStatus.Rejected, DocumentDestinationState.NotStarted, 0, diagnostics.Build());
         }
         catch (OperationCanceledException)
         {
             diagnostics.Error(PdfDiagnosticCodes.Cancelled, "The write was cancelled before any byte reached the destination.");
-            return new PdfWriteResult(0, PdfResultStatus.Rejected, PdfDestinationState.NotStarted, 0, diagnostics.Build());
+            return new PdfWriteResult(0, DocumentResultStatus.Rejected, DocumentDestinationState.NotStarted, 0, diagnostics.Build());
         }
 
         long written = 0;
@@ -95,14 +103,14 @@ internal sealed class PdfWriter
             diagnostics.Error(
                 PdfDiagnosticCodes.WritePartialDestination,
                 "The destination stream failed part-way through the write. The bytes already written are not a usable PDF and must be discarded.");
-            return new PdfWriteResult(written, PdfResultStatus.Rejected, PdfDestinationState.PartialDestination, pageCount, diagnostics.Build());
+            return new PdfWriteResult(written, DocumentResultStatus.Rejected, DocumentDestinationState.PartialDestination, pageCount, diagnostics.Build());
         }
 
-        PdfResultStatus status = diagnostics.HasSkips || diagnostics.HasErrors
-            ? PdfResultStatus.Partial
-            : PdfResultStatus.Success;
+        DocumentResultStatus status = diagnostics.HasSkips || diagnostics.HasErrors
+            ? DocumentResultStatus.Partial
+            : DocumentResultStatus.Success;
 
-        return new PdfWriteResult(written, status, PdfDestinationState.Committed, pageCount, diagnostics.Build());
+        return new PdfWriteResult(written, status, DocumentDestinationState.Committed, pageCount, diagnostics.Build());
     }
 
     private (byte[] Bytes, int PageCount) Build(RichTextDocument document)
@@ -117,7 +125,7 @@ internal sealed class PdfWriter
                 "Line breaking used the built-in approximate metric model. Pagination is deterministic and reproducible, but glyph advances in a viewer will differ slightly from the measured ones.");
         }
 
-        var layout = new PdfPageLayout(_options, metrics, policy, _diagnostics);
+        var layout = new PdfPageLayout(_options, metrics, policy, _diagnostics, _cancellationToken);
         List<PdfLayoutPage> pages = layout.Build(document);
 
         if (pages.Count > _options.PdfLimits.MaxPageCount)
@@ -172,7 +180,7 @@ internal sealed class PdfWriter
 
         for (int i = 0; i < pages.Count; i++)
         {
-            _options.CancellationToken.ThrowIfCancellationRequested();
+            _cancellationToken.ThrowIfCancellationRequested();
             WritePage(pages[i], pageObjects[i], fonts, fontObjects, policy);
         }
 

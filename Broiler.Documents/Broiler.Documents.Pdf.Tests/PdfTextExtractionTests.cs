@@ -224,7 +224,7 @@ public sealed class PdfTextExtractionTests
         PdfReadResult result = Read(builder.Build(catalog));
 
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.FilterDctUnsupported);
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
     }
 
     [Fact]
@@ -309,7 +309,7 @@ public sealed class PdfTextExtractionTests
         PdfReadResult result = Read(PdfFileBuilder.SinglePage("q 1 0 0 1 0 0 cm Q\n"));
 
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.TextOcrRequired);
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
     }
 
     [Fact]

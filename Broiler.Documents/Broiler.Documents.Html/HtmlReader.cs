@@ -56,7 +56,7 @@ internal static class HtmlReader
             diagnostics.Add(DocumentDiagnostic.Error(
                 "html.parse",
                 $"HTML parser recovered by returning an empty document: {ex.GetType().Name}."));
-            return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
+            return new DocumentReadResult(RichTextDocument.Empty, diagnostics, DocumentResultStatus.Rejected);
         }
 
         foreach (HtmlParseDiagnostic diagnostic in parse.Diagnostics)
@@ -67,7 +67,7 @@ internal static class HtmlReader
             ? parse.Document.Body
             : parse.Document.DocumentElement is not null ? parse.Document.DocumentElement : parse.Document;
         ReadChildren(root, builder, InlineStyle.Default, ParagraphStyle.Default, preserveWhitespace: false);
-        return new DocumentReadResult(builder.Build(), diagnostics);
+        return new DocumentReadResult(builder.Build(), diagnostics, DocumentReadResult.StatusFrom(diagnostics));
     }
 
     private static void ReadChildren(

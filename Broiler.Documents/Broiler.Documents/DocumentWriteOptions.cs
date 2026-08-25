@@ -7,7 +7,7 @@ namespace Broiler.Documents;
 /// <remarks>
 /// Open for derivation for the same reason as <see cref="DocumentReadOptions"/>:
 /// a codec carries its own immutable options through the shared
-/// <see cref="DocumentCodec.Write"/> signature (PDF roadmap §6.1).
+/// <see cref="DocumentCodec.Write(Model.RichTextDocument, System.IO.Stream, DocumentWriteOptions)"/> signature (PDF roadmap §6.1).
 /// </remarks>
 public class DocumentWriteOptions
 {
@@ -23,5 +23,10 @@ public class DocumentWriteOptions
     /// representation (for RTF, <c>\uN</c> with an ASCII fallback char) rather
     /// than emitted as raw bytes.
     /// </summary>
+    /// <remarks>
+    /// True is the only value the RTF writer implements, and the other codecs do
+    /// not consult it at all. A writer asked for the unimplemented value reports
+    /// it rather than quietly doing the opposite; see <c>RtfWriteOptions</c>.
+    /// </remarks>
     public bool AsciiOnly { get; }
 }

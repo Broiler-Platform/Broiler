@@ -31,7 +31,7 @@ public static class MarkdownWriter
         builder.Append('\n');
         byte[] bytes = Encoding.UTF8.GetBytes(builder.ToString());
         destination.Write(bytes, 0, bytes.Length);
-        return new DocumentWriteResult(bytes.Length, diagnostics);
+        return new DocumentWriteResult(bytes.Length, diagnostics, DocumentWriteResult.StatusFrom(diagnostics));
     }
 
     public static byte[] WriteToArray(RichTextDocument document, DocumentWriteOptions? options = null)
