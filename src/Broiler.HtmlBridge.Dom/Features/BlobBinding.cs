@@ -36,11 +36,12 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// <c>Selection</c> use, so the members are on the prototypes and an instance has no own properties.
 /// </para>
 /// <para>
-/// <b><c>stream()</c> is deliberately absent.</b> It returns a <c>ReadableStream</c>, and this engine
-/// has one partial stream implementation already — the one <c>response.body</c> hands back — which is
-/// not an interface a second copy should be written against. Whether to build a real
-/// <c>ReadableStream</c> is its own capability decision; until it is made, a page feature-detecting
-/// <c>blob.stream</c> takes its <c>arrayBuffer()</c> fallback, which works.
+/// <b><c>stream()</c> is in, and it is what made <c>ReadableStream</c> real.</b> It was left out
+/// because it returns one, and this engine had only a partial stream — the object
+/// <c>response.body</c> handed back — that a second copy should not have been written against. That
+/// decision has been taken the other way: there is one <c>ReadableStream</c> now, a page's own
+/// <c>new ReadableStream</c> builds the same interface, and both <c>blob.stream()</c> and a fetch
+/// body hand back one of those rather than a look-alike.
 /// </para>
 /// <para>
 /// Every expectation is Chromium's measured answer. Three are worth naming because reasoning gets
@@ -217,6 +218,14 @@ internal sealed class BlobBinding
     /// </summary>
     internal JSValue CreateBlobFromBytes(byte[] bytes, string contentType) =>
         Mint(new BlobData(bytes, NormalizeType(contentType)), file: false);
+
+    /// <summary>
+    /// The bytes behind a blob object, or <see langword="null"/> for anything that is not one. The
+    /// seam the streams asset reads a blob through — its hook is captured into that closure and
+    /// deleted from the global, so this does not become a way for a page to reach bytes out of band.
+    /// </summary>
+    internal byte[]? BytesOf(JSValue candidate) =>
+        candidate is JSObject blob && _blobs.TryGetValue(blob, out var data) ? data.Bytes : null;
 
     private static double ReadLastModified(JSObject? options)
     {

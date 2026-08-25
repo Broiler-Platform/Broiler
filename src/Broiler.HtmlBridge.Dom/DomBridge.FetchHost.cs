@@ -23,6 +23,14 @@ public sealed partial class DomBridge : IFetchHost
 
     string IFetchHost.PageUrl => _pageUrl;
 
+    Broiler.JavaScript.Runtime.JSValue IFetchHost.StreamOverText(string text) =>
+        _streams.StreamOverText(_jsContext!, text);
+
+    Broiler.JavaScript.Runtime.JSValue IFetchHost.StreamOverTextObserved(string text, System.Action onDisturbed) =>
+        _streams.StreamOverTextObserved(_jsContext!, text, onDisturbed);
+
+    bool IFetchHost.IsStreamLocked(Broiler.JavaScript.Runtime.JSValue stream) => _streams.IsStreamLocked(stream);
+
     Broiler.JavaScript.Runtime.JSValue IFetchHost.CreateBlob(byte[] bytes, string contentType) =>
         _blobs.CreateBlobFromBytes(bytes, contentType);
 }

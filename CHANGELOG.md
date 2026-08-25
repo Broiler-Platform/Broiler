@@ -9,6 +9,36 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `ReadableStream` (with its default reader and controller), `FileReader`,
+  `ProgressEvent`, and `Blob.prototype.stream()`.
+
+  Two of the File API slice's capability decisions, taken together because they
+  are one: `stream()` was left out precisely because it returns a
+  `ReadableStream`, and the engine had only a partial one — the shape-only
+  object `response.body` handed back, carrying a `getReader` whose reader had
+  `read`, `cancel` and `releaseLock` and nothing else. There was no `closed`, no
+  `tee`, no `cancel` on the stream, and no constructor, so
+  `new ReadableStream(...)` was a `ReferenceError` — the kind that aborts the
+  script rather than the statement. `FileReader` was absent outright, so the
+  standard way a page turns a dropped file into text, a preview data URL or an
+  `ArrayBuffer` was a `ReferenceError` too.
+
+  The stream is written in JavaScript, as an embedded asset beside the
+  content-rendering polyfills, because the specification is: a queue, a list of
+  pending read requests and a pull signal that must not re-enter. `blob.stream()`,
+  a fetch body and a page's own `new ReadableStream` all hand back the same
+  interface now. A fetch body reports its `bodyUsed` from the underlying source's
+  `pull` rather than from a wrapper, so the stream a page holds still has no own
+  properties, and `text()`/`json()`/`clone()` refuse a body that is disturbed
+  *or* locked.
+
+  Not implemented, and detectably so: `pipeTo`/`pipeThrough` (they need a
+  `WritableStream`), BYOB readers (they need a byte-stream controller), and async
+  iteration — that last one blocked on the engine rather than the stream, since
+  `for await` never completes here even over a plain array. Installing the hook
+  would turn `for await (const chunk of response.body)` from a `TypeError` a
+  script survives into a capture that never settles.
+
 - Three of `navigator`'s object-valued surfaces: `storage` (`StorageManager`),
   `permissions` (`Permissions`/`PermissionStatus`) and `userAgentData`
   (`NavigatorUAData`).

@@ -146,6 +146,12 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     /// <summary>The File API data surfaces — Blob, File and the URL object-URL pair. It needs nothing
     /// from the bridge (a blob is bytes, not a node), so it takes no host contract.</summary>
     private readonly Dom.Features.BlobBinding _blobs;
+
+    /// <summary>
+    /// <c>ReadableStream</c>, <c>ProgressEvent</c> and <c>FileReader</c>, plus the seam that mints a
+    /// stream over bytes for <c>blob.stream()</c> and a fetch body.
+    /// </summary>
+    private readonly Dom.Features.StreamsBinding _streams = new();
     private readonly Dom.Features.SubDocumentBinding _subDocuments;
     // Phase 3 (P3.17): the nested-browsing-context `window` (sub-window) object — its
     // document/location/scroll/getComputedStyle surface and the sub-window-scoped helpers — lives in

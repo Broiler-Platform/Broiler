@@ -19,6 +19,14 @@ A confirmed gap closes only under the rules in
 
 ## Track 1 — Core language and built-ins
 
+- **`for await` never completes.** An `async` function that reaches a `for await…of` loop is
+  suspended and never resumed — over a plain array, over an object carrying `@@asyncIterator`, over
+  anything. Ordinary `await` is fine, so this is the loop rather than async resumption: the
+  reproduction is `(async () => { for await (const v of [1, 2]) {} ; done(); })()`, whose `done()`
+  never runs, and over an `@@asyncIterator` object it additionally keeps a capture's drain loop
+  spinning until the run is killed. Characterized against the current pointer while implementing
+  `ReadableStream`, which is why that interface's `values()` / `@@asyncIterator` are deliberately not
+  installed — see [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - Remaining Annex B cases must be reduced from the current manifest rather than reconstructed
   from deleted issue snapshots.
 - `slice/create-proto-from-ctor-realm-array.js` — the one array case that still fails, a
@@ -190,10 +198,6 @@ and deterministic detection behavior.
   behaviour is not; adding it as an ordinary object would make the standard `document.all`
   feature-detect (which reads truthiness, precisely to exclude it) answer the wrong way round. This
   needs a `Broiler.JS` capability before it is a bridge question at all.
-- **`FileReader` is absent**, and `Blob.prototype.stream()` with it. `stream()` returns a
-  `ReadableStream`, and this engine already carries one partial stream — the object `response.body`
-  hands back — that a second copy should not be written against; building a real `ReadableStream` is
-  its own capability decision, and `FileReader` is the other half of the same File API slice.
 - **There is no *user* selection.** `Selection` is implemented for everything a script drives, but
   nothing populates it on its own, no `selectionchange` fires (nothing but script can change it),
   and the selection is not painted — a rendering question rather than a scripting one.

@@ -1088,6 +1088,49 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   `DomBridge/FormEntryList.cs`, plus `Features/CustomElementsBinding.cs`,
   `Features/FormAssociationBinding.cs`, `Features/FormBinding.cs`, `Features/FetchBinding.cs`,
   `DomBridge/FormReset.cs`); regressions in `FormAssociatedCustomElementTests`.
+- **`ReadableStream` and `FileReader`, and `Blob.prototype.stream()` with them.** Two of track 6's
+  capability decisions, taken together because they are one slice: `stream()` was left out precisely
+  because it returns a `ReadableStream`, and the engine had only a partial one — the shape-only
+  object `response.body` handed back, carrying a `getReader` whose reader had `read`, `cancel` and
+  `releaseLock` and nothing else. No `closed`, no `tee`, no `cancel` on the stream, and no
+  constructor: `new ReadableStream(...)` was a `ReferenceError`, the kind that aborts the script
+  rather than the statement. `FileReader` was absent outright, so the standard way a page turns a
+  dropped file into text, a preview data URL or an `ArrayBuffer` was a `ReferenceError` too.
+  <br>**The stream is JavaScript, and that is the point rather than a shortcut.** The specification
+  is a state machine over promises — a queue, a list of pending read requests, and a pull signal that
+  must not re-enter — and writing it in host functions would mean re-deriving the promise plumbing
+  the engine already has. It ships as an embedded asset beside the content-rendering polyfills. The
+  only thing the host provides is a blob's bytes; that hook is captured into the asset's closure and
+  deleted from the global, so a page cannot reach a blob's bytes through it.
+  <br>**One stream, three producers.** `blob.stream()`, a fetch body and a page's own
+  `new ReadableStream` now hand back the same interface. A fetch body is the case that needed care:
+  the Body mixin's `bodyUsed` is "disturbed", and it is reported from the underlying source's `pull`
+  rather than from a wrapper on the instance, so the stream a page holds still has no own properties;
+  its high-water mark is zero precisely so construction does not pull and mark the body used before
+  anything read it. `text()`, `json()` and `clone()` refuse a body that is disturbed *or* locked, and
+  the locked half is answered by the stream itself.
+  <br>**Not implemented, and detectably so:** `pipeTo`/`pipeThrough`, which need a `WritableStream`;
+  BYOB readers, which need a byte-stream controller, so `getReader({mode: 'byob'})` throws rather
+  than handing back a default reader that would ignore the caller's buffer; and async iteration,
+  which is blocked on the engine rather than on the stream. `for await` never completes here — it
+  leaves its async function suspended even over a plain array — and over an object carrying
+  `@@asyncIterator` it keeps a capture's drain loop spinning. Installing the hook would turn the
+  ordinary `for await (const chunk of response.body)` from a `TypeError` a page's script survives
+  into a capture that never settles, which is strictly worse; the engine gap is recorded in
+  [open](broiler-js-gaps-open.md#track-1--core-language-and-built-ins) and the hook goes on with the
+  fix. A capture-level probe confirms `await reader.read()` itself works end to end.
+  <br>`FileReader` brought `ProgressEvent` with it, which also did not exist: its events are
+  `ProgressEvent`s and a handler reads `e.constructor.name` as much as `e.loaded`. The reader's own
+  event plumbing is its own, because this realm's `EventTarget` is not subclassable — a deviation
+  worth naming: `addEventListener`, `removeEventListener` and `dispatchEvent` are own members of
+  `FileReader.prototype` where a browser inherits them.
+  <br>Over a 36-case corpus run against both engines, Broiler and Chromium agree on every one: the
+  event order and what each event reports, the four conversions (including that a typeless blob reads
+  as `data:application/octet-stream;…`), the busy and no-argument refusals, abort firing only
+  `abort` and `loadend`, and the stream's read, close, error, pull, empty, cancel and tee behaviour.
+  <br>Main-repo fix (the new `Polyfills/streams-and-file-reader.js` and `Features/StreamsBinding.cs`,
+  plus `Features/BlobBinding.cs`, `Features/FetchBinding.cs` and the registration); regressions in
+  `ReadableStreamTests` and `FileReaderTests`.
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

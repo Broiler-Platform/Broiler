@@ -50,12 +50,12 @@ work remaining on that track.
 | # | Track | What is left | Lives in | Required outcome |
 |---:|---|---|---|---|
 | 0 | Conformance evidence | The pinned-corpus CI run, and product decisions for three `$262` hooks | in progress · closed | Test failures and timeouts are trustworthy |
-| 1 | Core language and built-ins | Annex B remainder and the cross-realm cases | open · closed | Supported Test262 language clusters are clean |
+| 1 | Core language and built-ins | `for await`, the Annex B remainder and the cross-realm cases | open · closed | Supported Test262 language clusters are clean |
 | 2 | RegExp | Matcher performance, then non-Unicode routing, then retiring the translator | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
 | 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; three capability decisions | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | The excluded Worker capabilities, concurrent-context safety, cross-agent shared memory | open | Claimed agent capabilities are complete and deterministic |
 | 5 | Essential browser JavaScript APIs | Navigation semantics; storage and networking; Trusted Types | open · closed | A tested support matrix replaces accidental omissions |
-| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; live SVG DOM; four capability decisions (`document.all`, per-tag SVG interfaces, Font Loading, `ReadableStream`/`FileReader`) | open · closed | Script-visible objects and algorithms meet their claimed standards |
+| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; live SVG DOM; three capability decisions (`document.all`, per-tag SVG interfaces, Font Loading) | open · closed | Script-visible objects and algorithms meet their claimed standards |
 | 7 | Graphics, media, and advanced APIs | Every surface — large capability decisions first | open | Each surface is implemented or explicitly excluded |
 | 8 | Portable/Native-AOT profile | Everything past the numeric seed, and the profile decision that gates it | open | Optional profile decision and, if approved, a truthful capability set |
 

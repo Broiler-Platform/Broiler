@@ -13,7 +13,12 @@ internal static class PolyfillAssets
     private const string ContentRenderingResource =
         "Broiler.HtmlBridge.Polyfills.content-rendering-polyfills.js";
 
+    private const string StreamsResource =
+        "Broiler.HtmlBridge.Polyfills.streams-and-file-reader.js";
+
     private static string? _contentRendering;
+
+    private static string? _streams;
 
     /// <summary>
     /// The content-rendering polyfill bundle: <c>Image</c>, <c>IntersectionObserver</c>,
@@ -21,6 +26,14 @@ internal static class PolyfillAssets
     /// <c>AbortController</c>. Evaluated once per document into the browsing-context global.
     /// </summary>
     public static string ContentRendering => _contentRendering ??= Load(ContentRenderingResource);
+
+    /// <summary>
+    /// <c>ReadableStream</c> (with its default reader and controller), <c>ProgressEvent</c> and
+    /// <c>FileReader</c>. JavaScript rather than host functions for the same reason the
+    /// specification is written that way — the queue, the pending read requests and the pull
+    /// back-pressure are a state machine over promises.
+    /// </summary>
+    public static string Streams => _streams ??= Load(StreamsResource);
 
     private static string Load(string resourceName)
     {

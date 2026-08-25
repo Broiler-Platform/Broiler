@@ -27,4 +27,22 @@ internal interface IFetchHost
     /// the element's members rather than the form's fields.
     /// </summary>
     IReadOnlyList<KeyValuePair<string, string>>? FormEntriesFor(Broiler.JavaScript.Runtime.JSObject candidate);
+
+    /// <summary>
+    /// A real <c>ReadableStream</c> over a body's text, for <c>response.body</c> and
+    /// <c>request.body</c>. The interface belongs to the streams asset, not here — this seam exists
+    /// so a fetch body is the same object <c>blob.stream()</c> and a page's own
+    /// <c>new ReadableStream</c> produce, rather than a look-alike.
+    /// </summary>
+    Broiler.JavaScript.Runtime.JSValue StreamOverText(string text);
+
+    /// <summary>
+    /// The same stream, reporting the first read or cancel through <paramref name="onDisturbed"/> —
+    /// the Body mixin's <c>bodyUsed</c>, which is what makes <c>text()</c>, <c>json()</c> and
+    /// <c>clone()</c> refuse a body something has already consumed.
+    /// </summary>
+    Broiler.JavaScript.Runtime.JSValue StreamOverTextObserved(string text, System.Action onDisturbed);
+
+    /// <summary>Whether a reader holds the given body stream — the Body mixin's "locked" half.</summary>
+    bool IsStreamLocked(Broiler.JavaScript.Runtime.JSValue stream);
 }
