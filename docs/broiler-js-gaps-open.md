@@ -244,8 +244,34 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 
 ### CSSOM, fonts, SVG, and JS-visible layout algorithms
 
-- A linked stylesheet can report zero `cssRules`, while `getComputedStyle` ignores its
-  declarations.
+- **Confirmed with evidence — a linked stylesheet's rules reach neither `cssRules` nor
+  `getComputedStyle`.** Checked through `bridge.Attach(context, html, pageUrl)` — the same shape the
+  passing `StylesheetBaseHrefTests` uses — over a `file:` page with `#a { display: flex; color:
+  rgb(1,2,3); }` and `.z { margin-top: 7px }` in the sheet, against an **inline `<style>` control
+  carrying the identical rules**:
+
+  | sheet | `cssRules.length` | `display` | `color` | `marginTop` |
+  |---|---|---|---|---|
+  | inline `<style>` | 2 | `flex` | `rgb(1, 2, 3)` | `7px` |
+  | linked `<link>` | 0 | `inline` | `rgb(0, 0, 0)` | `0px` |
+
+  The linked sheet also appears in `document.styleSheets` with **no `href`**, so it is presented as an
+  inline sheet that happens to have no rules. `bridge.SetLocalBasePath` makes no difference. Note
+  this is what makes the retired *"`getComputedStyle().display` reports `inline` for every element"*
+  claim true after all for linked sheets — that retirement covered the inline case only.
+
+  Why it is not visible as a rendering bug: `HtmlRender` resolves and applies the link itself, which
+  is why the green-pixel assertion in `StylesheetBaseHrefTests` passes while the bridge's own CSSOM
+  never sees the sheet. Serialization confirms the split — the fetched rules do not appear in
+  `SerializeToHtml()` output either. So paint and CSSOM have two different stylesheet sets, and only
+  paint has the linked one.
+
+  **Open question, not yet answered:** whether this also fails over `http(s):`. The
+  `FetchStyleSheetText` seam says the loader dispatches file and http(s) alike, and the whole
+  collect → prefetch → fetch pipeline is present and does include external links
+  (`CollectStyleSheetCandidatesInTree` tests `IsExternalStylesheet`), so the fetch is failing
+  somewhere inside that path rather than the path being absent. Answer that before attempting a fix,
+  because it decides whether this is a `file:`-scheme defect or a general one.
 - ~~`getComputedStyle().display` can report `inline` for every element.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
 - Font Loading is a synchronous compatibility facade and accepts malformed non-empty shorthands.

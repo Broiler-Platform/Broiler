@@ -643,10 +643,13 @@ carried again as an asserted gap.
   `"xMidYMid"`, and `a.getAttribute('xlink:href')` → `"#z"`. Each returned the authored value under
   its authored spelling. Narrowed rather than retained: if a specific qualified name is still
   unreachable it needs naming, because the general claim is not current.
-- `getComputedStyle().display` can report `inline` for every element. **Does not reproduce.** Checked
-  through a DomBridge-attached capture with a stylesheet setting `#a{display:block}` and
-  `.f{display:flex}`: `getComputedStyle` reported `block` for the block element and `flex` for the
-  flex one, so the computed value tracks the cascade rather than collapsing to `inline`.
+- `getComputedStyle().display` can report `inline` for every element. **Retired too broadly — see the
+  correction below.** The original check used an **inline `<style>` block**, where
+  `getComputedStyle` reported `block` and `flex` correctly, and that much stands: the computed value
+  does track the cascade for inline sheets. But the claim was never only about inline sheets, and a
+  later check with a **linked** stylesheet reproduced it. The accurate statement is the open entry
+  *A linked stylesheet's rules reach neither `cssRules` nor `getComputedStyle`*, which now carries
+  the evidence; this retirement should be read as covering the inline case only.
 
 - `compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.
   **Does not reproduce.** Checked through a DomBridge-attached capture over a document with a
