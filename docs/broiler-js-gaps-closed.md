@@ -689,6 +689,62 @@ were deleted and the gitlinks point at commits that contain them. See
   `SubDocumentCollectionTests`, each of which asks the frame *and* the containing document the same
   question in one page, because the defect was never a frame being wrong in the abstract — it was the
   two disagreeing about what a document is.
+- **`setAttribute` accepted any name and `querySelector` accepted any selector.** The last two
+  members of the DOMException family, and the second was worse than "returns `null`" — it returned
+  the *wrong element*. The lenient matcher read `div:::bogus` as `div` and handed back a real node,
+  and `[` matched four; so an invalid selector did not fail, it quietly succeeded at something else,
+  which no caller can detect. `setAttribute` wrote every invalid name through — `@click`, `foo bar`,
+  `1abc`, `-x` all became attributes a browser refuses to create — and the one name that did fail,
+  the empty string, threw a bare `Error` carrying no `name` and no `code` to branch on.
+  <br>**Fixed** at the scripted-DOM boundary, in the main repo, and that placement is the design
+  rather than a convenience. The two obvious homes are exactly where the rules must *not* go, for the
+  same reason in both cases: `Broiler.Dom`'s `DomElement.SetAttribute` is what the HTML parser calls,
+  and HTML permits attribute names the XML `Name` production rejects; `Broiler.CSS.Dom`'s
+  `CssSelectorMatcher.Matches` is what the cascade calls, and a rule whose selector does not parse is
+  *dropped* per CSS error handling, never fatal. Throwing in either place would break the layer whose
+  job is to tolerate bad input. The requirement belongs to the scripted API, so it lives where the
+  `DOMException` is already minted — which also means **no submodule patch**, so it is live in CI
+  now rather than waiting to be applied.
+  <br>**Every expectation was measured against Chromium**, not derived from the grammar, and that
+  caught two assumptions wrong in opposite directions: `[tabindex=0]` *is* a syntax error (an
+  unquoted attribute value must be an identifier and a digit cannot start one) while
+  `setAttribute('a:b:c', …)` is perfectly valid, because `Name` admits colons. The second one was
+  the dangerous one — reusing the element-name rule, which deliberately forbids colons, would have
+  started rejecting `xlink:href` and broken inline SVG. Over a 149-case corpus run against both
+  engines the two now agree on 143; all six divergences are Broiler *accepting* where Chromium
+  throws, and none is the reverse, which is the only safe direction for a change that turns silence
+  into an exception.
+  <br>**The six are two deliberate decisions.** A well-formed but unknown pseudo (`:nope`,
+  `::bogus`, `::-moz-focus-inner`, `:matches()`, and a pseudo-class after a pseudo-element) is
+  accepted, because rejecting one needs a list of every pseudo this engine supports and such a list
+  drifts against what pages use rather than against the specification — Chromium itself accepts
+  `:focus-visible`, `:defined`, `::marker` and `::-webkit-scrollbar` while rejecting
+  `::-moz-focus-inner`. Turning an unknown name into a throw would break a page that merely asked
+  for a pseudo Broiler lacks. The other is the Selectors 4 `s` case flag, which is valid per
+  specification and which Chromium has not implemented.
+  <br>**The pseudo-element half was found by this work and fixed with it.** A selector carrying a
+  pseudo-element selects a box, not an element, so it matches nothing through the DOM API — but the
+  matcher strips the pseudo-element and matches what is left, so `querySelector('::before')` returned
+  the `<html>` element. That is the same silently-wrong-element failure by another route, so
+  `querySelector`/`querySelectorAll`/`matches`/`closest` now answer no element for any selector
+  carrying one, in both the `::` and the legacy one-colon spellings, while the cascade goes on
+  applying `::before` rules — pinned, since a rule that reached the renderer would stop generated
+  content painting. A pseudo-element that is not the subject (`div::before p`) is a `SyntaxError`
+  instead, which is what a browser gives.
+  <br>`toggleAttribute` and `setAttributeNS` validate too, because a browser validates from them;
+  `getAttribute`, `hasAttribute` and `removeAttribute` deliberately do not, because a browser accepts
+  an invalid name from all three — they ask about a name rather than create one. Both halves of that
+  line are pinned.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (the new `Features/DomApiSyntax.cs`,
+  `DomBridge/Utilities.NameValidation.cs`, `DomBridge/Utilities.cs`, `Features/AttributesBinding.cs`,
+  `Features/SelectorsBinding.cs`, `Features/DocumentQueryBinding.cs`,
+  `Features/SubDocumentBinding.cs`); regressions in `DomApiSyntaxTests`.
+  <br>**What this narrowed but did not close:** an unknown pseudo-class *with an argument* still
+  matches the first element rather than nothing, so `querySelector(':matches(a)')` answers `<html>`
+  where the argument-less `:nope` already answers `null`. The cause is the matcher's lenient default
+  arm in `Broiler.CSS.Dom`, a matching question rather than a syntax one; it is characterized in
+  `DomApiSyntaxTests` and left in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

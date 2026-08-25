@@ -515,6 +515,10 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
     private JSValue QuerySelector(DomNode docRoot, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+        DomBridge.ValidateSelector(selector, _host.JsContext);
+        if (DomApiSyntax.CarriesPseudoElement(selector))
+            return JSNull.Value;
+
         var found = DomBridge.FindInSubTree(docRoot, el => _host.MatchesSelector(el, selector));
         return found != null ? _host.ToJSObject(found) : JSNull.Value;
     }
@@ -527,7 +531,10 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
     private JSValue QuerySelectorAll(DomNode docRoot, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var results = Wrappers(docRoot, el => _host.MatchesSelector(el, selector));
+        DomBridge.ValidateSelector(selector, _host.JsContext);
+        var results = DomApiSyntax.CarriesPseudoElement(selector)
+            ? []
+            : Wrappers(docRoot, el => _host.MatchesSelector(el, selector));
         return DomCollectionBinding.NodeList(_host.JsContext, () => results);
     }
 

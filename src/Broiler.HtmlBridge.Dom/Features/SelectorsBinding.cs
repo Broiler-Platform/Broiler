@@ -21,27 +21,44 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class SelectorsBinding
 {
-    public static JSValue QuerySelector(ISelectorsHost host, DomElement element, in Arguments a)
+    /// <summary>
+    /// The selector argument of the four <c>Element</c> selector methods, validated per DOM §4.2.6
+    /// before any matching happens — an unparsable one is a <c>SyntaxError</c>, not an empty result.
+    /// </summary>
+    /// <remarks>
+    /// All four validate, because a browser throws from all four identically; that was measured, not
+    /// inferred from the fact that they share an algorithm. For the two <c>querySelector</c> forms
+    /// this repeats a check the shared descendant search makes as well, since that search is also
+    /// reached directly by the <c>DocumentFragment</c> forms and has to stand on its own; the second
+    /// scan of a short string is not worth removing the redundancy for.
+    /// </remarks>
+    private static string Selector(ISelectorsHost host, in Arguments a)
     {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return host.FindInDescendants(element, sel, false);
+        var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+        DomBridge.ValidateSelector(selector, host.JsContext);
+        return selector;
     }
 
-    public static JSValue QuerySelectorAll(ISelectorsHost host, DomElement element, in Arguments a)
-    {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return host.FindInDescendants(element, sel, true);
-    }
+    public static JSValue QuerySelector(ISelectorsHost host, DomElement element, in Arguments a) =>
+        host.FindInDescendants(element, Selector(host, in a), false);
+
+    public static JSValue QuerySelectorAll(ISelectorsHost host, DomElement element, in Arguments a) =>
+        host.FindInDescendants(element, Selector(host, in a), true);
 
     public static JSValue Matches(ISelectorsHost host, DomElement element, in Arguments a)
     {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
-        return host.MatchesSelector(element, sel, element) ? JSBoolean.True : JSBoolean.False;
+        var sel = Selector(host, in a);
+        return !DomApiSyntax.CarriesPseudoElement(sel) && host.MatchesSelector(element, sel, element)
+            ? JSBoolean.True
+            : JSBoolean.False;
     }
 
     public static JSValue Closest(ISelectorsHost host, DomElement element, in Arguments a)
     {
-        var sel = a.Length > 0 ? a[0].ToString() : string.Empty;
+        var sel = Selector(host, in a);
+        if (DomApiSyntax.CarriesPseudoElement(sel))
+            return JSNull.Value;
+
         for (DomElement? current = element; current != null && !current.TagName.StartsWith('#'); current = DomBridge.ParentEl(current))
         {
             if (host.MatchesSelector(current, sel, element))

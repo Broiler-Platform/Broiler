@@ -44,7 +44,24 @@ public sealed partial class DomBridge
     // self-match is guarded to element roots and the descendant scope is null for a fragment root.
     private static JSValue FindInDescendants(DomNode root, string selector, bool all, DomBridge bridge)
     {
+        // DOM §4.2.6: an unparsable selector is a SyntaxError before the search runs. This is the
+        // shared descendant search, so it covers the DocumentFragment forms as well as the Element
+        // ones — a browser throws from `fragment.querySelector('[')` exactly as it does from the
+        // document's.
+        ValidateSelector(selector, bridge._jsContext);
+
         var results = new List<JSValue>();
+
+        // A pseudo-element selects no element, so the search is over before it starts — see
+        // DomApiSyntax.CarriesPseudoElement. The empty list still has to be the right *kind* of
+        // empty: a NodeList for querySelectorAll and null for querySelector.
+        if (Dom.Features.DomApiSyntax.CarriesPseudoElement(selector))
+        {
+            return all
+                ? Dom.Features.DomCollectionBinding.NodeList(bridge._jsContext, () => results)
+                : JSNull.Value;
+        }
+
         var scope = root as DomElement;
         if (scope is not null && selector.Contains(":scope") &&
             bridge.MatchesSelector(scope, selector, scope))

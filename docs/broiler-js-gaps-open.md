@@ -256,15 +256,22 @@ and deterministic detection behavior.
 - ~~`input.form` and `input.labels` are `undefined`.~~ **Fixed** — the form-association surface,
   which the `NodeList` work above unblocked (`labels` is a live one). See
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
-  an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
-  lives in **`Broiler.DOM`** (`DomNameValidation`, which deliberately owns these rules rather than
-  the bridge re-copying them), so it is the patch workflow, and it also carries real-page risk — a
-  browser does throw on `setAttribute('@click', …)`, so pages relying on the permissive behaviour
-  would begin to fail. `querySelector` with an invalid selector returns `null` where `SyntaxError` is
-  required; surfacing that needs parse errors out of **`Broiler.CSS`**'s `CssSelectorParser`, plus
-  main-repo wiring. The DOMException machinery itself is sound, so both are wiring gaps rather than
-  missing mechanisms.
+- ~~The rest of that family: `setAttribute` with an invalid name, and `querySelector` with an invalid
+  selector.~~ **Fixed** — both throw the exception their specification names, and the selector half
+  turned out to be returning the *wrong element* rather than `null`. Neither needed a submodule: the
+  rules belong at the scripted-DOM boundary precisely because the canonical layers underneath them
+  (the parser's `SetAttribute`, the cascade's matcher) are required to stay lenient. Checked against
+  Chromium over a 149-case corpus. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed, newly characterized — an unknown pseudo-class *with an argument* over-matches.**
+  `querySelector(':matches(a)')` returns the `<html>` element where a browser throws and where the
+  argument-less `:nope` already returns `null`; any unrecognized functional pseudo behaves the same
+  way. The cause is the lenient default arm of `CssSelectorMatcher.ProcessPseudoClasses` in
+  **`Broiler.CSS.Dom`** — a *matching* defect, not a syntax one, so the selector validation that
+  closed the entry above runs and passes before it is reached. It is the last remaining shape of the
+  "a selector silently matches the wrong element" family, and it is behind a submodule, so it is the
+  patch workflow. Pinned as a characterization in `DomApiSyntaxTests` so a fix trips the test rather
+  than passing unnoticed.
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion
@@ -330,8 +337,12 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
    well as the containing one, which was the last surface still building its own snapshot arrays; see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
    The element-wrapper half is what remains.
-2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
-   focused DOM regressions.
+2. ~~Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
+   focused DOM regressions.~~ **Done for the exception family** — CharacterData, tree mutation, the
+   document-level mutation methods, `setAttribute`'s `InvalidCharacterError` and `querySelector`'s
+   `SyntaxError` all raise the specified `DOMException`; see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+   Range semantics are the part of this action still untouched.
 3. Implement production Custom Elements and ~~parser-owned template contents~~ (**template contents
    done** — see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);

@@ -112,6 +112,10 @@ internal static class DocumentQueryBinding
     public static JSValue QuerySelector(IDocumentQueryHost host, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+        DomBridge.ValidateSelector(selector, host.JsContext);
+        if (DomApiSyntax.CarriesPseudoElement(selector))
+            return JSNull.Value;
+
         foreach (var el in host.Elements)
         {
             if (host.MatchesSelector(el, selector))
@@ -128,11 +132,15 @@ internal static class DocumentQueryBinding
     public static JSValue QuerySelectorAll(IDocumentQueryHost host, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+        DomBridge.ValidateSelector(selector, host.JsContext);
         var results = new List<JSValue>();
-        foreach (var el in host.Elements)
+        if (!DomApiSyntax.CarriesPseudoElement(selector))
         {
-            if (host.MatchesSelector(el, selector))
-                results.Add(host.ToJSObject(el));
+            foreach (var el in host.Elements)
+            {
+                if (host.MatchesSelector(el, selector))
+                    results.Add(host.ToJSObject(el));
+            }
         }
 
         return DomCollectionBinding.NodeList(host.JsContext, () => results);

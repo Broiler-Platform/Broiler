@@ -349,6 +349,36 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- An invalid selector fails instead of matching the wrong element.
+  `document.querySelector('div:::bogus')` returned a real `<div>` — the matcher
+  read it as `div` — and `querySelectorAll('[')` matched four elements, so an
+  unparsable selector did not produce no answer, it produced a plausible wrong
+  one that no caller can detect. All five scripted entry points
+  (`querySelector`, `querySelectorAll`, `matches`, `closest`, and the document,
+  frame and `DocumentFragment` forms) now throw the `SyntaxError` DOM §4.2.6
+  requires. Selectors that carry a **pseudo-element** were the same failure by
+  another route: `querySelector('::before')` returned the `<html>` element,
+  where a pseudo-element selects a box and so matches nothing; those now answer
+  no element, in both the `::` and legacy one-colon spellings, while the cascade
+  goes on applying `::before` rules. A pseudo-element that is not the subject
+  (`div::before p`) is a syntax error, as it is in a browser.
+
+  A well-formed but unrecognized pseudo (`:nope`, `::bogus`) is deliberately
+  accepted rather than rejected: rejecting one needs a list of every pseudo the
+  engine supports, and turning an unknown name into an exception would break a
+  page that merely asked for a pseudo Broiler lacks.
+
+- `setAttribute` rejects a name a browser rejects. Every invalid name was
+  written through silently — `@click`, `foo bar`, `1abc` and `-x` all became
+  attributes no browser will create — and the one name that did fail, the empty
+  string, threw a bare `Error` with no `name` or `code` for a caller to branch
+  on rather than a `DOMException`. It now throws `InvalidCharacterError`, as do
+  `toggleAttribute` and `setAttributeNS`; `getAttribute`, `hasAttribute` and
+  `removeAttribute` keep accepting anything, which is where a browser draws the
+  line. Colons stay valid, so `setAttribute('xlink:href', …)` and
+  `setAttribute('v-on:click', …)` are unaffected — the XML `Name` production
+  admits them, and rejecting them would have broken inline SVG.
+
 - A frame's `document` answers the same object model as the document containing
   it. An `<iframe>`'s `contentDocument` — and every `createDocument` /
   `createHTMLDocument` result — kept its own older accessors, so from one page the

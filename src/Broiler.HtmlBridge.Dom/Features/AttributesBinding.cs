@@ -372,10 +372,26 @@ internal sealed class AttributesBinding(IAttributesHost host)
         return DomBridge.TryGetAttribute(element, name, out var val) ? new JSString(val) : JSNull.Value;
     }
 
+    /// <summary>
+    /// <c>element.setAttribute(name, value)</c> — DOM §4.9.1, which begins by requiring
+    /// <paramref name="a" />'s name to match the XML <c>Name</c> production and throwing
+    /// <c>InvalidCharacterError</c> when it does not.
+    /// </summary>
+    /// <remarks>
+    /// Every invalid name used to be written through silently, so <c>setAttribute('@click', …)</c>
+    /// and <c>setAttribute('foo bar', …)</c> produced an attribute a browser refuses to create — and
+    /// the one name that did fail, the empty string, threw a bare <c>Error</c> with no <c>name</c> or
+    /// <c>code</c> for a caller to branch on rather than a <c>DOMException</c>.
+    /// </remarks>
     internal JSValue SetAttribute(DomElement element, in Arguments a)
     {
         if (a.Length >= 2)
-            SetAttributeLikeSetAttribute(element, a[0].ToString(), a[1].ToString());
+        {
+            var name = a[0].ToString();
+            DomBridge.ValidateAttributeName(name, _host.JsContext);
+            SetAttributeLikeSetAttribute(element, name, a[1].ToString());
+        }
+
         return JSUndefined.Value;
     }
 
@@ -412,11 +428,19 @@ internal sealed class AttributesBinding(IAttributesHost host)
         return JSUndefined.Value;
     }
 
+    /// <summary>
+    /// <c>element.toggleAttribute(name, force)</c>. It validates the name the same way
+    /// <see cref="SetAttribute"/> does — DOM §4.9.4 runs the identical check, and a browser throws
+    /// from it, which was measured. <c>removeAttribute</c>, <c>hasAttribute</c> and
+    /// <c>getAttribute</c> deliberately do not: they answer about a name rather than create one, and a
+    /// browser accepts an invalid name from all three.
+    /// </summary>
     internal JSValue ToggleAttribute(DomElement element, in Arguments a)
     {
         if (a.Length == 0)
             return JSBoolean.False;
         var attrName = a[0].ToString();
+        DomBridge.ValidateAttributeName(attrName, _host.JsContext);
         var hasAttribute = DomBridge.HasAttr(element, attrName);
         var forceSpecified = a.Length > 1 && !a[1].IsUndefined;
         var shouldHaveAttribute = forceSpecified ? a[1].BooleanValue : !hasAttribute;
@@ -487,6 +511,13 @@ internal sealed class AttributesBinding(IAttributesHost host)
         return removed;
     }
 
+    /// <summary>
+    /// <c>element.setAttributeNS(namespace, qualifiedName, value)</c> — DOM §4.9.2, whose first step
+    /// is the "validate and extract" algorithm. That is the qualified-name rule
+    /// <c>createElementNS</c> already used, so this reuses it rather than carrying a second reading:
+    /// an invalid character is an <c>InvalidCharacterError</c> and a prefix without a namespace a
+    /// <c>NamespaceError</c>.
+    /// </summary>
     internal JSValue SetAttributeNS(DomElement element, in Arguments a)
     {
         if (a.Length >= 3)
@@ -494,6 +525,8 @@ internal sealed class AttributesBinding(IAttributesHost host)
             var ns = a[0].IsNull || a[0].IsUndefined ? null : a[0].ToString();
             var qName = a[1].ToString();
             var val = a[2].ToString();
+            if (_host.JsContext is { } context)
+                DomBridge.ValidateQualifiedName(qName, ns, context);
             var localName = qName.Contains(':') ? qName[(qName.IndexOf(':') + 1)..] : qName;
             SetAttributeLikeSetAttributeNS(element, ns, qName, localName, val);
         }
