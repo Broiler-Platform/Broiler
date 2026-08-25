@@ -19,4 +19,12 @@ internal interface IFetchHost
     /// same object a page's own <c>new Blob(...)</c> produces rather than a look-alike.
     /// </summary>
     Broiler.JavaScript.Runtime.JSValue CreateBlob(byte[] bytes, string contentType);
+
+    /// <summary>
+    /// The entry list of a <c>&lt;form&gt;</c> wrapper (HTML §4.10.21.4), or <see langword="null"/>
+    /// when the object is not one. <c>new FormData(form)</c> is the shape a page collects a form's
+    /// values with, and enumerating the wrapper's own properties — which is what it did — produced
+    /// the element's members rather than the form's fields.
+    /// </summary>
+    IReadOnlyList<KeyValuePair<string, string>>? FormEntriesFor(Broiler.JavaScript.Runtime.JSObject candidate);
 }

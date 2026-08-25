@@ -36,7 +36,7 @@ internal sealed class FormBinding(IFormHost host)
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // length — alias for elements.length
         obj.FastAddProperty((KeyString)"length",
-            new DomFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(element).Count), "get length"),
+            new DomFunction((in _) => new JSNumber(_host.CollectFormControls(element).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // action (read/write)
         obj.FastAddProperty((KeyString)"action",
@@ -53,7 +53,7 @@ internal sealed class FormBinding(IFormHost host)
 
     private JSObject BuildElementsCollection(DomElement form)
     {
-        var controls = HtmlElementQueries.CollectFormControls(form);
+        var controls = _host.CollectFormControls(form);
 
         // FormElementsCollection returns null for missing named properties (per
         // HTMLFormControlsCollection spec behaviour).
@@ -63,7 +63,7 @@ internal sealed class FormBinding(IFormHost host)
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
         collection.FastAddProperty((KeyString)"length",
-            new DomFunction((in _) => new JSNumber(HtmlElementQueries.CollectFormControls(form).Count), "get length"),
+            new DomFunction((in _) => new JSNumber(_host.CollectFormControls(form).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         return collection;
@@ -83,6 +83,11 @@ internal sealed class FormBinding(IFormHost host)
     {
         if (string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase))
             return AreFormChildrenValid(element);
+
+        // A form-associated custom element's validity is whatever it set through its internals; no
+        // amount of reading its markup can answer for it.
+        if (!_host.IsCustomElementValid(element))
+            return false;
 
         // Individual element validation
         if (!DomBridge.HasAttr(element, "required"))
@@ -130,7 +135,7 @@ internal sealed class FormBinding(IFormHost host)
         if (string.IsNullOrEmpty(name))
             return null;
 
-        foreach (var ctrl in HtmlElementQueries.CollectFormControls(form))
+        foreach (var ctrl in host.CollectFormControls(form))
         {
             if (ctrl.GetAttribute("name") is { } controlName &&
                 string.Equals(controlName, name, StringComparison.Ordinal))

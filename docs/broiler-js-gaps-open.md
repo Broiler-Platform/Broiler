@@ -209,12 +209,13 @@ and deterministic detection behavior.
 See [HTML5 exceptions](html5test-exceptions.md) and
 [the DOM bridge roadmap](../Broiler.DOM/docs/roadmap.md).
 
-### Custom Elements, templates, and Shadow DOM
+### Templates and Shadow DOM
 
-- **One Custom Elements capability remains**: form-associated custom elements — `formAssociated`,
-  `attachInternals`, `ElementInternals`, and the `formAssociatedCallback` / `formResetCallback` /
-  `formDisabledCallback` / `formStateRestoreCallback` reactions. Deliberately left out of the core
-  slice rather than faked; `attachInternals` is absent rather than answering a shape-only object.
+Custom Elements are complete — the core slice, customized built-ins, `adoptedCallback` and form
+association are all in [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+`formStateRestoreCallback` is the one reaction that never fires, and deliberately: it reports a value
+restored by session history or an autofill pass, and this engine performs neither.
+
 - **Shadow DOM uses synthetic markers**, selector rewriting, and light-child hiding rather than a
   canonical shadow and composed tree with slot assignment, fallback, hit-testing, traversal, and
   event retargeting.
@@ -246,18 +247,17 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 
 ### Actions
 
-Actions 1, 2 and 7 of the original list are complete and are recorded in
-[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);
-what is left of action 1 is the element-wrapper half named in the first bullet above. The rest:
+Most of the original list is complete and recorded in
+[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior),
+production Custom Elements among it; what is left of its first action is the element-wrapper half
+named in the first bullet above. The rest:
 
 1. Relocate the engine's own interface members onto the interface prototypes, so an instance
    carries no members of its own.
-2. Implement form-associated custom elements — the Custom Elements remainder now that customized
-   built-ins and `adoptedCallback` have landed.
-3. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
-4. Make CSSOM rules and computed style read from the same declarations used by cascade and
+2. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
+3. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.
-5. Connect live SVG DOM mutations to cascade and paint.
+4. Connect live SVG DOM mutations to cascade and paint.
 
 **Exit gate:** claimed DOM interfaces have correct prototypes, collections, exceptions, and
 algorithms; Custom Elements, templates, shadow/composed trees, CSSOM, computed style, and SVG

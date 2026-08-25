@@ -10,6 +10,17 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge : IFetchHost
 {
+    /// <summary>
+    /// The entry list of a <c>&lt;form&gt;</c> wrapper, or <see langword="null"/> for anything else —
+    /// what <c>new FormData(form)</c> collects.
+    /// </summary>
+    IReadOnlyList<KeyValuePair<string, string>>? IFetchHost.FormEntriesFor(
+        Broiler.JavaScript.Runtime.JSObject candidate) =>
+        FindDomNodeByJSObject(candidate) is Broiler.Dom.DomElement element &&
+        string.Equals(element.TagName, "form", StringComparison.OrdinalIgnoreCase)
+            ? BuildFormEntryList(element)
+            : null;
+
     string IFetchHost.PageUrl => _pageUrl;
 
     Broiler.JavaScript.Runtime.JSValue IFetchHost.CreateBlob(byte[] bytes, string contentType) =>

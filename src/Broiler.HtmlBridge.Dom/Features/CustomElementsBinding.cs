@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Broiler.Dom;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.String;
@@ -107,7 +108,8 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
         string LocalName,
         JSObject Constructor,
         HashSet<string> ObservedAttributes,
-        bool HasAttributeChangedCallback)
+        bool HasAttributeChangedCallback,
+        bool FormAssociated)
     {
         /// <summary>Whether this definition extends a built-in element rather than defining a new tag.</summary>
         public bool IsCustomizedBuiltIn => !string.Equals(Name, LocalName, StringComparison.Ordinal);
@@ -138,6 +140,15 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     /// <summary>Whether <paramref name="tagName"/> has a definition — used by the element-wrapper
     /// interface lookup so a defined element reports its own class.</summary>
     internal bool IsDefined(string tagName) => _byName.ContainsKey(tagName);
+
+    /// <summary>Whether the element is a custom element — the gate <c>attachInternals</c> applies,
+    /// which a browser refuses for an ordinary one.</summary>
+    internal bool IsCustom(DomElement element) => _upgraded.Contains(element);
+
+    /// <summary>Whether the element is an upgraded custom element whose definition declared
+    /// <c>static formAssociated = true</c>.</summary>
+    internal bool IsFormAssociated(DomElement element) =>
+        _upgraded.Contains(element) && DefinitionFor(element) is { FormAssociated: true };
 
     /// <summary>
     /// The element's <em>is value</em>: the name of the definition it claims to belong to, or
@@ -249,7 +260,11 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
             constructor,
             ReadObservedAttributes(constructor),
             constructor[(KeyString)"prototype"] is JSObject prototype &&
-                prototype[(KeyString)"attributeChangedCallback"] is JSFunction);
+                prototype[(KeyString)"attributeChangedCallback"] is JSFunction,
+            // formAssociated is read off the constructor, not the prototype: it is a static, and an
+            // instance getter of the same name deliberately does not count — measured, a class
+            // declaring `get formAssociated()` gets a NotSupportedError from attachInternals.
+            constructor[(KeyString)"formAssociated"] is { } formAssociated && formAssociated.BooleanValue);
 
         _byName[name] = definition;
         _byConstructor[constructor] = definition;
@@ -521,8 +536,83 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
             }
         }
 
+        if (definition.FormAssociated)
+        {
+            // The form-association reaction comes before the connected one and is not conditional on
+            // being connected: an upgrade inside a form reports that form, and one outside any form
+            // reports null only once something moves it. Tracked from here so the first observation
+            // is the upgrade itself rather than a later mutation.
+            _formAssociated.Add(element);
+            _formOwners[element] = _host.FormOwnerOf(element);
+            _disabled[element] = _host.IsFormControlDisabled(element);
+            if (_formOwners[element] is { } owner)
+                InvokeReaction(element, "formAssociatedCallback", _host.ToJSObject(owner));
+        }
+
         if (_host.IsConnected(element))
             InvokeReaction(element, "connectedCallback");
+    }
+
+    /// <summary>The upgraded form-associated custom elements, and the two pieces of state whose
+    /// changes they are told about.</summary>
+    private readonly HashSet<DomElement> _formAssociated = [];
+    private readonly Dictionary<DomElement, DomElement?> _formOwners = [];
+    private readonly Dictionary<DomElement, bool> _disabled = [];
+
+    /// <summary>
+    /// Re-reads every form-associated custom element's owner and disabled state and reports what
+    /// changed. Called after each mutation, because both are computed from the tree rather than
+    /// stored: a form owner changes when the element moves, when its <c>form</c> attribute changes,
+    /// and when the form it names appears; a disabled state changes with its own attribute and with
+    /// any ancestor <c>&lt;fieldset&gt;</c>'s.
+    /// </summary>
+    /// <remarks>
+    /// Sweeping rather than deriving which element a given mutation could have affected: the set is
+    /// only the form-associated custom elements a page has actually upgraded, and the alternatives —
+    /// mapping a fieldset mutation to its descendants, an id change to the elements naming it — are
+    /// the kind of partial dependency tracking that silently misses a case.
+    /// </remarks>
+    internal void SyncFormState()
+    {
+        if (_formAssociated.Count == 0)
+            return;
+
+        foreach (var element in _formAssociated.ToList())
+        {
+            var owner = _host.FormOwnerOf(element);
+            if (!_formOwners.TryGetValue(element, out var previousOwner) || !ReferenceEquals(previousOwner, owner))
+            {
+                _formOwners[element] = owner;
+                InvokeReaction(element, "formAssociatedCallback",
+                    owner is null ? JSNull.Value : _host.ToJSObject(owner));
+            }
+
+            var disabled = _host.IsFormControlDisabled(element);
+            if (!_disabled.TryGetValue(element, out var previousDisabled) || previousDisabled != disabled)
+            {
+                _disabled[element] = disabled;
+                InvokeReaction(element, "formDisabledCallback",
+                    disabled ? JSBoolean.True : JSBoolean.False);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a form reset to the form-associated custom elements among
+    /// <paramref name="controls"/> — the reaction a component resets its own value in.
+    /// </summary>
+    /// <remarks>
+    /// <c>formStateRestoreCallback</c> has no equivalent hook and is deliberately never fired: it
+    /// reports a value restored by session history or an autofill pass, and this engine performs
+    /// neither, so firing it would be an invention rather than a restoration.
+    /// </remarks>
+    internal void OnFormReset(IReadOnlyList<DomElement> controls)
+    {
+        foreach (var control in controls)
+        {
+            if (_formAssociated.Contains(control))
+                InvokeReaction(control, "formResetCallback");
+        }
     }
 
     // ---------------- reactions ----------------

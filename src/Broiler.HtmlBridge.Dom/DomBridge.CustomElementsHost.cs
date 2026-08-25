@@ -50,6 +50,11 @@ public sealed partial class DomBridge : ICustomElementsHost
         return false;
     }
 
+    DomElement? ICustomElementsHost.FormOwnerOf(DomElement element) =>
+        Dom.Features.FormAssociationBinding.FormOwnerOf(this, element);
+
+    bool ICustomElementsHost.IsFormControlDisabled(DomElement element) => IsFormControlDisabled(element);
+
     JSObject? ICustomElementsHost.Construct(JSObject constructor) =>
         constructor is JavaScript.BuiltIns.Function.JSFunction function
             ? function.CreateInstance(new Arguments(function)) as JSObject

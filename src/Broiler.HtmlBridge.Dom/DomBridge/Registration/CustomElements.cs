@@ -184,6 +184,9 @@ public sealed partial class DomBridge
             registry.OnChildListMutation(
                 record.AddedNodes ?? [],
                 record.RemovedNodes ?? []);
+            // A move changes a form-associated custom element's owner and can change its disabled
+            // state (an ancestor fieldset), and both are computed from the tree rather than stored.
+            registry.SyncFormState();
             return;
         }
 
@@ -191,6 +194,9 @@ public sealed partial class DomBridge
             record.AttributeName is { } attributeName)
         {
             registry.OnAttributeMutation(element, attributeName, record.OldValue);
+            // `disabled`, `form` and `id` each move a form-associated custom element between states;
+            // the sweep costs one pass over the elements a page actually upgraded.
+            registry.SyncFormState();
         }
     }
 

@@ -9,6 +9,37 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- Form-associated custom elements: `static formAssociated`, `attachInternals()`,
+  and the `ElementInternals`, `ValidityState` and `CustomStateSet` interfaces.
+
+  This is the last of the three capabilities the Custom Elements slice named and
+  left out. `attachInternals()` was undefined, so the line every such
+  component's constructor opens with — `this.internals_ =
+  this.attachInternals()` — was a `TypeError` that took the constructor down,
+  and with it the upgrade of every instance on the page. A component could sit
+  inside a form; it could not *be* a control.
+
+  The members live on the prototypes with per-instance state in a weak table, so
+  an instance carries no own properties — the shape `Range`, `Selection` and
+  `Blob` established. Every form-related member refuses on an element whose
+  definition did not declare `formAssociated`, rather than answering an empty
+  value: answering `null` for `form` there would say "this control has no form"
+  where the truth is "this is not a control".
+
+  **`setFormValue` is not a shape-only stub, and making that true needed the
+  form entry list.** `new FormData(form)` enumerated the *wrapper's* own string
+  properties, so it produced the element object's members — `tagName`,
+  `innerHTML` and the rest — instead of the form's fields. That is also where a
+  browser reads a form-associated custom element's submission value. The entry
+  list is built properly now, with the specified exclusions, and a `FormData`
+  submission value contributes its own entries.
+
+  `formAssociatedCallback`, `formDisabledCallback` (which an ancestor
+  `<fieldset disabled>` triggers as much as the element's own attribute) and
+  `formResetCallback` all fire. `formStateRestoreCallback` deliberately never
+  does: it reports a value restored by session history or an autofill pass, and
+  this engine performs neither.
+
 - Customized built-in elements — the `extends` option, the `is` value, and the
   `document.adoptNode` and `adoptedCallback` pair.
 

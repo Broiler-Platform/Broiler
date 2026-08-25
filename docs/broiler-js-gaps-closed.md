@@ -995,6 +995,57 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   `DomBridge.Serialization.cs`, `Features/DocumentFactoryBinding.cs`,
   `Features/SubDocumentBinding*.cs`); regressions in `CustomizedBuiltInElementsTests` and
   `CustomElementAdoptionTests`.
+- **Form-associated custom elements** — the last of the three the Custom Elements slice named.
+  `attachInternals()` was undefined, so the line every such component's constructor opens with,
+  `this.internals_ = this.attachInternals()`, was a `TypeError` that took the constructor down and
+  with it the upgrade of every instance on the page. A component could sit inside a form; it could
+  not *be* a control.
+  <br>**`ElementInternals`, `ValidityState` and `CustomStateSet` are real interfaces**, with their
+  members on their prototypes and per-instance state in a weak table — the shape `Range`,
+  `Selection` and `Blob` established, and the one Chromium reports (zero own property names on an
+  `ElementInternals`). `ValidityState` is keyed into the same table, so `internals.validity` is one
+  live object rather than a snapshot. `CustomStateSet` is written in JavaScript over a real `Set`,
+  which gets the setlike iteration protocol — `for…of`, `values`/`keys`/`entries`, `forEach` — right
+  by construction rather than by re-deriving it through host functions.
+  <br>**Every form-related member refuses on an element that is not form-associated**, rather than
+  answering an empty or neutral value: `form`, `labels`, `willValidate`, `validity`,
+  `validationMessage`, `setFormValue`, `setValidity`, `checkValidity` and `reportValidity` are each a
+  `NotSupportedError` naming that reason, while `states` and `shadowRoot` work regardless. Answering
+  `null` for `form` there would say "this control has no form" where the truth is "this is not a
+  control". `formAssociated` is read as the static it is: an instance getter of the same name
+  deliberately does not count, which is measured rather than assumed.
+  <br>**Nothing here is a shape-only stub, and making that true needed the form entry list.**
+  `new FormData(form)` enumerated the *wrapper's* own string properties, so it produced the element
+  object's members — `tagName`, `innerHTML` and the rest — instead of the form's fields. That is also
+  the place a browser reads a form-associated custom element's submission value, so `setFormValue`
+  would have had nowhere to be observed. The entry list is built properly now (HTML §4.10.21.4), with
+  the specified exclusions: a disabled control, a nameless control, an unchecked checkbox or radio,
+  and a button that is not the submitter each submit nothing. A `FormData` submission value
+  contributes its own entries and the element's `name` is not used; `null` means it submits nothing.
+  `setValidity`'s flags are likewise what the owning form's `checkValidity` answers from, and
+  `checkValidity` fires the `invalid` event at the element.
+  <br>**The three reactions that can fire, do.** `formAssociatedCallback` reports the owner at the
+  upgrade that made the element custom — but only when that owner is non-null, which is measured and
+  is not the plausible reading — and again on every later owner change; `formDisabledCallback`
+  reports a change from the element's own `disabled` attribute *or* an ancestor
+  `<fieldset disabled>`; `formResetCallback` reaches the custom controls of a form being reset, which
+  is the whole of what a reset can mean for a control with no dirty flags to clear. Both tracked
+  states are computed from the tree rather than stored, so they are re-read after each mutation over
+  the form-associated elements a page actually upgraded — the alternatives (mapping a fieldset
+  mutation to its descendants, an id change to the elements naming it) are the kind of partial
+  dependency tracking that silently misses a case.
+  <br>**`formStateRestoreCallback` is deliberately never fired.** It reports a value restored by
+  session history or an autofill pass, and this engine performs neither; firing it with the value the
+  page just set would be an invention rather than a restoration.
+  <br>`form.elements` lists a form-associated custom element among its controls, and such an element
+  is labelable in its own right — neither is answerable from a tag list, which is why the control
+  collection is re-walked in the bridge, where the registry that knows is.
+  <br>Over a 36-case corpus run against both engines, Broiler and Chromium agree on every one.
+  <br>Main-repo fix (the new `Features/ElementInternalsBinding.cs`,
+  `Features/IElementInternalsHost.cs`, `DomBridge.ElementInternalsHost.cs`,
+  `DomBridge/FormEntryList.cs`, plus `Features/CustomElementsBinding.cs`,
+  `Features/FormAssociationBinding.cs`, `Features/FormBinding.cs`, `Features/FetchBinding.cs`,
+  `DomBridge/FormReset.cs`); regressions in `FormAssociatedCustomElementTests`.
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

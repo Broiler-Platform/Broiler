@@ -235,7 +235,11 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
             return builder.ToString();
         }
-        static JSObject CreateFormDataObject(JSValue? initValue = null)
+        // Not static: a FormData built from a <form> reads that form's entry list through the host,
+        // which is what `new FormData(form)` means. It used to enumerate the wrapper's own string
+        // properties instead, so it produced the element object's members — tagName, innerHTML and
+        // the rest — rather than the form's fields.
+        JSObject CreateFormDataObject(JSValue? initValue = null)
         {
             var formDataObject = new JSObject();
             var entries = new List<KeyValuePair<string, string>>();
@@ -271,8 +275,16 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
             {
                 if (initValue is JSObject initObject)
                 {
-                    foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
-                        AppendEntry(key, value);
+                    if (_host.FormEntriesFor(initObject) is { } formEntries)
+                    {
+                        foreach (var entry in formEntries)
+                            AppendEntry(entry.Key, entry.Value);
+                    }
+                    else
+                    {
+                        foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
+                            AppendEntry(key, value);
+                    }
                 }
                 else
                 {

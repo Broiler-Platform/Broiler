@@ -16,4 +16,9 @@ internal interface IFormAssociationHost
     IReadOnlyList<DomElement> Elements { get; }
     DomElement? GetElementById(string id);
     Broiler.JavaScript.Engine.JSContext? JsContext { get; }
+
+    /// <summary>Whether the element belongs to a custom element definition that declared
+    /// <c>formAssociated</c>. Such an element is form-associated and labelable in its own right, so
+    /// the tag lists here cannot answer for it (HTML §4.13.5).</summary>
+    bool IsFormAssociatedCustomElement(DomElement element);
 }

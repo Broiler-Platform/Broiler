@@ -34,6 +34,14 @@ internal interface ICustomElementsHost
     /// <c>connectedCallback</c>.</summary>
     bool IsConnected(DomElement element);
 
+    /// <summary>The element's form owner, or <see langword="null"/> — what
+    /// <c>formAssociatedCallback</c> reports.</summary>
+    DomElement? FormOwnerOf(DomElement element);
+
+    /// <summary>Whether the element is disabled, by its own attribute or an ancestor
+    /// <c>&lt;fieldset&gt;</c>'s — what <c>formDisabledCallback</c> reports.</summary>
+    bool IsFormControlDisabled(DomElement element);
+
     /// <summary><c>new constructor()</c>, returning the object it produced.</summary>
     JSObject? Construct(JSObject constructor);
 

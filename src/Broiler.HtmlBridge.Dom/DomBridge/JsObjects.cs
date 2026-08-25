@@ -472,6 +472,14 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.ShadowDomBinding.AttachShadow(this, element, in a), "attachShadow", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // attachInternals() — form-associated custom elements (HTML §4.13.5). On every element
+        // rather than only the custom ones, because that is where a browser puts it: it is a member
+        // of HTMLElement, and it refuses at call time for an element that is not a custom element.
+        // Being absent instead would make the standard feature-detect answer the wrong way.
+        obj.FastAddValue((KeyString)"attachInternals",
+            new DomFunction((in a) => ElementInternals.AttachInternals(element, in a), "attachInternals", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // appendChild(child)
         obj.FastAddValue((KeyString)"appendChild",
             new DomFunction((in a) => Dom.Features.TreeMutationBinding.AppendChild(this, element, in a), "appendChild", 1),

@@ -63,6 +63,11 @@ public sealed partial class DomBridge
         // polyfills, which is where the URL constructor these attach to comes from.
         _blobs.RegisterInterfaces(context);
 
+        // ElementInternals/ValidityState/CustomStateSet — the objects a form-associated custom
+        // element's attachInternals() hands back. Registered here rather than with the custom-element
+        // pass because they are ordinary interface globals a page can name and feature-detect.
+        ElementInternals.RegisterInterfaces(context);
+
         // Storage interface global — the name a page tests before it touches an area.
         RegisterStorageConstructor(context);
 

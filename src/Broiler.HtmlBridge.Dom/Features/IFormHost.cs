@@ -26,4 +26,16 @@ internal interface IFormHost
     /// the far side of the seam from the state it is written in terms of.
     /// </remarks>
     void ResetForm(DomElement form);
+
+    /// <summary>
+    /// The form's controls in tree order, including form-associated custom elements —
+    /// <c>form.elements</c> lists them and a browser agrees, so the tag-only canonical query cannot
+    /// be the collection this reports.
+    /// </summary>
+    IReadOnlyList<DomElement> CollectFormControls(DomElement form);
+
+    /// <summary>Whether a form-associated custom element's own validity (set through
+    /// <c>ElementInternals.setValidity</c>) is satisfied. A form is valid when all its controls are,
+    /// and a custom control's validity is not readable from its markup.</summary>
+    bool IsCustomElementValid(DomElement element);
 }
