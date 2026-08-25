@@ -1247,6 +1247,24 @@ were deleted and the gitlinks point at commits that contain them. See
   subclass — and `window.getSelection` remain absent and are recorded in
   [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 
+- **`innerHTML` dropped every text and comment child.** Found while measuring `Range`, from a probe
+  that used `innerHTML` to read back what `insertNode` had done and got an answer with the text
+  missing. The read side filtered its child list with `.OfType<DomElement>()`, so
+  `<div>ab<b>c</b>d<!--k--></div>` read back as `"<b>c</b>"` and a `<div>` holding nothing but text
+  read back as `""` — while that same element's `textContent`, `childNodes` and `outerHTML` all
+  reported the text correctly. It returns a *wrong value* rather than failing, which is what let it
+  sit unnoticed under passing tests.
+  <br>The filter is a leftover from the facade era, when a text child was not a node at all but a
+  string on its parent's element record; construction has produced canonical `DomText`/`DomComment`
+  children since. `outerHTML` never had the bug because it hands the whole subtree to the serializer
+  in one call instead of re-serializing children one at a time — so the two accessors disagreed
+  about the same tree, which is the sharpest statement of it. The document-level `SerializeToHtml`
+  is the whole-subtree call too, which is why rendering and the render tests never saw it.
+  <br>**Fixed** by serializing every child through the same adapter, which already handles text,
+  comments, doctypes and fragments — including the raw-text rule, so a `<script>`'s content stays
+  literal while ordinary text is escaped. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`DomBridge.Serialization.cs`); regressions in `InnerHtmlChildSerializationTests`.
+
 ## Retired — did not reproduce
 
 Each was checked against the current pointer; the cases tried are recorded so the note is not

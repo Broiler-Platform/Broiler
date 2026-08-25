@@ -489,6 +489,17 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `innerHTML` dropped every text and comment child. Its read side filtered the
+  child list to elements, so `<div>ab<b>c</b>d<!--k--></div>` read back as
+  `"<b>c</b>"` and a div holding nothing but text read back as the empty string
+  — while that same element's `textContent`, `childNodes` and `outerHTML` all
+  reported the text correctly. `outerHTML` never had the bug because it hands
+  the whole subtree to the serializer in one call rather than re-serializing
+  children one at a time, and the document-level serialization the renderer uses
+  is that same call, which is why rendering never saw it. The filter is a
+  leftover from the era when a text child was a string on its parent's element
+  record rather than a node.
+
 - The `:is()` aliases no longer match every element. `:matches()`, `:any()`,
   `:-webkit-any()` and `:-moz-any()` are its historical spellings, and all four
   sat in the CSS selector matcher's recognized-but-unmodelled set, fell through

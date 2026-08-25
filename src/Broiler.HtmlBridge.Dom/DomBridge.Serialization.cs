@@ -163,12 +163,19 @@ public sealed partial class DomBridge
             ReflectRenderState(child);
     }
 
-    private string SerializeElementToHtml(DomElement element) =>
-        HtmlSerializer.Serialize(element, CreateSerializationAdapter(),
+    private string SerializeElementToHtml(DomElement element) => SerializeNodeToHtml(element);
+
+    /// <summary>Serializes one node of any kind — the adapter already covers text, comments,
+    /// doctypes and fragments.</summary>
+    private string SerializeNodeToHtml(DomNode node) =>
+        HtmlSerializer.Serialize(node, CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
+    /// <summary><c>innerHTML</c>'s read side: every child, not only the element ones. The
+    /// <c>OfType&lt;DomElement&gt;()</c> this filtered with is a leftover from the facade era, when a
+    /// text child was a string on its parent's element record rather than a node.</summary>
     private string SerializeChildrenToHtml(DomElement element) =>
-        string.Concat(SerializationChildrenOf(element).OfType<DomElement>().Select(SerializeElementToHtml));
+        string.Concat(SerializationChildrenOf(element).Select(SerializeNodeToHtml));
 
     private void ApplySerializationTransforms(DomElement root)
     {
