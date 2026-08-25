@@ -59,8 +59,8 @@ public sealed class SubDocumentCollectionTests
     [Fact(Timeout = 600000)]
     public void SubDocument_Collections_Are_Built_By_The_Shared_Binding()
     {
-        Assert.True(true);
-        Assert.True(true);
+        Assert.True(typeof(IDocumentCollectionHost).IsAssignableFrom(typeof(SubDocumentCollectionHost)));
+        Assert.False(typeof(SubDocumentCollectionHost).IsPublic);
     }
 
     /// <summary>
