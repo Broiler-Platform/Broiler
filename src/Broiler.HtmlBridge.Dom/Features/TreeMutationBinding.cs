@@ -18,6 +18,27 @@ namespace Broiler.HtmlBridge.Dom.Features;
 internal static class TreeMutationBinding
 {
     /// <summary>
+    /// Throws the <c>NotFoundError</c> <c>DOMException</c> that the pre-insert, pre-remove and replace
+    /// steps all require when the named child is not a child of this parent (DOM §4.2.3).
+    /// </summary>
+    /// <remarks>
+    /// The circular-reference guard beside these call sites already minted a real
+    /// <c>HierarchyRequestError</c> through <c>DomBridge.ThrowDOMException</c>, so the machinery was
+    /// present and only the not-found branches were missing it — one throwing a plain error whose
+    /// message merely began with the name, the other two returning as if they had succeeded.
+    /// </remarks>
+    private static void ThrowNotFoundError(ITreeMutationHost host, string method, string detail)
+    {
+        var message = $"Failed to execute '{method}' on 'Node': {detail}";
+
+        if (host.JsContext is { } context)
+            DomBridge.ThrowDOMException(context, message, "NotFoundError");
+
+        // Only before the bridge is attached, when there is no realm to mint a DOMException in.
+        throw new JSException(message);
+    }
+
+    /// <summary>
     /// The DOM <c>Node.moveBefore(node, child)</c> method: repositions an already-attached node
     /// atomically, preserving state that a remove-then-insert would destroy (iframe content,
     /// focus, running animations, render-blocking status).
@@ -84,7 +105,15 @@ internal static class TreeMutationBinding
             return a[0];
         var idx = DomBridge.ChildIndexOf(element, refEl);
         if (idx < 0)
-            throw new JSException("NotFoundError: The node before which the new node is to be inserted is not a child of this node.");
+        {
+            // DOM §4.2.3 pre-insert: "If child is non-null and its parent is not parent, then throw a
+            // NotFoundError DOMException." This threw a plain error whose message merely BEGAN with the
+            // name, so `e instanceof DOMException` was false, `e.name` was "Error" and `e.code` was 0 —
+            // the two things a caller tests. The HierarchyRequestError a few lines above was already
+            // minted properly through the same helper; this one simply was not reaching it.
+            ThrowNotFoundError(host, "insertBefore",
+                "The node before which the new node is to be inserted is not a child of this node.");
+        }
         host.InsertNodeAt(element, newEl, idx);
         return a[0];
     }
@@ -139,7 +168,16 @@ internal static class TreeMutationBinding
             return a[0];
         var idx = DomBridge.ChildIndexOf(element, childEl);
         if (idx < 0)
-            return a[0];
+        {
+            // DOM §4.2.3 pre-remove: "If child's parent is not parent, then throw a NotFoundError
+            // DOMException." This used to return the node unchanged, which is the worst shape a
+            // failure can take: `removeChild` returns the removed node on success, so returning it
+            // here told the caller the removal had happened. Code that removes a node and then
+            // re-parents the returned value silently operated on a node still attached to its
+            // original parent.
+            ThrowNotFoundError(host, "removeChild",
+                "The node to be removed is not a child of this node.");
+        }
         host.NotifyNodeIteratorPreRemoval(childEl);
         DomBridge.RemoveNthChild(element, idx);
         DomBridge.SetParent(childEl, null);
@@ -163,7 +201,16 @@ internal static class TreeMutationBinding
             DomBridge.ThrowDOMException(host.JsContext!, "The new child element contains the parent.", "HierarchyRequestError");
         var idx = DomBridge.ChildIndexOf(element, oldEl);
         if (idx < 0)
-            return a[1];
+        {
+            // Same rule for replaceChild (DOM §4.2.3 replace: "If child's parent is not parent, then
+            // throw a NotFoundError DOMException"), and the same misleading shape — it returned
+            // a[1], which is what a successful replaceChild returns. This check is before any
+            // mutation, which is where the specification puts the validation; the defensive re-check
+            // further down runs after newEl has already been detached, so it keeps returning rather
+            // than throwing out of a half-finished mutation.
+            ThrowNotFoundError(host, "replaceChild",
+                "The node to be replaced is not a child of this node.");
+        }
         var previousSibling = idx > 0 ? DomBridge.ChildAt(element, idx - 1) : null;
         var nextSibling = idx + 1 < element.ChildNodes.Count ? DomBridge.ChildAt(element, idx + 1) : null;
         // If newChild is already in this parent, remove it first and re-find idx

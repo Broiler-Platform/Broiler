@@ -189,17 +189,18 @@ and deterministic detection behavior.
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
 - ~~CharacterData failures are not proper `DOMException` objects.~~ **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, newly characterized — the same defect family, in tree mutation.** Found by the sweep
-  that closed the CharacterData bullet above, and left open because it is a different subsystem with
-  its own call paths rather than the same wiring: `element.insertBefore(node, notAChild)` throws a
-  plain `Error` where DOM §4.2.3 requires `NotFoundError`, and `element.removeChild(notAChild)`
-  **throws nothing at all** — it silently no-ops where the spec requires `NotFoundError`, which is the
-  worse of the two because the caller is told the removal succeeded. Also in the family and unchecked
-  against the spec: `setAttribute` with an invalid name and `querySelector` with an invalid selector
-  both return normally where `InvalidCharacterError` and `SyntaxError` are required. The DOMException
-  machinery itself is sound — `appendChild`'s `HierarchyRequestError` and `createElement`'s
-  `InvalidCharacterError` are already correct — so each of these is a wiring gap, not a missing
-  mechanism.
+- ~~The element tree-mutation half of the same family: `insertBefore` threw a plain `Error`, and
+  `removeChild`/`replaceChild` silently no-opped, where DOM §4.2.3 requires `NotFoundError`.~~
+  **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed, still open — the rest of that family.** `setAttribute` with an invalid name and
+  `querySelector` with an invalid selector both return normally where `InvalidCharacterError` and
+  `SyntaxError` are required. The *document-level* `document.removeChild(notAChild)` and
+  `document.insertBefore(node, notAChild)` also still no-op silently (a separate code path from the
+  element-level ones now fixed — `NodeMutationBinding` rather than `TreeMutationBinding` — and
+  `document.insertBefore` additionally *appends* when the reference node is not found, where the spec
+  requires a throw). The DOMException machinery is sound, so each of these is a wiring gap rather
+  than a missing mechanism.
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion

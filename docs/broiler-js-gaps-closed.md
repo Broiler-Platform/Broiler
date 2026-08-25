@@ -482,6 +482,27 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- The element tree-mutation methods did not raise `NotFoundError` for a node that is not a child
+  (DOM §4.2.3, which puts the same rule in the pre-insert, pre-remove and replace steps).
+  `insertBefore` threw a plain error whose message merely *began* with the name — so
+  `e instanceof DOMException` was false, `e.name` was `"Error"`, `e.code` was `0` — while
+  `removeChild` and `replaceChild` did something worse: they **returned the value a successful call
+  returns** (the removed or replaced node) and mutated nothing. The caller was told the mutation had
+  happened. Code that removes a node and then re-parents the returned value silently operated on a
+  node still attached to its original parent, with no error anywhere to trace it to. **Fixed:** all
+  three raise a real `NotFoundError` `DOMException` (`code` 8) naming the method, from the validation
+  point *before* any mutation, which is where the specification puts it. (`replaceChild`'s second,
+  defensive index re-check runs after the new node has already been detached, so it still returns
+  rather than throwing out of a half-finished mutation.) Wiring rather than a new mechanism: the
+  `HierarchyRequestError` circular-reference guard beside these very call sites was already minting
+  correct exceptions through `DomBridge.ThrowDOMException`, and only the not-found branches were not
+  reaching it. Every successful mutation is unchanged — including `removeChild`'s return value and
+  the `insertBefore(node, null)` append form — and a `DOMException` is still an `Error`, so existing
+  message-based handling is unaffected. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Features/TreeMutationBinding.cs`), landed directly rather than as a submodule patch; regressions
+  in `TreeMutationExceptionTests`. The document-level equivalents (`NodeMutationBinding`) and
+  `setAttribute`/`querySelector` name and selector validation remain in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - CharacterData failures were not proper `DOMException` objects. All four mutation methods —
   `substringData`, `insertData`, `deleteData`, `replaceData` — plus `Text.splitText` threw a plain
   error for an out-of-range offset, and the message was the string `"INDEX_SIZE_ERR"`: the legacy

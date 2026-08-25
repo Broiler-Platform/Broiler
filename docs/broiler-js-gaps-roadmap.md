@@ -44,7 +44,7 @@ found either by status or by track.
 | 3 | Scripts, tasks, and modules | Module syntax closed; scope isolation and import immutability fixed in patches; live bindings, host task model, and two decisions open | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | Worker first slice; shared memory not started | open | Claimed agent capabilities are complete and deterministic |
 | 5 | Essential browser JavaScript APIs | Mixed partial, absent, and stubbed surfaces; fetch Promise conformance (action 1), `performance.now()`, and the document-surface audit line fixed | open · closed | A tested support matrix replaces accidental omissions |
-| 6 | DOM, CSSOM, and SVG from JavaScript | Partial object and tree models; `Node` interface constants and CharacterData `DOMException`s fixed; `compareDocumentPosition`, qualified attributes and computed `display` retired as not reproducing | open · closed | Script-visible objects and algorithms meet their claimed standards |
+| 6 | DOM, CSSOM, and SVG from JavaScript | Partial object and tree models; `Node` interface constants, CharacterData and tree-mutation `DOMException`s fixed; `compareDocumentPosition`, qualified attributes and computed `display` retired as not reproducing | open · closed | Script-visible objects and algorithms meet their claimed standards |
 | 7 | Graphics, media, and advanced APIs | Large capability decisions | open | Each surface is implemented or explicitly excluded |
 | 8 | Portable/Native-AOT profile | Numeric seed only | open | Optional profile decision and, if approved, a truthful capability set |
 
