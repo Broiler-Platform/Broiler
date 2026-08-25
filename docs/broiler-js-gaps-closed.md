@@ -599,6 +599,29 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **Form association was entirely absent** — `control.form`, `control.labels`, `label.control` and
+  `label.form` were all `undefined`. `control.form` is how a script reaches the form from a control
+  it was handed (an event target, a query result), so the ordinary `input.form.submit()` threw on the
+  property access rather than on the call; `control.labels` is how accessibility and validation code
+  finds the text describing a field, and `labels.length` threw rather than answering zero. Recorded
+  as open when the form default/reset family was closed and deliberately left for later, because
+  `labels` is a live `NodeList` and that did not exist yet — the entry above is what unblocked it.
+  <br>**Fixed:** the form owner resolves the `form` content attribute first (a control rendered
+  outside the form it submits is the whole point of it), then the nearest ancestor `<form>`;
+  `labels` is a live `NodeList` in tree order covering both spellings, `for` and wrapping;
+  `label.control` honours `for` even when it names nothing, so a label wrapping one control while
+  pointing at a missing id labels nothing rather than quietly labelling what it wraps.
+  <br>**Two reference answers contradict the plausible reading**, which is why they were checked
+  rather than reasoned about. `label.form` follows the label's *control*, not the label's own
+  ancestry — a label outside every form whose `for` points into one reports that form, where
+  treating the label as an ordinary form-associated element gives `null`. And **absence is specified
+  three distinguishable ways**: a `<div>` has no `labels` property *at all*, an
+  `<input type=hidden>` has one and it is `null`, and a labelable control with no labels has an
+  empty list. Answering an empty list everywhere would have been wrong in two of the three — which
+  is also why these members are installed per tag rather than on every element wrapper as the
+  bridge's other form members are.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/FormAssociationBinding.cs` and its host,
+  installed from `DomBridge/ElementInterfaces.cs`); regressions in `FormAssociationTests`.
 - **`NodeList` and `HTMLCollection` were plain JavaScript arrays**, which is wrong three ways — and
   the third one changed results rather than raising errors.
   <br>Neither interface was defined at all, so `instanceof` was a `ReferenceError` and

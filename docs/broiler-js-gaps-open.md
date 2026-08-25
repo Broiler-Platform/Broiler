@@ -220,12 +220,9 @@ and deterministic detection behavior.
 - ~~The document-level `document.removeChild`/`document.insertBefore` no-op (or append) silently
   where `NotFoundError` is required.~~ **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, still open — `input.form` and `input.labels` are `undefined`.** Found while closing
-  the form-control default/reset entry (see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior))
-  and left out of it deliberately: these are the form-*association* surface — an element's form owner
-  and its label list — rather than the dirty/default/reset family, and `labels` needs the
-  `NodeList` this track still owes.
+- ~~`input.form` and `input.labels` are `undefined`.~~ **Fixed** — the form-association surface,
+  which the `NodeList` work above unblocked (`labels` is a live one). See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
   an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
   lives in **`Broiler.DOM`** (`DomNameValidation`, which deliberately owns these rules rather than
