@@ -2,9 +2,14 @@ namespace Broiler.Documents;
 
 /// <summary>
 /// Knobs for writing a document. Format-neutral at this level; format-specific
-/// options derive from these.
+/// options derive from these (for example <c>PdfWriteOptions</c>).
 /// </summary>
-public sealed class DocumentWriteOptions
+/// <remarks>
+/// Open for derivation for the same reason as <see cref="DocumentReadOptions"/>:
+/// a codec carries its own immutable options through the shared
+/// <see cref="DocumentCodec.Write"/> signature (PDF roadmap §6.1).
+/// </remarks>
+public class DocumentWriteOptions
 {
     public static DocumentWriteOptions Default { get; } = new();
 

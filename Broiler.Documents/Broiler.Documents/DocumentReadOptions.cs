@@ -4,10 +4,17 @@ namespace Broiler.Documents;
 
 /// <summary>
 /// Knobs for reading a document. Format-neutral at this level; format-specific
-/// options derive from these. Defaults are safe: embedded binary objects are
-/// <b>not</b> decoded (ADR 0004).
+/// options derive from these (for example <c>PdfReadOptions</c>). Defaults are
+/// safe: embedded binary objects are <b>not</b> decoded (ADR 0004).
 /// </summary>
-public sealed class DocumentReadOptions
+/// <remarks>
+/// The type is open for derivation so a codec can carry its own immutable option
+/// object through the shared <see cref="DocumentCodec.Read"/> signature. Only
+/// behavior genuinely shared by several codecs belongs here; a codec validates
+/// the concrete option type it was handed rather than downcasting opportunistically
+/// (PDF roadmap §6.1).
+/// </remarks>
+public class DocumentReadOptions
 {
     /// <summary>Windows-1252, the RTF default when no <c>\ansicpg</c> is present.</summary>
     public const int Windows1252CodePage = 1252;
