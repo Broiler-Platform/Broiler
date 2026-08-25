@@ -137,8 +137,12 @@ public sealed partial class DomBridge
         document.FastAddValue((KeyString)"prepend", new JSFunction((in a) => Dom.Features.NodeMutationBinding.Prepend(this, in a), "prepend", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         document.FastAddValue((KeyString)"replaceChildren", new JSFunction((in a) => Dom.Features.NodeMutationBinding.ReplaceChildren(this, in a), "replaceChildren", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.forms — collection of all <form> elements with named access
-        document.FastAddProperty((KeyString)"forms", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetForms(this, in a), "get forms"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        // document.forms/images/links/anchors/scripts/embeds/plugins/styleSheets — the live
+        // collections, each built once and closed over so the identity a browser guarantees holds.
+        RegisterDocumentCollections(context, document);
+
+        // document.doctype/dir/designMode — the metadata accessors DOM §4.5 and HTML §3.2 name.
+        RegisterDocumentMetadata(document);
 
         // document.createElementNS(namespace, tagName)  — DocumentFactoryBinding (Phase 3)
         document.FastAddValue((KeyString)"createElementNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateElementNS(this, context, in a), "createElementNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -146,23 +150,10 @@ public sealed partial class DomBridge
         // document.createAttributeNS(namespace, qualifiedName)  — DocumentFactoryBinding (Phase 3)
         document.FastAddValue((KeyString)"createAttributeNS", new JSFunction((in a) => Dom.Features.DocumentFactoryBinding.CreateAttributeNS(this, context, in a), "createAttributeNS", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.images — collection of all <img> elements
-        document.FastAddProperty((KeyString)"images", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetImages(this, in a), "get images"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.links — collection of all <a> and <area> elements with href
-        // Uses tree-order traversal so dynamically appended elements are reflected.
-        document.FastAddProperty((KeyString)"links", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetLinks(this, in a), "get links"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.scripts — collection of all <script> elements, in tree order.
-        document.FastAddProperty((KeyString)"scripts", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetScripts(this, in a), "get scripts"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
         // document.currentScript — the <script> element being executed, null when none is. The
         // element the bridge already tracks for document.write's insertion point, read from the
         // property a loader script uses to find its own <src>.
         document.FastAddProperty((KeyString)"currentScript", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetCurrentScript(this, in a), "get currentScript"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.styleSheets — collection of stylesheet objects for main document
-        document.FastAddProperty((KeyString)"styleSheets", new JSFunction((in a) => Dom.Features.DocumentCollectionBinding.GetStyleSheets(this, in a), "get styleSheets"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.adoptedStyleSheets — the live array of constructed stylesheets applied to the
         // document (CSSOM). Readable (supports .push) and assignable (= [sheet, …]).

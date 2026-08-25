@@ -216,11 +216,23 @@ and deterministic detection behavior.
     item close.
   - **`document.constructor.name`** is `"Object"` where a browser says `"HTMLDocument"` — an
     interface this engine does not register at all.
-- **Confirmed, newly characterized — `document.doctype` is `undefined`.** A document parsed from
-  `<!doctype html>` answers `undefined` where DOM §4.5 gives the `DocumentType` node, which the
-  bridge does build and can wrap (`document.implementation.createDocumentType` returns a correct one).
-  Found while linking the wrapper prototypes above and deliberately not fixed there; it is a missing
-  accessor rather than a missing mechanism.
+- ~~`document.doctype` is `undefined`.~~ **Fixed**, together with the document-collection family the
+  follow-up audit found around it — `anchors`/`embeds`/`plugins` absent, the collections that did
+  exist being snapshot arrays without identity or named access, and `document.childNodes` filtering
+  the doctype out. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed, newly characterized — `document.all` is absent, and cannot be added at this layer.**
+  A browser's is an `HTMLAllCollection` whose `typeof` is `"undefined"` and which is falsy — the
+  `[[IsHTMLDDA]]` internal slot, the one legacy exotic behaviour ECMAScript still specifies. The
+  engine has no way to mint an object with that slot, so the collection is implementable and its
+  distinguishing behaviour is not; adding it as an ordinary object would make the standard
+  `document.all` feature-detect (which reads truthiness, precisely to exclude it) answer the wrong
+  way round. This needs a `Broiler.JS` capability before it is a bridge question at all.
+- **Confirmed, still open — sub-documents keep their own, older collection accessors.** An
+  `iframe`'s `contentDocument` builds `forms`/`images`/`scripts`/`styleSheets` in
+  `SubDocumentBinding` rather than sharing `DocumentCollectionBinding`, so it still hands back
+  snapshot arrays. Everything the main document's fix needs is reachable from there; it was left out
+  to keep the change to one document.
 - ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
   of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
@@ -313,7 +325,8 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 
 1. Establish real interface prototypes and Web IDL collection behavior before adding more
    compatibility-only constructor globals. **Collection half done** — `NodeList` and
-   `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness; see
+   `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness, and
+   the `document` collections plus CSSOM's `StyleSheetList` now use them; see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
    The element-wrapper half is what remains.
 2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with

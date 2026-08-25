@@ -33,13 +33,26 @@ internal static class NodeMutationBinding
         throw new JSException(message);
     }
 
-    public static JSValue GetChildNodes(INodeMutationHost host, in Arguments a)
-    {
-        var nodes = new List<JSValue>();
-        foreach (var child in DomBridge.ChildElements(host.DocumentNode))
-            nodes.Add(host.ToJSObject(child));
-        return new JSArray(nodes);
-    }
+    /// <summary>
+    /// <c>document.childNodes</c> — a live <c>NodeList</c> of the document node's children, which for
+    /// a parsed HTML document is the doctype and then <c>&lt;html&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// This filtered to elements, so the doctype was absent from it and
+    /// <c>document.childNodes.length</c> answered 1 where a browser answers 2 — and
+    /// <c>document.firstChild</c>, which does not filter, returned a node
+    /// <c>document.childNodes[0]</c> disagreed with. The list is also live and a real
+    /// <c>NodeList</c> now, for the reasons in <see cref="DomCollectionBinding"/>; it used to be a
+    /// snapshot array.
+    /// </remarks>
+    public static JSValue GetChildNodes(INodeMutationHost host, in Arguments a) =>
+        DomCollectionBinding.NodeList(host.JsContext, () =>
+        {
+            var nodes = new List<JSValue>();
+            foreach (var child in host.DocumentNode.ChildNodes)
+                nodes.Add(host.ToJSObject(child));
+            return nodes;
+        });
 
     public static JSValue RemoveChild(INodeMutationHost host, in Arguments a)
     {

@@ -11,8 +11,8 @@ namespace Broiler.HtmlBridge.Dom.Features;
 
 /// <summary>
 /// <c>NodeList</c> and <c>HTMLCollection</c> — the two DOM collection interfaces (DOM §4.2.10 and
-/// §4.2.10.2), as real interfaces with real prototypes rather than the plain JavaScript arrays the
-/// bridge used to hand back.
+/// §4.2.10.2) — and CSSOM's <c>StyleSheetList</c> (§6.1), as real interfaces with real prototypes
+/// rather than the plain JavaScript arrays the bridge used to hand back.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -64,6 +64,10 @@ internal static class DomCollectionBinding
             // Not constructible, as in a browser: a collection comes from the DOM, never from `new`.
             function NodeList() { throw new TypeError('Illegal constructor'); }
             function HTMLCollection() { throw new TypeError('Illegal constructor'); }
+            // CSSOM §6.1. Not a NodeList and not an HTMLCollection — it holds stylesheet objects
+            // rather than nodes — but the same indexed-property interface, so it shares the
+            // machinery below and carries only the two members CSSOM gives it.
+            function StyleSheetList() { throw new TypeError('Illegal constructor'); }
 
             (function () {
                 // Every method here is written against `this.length` and `this[i]` only. The host
@@ -125,7 +129,7 @@ internal static class DomCollectionBinding
                     return iterator;
                 }
 
-                [NodeList, HTMLCollection].forEach(function (ctor) {
+                [NodeList, HTMLCollection, StyleSheetList].forEach(function (ctor) {
                     define(ctor.prototype, 'item', item);
                     define(ctor.prototype, Symbol.iterator, values);
                 });
@@ -169,6 +173,14 @@ internal static class DomCollectionBinding
     public static JSValue HtmlCollection(
         JSContext? context, Func<List<JSValue>> contents, Func<string, JSValue?>? namedLookup = null) =>
         Create(context, "HTMLCollection", contents, namedLookup);
+
+    /// <summary>
+    /// A <c>StyleSheetList</c> over <paramref name="contents"/> (CSSOM §6.1) — <c>document.styleSheets</c>
+    /// and nothing else. Live, and with no named getter: CSSOM declares neither <c>namedItem</c> nor
+    /// supported property names on it.
+    /// </summary>
+    public static JSValue StyleSheetList(JSContext? context, Func<List<JSValue>> contents) =>
+        Create(context, "StyleSheetList", contents, namedLookup: null);
 
     private static JSValue Create(
         JSContext? context, string interfaceName, Func<List<JSValue>> contents, Func<string, JSValue?>? namedLookup)

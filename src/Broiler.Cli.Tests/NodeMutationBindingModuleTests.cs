@@ -15,6 +15,12 @@ namespace Broiler.Cli.Tests;
 /// 750-line guard, de-listing it. The characterization mutates the document node directly (moving the
 /// documentElement out and back) end-to-end through the bridge.
 /// </summary>
+/// <remarks>
+/// The counts here changed once <c>document.childNodes</c> stopped filtering to elements: a page
+/// with a <c>&lt;!DOCTYPE&gt;</c> has two document children, not one, and <c>childNodes[0]</c> is the
+/// doctype rather than the <c>&lt;html&gt;</c> element. Every expectation below was re-taken from
+/// Chromium through Playwright on the same page.
+/// </remarks>
 public sealed class NodeMutationBindingModuleTests
 {
     [Fact(Timeout = 600000)]
@@ -36,9 +42,10 @@ public sealed class NodeMutationBindingModuleTests
 <html><body>
 <div id=""probe"">P</div>
 <script>
-// document.childNodes exposes the document's element children (the <html> documentElement).
+// document.childNodes is every child of the document node — the doctype and then the <html>
+// documentElement, so a page with a DOCTYPE has two.
 var before = document.childNodes.length;
-var docEl = document.childNodes[0];
+var docEl = document.documentElement;
 
 // removeChild / appendChild / insertBefore operate on the document node itself, moving the
 // documentElement subtree out and back (a document may hold only one element child, so this is
@@ -63,7 +70,8 @@ document.body.appendChild(out);
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        Assert.Contains(">before=1|remove=0|append=1|insert=1|probe=true<", result);
+        // Chromium, on this page, through Playwright.
+        Assert.Contains(">before=2|remove=1|append=2|insert=2|probe=true<", result);
     }
 
     /// <summary>
@@ -87,7 +95,12 @@ document.removeChild(docEl);
 document.append(docEl);            // the mixin, not appendChild
 var afterAppend = document.childNodes.length;
 
-document.replaceChildren(docEl);   // clear, then re-insert the same node
+// replaceChildren clears *every* child, the doctype included, before inserting — so the count
+// drops to one and document.doctype becomes null. (The documentElement is taken out first
+// because replacing while it is still in the tree would put two elements on the document,
+// which is a HierarchyRequestError.)
+document.removeChild(docEl);
+document.replaceChildren(docEl);
 var afterReplace = document.childNodes.length;
 
 var probeOk = document.getElementById('probe') !== null;
@@ -95,15 +108,17 @@ var probeOk = document.getElementById('probe') !== null;
 var out = document.createElement('div');
 out.id = 'result';
 out.textContent = 'kinds=' + kinds + '|append=' + afterAppend +
-                  '|replace=' + afterReplace + '|probe=' + probeOk;
+                  '|replace=' + afterReplace + '|probe=' + probeOk +
+                  '|doctype=' + (document.doctype === null ? 'null' : 'present');
 document.body.appendChild(out);
 </script>
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
+        // Chromium, on this page, through Playwright.
         Assert.Contains(
-            ">kinds=function,function,function|append=1|replace=1|probe=true<",
+            ">kinds=function,function,function|append=2|replace=1|probe=true|doctype=null<",
             result);
     }
 
