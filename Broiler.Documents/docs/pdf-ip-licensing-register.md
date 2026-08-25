@@ -1,7 +1,7 @@
 # PDF IP, Licensing, And Standards Register
 
-**Register version:** 0.1  
-**Updated:** 2026-08-22  
+**Register version:** 0.2  
+**Updated:** 2026-08-25  
 **Owner:** Broiler.Documents maintainers  
 **Approval authority:** Qualified legal reviewer designated by the project
 
@@ -9,6 +9,31 @@ This register is an engineering control, not legal advice. `Pending` is a
 blocking state for implementation or public claims involving that row. A public
 patent declaration or patent license is recorded as evidence, not interpreted as
 worldwide freedom to operate.
+
+## Relationship to the implemented code
+
+`Broiler.Documents.Pdf` implements the base slice described in
+[roadmap §2.5](pdf-support-roadmap.md#25-current-implementation-state). Two
+things follow for this register, and neither is a clearance.
+
+First, the scope was chosen to keep the number of live rows small: the base build
+implements only syntax, structure, and the Flate/ASCIIHex/ASCII85/RunLength
+filters, carries no third-party runtime dependency, and bundles no font, glyph
+list, metric file, ICC profile, or codec asset. IP-005 through IP-010 and IP-012
+therefore have **no implementation behind them** — each technology is detected,
+skipped, and reported by name.
+
+Second, the rows that *are* exercised — IP-001 for the implemented ISO 32000-1
+constructs, IP-011 for Flate and the predictors, IP-013 for the encoding data in
+§IP-021, IP-014 for the URI policy — remain **pending**, which is why no
+feature-matrix entry is `Supported` and why the package is neither packed nor
+registered in an application. Implementation without clearance is permitted here
+only because nothing is published; publication is gated by the roadmap's Phase 5,
+7, and 8 exit criteria.
+
+Adding an implementation for any pending row follows the step order in
+[PDF extension points §5](pdf-extension-points.md#5-adding-a-technology-step-by-step):
+the row clears first, the capability moves last.
 
 ## Decision fields
 
@@ -39,11 +64,15 @@ date, and obligations. Changes to scope reopen the row.
 | IP-018 | “PDF” naming, Adobe references, certification or compatibility claims | Current trademark/brand guidance reviewed for target markets | Descriptive use must not imply Adobe sponsorship or certification. | **Pending qualified review** before public marketing or stable-package claims. |
 | IP-019 | Old Broiler PDF source, binaries, fixtures, generated data, or output goldens | Per-artifact origin, author, license, hashes, and approval | None are approved sources merely because they are in project history or a local workspace. | **Rejected by default.** Delete/ignore; import only after independent approval and provenance record. |
 | IP-020 | User/third-party PDFs, images, and fonts used as fixtures | Written grant/license, redistribution scope, privacy review | Possession or public download is not permission to commit or redistribute. | **Pending per artifact.** Prefer purpose-built generated fixtures once the generator sources are approved. |
+| IP-021 | Broiler-authored PDF character data: the `StandardEncoding`/`WinAnsiEncoding`/`MacRomanEncoding` code-point tables, the Latin glyph-name repertoire, and PDFDocEncoding's exceptional ranges | `Broiler.Documents.Pdf/Text/PdfEncodings.cs`, `Structure/PdfMetadataReader.cs`; source record SRC-010 | Authored from the character identity each encoding slot denotes rather than transcribed from a third-party glyph-list file or standard table. Unicode identities are facts about characters; the tabulation is this project's. The data is small enough to review by inspection. | **Pending source review** confirming the authored-not-copied position and whether any residual normative-constant obligation attaches. No third-party notice is believed to apply. |
+| IP-022 | Broiler-authored approximate font metrics used for writer line breaking | `Broiler.Documents.Pdf/Text/PdfFontMetrics.cs`; source record SRC-010 | A proportion-class model authored from Latin letterform proportions. It is deliberately **not** Adobe's Standard 14 AFM metrics, and output must never be described as metrically exact or as using any vendor's metrics. Real metrics arrive through `IPdfFontMetricsProvider` under IP-012. | **Approved for use as authored data**; the accompanying wording restriction is a claims-review item. |
+| IP-023 | The .NET runtime's DEFLATE/zlib implementation used for `FlateDecode` | `System.IO.Compression.ZLibStream`; the platform's own licence and notices | The codec adds no compression implementation, table, or test vector of its own; it calls the runtime. This is a platform dependency, not a bundled third-party component, and it carries no PDF-specific obligation. | **Pending confirmation** under IP-011 that the runtime dependency satisfies that row's implementation-provenance requirement. |
 
 ## Review record
 
 | Review | Reviewer | Date | Scope | Result |
 |---|---|---|---|---|
 | Engineering issue spotting | Codex, not legal counsel | 2026-08-22 | Phase 0 architecture and public primary-source pointers | Register created; no row legally cleared |
+| Base-implementation scope review | Engineering review, not legal counsel | 2026-08-25 | Which rows the implemented base slice exercises; IP-021 to IP-023 added | Live rows narrowed to IP-001, IP-011, IP-013, IP-014; no row legally cleared, and nothing published |
 | Qualified legal review | _Unassigned_ | _Pending_ | Target jurisdictions and rows required by the first implementation slice | **Required for Phase 0 exit** |
 

@@ -26,6 +26,13 @@ approximated constructs. There is no hidden global codec registration.
   `Broiler.Dom` and `Broiler.Dom.Html`.
 - `Broiler.Documents.Markdown` - Markdown codec for a safe CommonMark-oriented
   subset.
+- `Broiler.Documents.Pdf` - base PDF codec: logical text import from ISO 32000-1
+  files and a deterministic PDF 1.7 writer. Built only from what this repository
+  implements itself, with every remaining PDF technology detected, skipped, and
+  reachable through a composed extension point. Not packed and not registered in
+  any application; see the
+  [PDF support roadmap](docs/pdf-support-roadmap.md) and
+  [PDF extension points](docs/pdf-extension-points.md).
 
 Matching headless test projects live beside each runtime project.
 
@@ -48,6 +55,8 @@ Matching headless test projects live beside each runtime project.
 - [DOCX conformance](docs/docx-conformance.md)
 - [HTML conformance](docs/html-conformance.md)
 - [Markdown conformance](docs/markdown-conformance.md)
+- [PDF feature matrix](docs/pdf-feature-matrix.md) - the authority for what the
+  PDF codec does today and what it may be described as.
 - [Formatting Codes grammar version 1](Broiler.Documents.FormatCodes/GRAMMAR.md)
 
 ## Records
@@ -60,3 +69,4 @@ Matching headless test projects live beside each runtime project.
   - [ADR 0004: Document Read Limits And RTF Sanitization Policy](docs/adr/0004-document-read-limits-and-rtf-sanitization.md)
   - [ADR 0005: RTF First-Release Subset And Text Encoding](docs/adr/0005-rtf-first-release-subset-and-text-encoding.md)
   - [ADR 0006: Formatting Codes Projection And Grammar](docs/adr/0006-formatting-codes-projection-and-grammar.md)
+  - [ADR 0012: PDF Base Implementation Scope And Composed Extensions](docs/adr/0012-pdf-base-implementation-and-composed-extensions.md)

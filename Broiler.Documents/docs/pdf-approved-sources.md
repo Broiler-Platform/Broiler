@@ -1,7 +1,7 @@
 # PDF Approved Sources And Similarity Record
 
-**Version:** 0.1  
-**Updated:** 2026-08-22
+**Version:** 0.2  
+**Updated:** 2026-08-25
 
 Only sources with an `Approved` decision may inform implementation. A source may
 be approved for background but not for copying code, prose, tables, fixtures, or
@@ -20,6 +20,8 @@ generated data. Contributors add a row before using a new implementation source.
 | SRC-007 | Existing Broiler shared-component source | Reuse through normal repository contribution history | Approved | Project-owned source; PDF-specific historical artifacts remain excluded |
 | SRC-008 | Old Broiler PDF source, decompiled binaries, tests, fixtures, outputs | None | Rejected | ADR 0011 and IP-019 |
 | SRC-009 | Third-party PDF libraries and their tests | None unless individually registered | Rejected by default | Prevent accidental code/test-vector similarity |
+| SRC-010 | Broiler-authored PDF character and metric data (IP-021, IP-022) | Implementation use | Approved | Authored in this repository from character identities and letterform proportions; no third-party glyph list, encoding table, or metric file was transcribed |
+| SRC-011 | The .NET runtime's compression, cryptography, and globalization APIs | Implementation use | Approved | Platform APIs consumed as APIs; no algorithm, table, or test vector is copied into this repository |
 
 ## Contributor provenance declaration
 
@@ -44,3 +46,4 @@ Suggested pull-request statement:
 | Change | Source IDs | Reviewer | Date | Result |
 |---|---|---|---|---|
 | Phase 0 governance documents and legacy CLI removal | SRC-002–SRC-005, SRC-007 | Engineering review completed | 2026-08-22 | No PDF implementation code or fixtures introduced; legacy process/test surface removed |
+| Base PDF codec implementation (`Broiler.Documents.Pdf`) | SRC-007, SRC-010, SRC-011 | Engineering review completed | 2026-08-25 | No code, table, fixture, or test vector adapted from the retired PdfSharp/PdfPig lineages or from any third-party PDF implementation. Syntax and structure written from the clause structure of ISO 32000-1 without reproducing its text. Encoding and metric data authored under SRC-010. All test fixtures generated in code; no `.pdf` committed. |

@@ -10,7 +10,11 @@ namespace Broiler.Documents;
 /// destination plus any diagnostics (styles or constructs that could not be
 /// represented in the target format).
 /// </summary>
-public sealed class DocumentWriteResult
+/// <remarks>
+/// Open for derivation for the same reason as <see cref="DocumentReadResult"/>;
+/// <c>PdfWriteResult</c> adds the result status and the destination commit state.
+/// </remarks>
+public class DocumentWriteResult
 {
     public DocumentWriteResult(long bytesWritten, IEnumerable<DocumentDiagnostic>? diagnostics = null)
     {

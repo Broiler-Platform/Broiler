@@ -1430,16 +1430,34 @@ publish an evidence-based preview support statement.
 
 ## PDF conversion decision
 
-The standalone `Broiler.Pdf` process path is retired. Native PDF support is being
-planned as an explicitly composed, in-process `Broiler.Documents.Pdf` codec; any
-reusable graphics, media, document-model, or pagination work belongs in its
-neutral owner. Scope, phases, security gates, feature claims, and legal review are
-maintained in the
-[PDF support roadmap](../Broiler.Documents/docs/pdf-support-roadmap.md).
+The standalone `Broiler.Pdf` process path is retired. Native PDF support is an
+explicitly composed, in-process `Broiler.Documents.Pdf` codec; any reusable
+graphics, media, document-model, or pagination work belongs in its neutral owner.
+Scope, phases, security gates, feature claims, and legal review are maintained in
+the [PDF support roadmap](../Broiler.Documents/docs/pdf-support-roadmap.md).
 
-**Exit gate:** the obsolete CLI/process path and tests remain absent, and future
-PDF behavior is advertised only after the roadmap's implementation, corpus,
-security, interoperability, and clearance gates pass.
+The codec's base slice is implemented — syntax, cross-references, object streams,
+the Flate/ASCIIHex/ASCII85/RunLength filters, logical text import, and a
+deterministic PDF 1.7 writer — built only from what this repository implements
+itself, with no third-party runtime dependency and no bundled font or codec
+asset. Every remaining PDF technology is detected, skipped with its own stable
+diagnostic, and reachable by composing a reviewed implementation into
+`PdfCodecServices`
+([PDF extension points](../Broiler.Documents/docs/pdf-extension-points.md)).
+
+Root work is limited to the cross-component consequences: the codec is
+deliberately absent from every application composition root, and the shared
+contracts the roadmap places in `Broiler.Documents`, `Broiler.Graphics`, and
+`Broiler.Media.Image` — request/result envelopes, `DocumentInput`, the resource
+context, `Broiler.Documents.Pagination`, the bounded font inspector, and the
+image services — are not built. Enabling PDF in a head means building those
+first, not referencing the package from an application.
+
+**Exit gate:** the obsolete CLI/process path and tests remain absent; the codec
+stays unpacked and unregistered until the roadmap's read-preview and
+write-preview gates pass; and PDF behavior is advertised only after the
+roadmap's implementation, corpus, security, interoperability, and clearance
+gates pass.
 
 ## Maintenance policy
 

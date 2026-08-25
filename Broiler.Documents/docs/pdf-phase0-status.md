@@ -1,9 +1,9 @@
 # PDF Phase 0 Status
 
-**Status date:** 2026-08-22  
-**Phase state:** Repository-controlled groundwork complete; Phase 0 exit remains
-blocked on the external legal, standards-access, jurisdiction, history-audit, and
-approval items below.
+**Status date:** 2026-08-25  
+**Phase state:** Repository-controlled groundwork complete and the base
+implementation slice landed; Phase 0 exit remains blocked on the external legal,
+standards-access, jurisdiction, history-audit, and approval items below.
 
 This record separates work the repository can prove from approvals that
 engineering cannot self-grant.
@@ -25,6 +25,27 @@ engineering cannot self-grant.
 - [x] Add automated guards against reintroducing legacy or misplaced PDF code.
 - [x] Run and record the Documents and affected CLI test baselines.
 
+## Base implementation slice
+
+`Broiler.Documents.Pdf` now exists and implements the syntax, structure, filter,
+text-import, and writer subset described in
+[roadmap §2.5](pdf-support-roadmap.md#25-current-implementation-state). It was
+built deliberately inside the Phase 0 constraints rather than after them:
+
+- it carries no third-party runtime dependency and bundles no font, glyph list,
+  metric file, ICC profile, or codec asset, so it adds no new licence obligation;
+- every technology with a pending register row is detected and skipped with its
+  own stable diagnostic instead of being implemented (see
+  [PDF extension points](pdf-extension-points.md));
+- no fixture is committed — every test PDF is generated in code — so the corpus
+  manifest remains empty and no artifact needs a rights decision; and
+- the package is `IsPackable=false` and registered in no application, enforced by
+  `PdfDeliveryGuardTests`, so nothing is published or advertised.
+
+Implementation is therefore not a claim. Nothing below becomes checked because
+code exists, and no feature-matrix entry may reach `Supported` until its register
+row clears.
+
 ## Validation record
 
 | Date | Command / check | Result |
@@ -33,6 +54,9 @@ engineering cannot self-grant.
 | 2026-08-22 | `dotnet build src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj -c Release --no-restore` | Passed with 0 errors; existing repository warnings remain |
 | 2026-08-22 | Parse both corpus JSON documents and run `git diff --check` | Passed; only Git line-ending notices reported |
 | 2026-08-22 | Search active CLI/current architecture documentation for retired process tokens | No active occurrences |
+| 2026-08-25 | `dotnet test Broiler.Documents/Broiler.Documents.slnx -c Release` | Passed: 504 tests across nine projects; 0 failed, 0 skipped |
+| 2026-08-25 | `dotnet build Broiler.Documents/Broiler.Documents.Pdf/Broiler.Documents.Pdf.csproj -c Release` | Passed with 0 errors and 0 warnings under `TreatWarningsAsErrors` |
+| 2026-08-25 | Delivery guards: package is unpacked, references only Documents projects, is absent from every `src/` composition root, and no `.pdf` is committed | Passed |
 
 ## External decisions required for Phase 0 exit
 

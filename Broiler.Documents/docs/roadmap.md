@@ -33,9 +33,34 @@ unless they are explicitly promoted into this roadmap.
 PDF is an active, separately gated initiative. The detailed
 [PDF support roadmap](pdf-support-roadmap.md) is authoritative for scope,
 component ownership, phases, security, conformance claims, provenance, and legal
-review. Phase 0 removes the obsolete standalone-process assumptions and creates
-the decision and evidence controls; it does not revive old parser code or grant
+review. Phase 0 removed the obsolete standalone-process assumptions and created
+the decision and evidence controls; it did not revive old parser code or grant
 implementation clearance.
+
+`Broiler.Documents.Pdf` now implements the base slice: PDF syntax and object
+stores, cross-reference tables and streams, object streams, the Flate, ASCIIHex,
+ASCII85 and RunLength filters, logical text import through encodings and
+`ToUnicode` maps, links under the shared URI policy, and a deterministic PDF 1.7
+writer over the standard font names. Every remaining technology — LZW, JPEG,
+CCITT, JPEG 2000, JBIG2, embedded font programs, image extraction, encryption —
+is detected and skipped with its own diagnostic and arrives by composing a
+reviewed implementation into `PdfCodecServices`; see
+[PDF extension points](pdf-extension-points.md).
+
+Residual work owned here:
+
+- The package stays `IsPackable=false` and unregistered until the roadmap's
+  read-preview and write-preview gates pass. Implementation is not a capability
+  claim, and no feature-matrix entry may reach `Supported` while its
+  IP/licensing row is pending.
+- The Phase 1 shared contracts — request/result envelopes, `DocumentInput`, the
+  conversion and resource context, and `Broiler.Documents.Pagination` — are not
+  built. The PDF package carries its own typed options, limits, results, and
+  internal pagination in the meantime, and those move to their shared owners when
+  Phase 1 lands rather than being promoted piecemeal.
+- Coverage-guided fuzzing and the pinned oracle, corpus and performance
+  infrastructure remain outstanding; the current suite covers bounded truncation
+  and mutation campaigns only.
 
 ## Stabilization
 
