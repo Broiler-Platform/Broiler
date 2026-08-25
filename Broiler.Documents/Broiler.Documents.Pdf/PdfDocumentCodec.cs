@@ -37,10 +37,14 @@ namespace Broiler.Documents.Pdf;
 /// service graph does.
 /// </para>
 /// <para>
-/// <b>Delivery state.</b> The package is not published and is not registered in
-/// any application catalog. Advertising a PDF capability to users waits on the
-/// preview gates in the PDF support roadmap and on the clearance rows in the
-/// IP/licensing register.
+/// <b>Delivery state.</b> The package is not published. It is registered — for
+/// opening only — by the Windows and Linux Writer composition roots, which is the
+/// read-preview integration candidate the roadmap allows so integration checks
+/// can run; no other application registers it, no head registers it for saving,
+/// and the shared Writer core does not reference it, so no head acquires it
+/// transitively. Advertising a PDF capability to users still waits on the preview
+/// gates in the PDF support roadmap and on the clearance rows in the IP/licensing
+/// register.
 /// </para>
 /// </remarks>
 public sealed class PdfDocumentCodec : DocumentCodec

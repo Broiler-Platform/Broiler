@@ -21,7 +21,7 @@ internal static class Program
 
         try
         {
-            using var window = new WriterWindow();
+            using var window = new WriterWindow(CreateDocumentFormats());
             return window.Run();
         }
         catch (Exception ex)
@@ -30,6 +30,32 @@ internal static class Program
             return 1;
         }
     }
+
+    /// <summary>
+    /// The document formats this head offers: the shared four, plus PDF for
+    /// opening.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// PDF is registered here rather than in <c>Broiler.Writer.Core</c>
+    /// deliberately. Putting it in the shared core would hand it to every head
+    /// that references the core — including the Android and WebAssembly Writers,
+    /// whose package-size, memory, trimming and AOT gates it has not passed — and
+    /// a codec must not reach a head by being someone else's transitive reference
+    /// (PDF roadmap §10.1). Each head that wants it says so, here.
+    /// </para>
+    /// <para>
+    /// Opening only. <c>PdfDocumentCodec</c> implements writing, but PDF export
+    /// has its own release gate that has not been passed, so this head offers no
+    /// PDF save filter and its save dispatch has no PDF entry.
+    /// </para>
+    /// </remarks>
+    private static WriterDocumentFormats CreateDocumentFormats() =>
+        WriterDocumentFormats.CreateDefault().With(
+            new WriterDocumentFormat(
+                new Broiler.Documents.Pdf.PdfDocumentCodec(),
+                "PDF",
+                WriterFormatCapabilities.Open));
 
     private const uint MbOk = 0x00000000;
     private const uint MbIconError = 0x00000010;

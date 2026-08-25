@@ -185,11 +185,12 @@ is authoritative for that boundary.
   today; its writer paginates internally against a replaceable metrics provider
   rather than pre-empting the shared paginator's design.
 
-**Not advertised.** The package is `IsPackable=false`, absent from every
-application catalog and composition root, and guarded by tests that fail the
-build if either changes. Phase 5 and Phase 7 remain the publication boundaries,
-and no feature-matrix entry may reach `Supported` while its register row is
-pending.
+**Not advertised.** The package is `IsPackable=false` and reaches an application
+only through the Windows and Linux Writer composition roots, for opening, as the
+§10.1 read-preview candidate; every other catalog and composition root is still
+closed to it, and tests fail the build if any of that changes. Phase 5 and Phase 7
+remain the publication boundaries, and no feature-matrix entry may reach
+`Supported` while its register row is pending.
 
 ## 3. Component ownership
 
@@ -266,7 +267,7 @@ Broiler.Documents.Pdf
 | 2 | PDF syntax and object store | Phase 1 | 4–6 | Implemented |
 | 3 | Streamed xrefs/object store, structure, filters, security detection | Phase 2 | 6–9 | Implemented for the filters this build owns; the rest detected and skipped |
 | 4 | Logical text/image/link import and minimum hostile-input gate | Phase 3 | 8–12 | Text, links and structure implemented; images and embedded font programs detected and skipped; hostile-input gate covered by in-suite truncation and mutation campaigns, not yet by coverage-guided fuzzing |
-| 5 | Read-preview integration | Phase 4 and Phase 1 unit/UI gate | 3–5 | Not started; the package is unregistered by design |
+| 5 | Read-preview integration | Phase 4 and Phase 1 unit/UI gate | 3–5 | Writer integration candidate landed: catalogs are injected from composition roots, the Windows and Linux Writer heads register the codec for opening, and the desktop open path runs through `SelectAndRead`/`DocumentInput`. CLI integration, conversion context, partial-read confirmation, and the §10.2 exit-gate evidence are outstanding; the package stays unpacked and unpublished |
 | 6 | Shared pagination/font/export foundation | Phase 1; parallel with 2–5 | 10–16 | Not started; the writer paginates internally against a replaceable metrics provider |
 | 7 | Deterministic PDF writer and output integration | Core: Phases 3 and 6; write-preview publication: Phase 5 also | 7–12 | Writer core implemented for the standard-font subset; integration and publication not started |
 | 8 | Hardening, packaging, legal and stable-release evidence | Phases 5 and 7 | 6–10 | Not started |
@@ -282,17 +283,21 @@ research, permissions, or commercial-license negotiation.
 ### 4.1 Delivery milestones and publication state
 
 - Phases 2–4 produce an internal parser/importer. The PDF project remains
-  `IsPackable=false`,
-  absent from application catalogs, and excluded from release artifacts. **This
-  is the state today**, enforced by `PdfDeliveryGuardTests`: the guards fail the
-  build if the project becomes packable, gains a third-party or non-Documents
-  reference, is referenced or registered anywhere under `src/`, or if a `.pdf`
+  `IsPackable=false` and excluded from release artifacts, enforced by
+  `PdfDeliveryGuardTests`: the guards fail the build if the project becomes
+  packable, gains a third-party or non-Documents reference, or if a `.pdf`
   fixture is committed outside the rights-aware corpus.
 - Phase 5 is the read-preview boundary. After the Phase 4 reader-core gate, a
   test-only candidate may expose `CanRead=true` and register PDF in open/import
   paths so integration checks can run. Publish that prerelease capability only
   after the complete Phase 5 gate passes on the candidate; `CanWrite` and every
-  PDF destination/save filter remain disabled.
+  PDF destination/save filter remain disabled. **This is the state today**: the
+  Windows and Linux Writer heads register the codec for opening, and the same
+  guards enforce the shape of that registration — only those two composition
+  roots (and the tests covering them) may name the codec, the shared
+  `Broiler.Writer.Core` and the Android and WebAssembly heads may not acquire it
+  even transitively, and no head may register it for saving. The package is not
+  packed and the capability is not published.
 - Phase 7 is the write-preview boundary. After its writer-core readiness subgate,
   a test-only candidate may enable `CanWrite`, CLI PDF destinations, and selected
   Writer save filters so integration gates can execute. Those capabilities are
@@ -1217,6 +1222,20 @@ the selected registrations below. Only that candidate is used for host/package
 tests; the capability is published only after the complete Phase 5 exit gate.
 
 ### 10.1 Deliverables
+
+The Writer half of this list has landed as the integration candidate: catalog
+construction moved to `WriterDocumentFormats`, which each composition root
+builds; the Windows and Linux heads register `PdfDocumentCodec` for opening; the
+desktop open path runs through `DocumentCodecCatalog.SelectAndRead` over a
+`DocumentInput` rather than `File.ReadAllBytes` plus a separate probe; `.pdf` is
+in the open filters and in no save filter; and a rejected read — or one that
+recovered no text at all — leaves the open document in place and says why.
+
+Outstanding: the CLI and `BrowserWriterDemo` migrations, `DocumentConversionContext`,
+explicit confirmation before a partial read replaces the open document (today it
+is committed and the status line reports it as partial rather than clean), host
+cancellation reaching probing and materialization, the composed managed JPEG
+service, the support-wording review, and every §10.2 exit-gate item.
 
 - Move catalog construction out of shared Writer internals and inject catalogs
   and codec services from each platform composition root. Register

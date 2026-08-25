@@ -25,7 +25,7 @@ internal sealed class WriterWindow : Direct2DWindow
     private readonly StandardLegacyGraphicsInputAdapter _legacyInput = new("broiler-writer");
 #pragma warning restore CS0618
 
-    public WriterWindow()
+    public WriterWindow(WriterDocumentFormats documentFormats)
         : base(new BWindowOptions
         {
             Title = "Broiler Writer",
@@ -43,7 +43,7 @@ internal sealed class WriterWindow : Direct2DWindow
             ReadClipboardText,
             WriteClipboardText,
             getRenderer: () => Renderer);
-        _app = new WriterApp(_host, CloseNativeWindow);
+        _app = new WriterApp(_host, CloseNativeWindow, documentFormats: documentFormats);
     }
 
     protected override void OnCreated() => _clipboard = new WindowsClipboard(NativeHandle);

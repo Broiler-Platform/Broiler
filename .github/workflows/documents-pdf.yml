@@ -21,11 +21,13 @@ name: Documents And PDF
 #     Adding one is a separate change; adding one *casually* is how a CI image
 #     acquires an obligation nobody recorded.
 #
-#   * No host-integration job. CLI, Writer, packaging, trimming, and AOT jobs
+#   * No host-integration job yet. CLI, packaging, trimming, and AOT jobs
 #     activate at the roadmap's Phase 5/7 boundaries, together with the paths
-#     that would trigger them. The PDF package is currently registered in no
-#     application at all — Broiler.Documents.Tests/PdfDeliveryGuardTests.cs
-#     fails the build if that changes — so a host job today would gate nothing.
+#     that would trigger them. The Windows and Linux Writer heads now register
+#     the codec for opening (roadmap §10.1), and the shape of that registration
+#     is enforced by Broiler.Documents.Tests/PdfDeliveryGuardTests.cs, which runs
+#     in this workflow — hence the src/Broiler.Writer*/** trigger paths below. The
+#     Writer's own behavioural cover lives with the Writer tests.
 #
 # Scope: the Documents solution and its dependency closure, which today is
 # Broiler.Graphics and nothing else — Broiler.Documents.Model references it for
@@ -50,6 +52,11 @@ on:
     paths:
       - 'Broiler.Documents/**'
       - 'Broiler.Graphics/**'
+      # The Writer heads, because PdfDeliveryGuardTests polices them: it reads
+      # every composition root under src/ to prove PDF is registered only where a
+      # head asks for it. A guard whose subject can change without running the
+      # guard is not a guard.
+      - 'src/Broiler.Writer*/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
@@ -59,6 +66,11 @@ on:
     paths:
       - 'Broiler.Documents/**'
       - 'Broiler.Graphics/**'
+      # The Writer heads, because PdfDeliveryGuardTests polices them: it reads
+      # every composition root under src/ to prove PDF is registered only where a
+      # head asks for it. A guard whose subject can change without running the
+      # guard is not a guard.
+      - 'src/Broiler.Writer*/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'

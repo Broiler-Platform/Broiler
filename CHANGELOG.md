@@ -9,6 +9,36 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- The PDF read-preview integration candidate: Broiler Writer can open PDFs on
+  Windows and Linux.
+
+  The Writer used to hard-code its codec catalog and its two file-dialog filter
+  arrays, so every head got exactly the same formats and adding one to the shared
+  core added it everywhere — including the Android and WebAssembly Writers, whose
+  package-size, memory, trimming and AOT gates PDF has not passed. Composition
+  roots now build a `WriterDocumentFormats` instead: `CreateDefault()` is the RTF,
+  DOCX, HTML and Markdown set every head has always had, and the Windows and Linux
+  heads add `PdfDocumentCodec` to their own. Nothing else changes for the heads
+  that do not ask for it, and `PdfDeliveryGuardTests` fails the build if the codec
+  is named anywhere but those two roots.
+
+  Registration carries a capability, separately from what the codec implements.
+  PDF is registered for opening only: its writer exists and passes its own tests,
+  but PDF export has its own release gate, so there is no PDF save filter and the
+  save dispatch — which reads the same set the filters come from — has no PDF
+  entry, whether the user picks the format or types the extension.
+
+  The desktop open path moved onto `DocumentCodecCatalog.SelectAndRead` over a
+  `DocumentInput`, so probing and reading observe the same bytes without a second
+  buffer, and the read's own limits decide how much of a file enters memory rather
+  than `File.ReadAllBytes` materializing it first and measuring after. Two reads
+  that used to replace the open document no longer can: a rejected one, which
+  carries a placeholder rather than content, and one that recovered no text at all
+  and knows it is incomplete — a scanned PDF with no text layer is that shape,
+  where "empty" is a report about the reader rather than about the file. Both
+  leave the editor alone and say why in the status bar. A partial read that did
+  recover text is committed and reported as partial, never as a clean open.
+
 - The Phase 1 §6.1 document contracts in `Broiler.Documents`.
 
   `DocumentInput` is the load-bearing one. Choosing a codec means reading a
@@ -63,7 +93,9 @@ are versioned in lockstep during the preview.
 
 - `Broiler.Documents.Pdf`, a base PDF codec: logical text import from ISO 32000-1
   files and a deterministic PDF 1.7 writer. It is not a published capability —
-  the package is not packed and is registered in no application — and the
+  the package is not packed, and the only applications registering it are the
+  Windows and Linux Writer heads, for opening, as the read-preview integration
+  candidate described above — and the
   [feature matrix](Broiler.Documents/docs/pdf-feature-matrix.md) remains the
   authority for what it may be described as.
 

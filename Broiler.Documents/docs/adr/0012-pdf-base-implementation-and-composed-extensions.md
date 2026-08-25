@@ -57,10 +57,12 @@ letterform proportions (register rows IP-021 and IP-022). Adobe's Standard 14
 metric files are not used, and output must never be described as using any
 vendor's metrics.
 
-**Implementation is not a claim.** The package is `IsPackable=false` and is
-registered in no application catalog, enforced by tests. Nothing in the feature
-matrix may reach `Supported` while its register row is pending, regardless of how
-complete the code is.
+**Implementation is not a claim.** The package is `IsPackable=false`, and its
+registration is confined to the composition roots that have been opened to it —
+at the time of writing none, and since the roadmap §10.1 read-preview candidate
+the Windows and Linux Writer heads, for opening only — enforced by tests.
+Nothing in the feature matrix may reach `Supported` while its register row is
+pending, regardless of how complete the code is.
 
 **The order for adding a technology is fixed**: the register row clears, the
 sources are recorded, the implementation goes behind the interface in its
