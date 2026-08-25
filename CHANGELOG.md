@@ -349,6 +349,23 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A frame's `document` answers the same object model as the document containing
+  it. An `<iframe>`'s `contentDocument` — and every `createDocument` /
+  `createHTMLDocument` result — kept its own older accessors, so from one page the
+  two documents disagreed about what a document is: `d.forms.constructor.name`
+  was `"Array"` against the parent's `"HTMLCollection"`, `d.forms === d.forms` was
+  false, `namedItem` and named access did not exist, a held collection's `length`
+  did not move when the tree changed, and `anchors`, `embeds`, `plugins`,
+  `doctype`, `dir` and `designMode` were absent outright, so `d.embeds.length` in
+  a frame threw the `TypeError` the main document had stopped giving. Both
+  documents are now served by one implementation. The query methods came with it,
+  each typed as DOM assigns — `querySelectorAll` stays a static `NodeList`, the
+  one collection specified as a snapshot, while `getElementsByTagName` /
+  `ByClassName` are live `HTMLCollection`s and `getElementsByName` a live
+  `NodeList`. A frame's tree also gained the DOCTYPE node its `doctype` accessor
+  needs: the frame parse returned the `<html>` element alone, so a resource
+  declaring a DOCTYPE built a tree that never carried one.
+
 - `image-set()` picks an image instead of painting nothing. It was recognised as
   an image value and never resolved, so the layer reached two readers that each
   understand only part of what the function can hold — the background loader

@@ -642,9 +642,53 @@ were deleted and the gitlinks point at commits that contain them. See
   <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/DocumentCollectionBinding.cs`,
   `Features/DomCollectionBinding.cs`, `Features/NodeMutationBinding.cs`,
   `DomBridge/Registration/DocumentSurface.cs`); regressions in `DocumentCollectionSurfaceTests`.
-  What the same audit found and did *not* fix — `document.all`, which needs an engine capability, and
-  the sub-documents' own older accessors — is in
-  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  What the same audit found and did *not* fix — `document.all`, which needs an engine capability — is
+  in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model). The sub-documents' own older
+  accessors, the other thing it deferred, are the entry below.
+- **A frame's `document` answered a different object model from the document containing it.** The
+  fix above was deliberately kept to one document, so an `<iframe>`'s `contentDocument` — and every
+  `createDocument`/`createHTMLDocument` result, which is a sub-document too — went on building its
+  collections in `SubDocumentBinding` as the `JSArray` snapshots the main document had just been
+  moved off. From one page, asking the two documents the same question got two answers:
+  `d.forms.constructor.name` was `"Array"` against the parent's `"HTMLCollection"`,
+  `d.forms === d.forms` was **false**, `namedItem` and named access did not exist,
+  `var f = d.forms; d.body.appendChild(d.createElement('form')); f.length` did not move, and
+  `anchors`, `embeds`, `plugins`, `doctype`, `dir` and `designMode` were absent outright — so a
+  frame's script hit the same `TypeError` on `d.embeds.length` the main document had stopped giving.
+  The query methods went the same way: `getElementsByTagName`, `getElementsByClassName`,
+  `getElementsByName`, `querySelectorAll` and `childNodes` were all arrays, so a frame's script got
+  `map`/`filter` a browser does not offer on any of them and no `item` it does.
+  <br>Nothing about a frame's document makes it a different kind of document, and a script inside one
+  is a script like any other. Chromium answers every one of these identically for both.
+  <br>**Fixed** by projecting a sub-document onto `IDocumentCollectionHost` — the contract
+  `DocumentCollectionBinding` already consumes — so both documents are served by one implementation
+  rather than two. Only two of the contract's members are genuinely per-document: the element list,
+  which becomes this root's sub-tree, and `currentScript`, which a sub-document does not track.
+  Wrapper identity and the two stylesheet services are per-*node* questions the bridge answers the
+  same way whichever document asks, so they delegate straight through, and the bridge's own
+  `BuildStyleSheetsCollection` — the last builder that returned a `JSArray` where CSSOM §6.1 requires
+  a `StyleSheetList` — was deleted rather than left as a second answer. The query methods were given
+  the types DOM assigns them, matching the main document down to which one is *not* live:
+  `querySelectorAll` stays a static `NodeList` (§4.2.6, the one collection specified as a snapshot)
+  while `getElementsByTagName`/`ByClassName` are live `HTMLCollection`s and `getElementsByName` a
+  live `NodeList`.
+  <br>**`doctype` needed the node before it needed the accessor,** which is the reverse of the main
+  document, where the node was already there and only the name was missing. A frame's tree never
+  carried one: `BuildDocumentTree` returns the `<html>` element alone, so a resource declaring a
+  DOCTYPE produced `childNodes` of `[<html>]` where the containing document's is `[doctype, <html>]`,
+  and the accessor would have had nothing to find. The frame parse now appends it first, through the
+  same `ParseDocType` reading `document.write` was already using for exactly this. It is invisible to
+  everything that walks a sub-document by element — `GetDocumentElement` and the frame serializer both
+  filter to `DomElement`, and a `DomDocumentType` has not been one since Phase 4 item 1.
+  <br>`designMode` is per-document state (HTML §3.2.7), so each sub-document carries its own rather
+  than sharing the containing document's — pinned, because a shared field would have been the easy
+  wrong answer.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (the new `Features/SubDocumentCollectionHost.cs`,
+  `Features/SubDocumentBinding.cs`, `Features/ISubDocumentHost.cs`, `DomBridge.SubDocumentHost.cs`,
+  `DomBridge/StyleSheets.cs`, `DomBridge/SubDocuments.cs`); regressions in
+  `SubDocumentCollectionTests`, each of which asks the frame *and* the containing document the same
+  question in one page, because the defect was never a frame being wrong in the abstract — it was the
+  two disagreeing about what a document is.
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

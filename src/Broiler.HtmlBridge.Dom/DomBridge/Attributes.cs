@@ -109,27 +109,6 @@ public sealed partial class DomBridge
     internal static IEnumerable<string> AttributeNames(DomElement element) =>
         element.Attributes.Values.Select(static attribute => attribute.QualifiedName);
 
-    private void CollectByTagName(DomNode root, string tag, List<JSValue> results)
-    {
-        foreach (var child in ChildElements(root))
-        {
-            if (!IsText(child) && (tag == "*" || string.Equals(child.TagName, tag, StringComparison.OrdinalIgnoreCase)))
-                results.Add(ToJSObject(child));
-            CollectByTagName(child, tag, results);
-        }
-    }
-
-    /// <summary>Collects all elements matching a predicate in a sub-tree.</summary>
-    private void CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results)
-    {
-        foreach (var child in ChildElements(root))
-        {
-            if (!IsText(child) && predicate(child))
-                results.Add(ToJSObject(child));
-            CollectMatching(child, predicate, results);
-        }
-    }
-
     /// <summary>Collects all Broiler.Dom.DomElement nodes in a sub-tree for tracking.</summary>
     private static void CollectSubDocElements(DomElement root, List<DomElement> list)
     {

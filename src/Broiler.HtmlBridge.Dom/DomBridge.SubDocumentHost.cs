@@ -56,16 +56,13 @@ public sealed partial class DomBridge : ISubDocumentHost
     void ISubDocumentHost.SetElementTextContent(DomElement element, string? value) => SetElementTextContent(element, value);
     IReadOnlyList<DomElement> ISubDocumentHost.HitTestDocumentPoint(DomNode docRoot, double x, double y) =>
         HitTestDocumentPoint(docRoot, x, y);
-    JSArray ISubDocumentHost.BuildStyleSheetsCollection(DomNode docRoot) => BuildStyleSheetsCollection(docRoot);
+    JSObject ISubDocumentHost.BuildStyleSheetObject(DomElement styleElement) => BuildStyleSheetObject(styleElement);
+    bool ISubDocumentHost.HasAssociatedStyleSheet(DomElement element) => HasAssociatedStyleSheet(element);
     JSObject ISubDocumentHost.BuildRange(DomNode docRoot) => BuildRange(docRoot);
     JSObject ISubDocumentHost.BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn) =>
         BuildTreeWalker(root, whatToShow, filterFn);
     JSObject ISubDocumentHost.BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn) =>
         BuildNodeIterator(root, whatToShow, filterFn);
-    void ISubDocumentHost.CollectByTagName(DomNode root, string tag, List<JSValue> results) =>
-        CollectByTagName(root, tag, results);
-    void ISubDocumentHost.CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results) =>
-        CollectMatching(root, predicate, results);
     bool ISubDocumentHost.MatchesSelector(DomElement element, string selector, DomElement? scope) =>
         MatchesSelector(element, selector, scope);
 

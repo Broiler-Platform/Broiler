@@ -228,11 +228,11 @@ and deterministic detection behavior.
   distinguishing behaviour is not; adding it as an ordinary object would make the standard
   `document.all` feature-detect (which reads truthiness, precisely to exclude it) answer the wrong
   way round. This needs a `Broiler.JS` capability before it is a bridge question at all.
-- **Confirmed, still open — sub-documents keep their own, older collection accessors.** An
-  `iframe`'s `contentDocument` builds `forms`/`images`/`scripts`/`styleSheets` in
-  `SubDocumentBinding` rather than sharing `DocumentCollectionBinding`, so it still hands back
-  snapshot arrays. Everything the main document's fix needs is reachable from there; it was left out
-  to keep the change to one document.
+- ~~Sub-documents keep their own, older collection accessors.~~ **Fixed** — a sub-document is now
+  projected onto `IDocumentCollectionHost`, so a frame's `contentDocument` and the containing
+  document are served by one implementation; the query methods, `childNodes`, `doctype`, `dir` and
+  `designMode` came with it, and a frame's tree gained the DOCTYPE node its accessor needs. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
   of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
@@ -326,7 +326,8 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 1. Establish real interface prototypes and Web IDL collection behavior before adding more
    compatibility-only constructor globals. **Collection half done** — `NodeList` and
    `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness, and
-   the `document` collections plus CSSOM's `StyleSheetList` now use them; see
+   the `document` collections plus CSSOM's `StyleSheetList` now use them — in a frame's document as
+   well as the containing one, which was the last surface still building its own snapshot arrays; see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
    The element-wrapper half is what remains.
 2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with

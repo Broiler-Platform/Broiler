@@ -23,33 +23,6 @@ public sealed partial class DomBridge
     /// <summary>Cache for stylesheet objects, keyed by the owning style element.</summary>
     private readonly Dictionary<DomElement, JSObject> _styleSheetCache = [];
 
-    private JSArray BuildStyleSheetsCollection(DomNode docRoot)
-    {
-        var styleEls = new List<DomElement>();
-        CollectStyleElements(docRoot, styleEls);
-
-        var arr = new JSArray();
-        foreach (var styleEl in styleEls)
-        {
-            var sheet = BuildStyleSheetObject(styleEl);
-            arr.Add(sheet);
-        }
-
-        return arr;
-    }
-
-    /// <summary>Collects all style elements in the sub-tree. Phase 4 item 4/5: reuses canonical
-    /// <see cref="DomNode.Descendants"/> (document-order, level-snapshotted against concurrent mutation)
-    /// instead of a hand-rolled depth-first recursion over the live child list.</summary>
-    private void CollectStyleElements(DomNode root, List<DomElement> results)
-    {
-        foreach (var element in root.Descendants().OfType<DomElement>())
-        {
-            if (HasAssociatedStyleSheet(element))
-                results.Add(element);
-        }
-    }
-
     /// <summary>
     /// Whether the element has an associated CSS style sheet, and so belongs in a document's
     /// <c>styleSheets</c> collection (CSSOM §2.2).
