@@ -15,8 +15,17 @@ internal interface IDocumentFactoryHost
     JSObject ToJSObject(DomNode node);
 
     /// <summary>The element a defined custom tag creates by running its own constructor, or
-    /// <see langword="null"/> when the tag has no definition and the ordinary path applies.</summary>
-    JSObject? CreateDefinedCustomElement(string tagName);
+    /// <see langword="null"/> when nothing is defined for it and the ordinary path applies.
+    /// <paramref name="isValue"/> is <c>createElement</c>'s <c>is</c> option, which selects a
+    /// customized built-in rather than an autonomous element.</summary>
+    JSObject? CreateDefinedCustomElement(string tagName, string? isValue);
+
+    /// <summary>Notes an <c>is</c> option that named nothing defined, so a later <c>define</c> can
+    /// still upgrade the element and serialization can report it.</summary>
+    void RecordCustomElementIsValue(DomElement element, string isValue);
+
+    /// <summary>Moves <paramref name="node"/> into this document (DOM §4.5), returning it.</summary>
+    DomNode AdoptNode(DomNode node);
 
     DomElement CreateBridgeElement(string tagName);
     DomElement CreateBridgeElementNS(string? namespaceUri, string tagName);

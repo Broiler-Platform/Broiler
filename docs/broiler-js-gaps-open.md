@@ -211,11 +211,10 @@ See [HTML5 exceptions](html5test-exceptions.md) and
 
 ### Custom Elements, templates, and Shadow DOM
 
-- **Three Custom Elements capabilities remain**, each deliberately left out of the core slice rather
-  than faked: customized built-ins (the `extends` option and `is=` attribute), which `define`
-  rejects with a `NotSupportedError` instead of accepting and ignoring; form-associated custom
-  elements (`formAssociated`, `ElementInternals`, `attachInternals`); and `adoptedCallback`, which
-  needs the document-adoption path to report ownership changes.
+- **One Custom Elements capability remains**: form-associated custom elements — `formAssociated`,
+  `attachInternals`, `ElementInternals`, and the `formAssociatedCallback` / `formResetCallback` /
+  `formDisabledCallback` / `formStateRestoreCallback` reactions. Deliberately left out of the core
+  slice rather than faked; `attachInternals` is absent rather than answering a shape-only object.
 - **Shadow DOM uses synthetic markers**, selector rewriting, and light-child hiding rather than a
   canonical shadow and composed tree with slot assignment, fallback, hit-testing, traversal, and
   event retargeting.
@@ -253,7 +252,8 @@ what is left of action 1 is the element-wrapper half named in the first bullet a
 
 1. Relocate the engine's own interface members onto the interface prototypes, so an instance
    carries no members of its own.
-2. Implement production Custom Elements: customized built-ins, form association, `adoptedCallback`.
+2. Implement form-associated custom elements — the Custom Elements remainder now that customized
+   built-ins and `adoptedCallback` have landed.
 3. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
 4. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.

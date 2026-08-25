@@ -946,9 +946,55 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   `Features/DocumentFactoryBinding.cs` and `src/Broiler.Wpt/WptTestRunner.cs`); regressions in
   `CustomElementsTests`.
   <br>**Left out deliberately, and not faked:** customized built-ins (`extends`/`is=`), which
-  `define` rejects rather than accepting and ignoring; form-associated custom elements; and
-  `adoptedCallback`. All three are in
-  [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
+  `define` rejected rather than accepting and ignoring; form-associated custom elements; and
+  `adoptedCallback`. The first and third have since landed, below; form association is what remains
+  in [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
+- **Customized built-in elements and `adoptedCallback`.** `define` rejected an `extends` option with
+  a `NotSupportedError`, so `class Fancy extends HTMLButtonElement` — the idiom for keeping a native
+  control's behaviour and adding to it — lost its component at the `define` call, which takes the
+  rest of the script with it. `adoptedCallback` never fired, because there was no document-adoption
+  path to fire it from: `document.adoptNode` had no implementation at all.
+  <br>**Each per-tag interface global is now a real constructor**, because a customized class reaches
+  one through `super()`. They are still not directly constructible — without a `new.target`, or
+  through a class no definition names, they throw the same `Illegal constructor` they always did —
+  and the construction hook is a closure the custom-element registration binds once, so no page-
+  reachable global mints elements out of band. The interface a `super()` goes through is *passed* to
+  the registry rather than inferred from the definition, which is HTML §4.13.3's active-function-object
+  check: without it, `class I extends HTMLButtonElement` registered with no `extends` option would
+  silently build an autonomous `<bad-3>` through `HTMLButtonElement`, and an `HTMLElement` subclass
+  registered *with* one would silently build a `<button>`. Both are `TypeError`s, with Chromium's
+  distinct messages.
+  <br>**An element's is value is not its `is` attribute**, and that is the part that could not be
+  guessed. An element parsed from `<button is="fancy-b">` has both; `new FancyButton()` and
+  `createElement('button', {is: 'fancy-b'})` produce one whose `getAttribute('is')` is `null` and
+  which still serializes as `<button is="fancy-b">` — HTML §13.3 writes the is value out so the
+  markup re-parses into the same element. An `is` naming nothing defined is kept as well, so a later
+  `define` upgrades it. A definition only reaches the tag it extends: a plain `<button>` is untouched,
+  and `<div is="fancy-b">` stays a plain `<div>` rather than running a button subclass's constructor
+  against something that is not a button.
+  <br>**Adoption is the operation a custom element can observe**, which is why `importNode` is not a
+  substitute for it: importing copies, so the node the page holds afterwards is a different one.
+  `adoptNode` is on the page's document and on a sub-document, and both *directions* are heard —
+  adoption publishes its mutation on the document a node moves **to**, so listening to the page's own
+  document alone would hear an adoption into the page and miss the symmetric one out of it. Every
+  document this bridge mints is subscribed. The whole adopted subtree is reported, not only the node
+  named on the record.
+  <br>**Two fixes fell out of the same work.** A class statically inherits `@@hasInstance` from the
+  interface it extends, so `class Fancy extends HTMLButtonElement` answered the interface's *tag*
+  test and reported every `<button>` on the page as one of its own instances; a subclass now gets the
+  ordinary prototype-chain answer. And the connected test asked for the page's document specifically,
+  so an element inserted into a frame's or a `createHTMLDocument`'s tree was never connected — a
+  browser runs its `connectedCallback` there, measured as connected, disconnected, adopted, connected
+  over a cross-document `appendChild`.
+  <br>Over a 26-case corpus run against both engines, Broiler and Chromium agree on every case but
+  one: the parsed element's `outerHTML` orders attributes `id` before `is` where a browser preserves
+  source order, which is the bridge's pre-existing serialization order for every attribute and not
+  this change's.
+  <br>Main-repo fix (`Features/CustomElementsBinding.cs`, `DomBridge/Registration/CustomElements.cs`,
+  `DomBridge/Utilities.DomInterfaces.cs`, `DomBridge.CustomElementsHost.cs`,
+  `DomBridge.Serialization.cs`, `Features/DocumentFactoryBinding.cs`,
+  `Features/SubDocumentBinding*.cs`); regressions in `CustomizedBuiltInElementsTests` and
+  `CustomElementAdoptionTests`.
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

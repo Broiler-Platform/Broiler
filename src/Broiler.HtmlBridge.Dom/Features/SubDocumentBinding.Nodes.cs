@@ -24,6 +24,31 @@ internal sealed partial class SubDocumentBinding
         return _host.ToJSObject(el);
     }
 
+    /// <summary>
+    /// <c>document.adoptNode(node)</c> on a sub-document — moves the node itself into this document,
+    /// which is what a custom element in the moved subtree hears as <c>adoptedCallback</c>.
+    /// </summary>
+    private JSValue AdoptNode(DomNode docRoot, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject source || _host.FindDomNodeByJSObject(source) is not { } node)
+        {
+            DomBridge.ThrowDOMException(_host.JsContext, "adoptNode requires a node to adopt.", "TypeError");
+            return JSUndefined.Value;
+        }
+
+        if (node is DomDocument)
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                "Failed to execute 'adoptNode' on 'Document': The node provided is of type '#document', which may not be adopted.",
+                "NotSupportedError");
+            return JSUndefined.Value;
+        }
+
+        _host.AdoptDetachedNode(node, docRoot);
+        return _host.ToJSObject(node);
+    }
+
     private JSValue CreateTextNode(DomNode docRoot, in Arguments a)
     {
         var text = a.Length > 0 ? a[0].ToString() : string.Empty;

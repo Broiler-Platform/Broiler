@@ -9,6 +9,48 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- Customized built-in elements — the `extends` option, the `is` value, and the
+  `document.adoptNode` and `adoptedCallback` pair.
+
+  The Custom Elements slice deliberately left both out and said so: `define`
+  rejected an `extends` option with a `NotSupportedError` rather than accepting
+  it and ignoring it, and `adoptedCallback` never fired because there was no
+  document-adoption path to fire it from. So the idiom for keeping a native
+  control's behaviour and adding to it — `class Fancy extends
+  HTMLButtonElement` — lost its component at the `define` call, which takes the
+  rest of the script with it.
+
+  Each per-tag interface global (`HTMLButtonElement`, `HTMLInputElement`, all of
+  them) is now a real constructor rather than an unconditional throw, because a
+  customized class reaches one through `super()`. It is still not directly
+  constructible: without a `new.target`, or through a class no definition names,
+  it throws the same `Illegal constructor` it always did. The interface a
+  `super()` goes through is passed to the registry rather than inferred, which is
+  what makes the two ways of mismatching a class and its definition report the
+  way a browser reports them instead of silently building the wrong element.
+
+  An element's **is value is not its `is` attribute**, and both halves are
+  measured: an element parsed from `<button is="fancy-b">` has both, while `new
+  FancyButton()` and `createElement('button', {is: 'fancy-b'})` produce one whose
+  `getAttribute('is')` is `null` — and which still serializes as `<button
+  is="fancy-b">`, because HTML §13.3 writes the is value out so the markup
+  re-parses into the same element. An `is` naming nothing defined is kept too, so
+  a later `define` upgrades it.
+
+  `document.adoptNode` had no implementation at all, and `importNode` is not a
+  substitute: importing copies, so the node a page holds afterwards is a
+  different one. Adoption moves the node itself, which is why it is the operation
+  a custom element can observe. Both directions are heard — adoption publishes on
+  the document a node moves *to*, so every document this bridge mints is
+  subscribed, not only the page's.
+
+  Two fixes fell out of the same work. A class statically inherits
+  `@@hasInstance` from the interface it extends, so `class Fancy extends
+  HTMLButtonElement` reported *every* `<button>` on the page as one of its own
+  instances; a subclass now gets the ordinary prototype-chain answer. And
+  `connectedCallback` tested for the page's document specifically, so an element
+  inserted into a frame's or a `createHTMLDocument`'s tree was never connected.
+
 - The File API data surfaces: `Blob`, `File`, `FileList`,
   `URL.createObjectURL`/`revokeObjectURL`, and a file input's `files`.
 

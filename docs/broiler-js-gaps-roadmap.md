@@ -55,7 +55,7 @@ work remaining on that track.
 | 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; three capability decisions | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | The excluded Worker capabilities, concurrent-context safety, cross-agent shared memory | open | Claimed agent capabilities are complete and deterministic |
 | 5 | Essential browser JavaScript APIs | Navigation semantics; storage and networking; navigator's object-valued surfaces; Trusted Types | open · closed | A tested support matrix replaces accidental omissions |
-| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; the Custom Elements remainder; live SVG DOM; four capability decisions (`document.all`, per-tag SVG interfaces, Font Loading, `ReadableStream`/`FileReader`) | open · closed | Script-visible objects and algorithms meet their claimed standards |
+| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; form-associated custom elements; live SVG DOM; four capability decisions (`document.all`, per-tag SVG interfaces, Font Loading, `ReadableStream`/`FileReader`) | open · closed | Script-visible objects and algorithms meet their claimed standards |
 | 7 | Graphics, media, and advanced APIs | Every surface — large capability decisions first | open | Each surface is implemented or explicitly excluded |
 | 8 | Portable/Native-AOT profile | Everything past the numeric seed, and the profile decision that gates it | open | Optional profile decision and, if approved, a truthful capability set |
 

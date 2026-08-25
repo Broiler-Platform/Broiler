@@ -467,6 +467,10 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     {
         var document = new DomDocument();
         DocumentStateFor(document).HasViewport.Set(false);
+        // Custom element reactions are dispatched off each document's mutation stream, and adoption
+        // publishes on the document a node moves *to* — so a document that can receive one has to be
+        // listened to as well as the page's own.
+        SubscribeBrowsingContextDocument(document);
         return document;
     }
 
