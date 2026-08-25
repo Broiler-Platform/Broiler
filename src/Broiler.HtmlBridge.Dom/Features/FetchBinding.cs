@@ -368,16 +368,14 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
             return formDataObject;
         }
-        static JSValue CreateBlobBody(string bodyText, JSObject headersObject)
-        {
-            var contentType = TryGetJsPropertyString(headersObject, "content-type", "Content-Type") ?? string.Empty;
-            var blobObject = new JSObject();
-            blobObject[(KeyString)"size"] = new JSNumber(Encoding.UTF8.GetByteCount(bodyText));
-            blobObject[(KeyString)"type"] = new JSString(contentType);
-            blobObject.FastAddValue((KeyString)"text", new JSFunction((in _) => CreateThenable(() => new JSString(bodyText)), "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            blobObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction((in _) => CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(bodyText))), "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            return blobObject;
-        }
+        // A real Blob. This used to build a plain object carrying size/type/text/arrayBuffer and
+        // nothing else, so `(await response.blob()) instanceof Blob` was false, `constructor.name`
+        // was "Object" and there was no `slice` — a shape-only stub that was invisible only because
+        // the interface it was imitating did not exist either.
+        JSValue CreateBlobBody(string bodyText, JSObject headersObject) =>
+            _host.CreateBlob(
+                Encoding.UTF8.GetBytes(bodyText),
+                TryGetJsPropertyString(headersObject, "content-type", "Content-Type") ?? string.Empty);
         static bool IsBodyUnavailable(JSObject owner)
             => (owner[(KeyString)"bodyUsed"]?.BooleanValue ?? false) || (owner[(KeyString)"_bodyStreamLocked"]?.BooleanValue ?? false);
         static JSObject CreateReadableStreamReadResult(JSValue value, bool done)

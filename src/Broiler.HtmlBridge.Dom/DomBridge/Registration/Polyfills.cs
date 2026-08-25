@@ -59,6 +59,10 @@ public sealed partial class DomBridge
         // range to it.
         _traversal.RegisterRangeInterface(context);
 
+        // Blob/File, and the URL.createObjectURL pair they need. After the content-rendering
+        // polyfills, which is where the URL constructor these attach to comes from.
+        _blobs.RegisterInterfaces(context);
+
         // Storage interface global — the name a page tests before it touches an area.
         RegisterStorageConstructor(context);
 

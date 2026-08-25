@@ -143,6 +143,9 @@ public sealed partial class DomBridge : IDomBridgeRuntime
     // browsing-context state (sub-document/-window caches, content-document maps, current-window
     // override) is owned by BrowsingContextManager (P3.16); the builders / resource loading / onload
     // algorithms stay bridge-owned and reach that state through it.
+    /// <summary>The File API data surfaces — Blob, File and the URL object-URL pair. It needs nothing
+    /// from the bridge (a blob is bytes, not a node), so it takes no host contract.</summary>
+    private readonly Dom.Features.BlobBinding _blobs;
     private readonly Dom.Features.SubDocumentBinding _subDocuments;
     // Phase 3 (P3.17): the nested-browsing-context `window` (sub-window) object — its
     // document/location/scroll/getComputedStyle surface and the sub-window-scoped helpers — lives in
@@ -261,6 +264,7 @@ public sealed partial class DomBridge : IDomBridgeRuntime
         _disposal.Add(_workers);
         _fetch = new Dom.Features.FetchBinding(this, _resources);
         _attributes = new Dom.Features.AttributesBinding(this);
+        _blobs = new Dom.Features.BlobBinding();
         _subDocuments = new Dom.Features.SubDocumentBinding(this);
         _subWindows = new Dom.Features.SubWindowBinding(this, _browsingContexts, _eventTargets, _messaging);
         _windowContext = new Dom.Runtime.WindowContextManager(this, _browsingContexts, _eventTargets);

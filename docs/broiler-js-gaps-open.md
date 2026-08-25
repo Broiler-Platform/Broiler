@@ -241,9 +241,19 @@ and deterministic detection behavior.
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
   (The claim that per-tag `HTML*Element` constructors are undefined was already stale when this was
   checked: they exist, as `@@hasInstance` interfaces — see the bullet above.)
-- `Blob` and `FileList` remain undefined. They are File API surfaces rather than DOM collections —
-  `FileList` is reachable only through `<input type=file>.files`, which this engine has no file
-  selection for — so they did not come with the collection work and need their own decision.
+- ~~`Blob` and `FileList` remain undefined.~~ **Fixed, and the decision they needed is made:
+  implement.** `Blob`, `File` and `FileList` are real interfaces, `URL.createObjectURL`/
+  `revokeObjectURL` exist, and `<input type=file>.files` is a `FileList` (empty, since there is no
+  file selection) where every other control reports `null`. The open note's reason for deferring —
+  that `FileList` is only reachable through a file selection this engine does not have — turned out
+  to cut the other way: a browser reports an *empty* `FileList` for an untouched input, so there is
+  a correct answer to give and `undefined` was not it. The same work replaced the shape-only object
+  `response.blob()` was handing back. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  <br>**What it left:** `Blob.prototype.stream()`, because it returns a `ReadableStream` and this
+  engine already has one partial stream — the one `response.body` hands back — that a second copy
+  should not be written against; building a real `ReadableStream` is its own capability decision.
+  `FileReader` is untouched and still absent.
 - ~~`Range` is not an interface, is missing five operations, and rejects nothing.~~ **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
   It is also the **first** interface here whose members really live on its prototype, so it is the

@@ -9,6 +9,38 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- The File API data surfaces: `Blob`, `File`, `FileList`,
+  `URL.createObjectURL`/`revokeObjectURL`, and a file input's `files`.
+
+  All of the interfaces were undefined, so the bare name was a `ReferenceError`
+  — the kind that aborts the script rather than the statement. `Blob` is reached
+  by ordinary pages and not only by upload code: it is how a page builds a
+  downloadable payload (`URL.createObjectURL(new Blob([csv], {type:
+  'text/csv'}))`), how it posts binary through `fetch`, and what
+  `response.blob()` is supposed to return.
+
+  `input.files` read `undefined` on a file input *and* on every other control,
+  where a browser gives a `FileList` and `null` respectively — so the standard
+  guard `if (input.files && input.files.length)` was a `TypeError` on the very
+  input it is written for. The list is empty, because there is no file
+  selection, which is exactly what a browser reports for an input nobody has
+  touched.
+
+  `File` really extends `Blob` through the prototype chain, and `FileList` joined
+  the existing indexed-collection machinery rather than getting a second one.
+
+  Three behaviours are worth knowing because reasoning gets them wrong: the parts
+  argument is a Web IDL sequence, which deliberately does not accept a string, so
+  `new Blob('abc')` throws rather than making a three-byte blob; a `type`
+  carrying a character outside printable ASCII is discarded entirely rather than
+  kept or escaped; and `slice` gives its result an empty type rather than
+  inheriting the source's.
+
+  `Blob.prototype.stream()` is deliberately absent rather than stubbed: it
+  returns a `ReadableStream`, and this engine already carries one partial stream
+  — the object `response.body` hands back — that a second copy should not be
+  written against.
+
 - `window.getSelection()` and `document.getSelection()`, the `Selection`
   interface behind them, and `StaticRange`.
 
@@ -537,6 +569,13 @@ are versioned in lockstep during the preview.
   is that same call, which is why rendering never saw it. The filter is a
   leftover from the era when a text child was a string on its parent's element
   record rather than a node.
+
+- `response.blob()` handed back a look-alike rather than a `Blob`: a plain object
+  carrying `size`, `type`, `text()` and `arrayBuffer()` and nothing else, so
+  `constructor.name` was `"Object"`, there was no `slice`, and
+  `(await response.blob()) instanceof Blob` could not even be asked. The stub was
+  invisible only because the interface it imitated did not exist to be compared
+  against; it now mints a real one.
 
 - The `:is()` aliases no longer match every element. `:matches()`, `:any()`,
   `:-webkit-any()` and `:-moz-any()` are its historical spellings, and all four

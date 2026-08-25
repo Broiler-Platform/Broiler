@@ -1247,6 +1247,47 @@ were deleted and the gitlinks point at commits that contain them. See
   subclass — and `window.getSelection` remain absent and are recorded in
   [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 
+- **`Blob`, `File` and `FileList` were undefined, and `response.blob()` handed back a look-alike.**
+  The open note deferred these for a decision, on the grounds that `FileList` is only reachable
+  through a file selection this engine does not have. That reason cut the other way once measured: a
+  browser reports an **empty** `FileList` for an input nobody has touched, so there is a correct
+  answer to give and `undefined` was not it — `input.files` read `undefined` on a file input *and* on
+  a text input, where a browser gives a list and `null` respectively, so the standard guard
+  `if (input.files && input.files.length)` was a `TypeError` on the very input it is written for.
+  The decision is therefore **implement**, and it is done.
+  <br>`Blob` is reached by ordinary pages and not only by upload code: it is how a page builds a
+  downloadable payload (`URL.createObjectURL(new Blob([csv], {type: 'text/csv'}))`), how it posts
+  binary through `fetch`, and what `response.blob()` is supposed to return. The bare name was a
+  `ReferenceError`, which aborts the script rather than the statement.
+  <br>**It also replaced a shape-only stub, which is the part worth naming.** `response.blob()`
+  already answered — with a plain object carrying `size`, `type`, `text()` and `arrayBuffer()` and
+  nothing else, so `constructor.name` was `"Object"`, there was no `slice`, and
+  `(await response.blob()) instanceof Blob` could not even be asked. That stub was invisible
+  precisely because the interface it imitated did not exist to be compared against; it now mints a
+  real one.
+  <br>**Fixed** on the same weak-table/prototype machinery `Range` and `Selection` use, so an
+  instance has no own properties and an illegal invocation is a `TypeError`. `File` really extends
+  `Blob` through the prototype chain rather than through a hook. `FileList` joined the existing
+  indexed-collection machinery rather than getting a second one, so it is live over its contents and
+  needs no new shape the day a file selection exists.
+  <br>**Three answers are measured rather than reasoned, and each is a trap.** The parts argument is
+  a Web IDL `sequence`, which deliberately does not accept a string however iterable a string is — so
+  `new Blob('abc')` is a `TypeError` and not a three-byte blob. A `type` carrying a character outside
+  U+0020–U+007E is discarded **entirely** rather than kept or escaped. And `slice` gives its result an
+  *empty* type rather than inheriting the source's, so the obvious `blob.slice(0, n)` loses the
+  content type unless it is passed again.
+  <br>**`Blob.prototype.stream()` is deliberately absent** rather than stubbed: it returns a
+  `ReadableStream`, and this engine already carries one partial stream — the object `response.body`
+  hands back — which a second copy should not be written against. Whether to build a real
+  `ReadableStream` is its own capability decision; until it is made a page feature-detecting
+  `blob.stream` takes its `arrayBuffer()` fallback, which works. `FileList.prototype` carries `item`
+  but not `length`, where a browser has both — that is the shared collection machinery answering
+  `length` from the host rather than a prototype accessor, identical for `NodeList`, and not this
+  interface's to change. Both are pinned.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/BlobBinding.cs`,
+  `Features/DomCollectionBinding.cs`, `Features/FormControlBinding.cs`, `Features/FetchBinding.cs`,
+  `DomBridge/Registration/Polyfills.cs`); regressions in `BlobInterfaceTests`. `FileReader` remains
+  absent and is recorded in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - **`window.getSelection()` did not exist, and neither did `Selection` or `StaticRange`.** The
   follow-up the `Range` work recorded beside itself. All three were absent, so `window.getSelection`
   read `undefined` and the bare `Selection`/`StaticRange` were `ReferenceError`s — the kind that
