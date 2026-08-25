@@ -25,7 +25,7 @@ public sealed class PdfWriterTests
         (byte[] bytes, PdfWriteResult result) = Write(RichTextDocument.FromPlainText("Hello, PDF."));
         string text = Latin1(bytes);
 
-        Assert.Equal(PdfDestinationState.Committed, result.DestinationState);
+        Assert.Equal(DocumentDestinationState.Committed, result.DestinationState);
         Assert.Equal(1, result.PageCount);
         Assert.StartsWith("%PDF-1.7", text);
         Assert.EndsWith("%%EOF\n", text);
@@ -157,7 +157,7 @@ public sealed class PdfWriterTests
         Assert.DoesNotContain("javascript", text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/Subtype /Link", text);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.UriRejected);
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
 
         // The text itself is still written; only the activation is withheld.
         Assert.Contains("(Click)", text);
@@ -234,7 +234,7 @@ public sealed class PdfWriterTests
             new PdfWriteOptions(compressStreams: false));
 
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.WriteCharacterUnsupported);
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
         Assert.Contains("(Greek: ???)", Latin1(bytes));
     }
 
@@ -260,7 +260,7 @@ public sealed class PdfWriterTests
         PdfWriteResult result = Write(document).Result;
 
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.WriteImageNotComposed);
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
     }
 
     [Fact]
@@ -290,8 +290,8 @@ public sealed class PdfWriterTests
         var options = new PdfWriteOptions(pdfLimits: new PdfLimits(maxOutputBytes: 64));
         (byte[] bytes, PdfWriteResult result) = Write(RichTextDocument.FromPlainText("Too big for the budget."), options);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
-        Assert.Equal(PdfDestinationState.NotStarted, result.DestinationState);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentDestinationState.NotStarted, result.DestinationState);
         Assert.Empty(bytes);
     }
 
@@ -302,8 +302,8 @@ public sealed class PdfWriterTests
         PdfWriteResult result = new PdfDocumentCodec()
             .WritePdf(RichTextDocument.FromPlainText("Doomed."), failing);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
-        Assert.Equal(PdfDestinationState.PartialDestination, result.DestinationState);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentDestinationState.PartialDestination, result.DestinationState);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.WritePartialDestination);
     }
 

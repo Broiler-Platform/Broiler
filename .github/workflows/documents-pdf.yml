@@ -1,0 +1,166 @@
+name: Documents And PDF
+
+# Required build/test checks for Broiler.Documents, including the PDF codec, on
+# Windows and Linux.
+#
+# This is the first pull-request-triggered workflow in the repository: every
+# other one is workflow_dispatch or tag-push, so until now the Documents
+# solution had no CI at all and its suites were only ever a local result. The
+# PDF support roadmap (Broiler.Documents/docs/pdf-support-roadmap.md §6.6) makes
+# this workflow a Phase 1 deliverable and a prerequisite for the later preview
+# gates.
+#
+# Two things this workflow deliberately does *not* do yet, because each is its
+# own gated piece of work rather than an oversight:
+#
+#   * No independent oracle. The roadmap's structural, extraction, and rendering
+#     oracles (qpdf, PDFium, Poppler, MuPDF, veraPDF) each need a licence review,
+#     a pinned build, and a row in tests/pdf/tools/manifest.json before they may
+#     run here — Poppler is GPL, MuPDF is AGPL with a named compliance path, and
+#     PDFium needs a full dependency SBOM rather than just a top-level licence.
+#     Adding one is a separate change; adding one *casually* is how a CI image
+#     acquires an obligation nobody recorded.
+#
+#   * No host-integration job. CLI, Writer, packaging, trimming, and AOT jobs
+#     activate at the roadmap's Phase 5/7 boundaries, together with the paths
+#     that would trigger them. The PDF package is currently registered in no
+#     application at all — Broiler.Documents.Tests/PdfDeliveryGuardTests.cs
+#     fails the build if that changes — so a host job today would gate nothing.
+#
+# Scope: the Documents solution and its dependency closure, which today is
+# Broiler.Graphics and nothing else — Broiler.Documents.Model references it for
+# value types such as BColor. Broiler.Media is deliberately *not* gated here.
+# Nothing in the solution references it, so a Media failure would say nothing
+# about Documents, and its Windows leg turns on whether the runner image happens
+# to carry the Store-shipped WIC WebP codec, which is not a property of this
+# repository. Images reach the PDF codec at a later roadmap phase; the Media
+# paths and suites belong in this workflow then, not before.
+#
+# The no-op guard below matters more than it looks. The Graphics suite this
+# workflow runs is a console runner rather than an xunit project: `dotnet test`
+# against it exits 0 having run nothing at all. It is invoked with `dotnet run`
+# so its exit code is the failure count. The Documents solution is xunit and is
+# checked for a plausible executed-test count, because the roadmap is explicit
+# that a skipped, empty, or no-op job can never satisfy a later phase gate.
+
+on:
+  # The two path lists are identical and must stay that way. They are written
+  # out twice because the workflow parser does not support YAML anchors.
+  pull_request:
+    paths:
+      - 'Broiler.Documents/**'
+      - 'Broiler.Graphics/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - '.github/workflows/documents-pdf.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Broiler.Documents/**'
+      - 'Broiler.Graphics/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - '.github/workflows/documents-pdf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documents-pdf-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # A floor, not a target: it exists so a run that silently executes almost
+  # nothing fails instead of reporting success. Raise it deliberately; do not
+  # track it to the exact suite size, or every added test breaks CI.
+  MINIMUM_EXECUTED_TESTS: 400
+
+jobs:
+  documents:
+    name: Documents and PDF (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            os: ubuntu-24.04
+          - name: Windows
+            os: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The recursive default would also fetch Broiler.JS, Broiler.HTML and
+          # Broiler.CSS, none of which this solution references.
+          submodules: false
+
+      - name: Initialize the submodules this solution needs
+        shell: bash
+        run: |
+          # Broiler.Documents.Model references Broiler.Graphics; the HTML codec
+          # references Broiler.DOM. Broiler.Media is in-repo, and neither
+          # submodule has nested submodules of its own.
+          git submodule update --init Broiler.Graphics Broiler.DOM
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore Broiler.Documents/Broiler.Documents.slnx
+
+      - name: Build
+        # Separated from the test step so a compilation failure is a distinct
+        # result from a test failure. TreatWarningsAsErrors is on in the codec
+        # projects, so a new warning fails here.
+        run: dotnet build Broiler.Documents/Broiler.Documents.slnx -c Release --no-restore
+
+      - name: Test the Documents solution
+        run: >
+          dotnet test Broiler.Documents/Broiler.Documents.slnx
+          -c Release --no-build
+          --logger trx
+          --results-directory "${{ github.workspace }}/artifacts/test-results"
+
+      - name: Assert the test run was not silently empty
+        shell: pwsh
+        run: |
+          $resultsDirectory = Join-Path '${{ github.workspace }}' 'artifacts/test-results'
+          $results = Get-ChildItem -Path $resultsDirectory -Filter *.trx -Recurse -ErrorAction SilentlyContinue
+
+          if (-not $results) {
+              throw "No .trx result files were produced; the test step ran nothing."
+          }
+
+          $executed = 0
+          foreach ($result in $results) {
+              $counters = ([xml](Get-Content -Raw -LiteralPath $result.FullName)).TestRun.ResultSummary.Counters
+              if ($null -ne $counters) {
+                  $executed += [int]$counters.executed
+              }
+          }
+
+          Write-Host "$executed tests executed across $($results.Count) result files."
+
+          if ($executed -lt [int]$env:MINIMUM_EXECUTED_TESTS) {
+              throw "Only $executed tests executed, below the floor of $env:MINIMUM_EXECUTED_TESTS. A run this small means a project was skipped, not that the suite shrank."
+          }
+
+      # A console runner, not an xunit project: its Main returns the failure
+      # count, so a non-zero exit fails the step. It runs because
+      # Broiler.Documents.Model builds against Broiler.Graphics.
+      - name: Run the Graphics test runner
+        run: dotnet run --project Broiler.Graphics/Broiler.Graphics.Tests/Broiler.Graphics.Tests.csproj -c Release
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: documents-test-results-${{ matrix.name }}
+          path: artifacts/test-results
+          if-no-files-found: warn
+          retention-days: 14

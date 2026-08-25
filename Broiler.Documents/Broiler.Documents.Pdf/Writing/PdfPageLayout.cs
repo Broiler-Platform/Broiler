@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using Broiler.Documents.Model;
 using Broiler.Documents.Pdf.Text;
 using Broiler.Graphics;
@@ -88,17 +89,20 @@ internal sealed class PdfPageLayout
     private readonly IPdfFontMetricsProvider _metrics;
     private readonly PdfUriPolicy _uriPolicy;
     private readonly PdfDiagnosticSink _diagnostics;
+    private readonly CancellationToken _cancellationToken;
 
     public PdfPageLayout(
         PdfWriteOptions options,
         IPdfFontMetricsProvider metrics,
         PdfUriPolicy uriPolicy,
-        PdfDiagnosticSink diagnostics)
+        PdfDiagnosticSink diagnostics,
+        CancellationToken cancellationToken)
     {
         _options = options;
         _metrics = metrics;
         _uriPolicy = uriPolicy;
         _diagnostics = diagnostics;
+        _cancellationToken = cancellationToken;
     }
 
     public List<PdfLayoutPage> Build(RichTextDocument document)
@@ -115,7 +119,7 @@ internal sealed class PdfPageLayout
 
         foreach (RichTextParagraph paragraph in document.Paragraphs)
         {
-            _options.CancellationToken.ThrowIfCancellationRequested();
+            _cancellationToken.ThrowIfCancellationRequested();
 
             ParagraphStyle style = paragraph.Style;
             double lineSpacing = style.LineSpacing > 0 ? style.LineSpacing : 1f;
@@ -243,7 +247,7 @@ internal sealed class PdfPageLayout
 
         foreach (Word word in EnumerateWords(paragraph, marker))
         {
-            _options.CancellationToken.ThrowIfCancellationRequested();
+            _cancellationToken.ThrowIfCancellationRequested();
 
             double wordWidth = word.Width;
             bool fits = used + wordWidth <= available || current.Pieces.Count == 0;

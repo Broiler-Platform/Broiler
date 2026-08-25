@@ -57,6 +57,7 @@ row clears.
 | 2026-08-25 | `dotnet test Broiler.Documents/Broiler.Documents.slnx -c Release` | Passed: 504 tests across nine projects; 0 failed, 0 skipped |
 | 2026-08-25 | `dotnet build Broiler.Documents/Broiler.Documents.Pdf/Broiler.Documents.Pdf.csproj -c Release` | Passed with 0 errors and 0 warnings under `TreatWarningsAsErrors` |
 | 2026-08-25 | Delivery guards: package is unpacked, references only Documents projects, is absent from every `src/` composition root, and no `.pdf` is committed | Passed |
+| 2026-08-25 | `.github/workflows/documents-pdf.yml` added; its exact build, test and console-runner commands rehearsed locally | Passed: 508 tests executed across 8 result files, plus 99, 10 and 18 from the Graphics and Media runners |
 
 ## External decisions required for Phase 0 exit
 

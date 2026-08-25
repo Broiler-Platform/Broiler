@@ -262,7 +262,7 @@ Broiler.Documents.Pdf
 | Phase | Goal | Dependency | Estimated effort | State |
 |---|---|---|---:|---|
 | 0 | Reset authority, scope, IP/legal ADRs, cleanup | None | 3–4 engineer-weeks | Repository work done; external approvals outstanding |
-| 1 | Shared contracts, read-safe shared services, approved corpus, CI/license foundation | Phase 0 | 7–10 | Not started; the PDF package carries its own typed options, limits, results, and budgets in the meantime |
+| 1 | Shared contracts, read-safe shared services, approved corpus, CI/license foundation | Phase 0 | 7–10 | §6.1 contracts landed (`DocumentInput`, request envelopes, shared result status and destination state, typed-option validation, async overloads, catalog selection-and-read) and the CI workflow created. §6.2 resource/metadata context, §6.4 model review, §6.5 Graphics/Media prerequisites, and the §6.6 oracle/corpus/harness work are outstanding |
 | 2 | PDF syntax and object store | Phase 1 | 4–6 | Implemented |
 | 3 | Streamed xrefs/object store, structure, filters, security detection | Phase 2 | 6–9 | Implemented for the filters this build owns; the rest detected and skipped |
 | 4 | Logical text/image/link import and minimum hostile-input gate | Phase 3 | 8–12 | Text, links and structure implemented; images and embedded font programs detected and skipped; hostile-input gate covered by in-suite truncation and mutation campaigns, not yet by coverage-guided fuzzing |
@@ -311,7 +311,9 @@ research, permissions, or commercial-license negotiation.
 Implementation status and external approvals are tracked separately in the
 [Phase 0 status record](pdf-phase0-status.md). The boundary between the
 implemented base and each not-yet-cleared technology is specified in
-[PDF extension points](pdf-extension-points.md). The current decision/evidence set
+[PDF extension points](pdf-extension-points.md), and the exact construct set the
+IP-001 review has to cover is enumerated in the
+[construct inventory](pdf-construct-inventory.md). The current decision/evidence set
 is indexed by the [ADR index](adr/README.md),
 [feature matrix](pdf-feature-matrix.md),
 [IP/licensing register](pdf-ip-licensing-register.md),
@@ -473,11 +475,33 @@ is indexed by the [ADR index](adr/README.md),
 
 ### 6.1 `Broiler.Documents` request, option, input, and result contracts
 
+> **Landed 2026-08-25.** `DocumentInput`, `DocumentReadRequest`/`DocumentWriteRequest`,
+> the shared `DocumentResultStatus`/`DocumentDestinationState`, typed-option
+> validation, the async overloads, and `DocumentCodecCatalog.SelectAndRead` are
+> implemented, and every codec reports a status. Two bullets below were amended by
+> what the implementation found; both amendments are marked in place. Not yet
+> done: the conversion/resource context (§6.2), which is where the write
+> request's resource-manifest and commit-policy members belong, and a
+> spooling-capable `DocumentInput` — the type is memory-only by design until a
+> host supplies a spooling policy of its own.
+
 - Adopt non-sealed format-option bases with codec-specific immutable options.
   Move Windows-1252/default-code-page, object-decoding, ASCII-only output, group
   depth, and `\bin` payload settings into `RtfReadOptions`, `RtfWriteOptions`, and
   `RtfLimits`; base options/limits contain only behavior genuinely shared by
-  multiple codecs. `PdfReadOptions`/`PdfWriteOptions` compose `PdfLimits`. Where
+  multiple codecs.
+  **Amended 2026-08-25 by implementation.** Group depth and the `\bin` payload
+  limit are *not* RTF-specific: DOCX enforces `MaxGroupDepth` for style-inheritance
+  depth and `MaxBinBytes` for part size, so both already have the second consumer
+  the containment rule requires and correctly stay on `DocumentLimits` — moving
+  them would have forced DOCX to duplicate them. `RtfLimits` is therefore
+  unnecessary and was not created. Of the remaining three settings only the
+  default code page had any consumer: object-decoding and ASCII-only output had
+  none at all, which made them a public contract implying behavior no codec
+  implemented. `RtfReadOptions`/`RtfWriteOptions` now name the RTF-specific
+  settings, the base members document what they actually do, and a codec asked
+  for the unimplemented behavior reports `document.capability.not-composed`
+  instead of silently doing something else. `PdfReadOptions`/`PdfWriteOptions` compose `PdfLimits`. Where
   common and format-specific budgets overlap, the effective value is the
   stricter remaining budget. A codec validates the concrete option type before
   touching input or output. A mismatched option object produces a structured
@@ -489,6 +513,11 @@ is indexed by the [ADR index](adr/README.md),
   caller-selected metadata, resource manifest/context, cancellation, and output
   commit policy. Preserve existing overloads as documented compatibility
   adapters until the repository's normal deprecation policy permits removal.
+  **Amended 2026-08-25 by implementation:** the metadata, resource-manifest, and
+  commit-policy members wait on the §6.2 conversion context that defines them, so
+  the write request carries document, destination, typed options, and
+  cancellation today. Cancellation moved off `PdfReadOptions`/`PdfWriteOptions`
+  onto the request, giving it the single owner this bullet requires.
   Cross-format values have exactly one owner on the request; format options may
   not duplicate or override them. A future accidental duplicate/conflict is an
   invalid-options rejection rather than a precedence rule.
@@ -734,6 +763,13 @@ fixed-layout objects remain prohibited.
 - Create required `.github/workflows/documents-pdf.yml` Windows/Linux checks for
   pull requests and pushes affecting Documents, Graphics, Media, relevant
   CLI/Writer roots, solution generation, packaging scripts, or the workflow.
+  **Created 2026-08-25** for the Documents solution plus the Graphics and Media
+  image suites, on both platforms, with a guard that fails a run whose executed
+  test count collapses — three of those suites are console runners that
+  `dotnet test` would exit 0 on having run nothing. The CLI/Writer host paths and
+  jobs are deliberately absent until Phase 5 activates them, so the trigger
+  covers only what the job actually proves; no oracle is wired in, because each
+  needs its licence review and tool-manifest row first.
   They restore locked inputs, build/test `Broiler.Documents/Broiler.Documents.slnx`
   in Release, explicitly run the applicable Graphics and Media test projects/
   console runners, execute host integration plus architecture/package-content

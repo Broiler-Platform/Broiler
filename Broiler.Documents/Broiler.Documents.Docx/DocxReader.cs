@@ -30,12 +30,12 @@ internal static class DocxReader
                 diagnostics.Add(DocumentDiagnostic.Error(
                     "docx.package.document",
                     "DOCX package did not contain a main word/document.xml part."));
-                return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
+                return new DocumentReadResult(RichTextDocument.Empty, diagnostics, DocumentResultStatus.Rejected);
             }
 
             XDocument? documentXml = DocxPackage.LoadEntryXml(documentEntry, options.Limits, diagnostics, "docx.document.xml");
             if (documentXml is null)
-                return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
+                return new DocumentReadResult(RichTextDocument.Empty, diagnostics, DocumentResultStatus.Rejected);
 
             string baseDirectory = DocxPackage.BasePartDirectory(documentPart);
             DocxRelationships documentRelationships = DocxPackage.ReadRelationships(
@@ -67,21 +67,21 @@ internal static class DocxReader
                 options.Limits,
                 diagnostics);
             ReportUnreadParts(documentRelationships, diagnostics);
-            return new DocumentReadResult(document, diagnostics);
+            return new DocumentReadResult(document, diagnostics, DocumentReadResult.StatusFrom(diagnostics));
         }
         catch (InvalidDataException ex)
         {
             diagnostics.Add(DocumentDiagnostic.Error(
                 "docx.package.zip",
                 "DOCX ZIP package could not be opened: " + ex.GetType().Name + "."));
-            return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
+            return new DocumentReadResult(RichTextDocument.Empty, diagnostics, DocumentResultStatus.Rejected);
         }
         catch (XmlException ex)
         {
             diagnostics.Add(DocumentDiagnostic.Error(
                 "docx.xml",
                 "DOCX XML could not be parsed: " + ex.GetType().Name + "."));
-            return new DocumentReadResult(RichTextDocument.Empty, diagnostics);
+            return new DocumentReadResult(RichTextDocument.Empty, diagnostics, DocumentResultStatus.Rejected);
         }
     }
 

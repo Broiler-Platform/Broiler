@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using Broiler.Documents.Model;
 using Broiler.Documents.Pdf.Writing;
 
@@ -109,14 +110,44 @@ public sealed class PdfDocumentCodec : DocumentCodec
     /// Reads a PDF. Malformed-but-recoverable input produces diagnostics rather
     /// than exceptions; input that cannot yield a usable document produces a
     /// result whose <see cref="PdfReadResult.Status"/> is
-    /// <see cref="PdfResultStatus.Rejected"/> and an empty document that no host
+    /// <see cref="DocumentResultStatus.Rejected"/> and an empty document that no host
     /// may present.
     /// </summary>
     public override DocumentReadResult Read(Stream source, DocumentReadOptions? options = null) =>
         ReadPdf(source, AsPdfOptions(options));
 
+    /// <summary>
+    /// Reads through the request contract, taking cancellation from the request —
+    /// its single owner — and probing and reading through the same replayable
+    /// input.
+    /// </summary>
+    public override DocumentReadResult Read(DocumentReadRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryValidateOptions(request.Options, Name, out PdfReadOptions? typed, out DocumentReadResult? rejection))
+            return rejection!;
+
+        PdfReadOptions effective = typed ?? new PdfReadOptions(request.Options.Limits);
+
+        byte[] bytes;
+        try
+        {
+            bytes = request.Input.Materialize(effective.PdfLimits.MaxInputBytes).ToArray();
+        }
+        catch (DocumentException e)
+        {
+            return RejectedRead(effective, DocumentDiagnosticCodes.InputTooLarge, e.Message);
+        }
+
+        return PdfReader.Read(bytes, effective, _services, request.CancellationToken);
+    }
+
     /// <summary>The typed read, returning the PDF-specific result.</summary>
-    public PdfReadResult ReadPdf(Stream source, PdfReadOptions? options = null)
+    public PdfReadResult ReadPdf(
+        Stream source,
+        PdfReadOptions? options = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
         PdfReadOptions effective = options ?? PdfReadOptions.Default;
@@ -132,7 +163,7 @@ public sealed class PdfDocumentCodec : DocumentCodec
             sink.Error(PdfDiagnosticCodes.Limit, e.Message);
             return new PdfReadResult(
                 RichTextDocument.Empty,
-                PdfResultStatus.Rejected,
+                DocumentResultStatus.Rejected,
                 PdfDocumentMetadata.Empty,
                 Structure.PdfVersion.Unknown,
                 0,
@@ -140,7 +171,7 @@ public sealed class PdfDocumentCodec : DocumentCodec
                 sink.Build());
         }
 
-        return PdfReader.Read(bytes, effective, _services);
+        return PdfReader.Read(bytes, effective, _services, cancellationToken);
     }
 
     /// <summary>
@@ -154,12 +185,43 @@ public sealed class PdfDocumentCodec : DocumentCodec
         DocumentWriteOptions? options = null) =>
         WritePdf(document, destination, AsPdfOptions(options));
 
+    /// <summary>Writes through the request contract, taking cancellation from the request.</summary>
+    public override DocumentWriteResult Write(DocumentWriteRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!TryValidateOptions(request.Options, Name, out PdfWriteOptions? typed, out DocumentWriteResult? rejection))
+            return rejection!;
+
+        return PdfWriter.Write(
+            request.Document,
+            request.Destination,
+            typed ?? PdfWriteOptions.Default,
+            _services,
+            request.CancellationToken);
+    }
+
     /// <summary>The typed write, returning the PDF-specific result.</summary>
     public PdfWriteResult WritePdf(
         RichTextDocument document,
         Stream destination,
-        PdfWriteOptions? options = null) =>
-        PdfWriter.Write(document, destination, options ?? PdfWriteOptions.Default, _services);
+        PdfWriteOptions? options = null,
+        CancellationToken cancellationToken = default) =>
+        PdfWriter.Write(document, destination, options ?? PdfWriteOptions.Default, _services, cancellationToken);
+
+    private static PdfReadResult RejectedRead(PdfReadOptions options, string code, string message)
+    {
+        var sink = new PdfDiagnosticSink(options.PdfLimits.MaxDiagnostics);
+        sink.Error(code, message);
+        return new PdfReadResult(
+            RichTextDocument.Empty,
+            DocumentResultStatus.Rejected,
+            PdfDocumentMetadata.Empty,
+            Structure.PdfVersion.Unknown,
+            0,
+            Array.Empty<Structure.PdfExtensionDeclaration>(),
+            sink.Build());
+    }
 
     // A codec validates the option object it was handed rather than downcasting
     // opportunistically: a caller that passes plain DocumentReadOptions gets the

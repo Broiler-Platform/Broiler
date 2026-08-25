@@ -87,7 +87,8 @@ public sealed class DocxDocumentCodec : DocumentCodec
                     DocumentDiagnostic.Error(
                         "docx.limit.bytes",
                         "DOCX input exceeded MaxDocumentBytes and was not parsed."),
-                });
+                },
+                DocumentResultStatus.Rejected);
         }
 
         return DocxReader.Read(input.Bytes, effective);

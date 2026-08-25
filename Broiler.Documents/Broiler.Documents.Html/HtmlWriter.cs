@@ -29,7 +29,7 @@ public static class HtmlWriter
 
         byte[] bytes = Encoding.UTF8.GetBytes(html);
         destination.Write(bytes, 0, bytes.Length);
-        return new DocumentWriteResult(bytes.Length, diagnostics);
+        return new DocumentWriteResult(bytes.Length, diagnostics, DocumentWriteResult.StatusFrom(diagnostics));
     }
 
     public static byte[] WriteToArray(RichTextDocument document, DocumentWriteOptions? options = null)

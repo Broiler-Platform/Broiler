@@ -114,7 +114,7 @@ internal static class MarkdownReader
         }
 
         FlushParagraph(builder, paragraph, paragraphStyle);
-        return new DocumentReadResult(builder.Build(), diagnostics);
+        return new DocumentReadResult(builder.Build(), diagnostics, DocumentReadResult.StatusFrom(diagnostics));
     }
 
     private static void FlushParagraph(

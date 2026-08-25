@@ -126,7 +126,7 @@ public sealed class PdfSecurityTests
         var options = new PdfReadOptions(pdfLimits: new PdfLimits(maxPageCount: 5));
         PdfReadResult result = Read(builder.Build(catalog), options);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.Limit);
     }
 
@@ -138,7 +138,7 @@ public sealed class PdfSecurityTests
 
         PdfReadResult result = Read(PdfFileBuilder.SinglePage(content), options);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.Limit);
     }
 
@@ -148,8 +148,8 @@ public sealed class PdfSecurityTests
         var options = new PdfReadOptions(pdfLimits: new PdfLimits(maxExtractedCharacters: 4));
         PdfReadResult result = Read(PdfFileBuilder.SinglePage(PdfFileBuilder.ShowText("Much longer than four")), options);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
-        Assert.NotEqual(PdfResultStatus.Success, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
+        Assert.NotEqual(DocumentResultStatus.Success, result.Status);
     }
 
     [Fact]
@@ -158,10 +158,11 @@ public sealed class PdfSecurityTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        var options = new PdfReadOptions(cancellationToken: cancellation.Token);
-        PdfReadResult result = Read(PdfFileBuilder.SinglePage(PdfFileBuilder.ShowText("Cancelled")), options);
+        using var input = DocumentInput.FromBytes(PdfFileBuilder.SinglePage(PdfFileBuilder.ShowText("Cancelled")));
+        var request = new DocumentReadRequest(input, PdfReadOptions.Default, cancellation.Token);
+        DocumentReadResult result = new PdfDocumentCodec().Read(request);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.Cancelled);
     }
 

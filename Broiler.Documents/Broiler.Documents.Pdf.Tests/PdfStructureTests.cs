@@ -16,7 +16,7 @@ public sealed class PdfStructureTests
     {
         PdfReadResult result = Read(PdfFileBuilder.SinglePage(PdfFileBuilder.ShowText("Hello")));
 
-        Assert.NotEqual(PdfResultStatus.Rejected, result.Status);
+        Assert.NotEqual(DocumentResultStatus.Rejected, result.Status);
         Assert.Equal(1, result.PageCount);
         Assert.Contains("Hello", result.Document.PlainText);
     }
@@ -54,7 +54,7 @@ public sealed class PdfStructureTests
 
         PdfReadResult result = Read(builder.Build(catalog, $"/Encrypt {encrypt} 0 R"));
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.EncryptionUnsupported);
         Assert.Equal(0, result.PageCount);
 
@@ -69,7 +69,7 @@ public sealed class PdfStructureTests
         byte[] pdf = BuildStreamedFile();
         PdfReadResult result = Read(pdf);
 
-        Assert.NotEqual(PdfResultStatus.Rejected, result.Status);
+        Assert.NotEqual(DocumentResultStatus.Rejected, result.Status);
         Assert.Equal(1, result.PageCount);
         Assert.Contains("Streamed", result.Document.PlainText);
         Assert.DoesNotContain(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.XrefRecovered);
@@ -94,7 +94,7 @@ public sealed class PdfStructureTests
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.XrefRecovered);
 
         // A recovered document is never reported as a clean parse.
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
     }
 
     [Fact]
@@ -282,7 +282,7 @@ public sealed class PdfStructureTests
         PdfReadResult result = Read(builder.Build(catalog));
 
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.FilterLzwUnsupported);
-        Assert.Equal(PdfResultStatus.Partial, result.Status);
+        Assert.Equal(DocumentResultStatus.Partial, result.Status);
     }
 
     [Fact]
@@ -293,7 +293,7 @@ public sealed class PdfStructureTests
 
         PdfReadResult result = Read(pdf, options);
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.Limit);
     }
 
@@ -302,7 +302,7 @@ public sealed class PdfStructureTests
     {
         PdfReadResult result = Read(PdfFileBuilder.Latin1("this is not a PDF at all"));
 
-        Assert.Equal(PdfResultStatus.Rejected, result.Status);
+        Assert.Equal(DocumentResultStatus.Rejected, result.Status);
         Assert.Contains(result.Diagnostics, d => d.Code == PdfDiagnosticCodes.HeaderMissing);
     }
 

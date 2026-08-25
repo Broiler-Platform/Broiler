@@ -25,11 +25,21 @@ public static class RtfWriter
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(destination);
-        _ = options;
 
         var fonts = new ResourceTable<string>(StringComparer.Ordinal);
         var colors = new ResourceTable<BColor>(EqualityComparer<BColor>.Default);
         var diagnostics = new List<DocumentDiagnostic>();
+
+        // The writer always escapes non-ASCII as \uN?; there is no raw-byte mode.
+        // A caller asking for one is told, rather than silently given the escaped
+        // form it did not ask for.
+        if (options is { AsciiOnly: false })
+        {
+            diagnostics.Add(DocumentDiagnostic.Warning(
+                DocumentDiagnosticCodes.CapabilityNotComposed,
+                "This writer emits non-ASCII characters as \\uN? escapes only; raw high bytes are not implemented, so AsciiOnly=false was not honoured."));
+        }
+
         var reported = new HashSet<string>(StringComparer.Ordinal);
         CollectResources(document, fonts, colors);
 
@@ -51,7 +61,7 @@ public static class RtfWriter
 
         byte[] bytes = Encoding.ASCII.GetBytes(sb.ToString());
         destination.Write(bytes, 0, bytes.Length);
-        return new DocumentWriteResult(bytes.Length, diagnostics);
+        return new DocumentWriteResult(bytes.Length, diagnostics, DocumentWriteResult.StatusFrom(diagnostics));
     }
 
     /// <summary>Serialize to a byte array (convenience over the stream overload).</summary>

@@ -1,53 +1,20 @@
 using System;
-using System.Threading;
 using Broiler.Documents.Pdf.Text;
 
 namespace Broiler.Documents.Pdf;
 
-/// <summary>
-/// Whether a read or write produced a usable result, independently of whether it
-/// produced diagnostics.
-/// </summary>
-/// <remarks>
-/// Severity and status answer different questions. A document can carry a dozen
-/// warnings and still be a complete rendering of its supported subset
-/// (<see cref="Success"/>); another can carry one warning that means a page was
-/// dropped (<see cref="Partial"/>). Hosts branch on this, never on a diagnostic
-/// count.
-/// </remarks>
-public enum PdfResultStatus
-{
-    /// <summary>The declared supported subset was processed; the result is usable.</summary>
-    Success,
-
-    /// <summary>
-    /// A usable result exists, but named content or features were skipped or
-    /// remain uncertain. A host must have the caller opt in before replacing an
-    /// open document or publishing this output.
-    /// </summary>
-    Partial,
-
-    /// <summary>No usable result exists and none may be accepted.</summary>
-    Rejected,
-}
-
-/// <summary>How far a write got before it stopped.</summary>
-public enum PdfDestinationState
-{
-    /// <summary>Nothing was written; the destination is untouched.</summary>
-    NotStarted,
-
-    /// <summary>The complete output reached the destination.</summary>
-    Committed,
-
-    /// <summary>
-    /// Bytes reached a caller-owned stream and then the write stopped. The prefix
-    /// is not a valid PDF and the caller owns discarding it.
-    /// </summary>
-    PartialDestination,
-}
+// The result-status and destination-state enums that used to live here are now
+// the shared DocumentResultStatus and DocumentDestinationState: they were always
+// format-neutral, and the RTF, DOCX, HTML and Markdown codecs report them too, so
+// they meet the containment rule's second-consumer test (PDF roadmap §3).
 
 /// <summary>Options for reading a PDF.</summary>
+/// <remarks>
+/// Cancellation is deliberately absent: it belongs to
+/// <see cref="DocumentReadRequest"/>, and a second copy here would create a
+/// precedence question the contract refuses to answer. Options carry settings;
+/// the request carries the operation (PDF roadmap §6.1).
+/// </remarks>
 public sealed class PdfReadOptions : DocumentReadOptions
 {
     public static new PdfReadOptions Default { get; } = new();
@@ -57,15 +24,13 @@ public sealed class PdfReadOptions : DocumentReadOptions
         PdfLimits? pdfLimits = null,
         bool mapPageBreaks = false,
         bool includeInvisibleText = true,
-        PdfUriPolicy? uriPolicy = null,
-        CancellationToken cancellationToken = default)
+        PdfUriPolicy? uriPolicy = null)
         : base(limits)
     {
         PdfLimits = pdfLimits ?? PdfLimits.Default;
         MapPageBreaks = mapPageBreaks;
         IncludeInvisibleText = includeInvisibleText;
         UriPolicy = uriPolicy;
-        CancellationToken = cancellationToken;
     }
 
     /// <summary>The PDF-specific budgets, composed with the shared limits.</summary>
@@ -91,9 +56,6 @@ public sealed class PdfReadOptions : DocumentReadOptions
     /// policy from <see cref="PdfCodecServices"/>.
     /// </summary>
     public PdfUriPolicy? UriPolicy { get; }
-
-    /// <summary>Cancellation observed at every documented parsing checkpoint.</summary>
-    public CancellationToken CancellationToken { get; }
 }
 
 /// <summary>Options for writing a PDF.</summary>
@@ -115,8 +77,7 @@ public sealed class PdfWriteOptions : DocumentWriteOptions
         PdfFontFamilyKind defaultFamily = PdfFontFamilyKind.SansSerif,
         float defaultFontSize = 12f,
         string? fileIdentifier = null,
-        PdfUriPolicy? uriPolicy = null,
-        CancellationToken cancellationToken = default)
+        PdfUriPolicy? uriPolicy = null)
     {
         if (defaultFontSize is <= 0 or > 1600 || !float.IsFinite(defaultFontSize))
             throw new ArgumentOutOfRangeException(nameof(defaultFontSize));
@@ -129,7 +90,6 @@ public sealed class PdfWriteOptions : DocumentWriteOptions
         DefaultFontSize = defaultFontSize;
         FileIdentifier = fileIdentifier;
         UriPolicy = uriPolicy;
-        CancellationToken = cancellationToken;
     }
 
     public PdfPageSetup PageSetup { get; }
@@ -160,8 +120,6 @@ public sealed class PdfWriteOptions : DocumentWriteOptions
 
     /// <summary>Overrides the composed URI policy for this write.</summary>
     public PdfUriPolicy? UriPolicy { get; }
-
-    public CancellationToken CancellationToken { get; }
 }
 
 /// <summary>Page geometry for the writer, in points.</summary>
