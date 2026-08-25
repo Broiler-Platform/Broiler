@@ -349,6 +349,33 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- DOM objects report the interface they implement. Every element, every
+  attribute and the document itself answered `constructor.name` of `"Object"`,
+  with `Object.getPrototypeOf(el) === Object.prototype` — so anything keyed on
+  the constructor (debugging output, logging, type dispatch) read the wrong
+  thing. They now name their interface, and the interfaces inherit along the
+  chain Web IDL gives them (`HTMLDivElement → HTMLElement → Element → Node →
+  EventTarget`). That last part is the one that is not cosmetic: extending an
+  interface prototype is the ordinary polyfill idiom, and
+  `Element.prototype.matches = …` now reaches every element where the assignment
+  used to go to an object nothing inherited from.
+
+  The per-tag interface names are Chromium's measured answers to
+  `document.createElement(tag).constructor.name` over every HTML tag, which is
+  what makes the three-way fallback right: a tag with its own interface names it,
+  a known tag without one is `HTMLElement`, and a tag that is neither known nor a
+  valid custom element name is `HTMLUnknownElement`. A hyphenated name such as
+  `x-foo` is an `HTMLElement` even when nothing defined it.
+
+  The same measurement corrected a live error: `plaintext` was grouped with
+  `listing`/`pre`/`xmp`, so `document.createElement('plaintext') instanceof
+  HTMLPreElement` answered `true` where a browser answers `false`.
+
+  Still reported as before: SVG elements answer the base `SVGElement` rather than
+  `SVGRectElement` and the rest, and `element.attributes` answers `"Object"` —
+  neither interface set is registered, and the engine's own members remain own
+  properties of each wrapper rather than living on the prototypes.
+
 - An invalid selector fails instead of matching the wrong element.
   `document.querySelector('div:::bogus')` returned a real `<div>` — the matcher
   read it as `div` — and `querySelectorAll('[')` matched four elements, so an

@@ -19,14 +19,18 @@ namespace Broiler.HtmlBridge;
 /// output, logging and any dispatch keyed on the constructor all read the wrong thing.
 /// </para>
 /// <para>
-/// <b>This covers the non-element wrappers only</b>, and that boundary is deliberate rather than
-/// convenient. Each of these node kinds has exactly one interface, fixed by its node type, so the
-/// mapping is a fact. An <em>element</em>'s interface depends on its tag through a curated table
-/// where the entries overlap (<c>HTMLMediaElement</c> covers <c>audio</c> and <c>video</c> while
-/// <c>HTMLAudioElement</c> covers <c>audio</c> again) and where a tag the table omits has to fall
-/// back to something — a browser distinguishes <c>HTMLSpanElement</c>, <c>HTMLElement</c> and
-/// <c>HTMLUnknownElement</c> there, and guessing between them would put a wrong name where an
-/// honest <c>"Object"</c> is at least not misleading. That half stays open.
+/// <b>Elements are covered too.</b> They were left out because an element's interface is a tag
+/// question and the table could not answer it: the entries overlapped (<c>HTMLMediaElement</c>
+/// covered <c>audio</c> and <c>video</c> while <c>HTMLAudioElement</c> covered <c>audio</c> again,
+/// so <c>audio</c> named two interfaces and a reverse lookup had none), and a tag the table omitted
+/// had to fall back to something a browser splits three ways — a named interface, plain
+/// <c>HTMLElement</c> for a known tag without one, and <c>HTMLUnknownElement</c> for a tag that is
+/// neither. Guessing between them would have put a wrong name where an honest <c>"Object"</c> is at
+/// least not misleading, so it was left. The answer was measured instead: every HTML tag run
+/// through Chromium's own <c>createElement(tag).constructor.name</c>, the table made single-valued
+/// with the abstract bases moved to an inheritance list, and the three-way fallback encoded from
+/// what a browser does — including that a hyphenated name is an <c>HTMLElement</c> even when
+/// nothing defined it. See <c>HtmlInterfaceForTag</c>.
 /// </para>
 /// <para>
 /// <b>What this does not do is move members onto the prototypes.</b> The bindings install every
@@ -41,31 +45,56 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     /// <summary>
-    /// Points <paramref name="wrapper"/> at its interface prototype when the realm is up and the
-    /// node kind has exactly one interface. A no-op otherwise, including for elements.
+    /// Points <paramref name="wrapper"/> at its interface prototype when the realm is up. A no-op
+    /// otherwise, and for a node kind this does not name.
     /// </summary>
-    private void ApplyInterfacePrototype(JSObject wrapper, DomNode node)
+    internal void ApplyInterfacePrototype(JSObject wrapper, DomNode node)
     {
-        if (InterfaceNameFor(node) is not { } interfaceName)
-            return;
+        if (InterfaceNameFor(node) is { } interfaceName)
+            LinkToInterface(wrapper, interfaceName);
+    }
 
+    /// <summary>
+    /// Points <paramref name="wrapper"/> at <paramref name="interfaceName"/>'s prototype. The one
+    /// seam for wrappers that are not minted from a <see cref="DomNode"/> — an attribute is not one
+    /// in the canonical DOM, so its wrapper never reaches the node choke point.
+    /// </summary>
+    internal void LinkToInterface(JSObject wrapper, string interfaceName)
+    {
         if (_jsContext?[interfaceName] is JSObject constructor &&
             constructor[(KeyString)"prototype"] is JSObject prototype)
             wrapper.BasePrototypeObject = prototype;
     }
 
     /// <summary>
-    /// The single interface a non-element node implements, or <see langword="null"/> when the node
-    /// is an element (whose interface is a tag question, see the class remarks) or a kind this does
-    /// not reach. <c>Attr</c> is the latter: an attribute is not a <see cref="DomNode"/> in the
-    /// canonical DOM, so its wrapper is not minted here and linking it needs its own hook.
+    /// The interface a node implements, or <see langword="null"/> for a kind this does not reach.
     /// </summary>
+    /// <remarks>
+    /// The element arm is a tag lookup rather than a type test, because that is what an element's
+    /// interface is; <see cref="HtmlInterfaceForTag"/> owns the rule. A non-HTML element — an SVG one
+    /// — is deliberately left at <c>SVGElement</c> rather than given a per-tag name: a browser does
+    /// have <c>SVGRectElement</c> and the rest, but this engine registers no SVG element interfaces
+    /// to point at, and inventing the globals to satisfy a name is what the collection work already
+    /// ruled out.
+    /// <para>
+    /// The order matters: <see cref="DomDocument"/> is checked before the element arm because a
+    /// document is not an element, and <c>HTMLDocument</c> is its interface.
+    /// </para>
+    /// </remarks>
     private static string? InterfaceNameFor(DomNode node) => node switch
     {
         DomDocumentType => "DocumentType",
         DomDocumentFragment => "DocumentFragment",
         DomComment => "Comment",
         DomText => "Text",
+        DomDocument => "HTMLDocument",
+        DomElement element => IsHtmlNamespace(element) ? HtmlInterfaceForTag(element.TagName) : "SVGElement",
         _ => null,
     };
+
+    /// <summary>Whether the element is in the HTML namespace — including the no-namespace case, which
+    /// a bridge element created outside a namespace-aware path reports and which the
+    /// <c>instanceof</c> hooks already treat as HTML.</summary>
+    private static bool IsHtmlNamespace(DomElement element) =>
+        element.NamespaceUri is null or "" or "http://www.w3.org/1999/xhtml";
 }

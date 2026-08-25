@@ -19,17 +19,28 @@ public sealed partial class DomBridge
     /// does for <c>blockquote</c> and <c>q</c>).
     /// </para>
     /// <para>
-    /// <c>HTMLMediaElement</c> is the one abstract entry: it is never an element's own interface, but
-    /// <c>audio</c> and <c>video</c> both derive from it, so it has to answer for both — which is why
-    /// the mapping is interface-to-tags rather than the tag-to-interface direction a lookup would
-    /// suggest. The same shape leaves room for any other interface that acquires a second tag.
+    /// <b>Every entry is single-valued: one tag names exactly one interface, its most derived one.</b>
+    /// That is what lets the table answer <c>constructor.name</c> as well as <c>instanceof</c>. It
+    /// used to carry an overlapping <c>("HTMLMediaElement", "audio video")</c> entry beside
+    /// <c>HTMLAudioElement</c> and <c>HTMLVideoElement</c>, so <c>audio</c> named two interfaces and a
+    /// reverse lookup had no answer — which is precisely why naming an element's interface was left
+    /// undone. The abstract bases now come from <see cref="HtmlInterfaceBases"/> instead and are
+    /// expanded into the <c>instanceof</c> sets at registration, so <c>audio instanceof
+    /// HTMLMediaElement</c> still holds while <c>audio.constructor.name</c> can be
+    /// <c>HTMLAudioElement</c>.
+    /// </para>
+    /// <para>
+    /// The tag-to-interface assignments are Chromium's measured answers to
+    /// <c>document.createElement(tag).constructor.name</c> over every HTML tag, not a reading of the
+    /// specification — which is how the <c>plaintext</c> entry was found to be wrong. It sat with
+    /// <c>listing pre xmp</c> under <c>HTMLPreElement</c>, and a browser gives it plain
+    /// <c>HTMLElement</c>; the other three are right.
     /// </para>
     /// </remarks>
     private static readonly (string Interface, string Tags)[] HtmlElementInterfaces =
     [
         ("HTMLAnchorElement", "a"),
         ("HTMLAreaElement", "area"),
-        ("HTMLMediaElement", "audio video"),
         ("HTMLAudioElement", "audio"),
         ("HTMLBaseElement", "base"),
         ("HTMLQuoteElement", "blockquote q"),
@@ -64,7 +75,8 @@ public sealed partial class DomBridge
         ("HTMLLegendElement", "legend"),
         ("HTMLLIElement", "li"),
         ("HTMLLinkElement", "link"),
-        ("HTMLPreElement", "listing plaintext pre xmp"),
+        // `plaintext` is deliberately absent: a browser gives it plain HTMLElement, not this.
+        ("HTMLPreElement", "listing pre xmp"),
         ("HTMLMapElement", "map"),
         ("HTMLMarqueeElement", "marquee"),
         ("HTMLMenuElement", "menu"),
@@ -97,6 +109,88 @@ public sealed partial class DomBridge
         ("HTMLUListElement", "ul"),
         ("HTMLVideoElement", "video"),
     ];
+
+    /// <summary>
+    /// The Web IDL inheritance edges that are <em>not</em> the default. Every interface in
+    /// <see cref="HtmlElementInterfaces"/> derives from <c>HTMLElement</c> unless named here.
+    /// </summary>
+    /// <remarks>
+    /// This is what replaces the old overlapping table entry, and it carries more than that entry
+    /// did: an interface's <c>instanceof</c> set is its own tags plus every descendant's, so
+    /// <c>HTMLMediaElement</c> answers for <c>audio</c> and <c>video</c> without being either one's
+    /// own interface — and the same edges are what the prototype chain is built from, so
+    /// <c>Object.getPrototypeOf(HTMLAudioElement.prototype) === HTMLMediaElement.prototype</c> as it
+    /// is in a browser. Measured from Chromium's own chains rather than transcribed.
+    /// </remarks>
+    private static readonly (string Interface, string Base)[] HtmlInterfaceBases =
+    [
+        ("HTMLAudioElement", "HTMLMediaElement"),
+        ("HTMLVideoElement", "HTMLMediaElement"),
+        ("HTMLMediaElement", "HTMLElement"),
+        ("HTMLUnknownElement", "HTMLElement"),
+    ];
+
+    /// <summary>
+    /// The HTML tags whose own interface <em>is</em> <c>HTMLElement</c> — known to the parser, but
+    /// with no interface of their own.
+    /// </summary>
+    /// <remarks>
+    /// The distinction this encodes is the one that made naming an element's interface look like
+    /// guesswork: a tag absent from <see cref="HtmlElementInterfaces"/> is not automatically
+    /// <c>HTMLElement</c>, because a browser splits those into <c>HTMLElement</c> for a tag it knows
+    /// (<c>section</c>, <c>abbr</c>, <c>nav</c>) and <c>HTMLUnknownElement</c> for one it does not
+    /// (<c>foo</c>, <c>blink</c>, and — since they were removed from HTML — <c>applet</c> and
+    /// <c>keygen</c>). A name containing a hyphen is a valid custom element name and is
+    /// <c>HTMLElement</c> whether or not anything defined it. All three cases are measured.
+    /// </remarks>
+    private const string PlainHtmlElementTags =
+        "abbr acronym address article aside b basefont bdi bdo big center cite code dd dfn dt em " +
+        "figcaption figure footer header hgroup i kbd main mark nav nobr noembed noframes noscript " +
+        "plaintext rb rp rt rtc ruby s samp search section small strike strong sub summary sup tt u " +
+        "var wbr";
+
+    /// <summary>Tag name → its own interface, built once from <see cref="HtmlElementInterfaces"/>.</summary>
+    private static readonly Dictionary<string, string> InterfaceByTag = BuildInterfaceByTag();
+
+    private static readonly HashSet<string> PlainHtmlElementTagSet =
+        new(PlainHtmlElementTags.Split(' '), StringComparer.Ordinal);
+
+    private static Dictionary<string, string> BuildInterfaceByTag()
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (name, tags) in HtmlElementInterfaces)
+        {
+            foreach (var tag in tags.Split(' '))
+                map[tag] = name;
+        }
+
+        return map;
+    }
+
+    /// <summary>
+    /// The interface an HTML element with <paramref name="tagName"/> implements — the name a browser
+    /// answers from <c>constructor.name</c>.
+    /// </summary>
+    /// <remarks>
+    /// The three-way split is the whole reason this could not be guessed: a named interface, plain
+    /// <c>HTMLElement</c> for a known tag without one, and <c>HTMLUnknownElement</c> for a tag that is
+    /// neither known nor a valid custom element name. Tag names are compared lower-case because an
+    /// HTML document's are, and <c>createElement('DIV')</c> answers <c>HTMLDivElement</c>.
+    /// </remarks>
+    internal static string HtmlInterfaceForTag(string? tagName)
+    {
+        if (string.IsNullOrEmpty(tagName))
+            return "HTMLUnknownElement";
+
+        var tag = AsciiToLower(tagName);
+        if (InterfaceByTag.TryGetValue(tag, out var named))
+            return named;
+
+        // A hyphen makes it a valid custom element name, which is an HTMLElement even undefined.
+        return PlainHtmlElementTagSet.Contains(tag) || tag.Contains('-')
+            ? "HTMLElement"
+            : "HTMLUnknownElement";
+    }
 
     /// <summary>
     /// Registers the DOM interface-constructor globals a page reaches for by bare name —
@@ -140,6 +234,10 @@ public sealed partial class DomBridge
             function HTMLElement() { throw new TypeError('Illegal constructor'); }
             function HTMLUnknownElement() { throw new TypeError('Illegal constructor'); }
             function Document() { throw new TypeError('Illegal constructor'); }
+            // HTMLDocument is the interface an HTML document's own object implements, and it was the
+            // one this file never registered: `document.constructor.name` answered 'Object' where a
+            // browser answers 'HTMLDocument'.
+            function HTMLDocument() { throw new TypeError('Illegal constructor'); }
             function DocumentFragment() { throw new TypeError('Illegal constructor'); }
             function CharacterData() { throw new TypeError('Illegal constructor'); }
             function Text() { throw new TypeError('Illegal constructor'); }
@@ -246,6 +344,7 @@ public sealed partial class DomBridge
                 });
 
                 define(Document, function (o) { return isNode(o) && (o.nodeType === 9 || o.nodeType === 10); });
+                define(HTMLDocument, function (o) { return isNode(o) && o.nodeType === 9; });
                 define(DocumentFragment, function (o) { return isNode(o) && o.nodeType === 11; });
                 define(CharacterData, function (o) {
                     return isNode(o) && (o.nodeType === 3 || o.nodeType === 4 || o.nodeType === 8);
@@ -290,6 +389,26 @@ public sealed partial class DomBridge
                 define(SVGElement, function (o) {
                     return isElement(o) && o.namespaceURI === 'http://www.w3.org/2000/svg';
                 });
+
+                // The inheritance chain these interfaces are defined along, so a wrapper linked to
+                // one of them inherits the whole chain — which is what makes the ordinary polyfill
+                // idiom work: `Element.prototype.matches = ...` now reaches every element, where
+                // before it assigned to an object nothing inherited from. setPrototypeOf rather than
+                // Object.create keeps each prototype's identity and its non-enumerable
+                // `constructor`. EventTarget is not registered by this file, so the edge to it is
+                // taken only if the realm already carries it.
+                var edges = [
+                    [HTMLElement, Element], [SVGElement, Element], [Element, Node],
+                    [HTMLDocument, Document], [Document, Node],
+                    [CharacterData, Node], [Text, CharacterData], [Comment, CharacterData],
+                    [Attr, Node], [DocumentFragment, Node], [DocumentType, Node]
+                ];
+                if (typeof EventTarget === 'function') edges.push([Node, EventTarget]);
+                for (var e = 0; e < edges.length; e++) {
+                    var child = edges[e][0], parent = edges[e][1];
+                    if (child && parent && child.prototype && parent.prototype)
+                        Object.setPrototypeOf(child.prototype, parent.prototype);
+                }
             })();
         ");
 
@@ -339,22 +458,50 @@ public sealed partial class DomBridge
     {
         var script = new StringBuilder();
 
+        // HTMLMediaElement is declared here rather than beside HTMLElement because it belongs to
+        // this table's world: it is abstract, so it owns no tag and appears only as a base.
+        script.Append("function HTMLMediaElement() { throw new TypeError('Illegal constructor'); }\n");
         foreach (var (name, _) in HtmlElementInterfaces)
             script.Append("function ").Append(name).Append("() { throw new TypeError('Illegal constructor'); }\n");
 
         script.Append("(function () {\n");
-        script.Append("    var byInterface = {\n");
+        script.Append("    var ownTags = {\n");
         foreach (var (name, tags) in HtmlElementInterfaces)
-            script.Append("        ").Append(name).Append(": [").Append(name).Append(", '").Append(tags).Append("'],\n");
+            script.Append("        ").Append(name).Append(": '").Append(tags).Append("',\n");
+        script.Append("    };\n");
+        script.Append("    var bases = {\n");
+        foreach (var (name, baseName) in HtmlInterfaceBases)
+            script.Append("        ").Append(name).Append(": '").Append(baseName).Append("',\n");
         script.Append("    };\n");
         script.Append("""
-                for (var key in byInterface) {
-                    if (!Object.prototype.hasOwnProperty.call(byInterface, key)) continue;
-                    var ctor = byInterface[key][0];
-                    var tags = byInterface[key][1].split(' ');
-                    var set = {};
-                    for (var i = 0; i < tags.length; i++) set[tags[i]] = true;
-                    // `set` is captured per iteration through the factory rather than through the
+                function ctorOf(name) {
+                    var c = typeof globalThis !== 'undefined' ? globalThis[name] : undefined;
+                    return typeof c === 'function' ? c : null;
+                }
+
+                function baseOf(name) {
+                    // Everything in the table derives from HTMLElement unless an edge says otherwise.
+                    return Object.prototype.hasOwnProperty.call(bases, name) ? bases[name] : 'HTMLElement';
+                }
+
+                // Each interface answers instanceof for its own tags *and* every descendant's, which
+                // is what keeps an abstract base like HTMLMediaElement answering for audio and video
+                // now that neither names it directly.
+                var effective = {};
+                for (var key in ownTags) {
+                    if (!Object.prototype.hasOwnProperty.call(ownTags, key)) continue;
+                    var tags = ownTags[key].split(' ');
+                    for (var walk = key; walk && walk !== 'HTMLElement'; walk = baseOf(walk)) {
+                        if (!effective[walk]) effective[walk] = {};
+                        for (var i = 0; i < tags.length; i++) effective[walk][tags[i]] = true;
+                    }
+                }
+
+                for (var name in effective) {
+                    if (!Object.prototype.hasOwnProperty.call(effective, name)) continue;
+                    var ctor = ctorOf(name);
+                    if (!ctor) continue;
+                    // The set is captured per iteration through the factory rather than through the
                     // loop body, whose `var` bindings are one shared pair by the time a test runs.
                     Object.defineProperty(ctor, Symbol.hasInstance, {
                         value: (function (tagSet) {
@@ -366,9 +513,24 @@ public sealed partial class DomBridge
                                 var tag = typeof o.tagName === 'string' ? o.tagName.toLowerCase() : '';
                                 return tagSet[tag] === true;
                             };
-                        })(set),
+                        })(effective[name]),
                         writable: false, enumerable: false, configurable: true
                     });
+                }
+
+                // The prototype chain the interfaces inherit along. setPrototypeOf rather than a
+                // fresh Object.create: it keeps each prototype object's identity and its
+                // non-enumerable `constructor`, so a wrapper linked to it still reports the right
+                // constructor.name and `for...in` over an element gains nothing.
+                var chained = ['HTMLMediaElement', 'HTMLUnknownElement'];
+                for (var t in ownTags) {
+                    if (Object.prototype.hasOwnProperty.call(ownTags, t)) chained.push(t);
+                }
+                for (var j = 0; j < chained.length; j++) {
+                    var child = ctorOf(chained[j]);
+                    var parent = ctorOf(baseOf(chained[j]));
+                    if (child && parent && child.prototype && parent.prototype)
+                        Object.setPrototypeOf(child.prototype, parent.prototype);
                 }
             })();
             """);

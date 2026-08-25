@@ -165,6 +165,24 @@ public sealed partial class DomBridge
             RegisterContentRenderingPolyfills(context, document);
         using (Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Measure(Broiler.HtmlBridge.Core.Diagnostics.BridgePhaseTrace.Phases.RegSecurityPolyfills))
             RegisterSecurityAndConstructorPolyfills(context, window);
+
+        // Interface prototypes, which have to be applied *here* rather than where each object is
+        // built: the constructors they point at are registered by the polyfill pass immediately
+        // above, so an earlier link finds nothing and silently leaves Object.prototype behind. That
+        // is the same ordering the document's lazy collections are built around.
+        //
+        // The document object is built rather than minted as a node wrapper, so it never passes the
+        // choke point at all. The re-link covers the wrappers that *did* pass it but were minted
+        // during attach, before the constructors existed — `document.documentElement` is eagerly
+        // materialized as a value property, so the <html> wrapper is always one of them. Doing this
+        // by sweeping the registry rather than naming that one keeps a future eager mint from
+        // silently reverting to "Object".
+        LinkToInterface(document, "HTMLDocument");
+        foreach (var (node, wrapper) in _jsObjects.Entries)
+        {
+            if (!ReferenceEquals(wrapper, document))
+                ApplyInterfacePrototype(wrapper, node);
+        }
         // Worker (multithreading item #18). Registered after the window globals so the constructor
         // lands on a fully-built window, and before the global mirror below so it is reachable
         // unqualified the way page scripts spell it.

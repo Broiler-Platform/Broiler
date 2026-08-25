@@ -31,4 +31,9 @@ internal interface IAttributesHost
 
     /// <summary>Queues an <c>attributes</c> MutationObserver record for the change.</summary>
     void NotifyAttributeMutationObservers(DomElement element, string attributeName, string? oldValue);
+
+    /// <summary>Points a wrapper at a named interface's prototype. Needed here because an attribute
+    /// is not a <c>DomNode</c>, so its wrapper is not minted at the choke point that links every
+    /// other one.</summary>
+    void LinkToInterface(Broiler.JavaScript.Runtime.JSObject wrapper, string interfaceName);
 }

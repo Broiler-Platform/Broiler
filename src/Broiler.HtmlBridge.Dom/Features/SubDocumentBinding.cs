@@ -44,6 +44,10 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         var doc = new JSObject();
         _host.RegisterDocumentWrapper(docRoot, doc);
 
+        // A frame's document is a document like any other, so it reports HTMLDocument too. Built
+        // here rather than minted as a node wrapper, so it needs the explicit link.
+        _host.LinkToInterface(doc, "HTMLDocument");
+
         // This sub-document projected onto the contract DocumentCollectionBinding consumes, so its
         // collections are the main document's, over this root's sub-tree.
         var collections = new SubDocumentCollectionHost(_host, docRoot);

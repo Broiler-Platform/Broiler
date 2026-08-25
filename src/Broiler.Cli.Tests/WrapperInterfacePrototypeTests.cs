@@ -1,8 +1,8 @@
 namespace Broiler.Cli.Tests;
 
 /// <summary>
-/// A non-element DOM wrapper's prototype is its interface's prototype, so <c>constructor.name</c>
-/// and <c>Object.getPrototypeOf</c> answer the interface rather than <c>Object</c>.
+/// A DOM wrapper's prototype is its interface's prototype, so <c>constructor.name</c> and
+/// <c>Object.getPrototypeOf</c> answer the interface rather than <c>Object</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -13,12 +13,14 @@ namespace Broiler.Cli.Tests;
 /// <c>"Object"</c> and <c>Object.getPrototypeOf(node) === Text.prototype</c> was <c>false</c>.
 /// </para>
 /// <para>
-/// <b>Non-element wrappers only</b>, and the boundary is deliberate: each of these node kinds has
-/// exactly one interface fixed by its node type, so the mapping is a fact. An element's interface is
-/// a tag question over a table whose entries overlap and which omits tags a browser still names, so
-/// guessing there would put a wrong name where <c>"Object"</c> is at least not misleading. That half
-/// is asserted below as still open, so this fixture says what is <em>not</em> covered as well as
-/// what is. Expectations come from Chromium through Playwright.
+/// This fixture began as the non-element wrappers alone, with the element and attribute cases
+/// asserted as still open: each non-element node kind has exactly one interface fixed by its node
+/// type, so the mapping is a fact, while an element's was a tag question over a table whose entries
+/// overlapped and which omitted tags a browser still names. Guessing there would have put a wrong
+/// name where <c>"Object"</c> is at least not misleading. Both are covered now — the table was
+/// rebuilt from Chromium's measured per-tag answers — so the last test is the deliberate update the
+/// old assertion asked for rather than a silent flip. <see cref="DomInterfacePrototypeTests"/> owns
+/// the element detail. Expectations come from Chromium through Playwright.
 /// </para>
 /// </remarks>
 public class WrapperInterfacePrototypeTests
@@ -96,19 +98,25 @@ document.getElementById('result').textContent = [
     }
 
     /// <summary>
-    /// The boundary, asserted rather than described. An element and an attribute still report
-    /// <c>Object</c>: an element's interface is a tag question this does not answer, and an
-    /// attribute is not a canonical node, so its wrapper is not minted where the link is applied.
-    /// Both are recorded as open — if either starts naming its interface, this fixture should be
-    /// updated deliberately rather than the change landing unnoticed.
+    /// The boundary this fixture used to pin — an element and an attribute reporting <c>Object</c> —
+    /// is gone: both now name their interface.
     /// </summary>
+    /// <remarks>
+    /// This is the deliberate update the old assertion asked for. An element's interface was left
+    /// unanswered because it is a tag question the engine's table could not answer; the table was
+    /// rebuilt from Chromium's measured answers and made single-valued, and an attribute gained the
+    /// explicit link its wrapper needs for not being a canonical node.
+    /// <see cref="DomInterfacePrototypeTests"/> owns the detail — the per-tag names, the three-way
+    /// fallback and the inheritance chains. What stays here is the pairing with the non-element
+    /// wrappers above, so one fixture shows the whole surface answering consistently.
+    /// </remarks>
     [Fact(Timeout = 600000)]
-    public void Element_And_Attribute_Wrappers_Are_Still_Unlinked()
+    public void Element_And_Attribute_Wrappers_Name_Their_Interfaces_Too()
     {
         var result = Run(Box + """
 document.getElementById('result').textContent =
   box.constructor.name + '|' + box.getAttributeNode('id').constructor.name;
 """);
-        Assert.Equal("Object|Object", result);
+        Assert.Equal("HTMLDivElement|Attr", result);
     }
 }

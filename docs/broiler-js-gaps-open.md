@@ -200,22 +200,25 @@ and deterministic detection behavior.
   to their interface prototypes, so `constructor.name` names the interface and extending a prototype
   reaches instances. Both are in
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  **Narrowed a third time** — element, attribute and document wrappers all name their interfaces
+  now, and the interfaces inherit along the chain Web IDL gives them, so `Element.prototype.x = …`
+  reaches every element. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
   <br>**What remains, precisely:**
-  - **Element wrappers report `constructor.name` of `"Object"`.** Their interface is a tag question:
-    the curated table's entries overlap (`HTMLMediaElement` covers `audio` and `video` while
-    `HTMLAudioElement` covers `audio` again) and a tag it omits has to fall back to something a
-    browser distinguishes — `HTMLSpanElement` from `HTMLElement` from `HTMLUnknownElement`. Guessing
-    would put a *wrong* name where `"Object"` is at least not misleading, so it was left rather than
-    approximated. `instanceof` already answers, through the `@@hasInstance` hook.
-  - **`Attr` likewise**, for a different reason: an attribute is not a `DomNode` in the canonical
-    DOM, so its wrapper is not minted at the choke point where the link is applied and needs its own
-    hook.
-  - **Members are still own properties of each wrapper**, so an interface prototype is empty:
-    `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)` lists the whole
-    interface. Relocating them is the larger object-model change, and the one that would let this
-    item close.
-  - **`document.constructor.name`** is `"Object"` where a browser says `"HTMLDocument"` — an
-    interface this engine does not register at all.
+  - **Members are still own properties of each wrapper**, so an interface prototype carries nothing
+    of its own: `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)`
+    lists the whole interface. The prototype *chain* is real now, so a page can add to it and be
+    heard; what has not happened is the engine putting its own members there. Relocating them is the
+    larger object-model change, and the one that would let this item close.
+  - **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
+    and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
+    a name can be reported is what this track's action 1 rules out — so it is a capability decision
+    (implement the SVG interface set, or keep the base) rather than an oversight. Pinned as the
+    current answer.
+  - **`NamedNodeMap` is not registered**, so `element.attributes.constructor.name` is `"Object"`. It
+    is a Web IDL collection rather than a node wrapper, so it belongs with the `NodeList` /
+    `HTMLCollection` work that gave those real prototypes and indexed access, not with the wrapper
+    linking.
 - ~~`document.doctype` is `undefined`.~~ **Fixed**, together with the document-collection family the
   follow-up audit found around it — `anchors`/`embeds`/`plugins` absent, the collections that did
   exist being snapshot arrays without identity or named access, and `document.childNodes` filtering
@@ -330,8 +333,12 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 
 ### Actions
 
-1. Establish real interface prototypes and Web IDL collection behavior before adding more
-   compatibility-only constructor globals. **Collection half done** — `NodeList` and
+1. ~~Establish real interface prototypes and Web IDL collection behavior before adding more
+   compatibility-only constructor globals.~~ **Done for both halves.** Every DOM wrapper — elements,
+   attributes and the document included — is linked to its interface prototype, and the interfaces
+   inherit along their Web IDL chains, so extending `Element.prototype` reaches instances. What is
+   left of the wrapper item is relocating the engine's own members onto those prototypes, which is
+   the separate object-model change. **Collection half done** — `NodeList` and
    `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness, and
    the `document` collections plus CSSOM's `StyleSheetList` now use them — in a frame's document as
    well as the containing one, which was the last surface still building its own snapshot arrays; see

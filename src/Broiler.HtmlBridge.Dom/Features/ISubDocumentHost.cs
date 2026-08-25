@@ -28,6 +28,11 @@ internal interface ISubDocumentHost
     /// <summary>Returns the single JS wrapper identity for <paramref name="node"/>.</summary>
     JSObject ToJSObject(DomNode node);
 
+    /// <summary>Points a wrapper at a named interface's prototype. A sub-document object is built
+    /// rather than minted as a node wrapper, so it does not pass the choke point that links every
+    /// other one.</summary>
+    void LinkToInterface(JSObject wrapper, string interfaceName);
+
     /// <summary>Reverse wrapper lookup: the element whose JS wrapper is <paramref name="jsObj"/>.</summary>
     DomElement? FindDomElementByJSObject(JSObject jsObj);
 

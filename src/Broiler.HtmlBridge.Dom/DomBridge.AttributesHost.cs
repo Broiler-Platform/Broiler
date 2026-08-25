@@ -30,4 +30,7 @@ public sealed partial class DomBridge : IAttributesHost
 
     void IAttributesHost.NotifyAttributeMutationObservers(DomElement element, string attributeName, string? oldValue) =>
         NotifyAttributeMutationObservers(element, attributeName, oldValue);
+
+    void IAttributesHost.LinkToInterface(Broiler.JavaScript.Runtime.JSObject wrapper, string interfaceName) =>
+        LinkToInterface(wrapper, interfaceName);
 }

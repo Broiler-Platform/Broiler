@@ -745,6 +745,55 @@ were deleted and the gitlinks point at commits that contain them. See
   arm in `Broiler.CSS.Dom`, a matching question rather than a syntax one; it is characterized in
   `DomApiSyntaxTests` and left in
   [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **Element, attribute and document wrappers now name their interfaces, and the interfaces inherit.**
+  The non-element wrappers were linked first; elements were left deliberately, because an element's
+  interface is a tag question the engine's own table could not answer. It carried an overlapping
+  `("HTMLMediaElement", "audio video")` entry beside `HTMLAudioElement` and `HTMLVideoElement`, so
+  `audio` named two interfaces and a reverse lookup had none — and a tag the table omitted had to
+  fall back to something a browser splits three ways. Guessing between them would have put a *wrong*
+  name where an honest `"Object"` is at least not misleading, which is why it stayed open rather than
+  being approximated.
+  <br>**It was measured instead of guessed.** Every HTML tag was run through Chromium's own
+  `document.createElement(tag).constructor.name`, and the table rebuilt from the result: single-valued,
+  with the abstract bases moved into an inheritance list. Over the full tag corpus Broiler and
+  Chromium now agree on every case. Three of them are ones reasoning gets wrong — `plaintext` is
+  plain `HTMLElement`, not the `HTMLPreElement` it sat under with `listing`/`pre`/`xmp`; a
+  hyphenated unknown name (`x-foo`) is an `HTMLElement`, because it is a valid custom element name
+  even undefined; and a tag removed from HTML (`applet`, `keygen`) is `HTMLUnknownElement` even
+  though the parser still knows the name.
+  <br>**The measurement found a live bug in the shipped `instanceof` table.** `plaintext` was grouped
+  under `HTMLPreElement`, so `document.createElement('plaintext') instanceof HTMLPreElement` answered
+  `true` where a browser answers `false`. That is fixed with the same edit, and pinned.
+  <br>**The interfaces now inherit along the chain Web IDL gives them** —
+  `HTMLDivElement → HTMLElement → Element → Node → EventTarget`, and
+  `HTMLAudioElement → HTMLMediaElement → …` — which is the part that is not cosmetic. Extending an
+  interface prototype is the ordinary polyfill idiom, and `Element.prototype.matches = …` now reaches
+  every element where the assignment used to go to an object nothing inherited from. The chain is
+  built with `setPrototypeOf` rather than a fresh `Object.create`, so each prototype keeps its
+  identity and its non-enumerable `constructor` — pinned, because a `for...in` over an element that
+  started yielding `constructor` would be a silent regression in every enumeration a page does.
+  <br>Making the table single-valued carried its own risk, and it is pinned too: `audio` no longer
+  names `HTMLMediaElement`, so `audio instanceof HTMLMediaElement` has to come from the inheritance
+  edges instead. Each interface's `instanceof` set is expanded at registration to its own tags plus
+  every descendant's, so an abstract base answers for tags that never mention it.
+  <br>`document` and attribute nodes needed their own links: neither is minted at the node choke
+  point where every other wrapper is linked. `HTMLDocument` was an interface the engine did not
+  register at all. The document's link also has to run *after* the polyfill pass that registers the
+  constructors, not where the document is built — the same ordering the lazy document collections are
+  built around — and the wrappers minted eagerly during attach (`document.documentElement` is
+  materialized as a value property, so the `<html>` wrapper is always one) are re-linked by sweeping
+  the wrapper registry at that point rather than by naming that one case.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/Utilities.DomInterfaces.cs`,
+  `DomBridge/WrapperPrototypes.cs`, `DomBridge/Registration/Registration.cs`,
+  `Features/AttributesBinding.cs`, `Features/SubDocumentBinding.cs`); regressions in
+  `DomInterfacePrototypeTests`, and `WrapperInterfacePrototypeTests`' own
+  "element and attribute are still unlinked" assertion updated — that fixture asked for a deliberate
+  update rather than a silent flip, and this is it.
+  <br>**What this leaves:** the engine's members are still own properties of each wrapper rather than
+  living on the prototypes, so an interface prototype carries nothing of its own; SVG elements report
+  the base `SVGElement` because no per-tag SVG interfaces are registered to point at; and
+  `NamedNodeMap` is unregistered, so `element.attributes` still reports `"Object"`. All three are in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

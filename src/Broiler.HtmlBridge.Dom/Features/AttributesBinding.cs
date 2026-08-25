@@ -189,9 +189,13 @@ internal sealed class AttributesBinding(IAttributesHost host)
 
     internal JSObject BuildStandaloneAttrNode(string qualifiedName, string? namespaceUri) => BuildAttrNodeCore(qualifiedName, string.Empty, JSNull.Value, namespaceUri);
 
-    private static JSObject BuildAttrNodeCore(string name, string value, JSValue ownerElement, string? namespaceUri, string? explicitLocalName = null)
+    private JSObject BuildAttrNodeCore(string name, string value, JSValue ownerElement, string? namespaceUri, string? explicitLocalName = null)
     {
         var attr = new JSObject();
+        // An attribute is not a DomNode in the canonical DOM, so its wrapper never reaches the node
+        // choke point where every other wrapper is linked to its interface — hence the explicit
+        // call. Without it an Attr reported constructor.name of 'Object' like the rest used to.
+        _host.LinkToInterface(attr, "Attr");
         var colonIdx = name.IndexOf(':');
         var localName = explicitLocalName ?? (colonIdx >= 0 ? name[(colonIdx + 1)..] : name);
         var prefix = colonIdx >= 0 ? name[..colonIdx] : null;
