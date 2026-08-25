@@ -244,6 +244,15 @@ and deterministic detection behavior.
 - `Blob` and `FileList` remain undefined. They are File API surfaces rather than DOM collections —
   `FileList` is reachable only through `<input type=file>.files`, which this engine has no file
   selection for — so they did not come with the collection work and need their own decision.
+- ~~`Range` is not an interface, is missing five operations, and rejects nothing.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  It is also the **first** interface here whose members really live on its prototype, so it is the
+  worked example for the wrapper item above.
+  <br>**What the same work found beside it and did not do:** `StaticRange` — the other
+  `AbstractRange` subclass — is still undefined, and `window.getSelection` does not exist at all, so
+  a page cannot reach the ranges a selection would hold. Neither is part of Range's own gate;
+  `getSelection` in particular is a selection *model* rather than a missing name, since this engine
+  has no user selection to report.
 - ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
   be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
@@ -266,23 +275,12 @@ and deterministic detection behavior.
   (the parser's `SetAttribute`, the cascade's matcher) are required to stay lenient. Checked against
   Chromium over a 149-case corpus. See
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed — the `:is()` aliases match every element. Fixed as a patch, not yet live.** Root-caused
-  and narrowed since it was first characterized, and it is worse than "an unknown functional pseudo
-  over-matches": `:matches()`, `:any()`, `:-webkit-any()` and `:-moz-any()` are the historical
-  spellings of `:is()`, all four sat in the matcher's recognized-but-unmodelled set, and so all four
-  fell through its lenient default and matched **every element**. The **cascade** uses the same
-  matcher, so `:-webkit-any(h1) { color: red }` painted the whole page — a rendering bug rather than
-  only a `querySelector` one.
-  <br>Measured against Chromium: only `-webkit-any` is still accepted and it behaves exactly like
-  `:is()`; the other three were removed from the platform and match nothing. The fix is in
-  **`Broiler.CSS.Dom`**'s `CssSelectorMatcher`, whose remote is outside this session's scope (the push
-  returns 403), so it ships as `patches/` → *Stop the `:is()` aliases matching every element*. **No
-  main-repo fallback is possible**: the damaging half is the cascade, which reaches the matcher
-  through the computed-style engine rather than the bridge's `MatchesSelector` wrapper, so there is no
-  seam to intercept. It is live only once the patch is applied.
-  <br>What stays lenient afterwards, deliberately, is an unknown *vendor-prefixed* pseudo-class,
-  which still matches everything. `DomApiSyntaxTests` pins the current answer so applying the patch
-  trips it; the patch index says what to change it to.
+- ~~The `:is()` aliases match every element.~~ **Fixed and live** — the patch was applied upstream and
+  the pinned `Broiler.CSS` pointer carries it, so `:-webkit-any()` behaves like `:is()` while
+  `:matches()`, `:any()` and `:-moz-any()` match nothing, in the cascade as well as in
+  `querySelector`. What stays lenient, deliberately, is an unknown *vendor-prefixed* functional
+  pseudo-class, which still matches everything. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion
@@ -365,7 +363,12 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
    document-level mutation methods, `setAttribute`'s `InvalidCharacterError` and `querySelector`'s
    `SyntaxError` all raise the specified `DOMException`; see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-   Range semantics are the part of this action still untouched.
+   **Range done too** — `AbstractRange`/`Range` are real interfaces with their members on their
+   prototypes, the five missing operations exist, and every argument check raises the exception DOM
+   §4.5 names instead of clamping or returning `undefined`; the same measurement unswapped
+   `START_TO_END`/`END_TO_START`. See
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+   Nothing named in this action is left.
 3. Implement production Custom Elements and ~~parser-owned template contents~~ (**template contents
    done** — see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);

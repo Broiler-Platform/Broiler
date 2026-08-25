@@ -54,6 +54,11 @@ public sealed partial class DomBridge
         // SVGLength interface constants
         RegisterSVGLength(context);
 
+        // AbstractRange/Range — the one DOM interface here whose members really live on its
+        // prototype, so it has to be registered before the first document.createRange() can link a
+        // range to it.
+        _traversal.RegisterRangeInterface(context);
+
         // Storage interface global — the name a page tests before it touches an area.
         RegisterStorageConstructor(context);
 

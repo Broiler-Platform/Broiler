@@ -54,4 +54,9 @@ public sealed partial class DomBridge : ITraversalHost
         var text = CreateBridgeTextNode(data);
         return text;
     }
+
+    List<DomNode> ITraversalHost.ParseHtmlFragment(DomElement contextElement, string html) =>
+        BuildAdjacentHtmlNodes(contextElement, html);
+
+    DomElement ITraversalHost.CreateBridgeElement(string tagName) => CreateBridgeElement(tagName);
 }

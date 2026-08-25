@@ -351,30 +351,46 @@ public sealed class DomApiSyntaxTests
     }
 
     /// <summary>
-    /// <b>Characterization of a gap this work narrowed but did not close.</b> An unknown pseudo-class
-    /// <em>with an argument</em> still matches the first element instead of nothing, so
-    /// <c>querySelector(':matches(a)')</c> answers <c>&lt;html&gt;</c> where a browser throws and
-    /// where the argument-less <c>:nope</c> already answers <c>null</c>.
+    /// The <c>:is()</c> aliases, which this file used to pin as over-matching. <c>:matches()</c>,
+    /// <c>:any()</c>, <c>:-webkit-any()</c> and <c>:-moz-any()</c> are its historical spellings, all
+    /// four sat in <c>Broiler.CSS.Dom</c>'s recognized-but-unmodelled set, and so all four fell
+    /// through the matcher's lenient default and matched <em>every</em> element — a rendering bug as
+    /// much as a <c>querySelector</c> one, since the cascade uses the same matcher.
     /// </summary>
     /// <remarks>
-    /// The cause is in the matcher, not here: its pseudo-class dispatch falls through to a lenient
-    /// default for a name it does not know, and the argument-less path reaches a stricter arm than
-    /// the functional one. That is <c>Broiler.CSS.Dom</c>'s <c>CssSelectorMatcher</c>, a submodule,
-    /// and it is a matching question rather than a syntax one — this file's validator has already
-    /// done its job by the time it is reached. Pinned as the current answer, wrong though it is, so
-    /// that fixing the matcher trips this test rather than passing unnoticed.
+    /// Fixed in the submodule (<c>CssSelectorMatcher</c>, commit <i>Stop the <c>:is()</c> aliases
+    /// matching every element</i>) and now live in the pinned pointer. Measured against Chromium:
+    /// only the <c>-webkit-</c> spelling survives on the platform and it behaves exactly like
+    /// <c>:is()</c>; the other three were removed, so they match nothing.
     /// </remarks>
     [Fact(Timeout = 600000)]
-    public void An_Unknown_Functional_Pseudo_Class_Still_Over_Matches()
+    public void The_Is_Aliases_Match_What_A_Browser_Matches()
     {
         using var bridge = Attach(out var context);
 
-        Assert.Equal("OK", Outcome(context, "document.querySelector(':matches(a)')"));
+        Assert.Equal("P", context.Eval("document.querySelector(':-webkit-any(p)').tagName").ToString());
+        Assert.Equal("null", context.Eval("String(document.querySelector(':matches(p)'))").ToString());
+        Assert.Equal("null", context.Eval("String(document.querySelector(':any(p)'))").ToString());
+        Assert.Equal("null", context.Eval("String(document.querySelector(':-moz-any(p)'))").ToString());
+    }
+
+    /// <summary>
+    /// <b>What stays lenient, deliberately.</b> An unknown pseudo-class carrying a <em>vendor
+    /// prefix</em> still matches every element, so <c>querySelector(':-webkit-frob(p)')</c> answers
+    /// <c>&lt;html&gt;</c> where a browser throws — that is the matcher's standing policy for
+    /// extensions it does not model, and narrowing it is a separate decision from the alias fix
+    /// above. An unknown <em>unprefixed</em> one, functional or not, correctly matches nothing now.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void An_Unknown_Vendor_Prefixed_Functional_Pseudo_Class_Still_Over_Matches()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("OK", Outcome(context, "document.querySelector(':-webkit-frob(p)')"));
         Assert.Equal(
             "HTML",
-            context.Eval("document.querySelector(':matches(a)').tagName").ToString());
-        // The argument-less form is already right, which is what makes this a matcher arm rather
-        // than a whole missing rule.
+            context.Eval("document.querySelector(':-webkit-frob(p)').tagName").ToString());
+        Assert.Equal("null", context.Eval("String(document.querySelector(':bogus(p)'))").ToString());
         Assert.Equal("null", context.Eval("String(document.querySelector(':nope'))").ToString());
     }
 

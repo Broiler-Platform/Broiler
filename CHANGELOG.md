@@ -9,6 +9,42 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `AbstractRange` and `Range` are real DOM interfaces, with the five operations
+  that were missing from them and the exceptions their arguments owe the caller.
+
+  `Range` was not a global at all, so `typeof Range` was `"undefined"` and both
+  `new Range()` and `r instanceof Range` were `ReferenceError`s — the kind that
+  aborts the whole script, not just the line that asked. A range's
+  `constructor.name` was `"Object"`, and its 29 members were its own properties,
+  so `Range.prototype.setStart` had nothing to be. Both interfaces are now
+  registered, `new Range()` builds a range over the document, and every member
+  lives on a prototype: a range's boundaries are held in a weak table keyed by the
+  range object, so a prototype method finds its own state from its receiver and
+  the instance is left with no own properties at all, as in a browser. Calling one
+  on a foreign receiver is a `TypeError` rather than a wrong answer. The boundary
+  attributes go on `AbstractRange`, which is where a browser has them.
+
+  `comparePoint`, `isPointInRange`, `intersectsNode`, `createContextualFragment`
+  and `detach` did not exist and now do.
+
+  The argument checks that were absent are in. An offset past the container's
+  length raises `IndexSizeError` instead of being clamped into the node — the
+  clamp was the quiet failure of the set, since it left the range pointing
+  somewhere else and surfaced later as a wrong extraction. A missing or non-`Node`
+  argument raises `TypeError` instead of returning `undefined`; `selectNode` on a
+  parentless node raises `InvalidNodeTypeError` instead of doing nothing;
+  `selectNodeContents(doctype)` raises a `DOMException` instead of escaping as a
+  bare `Error` with a .NET stack trace; `compareBoundaryPoints` distinguishes an
+  unknown comparison method (`NotSupportedError`) and a source range in another
+  tree (`WrongDocumentError`) from a legitimate `0`; and `insertNode` no longer
+  puts a doctype inside a paragraph.
+
+  Every expectation is a browser's measured answer over one probe corpus rather
+  than a reading of the specification, which is what pins two that reasoning gets
+  wrong: `setStart(node, -1)` is an `IndexSizeError` and not a `TypeError`,
+  because Web IDL turns `-1` into `4294967295` first, and by the same conversion
+  `compareBoundaryPoints(3.7, r)` is accepted while `4` is rejected.
+
 - The PDF read-preview integration candidate: Broiler Writer can open PDFs on
   Windows and Linux.
 
@@ -452,6 +488,26 @@ are versioned in lockstep during the preview.
   host that already runs several decodes at once should do.
 
 ### Fixed
+
+- The `:is()` aliases no longer match every element. `:matches()`, `:any()`,
+  `:-webkit-any()` and `:-moz-any()` are its historical spellings, and all four
+  sat in the CSS selector matcher's recognized-but-unmodelled set, fell through
+  its lenient default arm, and matched **every** element. The cascade reaches the
+  same matcher, so `:-webkit-any(h1) { color: red }` painted the whole page rather
+  than the headings — a rendering bug as much as a `querySelector` one. Measured
+  against a browser: only the `-webkit-` spelling is still accepted, and it
+  behaves exactly like `:is()`; the other three were removed from the platform, so
+  they match nothing. An unknown *vendor-prefixed* functional pseudo-class still
+  matches everything, which stays the matcher's deliberate policy for extensions
+  it does not model.
+
+- `Range.compareBoundaryPoints` had `START_TO_END` and `END_TO_START` swapped.
+  DOM §4.5 makes `START_TO_END` compare *this* range's end against the source's
+  start and `END_TO_START` this range's start against the source's end; each was
+  reading the other pair, so two of the four comparisons answered the wrong sign.
+  `cloneRange` also minted its copy against the main document whatever the
+  original's root was, so a range created in a frame's document cloned into the
+  containing page's.
 
 - Custom Elements work. There was no implementation: `customElements` was
   undefined and `HTMLElement` threw `Illegal constructor`, so

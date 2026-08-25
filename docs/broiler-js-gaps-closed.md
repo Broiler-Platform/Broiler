@@ -1186,6 +1186,66 @@ were deleted and the gitlinks point at commits that contain them. See
   Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/NodeConstantsBinding.cs` and its five call
   sites, plus the `Node` polyfill in `DomBridge/Utilities.NameValidation.cs`), landed directly
   rather than as a submodule patch; regressions in `NodeConstantsTests`.
+- **The `:is()` aliases matched every element. Now live.** `:matches()`, `:any()`,
+  `:-webkit-any()` and `:-moz-any()` are the historical spellings of `:is()`; all four sat in
+  `Broiler.CSS.Dom`'s `CssSelectorMatcher` recognized-but-unmodelled set, fell through its lenient
+  default arm, and matched **every** element. The cascade reaches the same matcher, so
+  `:-webkit-any(h1) { color: red }` painted the whole page — a rendering bug rather than only a
+  `querySelector` one. It shipped as a `patches/` file because the submodule remote is outside this
+  session's GitHub scope; the maintainer has since applied it, and the pinned `Broiler.CSS` pointer
+  carries *Stop the `:is()` aliases matching every element*, so it is live and the patch file is
+  gone. Measured against Chromium: only the `-webkit-` spelling is still accepted and it behaves
+  exactly like `:is()`, while the other three were removed from the platform and match nothing —
+  Broiler now agrees on all four, and the cascade paints only the `h1`.
+  <br>What stays lenient, deliberately, is an unknown **vendor-prefixed** functional pseudo-class,
+  which still matches everything (`:-webkit-frob(p)` answers `<html>`); an unknown *unprefixed* one
+  matches nothing, as it should. `DomApiSyntaxTests` pinned the pre-patch over-matching and was
+  re-taken from Chromium: `The_Is_Aliases_Match_What_A_Browser_Matches` holds the fix and
+  `An_Unknown_Vendor_Prefixed_Functional_Pseudo_Class_Still_Over_Matches` holds the residual policy.
+- **`Range` was not an interface, was missing five operations, and rejected nothing.** Three gaps in
+  one surface, all of them script-visible.
+  <br>**No interface.** `Range` did not exist as a global, so `typeof Range` was `"undefined"` and
+  both `new Range()` and `r instanceof Range` were `ReferenceError`s — the kind that aborts the whole
+  script, not just the line that asked. `document.createRange()` handed back a plain object whose
+  `constructor.name` was `"Object"`, whose `Object.prototype.toString` was `[object Object]`, and
+  whose 29 members were its own properties, so `Range.prototype.setStart` had nothing to be.
+  <br>**Five missing operations:** `comparePoint`, `isPointInRange`, `intersectsNode`,
+  `createContextualFragment` and `detach` were all absent.
+  <br>**No argument checking.** An offset past the container's length was clamped into it rather than
+  raising `IndexSizeError`, so a range silently pointed somewhere else and the wrongness surfaced
+  later as a wrong extraction; a missing or non-`Node` argument returned `undefined`;
+  `selectNode` on a parentless node was a no-op; `selectNodeContents(doctype)` escaped as a bare
+  `Error` carrying a .NET stack trace; `compareBoundaryPoints` answered `0` both for an unknown
+  comparison method and for a source range in another tree — indistinguishable from a legitimate
+  "equal"; and `insertNode` would put a doctype inside a paragraph.
+  <br>**Fixed** by registering `AbstractRange` and `Range` as real interfaces and moving every member
+  onto their prototypes. A range's boundaries live in a weak table keyed by the range object, so a
+  prototype method finds its own state from its receiver — which is what leaves the instance with no
+  own properties at all (`Object.getOwnPropertyNames(r)` is `[]`, as in a browser) and makes an
+  illegal invocation a `TypeError` rather than a wrong answer. **This is the first DOM interface here
+  whose members really are on its prototype**; the rest still install theirs per wrapper, which is
+  the open half of the wrapper item in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**The boundary getters went on `AbstractRange`, not on `Range`** — measured, not assumed: a
+  browser's `Range.prototype` genuinely does not own `startContainer`, `startOffset`,
+  `endContainer`, `endOffset` or `collapsed`, because they are the base interface's.
+  <br>**Two answers reasoning gets wrong**, both taken from the probe corpus rather than the
+  grammar. `setStart(node, -1)` is an `IndexSizeError` and not a `TypeError`, because Web IDL
+  converts `-1` to `4294967295` first and it is then merely too large; and by the same conversion
+  `compareBoundaryPoints(3.7, r)` is *accepted* (truncating to `END_TO_START`) while `4` is a
+  `NotSupportedError`.
+  <br>**The measurement also found a live bug beside the ones it was looking for:**
+  `START_TO_END` and `END_TO_START` were swapped. DOM §4.5 makes `START_TO_END` compare *this*
+  range's end against the source's start and `END_TO_START` this range's start against the source's
+  end; the bridge had each reading the other pair, so two of the four comparisons answered the wrong
+  sign. Three `DomTraversalAndRangeTests` cases pinned the swapped answers and were re-taken from
+  Chromium. `cloneRange` was minting its copy against the main document whatever the original's root
+  was, which is fixed in the same edit.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/TraversalBinding.RangeInterface.cs`,
+  `Features/TraversalBinding.Range.cs`, `Features/TraversalBinding.cs`,
+  `DomBridge/Registration/Polyfills.cs`); regressions in `RangeInterfaceTests`, with the corrected
+  comparison cases in `DomTraversalAndRangeTests`. `StaticRange` — the other `AbstractRange`
+  subclass — and `window.getSelection` remain absent and are recorded in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 
 ## Retired — did not reproduce
 

@@ -1,3 +1,4 @@
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.Array;
@@ -10,15 +11,38 @@ using Broiler.Dom;
 namespace Broiler.HtmlBridge.Dom.Features;
 
 /// <summary>
-/// The <c>Range</c> handlers and range content/geometry helpers for <see cref="TraversalBinding"/>
-/// (HtmlBridge complexity-reduction roadmap Phase 3, first slice). Split from the primary module
-/// file only so no single source file exceeds the 750-line guideline; this is the same class.
+/// The <c>Range</c> operations for <see cref="TraversalBinding"/> — the bodies behind the members
+/// <see cref="TraversalBinding.InstallRangeMembers"/> puts on <c>Range.prototype</c>. Split from the
+/// primary module file only so no single source file exceeds the 750-line guideline; this is the
+/// same class.
 /// </summary>
+/// <remarks>
+/// <para>
+/// <b>These raise the exceptions DOM §4.5 names.</b> They used to be uniformly lenient: an
+/// out-of-range offset was clamped into the node instead of raising <c>IndexSizeError</c>, a
+/// non-<c>Node</c> or missing argument returned <c>undefined</c> instead of raising
+/// <c>TypeError</c>, <c>selectNode</c> on a parentless node was a silent no-op, an invalid
+/// <c>compareBoundaryPoints</c> comparison method and a source range in another tree both answered
+/// <c>0</c>, and <c>insertNode</c> happily put a doctype inside a paragraph. Leniency of that shape
+/// does not make a page work — it makes the range quietly point somewhere else and the wrongness
+/// surface later, in the content operation, as a wrong extraction rather than a caught error.
+/// </para>
+/// <para>
+/// Every expectation is Chromium's measured answer over one probe corpus run against both engines,
+/// not a reading of the grammar, which is what pins the cases where the specification's wording and
+/// a browser's behaviour part company: <c>setStart(node, -1)</c> is an <c>IndexSizeError</c> and not
+/// a <c>TypeError</c> (Web IDL converts <c>-1</c> to <c>4294967295</c>, which is then merely too
+/// large), <c>compareBoundaryPoints(3.7, r)</c> is accepted (the same conversion truncates it to
+/// <c>END_TO_START</c>) while <c>compareBoundaryPoints(4, r)</c> is a <c>NotSupportedError</c>, and
+/// <c>surroundContents</c> splits into <c>InvalidNodeTypeError</c> for a doctype and
+/// <c>HierarchyRequestError</c> for a text node.
+/// </para>
+/// </remarks>
 internal sealed partial class TraversalBinding
 {
-    // -------- Range handlers --------
+    // -------- Attributes --------
 
-    private JSValue RangeGetCommonAncestorContainer(DomRange state, in Arguments a)
+    private JSValue RangeGetCommonAncestorContainer(DomRange state)
     {
         // CommonAncestorWith returns null for boundaries in different trees, preserving the lenient
         // JSNull result; the canonical DomRange.CommonAncestorContainer would throw.
@@ -26,13 +50,15 @@ internal sealed partial class TraversalBinding
         return ancestor != null ? _host.ToJSObject(ancestor) : JSNull.Value;
     }
 
-    private JSValue RangeGetBoundingClientRect(DomRange state, in Arguments _)
+    // -------- Geometry (CSSOM View) --------
+
+    private JSValue RangeGetBoundingClientRect(BridgeDomRange state, in Arguments _)
     {
         var rects = _host.GetClientRectsForRange(state);
         return _host.CreateDomRectObject(UnionClientRects(rects));
     }
 
-    private JSValue RangeGetClientRects(DomRange state, in Arguments _)
+    private JSValue RangeGetClientRects(BridgeDomRange state, in Arguments _)
     {
         var rects = _host.GetClientRectsForRange(state);
         if (rects.Count == 0)
@@ -40,180 +66,205 @@ internal sealed partial class TraversalBinding
         return new JSArray([.. rects.Select(rect => (JSValue)_host.CreateDomRectObject(rect))]);
     }
 
-    // Coerces a JS-supplied range offset to the node's valid [0, length] range, matching the
-    // pre-rewire bridge's lenient behaviour (it clamped in the content ops) so canonical
-    // Substring/child indexing never throws on an out-of-range offset.
-    private static int ClampRangeOffset(DomNode node, int offset)
+    // -------- Argument and boundary validation --------
+
+    /// <summary>
+    /// The node behind argument <paramref name="index"/>, or a <c>TypeError</c>. A missing argument
+    /// and one that is not a <c>Node</c> are the same failure to a browser — "parameter 1 is not of
+    /// type 'Node'" — and both used to return <c>undefined</c> here, leaving the range untouched and
+    /// the caller none the wiser.
+    /// </summary>
+    private DomNode NodeArgument(in Arguments a, int index, string member)
     {
-        var length = node is DomCharacterData characterData
-            ? characterData.Data.Length
-            : node.ChildNodes.Count;
-        return Math.Clamp(offset, 0, length);
+        if (index < a.Length && a[index] is JSObject candidate &&
+            _host.FindDomNodeByJSObject(candidate) is { } node)
+            return node;
+
+        return JSException.ThrowTypeError<DomNode>(
+            $"Failed to execute '{member}' on 'Range': parameter {index + 1} is not of type 'Node'.");
     }
 
-    private JSValue RangeSetStart(DomRange state, in Arguments a)
+    /// <summary>
+    /// Web IDL's <c>unsigned long</c> conversion for a range offset: <c>NaN</c> and the infinities
+    /// become <c>0</c>, everything else truncates and wraps modulo 2^32 — which is why a negative
+    /// offset is reported as a very large one rather than rejected as negative.
+    /// </summary>
+    private static uint ToUnsignedLong(JSValue? value)
     {
-        if (a.Length < 2)
-            throw new JSException("Failed to execute 'setStart': 2 arguments required.");
-        if (a[0] is not JSObject nodeObj)
-            throw new JSException("Failed to execute 'setStart': parameter 1 is not of type 'Node'.");
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el == null)
-            return JSUndefined.Value;
-        state.SetStart(el, ClampRangeOffset(el, (int)a[1].DoubleValue));
+        var number = value is null ? 0 : value.DoubleValue;
+        if (double.IsNaN(number) || double.IsInfinity(number))
+            return 0;
+
+        var wrapped = Math.Truncate(number) % 4294967296.0;
+        if (wrapped < 0)
+            wrapped += 4294967296.0;
+        return (uint)wrapped;
+    }
+
+    /// <summary>
+    /// The node name a DOM exception message reports — the same value <c>nodeName</c> answers, which
+    /// is what a browser puts in "The node provided is of type 'html'".
+    /// </summary>
+    private static string NodeNameOf(DomNode node) => node switch
+    {
+        DomDocumentType doctype => doctype.Name,
+        DomText => "#text",
+        DomComment => "#comment",
+        DomDocumentFragment => "#document-fragment",
+        DomDocument => "#document",
+        DomElement element => element.TagName.ToUpperInvariant(),
+        _ => node.NodeType.ToString(),
+    };
+
+    /// <summary>A node's length (DOM §4.4): zero for a doctype, the data length for character data,
+    /// the child count otherwise.</summary>
+    private static int NodeLength(DomNode node) => node switch
+    {
+        DomDocumentType => 0,
+        DomCharacterData characterData => characterData.Data.Length,
+        _ => node.ChildNodes.Count,
+    };
+
+    /// <summary>
+    /// The "set the start/end of a range" preconditions: a doctype is never a boundary container,
+    /// and an offset past the container's length is an <c>IndexSizeError</c> rather than something to
+    /// clamp.
+    /// </summary>
+    private int ValidateBoundary(DomNode node, uint offset, string member)
+    {
+        if (node is DomDocumentType)
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute '{member}' on 'Range': The node provided is of type '{NodeNameOf(node)}'.",
+                "InvalidNodeTypeError");
+
+        var length = NodeLength(node);
+        if (offset > (uint)length)
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                node is DomCharacterData
+                    ? $"Failed to execute '{member}' on 'Range': The offset {offset} is larger than the node's length ({length})."
+                    : $"Failed to execute '{member}' on 'Range': There is no child at offset {offset}.",
+                "IndexSizeError");
+
+        return (int)offset;
+    }
+
+    // -------- Boundary operations --------
+
+    private JSValue RangeSetStart(BridgeDomRange state, in Arguments a)
+    {
+        var node = NodeArgument(in a, 0, "setStart");
+        state.SetStart(node, ValidateBoundary(node, ToUnsignedLong(a.Length > 1 ? a[1] : null), "setStart"));
         return JSUndefined.Value;
     }
 
-    private JSValue RangeSetEnd(DomRange state, in Arguments a)
+    private JSValue RangeSetEnd(BridgeDomRange state, in Arguments a)
     {
-        if (a.Length < 2)
-            throw new JSException("Failed to execute 'setEnd': 2 arguments required.");
-        if (a[0] is not JSObject nodeObj)
-            throw new JSException("Failed to execute 'setEnd': parameter 1 is not of type 'Node'.");
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el == null)
-            return JSUndefined.Value;
-        state.SetEnd(el, ClampRangeOffset(el, (int)a[1].DoubleValue));
+        var node = NodeArgument(in a, 0, "setEnd");
+        state.SetEnd(node, ValidateBoundary(node, ToUnsignedLong(a.Length > 1 ? a[1] : null), "setEnd"));
         return JSUndefined.Value;
     }
 
-    private JSValue RangeSetStartBefore(DomRange state, in Arguments a)
+    /// <summary>
+    /// The four sibling-relative setters. They differ only in which boundary they move and whether
+    /// the offset is the node's index or one past it, so one body serves all four — and all four owe
+    /// the caller <c>InvalidNodeTypeError</c> when the node has no parent to be positioned within.
+    /// </summary>
+    private JSValue RangeSetBoundaryToSibling(BridgeDomRange state, in Arguments a, string member, bool start, bool after)
     {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'setStartBefore': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
-            return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
+        var node = NodeArgument(in a, 0, member);
         // Phase 4 item 1 (P4.4a): a boundary node's parent may be a canonical DomDocument (a regime-B
         // createDocument root) — a valid boundary container that is not a DomElement, so use the raw
         // ParentNode (ParentEl nulled out a non-element parent and wrongly threw here).
-        if (el is null || el.ParentNode == null)
+        if (node.ParentNode is not { } parent)
         {
-            DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute '{member}' on 'Range': the given Node has no parent.",
+                "InvalidNodeTypeError");
             return JSUndefined.Value;
         }
 
-        state.SetStart(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el));
+        var offset = DomBridge.ChildIndexOf(parent, node) + (after ? 1 : 0);
+        if (start)
+            state.SetStart(parent, offset);
+        else
+            state.SetEnd(parent, offset);
         return JSUndefined.Value;
     }
 
-    private JSValue RangeSetStartAfter(DomRange state, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'setStartAfter': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
-            return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        // Phase 4 item 1 (P4.4a): a boundary node's parent may be a canonical DomDocument (a regime-B
-        // createDocument root) — a valid boundary container that is not a DomElement, so use the raw
-        // ParentNode (ParentEl nulled out a non-element parent and wrongly threw here).
-        if (el is null || el.ParentNode == null)
-        {
-            DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
-            return JSUndefined.Value;
-        }
-
-        state.SetStart(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el) + 1);
-        return JSUndefined.Value;
-    }
-
-    private JSValue RangeSetEndBefore(DomRange state, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'setEndBefore': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
-            return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        // INVALID_NODE_TYPE_ERR — node has no parent. Phase 4 item 1 (P4.4a): use the raw ParentNode so
-        // a canonical DomDocument parent (regime-B createDocument root) is accepted as a container.
-        if (el is null || el.ParentNode == null)
-        {
-            DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
-            return JSUndefined.Value;
-        }
-
-        state.SetEnd(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el));
-        return JSUndefined.Value;
-    }
-
-    private JSValue RangeSetEndAfter(DomRange state, in Arguments a)
-    {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'setEndAfter': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
-            return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        // Phase 4 item 1 (P4.4a): a boundary node's parent may be a canonical DomDocument (a regime-B
-        // createDocument root) — a valid boundary container that is not a DomElement, so use the raw
-        // ParentNode (ParentEl nulled out a non-element parent and wrongly threw here).
-        if (el is null || el.ParentNode == null)
-        {
-            DomBridge.ThrowDOMException(_host.JsContext, "Invalid node type", "InvalidNodeTypeError");
-            return JSUndefined.Value;
-        }
-
-        state.SetEnd(el.ParentNode, DomBridge.ChildIndexOf(el.ParentNode, el) + 1);
-        return JSUndefined.Value;
-    }
-
-    private static JSValue RangeCollapse(DomRange state, in Arguments a)
+    private static JSValue RangeCollapse(BridgeDomRange state, in Arguments a)
     {
         state.Collapse(a.Length > 0 && a[0].BooleanValue);
         return JSUndefined.Value;
     }
 
-    private JSValue RangeSelectNode(DomRange state, in Arguments a)
+    private JSValue RangeSelectNode(BridgeDomRange state, in Arguments a)
     {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'selectNode': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
+        var node = NodeArgument(in a, 0, "selectNode");
+        if (node.ParentNode is null)
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                "Failed to execute 'selectNode' on 'Range': the given Node has no parent.",
+                "InvalidNodeTypeError");
             return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        // Preserve the pre-rewire lenient behaviour: a parentless node is a no-op here rather
-        // than the canonical InvalidNodeTypeError throw.
-        if (el is null || DomBridge.ParentEl(el) == null)
-            return JSUndefined.Value;
-        state.SelectNode(el);
+        }
+
+        state.SelectNode(node);
         return JSUndefined.Value;
     }
 
-    private JSValue RangeSelectNodeContents(DomRange state, in Arguments a)
+    private JSValue RangeSelectNodeContents(BridgeDomRange state, in Arguments a)
     {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'selectNodeContents': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
-            return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el == null)
-            return JSUndefined.Value;
-        state.SelectNodeContents(el);
+        var node = NodeArgument(in a, 0, "selectNodeContents");
+        try
+        {
+            state.SelectNodeContents(node);
+        }
+        catch (DomException ex)
+        {
+            // A doctype has no contents to select. Uncaught, the canonical exception reached the page
+            // as a bare Error carrying a .NET stack trace instead of a DOMException.
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute 'selectNodeContents' on 'Range': The node provided is of type '{NodeNameOf(node)}'.",
+                ex.Name);
+        }
+
         return JSUndefined.Value;
     }
 
-    private JSValue RangeCloneContents(DomRange state, in Arguments a) =>
+    // -------- Content operations --------
+
+    private JSValue RangeCloneContents(BridgeDomRange state, in Arguments a) =>
         _host.ToJSObject(state.CloneContents());
 
-    private JSValue RangeExtractContents(DomRange state, in Arguments a) =>
+    private JSValue RangeExtractContents(BridgeDomRange state, in Arguments a) =>
         _host.ToJSObject(state.ExtractContents());
 
-    private static JSValue RangeDeleteContents(DomRange state, in Arguments a)
+    private static JSValue RangeDeleteContents(BridgeDomRange state, in Arguments a)
     {
         state.DeleteContents();
         return JSUndefined.Value;
     }
 
-    private JSValue RangeInsertNode(DomRange state, in Arguments a)
+    private JSValue RangeInsertNode(BridgeDomRange state, in Arguments a)
     {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'insertNode': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
+        var node = NodeArgument(in a, 0, "insertNode");
+        if (node is DomDocumentType)
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute 'insertNode' on 'Range': Nodes of type '{NodeNameOf(node)}' may not be inserted inside nodes of type '{NodeNameOf(state.StartContainer)}'.",
+                "HierarchyRequestError");
             return JSUndefined.Value;
-        var el = _host.FindDomNodeByJSObject(nodeObj);
-        if (el == null)
-            return JSUndefined.Value;
+        }
+
         try
         {
-            state.InsertNode(el);
+            state.InsertNode(node);
         }
         catch (DomException ex)
         {
@@ -223,26 +274,37 @@ internal sealed partial class TraversalBinding
         return JSUndefined.Value;
     }
 
-    private JSValue RangeSurroundContents(DomRange state, in Arguments a)
+    private JSValue RangeSurroundContents(BridgeDomRange state, in Arguments a)
     {
-        if (a.Length == 0)
-            throw new JSException("Failed to execute 'surroundContents': 1 argument required.");
-        if (a[0] is not JSObject nodeObj)
-            return JSUndefined.Value;
-        var newParent = _host.FindDomElementByJSObject(nodeObj);
-        if (newParent == null)
-            return JSUndefined.Value;
+        var newParent = NodeArgument(in a, 0, "surroundContents");
 
         // The document root is now a canonical DomDocument (P4.6) and sub-document roots are severed
-        // canonical DomDocuments (P4.4b) — neither is a DomElement — so the canonical
-        // SurroundContents below enforces the single-document-element hierarchy rule directly; the
-        // former #document / #subdoc-root sentinel guard here is dead and removed.
+        // canonical DomDocuments (P4.4b) — neither is a DomElement — so a non-element new parent is
+        // rejected here by node kind rather than by the former #document / #subdoc-root sentinel
+        // guard. A browser splits the rejection two ways, which is what these two arms are.
+        if (newParent is DomDocumentType or DomDocument or DomDocumentFragment)
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute 'surroundContents' on 'Range': The node provided is of type '{NodeNameOf(newParent)}'.",
+                "InvalidNodeTypeError");
+            return JSUndefined.Value;
+        }
+
+        if (newParent is not DomElement newParentElement)
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                "Failed to execute 'surroundContents' on 'Range': This node type does not support this method.",
+                "HierarchyRequestError");
+            return JSUndefined.Value;
+        }
 
         // The canonical algorithm handles the partial-non-text (InvalidStateError, incl. comment
-        // boundaries) and invalid-newParent (InvalidNodeTypeError) checks, the extract, and the wrap.
+        // boundaries) check, the extract, and the wrap.
         try
         {
-            state.SurroundContents(newParent);
+            state.SurroundContents(newParentElement);
         }
         catch (DomException ex)
         {
@@ -252,45 +314,191 @@ internal sealed partial class TraversalBinding
         return JSUndefined.Value;
     }
 
-    private JSValue RangeCloneRange(DomRange state, in Arguments a)
+    /// <summary>
+    /// A copy with the same boundaries and the same root — the root matters, because a range created
+    /// in a frame's document must clone into that document and not into the containing page's. The
+    /// former implementation minted the clone against the main document and set its boundaries by
+    /// calling the JS <c>setStart</c>/<c>setEnd</c> it looked up off the object; both go away with
+    /// the members now on the prototype and the state held here.
+    /// </summary>
+    private JSValue RangeCloneRange(BridgeDomRange state, in Arguments a)
     {
-        var clone = BuildRange();
-        // Set clone boundaries via internal approach
-        var setStartFn = clone[(KeyString)"setStart"] as JSFunction;
-        var setEndFn = clone[(KeyString)"setEnd"] as JSFunction;
-        setStartFn?.InvokeFunction(new Arguments(setStartFn, _host.ToJSObject(state.StartContainer), new JSNumber(state.StartOffset)));
-        setEndFn?.InvokeFunction(new Arguments(setEndFn, _host.ToJSObject(state.EndContainer), new JSNumber(state.EndOffset)));
+        var clone = BuildRange(state.Root);
+        if (_rangeStates.TryGetValue(clone, out var cloneState))
+        {
+            cloneState.SetStart(state.StartContainer, state.StartOffset);
+            cloneState.SetEnd(state.EndContainer, state.EndOffset);
+        }
+
         return clone;
     }
 
-    private JSValue RangeCompareBoundaryPoints(DomRange state, in Arguments a)
+    /// <summary>
+    /// A no-op that a page may still call: <c>detach()</c> was DOM Level 2's way of releasing a
+    /// range, and DOM §4.5 keeps the method so old code does not break while specifying that it does
+    /// nothing. The range stays usable afterwards, which is the observable part.
+    /// </summary>
+    private static JSValue RangeDetach(BridgeDomRange state, in Arguments a) => JSUndefined.Value;
+
+    // -------- Comparison --------
+
+    private JSValue RangeCompareBoundaryPoints(BridgeDomRange state, in Arguments a)
     {
         if (a.Length < 2)
-            throw new JSException("Failed to execute 'compareBoundaryPoints': 2 arguments required.");
-        if (a[1] is not JSObject sourceRangeObj)
-            return new JSNumber(0);
-        var sourceStartContainer = _host.FindDomNodeByJSObject(sourceRangeObj[(KeyString)"startContainer"] as JSObject);
-        var sourceEndContainer = _host.FindDomNodeByJSObject(sourceRangeObj[(KeyString)"endContainer"] as JSObject);
-        if (sourceStartContainer == null || sourceEndContainer == null)
-            return new JSNumber(0);
-        var sourceStartOffsetValue = sourceRangeObj[(KeyString)"startOffset"];
-        var sourceEndOffsetValue = sourceRangeObj[(KeyString)"endOffset"];
-        var sourceStartOffset = sourceStartOffsetValue is null || sourceStartOffsetValue.IsNull || sourceStartOffsetValue.IsUndefined ? 0 : (int)sourceStartOffsetValue.DoubleValue;
-        var sourceEndOffset = sourceEndOffsetValue is null || sourceEndOffsetValue.IsNull || sourceEndOffsetValue.IsUndefined ? 0 : (int)sourceEndOffsetValue.DoubleValue;
-        var howValue = a[0].DoubleValue;
-        var how = double.IsNaN(howValue) ? -1 : (int)howValue;
-        var comparison = how switch
+            return JSException.ThrowTypeError<JSValue>(
+                "Failed to execute 'compareBoundaryPoints' on 'Range': 2 arguments required, but only " +
+                $"{a.Length} present.");
+
+        if (a[1] is not JSObject sourceRangeObject || !_rangeStates.TryGetValue(sourceRangeObject, out var source))
+            return JSException.ThrowTypeError<JSValue>(
+                "Failed to execute 'compareBoundaryPoints' on 'Range': parameter 2 is not of type 'Range'.");
+
+        // Web IDL `unsigned short`: 3.7 truncates to END_TO_START and is accepted; -1 wraps to 65535
+        // and is not. Only the four named methods are in range.
+        var how = ToUnsignedLong(a[0]) % 65536;
+        if (how > 3)
         {
-            0 => _host.CompareBoundaryPosition(state.Root, state.StartContainer, state.StartOffset, sourceStartContainer, sourceStartOffset),
-            1 => _host.CompareBoundaryPosition(state.Root, state.StartContainer, state.StartOffset, sourceEndContainer, sourceEndOffset),
-            2 => _host.CompareBoundaryPosition(state.Root, state.EndContainer, state.EndOffset, sourceEndContainer, sourceEndOffset),
-            3 => _host.CompareBoundaryPosition(state.Root, state.EndContainer, state.EndOffset, sourceStartContainer, sourceStartOffset),
-            _ => throw new JSException("Failed to execute 'compareBoundaryPoints': invalid comparison type.")
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                "Failed to execute 'compareBoundaryPoints' on 'Range': The comparison method provided must be one of " +
+                "'START_TO_START', 'START_TO_END', 'END_TO_END', or 'END_TO_START'.",
+                "NotSupportedError");
+            return new JSNumber(0);
+        }
+
+        if (!ReferenceEquals(state.StartContainer.GetRootNode(), source.StartContainer.GetRootNode()))
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                "Failed to execute 'compareBoundaryPoints' on 'Range': The source range is in a different document than this range.",
+                "WrongDocumentError");
+            return new JSNumber(0);
+        }
+
+        var (thisContainer, thisOffset, otherContainer, otherOffset) = how switch
+        {
+            0 => (state.StartContainer, state.StartOffset, source.StartContainer, source.StartOffset),
+            1 => (state.EndContainer, state.EndOffset, source.StartContainer, source.StartOffset),
+            2 => (state.EndContainer, state.EndOffset, source.EndContainer, source.EndOffset),
+            _ => (state.StartContainer, state.StartOffset, source.EndContainer, source.EndOffset),
         };
-        return new JSNumber(comparison);
+
+        return new JSNumber(
+            DomRange.CompareBoundaryPoints(thisContainer, thisOffset, otherContainer, otherOffset));
     }
 
-    private static JSValue RangeToString(DomRange state, in Arguments a)
+    /// <summary>
+    /// Whether a point is before (<c>-1</c>), within (<c>0</c>) or after (<c>1</c>) the range. The
+    /// three point/node predicates below share their preconditions, which is what
+    /// <see cref="ValidatePoint"/> holds.
+    /// </summary>
+    private JSValue RangeComparePoint(BridgeDomRange state, in Arguments a)
+    {
+        var node = NodeArgument(in a, 0, "comparePoint");
+        var offset = ToUnsignedLong(a.Length > 1 ? a[1] : null);
+
+        if (!ReferenceEquals(node.GetRootNode(), state.StartContainer.GetRootNode()))
+        {
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                "Failed to execute 'comparePoint' on 'Range': The node provided and the Range are not in the same tree.",
+                "WrongDocumentError");
+            return new JSNumber(0);
+        }
+
+        var point = ValidatePoint(node, offset, "comparePoint");
+        if (DomRange.CompareBoundaryPoints(node, point, state.StartContainer, state.StartOffset) < 0)
+            return new JSNumber(-1);
+        if (DomRange.CompareBoundaryPoints(node, point, state.EndContainer, state.EndOffset) > 0)
+            return new JSNumber(1);
+        return new JSNumber(0);
+    }
+
+    private JSValue RangeIsPointInRange(BridgeDomRange state, in Arguments a)
+    {
+        var node = NodeArgument(in a, 0, "isPointInRange");
+        var offset = ToUnsignedLong(a.Length > 1 ? a[1] : null);
+
+        // A point in another tree is simply not in the range — this one answers false where
+        // comparePoint throws, because "is it inside?" has an answer and "where is it?" does not.
+        if (!ReferenceEquals(node.GetRootNode(), state.StartContainer.GetRootNode()))
+            return JSBoolean.False;
+
+        var point = ValidatePoint(node, offset, "isPointInRange");
+        var inside =
+            DomRange.CompareBoundaryPoints(node, point, state.StartContainer, state.StartOffset) >= 0 &&
+            DomRange.CompareBoundaryPoints(node, point, state.EndContainer, state.EndOffset) <= 0;
+        return inside ? JSBoolean.True : JSBoolean.False;
+    }
+
+    private JSValue RangeIntersectsNode(BridgeDomRange state, in Arguments a)
+    {
+        var node = NodeArgument(in a, 0, "intersectsNode");
+        if (!ReferenceEquals(node.GetRootNode(), state.StartContainer.GetRootNode()))
+            return JSBoolean.False;
+
+        // A node with no parent that shares the range's root is the root itself, and the range is
+        // inside it — so it intersects. (A *detached* node fails the root test above instead, which
+        // is why this arm is true rather than false.)
+        if (node.ParentNode is not { } parent)
+            return JSBoolean.True;
+
+        var offset = DomBridge.ChildIndexOf(parent, node);
+        var intersects =
+            DomRange.CompareBoundaryPoints(parent, offset, state.EndContainer, state.EndOffset) < 0 &&
+            DomRange.CompareBoundaryPoints(parent, offset + 1, state.StartContainer, state.StartOffset) > 0;
+        return intersects ? JSBoolean.True : JSBoolean.False;
+    }
+
+    /// <summary>The two checks a point argument owes: not inside a doctype, and not past the node's
+    /// length.</summary>
+    private int ValidatePoint(DomNode node, uint offset, string member)
+    {
+        if (node is DomDocumentType)
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute '{member}' on 'Range': The node provided is of type '{NodeNameOf(node)}'.",
+                "InvalidNodeTypeError");
+
+        var length = NodeLength(node);
+        if (offset > (uint)length)
+            DomBridge.ThrowDOMException(
+                _host.JsContext,
+                $"Failed to execute '{member}' on 'Range': The offset {offset} is larger than the node's length ({length}).",
+                "IndexSizeError");
+
+        return (int)offset;
+    }
+
+    // -------- HTML fragment parsing --------
+
+    /// <summary>
+    /// <c>createContextualFragment</c> (HTML §3.5): parse a markup string as if it were being written
+    /// into the range's start node, and hand back the result as a document fragment. It is how a page
+    /// turns a string into nodes with the *surrounding* element's content model applied, which
+    /// <c>innerHTML</c> on a detached container cannot do.
+    /// </summary>
+    private JSValue RangeCreateContextualFragment(BridgeDomRange state, in Arguments a)
+    {
+        var html = a.Length > 0 && !a[0].IsUndefined ? a[0].ToString() : string.Empty;
+
+        // The parsing context is the start node if it is an element, otherwise its parent element.
+        // `html` is excluded deliberately: parsing into it would run the "before head" rules and
+        // discard ordinary flow content, so HTML §3.5 substitutes a body element, and so does this.
+        var context = state.StartContainer as DomElement ?? state.StartContainer.ParentNode as DomElement;
+        if (context is null || string.Equals(context.LocalName, "html", StringComparison.OrdinalIgnoreCase))
+            context = state.StartContainer.OwnerDocument?.Body ?? _host.CreateBridgeElement("body");
+
+        var fragment = _host.CreateRangeResultFragment();
+        foreach (var node in _host.ParseHtmlFragment(context, html))
+            fragment.AppendChild(node);
+
+        return _host.ToJSObject(fragment);
+    }
+
+    // -------- Stringifier --------
+
+    private static JSValue RangeToString(BridgeDomRange state, in Arguments a)
     {
         // A range within a single Comment node stringifies to the selected substring — a deliberate
         // deviation from the DOM §4.5 stringifier, which is Text-only (a Comment range would yield
