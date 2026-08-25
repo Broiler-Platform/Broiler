@@ -194,16 +194,33 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- DOM wrappers do not consistently use genuine interface/prototype chains. **Narrowed:** the
-  collection interfaces now do — `NodeList` and `HTMLCollection` instances have real prototypes and
-  answer `instanceof` through the chain, which is action 1's "establish real interface prototypes"
-  for the two interfaces it names. The *element* wrappers still do not: `Element`, `HTMLElement` and
-  the per-tag `HTML*Element` interfaces answer through an `@@hasInstance` hook reading `tagName`,
-  and giving element objects genuine per-interface chains remains the larger open change. Nor do the
-  non-element wrappers: `template.content.constructor.name` is `"Object"` where a browser says
-  `"DocumentFragment"`, so `instanceof DocumentFragment` is false for a real fragment — measured
-  while closing the `template.content` entry below, and left there because it is this item rather
-  than that one.
+- DOM wrappers do not consistently use genuine interface/prototype chains. **Narrowed twice.**
+  `NodeList` and `HTMLCollection` have real prototypes with their methods on them, and the
+  non-element node wrappers — `Text`, `Comment`, `DocumentFragment`, `DocumentType` — are now linked
+  to their interface prototypes, so `constructor.name` names the interface and extending a prototype
+  reaches instances. Both are in
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  <br>**What remains, precisely:**
+  - **Element wrappers report `constructor.name` of `"Object"`.** Their interface is a tag question:
+    the curated table's entries overlap (`HTMLMediaElement` covers `audio` and `video` while
+    `HTMLAudioElement` covers `audio` again) and a tag it omits has to fall back to something a
+    browser distinguishes — `HTMLSpanElement` from `HTMLElement` from `HTMLUnknownElement`. Guessing
+    would put a *wrong* name where `"Object"` is at least not misleading, so it was left rather than
+    approximated. `instanceof` already answers, through the `@@hasInstance` hook.
+  - **`Attr` likewise**, for a different reason: an attribute is not a `DomNode` in the canonical
+    DOM, so its wrapper is not minted at the choke point where the link is applied and needs its own
+    hook.
+  - **Members are still own properties of each wrapper**, so an interface prototype is empty:
+    `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)` lists the whole
+    interface. Relocating them is the larger object-model change, and the one that would let this
+    item close.
+  - **`document.constructor.name`** is `"Object"` where a browser says `"HTMLDocument"` — an
+    interface this engine does not register at all.
+- **Confirmed, newly characterized — `document.doctype` is `undefined`.** A document parsed from
+  `<!doctype html>` answers `undefined` where DOM §4.5 gives the `DocumentType` node, which the
+  bridge does build and can wrap (`document.implementation.createDocumentType` returns a correct one).
+  Found while linking the wrapper prototypes above and deliberately not fixed there; it is a missing
+  accessor rather than a missing mechanism.
 - ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
   of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).

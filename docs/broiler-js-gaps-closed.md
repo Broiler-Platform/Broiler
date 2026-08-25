@@ -599,6 +599,28 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
+  `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
+  reads `nodeType`, which made the gap narrower than it looks and also more confusing:
+  `node instanceof Text` was `true` while `node.constructor.name` was `"Object"` and
+  `Object.getPrototypeOf(node) === Text.prototype` was `false`. Anything keyed on the constructor —
+  debugging output, logging, dispatch — read the wrong thing.
+  <br>**Fixed for the non-element wrappers**: `Text`, `Comment`, `DocumentFragment` and
+  `DocumentType` are linked to their interface prototypes at the single choke point that mints every
+  wrapper. `DocumentType` had no global and gained one. The gain is not only cosmetic — the
+  prototype is genuinely in the chain, so extending `Text.prototype`, the ordinary polyfill idiom,
+  now reaches instances where the assignment used to go to an object nothing inherited from.
+  <br>**The boundary is deliberate and is asserted, not just described.** Each of these node kinds
+  has exactly one interface fixed by its node type, so the mapping is a fact. An *element's* is a tag
+  question over a table whose entries overlap and which omits tags a browser still names, so a guess
+  would put a wrong name where `"Object"` is at least not misleading; `Attr` is not a canonical
+  `DomNode` and so is not minted where the link is applied. A regression asserts both still report
+  `"Object"`, so if either starts naming its interface the fixture is updated deliberately rather
+  than the change landing unnoticed. Members also stay own properties, leaving the interface
+  prototypes themselves empty — the larger object-model change, and what this item's remainder in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model) now names precisely.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/WrapperPrototypes.cs`, applied from
+  `DomBridge/JsObjects.cs`); regressions in `WrapperInterfacePrototypeTests`.
 - **`document.fonts.check()` accepted malformed shorthands**, answering `true` for strings that are
   not fonts — `check('not-a-font')`, `check('12px')`, `check('px monospace')` — where every browser
   throws a `SyntaxError` (css-font-loading-3). `true` is the answer that does the damage: a page

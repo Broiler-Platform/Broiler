@@ -145,6 +145,7 @@ public sealed partial class DomBridge
             function Text() { throw new TypeError('Illegal constructor'); }
             function Comment() { throw new TypeError('Illegal constructor'); }
             function Attr() { throw new TypeError('Illegal constructor'); }
+            function DocumentType() { throw new TypeError('Illegal constructor'); }
             function SVGElement() { throw new TypeError('Illegal constructor'); }
             function CanvasRenderingContext2D() { throw new TypeError('Illegal constructor'); }
 
