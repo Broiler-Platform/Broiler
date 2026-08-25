@@ -322,7 +322,14 @@ public sealed partial class DomBridge
         navigatorObj.FastAddValue((KeyString)"cookieEnabled", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"onLine", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"platform", new JSString("Win32"), JSPropertyAttributes.EnumerableConfigurableValue);
+        // Conforming and truthful: §8.9 allows exactly "", "Apple Computer, Inc." or "Google Inc.",
+        // and Broiler's user agent does not claim to be Chrome. See NavigatorIdentityBinding.
         navigatorObj.FastAddValue((KeyString)"vendor", new JSString(""), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Who the browser is and what the machine underneath it has — the legacy identity constants
+        // §8.9 mandates for every user agent, `webdriver`, and the measured hardware members. Takes
+        // the same user-agent string registered above so `appVersion` cannot drift from `userAgent`.
+        Dom.Features.NavigatorIdentityBinding.Install(navigatorObj, Layout.Net.BroilerUserAgent.Value);
 
         // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
         navigatorObj.FastAddValue((KeyString)"sendBeacon", new DomFunction((in a) => Dom.Features.BeaconBinding.Send(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -376,6 +383,13 @@ public sealed partial class DomBridge
 
         // The six BarProp objects. See WindowBarPropBinding for why every one reports not-visible.
         Dom.Features.WindowBarPropBinding.Install(window);
+
+        // window.offscreenBuffering — a legacy Netscape-era property that survives on the Window
+        // interface and is still read by old feature-detection preambles. It has no standard
+        // definition left to satisfy; `true` is the value the reference engine reports, and the point
+        // of having it at all is that the read yields a boolean rather than `undefined`. Grouped with
+        // the geometry above because it is the last member of that same audited block.
+        window.FastAddProperty((KeyString)"offscreenBuffering", new DomFunction((in _) => JSBoolean.True, "get offscreenBuffering"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // window scroll / scrollTo / scrollBy, co-located in the WindowScrollBinding feature module (Phase 3).
         window.FastAddValue((KeyString)"scroll", new DomFunction((in a) => Dom.Features.WindowScrollBinding.Scroll(this, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);

@@ -455,6 +455,35 @@ were deleted and the gitlinks point at commits that contain them. See
   queue drains and still asserts LOADING arrives, in order, before DONE. Main-repo
   `Broiler.HtmlBridge.Dom` fix (`Features/FetchBinding.cs`, `Features/FetchBinding.Callbacks.cs`),
   landed directly rather than as a submodule patch; regressions in `FetchPromiseConformanceTests`.
+- `navigator`'s identity and hardware surface was absent — the privacy inventory's #1748, ten probes.
+  `appCodeName`, `appName`, `appVersion`, `product`, `productSub`, `webdriver`, `deviceMemory`,
+  `hardwareConcurrency` and `maxTouchPoints` all read `undefined`, which is the one answer none of
+  them may have: five are constants HTML §8.9 *mandates* for every user agent, and the rest are read
+  inside arithmetic and comparisons where an absent value propagates silently rather than announcing
+  itself — `navigator.appVersion.indexOf(…)`, still the shape of a great deal of legacy sniffing,
+  threw outright. **Fixed**, with each value chosen from what this engine actually is:
+  the five legacy constants are the specification's fixed strings (`"Mozilla"`, `"Netscape"`,
+  `"Gecko"`, `"20030107"`), which are *not* vendor identity claims — §8.9 pins them for every browser
+  regardless of engine precisely so that sniffing them tells a page nothing, and returning anything
+  else would be the deviation; `appVersion` is **derived** from the one user-agent string rather than
+  written out a second time, so it cannot drift from `navigator.userAgent` (a regression asserts
+  `'Mozilla/' + appVersion === userAgent`); `webdriver` is `true`, the honest answer rather than the
+  flattering one, because the attribute reports whether the agent is driven by automation and a
+  capture engine is exactly that; `hardwareConcurrency` is the machine's real logical-processor
+  count and `deviceMemory` its real memory coarsened as the Device Memory specification requires
+  (a power of two, clamped to 0.25–8), so both are measured rather than asserted; and
+  `maxTouchPoints` is `0` because a capture has no touch input.
+  <br>`vendor` was deliberately **left unchanged** at `""`. §8.9 permits exactly `""`,
+  `"Apple Computer, Inc."` or `"Google Inc."`; Broiler's user agent does not claim to be Chrome, so
+  `""` is both conforming and truthful, and changing it to match Chromium's answer would be an
+  identity claim rather than a fix. The object-valued surfaces beside these (`connection`,
+  `permissions`, `storage`, `mediaDevices`, `mediaCapabilities`, `userAgentData`) are whole APIs, not
+  values, and stay in [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics)
+  pending the same present-but-empty-object judgement that kept `speechSynthesis` out.
+  This also picked up `window.offscreenBuffering`, the one member of the window/screen block below
+  that the geometry fix missed. Main-repo `Broiler.HtmlBridge.Dom` fix (the new
+  `Features/NavigatorIdentityBinding.cs` and its registration), landed directly rather than as a
+  submodule patch; regressions in `NavigatorIdentityTests`.
 - Window and screen geometry plus the `BarProp` objects were absent: `window.screenX`/`screenY` (and
   the `screenLeft`/`screenTop` spellings), `window.devicePixelRatio`, `screen.availLeft`/`availTop`,
   and all six of `locationbar`, `menubar`, `personalbar`, `scrollbars`, `statusbar`, `toolbar`.

@@ -140,8 +140,14 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 
 ### Window, document, navigator, URL, and timing semantics
 
-- Navigator identity, hardware, connection, permissions, storage, media-device, media-capability,
-  and user-agent-data surfaces remain incomplete.
+- Navigator's **object-valued** surfaces remain absent: `connection`, `permissions`, `storage`,
+  `mediaDevices`, `mediaCapabilities` and `userAgentData`. Each is a whole API rather than a value,
+  and each needs its own decision about whether a present-but-empty object answers a page's
+  `'x' in navigator` detection *more* misleadingly than absence does — the same test that kept
+  `speechSynthesis` and `navigator.bluetooth` deliberately absent (see
+  [the privacy inventory](privacy-test-page-gaps.md)). The scalar identity and hardware half of this
+  line is **fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - ~~Window and screen geometry plus `BarProp` objects are absent.~~ **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - `window.trustedTypes` is absent — a **capability decision**, not an omission: Trusted Types is an
