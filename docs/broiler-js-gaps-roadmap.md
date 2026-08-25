@@ -30,23 +30,34 @@ we already settle?" are separate questions with separate answers:
 | [**closed**](broiler-js-gaps-closed.md) | Fixed, and retired-as-not-reproducing — with the evidence for each |
 | [**won't fix**](broiler-js-gaps-wont-fix.md) | Landed-but-still-listed, deliberate deviations, product boundaries |
 
+**One item, one document.** When an item is fixed or retired it is *removed* from **open** or
+**in progress** rather than struck through in place, and its full record — root cause, what landed,
+the evidence — moves to **closed**. So **open** answers "what is left?" with nothing else mixed in,
+and no item has two entries that can drift apart. Where fixing something leaves a smaller thing
+behind, only the remainder stays in **open**, stated on its own without the history.
+
 ## Where each track stands
 
 Status is per item, not per track: a track's fixed items are in **closed** while its remaining
 ones are in **open** or **in progress**. Each document keeps the track headings, so an item can be
 found either by status or by track.
 
-| # | Track | Current state | Lives in | Required outcome |
+**"What is left" is the only thing this table states.** It deliberately does not list what has been
+fixed — that grows without bound and goes stale the moment it is not updated, and it is already
+recorded, with root cause and evidence, in [closed](broiler-js-gaps-closed.md). Read a row as the
+work remaining on that track.
+
+| # | Track | What is left | Lives in | Required outcome |
 |---:|---|---|---|---|
-| 0 | Conformance evidence | Coverage gaps closed; pinned-corpus CI run outstanding | in progress · closed | Test failures and timeouts are trustworthy |
-| 1 | Core language and built-ins | Named clusters fixed; Annex B and cross-realm remain | open · closed | Supported Test262 language clusters are clean |
-| 2 | RegExp | Engine gaps closed; matcher performance then non-Unicode routing | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
-| 3 | Scripts, tasks, and modules | Module syntax closed; scope isolation and import immutability landed upstream; live bindings, host task model, and two decisions open | open · in progress · closed | Parsing and task ordering match observable browser behavior |
-| 4 | Workers and shared memory | Worker first slice; shared memory not started | open | Claimed agent capabilities are complete and deterministic |
-| 5 | Essential browser JavaScript APIs | Mixed partial, absent, and stubbed surfaces; fetch Promise conformance (action 1), `performance.now()`, the document-surface audit line, window/screen geometry, navigator identity and the Navigation Timing marks — lifecycle and network — fixed | open · closed | A tested support matrix replaces accidental omissions |
-| 6 | DOM, CSSOM, and SVG from JavaScript | Partial object and tree models; `Node` interface constants, CharacterData, tree-mutation, `setAttribute` and `querySelector` `DOMException`s and the linked-stylesheet CSSOM gap fixed; the form default/reset/radio family characterized and fixed; `NodeList`/`HTMLCollection`/`NamedNodeMap` given real prototypes and correct liveness (action 1's collection half), an attribute made one live `Attr` node, form association implemented on top of them, Custom Elements given a production registry, constructible base and reactions, `template.content` made the parser-owned fragment, Font Loading's shorthand validation implemented, the DOM wrappers — elements, attributes and the document included — linked to their interface prototypes along real inheritance chains, the document's own collection surface — `doctype`, `dir`, `designMode`, the seven element collections and `styleSheets` — made live, identity-stable and complete, in a frame's document as well as the containing one, the `:is()` aliases stopped matching every element (upstream, now live), `AbstractRange`/`Range` made real interfaces with their members on their prototypes, their five missing operations, and the exceptions DOM §4.5 names — closing action 2 — and `Selection`/`StaticRange` plus the `window`/`document` `getSelection()` pair implemented on the same machinery, and the File API data surfaces — `Blob`, `File`, `FileList`, `URL.createObjectURL` and `input.files` — implemented, replacing the look-alike `response.blob()` was returning; `compareDocumentPosition`, qualified attributes and computed `display` retired as not reproducing | open · closed | Script-visible objects and algorithms meet their claimed standards |
-| 7 | Graphics, media, and advanced APIs | Large capability decisions | open | Each surface is implemented or explicitly excluded |
-| 8 | Portable/Native-AOT profile | Numeric seed only | open | Optional profile decision and, if approved, a truthful capability set |
+| 0 | Conformance evidence | The pinned-corpus CI run, and product decisions for three `$262` hooks | in progress · closed | Test failures and timeouts are trustworthy |
+| 1 | Core language and built-ins | Annex B remainder and the cross-realm cases | open · closed | Supported Test262 language clusters are clean |
+| 2 | RegExp | Matcher performance, then non-Unicode routing, then retiring the translator | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
+| 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; three capability decisions | open · in progress · closed | Parsing and task ordering match observable browser behavior |
+| 4 | Workers and shared memory | The excluded Worker capabilities, concurrent-context safety, cross-agent shared memory | open | Claimed agent capabilities are complete and deterministic |
+| 5 | Essential browser JavaScript APIs | Navigation semantics; storage and networking; navigator's object-valued surfaces; Trusted Types | open · closed | A tested support matrix replaces accidental omissions |
+| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; the Custom Elements remainder; live SVG DOM; four capability decisions (`document.all`, per-tag SVG interfaces, Font Loading, `ReadableStream`/`FileReader`) | open · closed | Script-visible objects and algorithms meet their claimed standards |
+| 7 | Graphics, media, and advanced APIs | Every surface — large capability decisions first | open | Each surface is implemented or explicitly excluded |
+| 8 | Portable/Native-AOT profile | Everything past the numeric seed, and the profile decision that gates it | open | Optional profile decision and, if approved, a truthful capability set |
 
 Tracks 1 and 2 can proceed in parallel once track 0 makes their results trustworthy. Tracks 3
 through 7 share host and DOM dependencies and must use one published support matrix rather than

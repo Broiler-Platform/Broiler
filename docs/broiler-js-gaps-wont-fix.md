@@ -2,8 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · **won't fix**.
-> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names the pinned
-> `Broiler.JS` commit that carries it and the regression that holds it.
+> Statuses were last reconciled on **2026-08-25**.
 
 Records that look like open gaps and are not. Some are already landed and only older Markdown
 still calls them pending; some are deliberate product or profile boundaries; one is a deliberate
@@ -24,10 +23,6 @@ Do not reopen these solely because older Markdown calls them pending:
 - Broiler.HTML static-renderer exclusions do not prove that the aggregate Browser/HtmlBridge stack
   lacks every excluded API; and
 - Minimal and deliberately narrow Portable profiles are not gaps in the Full profile.
-
-Removed or proprietary surfaces such as WebSQL and `chrome.loadTimes()` are not roadmap work.
-Diagnostics that merely hide first-chance exceptions are useful tooling work but are not language
-feature gaps and are not tracked here.
 
 ## Deliberate deviations
 

@@ -2,8 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · [open](broiler-js-gaps-open.md) · **in progress** · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names the pinned
-> `Broiler.JS` commit that carries it and the regression that holds it.
+> Statuses were last reconciled on **2026-08-25**.
 
 Tracks that are part-landed: the mechanism is in and the evidence is real, but named steps remain
 before the track's exit gate is met. What each still needs is listed as work, not as a gap.
@@ -88,20 +87,12 @@ See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.m
 
 ### Actions
 
-1. ~~Connect Unicode property escapes to reviewed Broiler.Unicode property data.~~ Done.
-2. ~~Implement and test UnicodeSets operands and string alternatives before routing `v`
-   patterns.~~ Done.
-3. ~~Implement complete mode-sensitive canonicalization and pin astral and multi-script
-   cases.~~ Done.
-4. ~~Move `Exec`, `Split`, and `Replace` to one match-data abstraction.~~ Done — all three
-   read the routed engine through `EnumerateMatches`/`RunMatch`, `IJSRegExp.Value` is
-   replaced by an engine-agnostic `IsMatch`, and a routed pattern no longer needs a .NET
-   translation (`value` is null when the translator cannot represent it).
-5. ~~Expand native routing only for syntax and semantics covered by focused and pinned
-   corpus tests.~~ Done — every Unicode-mode (`u`/`v`) pattern Broiler can build now routes,
-   validated by a JSRegExp-level differential against V8. Non-Unicode routing is deferred to
-   the matcher-performance work.
-6. Retire the translator only after captures, named groups, indices, `lastIndex`, species,
+Actions 1-5 of the original list are complete — property escapes, UnicodeSets operands and string
+alternatives, mode-sensitive canonicalization, the one match-data abstraction behind
+`Exec`/`Split`/`Replace`, and native routing for every Unicode-mode pattern Broiler can build. What
+they landed is recorded in [closed](broiler-js-gaps-closed.md#track-2--regexp). One action is left:
+
+1. Retire the translator only after captures, named groups, indices, `lastIndex`, species,
    replacement substitutions, and observable property order are clean — now gated solely on
    non-Unicode routing (remaining work item 1). Quantifier repetition is iterative for every
    body shape, so no Unicode-mode pattern falls back to .NET on overflow; the stack guard is
@@ -112,58 +103,13 @@ the native backend, and all public RegExp operations consume the same conforming
 
 ## Track 3 — Module execution semantics
 
-**Status: two module-binding defects are root-caused, fixed, and now landed upstream — the pinned
-`Broiler.JS` gitlink carries both, so CI sees them. A third, larger defect — imports are not live
+**Status: the module-binding defects this track has fixed are landed upstream and recorded in
+[closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics) — the pinned `Broiler.JS`
+gitlink carries them, so CI sees them. One larger defect of the same family — imports are not live
 bindings — is characterized but not fixed, because it is an architectural change to how the engine
 links modules. The rest of track 3 — the host task model and the JSON-module / `import.meta` /
 attribute-enforcement decisions — stays in
 [open](broiler-js-gaps-open.md#track-3--scripts-tasks-and-modules).**
-
-### Fixed
-
-Both were written as `Broiler.JS` submodule patches because the push to the submodule remote
-returned 403 (it is outside this session's GitHub scope). They have since been applied upstream and
-the gitlink bumped: `12839186` *Give a module's top-level lexicals their own environment* and
-`8b74d6c3` *Make an imported binding immutable* are both ancestors of the pinned pointer, and the
-`patches/` copies are deleted. Check either with
-`git -C Broiler.JS log --oneline --grep '<subject>'` rather than by patch number.
-
-- **A module's top-level `let`/`const`/`class` bindings shared one realm-wide slot per name.** They
-  were published into the realm's global lexical environment exactly as a script's top-level
-  lexicals are, so two modules declaring the same top-level name aliased one binding. A module that
-  declared a top-level `const x` and, while its body was still running, triggered a transitive
-  import of another module that also declared a top-level `const x` then wrote through the first
-  module's read-only binding and threw "Cannot assign to read only variable". (Sibling imports at
-  one level escaped only because each body had returned before the next ran, re-declaring the shared
-  slot rather than double-occupying it.) **Fixed** by keeping a module's top-level lexicals local to
-  its compiled body — the global-lexical publishing in `VisitProgram` is gated on the ES module
-  goal, and the names an `export const`/`let`/`class` introduces are collected so an exported
-  declaration follows the same module-local path as a bare one instead of falling through to a
-  global-lexical slot. This is also the spec-correct scoping: an indirect eval in the global
-  environment must not resolve a module's top-level bindings. The submodule commit is *Give a
-  module's top-level lexicals their own environment*; regressions in `ModuleScopeIsolationTests`.
-- **`export *` did not respect export precedence.** A star re-export republishes the source's names
-  onto this module's `exports` at run time, and it overwrote a name the module already exported
-  locally or via a named re-export — last-writer-wins, and a throw ("Cannot assign to read only
-  variable") when the overwritten name was a `const` export and the star followed it in source
-  order. ResolveExport (ES2024 16.2.1.5.3) consults a module's own local and indirect entries before
-  its star entries, so an explicitly exported name is never taken from `export *`. **Fixed** in the
-  same commit: the run-time copy skips a name the target already owns. (Two `export *` sources that
-  both carry one name — a genuinely *ambiguous* star export, which should be excluded from the
-  namespace and a SyntaxError to import by name — is a separate, unfixed case that the run-time-copy
-  model cannot yet represent; it now resolves to the first star rather than the last, neither being
-  conformant.)
-- **An imported binding was mutable.** An `ImportedBinding` is immutable (ES2024 16.2.1.5 creates it
-  as an immutable binding), but the engine seeded each import into an ordinary mutable local, so
-  `import { x } from 'm'; x = 2;` quietly overwrote the local snapshot and ran on. **Fixed** by
-  sealing every import binding — named, default, namespace, and renamed — read-only right after it is
-  seeded, so a later assignment throws in the strict module code, the same runtime read-only
-  TypeError a reassigned `const` gives. The spec makes assignment to an import an *early* SyntaxError;
-  this engine cannot raise that phase without whole-module scope analysis across its deferred function
-  bodies (an assignment inside a not-yet-compiled function body is not seen at module-compile time),
-  so it matches its own `const` treatment — a runtime read-only write — rather than leaving the write
-  to succeed. The submodule commit is *Make an imported binding immutable*; regressions in
-  `ModuleImportImmutabilityTests`.
 
 ### Newly characterized — not yet fixed
 
@@ -186,13 +132,11 @@ the gitlink bumped: `12839186` *Give a module's top-level lexicals their own env
 
 ### Remaining work
 
-1. ~~Land the two `Broiler.JS` patches and bump the submodule gitlink.~~ **Done** — see *Fixed*
-   above. CI now clones a pointer that carries both.
-2. Re-measure the module corpus against the landed fixes. Track 0's run recorded "22
+1. Re-measure the module corpus against the landed fixes. Track 0's run recorded "22
    NullReferenceException crashes in module namespace and ambiguous-export paths" and "52 that hang";
    the scope-isolation fix targets a distinct read-only-write crash class (not those NREs), so its
    effect on those totals is unknown until the corpus is re-run — do not assume it moves them.
-3. Design and implement live import bindings (the *Newly characterized* item). This is the
+2. Design and implement live import bindings (the *Newly characterized* item). This is the
    architectural piece the exit gate turns on, and it also converts the import-immutability error to
    the spec's parse phase; it is not a patch-sized change.
 

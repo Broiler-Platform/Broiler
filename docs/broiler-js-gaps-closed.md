@@ -310,8 +310,9 @@ mismatches.
 
 The engine and routing changes have landed in the pinned submodules: the `Broiler.Regex`
 work reached `4df3fb8` and the `Broiler.JS` routing reached `d20e506`, so their patch files
-were deleted and the gitlinks point at commits that contain them. See
-[`patches/README.md`](../patches/README.md) for the current (now empty) patch backlog.
+were deleted and the gitlinks point at commits that contain them. The `patches/` backlog is
+empty and the directory is gone with it — a submodule fix is now checked with
+`git -C <Submodule> log --oneline --grep '<subject>'`, never by patch number.
 
 
 ### Track 3 — Module syntax
@@ -387,6 +388,56 @@ were deleted and the gitlinks point at commits that contain them. See
   modules the rule is about bindings only: `await` stays legal as a property name, a method name and
   the operator, including top-level await. Landed in `8e745b4`; regressions in
   `ModuleAwaitReservedTests`.
+
+### Track 3 — Module binding semantics
+
+The part-landed half of track 3. Live import bindings, the remaining defect of the same
+family, are characterized but not fixed and stay in
+[in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
+
+The two `Broiler.JS` patches carrying these three fixes were written as submodule patches because
+the push to the submodule remote returned 403 (it is outside this session's GitHub scope). They have
+since been applied upstream and the gitlink bumped: `12839186` *Give a module's top-level lexicals their own environment* and
+`8b74d6c3` *Make an imported binding immutable* are both ancestors of the pinned pointer, and the
+`patches/` copies are deleted. Check either with
+`git -C Broiler.JS log --oneline --grep '<subject>'` rather than by patch number.
+
+- **A module's top-level `let`/`const`/`class` bindings shared one realm-wide slot per name.** They
+  were published into the realm's global lexical environment exactly as a script's top-level
+  lexicals are, so two modules declaring the same top-level name aliased one binding. A module that
+  declared a top-level `const x` and, while its body was still running, triggered a transitive
+  import of another module that also declared a top-level `const x` then wrote through the first
+  module's read-only binding and threw "Cannot assign to read only variable". (Sibling imports at
+  one level escaped only because each body had returned before the next ran, re-declaring the shared
+  slot rather than double-occupying it.) **Fixed** by keeping a module's top-level lexicals local to
+  its compiled body — the global-lexical publishing in `VisitProgram` is gated on the ES module
+  goal, and the names an `export const`/`let`/`class` introduces are collected so an exported
+  declaration follows the same module-local path as a bare one instead of falling through to a
+  global-lexical slot. This is also the spec-correct scoping: an indirect eval in the global
+  environment must not resolve a module's top-level bindings. The submodule commit is *Give a
+  module's top-level lexicals their own environment*; regressions in `ModuleScopeIsolationTests`.
+- **`export *` did not respect export precedence.** A star re-export republishes the source's names
+  onto this module's `exports` at run time, and it overwrote a name the module already exported
+  locally or via a named re-export — last-writer-wins, and a throw ("Cannot assign to read only
+  variable") when the overwritten name was a `const` export and the star followed it in source
+  order. ResolveExport (ES2024 16.2.1.5.3) consults a module's own local and indirect entries before
+  its star entries, so an explicitly exported name is never taken from `export *`. **Fixed** in the
+  same commit: the run-time copy skips a name the target already owns. (Two `export *` sources that
+  both carry one name — a genuinely *ambiguous* star export, which should be excluded from the
+  namespace and a SyntaxError to import by name — is a separate, unfixed case that the run-time-copy
+  model cannot yet represent; it now resolves to the first star rather than the last, neither being
+  conformant.)
+- **An imported binding was mutable.** An `ImportedBinding` is immutable (ES2024 16.2.1.5 creates it
+  as an immutable binding), but the engine seeded each import into an ordinary mutable local, so
+  `import { x } from 'm'; x = 2;` quietly overwrote the local snapshot and ran on. **Fixed** by
+  sealing every import binding — named, default, namespace, and renamed — read-only right after it is
+  seeded, so a later assignment throws in the strict module code, the same runtime read-only
+  TypeError a reassigned `const` gives. The spec makes assignment to an import an *early* SyntaxError;
+  this engine cannot raise that phase without whole-module scope analysis across its deferred function
+  bodies (an assignment inside a not-yet-compiled function body is not seen at module-compile time),
+  so it matches its own `const` treatment — a runtime read-only write — rather than leaving the write
+  to succeed. The submodule commit is *Make an imported binding immutable*; regressions in
+  `ModuleImportImmutabilityTests`.
 
 ### Track 5 — Essential browser JavaScript APIs
 
