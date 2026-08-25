@@ -11,6 +11,9 @@ public sealed partial class DomBridge : Dom.Features.IDocumentFactoryHost
 {
     JSObject Dom.Features.IDocumentFactoryHost.ToJSObject(DomNode node) => ToJSObject(node);
 
+    JSObject? Dom.Features.IDocumentFactoryHost.CreateDefinedCustomElement(string tagName) =>
+        CustomElements.CreateDefined(tagName);
+
     DomElement Dom.Features.IDocumentFactoryHost.CreateBridgeElement(string tagName)
         => NoteCreatedByScript(CreateBridgeElement(tagName));
 

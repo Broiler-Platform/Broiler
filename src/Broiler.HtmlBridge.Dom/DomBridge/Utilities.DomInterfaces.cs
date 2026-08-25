@@ -1,6 +1,7 @@
 using System.Text;
 
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.HtmlBridge;
 
@@ -420,6 +421,12 @@ public sealed partial class DomBridge
         // track 6 action 1's "establish real interface prototypes and Web IDL collection behavior
         // before adding more compatibility-only constructor globals", so adding them in the shape
         // this file otherwise uses would have been the thing that action rules out.
+        // Handed to the custom-elements registration so its constructible HTMLElement can keep
+        // this exact prototype object — every element wrapper is linked to it, so replacing it
+        // with a fresh one would orphan them all.
+        if (context["HTMLElement"] is JSObject htmlElement)
+            context["__broilerHTMLElementPrototype"] = htmlElement[(Broiler.JavaScript.Storage.KeyString)"prototype"];
+
         Dom.Features.DomCollectionBinding.RegisterInterfaces(context);
         // The five NamedNodeMap members that need the owning element are host functions, so they
         // are installed on the interface prototype after it exists.

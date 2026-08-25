@@ -847,6 +847,57 @@ were deleted and the gitlinks point at commits that contain them. See
   <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/DomCollectionBinding.cs`,
   `Features/AttributesBinding.cs`, `DomBridge/Utilities.DomInterfaces.cs`); regressions in
   `NamedNodeMapTests`.
+- **Custom Elements have a production implementation.** There was none: `customElements` was
+  undefined and `HTMLElement` threw `Illegal constructor`, so `class X extends HTMLElement` followed
+  by `customElements.define(…)` failed on the bare name — which aborts the whole script, not the
+  statement that named it. The WPT runner carried a shim to get past that, and the shim could not
+  reach what mattered: its `HTMLElement` handed back a plain element that did not carry the class's
+  prototype, so a component's own methods were unreachable and the four reaction callbacks had to be
+  copied onto each instance by hand.
+  <br>**The one piece that had to be JavaScript is the base constructor**, and the reason is
+  `new.target`. `new X()` runs `X`'s constructor, which calls `super()`, and only `new.target` says
+  which subclass is being built — so which prototype the element takes and, through the registry,
+  which tag name it has. A host function cannot see it: the engine's `Arguments` does not carry one.
+  So the base reads it in JavaScript and calls the host for the element, and everything else — the
+  registry, name validation, upgrades, reaction dispatch — is C#, where the DOM is. That also kept
+  the whole feature in the main repo, with no submodule patch.
+  <br>Two things the earlier interface work put in place are what make the base work at all.
+  Returning an object from a base constructor makes it `this`, so the subclass constructor runs
+  against a real DOM element; and because an element's members are its *own* properties, re-pointing
+  its prototype at `new.target.prototype` adds the class without displacing any of them, while the
+  class's chain still ends at the `HTMLElement.prototype` every element wrapper is linked to.
+  <br>**Upgrading reuses the same constructor path rather than a second one**, which is what the
+  specification's construction stack is for: an upgrade pushes the existing element and the base's
+  callback hands that one back instead of minting a new one, so the author's constructor runs against
+  the node already in the tree. The shim instead copied attributes and children onto a fresh element
+  and swapped it in, which loses node identity — a page holding the element from before the
+  definition landed kept pointing at the discarded one. Identity across an upgrade is pinned.
+  <br>**Reactions come off the canonical `DomDocument.Mutated` stream, which is synchronous.** The
+  obvious reuse would have been `MutationObserver`, which already subscribes there — but its delivery
+  is a microtask, and a browser runs `connectedCallback` before the statement after the `appendChild`
+  that caused it. A component that reads its own DOM immediately after inserting itself would have
+  seen nothing.
+  <br>**The runner's shim now steps aside, and finding out why it did not is part of this.** Its
+  capability probe asked whether `new HTMLElement()` yields an element — which a *correct*
+  implementation can never satisfy, because a bare `new HTMLElement()` has no definition to build
+  from and must throw, exactly as in a browser. So the probe failed against the real implementation
+  and the shim kept winning, which would have meant WPT never exercising the production code at all.
+  The probe now asks whether a *defined* class constructs an element, which is the capability the
+  shim exists to fake.
+  <br>Over a 17-case corpus run against both engines, Broiler and Chromium agree on every one:
+  construction, `createElement` running the definition's constructor, name validation and the
+  reserved hyphenated SVG/MathML names, duplicate name and constructor rejection,
+  `get`/`getName`/`whenDefined`, upgrade-in-place with identity, the connected, disconnected and
+  attribute-changed reactions, the attributes an upgrade replays, and an undefined hyphenated tag
+  staying a plain `HTMLElement`.
+  <br>Main-repo fix (the new `Features/CustomElementsBinding.cs`, `Features/ICustomElementsHost.cs`,
+  `DomBridge.CustomElementsHost.cs`, `DomBridge/Registration/CustomElements.cs`, plus
+  `Features/DocumentFactoryBinding.cs` and `src/Broiler.Wpt/WptTestRunner.cs`); regressions in
+  `CustomElementsTests`.
+  <br>**Left out deliberately, and not faked:** customized built-ins (`extends`/`is=`), which
+  `define` rejects rather than accepting and ignoring; form-associated custom elements; and
+  `adoptedCallback`. All three are in
+  [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

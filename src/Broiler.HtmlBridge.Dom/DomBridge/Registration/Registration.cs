@@ -177,6 +177,11 @@ public sealed partial class DomBridge
         // materialized as a value property, so the <html> wrapper is always one of them. Doing this
         // by sweeping the registry rather than naming that one keeps a future eager mint from
         // silently reverting to "Object".
+        // Custom elements last among the constructor globals: its HTMLElement replaces the
+        // non-constructible one the polyfill pass registers, and it keeps that interface's
+        // prototype object so every element wrapper already linked to it stays linked.
+        RegisterCustomElements(context, window);
+
         LinkToInterface(document, "HTMLDocument");
         foreach (var (node, wrapper) in _jsObjects.Entries)
         {

@@ -777,16 +777,21 @@ internal sealed partial class WptTestRunner
   }
   __broilerEnsureAnimate(document.documentElement);
   __broilerEnsureAnimate(document.body);
-  // The bridge now defines HTMLElement (see DomBridge RegisterDomInterfaceConstructors), so an
-  // `is it missing?` guard would skip this shim and leave `class X extends HTMLElement` building
-  // plain objects instead of elements. Probe the capability this shim actually needs — that
-  // `new HTMLElement()` yields an element node — rather than the name's mere existence. The
-  // bridge's version answers `instanceof` and is not constructible into an element, so the
-  // override still installs; a future real implementation would pass the probe and win.
+  // The bridge defines HTMLElement whether or not custom elements work, so an `is it missing?`
+  // guard would skip this shim and leave `class X extends HTMLElement` building plain objects.
+  // Probe the capability instead — but probe the right one. This used to ask whether
+  // `new HTMLElement()` yields an element node, which a *correct* implementation can never satisfy:
+  // a bare `new HTMLElement()` has no definition to build from and must throw, exactly as it does
+  // in a browser. So the probe failed against the real implementation and the shim kept winning,
+  // which meant the production code was never the thing a WPT test exercised. Ask instead whether
+  // a *defined* class constructs an element, which is the capability the shim exists to fake.
   var __broilerNeedsHtmlElementShim = true;
   try {
-    if (typeof HTMLElement !== 'undefined') {
-      var __broilerHtmlElementProbe = new HTMLElement();
+    if (typeof HTMLElement !== 'undefined' && typeof customElements !== 'undefined' &&
+        typeof customElements.define === 'function') {
+      var __broilerProbeCtor = class extends HTMLElement {};
+      customElements.define('broiler-shim-probe', __broilerProbeCtor);
+      var __broilerHtmlElementProbe = new __broilerProbeCtor();
       __broilerNeedsHtmlElementShim =
         !(__broilerHtmlElementProbe && __broilerHtmlElementProbe.nodeType === 1);
     }

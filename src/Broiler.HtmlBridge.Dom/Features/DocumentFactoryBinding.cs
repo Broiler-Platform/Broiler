@@ -23,6 +23,13 @@ internal static class DocumentFactoryBinding
         var tag = a[0].ToString();
         DomBridge.ValidateElementName(tag, context);
         tag = DomBridge.AsciiToLower(tag);
+
+        // A defined custom element is created by running its own constructor, which is what makes
+        // document.createElement('x-thing') an instance of the class rather than a plain element
+        // that happens to carry the tag (HTML 4.13.6).
+        if (host.CreateDefinedCustomElement(tag) is { } upgraded)
+            return upgraded;
+
         var el = host.CreateBridgeElement(tag);
         return host.ToJSObject(el);
     }

@@ -349,6 +349,28 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Custom Elements work. There was no implementation: `customElements` was
+  undefined and `HTMLElement` threw `Illegal constructor`, so
+  `class X extends HTMLElement` followed by `customElements.define(…)` failed on
+  the bare name — which aborts the whole script, not the statement that named it.
+  A component page therefore rendered as whatever its markup said before any
+  component built itself.
+
+  `customElements` is now a real `CustomElementRegistry` with `define`, `get`,
+  `getName`, `whenDefined` and `upgrade`; `HTMLElement` is constructible from a
+  defined class, so `new X()` and `document.createElement('x-thing')` both
+  produce a real element carrying the class's own methods; elements parsed
+  before their definition are upgraded in place, keeping their identity and
+  children; and the `connectedCallback`, `disconnectedCallback` and
+  `attributeChangedCallback` reactions run synchronously, as a browser runs
+  them.
+
+  Name validation follows HTML §4.13.1, including the hyphenated SVG and MathML
+  names that are reserved. Customized built-ins (the `extends` option and `is=`
+  attribute), form-associated custom elements and `adoptedCallback` are not in
+  this slice and are not faked — `define` rejects an `extends` option rather
+  than accepting it and quietly doing nothing.
+
 - `element.attributes` is a live `NamedNodeMap`, and an attribute is one `Attr`
   node with a live value. It was a fresh plain object per read: naming
   `NamedNodeMap` was a `ReferenceError` (which aborts the whole script, not just

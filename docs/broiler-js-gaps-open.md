@@ -287,7 +287,15 @@ See [HTML5 exceptions](html5test-exceptions.md) and
 
 ### Custom Elements, templates, and Shadow DOM
 
-- WPT currently relies on a `customElements` runner shim; there is no production implementation.
+- ~~WPT currently relies on a `customElements` runner shim; there is no production implementation.~~
+  **Fixed for the core** — the registry, a constructible `HTMLElement`, upgrades and the reaction
+  callbacks are implemented, and the runner's shim now steps aside for them. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  <br>**What remains** are three separate capabilities the slice deliberately left out rather than
+  faked: customized built-ins (the `extends` option and `is=` attribute), which `define` rejects with
+  a `NotSupportedError` instead of accepting and ignoring; form-associated custom elements
+  (`formAssociated`, `ElementInternals`, `attachInternals`); and `adoptedCallback`, which needs the
+  document-adoption path to report ownership changes.
 - ~~`template.content` is a snapshot rather than the parser-owned fragment required by HTML.~~
   **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
