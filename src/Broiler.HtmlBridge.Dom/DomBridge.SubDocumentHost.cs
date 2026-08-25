@@ -60,6 +60,7 @@ public sealed partial class DomBridge : ISubDocumentHost
     JSObject ISubDocumentHost.BuildStyleSheetObject(DomElement styleElement) => BuildStyleSheetObject(styleElement);
     bool ISubDocumentHost.HasAssociatedStyleSheet(DomElement element) => HasAssociatedStyleSheet(element);
     JSObject ISubDocumentHost.BuildRange(DomNode docRoot) => BuildRange(docRoot);
+    JSValue ISubDocumentHost.GetSelection(DomNode docRoot) => _traversal.GetSelection(docRoot);
     JSObject ISubDocumentHost.BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn) =>
         BuildTreeWalker(root, whatToShow, filterFn);
     JSObject ISubDocumentHost.BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn) =>

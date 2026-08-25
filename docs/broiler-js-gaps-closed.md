@@ -310,8 +310,9 @@ mismatches.
 
 The engine and routing changes have landed in the pinned submodules: the `Broiler.Regex`
 work reached `4df3fb8` and the `Broiler.JS` routing reached `d20e506`, so their patch files
-were deleted and the gitlinks point at commits that contain them. See
-[`patches/README.md`](../patches/README.md) for the current (now empty) patch backlog.
+were deleted and the gitlinks point at commits that contain them. The `patches/` backlog is
+empty and the directory is gone with it — a submodule fix is now checked with
+`git -C <Submodule> log --oneline --grep '<subject>'`, never by patch number.
 
 
 ### Track 3 — Module syntax
@@ -387,6 +388,56 @@ were deleted and the gitlinks point at commits that contain them. See
   modules the rule is about bindings only: `await` stays legal as a property name, a method name and
   the operator, including top-level await. Landed in `8e745b4`; regressions in
   `ModuleAwaitReservedTests`.
+
+### Track 3 — Module binding semantics
+
+The part-landed half of track 3. Live import bindings, the remaining defect of the same
+family, are characterized but not fixed and stay in
+[in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
+
+The two `Broiler.JS` patches carrying these three fixes were written as submodule patches because
+the push to the submodule remote returned 403 (it is outside this session's GitHub scope). They have
+since been applied upstream and the gitlink bumped: `12839186` *Give a module's top-level lexicals their own environment* and
+`8b74d6c3` *Make an imported binding immutable* are both ancestors of the pinned pointer, and the
+`patches/` copies are deleted. Check either with
+`git -C Broiler.JS log --oneline --grep '<subject>'` rather than by patch number.
+
+- **A module's top-level `let`/`const`/`class` bindings shared one realm-wide slot per name.** They
+  were published into the realm's global lexical environment exactly as a script's top-level
+  lexicals are, so two modules declaring the same top-level name aliased one binding. A module that
+  declared a top-level `const x` and, while its body was still running, triggered a transitive
+  import of another module that also declared a top-level `const x` then wrote through the first
+  module's read-only binding and threw "Cannot assign to read only variable". (Sibling imports at
+  one level escaped only because each body had returned before the next ran, re-declaring the shared
+  slot rather than double-occupying it.) **Fixed** by keeping a module's top-level lexicals local to
+  its compiled body — the global-lexical publishing in `VisitProgram` is gated on the ES module
+  goal, and the names an `export const`/`let`/`class` introduces are collected so an exported
+  declaration follows the same module-local path as a bare one instead of falling through to a
+  global-lexical slot. This is also the spec-correct scoping: an indirect eval in the global
+  environment must not resolve a module's top-level bindings. The submodule commit is *Give a
+  module's top-level lexicals their own environment*; regressions in `ModuleScopeIsolationTests`.
+- **`export *` did not respect export precedence.** A star re-export republishes the source's names
+  onto this module's `exports` at run time, and it overwrote a name the module already exported
+  locally or via a named re-export — last-writer-wins, and a throw ("Cannot assign to read only
+  variable") when the overwritten name was a `const` export and the star followed it in source
+  order. ResolveExport (ES2024 16.2.1.5.3) consults a module's own local and indirect entries before
+  its star entries, so an explicitly exported name is never taken from `export *`. **Fixed** in the
+  same commit: the run-time copy skips a name the target already owns. (Two `export *` sources that
+  both carry one name — a genuinely *ambiguous* star export, which should be excluded from the
+  namespace and a SyntaxError to import by name — is a separate, unfixed case that the run-time-copy
+  model cannot yet represent; it now resolves to the first star rather than the last, neither being
+  conformant.)
+- **An imported binding was mutable.** An `ImportedBinding` is immutable (ES2024 16.2.1.5 creates it
+  as an immutable binding), but the engine seeded each import into an ordinary mutable local, so
+  `import { x } from 'm'; x = 2;` quietly overwrote the local snapshot and ran on. **Fixed** by
+  sealing every import binding — named, default, namespace, and renamed — read-only right after it is
+  seeded, so a later assignment throws in the strict module code, the same runtime read-only
+  TypeError a reassigned `const` gives. The spec makes assignment to an import an *early* SyntaxError;
+  this engine cannot raise that phase without whole-module scope analysis across its deferred function
+  bodies (an assignment inside a not-yet-compiled function body is not seen at module-compile time),
+  so it matches its own `const` treatment — a runtime read-only write — rather than leaving the write
+  to succeed. The submodule commit is *Make an imported binding immutable*; regressions in
+  `ModuleImportImmutabilityTests`.
 
 ### Track 5 — Essential browser JavaScript APIs
 
@@ -1186,6 +1237,167 @@ were deleted and the gitlinks point at commits that contain them. See
   Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/NodeConstantsBinding.cs` and its five call
   sites, plus the `Node` polyfill in `DomBridge/Utilities.NameValidation.cs`), landed directly
   rather than as a submodule patch; regressions in `NodeConstantsTests`.
+- **The `:is()` aliases matched every element. Now live.** `:matches()`, `:any()`,
+  `:-webkit-any()` and `:-moz-any()` are the historical spellings of `:is()`; all four sat in
+  `Broiler.CSS.Dom`'s `CssSelectorMatcher` recognized-but-unmodelled set, fell through its lenient
+  default arm, and matched **every** element. The cascade reaches the same matcher, so
+  `:-webkit-any(h1) { color: red }` painted the whole page — a rendering bug rather than only a
+  `querySelector` one. It shipped as a `patches/` file because the submodule remote is outside this
+  session's GitHub scope; the maintainer has since applied it, and the pinned `Broiler.CSS` pointer
+  carries *Stop the `:is()` aliases matching every element*, so it is live and the patch file is
+  gone. Measured against Chromium: only the `-webkit-` spelling is still accepted and it behaves
+  exactly like `:is()`, while the other three were removed from the platform and match nothing —
+  Broiler now agrees on all four, and the cascade paints only the `h1`.
+  <br>What stays lenient, deliberately, is an unknown **vendor-prefixed** functional pseudo-class,
+  which still matches everything (`:-webkit-frob(p)` answers `<html>`); an unknown *unprefixed* one
+  matches nothing, as it should. `DomApiSyntaxTests` pinned the pre-patch over-matching and was
+  re-taken from Chromium: `The_Is_Aliases_Match_What_A_Browser_Matches` holds the fix and
+  `An_Unknown_Vendor_Prefixed_Functional_Pseudo_Class_Still_Over_Matches` holds the residual policy.
+- **`Range` was not an interface, was missing five operations, and rejected nothing.** Three gaps in
+  one surface, all of them script-visible.
+  <br>**No interface.** `Range` did not exist as a global, so `typeof Range` was `"undefined"` and
+  both `new Range()` and `r instanceof Range` were `ReferenceError`s — the kind that aborts the whole
+  script, not just the line that asked. `document.createRange()` handed back a plain object whose
+  `constructor.name` was `"Object"`, whose `Object.prototype.toString` was `[object Object]`, and
+  whose 29 members were its own properties, so `Range.prototype.setStart` had nothing to be.
+  <br>**Five missing operations:** `comparePoint`, `isPointInRange`, `intersectsNode`,
+  `createContextualFragment` and `detach` were all absent.
+  <br>**No argument checking.** An offset past the container's length was clamped into it rather than
+  raising `IndexSizeError`, so a range silently pointed somewhere else and the wrongness surfaced
+  later as a wrong extraction; a missing or non-`Node` argument returned `undefined`;
+  `selectNode` on a parentless node was a no-op; `selectNodeContents(doctype)` escaped as a bare
+  `Error` carrying a .NET stack trace; `compareBoundaryPoints` answered `0` both for an unknown
+  comparison method and for a source range in another tree — indistinguishable from a legitimate
+  "equal"; and `insertNode` would put a doctype inside a paragraph.
+  <br>**Fixed** by registering `AbstractRange` and `Range` as real interfaces and moving every member
+  onto their prototypes. A range's boundaries live in a weak table keyed by the range object, so a
+  prototype method finds its own state from its receiver — which is what leaves the instance with no
+  own properties at all (`Object.getOwnPropertyNames(r)` is `[]`, as in a browser) and makes an
+  illegal invocation a `TypeError` rather than a wrong answer. **This is the first DOM interface here
+  whose members really are on its prototype**; the rest still install theirs per wrapper, which is
+  the open half of the wrapper item in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**The boundary getters went on `AbstractRange`, not on `Range`** — measured, not assumed: a
+  browser's `Range.prototype` genuinely does not own `startContainer`, `startOffset`,
+  `endContainer`, `endOffset` or `collapsed`, because they are the base interface's.
+  <br>**Two answers reasoning gets wrong**, both taken from the probe corpus rather than the
+  grammar. `setStart(node, -1)` is an `IndexSizeError` and not a `TypeError`, because Web IDL
+  converts `-1` to `4294967295` first and it is then merely too large; and by the same conversion
+  `compareBoundaryPoints(3.7, r)` is *accepted* (truncating to `END_TO_START`) while `4` is a
+  `NotSupportedError`.
+  <br>**The measurement also found a live bug beside the ones it was looking for:**
+  `START_TO_END` and `END_TO_START` were swapped. DOM §4.5 makes `START_TO_END` compare *this*
+  range's end against the source's start and `END_TO_START` this range's start against the source's
+  end; the bridge had each reading the other pair, so two of the four comparisons answered the wrong
+  sign. Three `DomTraversalAndRangeTests` cases pinned the swapped answers and were re-taken from
+  Chromium. `cloneRange` was minting its copy against the main document whatever the original's root
+  was, which is fixed in the same edit.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/TraversalBinding.RangeInterface.cs`,
+  `Features/TraversalBinding.Range.cs`, `Features/TraversalBinding.cs`,
+  `DomBridge/Registration/Polyfills.cs`); regressions in `RangeInterfaceTests`, with the corrected
+  comparison cases in `DomTraversalAndRangeTests`. `StaticRange` — the other `AbstractRange`
+  subclass — and `window.getSelection` remain absent and are recorded in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+
+- **`Blob`, `File` and `FileList` were undefined, and `response.blob()` handed back a look-alike.**
+  The open note deferred these for a decision, on the grounds that `FileList` is only reachable
+  through a file selection this engine does not have. That reason cut the other way once measured: a
+  browser reports an **empty** `FileList` for an input nobody has touched, so there is a correct
+  answer to give and `undefined` was not it — `input.files` read `undefined` on a file input *and* on
+  a text input, where a browser gives a list and `null` respectively, so the standard guard
+  `if (input.files && input.files.length)` was a `TypeError` on the very input it is written for.
+  The decision is therefore **implement**, and it is done.
+  <br>`Blob` is reached by ordinary pages and not only by upload code: it is how a page builds a
+  downloadable payload (`URL.createObjectURL(new Blob([csv], {type: 'text/csv'}))`), how it posts
+  binary through `fetch`, and what `response.blob()` is supposed to return. The bare name was a
+  `ReferenceError`, which aborts the script rather than the statement.
+  <br>**It also replaced a shape-only stub, which is the part worth naming.** `response.blob()`
+  already answered — with a plain object carrying `size`, `type`, `text()` and `arrayBuffer()` and
+  nothing else, so `constructor.name` was `"Object"`, there was no `slice`, and
+  `(await response.blob()) instanceof Blob` could not even be asked. That stub was invisible
+  precisely because the interface it imitated did not exist to be compared against; it now mints a
+  real one.
+  <br>**Fixed** on the same weak-table/prototype machinery `Range` and `Selection` use, so an
+  instance has no own properties and an illegal invocation is a `TypeError`. `File` really extends
+  `Blob` through the prototype chain rather than through a hook. `FileList` joined the existing
+  indexed-collection machinery rather than getting a second one, so it is live over its contents and
+  needs no new shape the day a file selection exists.
+  <br>**Three answers are measured rather than reasoned, and each is a trap.** The parts argument is
+  a Web IDL `sequence`, which deliberately does not accept a string however iterable a string is — so
+  `new Blob('abc')` is a `TypeError` and not a three-byte blob. A `type` carrying a character outside
+  U+0020–U+007E is discarded **entirely** rather than kept or escaped. And `slice` gives its result an
+  *empty* type rather than inheriting the source's, so the obvious `blob.slice(0, n)` loses the
+  content type unless it is passed again.
+  <br>**`Blob.prototype.stream()` is deliberately absent** rather than stubbed: it returns a
+  `ReadableStream`, and this engine already carries one partial stream — the object `response.body`
+  hands back — which a second copy should not be written against. Whether to build a real
+  `ReadableStream` is its own capability decision; until it is made a page feature-detecting
+  `blob.stream` takes its `arrayBuffer()` fallback, which works. `FileList.prototype` carries `item`
+  but not `length`, where a browser has both — that is the shared collection machinery answering
+  `length` from the host rather than a prototype accessor, identical for `NodeList`, and not this
+  interface's to change. Both are pinned.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/BlobBinding.cs`,
+  `Features/DomCollectionBinding.cs`, `Features/FormControlBinding.cs`, `Features/FetchBinding.cs`,
+  `DomBridge/Registration/Polyfills.cs`); regressions in `BlobInterfaceTests`. `FileReader` remains
+  absent and is recorded in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **`window.getSelection()` did not exist, and neither did `Selection` or `StaticRange`.** The
+  follow-up the `Range` work recorded beside itself. All three were absent, so `window.getSelection`
+  read `undefined` and the bare `Selection`/`StaticRange` were `ReferenceError`s — the kind that
+  aborts the script rather than the statement. That reaches ordinary pages and not only editors: the
+  copy-to-clipboard idiom every page shares is `sel.removeAllRanges(); sel.addRange(range)`, and
+  `window.getSelection().toString()` is how a page reads what was picked.
+  <br>**The open note said this was "a selection *model* rather than a missing name, since this
+  engine has no user selection to report", and that turned out to be half right.** There is no user
+  selection — but that is precisely the state a browser is in on a freshly loaded page: `rangeCount`
+  `0`, `type` `"None"`, `anchorNode` `null`. Everything a script then does to it — `addRange`,
+  `collapse`, `extend`, `setBaseAndExtent`, `selectAllChildren`, `deleteFromDocument` — has an answer
+  that does not depend on a user, and that scripted half is what is implemented. **Fixed** on the
+  prototype machinery the `Range` work built: `Selection` is a real interface with its members on its
+  prototype and its state in a weak table, and `StaticRange` shares `AbstractRange`'s five getters
+  with `Range` by holding four captured values where a range holds a live one.
+  <br>**Three details are measured rather than reasoned, and two contradict the specification's
+  wording.** A node or range belonging to another tree is silently **ignored** by `addRange`,
+  `collapse`, `selectAllChildren` and `setBaseAndExtent` rather than rejected — and "another tree"
+  includes a *detached* one, so collapsing into an element a page has built but not yet inserted does
+  nothing at all. Yet an out-of-range offset or a doctype in that same argument still throws, so the
+  argument is validated *before* the tree is consulted. And a selection carries exactly one range: a
+  second `addRange` is dropped, not added.
+  <br>The selection holds the page's **own** range object, so `sel.getRangeAt(0) === r` and a later
+  edit of that range moves the selection — which is what a browser means by the selection *being* the
+  range rather than a copy of it. `extend` is the one operation a bare `Range` cannot express, since
+  the focus may end up before the anchor; the range still runs low-to-high and the selection
+  remembers the direction.
+  <br>A document with no browsing context answers `null`, which is the browser's answer: a frame's
+  `contentDocument`/`contentWindow` gets its own `Selection`, a `createHTMLDocument` result gets
+  `null`. The bridge already knew the difference — `BrowsingContextManager` links exactly the
+  displayed documents — so the line is drawn from real state rather than guessed.
+  <br>**Two operations are deliberately absent rather than stubbed:** `modify()`, which moves the
+  selection by character/word/line and so needs the text-segmentation model this engine does not
+  have, and `getComposedRanges()`, which is shadow-tree composition. A page feature-detecting either
+  takes its fallback, where a stub would claim a movement that silently does nothing. They are the
+  only two of Chromium's 30 `Selection.prototype` members not present, and both are pinned.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/TraversalBinding.Selection.cs`,
+  `Features/TraversalBinding.RangeInterface.cs`, `Features/TraversalBinding.cs`,
+  `Features/SubDocumentBinding.cs`, `Features/SubWindowBinding.cs`); regressions in
+  `SelectionInterfaceTests`. What stays absent, and is not part of this gate, is the half that needs
+  a user: nothing populates the selection on its own, no `selectionchange` fires from input, and the
+  selection is not painted — see [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **`innerHTML` dropped every text and comment child.** Found while measuring `Range`, from a probe
+  that used `innerHTML` to read back what `insertNode` had done and got an answer with the text
+  missing. The read side filtered its child list with `.OfType<DomElement>()`, so
+  `<div>ab<b>c</b>d<!--k--></div>` read back as `"<b>c</b>"` and a `<div>` holding nothing but text
+  read back as `""` — while that same element's `textContent`, `childNodes` and `outerHTML` all
+  reported the text correctly. It returns a *wrong value* rather than failing, which is what let it
+  sit unnoticed under passing tests.
+  <br>The filter is a leftover from the facade era, when a text child was not a node at all but a
+  string on its parent's element record; construction has produced canonical `DomText`/`DomComment`
+  children since. `outerHTML` never had the bug because it hands the whole subtree to the serializer
+  in one call instead of re-serializing children one at a time — so the two accessors disagreed
+  about the same tree, which is the sharpest statement of it. The document-level `SerializeToHtml`
+  is the whole-subtree call too, which is why rendering and the render tests never saw it.
+  <br>**Fixed** by serializing every child through the same adapter, which already handles text,
+  comments, doctypes and fragments — including the raw-text rule, so a `<script>`'s content stays
+  literal while ordinary text is escaped. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`DomBridge.Serialization.cs`); regressions in `InnerHtmlChildSerializationTests`.
 
 ## Retired — did not reproduce
 

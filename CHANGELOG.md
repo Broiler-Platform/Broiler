@@ -9,6 +9,112 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- The File API data surfaces: `Blob`, `File`, `FileList`,
+  `URL.createObjectURL`/`revokeObjectURL`, and a file input's `files`.
+
+  All of the interfaces were undefined, so the bare name was a `ReferenceError`
+  — the kind that aborts the script rather than the statement. `Blob` is reached
+  by ordinary pages and not only by upload code: it is how a page builds a
+  downloadable payload (`URL.createObjectURL(new Blob([csv], {type:
+  'text/csv'}))`), how it posts binary through `fetch`, and what
+  `response.blob()` is supposed to return.
+
+  `input.files` read `undefined` on a file input *and* on every other control,
+  where a browser gives a `FileList` and `null` respectively — so the standard
+  guard `if (input.files && input.files.length)` was a `TypeError` on the very
+  input it is written for. The list is empty, because there is no file
+  selection, which is exactly what a browser reports for an input nobody has
+  touched.
+
+  `File` really extends `Blob` through the prototype chain, and `FileList` joined
+  the existing indexed-collection machinery rather than getting a second one.
+
+  Three behaviours are worth knowing because reasoning gets them wrong: the parts
+  argument is a Web IDL sequence, which deliberately does not accept a string, so
+  `new Blob('abc')` throws rather than making a three-byte blob; a `type`
+  carrying a character outside printable ASCII is discarded entirely rather than
+  kept or escaped; and `slice` gives its result an empty type rather than
+  inheriting the source's.
+
+  `Blob.prototype.stream()` is deliberately absent rather than stubbed: it
+  returns a `ReadableStream`, and this engine already carries one partial stream
+  — the object `response.body` hands back — that a second copy should not be
+  written against.
+
+- `window.getSelection()` and `document.getSelection()`, the `Selection`
+  interface behind them, and `StaticRange`.
+
+  None of the three existed, so `window.getSelection` read `undefined` and the
+  bare `Selection` and `StaticRange` were `ReferenceError`s — the kind that
+  aborts the script rather than the statement. That reaches ordinary pages and
+  not only editors: the copy-to-clipboard idiom every page shares is
+  `sel.removeAllRanges(); sel.addRange(range)`, and
+  `window.getSelection().toString()` is how a page reads what was picked.
+
+  Broiler has no user input and so no *user* selection — which is exactly the
+  state a browser is in on a freshly loaded page: `rangeCount` `0`, `type`
+  `"None"`, `anchorNode` `null`. Everything a script then does to it —
+  `addRange`, `collapse`, `extend`, `setBaseAndExtent`, `selectAllChildren`,
+  `containsNode`, `deleteFromDocument` — has an answer that does not depend on a
+  user, and that scripted half is implemented. What stays absent is the half
+  that does not: nothing populates the selection on its own, no
+  `selectionchange` fires, and the selection is not painted.
+
+  The selection holds the page's own range object, so `sel.getRangeAt(0) === r`
+  after `addRange(r)` and a later edit of that range moves the selection. A node
+  or range in another tree is silently ignored rather than rejected — and a
+  detached tree counts, so collapsing into an element built but not yet inserted
+  does nothing — while an out-of-range offset or a doctype in that same argument
+  still throws. A frame's document and window get their own selection; a
+  `createHTMLDocument` result has no browsing context and so answers `null`, as
+  a browser does.
+
+  `Selection.modify()` and `getComposedRanges()` are deliberately absent rather
+  than stubbed: the first moves the selection by character/word/line and needs a
+  text-segmentation model this engine does not have, the second is shadow-tree
+  composition. A page feature-detecting either takes its fallback, where a stub
+  would claim a movement that silently does nothing.
+
+  `StaticRange` shares `AbstractRange`'s boundary attributes with `Range`,
+  holding four values captured at construction where a range holds a live
+  boundary — so a tree mutation moves one and not the other.
+
+- `AbstractRange` and `Range` are real DOM interfaces, with the five operations
+  that were missing from them and the exceptions their arguments owe the caller.
+
+  `Range` was not a global at all, so `typeof Range` was `"undefined"` and both
+  `new Range()` and `r instanceof Range` were `ReferenceError`s — the kind that
+  aborts the whole script, not just the line that asked. A range's
+  `constructor.name` was `"Object"`, and its 29 members were its own properties,
+  so `Range.prototype.setStart` had nothing to be. Both interfaces are now
+  registered, `new Range()` builds a range over the document, and every member
+  lives on a prototype: a range's boundaries are held in a weak table keyed by the
+  range object, so a prototype method finds its own state from its receiver and
+  the instance is left with no own properties at all, as in a browser. Calling one
+  on a foreign receiver is a `TypeError` rather than a wrong answer. The boundary
+  attributes go on `AbstractRange`, which is where a browser has them.
+
+  `comparePoint`, `isPointInRange`, `intersectsNode`, `createContextualFragment`
+  and `detach` did not exist and now do.
+
+  The argument checks that were absent are in. An offset past the container's
+  length raises `IndexSizeError` instead of being clamped into the node — the
+  clamp was the quiet failure of the set, since it left the range pointing
+  somewhere else and surfaced later as a wrong extraction. A missing or non-`Node`
+  argument raises `TypeError` instead of returning `undefined`; `selectNode` on a
+  parentless node raises `InvalidNodeTypeError` instead of doing nothing;
+  `selectNodeContents(doctype)` raises a `DOMException` instead of escaping as a
+  bare `Error` with a .NET stack trace; `compareBoundaryPoints` distinguishes an
+  unknown comparison method (`NotSupportedError`) and a source range in another
+  tree (`WrongDocumentError`) from a legitimate `0`; and `insertNode` no longer
+  puts a doctype inside a paragraph.
+
+  Every expectation is a browser's measured answer over one probe corpus rather
+  than a reading of the specification, which is what pins two that reasoning gets
+  wrong: `setStart(node, -1)` is an `IndexSizeError` and not a `TypeError`,
+  because Web IDL turns `-1` into `4294967295` first, and by the same conversion
+  `compareBoundaryPoints(3.7, r)` is accepted while `4` is rejected.
+
 - The PDF read-preview integration candidate: Broiler Writer can open PDFs on
   Windows and Linux.
 
@@ -452,6 +558,44 @@ are versioned in lockstep during the preview.
   host that already runs several decodes at once should do.
 
 ### Fixed
+
+- `innerHTML` dropped every text and comment child. Its read side filtered the
+  child list to elements, so `<div>ab<b>c</b>d<!--k--></div>` read back as
+  `"<b>c</b>"` and a div holding nothing but text read back as the empty string
+  — while that same element's `textContent`, `childNodes` and `outerHTML` all
+  reported the text correctly. `outerHTML` never had the bug because it hands
+  the whole subtree to the serializer in one call rather than re-serializing
+  children one at a time, and the document-level serialization the renderer uses
+  is that same call, which is why rendering never saw it. The filter is a
+  leftover from the era when a text child was a string on its parent's element
+  record rather than a node.
+
+- `response.blob()` handed back a look-alike rather than a `Blob`: a plain object
+  carrying `size`, `type`, `text()` and `arrayBuffer()` and nothing else, so
+  `constructor.name` was `"Object"`, there was no `slice`, and
+  `(await response.blob()) instanceof Blob` could not even be asked. The stub was
+  invisible only because the interface it imitated did not exist to be compared
+  against; it now mints a real one.
+
+- The `:is()` aliases no longer match every element. `:matches()`, `:any()`,
+  `:-webkit-any()` and `:-moz-any()` are its historical spellings, and all four
+  sat in the CSS selector matcher's recognized-but-unmodelled set, fell through
+  its lenient default arm, and matched **every** element. The cascade reaches the
+  same matcher, so `:-webkit-any(h1) { color: red }` painted the whole page rather
+  than the headings — a rendering bug as much as a `querySelector` one. Measured
+  against a browser: only the `-webkit-` spelling is still accepted, and it
+  behaves exactly like `:is()`; the other three were removed from the platform, so
+  they match nothing. An unknown *vendor-prefixed* functional pseudo-class still
+  matches everything, which stays the matcher's deliberate policy for extensions
+  it does not model.
+
+- `Range.compareBoundaryPoints` had `START_TO_END` and `END_TO_START` swapped.
+  DOM §4.5 makes `START_TO_END` compare *this* range's end against the source's
+  start and `END_TO_START` this range's start against the source's end; each was
+  reading the other pair, so two of the four comparisons answered the wrong sign.
+  `cloneRange` also minted its copy against the main document whatever the
+  original's root was, so a range created in a frame's document cloned into the
+  containing page's.
 
 - Custom Elements work. There was no implementation: `customElements` was
   undefined and `HTMLElement` threw `Illegal constructor`, so

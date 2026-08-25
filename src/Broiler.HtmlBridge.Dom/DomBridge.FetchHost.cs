@@ -11,4 +11,7 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge : IFetchHost
 {
     string IFetchHost.PageUrl => _pageUrl;
+
+    Broiler.JavaScript.Runtime.JSValue IFetchHost.CreateBlob(byte[] bytes, string contentType) =>
+        _blobs.CreateBlobFromBytes(bytes, contentType);
 }

@@ -58,4 +58,27 @@ internal interface ITraversalHost
     /// <summary>Mints a bridge text node for a range content operation, registered for wrapper
     /// lookup.</summary>
     DomText CreateRangeTextNode(string data);
+
+    /// <summary>
+    /// Parses <paramref name="html"/> as a fragment in <paramref name="contextElement"/>'s content
+    /// model and returns its parentless top-level nodes, for
+    /// <c>Range.createContextualFragment</c>. The same parse <c>insertAdjacentHTML</c> uses.
+    /// </summary>
+    List<DomNode> ParseHtmlFragment(DomElement contextElement, string html);
+
+    /// <summary>
+    /// Mints a bridge element, for the one case <c>createContextualFragment</c> needs one: a range
+    /// whose start node has no element context at all, where HTML §3.5 parses against a
+    /// <c>body</c>.
+    /// </summary>
+    DomElement CreateBridgeElement(string tagName);
+
+    /// <summary>
+    /// Whether <paramref name="documentRoot"/> is a nested browsing context's document — an
+    /// <c>&lt;iframe&gt;</c>/<c>&lt;object&gt;</c>/<c>&lt;frame&gt;</c> content document — rather than
+    /// a free-standing <c>createDocument</c>/<c>createHTMLDocument</c> result. It is what separates
+    /// the two for <c>getSelection()</c>, which a browser answers with <c>null</c> for a document that
+    /// is not being displayed anywhere.
+    /// </summary>
+    bool HasBrowsingContext(DomNode documentRoot);
 }

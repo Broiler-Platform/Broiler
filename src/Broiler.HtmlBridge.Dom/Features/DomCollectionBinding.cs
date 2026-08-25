@@ -72,6 +72,10 @@ internal static class DomCollectionBinding
             // DOM §4.9.1. An element's `attributes`, and the one collection here whose members can
             // mutate the tree — see the host operations installed on its prototype below.
             function NamedNodeMap() { throw new TypeError('Illegal constructor'); }
+            // File API §3.2. `<input type=file>.files`, and nothing else — which is why it is here
+            // rather than with Blob and File: it is an indexed collection, and this is where the
+            // indexed-collection machinery lives.
+            function FileList() { throw new TypeError('Illegal constructor'); }
 
             (function () {
                 // Every method here is written against `this.length` and `this[i]` only. The host
@@ -136,7 +140,7 @@ internal static class DomCollectionBinding
                     return iterator;
                 }
 
-                [NodeList, HTMLCollection, StyleSheetList, NamedNodeMap].forEach(function (ctor) {
+                [NodeList, HTMLCollection, StyleSheetList, NamedNodeMap, FileList].forEach(function (ctor) {
                     define(ctor.prototype, 'item', item);
                     define(ctor.prototype, Symbol.iterator, values);
                 });
@@ -194,6 +198,18 @@ internal static class DomCollectionBinding
     /// </summary>
     public static JSValue StyleSheetList(JSContext? context, Func<List<JSValue>> contents) =>
         Create(context, "StyleSheetList", contents, namedLookup: null);
+
+    /// <summary>
+    /// A <c>FileList</c> over <paramref name="contents"/> (File API §3.2) — a file input's
+    /// <c>files</c> and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Broiler has no file selection, so the list a file input reports is always empty — which is
+    /// exactly what a browser reports for an input the user has not touched. The collection is live
+    /// over its contents function regardless, so the day a selection exists it needs no second shape.
+    /// </remarks>
+    public static JSValue FileList(JSContext? context, Func<List<JSValue>> contents) =>
+        Create(context, "FileList", contents, namedLookup: null);
 
     /// <summary>
     /// A <c>NamedNodeMap</c> over <paramref name="contents"/> (DOM §4.9.1) — an element's

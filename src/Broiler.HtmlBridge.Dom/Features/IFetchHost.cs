@@ -12,4 +12,11 @@ internal interface IFetchHost
 {
     /// <summary>The document's current URL, used as the base for resolving relative redirect URLs.</summary>
     string PageUrl { get; }
+
+    /// <summary>
+    /// A real <c>Blob</c> over <paramref name="bytes"/>, for <c>response.blob()</c>. The interface
+    /// belongs to <c>BlobBinding</c>, not here — this seam exists so the fetch path hands back the
+    /// same object a page's own <c>new Blob(...)</c> produces rather than a look-alike.
+    /// </summary>
+    Broiler.JavaScript.Runtime.JSValue CreateBlob(byte[] bytes, string contentType);
 }

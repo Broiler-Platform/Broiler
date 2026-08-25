@@ -1,4 +1,5 @@
 using Broiler.JavaScript.BuiltIns.Boolean;
+using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Storage;
@@ -93,7 +94,24 @@ internal sealed class FormControlBinding(IFormControlHost host)
             new DomFunction((in _) => DomBridge.HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
             new DomFunction((in a) => SetRequired(element, in a), "set required"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // files (read-only) — a FileList on a file input, null on every other control, exactly as
+        // HTML §4.10.5.1.18 has it. It read `undefined` on both, so the standard guard
+        // `if (input.files && input.files.length)` was a TypeError on the input it was written for.
+        // The list is empty because this engine has no file selection, which is also what a browser
+        // reports for an input nobody has touched.
+        obj.FastAddProperty((KeyString)"files",
+            new DomFunction((in _) => GetFiles(element), "get files"),
+            null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
     }
+
+    private JSValue GetFiles(DomElement element) =>
+        string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase) &&
+        DomBridge.TryGetAttribute(element, "type", out var inputType) &&
+        string.Equals(inputType, "file", StringComparison.OrdinalIgnoreCase)
+            ? _host.GetFileList(element)
+            : JSNull.Value;
 
     private JSValue GetValue(DomElement element)
     {

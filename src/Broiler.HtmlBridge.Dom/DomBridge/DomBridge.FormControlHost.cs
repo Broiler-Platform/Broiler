@@ -1,4 +1,5 @@
 using Broiler.Dom;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.HtmlBridge;
 
@@ -9,6 +10,21 @@ namespace Broiler.HtmlBridge;
 // Explicit interface members, so these seams do not widen the public DomBridge surface.
 public sealed partial class DomBridge : Dom.Features.IFormControlHost
 {
+    /// <summary>One <c>FileList</c> per file input, cached so <c>input.files === input.files</c>. The
+    /// contents function stays live over an always-empty list rather than being a fixed one, so a file
+    /// selection would need no second shape.</summary>
+    private readonly Dictionary<DomElement, JSValue> _fileLists = [];
+
+    JSValue Dom.Features.IFormControlHost.GetFileList(DomElement element)
+    {
+        if (_fileLists.TryGetValue(element, out var existing))
+            return existing;
+
+        var files = Dom.Features.DomCollectionBinding.FileList(_jsContext, static () => []);
+        _fileLists[element] = files;
+        return files;
+    }
+
     bool Dom.Features.IFormControlHost.TryGetFormControlValue(DomElement element, out string value)
     {
         if (FormControlStateFor(element).Value.TryGet(out var stored) && stored is string s)

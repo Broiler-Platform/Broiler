@@ -1,4 +1,5 @@
 using Broiler.Dom;
+using Broiler.JavaScript.Runtime;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -14,6 +15,12 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal interface IFormControlHost
 {
+    /// <summary>
+    /// The file input's <c>FileList</c> — one object per element, so <c>input.files ===
+    /// input.files</c> holds as it does in a browser. Always empty: there is no file selection.
+    /// </summary>
+    JSValue GetFileList(DomElement element);
+
     /// <summary>The input's dirty IDL <c>value</c> (set via the property, not the attribute), if any.</summary>
     bool TryGetFormControlValue(DomElement element, out string value);
 

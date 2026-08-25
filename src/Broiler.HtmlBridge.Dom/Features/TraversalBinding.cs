@@ -76,6 +76,15 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             (KeyString)"createComment",
             new DomFunction((in a) => CreateComment(in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // window.getSelection() and document.getSelection(), which answer the same object — the
+        // window is the global here, so one function installed in both places is what a browser has.
+        // The Selection interface itself is registered with the other DOM interface constructors;
+        // this is only reachable from page script, which runs after that.
+        var getSelection = new DomFunction((in _) => GetSelection(), "getSelection", 0);
+        document.FastAddValue(
+            (KeyString)"getSelection", getSelection, JSPropertyAttributes.EnumerableConfigurableValue);
+        context["getSelection"] = getSelection;
     }
 
     private JSValue CreateTreeWalker(in Arguments a)
@@ -254,96 +263,26 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     /// Builds a DOM <c>Range</c> object. The <paramref name="documentRoot"/> is the document node
     /// that owns this range (main or sub-document); defaults to the main document root.
     /// </summary>
+    /// <remarks>
+    /// The object carries no members of its own: they live on <c>Range.prototype</c> and
+    /// <c>AbstractRange.prototype</c>, and its boundaries are held in
+    /// <see cref="_rangeStates"/> under the object itself — see
+    /// <see cref="RegisterRangeInterface"/>. So <c>Object.getOwnPropertyNames</c> of a range is
+    /// empty, as it is in a browser, and the 29 own properties this used to install are gone.
+    /// </remarks>
     internal JSObject BuildRange(DomNode? documentRoot = null)
     {
         var range = new JSObject();
         var docRoot = documentRoot ?? _host.DocumentNode;
         // The range self-subscribes to its document's DomDocument.Mutated (trackMutations) and runs
         // the DOM "removing steps" itself, so the bridge keeps no active-range registry.
-        var state = new BridgeDomRange(_host, docRoot);
+        _rangeStates.Add(range, new BridgeDomRange(_host, docRoot));
 
-        range.FastAddProperty((KeyString)"startContainer",
-            new DomFunction((in a) => _host.ToJSObject(state.StartContainer), "get startContainer"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        range.FastAddProperty((KeyString)"startOffset",
-            new DomFunction((in a) => new JSNumber(state.StartOffset), "get startOffset"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        range.FastAddProperty((KeyString)"endContainer",
-            new DomFunction((in a) => _host.ToJSObject(state.EndContainer), "get endContainer"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        range.FastAddProperty((KeyString)"endOffset",
-            new DomFunction((in a) => new JSNumber(state.EndOffset), "get endOffset"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        range.FastAddProperty((KeyString)"collapsed",
-            new DomFunction((in a) => state.Collapsed ? JSBoolean.True : JSBoolean.False, "get collapsed"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        range.FastAddProperty((KeyString)"commonAncestorContainer",
-            new DomFunction((in a) => RangeGetCommonAncestorContainer(state, in a), "get commonAncestorContainer"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        range.FastAddValue((KeyString)"getBoundingClientRect",
-            new DomFunction((in _) => RangeGetBoundingClientRect(state, in _), "getBoundingClientRect", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"getClientRects",
-            new DomFunction((in _) => RangeGetClientRects(state, in _), "getClientRects", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"setStart",
-            new DomFunction((in a) => RangeSetStart(state, in a), "setStart", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"setEnd",
-            new DomFunction((in a) => RangeSetEnd(state, in a), "setEnd", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"setStartBefore",
-            new DomFunction((in a) => RangeSetStartBefore(state, in a), "setStartBefore", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"setStartAfter",
-            new DomFunction((in a) => RangeSetStartAfter(state, in a), "setStartAfter", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"setEndBefore",
-            new DomFunction((in a) => RangeSetEndBefore(state, in a), "setEndBefore", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"setEndAfter",
-            new DomFunction((in a) => RangeSetEndAfter(state, in a), "setEndAfter", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"collapse",
-            new DomFunction((in a) => RangeCollapse(state, in a), "collapse", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"selectNode",
-            new DomFunction((in a) => RangeSelectNode(state, in a), "selectNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"selectNodeContents",
-            new DomFunction((in a) => RangeSelectNodeContents(state, in a), "selectNodeContents", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"cloneContents",
-            new DomFunction((in a) => RangeCloneContents(state, in a), "cloneContents", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"extractContents",
-            new DomFunction((in a) => RangeExtractContents(state, in a), "extractContents", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"deleteContents",
-            new DomFunction((in a) => RangeDeleteContents(state, in a), "deleteContents", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"insertNode",
-            new DomFunction((in a) => RangeInsertNode(state, in a), "insertNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"surroundContents",
-            new DomFunction((in a) => RangeSurroundContents(state, in a), "surroundContents", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"cloneRange",
-            new DomFunction((in a) => RangeCloneRange(state, in a), "cloneRange", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"compareBoundaryPoints",
-            new DomFunction((in a) => RangeCompareBoundaryPoints(state, in a), "compareBoundaryPoints", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"toString",
-            new DomFunction((in a) => RangeToString(state, in a), "toString", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // Range comparison constants
-        range.FastAddValue((KeyString)"START_TO_START", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"START_TO_END", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"END_TO_END", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        range.FastAddValue((KeyString)"END_TO_START", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        // Before the interface is registered there is no prototype to point at, so the range is left
+        // unlinked rather than failing. There is no such range on the normal path: createRange and
+        // `new Range()` are both reachable only from page script, which runs after registration.
+        if (_rangePrototype is { } prototype)
+            range.BasePrototypeObject = prototype;
 
         return range;
     }
@@ -359,7 +298,7 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     /// bridge no longer drives a separate notification channel.
     /// </summary>
     private sealed class BridgeDomRange(ITraversalHost host, DomNode root)
-        : DomRange(root, trackMutations: true)
+        : DomRange(root, trackMutations: true), IRangeBoundaries
     {
         protected override DomNode CreateResultFragment() => host.CreateRangeResultFragment();
 

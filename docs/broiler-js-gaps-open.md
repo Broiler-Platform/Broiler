@@ -2,12 +2,17 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · **open** · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names the pinned
-> `Broiler.JS` commit that carries it and the regression that holds it.
+> Statuses were last reconciled on **2026-08-25**.
 
 Gaps that are real and not started, plus the surfaces that need an explicit product decision
 before anything can be built. Work that is part-landed with named remaining steps lives in
 [in progress](broiler-js-gaps-in-progress.md) instead.
+
+**This document holds only what is still open.** A fixed or retired item is removed from here
+outright and lives in [closed](broiler-js-gaps-closed.md), which keeps its root cause, what landed
+and the evidence — so a gap appears in exactly one place and "what is left?" can be read straight
+off this page. Where fixing one thing left a smaller thing behind, only the remainder is stated
+here, without its history.
 
 A confirmed gap closes only under the rules in
 [the hub](broiler-js-gaps-roadmap.md#status-and-closure-rules).
@@ -57,17 +62,17 @@ below is host semantics and two decisions.
 
 ### Needs a product decision
 
-- **Still open — a JSON module's default import is `undefined`.** `import d from './data.json'`
-  yields `undefined`, so JSON modules are effectively unusable. The module host wraps a `.json`
-  file as `module.exports = <json>`, which replaces the exports object with the parsed value, and
-  a default import then reads `.default` off that value and finds nothing. Per ES2025 a JSON
-  module has exactly one export, `default`, and no named exports — but this engine serves both
-  `require` (which wants the object itself) and `import` from the same wrapper, so making the two
-  agree is a product decision about the CommonJS/ESM boundary rather than a mechanical fix, and is
-  left for one. Characterized, not guessed at.
-- **Still open — `import.meta`** reports "import.meta not supported" (deterministic, not a crash),
-  and `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
-- Attribute **enforcement**: import attributes now parse everywhere the grammar allows, but
+- **A JSON module's default import is `undefined`.** `import d from './data.json'` yields
+  `undefined`, so JSON modules are effectively unusable. The module host wraps a `.json` file as
+  `module.exports = <json>`, which replaces the exports object with the parsed value, and a default
+  import then reads `.default` off that value and finds nothing. Per ES2025 a JSON module has
+  exactly one export, `default`, and no named exports — but this engine serves both `require` (which
+  wants the object itself) and `import` from the same wrapper, so making the two agree is a product
+  decision about the CommonJS/ESM boundary rather than a mechanical fix. Characterized, not guessed
+  at.
+- **`import.meta`** reports "import.meta not supported" (deterministic, not a crash), and
+  `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
+- **Import-attribute enforcement.** Import attributes now parse everywhere the grammar allows, but
   nothing acts on them. Rejecting a module whose type does not match its attribute is a separate
   capability.
 
@@ -126,9 +131,6 @@ shared-memory claim is made before the complete memory-model gate passes.
 
 ### Fetch, navigation, storage, and networking
 
-- ~~`fetch()` returns a self-returning thenable rather than a conforming chainable Promise.~~
-  **Fixed** — `fetch()` and the body methods return real Promises; see
-  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - `location.assign`, `replace`, `reload`, and `href=` record requests but do not navigate.
 - Some HTTP subresource, iframe, worker, socket, and navigation attempts never complete or call
   back to the probing script.
@@ -140,34 +142,16 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 
 ### Window, document, navigator, URL, and timing semantics
 
-- Navigator's **object-valued** surfaces remain absent: `connection`, `permissions`, `storage`,
+- **Navigator's object-valued surfaces are absent:** `connection`, `permissions`, `storage`,
   `mediaDevices`, `mediaCapabilities` and `userAgentData`. Each is a whole API rather than a value,
   and each needs its own decision about whether a present-but-empty object answers a page's
   `'x' in navigator` detection *more* misleadingly than absence does — the same test that kept
   `speechSynthesis` and `navigator.bluetooth` deliberately absent (see
-  [the privacy inventory](privacy-test-page-gaps.md)). The scalar identity and hardware half of this
-  line is **fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
-- ~~Window and screen geometry plus `BarProp` objects are absent.~~ **Fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
-- `window.trustedTypes` is absent — a **capability decision**, not an omission: Trusted Types is an
+  [the privacy inventory](privacy-test-page-gaps.md)). The scalar identity and hardware half of the
+  same audit line is done.
+- **`window.trustedTypes` is absent — a capability decision, not an omission.** Trusted Types is an
   enforcement API (policy creation, sink guarding, CSP integration), and a shape-only stub would
-  claim a policy mechanism that does not exist. The rest of that audit line —
-  `document.hasFocus`, `referrer`, `domain`, `lastModified`, `charset`, `activeElement`, and
-  `onvisibilitychange` — was confirmed missing and is now implemented; see
-  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
-- ~~Non-special URLs such as `data:` can report an empty `.protocol`.~~ **Does not reproduce** — see
-  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
-- ~~Performance Navigation Timing exposes no timing marks.~~ **Fixed** for the document-lifecycle
-  half — see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
-  (`performance.now()` likewise no longer reports a whole-millisecond wall clock.)
-- ~~The navigation entry's network phases are not measured.~~ **Fixed** — the capture host measures
-  its own document fetch and hands the measurements, and the navigation start it took as the time
-  origin, to the bridge. See
-  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
-- ~~A navigation entry's `duration` is a hardcoded `0` where Navigation Timing makes it
-  `loadEventEnd`.~~ **Fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+  claim a policy mechanism that does not exist.
 
 See [the privacy inventory](privacy-test-page-gaps.md),
 [the Google current-script investigation](google-about-current-script.md), and
@@ -175,15 +159,13 @@ See [the privacy inventory](privacy-test-page-gaps.md),
 
 ### Actions
 
-1. ~~Replace the fetch thenable with Promise-conforming settlement and chaining while retaining
-   correct `await` behavior.~~ **Done.**
-2. Define capture-mode navigation semantics and a complete callback/error contract; do not expose
+1. Define capture-mode navigation semantics and a complete callback/error contract; do not expose
    browser-like methods whose only observable effect is silent non-navigation.
-3. Implement storage and networking APIs in independently testable slices with origin, lifetime,
+2. Implement storage and networking APIs in independently testable slices with origin, lifetime,
    failure, and frame/worker behavior pinned from the start.
-4. Complete foundational window, document, navigator, URL, screen, and timing properties before
+3. Complete foundational window, document, navigator, URL, screen, and timing properties before
    using broad compatibility pages as acceptance evidence.
-5. Publish an API support matrix that distinguishes implemented, negative stub, deliberately
+4. Publish an API support matrix that distinguishes implemented, negative stub, deliberately
    unsupported, and not-yet-implemented surfaces.
 
 **Exit gate:** Promise chaining, navigation/callback, URL, timing, origin, frame, worker, and
@@ -194,120 +176,47 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- DOM wrappers do not consistently use genuine interface/prototype chains. **Narrowed twice.**
-  `NodeList` and `HTMLCollection` have real prototypes with their methods on them, and the
-  non-element node wrappers — `Text`, `Comment`, `DocumentFragment`, `DocumentType` — are now linked
-  to their interface prototypes, so `constructor.name` names the interface and extending a prototype
-  reaches instances. Both are in
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  **Narrowed a third time** — element, attribute and document wrappers all name their interfaces
-  now, and the interfaces inherit along the chain Web IDL gives them, so `Element.prototype.x = …`
-  reaches every element. See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  <br>**What remains, precisely:**
-  - **Members are still own properties of each wrapper**, so an interface prototype carries nothing
-    of its own: `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)`
-    lists the whole interface. The prototype *chain* is real now, so a page can add to it and be
-    heard; what has not happened is the engine putting its own members there. Relocating them is the
-    larger object-model change, and the one that would let this item close.
-  - **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
-    and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
-    a name can be reported is what this track's action 1 rules out — so it is a capability decision
-    (implement the SVG interface set, or keep the base) rather than an oversight. Pinned as the
-    current answer.
-  - ~~`NamedNodeMap` is not registered.~~ **Fixed** — `element.attributes` is a live `NamedNodeMap`
-    on the shared collection machinery, and its `Attr` nodes are one object per attribute with a
-    live value. See
-    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~`document.doctype` is `undefined`.~~ **Fixed**, together with the document-collection family the
-  follow-up audit found around it — `anchors`/`embeds`/`plugins` absent, the collections that did
-  exist being snapshot arrays without identity or named access, and `document.childNodes` filtering
-  the doctype out. See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, newly characterized — `document.all` is absent, and cannot be added at this layer.**
-  A browser's is an `HTMLAllCollection` whose `typeof` is `"undefined"` and which is falsy — the
-  `[[IsHTMLDDA]]` internal slot, the one legacy exotic behaviour ECMAScript still specifies. The
-  engine has no way to mint an object with that slot, so the collection is implementable and its
-  distinguishing behaviour is not; adding it as an ordinary object would make the standard
-  `document.all` feature-detect (which reads truthiness, precisely to exclude it) answer the wrong
-  way round. This needs a `Broiler.JS` capability before it is a bridge question at all.
-- ~~Sub-documents keep their own, older collection accessors.~~ **Fixed** — a sub-document is now
-  projected onto `IDocumentCollectionHost`, so a frame's `contentDocument` and the containing
-  document are served by one implementation; the query methods, `childNodes`, `doctype`, `dir` and
-  `designMode` came with it, and a frame's tree gained the DOCTYPE node its accessor needs. See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
-  of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  (The claim that per-tag `HTML*Element` constructors are undefined was already stale when this was
-  checked: they exist, as `@@hasInstance` interfaces — see the bullet above.)
-- `Blob` and `FileList` remain undefined. They are File API surfaces rather than DOM collections —
-  `FileList` is reachable only through `<input type=file>.files`, which this engine has no file
-  selection for — so they did not come with the collection work and need their own decision.
-- ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
-  be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
-  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
-- ~~CharacterData failures are not proper `DOMException` objects.~~ **Fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~The element tree-mutation half of the same family: `insertBefore` threw a plain `Error`, and
-  `removeChild`/`replaceChild` silently no-opped, where DOM §4.2.3 requires `NotFoundError`.~~
-  **Fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~The document-level `document.removeChild`/`document.insertBefore` no-op (or append) silently
-  where `NotFoundError` is required.~~ **Fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~`input.form` and `input.labels` are `undefined`.~~ **Fixed** — the form-association surface,
-  which the `NodeList` work above unblocked (`labels` is a live one). See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~The rest of that family: `setAttribute` with an invalid name, and `querySelector` with an invalid
-  selector.~~ **Fixed** — both throw the exception their specification names, and the selector half
-  turned out to be returning the *wrong element* rather than `null`. Neither needed a submodule: the
-  rules belong at the scripted-DOM boundary precisely because the canonical layers underneath them
-  (the parser's `SetAttribute`, the cascade's matcher) are required to stay lenient. Checked against
-  Chromium over a 149-case corpus. See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed — the `:is()` aliases match every element. Fixed as a patch, not yet live.** Root-caused
-  and narrowed since it was first characterized, and it is worse than "an unknown functional pseudo
-  over-matches": `:matches()`, `:any()`, `:-webkit-any()` and `:-moz-any()` are the historical
-  spellings of `:is()`, all four sat in the matcher's recognized-but-unmodelled set, and so all four
-  fell through its lenient default and matched **every element**. The **cascade** uses the same
-  matcher, so `:-webkit-any(h1) { color: red }` painted the whole page — a rendering bug rather than
-  only a `querySelector` one.
-  <br>Measured against Chromium: only `-webkit-any` is still accepted and it behaves exactly like
-  `:is()`; the other three were removed from the platform and match nothing. The fix is in
-  **`Broiler.CSS.Dom`**'s `CssSelectorMatcher`, whose remote is outside this session's scope (the push
-  returns 403), so it ships as `patches/` → *Stop the `:is()` aliases matching every element*. **No
-  main-repo fallback is possible**: the damaging half is the cascade, which reaches the matcher
-  through the computed-style engine rather than the bridge's `MatchesSelector` wrapper, so there is no
-  seam to intercept. It is live only once the patch is applied.
-  <br>What stays lenient afterwards, deliberately, is an unknown *vendor-prefixed* pseudo-class,
-  which still matches everything. `DomApiSyntaxTests` pins the current answer so applying the patch
-  trips it; the patch index says what to change it to.
-- ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
-  **Does not reproduce** — it returns the correct bitmask; see
-  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion
-  `Node.DOCUMENT_POSITION_*` constants *were* missing, which is what made the correct bitmask
-  undecodable; that half is now **fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **The engine's own members are still own properties of each wrapper**, so an interface prototype
+  carries nothing of its own: `Text.prototype.splitText` is `undefined` and
+  `Object.getOwnPropertyNames(node)` lists the whole interface. The prototype *chain* is real, so a
+  page can extend `Element.prototype` and be heard; what has not happened is the engine putting its
+  members there. Relocating them is the larger object-model change, and the one this item turns on.
+  `Range`, `Selection` and `Blob` are the worked examples of the target shape — their members do
+  live on their prototypes, with per-instance state in a weak table.
+- **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
+  and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
+  a name can be reported is what this track's action 1 rules out — so it is a capability decision
+  (implement the SVG interface set, or keep the base) rather than an oversight. Pinned as the
+  current answer.
+- **`document.all` is absent, and cannot be added at this layer.** A browser's is an
+  `HTMLAllCollection` whose `typeof` is `"undefined"` and which is falsy — the `[[IsHTMLDDA]]`
+  internal slot, the one legacy exotic behaviour ECMAScript still specifies. The engine has no way
+  to mint an object with that slot, so the collection is implementable and its distinguishing
+  behaviour is not; adding it as an ordinary object would make the standard `document.all`
+  feature-detect (which reads truthiness, precisely to exclude it) answer the wrong way round. This
+  needs a `Broiler.JS` capability before it is a bridge question at all.
+- **`FileReader` is absent**, and `Blob.prototype.stream()` with it. `stream()` returns a
+  `ReadableStream`, and this engine already carries one partial stream — the object `response.body`
+  hands back — that a second copy should not be written against; building a real `ReadableStream` is
+  its own capability decision, and `FileReader` is the other half of the same File API slice.
+- **There is no *user* selection.** `Selection` is implemented for everything a script drives, but
+  nothing populates it on its own, no `selectionchange` fires (nothing but script can change it),
+  and the selection is not painted — a rendering question rather than a scripting one.
+  `Selection.modify()` needs text segmentation this engine does not have, and
+  `getComposedRanges()` needs the canonical shadow tree that is still open below; both are pinned so
+  implementing either is a decision rather than a drift.
 
 See [HTML5 exceptions](html5test-exceptions.md) and
 [the DOM bridge roadmap](../Broiler.DOM/docs/roadmap.md).
 
 ### Custom Elements, templates, and Shadow DOM
 
-- ~~WPT currently relies on a `customElements` runner shim; there is no production implementation.~~
-  **Fixed for the core** — the registry, a constructible `HTMLElement`, upgrades and the reaction
-  callbacks are implemented, and the runner's shim now steps aside for them. See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  <br>**What remains** are three separate capabilities the slice deliberately left out rather than
-  faked: customized built-ins (the `extends` option and `is=` attribute), which `define` rejects with
-  a `NotSupportedError` instead of accepting and ignoring; form-associated custom elements
-  (`formAssociated`, `ElementInternals`, `attachInternals`); and `adoptedCallback`, which needs the
-  document-adoption path to report ownership changes.
-- ~~`template.content` is a snapshot rather than the parser-owned fragment required by HTML.~~
-  **Fixed** — see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- Shadow DOM uses synthetic markers, selector rewriting, and light-child hiding rather than a
+- **Three Custom Elements capabilities remain**, each deliberately left out of the core slice rather
+  than faked: customized built-ins (the `extends` option and `is=` attribute), which `define`
+  rejects with a `NotSupportedError` instead of accepting and ignoring; form-associated custom
+  elements (`formAssociated`, `ElementInternals`, `attachInternals`); and `adoptedCallback`, which
+  needs the document-adoption path to report ownership changes.
+- **Shadow DOM uses synthetic markers**, selector rewriting, and light-child hiding rather than a
   canonical shadow and composed tree with slot assignment, fallback, hit-testing, traversal, and
   event retargeting.
 
@@ -316,31 +225,20 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 
 ### CSSOM, fonts, SVG, and JS-visible layout algorithms
 
-- ~~A linked stylesheet's rules reach neither `cssRules` nor `getComputedStyle`, and the sheet
-  reports no `href`.~~ **Fixed** — the open question ("does it also fail over `http(s):`?") is
-  answered: it was never a `file:`-scheme defect. The raw `href` content attribute was handed to a
-  loader that takes absolute URLs only, so a *relative* href fetched nothing on either scheme. See
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- ~~`getComputedStyle().display` can report `inline` for every element.~~ **Does not reproduce** — see
-  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
-- Font Loading is a synchronous compatibility facade; it no longer ~~accepts malformed non-empty
-  shorthands~~ — that half is **fixed**; see
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  What remains is the facade itself, which is a modelling choice rather than a parsing defect:
-  Broiler resolves fonts synchronously against what it already has, so `status` is always
+- **Font Loading is a synchronous compatibility facade** — a modelling choice rather than a parsing
+  defect. Broiler resolves fonts synchronously against what it already has, so `status` is always
   `"loaded"`, `ready` is already resolved and `check()` of a *parsable* shorthand is always `true`.
   Whether to model a real load — which needs a font pipeline that can report one — is a capability
   decision, not a bug fix.
-- SVG lacks conforming live DOM integration for features such as `requiredFeatures` and
+- **SVG lacks conforming live DOM integration** for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
-- Current tests retain JS-visible failures involving SVG `elementFromPoint`, writing-mode
-  `scrollIntoView`, and mutated iframe state. **Two of the five named here no longer reproduce** and
-  were checked against Chromium while the Font Loading entry above was being fixed: a `@keyframes`
-  rule read from style text answers the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`),
-  and out-of-range `scrollTop`/`scrollLeft` writes clamp identically. Both are recorded here rather
-  than retired outright because this was a spot check of one shape each, not the failing cases the
-  line was written from — the owning manifests are what should settle them.
+- **Three JS-visible failures remain in the current tests**: SVG `elementFromPoint`, writing-mode
+  `scrollIntoView`, and mutated iframe state. Two others once listed here no longer reproduce — a
+  `@keyframes` rule read from style text answers the same `type`/`name`/`cssRules.length` triple
+  (`7`/`spin`/`2`), and out-of-range `scrollTop`/`scrollLeft` writes clamp identically. That was a
+  spot check of one shape each rather than the failing cases the line was written from, so the
+  owning manifests are what should settle those two.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),
@@ -349,34 +247,17 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 
 ### Actions
 
-1. ~~Establish real interface prototypes and Web IDL collection behavior before adding more
-   compatibility-only constructor globals.~~ **Done for both halves.** Every DOM wrapper — elements,
-   attributes and the document included — is linked to its interface prototype, and the interfaces
-   inherit along their Web IDL chains, so extending `Element.prototype` reaches instances. What is
-   left of the wrapper item is relocating the engine's own members onto those prototypes, which is
-   the separate object-model change. **Collection half done** — `NodeList` and
-   `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness, and
-   the `document` collections plus CSSOM's `StyleSheetList` now use them — in a frame's document as
-   well as the containing one, which was the last surface still building its own snapshot arrays; see
-   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-   The element-wrapper half is what remains.
-2. ~~Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
-   focused DOM regressions.~~ **Done for the exception family** — CharacterData, tree mutation, the
-   document-level mutation methods, `setAttribute`'s `InvalidCharacterError` and `querySelector`'s
-   `SyntaxError` all raise the specified `DOMException`; see
-   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-   Range semantics are the part of this action still untouched.
-3. Implement production Custom Elements and ~~parser-owned template contents~~ (**template contents
-   done** — see
-   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);
-   Custom Elements is what remains of this action).
-4. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
-5. Make CSSOM rules and computed style read from the same declarations used by cascade and
+Actions 1, 2 and 7 of the original list are complete and are recorded in
+[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);
+what is left of action 1 is the element-wrapper half named in the first bullet above. The rest:
+
+1. Relocate the engine's own interface members onto the interface prototypes, so an instance
+   carries no members of its own.
+2. Implement production Custom Elements: customized built-ins, form association, `adoptedCallback`.
+3. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
+4. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.
-6. Connect live SVG DOM mutations to cascade and paint.
-7. ~~Characterize form dirty/default/reset/radio behavior before promoting it from the retest
-   queue.~~ **Done** — characterized against Chromium and fixed; see
-   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+5. Connect live SVG DOM mutations to cascade and paint.
 
 **Exit gate:** claimed DOM interfaces have correct prototypes, collections, exceptions, and
 algorithms; Custom Elements, templates, shadow/composed trees, CSSOM, computed style, and SVG
@@ -448,19 +329,14 @@ claim.
 Not yet confirmed as current defects. Do not schedule fixes for these until the
 smallest current-pointer reproduction exists.
 
-- an unreproduced module-initializer-ordering failure — **narrowed, still open.** It is a single
+- **An unreproduced module-initializer-ordering failure — narrowed, still open.** It is a single
   recorded `ModuleExtensions.Tests` failure whose first test is order-dependent by construction
   ("before the BuiltIns `[ModuleInitializer]` that wires it had run"); 12 further runs are clean,
   which with the 9 already on record is 21 without a recurrence — but the owning record's own
   point stands, that a handful of runs cannot separate a 1-in-10 flake from a 1-in-10 regression,
   so it is not retired. One *related* order dependence has been removed since: compilation
   back ends registered from a `[ModuleInitializer]` that only ran if the host happened to load
-  the emitter assembly, which is now forced (below).
-
-~~form-control dirty/default/reset/radio semantics, which remain uncharacterized.~~ **Characterized
-and closed** — the dirty half was already correct, the default and reset halves were absent
-outright. See
-[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  the emitter assembly, which is now forced.
 
 **Retest rule:** add the minimal current-pointer reproduction first. If it reproduces, move it to
 the owning track and apply the normal closure gate. If it does not, record the exact cases and

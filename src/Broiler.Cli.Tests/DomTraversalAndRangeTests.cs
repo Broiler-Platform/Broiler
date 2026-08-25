@@ -692,7 +692,11 @@ document.body.appendChild(out);
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        Assert.Contains("-1,-1,-1,1", result);
+        // The middle pair reads "-1,1,-1,-1" now, not "-1,-1,-1,1": START_TO_END compares *this*
+        // range's end against the source's start (4 vs 2 → 1) and END_TO_START compares this range's
+        // start against the source's end (1 vs 5 → -1). The bridge had the two the other way round.
+        // Chromium's measured answer.
+        Assert.Contains("-1,1,-1,-1", result);
     }
 
     [Fact(Timeout = 600000)]
@@ -722,7 +726,12 @@ document.body.appendChild(out);
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        Assert.Contains("-1,1,0", result);
+        // The third value was 0 here until END_TO_START and START_TO_END were unswapped. DOM §4.5
+        // makes END_TO_START compare *this* range's start against the source's end, and the bridge
+        // compared this range's end against the source's start — so `before.END_TO_START(after)`
+        // answered "the two touch" where it should answer "before starts before after ends".
+        // Chromium answers -1.
+        Assert.Contains("-1,1,-1", result);
     }
 
     [Fact(Timeout = 600000)]
@@ -753,7 +762,10 @@ document.body.appendChild(out);
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
 
-        Assert.Contains("-1,1,-1", result);
+        // Third value: `inner.START_TO_END(outer)` compares inner's *end* against outer's start, so
+        // the descendant's end is after the ancestor's start — 1. It read -1 while START_TO_END and
+        // END_TO_START were swapped. Chromium answers 1.
+        Assert.Contains("-1,1,1", result);
     }
 
     [Fact(Timeout = 600000)]
