@@ -642,9 +642,262 @@ were deleted and the gitlinks point at commits that contain them. See
   <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/DocumentCollectionBinding.cs`,
   `Features/DomCollectionBinding.cs`, `Features/NodeMutationBinding.cs`,
   `DomBridge/Registration/DocumentSurface.cs`); regressions in `DocumentCollectionSurfaceTests`.
-  What the same audit found and did *not* fix — `document.all`, which needs an engine capability, and
-  the sub-documents' own older accessors — is in
+  What the same audit found and did *not* fix — `document.all`, which needs an engine capability — is
+  in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model). The sub-documents' own older
+  accessors, the other thing it deferred, are the entry below.
+- **A frame's `document` answered a different object model from the document containing it.** The
+  fix above was deliberately kept to one document, so an `<iframe>`'s `contentDocument` — and every
+  `createDocument`/`createHTMLDocument` result, which is a sub-document too — went on building its
+  collections in `SubDocumentBinding` as the `JSArray` snapshots the main document had just been
+  moved off. From one page, asking the two documents the same question got two answers:
+  `d.forms.constructor.name` was `"Array"` against the parent's `"HTMLCollection"`,
+  `d.forms === d.forms` was **false**, `namedItem` and named access did not exist,
+  `var f = d.forms; d.body.appendChild(d.createElement('form')); f.length` did not move, and
+  `anchors`, `embeds`, `plugins`, `doctype`, `dir` and `designMode` were absent outright — so a
+  frame's script hit the same `TypeError` on `d.embeds.length` the main document had stopped giving.
+  The query methods went the same way: `getElementsByTagName`, `getElementsByClassName`,
+  `getElementsByName`, `querySelectorAll` and `childNodes` were all arrays, so a frame's script got
+  `map`/`filter` a browser does not offer on any of them and no `item` it does.
+  <br>Nothing about a frame's document makes it a different kind of document, and a script inside one
+  is a script like any other. Chromium answers every one of these identically for both.
+  <br>**Fixed** by projecting a sub-document onto `IDocumentCollectionHost` — the contract
+  `DocumentCollectionBinding` already consumes — so both documents are served by one implementation
+  rather than two. Only two of the contract's members are genuinely per-document: the element list,
+  which becomes this root's sub-tree, and `currentScript`, which a sub-document does not track.
+  Wrapper identity and the two stylesheet services are per-*node* questions the bridge answers the
+  same way whichever document asks, so they delegate straight through, and the bridge's own
+  `BuildStyleSheetsCollection` — the last builder that returned a `JSArray` where CSSOM §6.1 requires
+  a `StyleSheetList` — was deleted rather than left as a second answer. The query methods were given
+  the types DOM assigns them, matching the main document down to which one is *not* live:
+  `querySelectorAll` stays a static `NodeList` (§4.2.6, the one collection specified as a snapshot)
+  while `getElementsByTagName`/`ByClassName` are live `HTMLCollection`s and `getElementsByName` a
+  live `NodeList`.
+  <br>**`doctype` needed the node before it needed the accessor,** which is the reverse of the main
+  document, where the node was already there and only the name was missing. A frame's tree never
+  carried one: `BuildDocumentTree` returns the `<html>` element alone, so a resource declaring a
+  DOCTYPE produced `childNodes` of `[<html>]` where the containing document's is `[doctype, <html>]`,
+  and the accessor would have had nothing to find. The frame parse now appends it first, through the
+  same `ParseDocType` reading `document.write` was already using for exactly this. It is invisible to
+  everything that walks a sub-document by element — `GetDocumentElement` and the frame serializer both
+  filter to `DomElement`, and a `DomDocumentType` has not been one since Phase 4 item 1.
+  <br>`designMode` is per-document state (HTML §3.2.7), so each sub-document carries its own rather
+  than sharing the containing document's — pinned, because a shared field would have been the easy
+  wrong answer.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (the new `Features/SubDocumentCollectionHost.cs`,
+  `Features/SubDocumentBinding.cs`, `Features/ISubDocumentHost.cs`, `DomBridge.SubDocumentHost.cs`,
+  `DomBridge/StyleSheets.cs`, `DomBridge/SubDocuments.cs`); regressions in
+  `SubDocumentCollectionTests`, each of which asks the frame *and* the containing document the same
+  question in one page, because the defect was never a frame being wrong in the abstract — it was the
+  two disagreeing about what a document is.
+- **`setAttribute` accepted any name and `querySelector` accepted any selector.** The last two
+  members of the DOMException family, and the second was worse than "returns `null`" — it returned
+  the *wrong element*. The lenient matcher read `div:::bogus` as `div` and handed back a real node,
+  and `[` matched four; so an invalid selector did not fail, it quietly succeeded at something else,
+  which no caller can detect. `setAttribute` wrote every invalid name through — `@click`, `foo bar`,
+  `1abc`, `-x` all became attributes a browser refuses to create — and the one name that did fail,
+  the empty string, threw a bare `Error` carrying no `name` and no `code` to branch on.
+  <br>**Fixed** at the scripted-DOM boundary, in the main repo, and that placement is the design
+  rather than a convenience. The two obvious homes are exactly where the rules must *not* go, for the
+  same reason in both cases: `Broiler.Dom`'s `DomElement.SetAttribute` is what the HTML parser calls,
+  and HTML permits attribute names the XML `Name` production rejects; `Broiler.CSS.Dom`'s
+  `CssSelectorMatcher.Matches` is what the cascade calls, and a rule whose selector does not parse is
+  *dropped* per CSS error handling, never fatal. Throwing in either place would break the layer whose
+  job is to tolerate bad input. The requirement belongs to the scripted API, so it lives where the
+  `DOMException` is already minted — which also means **no submodule patch**, so it is live in CI
+  now rather than waiting to be applied.
+  <br>**Every expectation was measured against Chromium**, not derived from the grammar, and that
+  caught two assumptions wrong in opposite directions: `[tabindex=0]` *is* a syntax error (an
+  unquoted attribute value must be an identifier and a digit cannot start one) while
+  `setAttribute('a:b:c', …)` is perfectly valid, because `Name` admits colons. The second one was
+  the dangerous one — reusing the element-name rule, which deliberately forbids colons, would have
+  started rejecting `xlink:href` and broken inline SVG. Over a 149-case corpus run against both
+  engines the two now agree on 143; all six divergences are Broiler *accepting* where Chromium
+  throws, and none is the reverse, which is the only safe direction for a change that turns silence
+  into an exception.
+  <br>**The six are two deliberate decisions.** A well-formed but unknown pseudo (`:nope`,
+  `::bogus`, `::-moz-focus-inner`, `:matches()`, and a pseudo-class after a pseudo-element) is
+  accepted, because rejecting one needs a list of every pseudo this engine supports and such a list
+  drifts against what pages use rather than against the specification — Chromium itself accepts
+  `:focus-visible`, `:defined`, `::marker` and `::-webkit-scrollbar` while rejecting
+  `::-moz-focus-inner`. Turning an unknown name into a throw would break a page that merely asked
+  for a pseudo Broiler lacks. The other is the Selectors 4 `s` case flag, which is valid per
+  specification and which Chromium has not implemented.
+  <br>**The pseudo-element half was found by this work and fixed with it.** A selector carrying a
+  pseudo-element selects a box, not an element, so it matches nothing through the DOM API — but the
+  matcher strips the pseudo-element and matches what is left, so `querySelector('::before')` returned
+  the `<html>` element. That is the same silently-wrong-element failure by another route, so
+  `querySelector`/`querySelectorAll`/`matches`/`closest` now answer no element for any selector
+  carrying one, in both the `::` and the legacy one-colon spellings, while the cascade goes on
+  applying `::before` rules — pinned, since a rule that reached the renderer would stop generated
+  content painting. A pseudo-element that is not the subject (`div::before p`) is a `SyntaxError`
+  instead, which is what a browser gives.
+  <br>`toggleAttribute` and `setAttributeNS` validate too, because a browser validates from them;
+  `getAttribute`, `hasAttribute` and `removeAttribute` deliberately do not, because a browser accepts
+  an invalid name from all three — they ask about a name rather than create one. Both halves of that
+  line are pinned.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (the new `Features/DomApiSyntax.cs`,
+  `DomBridge/Utilities.NameValidation.cs`, `DomBridge/Utilities.cs`, `Features/AttributesBinding.cs`,
+  `Features/SelectorsBinding.cs`, `Features/DocumentQueryBinding.cs`,
+  `Features/SubDocumentBinding.cs`); regressions in `DomApiSyntaxTests`.
+  <br>**What this narrowed but did not close:** an unknown pseudo-class *with an argument* still
+  matches the first element rather than nothing, so `querySelector(':matches(a)')` answers `<html>`
+  where the argument-less `:nope` already answers `null`. The cause is the matcher's lenient default
+  arm in `Broiler.CSS.Dom`, a matching question rather than a syntax one; it is characterized in
+  `DomApiSyntaxTests` and left in
   [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **Element, attribute and document wrappers now name their interfaces, and the interfaces inherit.**
+  The non-element wrappers were linked first; elements were left deliberately, because an element's
+  interface is a tag question the engine's own table could not answer. It carried an overlapping
+  `("HTMLMediaElement", "audio video")` entry beside `HTMLAudioElement` and `HTMLVideoElement`, so
+  `audio` named two interfaces and a reverse lookup had none — and a tag the table omitted had to
+  fall back to something a browser splits three ways. Guessing between them would have put a *wrong*
+  name where an honest `"Object"` is at least not misleading, which is why it stayed open rather than
+  being approximated.
+  <br>**It was measured instead of guessed.** Every HTML tag was run through Chromium's own
+  `document.createElement(tag).constructor.name`, and the table rebuilt from the result: single-valued,
+  with the abstract bases moved into an inheritance list. Over the full tag corpus Broiler and
+  Chromium now agree on every case. Three of them are ones reasoning gets wrong — `plaintext` is
+  plain `HTMLElement`, not the `HTMLPreElement` it sat under with `listing`/`pre`/`xmp`; a
+  hyphenated unknown name (`x-foo`) is an `HTMLElement`, because it is a valid custom element name
+  even undefined; and a tag removed from HTML (`applet`, `keygen`) is `HTMLUnknownElement` even
+  though the parser still knows the name.
+  <br>**The measurement found a live bug in the shipped `instanceof` table.** `plaintext` was grouped
+  under `HTMLPreElement`, so `document.createElement('plaintext') instanceof HTMLPreElement` answered
+  `true` where a browser answers `false`. That is fixed with the same edit, and pinned.
+  <br>**The interfaces now inherit along the chain Web IDL gives them** —
+  `HTMLDivElement → HTMLElement → Element → Node → EventTarget`, and
+  `HTMLAudioElement → HTMLMediaElement → …` — which is the part that is not cosmetic. Extending an
+  interface prototype is the ordinary polyfill idiom, and `Element.prototype.matches = …` now reaches
+  every element where the assignment used to go to an object nothing inherited from. The chain is
+  built with `setPrototypeOf` rather than a fresh `Object.create`, so each prototype keeps its
+  identity and its non-enumerable `constructor` — pinned, because a `for...in` over an element that
+  started yielding `constructor` would be a silent regression in every enumeration a page does.
+  <br>Making the table single-valued carried its own risk, and it is pinned too: `audio` no longer
+  names `HTMLMediaElement`, so `audio instanceof HTMLMediaElement` has to come from the inheritance
+  edges instead. Each interface's `instanceof` set is expanded at registration to its own tags plus
+  every descendant's, so an abstract base answers for tags that never mention it.
+  <br>`document` and attribute nodes needed their own links: neither is minted at the node choke
+  point where every other wrapper is linked. `HTMLDocument` was an interface the engine did not
+  register at all. The document's link also has to run *after* the polyfill pass that registers the
+  constructors, not where the document is built — the same ordering the lazy document collections are
+  built around — and the wrappers minted eagerly during attach (`document.documentElement` is
+  materialized as a value property, so the `<html>` wrapper is always one) are re-linked by sweeping
+  the wrapper registry at that point rather than by naming that one case.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/Utilities.DomInterfaces.cs`,
+  `DomBridge/WrapperPrototypes.cs`, `DomBridge/Registration/Registration.cs`,
+  `Features/AttributesBinding.cs`, `Features/SubDocumentBinding.cs`); regressions in
+  `DomInterfacePrototypeTests`, and `WrapperInterfacePrototypeTests`' own
+  "element and attribute are still unlinked" assertion updated — that fixture asked for a deliberate
+  update rather than a silent flip, and this is it.
+  <br>**What this leaves:** the engine's members are still own properties of each wrapper rather than
+  living on the prototypes, so an interface prototype carries nothing of its own; SVG elements report
+  the base `SVGElement` because no per-tag SVG interfaces are registered to point at; and
+  `NamedNodeMap` was unregistered, so `element.attributes` reported `"Object"` — that last one is the
+  entry below. The other two are in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **`element.attributes` is a live `NamedNodeMap`, and an attribute is one `Attr` node with a live
+  value.** It was a fresh plain object per read, carrying the same four faults the document
+  collections had before they moved onto the shared collection machinery — and the fourth is the one
+  that made a page *throw* rather than answer wrongly.
+  <br>**No interface:** `constructor.name` was `"Object"`, and the bare name `NamedNodeMap` was a
+  `ReferenceError`, which aborts the whole script that names it rather than the expression that did.
+  **No identity:** `el.attributes === el.attributes` was `false`. **No named access:**
+  `el.attributes.id` was `undefined`, where DOM §4.9.1 makes a qualified name a supported property
+  name. **And half-live:** `length` was a getter over the current attributes while the indices were
+  materialized once at build time, so a map held across a `setAttribute` reported the new count with
+  nothing at the new index — the idiomatic `for (i = 0; i < m.length; i++) m[i].name` read
+  `undefined.name` and threw.
+  <br>**Fixed** by building it through `DomCollectionBinding`, the same machinery `NodeList`,
+  `HTMLCollection` and `StyleSheetList` already use, so both halves come from one contents function
+  and cannot disagree again. The members that mutate or that need the owning element cannot be
+  written against `this.length` and `this[i]` the way every other method there is, so they are host
+  functions — but still on the *prototype*, shared, each finding its element from a weak table keyed
+  on the receiver, so no per-instance slot appears and `Object.getOwnPropertyNames` stays the indices
+  alone. Calling one on a foreign object is a `TypeError`, as a browser gives.
+  <br>**`getNamedItem` cannot be `this[name]`,** which is how `HTMLCollection.namedItem` is written
+  and was the first attempt here. An interface member wins the property lookup over a named one, so
+  an element carrying `length="x"` has `attributes.length === 3` — correctly — while
+  `getNamedItem('length')` must still hand back the attribute. Measured; it is a host function for
+  that reason and the case is pinned.
+  <br>**The `Attr` nodes had to become real objects for any of this to mean anything.** A cached map
+  over freshly minted attribute nodes would still answer `el.attributes[0] === el.attributes[0]`
+  false, and a cached *node* holding a snapshot value would be worse than the old per-read one — the
+  single surviving object would report whatever the value was when first asked. So an attribute is
+  now one node per element and name across every access path (index, qualified name, `getNamedItem`,
+  `getAttributeNode`), its `value` reads through to the element and writing it writes back, and
+  removing the attribute detaches the node: it keeps the value it had, its `ownerElement` becomes
+  `null`, and re-adding mints a new node rather than reviving the old one. All measured, and the
+  detachment is observable — the old node and the new one report the old and the new value.
+  <br>**Two existing fixtures were measured wrong and are corrected.**
+  `Element_SetAttributeNode_Replaces_And_Returns_Old_Attr` asserted that re-setting an element's own
+  attribute node returns something reading the *previous* value, which only held while an `Attr` was
+  a per-read snapshot: a browser has one node with a live value, so after `attr.value = 'new'` the
+  returned node **is** `attr` and reads `'new'`. Replacing with a genuinely *different* node is the
+  other half and does detach the displaced one — DOM §4.9.2 distinguishes the two, and both are now
+  pinned from measurement.
+  <br>**One thing this corrected beyond its own scope:** the collection prototypes' members were
+  non-enumerable, on `NodeList` and `HTMLCollection` as well, where Web IDL makes an interface's
+  members enumerable and a browser agrees — `for (var k in el.childNodes)` yields `item`, `forEach`
+  and the rest beside the indices. One word in the shared `define` helper; verified against both
+  suites.
+  <br>Over the two measured corpora Broiler and Chromium now agree on every attribute-node case and
+  on every map case but one: `for...in` omits `length`, because it is answered by the host rather
+  than held as a prototype accessor, and the member order is definition order rather than Web IDL's.
+  Recorded rather than papered over.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/DomCollectionBinding.cs`,
+  `Features/AttributesBinding.cs`, `DomBridge/Utilities.DomInterfaces.cs`); regressions in
+  `NamedNodeMapTests`.
+- **Custom Elements have a production implementation.** There was none: `customElements` was
+  undefined and `HTMLElement` threw `Illegal constructor`, so `class X extends HTMLElement` followed
+  by `customElements.define(…)` failed on the bare name — which aborts the whole script, not the
+  statement that named it. The WPT runner carried a shim to get past that, and the shim could not
+  reach what mattered: its `HTMLElement` handed back a plain element that did not carry the class's
+  prototype, so a component's own methods were unreachable and the four reaction callbacks had to be
+  copied onto each instance by hand.
+  <br>**The one piece that had to be JavaScript is the base constructor**, and the reason is
+  `new.target`. `new X()` runs `X`'s constructor, which calls `super()`, and only `new.target` says
+  which subclass is being built — so which prototype the element takes and, through the registry,
+  which tag name it has. A host function cannot see it: the engine's `Arguments` does not carry one.
+  So the base reads it in JavaScript and calls the host for the element, and everything else — the
+  registry, name validation, upgrades, reaction dispatch — is C#, where the DOM is. That also kept
+  the whole feature in the main repo, with no submodule patch.
+  <br>Two things the earlier interface work put in place are what make the base work at all.
+  Returning an object from a base constructor makes it `this`, so the subclass constructor runs
+  against a real DOM element; and because an element's members are its *own* properties, re-pointing
+  its prototype at `new.target.prototype` adds the class without displacing any of them, while the
+  class's chain still ends at the `HTMLElement.prototype` every element wrapper is linked to.
+  <br>**Upgrading reuses the same constructor path rather than a second one**, which is what the
+  specification's construction stack is for: an upgrade pushes the existing element and the base's
+  callback hands that one back instead of minting a new one, so the author's constructor runs against
+  the node already in the tree. The shim instead copied attributes and children onto a fresh element
+  and swapped it in, which loses node identity — a page holding the element from before the
+  definition landed kept pointing at the discarded one. Identity across an upgrade is pinned.
+  <br>**Reactions come off the canonical `DomDocument.Mutated` stream, which is synchronous.** The
+  obvious reuse would have been `MutationObserver`, which already subscribes there — but its delivery
+  is a microtask, and a browser runs `connectedCallback` before the statement after the `appendChild`
+  that caused it. A component that reads its own DOM immediately after inserting itself would have
+  seen nothing.
+  <br>**The runner's shim now steps aside, and finding out why it did not is part of this.** Its
+  capability probe asked whether `new HTMLElement()` yields an element — which a *correct*
+  implementation can never satisfy, because a bare `new HTMLElement()` has no definition to build
+  from and must throw, exactly as in a browser. So the probe failed against the real implementation
+  and the shim kept winning, which would have meant WPT never exercising the production code at all.
+  The probe now asks whether a *defined* class constructs an element, which is the capability the
+  shim exists to fake.
+  <br>Over a 17-case corpus run against both engines, Broiler and Chromium agree on every one:
+  construction, `createElement` running the definition's constructor, name validation and the
+  reserved hyphenated SVG/MathML names, duplicate name and constructor rejection,
+  `get`/`getName`/`whenDefined`, upgrade-in-place with identity, the connected, disconnected and
+  attribute-changed reactions, the attributes an upgrade replays, and an undefined hyphenated tag
+  staying a plain `HTMLElement`.
+  <br>Main-repo fix (the new `Features/CustomElementsBinding.cs`, `Features/ICustomElementsHost.cs`,
+  `DomBridge.CustomElementsHost.cs`, `DomBridge/Registration/CustomElements.cs`, plus
+  `Features/DocumentFactoryBinding.cs` and `src/Broiler.Wpt/WptTestRunner.cs`); regressions in
+  `CustomElementsTests`.
+  <br>**Left out deliberately, and not faked:** customized built-ins (`extends`/`is=`), which
+  `define` rejects rather than accepting and ignoring; form-associated custom elements; and
+  `adoptedCallback`. All three are in
+  [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

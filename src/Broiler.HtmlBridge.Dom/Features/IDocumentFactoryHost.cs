@@ -14,6 +14,10 @@ internal interface IDocumentFactoryHost
 {
     JSObject ToJSObject(DomNode node);
 
+    /// <summary>The element a defined custom tag creates by running its own constructor, or
+    /// <see langword="null"/> when the tag has no definition and the ordinary path applies.</summary>
+    JSObject? CreateDefinedCustomElement(string tagName);
+
     DomElement CreateBridgeElement(string tagName);
     DomElement CreateBridgeElementNS(string? namespaceUri, string tagName);
     DomText CreateBridgeTextNode(string data);

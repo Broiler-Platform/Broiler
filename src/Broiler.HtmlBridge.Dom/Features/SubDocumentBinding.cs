@@ -7,6 +7,7 @@ using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.Runtime;
+using Broiler.JavaScript.Engine;
 using Broiler.Dom;
 
 namespace Broiler.HtmlBridge.Dom.Features;
@@ -43,6 +44,14 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         var doc = new JSObject();
         _host.RegisterDocumentWrapper(docRoot, doc);
 
+        // A frame's document is a document like any other, so it reports HTMLDocument too. Built
+        // here rather than minted as a node wrapper, so it needs the explicit link.
+        _host.LinkToInterface(doc, "HTMLDocument");
+
+        // This sub-document projected onto the contract DocumentCollectionBinding consumes, so its
+        // collections are the main document's, over this root's sub-tree.
+        var collections = new SubDocumentCollectionHost(_host, docRoot);
+
         doc.FastAddProperty((KeyString)"documentElement",
             new DomFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } de ? _host.ToJSObject(de) : JSNull.Value, "get documentElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -67,10 +76,12 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => SetTitle(docRoot, in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // forms (dynamic collection of <form> elements)
-        doc.FastAddProperty((KeyString)"forms",
-            new DomFunction((in _) => GetForms(docRoot), "get forms"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        // forms/images/links/anchors/scripts/embeds/plugins/styleSheets — the document collection
+        // family, built by the shared binding rather than by this module's own snapshot builders.
+        RegisterCollections(doc, collections, _host.JsContext);
+
+        // doctype/dir/designMode — the three document metadata accessors that came with that family.
+        RegisterMetadata(doc, docRoot);
 
         // childNodes
         doc.FastAddProperty((KeyString)"childNodes",
@@ -186,26 +197,6 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => Write(docRoot, in a), "write", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // document.images
-        doc.FastAddProperty((KeyString)"images",
-            new DomFunction((in _) => GetImages(docRoot), "get images"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.links
-        doc.FastAddProperty((KeyString)"links",
-            new DomFunction((in _) => GetLinks(docRoot), "get links"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.scripts
-        doc.FastAddProperty((KeyString)"scripts",
-            new DomFunction((in _) => GetScripts(docRoot), "get scripts"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // document.styleSheets
-        doc.FastAddProperty((KeyString)"styleSheets",
-            new DomFunction((in _) => _host.BuildStyleSheetsCollection(docRoot), "get styleSheets"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
         // removeChild on document
         doc.FastAddValue((KeyString)"removeChild",
             new DomFunction((in a) => RemoveChild(docRoot, in a), "removeChild", 1),
@@ -277,6 +268,123 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         return doc;
     }
 
+    // -------- the document collection family --------
+
+    /// <summary>
+    /// Registers this sub-document's eight live collections through
+    /// <see cref="DocumentCollectionBinding"/> — the same builders, the same interfaces and the same
+    /// identity rule the containing document uses.
+    /// </summary>
+    /// <remarks>
+    /// Each collection object is built once, on first read, and closed over, so the getter hands back
+    /// the same object every time: <c>d.forms === d.forms</c>, which the snapshot arrays this replaces
+    /// answered <see langword="false"/>. <c>embeds</c> and <c>plugins</c> share one local because
+    /// HTML §3.1.5 requires them to return the same object, not merely equal ones. Building lazily
+    /// matters more here than on the main document: a sub-document can be minted by
+    /// <c>createHTMLDocument</c> at any point, but the interface constructors these take their
+    /// prototypes from are registered once during attach, so an eager build during attach — while an
+    /// <c>&lt;iframe&gt;</c>'s content document is being wired — would capture no prototype at all.
+    /// </remarks>
+    private static void RegisterCollections(
+        JSObject doc, IDocumentCollectionHost collections, JSContext? context)
+    {
+        Live("forms", DocumentCollectionBinding.Forms);
+        Live("images", DocumentCollectionBinding.Images);
+        Live("links", DocumentCollectionBinding.Links);
+        Live("anchors", DocumentCollectionBinding.Anchors);
+        Live("scripts", DocumentCollectionBinding.Scripts);
+        Live("styleSheets", DocumentCollectionBinding.StyleSheets);
+
+        JSValue? embeds = null;
+        JSValue Embeds() => embeds ??= DocumentCollectionBinding.Embeds(collections, context);
+        Getter("embeds", Embeds);
+        Getter("plugins", Embeds);
+
+        void Live(string name, Func<IDocumentCollectionHost, JSContext?, JSValue> build)
+        {
+            JSValue? collection = null;
+            Getter(name, () => collection ??= build(collections, context));
+        }
+
+        void Getter(string name, Func<JSValue> read) =>
+            doc.FastAddProperty(
+                (KeyString)name, new DomFunction((in _) => read(), $"get {name}"), null,
+                JSPropertyAttributes.EnumerableConfigurableProperty);
+    }
+
+    /// <summary>
+    /// <c>doctype</c>, <c>dir</c> and <c>designMode</c> on a sub-document — the metadata accessors the
+    /// containing document gained beside its collections, and which a frame's document was missing for
+    /// the same reason: nothing ever registered them.
+    /// </summary>
+    /// <remarks>
+    /// <c>doctype</c> matters most of the three, and for the same reason it did on the main document:
+    /// the node is already there — <c>createDocument(ns, qname, doctype)</c> appends it and
+    /// <c>d.firstChild</c> returns it — so it was reachable by position and not by the name DOM §4.5
+    /// gives it. <c>designMode</c> is per-document state (HTML §3.2.7), so each sub-document carries
+    /// its own rather than sharing the containing document's.
+    /// </remarks>
+    private void RegisterMetadata(JSObject doc, DomNode docRoot)
+    {
+        doc.FastAddProperty(
+            (KeyString)"doctype",
+            new DomFunction((in _) => DocumentTypeNode(docRoot) is { } doctype ? _host.ToJSObject(doctype) : JSNull.Value, "get doctype"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // HTML §3.2.6: the getter is limited to only known values — the canonical lower-case keyword
+        // or the empty string — while the setter writes the assigned text through unchanged.
+        doc.FastAddProperty(
+            (KeyString)"dir",
+            new DomFunction((in _) => new JSString(DocumentDirection(docRoot)), "get dir"),
+            new DomFunction((in a) =>
+            {
+                if (DomBridge.GetDocumentElement(docRoot) is { } documentElement)
+                    DomBridge.SetAttr(documentElement, "dir", a.Length > 0 ? a[0].ToString() : string.Empty);
+                return JSUndefined.Value;
+            }, "set dir"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // HTML §3.2.7: an enumerated document state rather than an attribute. Anything but "on"/"off"
+        // (ASCII case-insensitively) is ignored rather than stored.
+        var designMode = "off";
+        doc.FastAddProperty(
+            (KeyString)"designMode",
+            new DomFunction((in _) => new JSString(designMode), "get designMode"),
+            new DomFunction((in a) =>
+            {
+                var requested = a.Length > 0 ? a[0].ToString() : string.Empty;
+                if (string.Equals(requested, "on", StringComparison.OrdinalIgnoreCase))
+                    designMode = "on";
+                else if (string.Equals(requested, "off", StringComparison.OrdinalIgnoreCase))
+                    designMode = "off";
+                return JSUndefined.Value;
+            }, "set designMode"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+    }
+
+    /// <summary>This sub-document's <see cref="DomDocumentType"/> child, or <see langword="null"/>.</summary>
+    private static DomDocumentType? DocumentTypeNode(DomNode docRoot)
+    {
+        foreach (var child in docRoot.ChildNodes)
+        {
+            if (child is DomDocumentType doctype)
+                return doctype;
+        }
+
+        return null;
+    }
+
+    /// <summary>The document element's <c>dir</c>, limited to the three keywords HTML defines.</summary>
+    private static string DocumentDirection(DomNode docRoot)
+    {
+        if (DomBridge.GetDocumentElement(docRoot) is not { } documentElement ||
+            !DomBridge.TryGetAttribute(documentElement, "dir", out var value))
+            return string.Empty;
+
+        var keyword = value.ToLowerInvariant();
+        return keyword is "ltr" or "rtl" or "auto" ? keyword : string.Empty;
+    }
+
     // -------- read-only document getters --------
 
     private JSValue GetBody(DomNode docRoot)
@@ -343,23 +451,24 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         return JSUndefined.Value;
     }
 
-    private JSValue GetForms(DomNode docRoot)
-    {
-        var results = new List<JSValue>();
-        _host.CollectByTagName(docRoot, "form", results);
-        return new JSArray(results);
-    }
-
-    private JSValue GetChildNodes(DomNode docRoot)
-    {
-        // childNodes includes ALL node types (per DOM), notably the canonical DomDocumentType — which
-        // is no longer a DomElement after Phase 4 item 1, so ChildElements would wrongly drop it. This
-        // matches the sub-document's firstChild (raw first child) and the document childNodes semantics.
-        var arr = new JSArray();
-        foreach (var child in docRoot.ChildNodes)
-            arr.Add(_host.ToJSObject(child));
-        return arr;
-    }
+    /// <summary>
+    /// <c>document.childNodes</c> on a sub-document — a <b>live</b> <c>NodeList</c> (DOM §4.4), as the
+    /// containing document's is.
+    /// </summary>
+    /// <remarks>
+    /// It includes every node type, notably the canonical <see cref="DomDocumentType"/> — which is no
+    /// longer a <see cref="DomElement"/> after Phase 4 item 1, so <c>ChildElements</c> would wrongly
+    /// drop it. That matches the sub-document's <c>firstChild</c> (the raw first child) and the main
+    /// document's <c>childNodes</c>.
+    /// </remarks>
+    private JSValue GetChildNodes(DomNode docRoot) =>
+        DomCollectionBinding.NodeList(_host.JsContext, () =>
+        {
+            var children = new List<JSValue>();
+            foreach (var child in docRoot.ChildNodes)
+                children.Add(_host.ToJSObject(child));
+            return children;
+        });
 
     private JSValue GetElementById(DomNode docRoot, in Arguments a)
     {
@@ -368,58 +477,116 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         return found != null ? _host.ToJSObject(found) : JSNull.Value;
     }
 
+    /// <summary>
+    /// <c>getElementsByTagName(name)</c> on a frame's document — a <b>live</b> <c>HTMLCollection</c>
+    /// (DOM §4.5), as the containing document's is.
+    /// </summary>
     private JSValue GetElementsByTagName(DomNode docRoot, in Arguments a)
     {
-        var tagName = a.Length > 0 ? a[0].ToString().ToLowerInvariant() : string.Empty;
-        var results = new List<JSValue>();
-        _host.CollectByTagName(docRoot, tagName, results);
-        return new JSArray(results);
+        var tagName = a.Length > 0 ? a[0].ToString() : string.Empty;
+        return LiveCollection(
+            docRoot,
+            el => tagName == "*" || string.Equals(el.TagName, tagName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
-    /// <c>getElementsByClassName</c> on a frame's document. It reuses
-    /// <see cref="ClassNameSet"/>, the rule the main document and the element-scoped search already
-    /// share, so all three surfaces answer a class query the same way.
+    /// <c>getElementsByClassName</c> on a frame's document — a <b>live</b> <c>HTMLCollection</c>
+    /// (DOM §4.5). It reuses <see cref="ClassNameSet"/>, the rule the main document and the
+    /// element-scoped search already share, so all three surfaces answer a class query the same way.
     /// </summary>
     private JSValue GetElementsByClassName(DomNode docRoot, in Arguments a)
     {
         var wanted = ClassNameSet.Parse(a.Length > 0 ? a[0].ToString() : string.Empty);
-        var results = new List<JSValue>();
-        if (wanted.Length > 0)
-            _host.CollectMatching(docRoot, el => ClassNameSet.Matches(el, wanted), results);
-
-        return new JSArray(results);
+        return LiveCollection(docRoot, el => wanted.Length > 0 && ClassNameSet.Matches(el, wanted));
     }
 
     /// <summary>
     /// <c>getElementsByName</c> on a frame's document — the elements whose <c>name</c> attribute is
-    /// identical to the argument, matching the main document's implementation (HTML §3.1.5).
+    /// identical to the argument, matching the main document's implementation (HTML §3.1.5): a live
+    /// <c>NodeList</c>, the one by-name lookup the specification types as a NodeList rather than an
+    /// <c>HTMLCollection</c>.
     /// </summary>
     private JSValue GetElementsByName(DomNode docRoot, in Arguments a)
     {
         var name = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var results = new List<JSValue>();
-        _host.CollectMatching(
-            docRoot,
-            el => DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal),
-            results);
-
-        return new JSArray(results);
+        return DomCollectionBinding.NodeList(
+            _host.JsContext,
+            () => Wrappers(
+                docRoot,
+                el => DomBridge.TryGetAttribute(el, "name", out var value) && string.Equals(value, name, StringComparison.Ordinal)));
     }
 
     private JSValue QuerySelector(DomNode docRoot, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
+        DomBridge.ValidateSelector(selector, _host.JsContext);
+        if (DomApiSyntax.CarriesPseudoElement(selector))
+            return JSNull.Value;
+
         var found = DomBridge.FindInSubTree(docRoot, el => _host.MatchesSelector(el, selector));
         return found != null ? _host.ToJSObject(found) : JSNull.Value;
     }
 
+    /// <summary>
+    /// <c>querySelectorAll(selector)</c> on a frame's document — a <b>static</b> <c>NodeList</c>
+    /// (DOM §4.2.6), the one collection the specification defines as a snapshot rather than live. The
+    /// members are resolved once, here, and the list closes over that result.
+    /// </summary>
     private JSValue QuerySelectorAll(DomNode docRoot, in Arguments a)
     {
         var selector = a.Length > 0 ? a[0].ToString() : string.Empty;
-        var results = new List<JSValue>();
-        _host.CollectMatching(docRoot, el => _host.MatchesSelector(el, selector), results);
-        return new JSArray(results);
+        DomBridge.ValidateSelector(selector, _host.JsContext);
+        var results = DomApiSyntax.CarriesPseudoElement(selector)
+            ? []
+            : Wrappers(docRoot, el => _host.MatchesSelector(el, selector));
+        return DomCollectionBinding.NodeList(_host.JsContext, () => results);
+    }
+
+    /// <summary>
+    /// A live <c>HTMLCollection</c> over the elements of this sub-document matching
+    /// <paramref name="predicate"/>, with the named getter DOM §4.2.10.2 gives one — by <c>id</c>,
+    /// then by <c>name</c>, taking the first member in tree order that answers to either.
+    /// </summary>
+    private JSValue LiveCollection(DomNode docRoot, Func<DomElement, bool> predicate) =>
+        DomCollectionBinding.HtmlCollection(
+            _host.JsContext,
+            () => Wrappers(docRoot, predicate),
+            name =>
+            {
+                if (name.Length == 0)
+                    return null;
+
+                foreach (var element in Members(docRoot, predicate))
+                {
+                    if ((DomBridge.TryGetAttribute(element, "id", out var id) && id == name) ||
+                        (DomBridge.TryGetAttribute(element, "name", out var named) && named == name))
+                        return _host.ToJSObject(element);
+                }
+
+                return null;
+            });
+
+    /// <summary>The matching elements of this sub-document, in tree order, recomputed per call — which
+    /// is what makes a collection built over it live.</summary>
+    private static List<DomElement> Members(DomNode docRoot, Func<DomElement, bool> predicate)
+    {
+        var members = new List<DomElement>();
+        foreach (var element in docRoot.InclusiveDescendants().OfType<DomElement>())
+        {
+            if (predicate(element))
+                members.Add(element);
+        }
+
+        return members;
+    }
+
+    /// <summary><see cref="Members"/>, as JS wrappers.</summary>
+    private List<JSValue> Wrappers(DomNode docRoot, Func<DomElement, bool> predicate)
+    {
+        var wrappers = new List<JSValue>();
+        foreach (var member in Members(docRoot, predicate))
+            wrappers.Add(_host.ToJSObject(member));
+        return wrappers;
     }
 
     private JSValue ElementFromPoint(DomNode docRoot, in Arguments a)
@@ -432,26 +599,5 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
     {
         var hits = _host.HitTestDocumentPoint(docRoot, DomBridge.GetCoordinateArgument(a, 0), DomBridge.GetCoordinateArgument(a, 1));
         return new JSArray(hits.Select(_host.ToJSObject).ToArray());
-    }
-
-    private JSValue GetImages(DomNode docRoot)
-    {
-        var results = new List<JSValue>();
-        _host.CollectByTagName(docRoot, "img", results);
-        return new JSArray(results);
-    }
-
-    private JSValue GetScripts(DomNode docRoot)
-    {
-        var results = new List<JSValue>();
-        _host.CollectByTagName(docRoot, "script", results);
-        return new JSArray(results);
-    }
-
-    private JSValue GetLinks(DomNode docRoot)
-    {
-        var results = new List<JSValue>();
-        _host.CollectMatching(docRoot, el => (string.Equals(el.TagName, "a", StringComparison.OrdinalIgnoreCase) || string.Equals(el.TagName, "area", StringComparison.OrdinalIgnoreCase)) && DomBridge.HasAttr(el, "href"), results);
-        return new JSArray(results);
     }
 }

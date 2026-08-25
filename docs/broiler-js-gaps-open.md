@@ -200,22 +200,25 @@ and deterministic detection behavior.
   to their interface prototypes, so `constructor.name` names the interface and extending a prototype
   reaches instances. Both are in
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  **Narrowed a third time** — element, attribute and document wrappers all name their interfaces
+  now, and the interfaces inherit along the chain Web IDL gives them, so `Element.prototype.x = …`
+  reaches every element. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
   <br>**What remains, precisely:**
-  - **Element wrappers report `constructor.name` of `"Object"`.** Their interface is a tag question:
-    the curated table's entries overlap (`HTMLMediaElement` covers `audio` and `video` while
-    `HTMLAudioElement` covers `audio` again) and a tag it omits has to fall back to something a
-    browser distinguishes — `HTMLSpanElement` from `HTMLElement` from `HTMLUnknownElement`. Guessing
-    would put a *wrong* name where `"Object"` is at least not misleading, so it was left rather than
-    approximated. `instanceof` already answers, through the `@@hasInstance` hook.
-  - **`Attr` likewise**, for a different reason: an attribute is not a `DomNode` in the canonical
-    DOM, so its wrapper is not minted at the choke point where the link is applied and needs its own
-    hook.
-  - **Members are still own properties of each wrapper**, so an interface prototype is empty:
-    `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)` lists the whole
-    interface. Relocating them is the larger object-model change, and the one that would let this
-    item close.
-  - **`document.constructor.name`** is `"Object"` where a browser says `"HTMLDocument"` — an
-    interface this engine does not register at all.
+  - **Members are still own properties of each wrapper**, so an interface prototype carries nothing
+    of its own: `Text.prototype.splitText` is `undefined` and `Object.getOwnPropertyNames(node)`
+    lists the whole interface. The prototype *chain* is real now, so a page can add to it and be
+    heard; what has not happened is the engine putting its own members there. Relocating them is the
+    larger object-model change, and the one that would let this item close.
+  - **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
+    and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
+    a name can be reported is what this track's action 1 rules out — so it is a capability decision
+    (implement the SVG interface set, or keep the base) rather than an oversight. Pinned as the
+    current answer.
+  - ~~`NamedNodeMap` is not registered.~~ **Fixed** — `element.attributes` is a live `NamedNodeMap`
+    on the shared collection machinery, and its `Attr` nodes are one object per attribute with a
+    live value. See
+    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`document.doctype` is `undefined`.~~ **Fixed**, together with the document-collection family the
   follow-up audit found around it — `anchors`/`embeds`/`plugins` absent, the collections that did
   exist being snapshot arrays without identity or named access, and `document.childNodes` filtering
@@ -228,11 +231,11 @@ and deterministic detection behavior.
   distinguishing behaviour is not; adding it as an ordinary object would make the standard
   `document.all` feature-detect (which reads truthiness, precisely to exclude it) answer the wrong
   way round. This needs a `Broiler.JS` capability before it is a bridge question at all.
-- **Confirmed, still open — sub-documents keep their own, older collection accessors.** An
-  `iframe`'s `contentDocument` builds `forms`/`images`/`scripts`/`styleSheets` in
-  `SubDocumentBinding` rather than sharing `DocumentCollectionBinding`, so it still hands back
-  snapshot arrays. Everything the main document's fix needs is reachable from there; it was left out
-  to keep the change to one document.
+- ~~Sub-documents keep their own, older collection accessors.~~ **Fixed** — a sub-document is now
+  projected onto `IDocumentCollectionHost`, so a frame's `contentDocument` and the containing
+  document are served by one implementation; the query methods, `childNodes`, `doctype`, `dir` and
+  `designMode` came with it, and a frame's tree gained the DOCTYPE node its accessor needs. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
   of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
@@ -256,15 +259,30 @@ and deterministic detection behavior.
 - ~~`input.form` and `input.labels` are `undefined`.~~ **Fixed** — the form-association surface,
   which the `NodeList` work above unblocked (`labels` is a live one). See
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
-  an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
-  lives in **`Broiler.DOM`** (`DomNameValidation`, which deliberately owns these rules rather than
-  the bridge re-copying them), so it is the patch workflow, and it also carries real-page risk — a
-  browser does throw on `setAttribute('@click', …)`, so pages relying on the permissive behaviour
-  would begin to fail. `querySelector` with an invalid selector returns `null` where `SyntaxError` is
-  required; surfacing that needs parse errors out of **`Broiler.CSS`**'s `CssSelectorParser`, plus
-  main-repo wiring. The DOMException machinery itself is sound, so both are wiring gaps rather than
-  missing mechanisms.
+- ~~The rest of that family: `setAttribute` with an invalid name, and `querySelector` with an invalid
+  selector.~~ **Fixed** — both throw the exception their specification names, and the selector half
+  turned out to be returning the *wrong element* rather than `null`. Neither needed a submodule: the
+  rules belong at the scripted-DOM boundary precisely because the canonical layers underneath them
+  (the parser's `SetAttribute`, the cascade's matcher) are required to stay lenient. Checked against
+  Chromium over a 149-case corpus. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed — the `:is()` aliases match every element. Fixed as a patch, not yet live.** Root-caused
+  and narrowed since it was first characterized, and it is worse than "an unknown functional pseudo
+  over-matches": `:matches()`, `:any()`, `:-webkit-any()` and `:-moz-any()` are the historical
+  spellings of `:is()`, all four sat in the matcher's recognized-but-unmodelled set, and so all four
+  fell through its lenient default and matched **every element**. The **cascade** uses the same
+  matcher, so `:-webkit-any(h1) { color: red }` painted the whole page — a rendering bug rather than
+  only a `querySelector` one.
+  <br>Measured against Chromium: only `-webkit-any` is still accepted and it behaves exactly like
+  `:is()`; the other three were removed from the platform and match nothing. The fix is in
+  **`Broiler.CSS.Dom`**'s `CssSelectorMatcher`, whose remote is outside this session's scope (the push
+  returns 403), so it ships as `patches/` → *Stop the `:is()` aliases matching every element*. **No
+  main-repo fallback is possible**: the damaging half is the cascade, which reaches the matcher
+  through the computed-style engine rather than the bridge's `MatchesSelector` wrapper, so there is no
+  seam to intercept. It is live only once the patch is applied.
+  <br>What stays lenient afterwards, deliberately, is an unknown *vendor-prefixed* pseudo-class,
+  which still matches everything. `DomApiSyntaxTests` pins the current answer so applying the patch
+  trips it; the patch index says what to change it to.
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion
@@ -277,7 +295,15 @@ See [HTML5 exceptions](html5test-exceptions.md) and
 
 ### Custom Elements, templates, and Shadow DOM
 
-- WPT currently relies on a `customElements` runner shim; there is no production implementation.
+- ~~WPT currently relies on a `customElements` runner shim; there is no production implementation.~~
+  **Fixed for the core** — the registry, a constructible `HTMLElement`, upgrades and the reaction
+  callbacks are implemented, and the runner's shim now steps aside for them. See
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  <br>**What remains** are three separate capabilities the slice deliberately left out rather than
+  faked: customized built-ins (the `extends` option and `is=` attribute), which `define` rejects with
+  a `NotSupportedError` instead of accepting and ignoring; form-associated custom elements
+  (`formAssociated`, `ElementInternals`, `attachInternals`); and `adoptedCallback`, which needs the
+  document-adoption path to report ownership changes.
 - ~~`template.content` is a snapshot rather than the parser-owned fragment required by HTML.~~
   **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
@@ -323,14 +349,23 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 
 ### Actions
 
-1. Establish real interface prototypes and Web IDL collection behavior before adding more
-   compatibility-only constructor globals. **Collection half done** — `NodeList` and
+1. ~~Establish real interface prototypes and Web IDL collection behavior before adding more
+   compatibility-only constructor globals.~~ **Done for both halves.** Every DOM wrapper — elements,
+   attributes and the document included — is linked to its interface prototype, and the interfaces
+   inherit along their Web IDL chains, so extending `Element.prototype` reaches instances. What is
+   left of the wrapper item is relocating the engine's own members onto those prototypes, which is
+   the separate object-model change. **Collection half done** — `NodeList` and
    `HTMLCollection` have real prototypes, Web IDL indexed/named access, and correct liveness, and
-   the `document` collections plus CSSOM's `StyleSheetList` now use them; see
+   the `document` collections plus CSSOM's `StyleSheetList` now use them — in a frame's document as
+   well as the containing one, which was the last surface still building its own snapshot arrays; see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
    The element-wrapper half is what remains.
-2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
-   focused DOM regressions.
+2. ~~Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
+   focused DOM regressions.~~ **Done for the exception family** — CharacterData, tree mutation, the
+   document-level mutation methods, `setAttribute`'s `InvalidCharacterError` and `querySelector`'s
+   `SyntaxError` all raise the specified `DOMException`; see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+   Range semantics are the part of this action still untouched.
 3. Implement production Custom Elements and ~~parser-owned template contents~~ (**template contents
    done** — see
    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);

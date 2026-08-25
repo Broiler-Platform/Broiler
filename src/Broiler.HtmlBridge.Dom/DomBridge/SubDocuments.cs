@@ -763,6 +763,14 @@ public sealed partial class DomBridge
 
         var (parsedRoot, _, allElements, _) = BuildDocumentTree(html);
 
+        // The frame's DOCTYPE, before its documentElement — DOM §4.5 makes it the document's first
+        // child, and BuildDocumentTree returns only the <html> element, so a frame's resource
+        // declaring one produced a tree that did not carry it: `d.childNodes` was [<html>] where the
+        // containing document's is [doctype, <html>], and `d.doctype` had nothing to find. The same
+        // `ParseDocType` reading that `document.write` already uses for exactly this.
+        if (ParseDocType(html) is { } docType)
+            document.AppendChild(docType);
+
         // parsedRoot is the <html> element itself (HtmlTreeBuilder returns it directly).
         // Append it as the sub-document's documentElement (a canonical DomDocument child).
         document.AppendChild(parsedRoot);

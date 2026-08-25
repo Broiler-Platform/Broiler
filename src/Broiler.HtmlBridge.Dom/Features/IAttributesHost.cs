@@ -15,6 +15,10 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal interface IAttributesHost
 {
+    /// <summary>The bridge's JS context, needed to mint the <c>InvalidCharacterError</c> that an
+    /// invalid <c>setAttribute</c> name must throw (DOM §4.9.1).</summary>
+    Broiler.JavaScript.Engine.JSContext? JsContext { get; }
+
     /// <summary>Applies a <c>style</c> attribute value to the element's inline style declaration
     /// (clearing and reparsing it) and invalidates the element's style scope.</summary>
     void ApplyStyleAttribute(DomElement element, string value);
@@ -27,4 +31,9 @@ internal interface IAttributesHost
 
     /// <summary>Queues an <c>attributes</c> MutationObserver record for the change.</summary>
     void NotifyAttributeMutationObservers(DomElement element, string attributeName, string? oldValue);
+
+    /// <summary>Points a wrapper at a named interface's prototype. Needed here because an attribute
+    /// is not a <c>DomNode</c>, so its wrapper is not minted at the choke point that links every
+    /// other one.</summary>
+    void LinkToInterface(Broiler.JavaScript.Runtime.JSObject wrapper, string interfaceName);
 }

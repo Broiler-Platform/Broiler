@@ -421,6 +421,123 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Custom Elements work. There was no implementation: `customElements` was
+  undefined and `HTMLElement` threw `Illegal constructor`, so
+  `class X extends HTMLElement` followed by `customElements.define(…)` failed on
+  the bare name — which aborts the whole script, not the statement that named it.
+  A component page therefore rendered as whatever its markup said before any
+  component built itself.
+
+  `customElements` is now a real `CustomElementRegistry` with `define`, `get`,
+  `getName`, `whenDefined` and `upgrade`; `HTMLElement` is constructible from a
+  defined class, so `new X()` and `document.createElement('x-thing')` both
+  produce a real element carrying the class's own methods; elements parsed
+  before their definition are upgraded in place, keeping their identity and
+  children; and the `connectedCallback`, `disconnectedCallback` and
+  `attributeChangedCallback` reactions run synchronously, as a browser runs
+  them.
+
+  Name validation follows HTML §4.13.1, including the hyphenated SVG and MathML
+  names that are reserved. Customized built-ins (the `extends` option and `is=`
+  attribute), form-associated custom elements and `adoptedCallback` are not in
+  this slice and are not faked — `define` rejects an `extends` option rather
+  than accepting it and quietly doing nothing.
+
+- `element.attributes` is a live `NamedNodeMap`, and an attribute is one `Attr`
+  node with a live value. It was a fresh plain object per read: naming
+  `NamedNodeMap` was a `ReferenceError` (which aborts the whole script, not just
+  the expression), `el.attributes === el.attributes` was false, and
+  `el.attributes.id` was `undefined` where a qualified name is a supported
+  property name. The fourth fault made pages throw rather than answer wrongly —
+  `length` was live while the indices were fixed at build time, so a map held
+  across a `setAttribute` reported the new count with nothing at the new index
+  and the idiomatic `for (i = 0; i < m.length; i++) m[i].name` read
+  `undefined.name`.
+
+  Attribute nodes became real objects to match: one node per element and name
+  across every access path, whose `value` reads through to the element and
+  writes back, and which detaches on removal — keeping its last value, losing
+  its `ownerElement`, and letting a re-add mint a new node.
+
+  Beyond its own scope, this corrected the collection prototypes' members from
+  non-enumerable to enumerable on `NodeList` and `HTMLCollection` as well, which
+  is what Web IDL specifies and a browser has: `for (var k in el.childNodes)`
+  now yields `item`, `forEach` and the rest beside the indices.
+
+- DOM objects report the interface they implement. Every element, every
+  attribute and the document itself answered `constructor.name` of `"Object"`,
+  with `Object.getPrototypeOf(el) === Object.prototype` — so anything keyed on
+  the constructor (debugging output, logging, type dispatch) read the wrong
+  thing. They now name their interface, and the interfaces inherit along the
+  chain Web IDL gives them (`HTMLDivElement → HTMLElement → Element → Node →
+  EventTarget`). That last part is the one that is not cosmetic: extending an
+  interface prototype is the ordinary polyfill idiom, and
+  `Element.prototype.matches = …` now reaches every element where the assignment
+  used to go to an object nothing inherited from.
+
+  The per-tag interface names are Chromium's measured answers to
+  `document.createElement(tag).constructor.name` over every HTML tag, which is
+  what makes the three-way fallback right: a tag with its own interface names it,
+  a known tag without one is `HTMLElement`, and a tag that is neither known nor a
+  valid custom element name is `HTMLUnknownElement`. A hyphenated name such as
+  `x-foo` is an `HTMLElement` even when nothing defined it.
+
+  The same measurement corrected a live error: `plaintext` was grouped with
+  `listing`/`pre`/`xmp`, so `document.createElement('plaintext') instanceof
+  HTMLPreElement` answered `true` where a browser answers `false`.
+
+  Still reported as before: SVG elements answer the base `SVGElement` rather than
+  `SVGRectElement` and the rest, and `element.attributes` answers `"Object"` —
+  neither interface set is registered, and the engine's own members remain own
+  properties of each wrapper rather than living on the prototypes.
+
+- An invalid selector fails instead of matching the wrong element.
+  `document.querySelector('div:::bogus')` returned a real `<div>` — the matcher
+  read it as `div` — and `querySelectorAll('[')` matched four elements, so an
+  unparsable selector did not produce no answer, it produced a plausible wrong
+  one that no caller can detect. All five scripted entry points
+  (`querySelector`, `querySelectorAll`, `matches`, `closest`, and the document,
+  frame and `DocumentFragment` forms) now throw the `SyntaxError` DOM §4.2.6
+  requires. Selectors that carry a **pseudo-element** were the same failure by
+  another route: `querySelector('::before')` returned the `<html>` element,
+  where a pseudo-element selects a box and so matches nothing; those now answer
+  no element, in both the `::` and legacy one-colon spellings, while the cascade
+  goes on applying `::before` rules. A pseudo-element that is not the subject
+  (`div::before p`) is a syntax error, as it is in a browser.
+
+  A well-formed but unrecognized pseudo (`:nope`, `::bogus`) is deliberately
+  accepted rather than rejected: rejecting one needs a list of every pseudo the
+  engine supports, and turning an unknown name into an exception would break a
+  page that merely asked for a pseudo Broiler lacks.
+
+- `setAttribute` rejects a name a browser rejects. Every invalid name was
+  written through silently — `@click`, `foo bar`, `1abc` and `-x` all became
+  attributes no browser will create — and the one name that did fail, the empty
+  string, threw a bare `Error` with no `name` or `code` for a caller to branch
+  on rather than a `DOMException`. It now throws `InvalidCharacterError`, as do
+  `toggleAttribute` and `setAttributeNS`; `getAttribute`, `hasAttribute` and
+  `removeAttribute` keep accepting anything, which is where a browser draws the
+  line. Colons stay valid, so `setAttribute('xlink:href', …)` and
+  `setAttribute('v-on:click', …)` are unaffected — the XML `Name` production
+  admits them, and rejecting them would have broken inline SVG.
+
+- A frame's `document` answers the same object model as the document containing
+  it. An `<iframe>`'s `contentDocument` — and every `createDocument` /
+  `createHTMLDocument` result — kept its own older accessors, so from one page the
+  two documents disagreed about what a document is: `d.forms.constructor.name`
+  was `"Array"` against the parent's `"HTMLCollection"`, `d.forms === d.forms` was
+  false, `namedItem` and named access did not exist, a held collection's `length`
+  did not move when the tree changed, and `anchors`, `embeds`, `plugins`,
+  `doctype`, `dir` and `designMode` were absent outright, so `d.embeds.length` in
+  a frame threw the `TypeError` the main document had stopped giving. Both
+  documents are now served by one implementation. The query methods came with it,
+  each typed as DOM assigns — `querySelectorAll` stays a static `NodeList`, the
+  one collection specified as a snapshot, while `getElementsByTagName` /
+  `ByClassName` are live `HTMLCollection`s and `getElementsByName` a live
+  `NodeList`. A frame's tree also gained the DOCTYPE node its `doctype` accessor
+  needs: the frame parse returned the `<html>` element alone, so a resource
+  declaring a DOCTYPE built a tree that never carried one.
+
 - `image-set()` picks an image instead of painting nothing. It was recognised as
   an image value and never resolved, so the layer reached two readers that each
   understand only part of what the function can hold — the background loader

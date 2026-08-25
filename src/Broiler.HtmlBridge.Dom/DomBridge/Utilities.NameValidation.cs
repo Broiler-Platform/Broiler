@@ -76,6 +76,50 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
+    /// Validates a <c>setAttribute</c>/<c>toggleAttribute</c> attribute name (DOM §4.9.1), throwing
+    /// <c>InvalidCharacterError</c> when it does not match the XML <c>Name</c> production.
+    /// </summary>
+    /// <remarks>
+    /// A separate rule from <see cref="ValidateElementName"/> rather than a reuse of it, because
+    /// <c>Name</c> allows colons and the element-name pattern deliberately does not — see
+    /// <see cref="Dom.Features.DomApiSyntax.IsValidAttributeName"/> for why that distinction is the
+    /// load-bearing one. Every call site is a scripted DOM entry point: the canonical
+    /// <c>DomElement.SetAttribute</c> stays permissive because the HTML parser goes through it.
+    /// </remarks>
+    internal static void ValidateAttributeName(string name, JSContext? context)
+    {
+        if (context is not null && !Dom.Features.DomApiSyntax.IsValidAttributeName(name))
+        {
+            ThrowDOMException(
+                context,
+                $"Failed to execute 'setAttribute' on 'Element': '{name}' is not a valid attribute name.",
+                "InvalidCharacterError");
+        }
+    }
+
+    /// <summary>
+    /// Validates a selector argument (DOM §4.2.6), throwing <c>SyntaxError</c> when it does not parse
+    /// as a selector list.
+    /// </summary>
+    /// <remarks>
+    /// Shared by all five scripted entry points that take one — <c>querySelector</c>,
+    /// <c>querySelectorAll</c>, <c>matches</c> and <c>closest</c> on an element, the two document
+    /// forms, the sub-document forms, and the <c>DocumentFragment</c> forms — because a browser throws
+    /// from all of them identically, which was measured rather than assumed. The CSS cascade does not
+    /// come through here and stays lenient, as CSS error handling requires.
+    /// </remarks>
+    internal static void ValidateSelector(string selector, JSContext? context)
+    {
+        if (context is not null && !Dom.Features.DomApiSyntax.IsValidSelectorList(selector))
+        {
+            ThrowDOMException(
+                context,
+                $"Failed to execute 'querySelector' on 'Document': '{selector}' is not a valid selector.",
+                "SyntaxError");
+        }
+    }
+
+    /// <summary>
     /// Registers the <c>DOMException</c> constructor on <paramref name="context"/>.
     /// </summary>
     /// <remarks>

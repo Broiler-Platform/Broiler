@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.Number;
+using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Engine;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
@@ -68,15 +69,21 @@ internal static class DomCollectionBinding
             // rather than nodes — but the same indexed-property interface, so it shares the
             // machinery below and carries only the two members CSSOM gives it.
             function StyleSheetList() { throw new TypeError('Illegal constructor'); }
+            // DOM §4.9.1. An element's `attributes`, and the one collection here whose members can
+            // mutate the tree — see the host operations installed on its prototype below.
+            function NamedNodeMap() { throw new TypeError('Illegal constructor'); }
 
             (function () {
                 // Every method here is written against `this.length` and `this[i]` only. The host
                 // answers both from the collection's live contents, so a method defined once on the
                 // prototype is correct for a live and a static collection alike, and needs to know
                 // which it is holding no more than a caller does.
+                // Enumerable, which is what Web IDL says of an interface's members and what a
+                // browser has: `for (var k in el.childNodes)` yields `item`, `forEach` and the rest
+                // beside the indices. They were non-enumerable here, so it yielded only indices.
                 function define(target, name, value) {
                     Object.defineProperty(target, name, {
-                        value: value, writable: true, enumerable: false, configurable: true
+                        value: value, writable: true, enumerable: true, configurable: true
                     });
                 }
 
@@ -129,10 +136,16 @@ internal static class DomCollectionBinding
                     return iterator;
                 }
 
-                [NodeList, HTMLCollection, StyleSheetList].forEach(function (ctor) {
+                [NodeList, HTMLCollection, StyleSheetList, NamedNodeMap].forEach(function (ctor) {
                     define(ctor.prototype, 'item', item);
                     define(ctor.prototype, Symbol.iterator, values);
                 });
+
+                // NamedNodeMap's members all come from C# (see NamedNodeMapOperations): even
+                // getNamedItem cannot be written as `this[name]` the way HTMLCollection's namedItem
+                // is, because an interface member wins the property lookup over a named one — an
+                // element carrying `length="x"` has `attributes.length === 3`, while
+                // `getNamedItem('length')` must still hand back the attribute. Measured.
 
                 // NodeList is iterable and HTMLCollection is NOT (DOM §4.2.10.2 declares no
                 // iterable<> on it), so only NodeList gets the iteration helpers. HTMLCollection
@@ -181,6 +194,88 @@ internal static class DomCollectionBinding
     /// </summary>
     public static JSValue StyleSheetList(JSContext? context, Func<List<JSValue>> contents) =>
         Create(context, "StyleSheetList", contents, namedLookup: null);
+
+    /// <summary>
+    /// A <c>NamedNodeMap</c> over <paramref name="contents"/> (DOM §4.9.1) — an element's
+    /// <c>attributes</c> and nothing else. Live, with the qualified-name getter the interface
+    /// declares.
+    /// </summary>
+    /// <remarks>
+    /// The members that mutate, or that need the owning element rather than the collection, cannot
+    /// be written against <c>this.length</c> and <c>this[i]</c> the way every other method here is,
+    /// so they are host functions rather than JavaScript. They still live on the
+    /// <em>prototype</em>, shared, as Web IDL requires: each reads its element back from
+    /// <paramref name="operations"/> keyed on the receiver, so no per-instance slot appears on the
+    /// object and <c>Object.getOwnPropertyNames(el.attributes)</c> stays the indices alone.
+    /// </remarks>
+    public static JSValue NamedNodeMap(
+        JSContext? context,
+        Func<List<JSValue>> contents,
+        Func<string, JSValue?> namedLookup,
+        NamedNodeMapOperations operations)
+    {
+        var map = Create(context, "NamedNodeMap", contents, namedLookup);
+        if (map is JSObject instance)
+            OperationsByMap.Add(instance, operations);
+        return map;
+    }
+
+    /// <summary>The element-dependent members of <c>NamedNodeMap</c>, supplied by the attribute
+    /// binding, which owns the attribute write path.</summary>
+    internal sealed class NamedNodeMapOperations
+    {
+        public required Func<Arguments, JSValue> GetNamedItem { get; init; }
+        public required Func<Arguments, JSValue> GetNamedItemNS { get; init; }
+        public required Func<Arguments, JSValue> SetNamedItem { get; init; }
+        public required Func<Arguments, JSValue> SetNamedItemNS { get; init; }
+        public required Func<Arguments, JSValue> RemoveNamedItem { get; init; }
+        public required Func<Arguments, JSValue> RemoveNamedItemNS { get; init; }
+    }
+
+    /// <summary>
+    /// Which element each live <c>NamedNodeMap</c> belongs to, so a prototype method can find it from
+    /// its receiver. A weak table, so a map that a page has dropped does not pin its element.
+    /// </summary>
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<JSObject, NamedNodeMapOperations>
+        OperationsByMap = new();
+
+    /// <summary>
+    /// Installs the six host-backed <c>NamedNodeMap</c> methods on the interface prototype. Called
+    /// once per context, after <see cref="RegisterInterfaces"/> has defined the interface.
+    /// </summary>
+    /// <remarks>
+    /// Each looks its operations up from the receiver, so calling one on something that is not a
+    /// <c>NamedNodeMap</c> is a <c>TypeError</c> rather than a silent wrong answer — which is what a
+    /// browser gives for an illegal invocation.
+    /// </remarks>
+    public static void RegisterNamedNodeMapOperations(JSContext context)
+    {
+        if (context["NamedNodeMap"] is not JSObject constructor ||
+            constructor[(KeyString)"prototype"] is not JSObject prototype)
+            return;
+
+        Install("getNamedItem", 1, static operations => operations.GetNamedItem);
+        Install("getNamedItemNS", 2, static operations => operations.GetNamedItemNS);
+        Install("setNamedItem", 1, static operations => operations.SetNamedItem);
+        Install("setNamedItemNS", 1, static operations => operations.SetNamedItemNS);
+        Install("removeNamedItem", 1, static operations => operations.RemoveNamedItem);
+        Install("removeNamedItemNS", 2, static operations => operations.RemoveNamedItemNS);
+
+        void Install(string name, int length, Func<NamedNodeMapOperations, Func<Arguments, JSValue>> pick) =>
+            prototype.FastAddValue(
+                (KeyString)name,
+                new DomFunction(
+                    (in Arguments a) =>
+                    {
+                        if (a.This is not JSObject receiver || !OperationsByMap.TryGetValue(receiver, out var operations))
+                            throw new JSException(new JSString(
+                                $"TypeError: Failed to execute '{name}' on 'NamedNodeMap': Illegal invocation."));
+                        return pick(operations)(a);
+                    },
+                    name,
+                    length),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+    }
 
     private static JSValue Create(
         JSContext? context, string interfaceName, Func<List<JSValue>> contents, Func<string, JSValue?>? namedLookup)

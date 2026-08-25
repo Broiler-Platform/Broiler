@@ -13,6 +13,8 @@ namespace Broiler.HtmlBridge;
 /// </summary>
 public sealed partial class DomBridge : IAttributesHost
 {
+    Broiler.JavaScript.Engine.JSContext? IAttributesHost.JsContext => _jsContext;
+
     void IAttributesHost.ApplyStyleAttribute(DomElement element, string value)
     {
         InlineStyle(element).Clear();
@@ -28,4 +30,7 @@ public sealed partial class DomBridge : IAttributesHost
 
     void IAttributesHost.NotifyAttributeMutationObservers(DomElement element, string attributeName, string? oldValue) =>
         NotifyAttributeMutationObservers(element, attributeName, oldValue);
+
+    void IAttributesHost.LinkToInterface(Broiler.JavaScript.Runtime.JSObject wrapper, string interfaceName) =>
+        LinkToInterface(wrapper, interfaceName);
 }

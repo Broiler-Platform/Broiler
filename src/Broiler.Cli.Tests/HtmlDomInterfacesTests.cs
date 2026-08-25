@@ -684,8 +684,21 @@ document.getElementById('result').textContent = r.join(',');
         Assert.Contains("true,true,true,true", result);
     }
 
+    /// <summary>
+    /// <c>setAttributeNode</c> with the attribute node the element already has returns <em>that</em>
+    /// node, still attached and reading the element's current value (DOM §4.9.2).
+    /// </summary>
+    /// <remarks>
+    /// This fixture used to assert <c>old.value === 'old'</c>, which only held while an <c>Attr</c>
+    /// was a snapshot minted per read: two separate objects, so the returned one could still be
+    /// showing the value from before the write. A browser has one node per attribute with a live
+    /// value, so after <c>attr.value = 'new'</c> the returned node <em>is</em> <c>attr</c> and reads
+    /// <c>'new'</c> — measured, and pinned here in place of the old expectation. Replacing with a
+    /// genuinely different node is the other half and is covered by the NS fixture above, where the
+    /// displaced node detaches and keeps its own value.
+    /// </remarks>
     [Fact(Timeout = 600000)]
-    public void Element_SetAttributeNode_Replaces_And_Returns_Old_Attr()
+    public void Element_SetAttributeNode_With_The_Elements_Own_Node_Returns_It_Live()
     {
         var html = @"<!DOCTYPE html>
 <html><body>
@@ -698,7 +711,8 @@ attr.value = 'new';
 var old = d.setAttributeNode(attr);
 var r = [];
 r.push(old !== null);
-r.push(old.value === 'old');
+r.push(old === attr);
+r.push(old.value === 'new');
 r.push(d.getAttribute('class') === 'new');
 r.push(d.className === 'new');
 document.getElementById('result').textContent = r.join(',');
@@ -706,7 +720,7 @@ document.getElementById('result').textContent = r.join(',');
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        Assert.Contains("true,true,true,true", result);
+        Assert.Contains("true,true,true,true,true", result);
     }
 
     [Fact(Timeout = 600000)]

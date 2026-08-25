@@ -28,6 +28,11 @@ internal interface ISubDocumentHost
     /// <summary>Returns the single JS wrapper identity for <paramref name="node"/>.</summary>
     JSObject ToJSObject(DomNode node);
 
+    /// <summary>Points a wrapper at a named interface's prototype. A sub-document object is built
+    /// rather than minted as a node wrapper, so it does not pass the choke point that links every
+    /// other one.</summary>
+    void LinkToInterface(JSObject wrapper, string interfaceName);
+
     /// <summary>Reverse wrapper lookup: the element whose JS wrapper is <paramref name="jsObj"/>.</summary>
     DomElement? FindDomElementByJSObject(JSObject jsObj);
 
@@ -62,12 +67,25 @@ internal interface ISubDocumentHost
     // -------- shared document sub-surface builders --------
     void SetElementTextContent(DomElement element, string? value);
     IReadOnlyList<DomElement> HitTestDocumentPoint(DomNode docRoot, double x, double y);
-    JSArray BuildStyleSheetsCollection(DomNode docRoot);
+
+    /// <summary>The per-element <c>CSSStyleSheet</c> object, and whether the element has an
+    /// associated sheet at all — the two services <see cref="DocumentCollectionBinding.StyleSheets"/>
+    /// needs, mirroring <see cref="IDocumentCollectionHost"/>. They replace the sub-document's own
+    /// <c>BuildStyleSheetsCollection</c>, which handed back a <c>JSArray</c> where CSSOM §6.1 requires
+    /// a live <c>StyleSheetList</c>; see <see cref="SubDocumentCollectionHost"/>.</summary>
+    JSObject BuildStyleSheetObject(DomElement styleElement);
+
+    /// <inheritdoc cref="IDocumentCollectionHost.HasAssociatedStyleSheet"/>
+    bool HasAssociatedStyleSheet(DomElement element);
+
     JSObject BuildRange(DomNode docRoot);
     JSObject BuildTreeWalker(DomElement root, int whatToShow, JSFunction? filterFn);
     JSObject BuildNodeIterator(DomElement root, int whatToShow, JSFunction? filterFn);
-    void CollectByTagName(DomNode root, string tag, List<JSValue> results);
-    void CollectMatching(DomNode root, Func<DomElement, bool> predicate, List<JSValue> results);
+    // The two tree-walking collectors this contract used to carry — CollectByTagName and
+    // CollectMatching — are gone with the snapshot collections that were their only callers. A
+    // sub-document's element list is now read the way the main document's is, from the root's own
+    // InclusiveDescendants, so there is one definition of "the elements of this document" rather
+    // than a second walk that could order or filter them differently.
     // Selector matching moved onto the host (Phase 2 item 4 de-globalization): it reads the per-bridge
     // `:checked` state, so it is now a bridge-instance method rather than a static helper.
     bool MatchesSelector(DomElement element, string selector, DomElement? scope = null);
