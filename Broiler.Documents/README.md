@@ -57,6 +57,9 @@ Matching headless test projects live beside each runtime project.
 - [Markdown conformance](docs/markdown-conformance.md)
 - [PDF feature matrix](docs/pdf-feature-matrix.md) - the authority for what the
   PDF codec does today and what it may be described as.
+- [PDF construct inventory](docs/pdf-construct-inventory.md) - exactly which PDF
+  constructs the codec reads, writes, recognizes without interpreting, and
+  rejects, derived from the implementation.
 - [Formatting Codes grammar version 1](Broiler.Documents.FormatCodes/GRAMMAR.md)
 
 ## Records

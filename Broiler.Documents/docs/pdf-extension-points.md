@@ -4,6 +4,7 @@
 - **Component:** `Broiler.Documents.Pdf`
 - **Updated:** 2026-08-25
 - **Companion documents:** [PDF support roadmap](pdf-support-roadmap.md),
+  [construct inventory](pdf-construct-inventory.md),
   [feature matrix](pdf-feature-matrix.md),
   [IP/licensing register](pdf-ip-licensing-register.md),
   [approved-source record](pdf-approved-sources.md)

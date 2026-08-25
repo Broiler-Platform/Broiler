@@ -262,7 +262,7 @@ Broiler.Documents.Pdf
 | Phase | Goal | Dependency | Estimated effort | State |
 |---|---|---|---:|---|
 | 0 | Reset authority, scope, IP/legal ADRs, cleanup | None | 3–4 engineer-weeks | Repository work done; external approvals outstanding |
-| 1 | Shared contracts, read-safe shared services, approved corpus, CI/license foundation | Phase 0 | 7–10 | Not started; the PDF package carries its own typed options, limits, results, and budgets in the meantime |
+| 1 | Shared contracts, read-safe shared services, approved corpus, CI/license foundation | Phase 0 | 7–10 | CI workflow and existing-component jobs created (`.github/workflows/documents-pdf.yml`); shared contracts, oracles, corpus, harness, and package/notice work outstanding. The PDF package carries its own typed options, limits, results, and budgets in the meantime |
 | 2 | PDF syntax and object store | Phase 1 | 4–6 | Implemented |
 | 3 | Streamed xrefs/object store, structure, filters, security detection | Phase 2 | 6–9 | Implemented for the filters this build owns; the rest detected and skipped |
 | 4 | Logical text/image/link import and minimum hostile-input gate | Phase 3 | 8–12 | Text, links and structure implemented; images and embedded font programs detected and skipped; hostile-input gate covered by in-suite truncation and mutation campaigns, not yet by coverage-guided fuzzing |
@@ -311,7 +311,9 @@ research, permissions, or commercial-license negotiation.
 Implementation status and external approvals are tracked separately in the
 [Phase 0 status record](pdf-phase0-status.md). The boundary between the
 implemented base and each not-yet-cleared technology is specified in
-[PDF extension points](pdf-extension-points.md). The current decision/evidence set
+[PDF extension points](pdf-extension-points.md), and the exact construct set the
+IP-001 review has to cover is enumerated in the
+[construct inventory](pdf-construct-inventory.md). The current decision/evidence set
 is indexed by the [ADR index](adr/README.md),
 [feature matrix](pdf-feature-matrix.md),
 [IP/licensing register](pdf-ip-licensing-register.md),
@@ -734,6 +736,13 @@ fixed-layout objects remain prohibited.
 - Create required `.github/workflows/documents-pdf.yml` Windows/Linux checks for
   pull requests and pushes affecting Documents, Graphics, Media, relevant
   CLI/Writer roots, solution generation, packaging scripts, or the workflow.
+  **Created 2026-08-25** for the Documents solution plus the Graphics and Media
+  image suites, on both platforms, with a guard that fails a run whose executed
+  test count collapses — three of those suites are console runners that
+  `dotnet test` would exit 0 on having run nothing. The CLI/Writer host paths and
+  jobs are deliberately absent until Phase 5 activates them, so the trigger
+  covers only what the job actually proves; no oracle is wired in, because each
+  needs its licence review and tool-manifest row first.
   They restore locked inputs, build/test `Broiler.Documents/Broiler.Documents.slnx`
   in Release, explicitly run the applicable Graphics and Media test projects/
   console runners, execute host integration plus architecture/package-content

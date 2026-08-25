@@ -9,6 +9,28 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- A required `Documents And PDF` CI workflow — the first pull-request-triggered
+  workflow in the repository. Every other one is `workflow_dispatch` or
+  tag-push, so the Documents solution had no CI at all and its suites were only
+  ever a local result. It builds and tests the solution on Windows and Linux and
+  runs the Graphics and Media image suites, which are console runners rather
+  than xunit projects: `dotnet test` exits 0 against them having run nothing, so
+  they are invoked with `dotnet run` where the exit code is the failure count.
+  The xunit half is checked against a floor on executed tests, because a run that
+  silently executes almost nothing should fail rather than report success. No
+  independent oracle is wired in — qpdf, PDFium, Poppler, MuPDF and veraPDF each
+  need a licence review and a tool-manifest row first — and the CLI/Writer host
+  jobs activate at the roadmap's Phase 5/7 boundaries along with the paths that
+  would trigger them.
+- A [PDF construct inventory](Broiler.Documents/docs/pdf-construct-inventory.md):
+  exactly which PDF constructs the codec reads, writes, recognizes without
+  interpreting, and rejects, each with the file that implements it. It exists to
+  scope the IP-001 qualified review, which asks whether a *concrete
+  implementation* falls within Adobe's ISO 32000-1 patent licence — a question
+  that had no definite subject until the base slice existed and now does. It
+  cites clauses without reproducing standard text, and marks the clause column
+  provisional, since lawful standards access is still an open Phase 0 item.
+
 - `Broiler.Documents.Pdf`, a base PDF codec: logical text import from ISO 32000-1
   files and a deterministic PDF 1.7 writer. It is not a published capability —
   the package is not packed and is registered in no application — and the

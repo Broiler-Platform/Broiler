@@ -19,6 +19,7 @@ public sealed class PdfPhaseZeroGuardTests
         "Broiler.Documents/docs/pdf-corpus-manifest.json",
         "Broiler.Documents/docs/pdf-phase0-status.md",
         "Broiler.Documents/docs/pdf-extension-points.md",
+        "Broiler.Documents/docs/pdf-construct-inventory.md",
         "Broiler.Documents/docs/adr/0007-pdf-component-scope-and-delivery.md",
         "Broiler.Documents/docs/adr/0008-pdf-codec-requests-results-and-commit.md",
         "Broiler.Documents/docs/adr/0009-pdf-security-resources-and-privacy.md",
