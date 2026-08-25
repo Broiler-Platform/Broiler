@@ -599,6 +599,46 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **Form-control default, reset and radio-group semantics** — the retest-queue entry that was carried
+  as *uncharacterized*. Characterizing it split the entry in two: **the dirty half was already
+  correct**, and the default and reset halves were absent outright.
+  <br>Correct, and now pinned so it stays that way: a property write does not reflect to the content
+  attribute, once the dirty value flag is set a later `setAttribute('value', …)` no longer moves the
+  value, dirty checkedness decouples from the `checked` attribute the same way, a `<select>` takes its
+  initial selection from the markup's `selected`, and setting `checked` through the property unchecks
+  the rest of that radio group and leaves other groups alone.
+  <br>**Absent, and fixed:** `input.defaultValue`, `textarea.defaultValue` and `input.defaultChecked`
+  were `undefined`, so a page comparing the current value against the original to decide whether a
+  field is unsaved compared against `undefined` and concluded "changed" for every field, including
+  ones it had just reset. `form.reset()` was `undefined`, so the call a "clear this form" control is
+  written as was a TypeError that aborted the handler rather than clearing anything. An untouched
+  `<textarea>` reported `""` rather than its child text, so a form read before the user typed
+  anything submitted an empty field. `option.defaultSelected` read the bridge's runtime slot alone
+  and was `false` for every option the markup had selected — including the one the select was
+  showing. And an already-checked radio *inserted* into a group left two members checked: the
+  property setter's exclusivity walk never runs for it, because it was checked while still detached
+  and in a group of one.
+  <br>The reset itself is small because the state model was already right: a reset is defined over
+  the dirty flags, and the bridge's per-element `FormControl` runtime slots *are* those flags, with
+  "unset" already meaning "tracks the markup" everywhere the IDL getters fall back through. So the
+  algorithm removes slots rather than computing replacement values. Fixing the textarea default
+  exposed one coupling: writing `textarea.value` had been storing a `value` content attribute that
+  nothing reads on a textarea — harmless while the getter read that same attribute back, a lost write
+  once the getter started falling back to the child text — so the setter now sets the dirty flag, as
+  HTML §4.10.11 specifies and as `<input>` already did.
+  <br>**Every expectation was taken from Chromium, not from a reading of the specification**, through
+  Playwright against the pinned browser. Two would plausibly have been got backwards otherwise:
+  whether appending an already-checked radio re-imposes exclusivity at all (it does), and which
+  member of a group with two `checked` attributes survives a reset (the last in tree order, because
+  the rule fires whenever a radio becomes checked, so restoring them in order leaves each unchecking
+  the ones before it).
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`DomBridge/FormReset.cs`, `Features/FormBinding.cs`,
+  `Features/FormControlBinding.cs`, `DomBridge.SelectHost.cs`, and the insertion hook in
+  `DomBridge/HtmlFragmentMutation.cs` — the one choke point every insertion path already reaches);
+  regressions in `FormDefaultsAndResetTests`. Still absent and *not* part of this entry:
+  `input.form` and `input.labels`, which are the form-association surface rather than the
+  dirty/default/reset family, recorded in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - **A linked stylesheet's rules reached neither `cssRules` nor `getComputedStyle`, and the sheet
   reported no `href`.** A `<link rel="stylesheet">` appeared in `document.styleSheets` as a sheet
   with zero rules and a null location, and the elements it styled computed as if it were not there —

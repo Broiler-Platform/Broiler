@@ -41,6 +41,23 @@ internal sealed class FormControlBinding(IFormControlHost host)
             new DomFunction((in a) => SetChecked(element, in a), "set checked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // defaultValue (read/write) — the value a reset restores, and the counterpart to the dirty
+        // IDL `value` above. It was absent, so `input.defaultValue` read `undefined`: a page
+        // comparing the current value against the original to decide whether a field is unsaved
+        // compared against `undefined` and concluded "changed" for every field, including the ones
+        // it had just reset.
+        obj.FastAddProperty((KeyString)"defaultValue",
+            new DomFunction((in _) => GetDefaultValue(element), "get defaultValue"),
+            new DomFunction((in a) => SetDefaultValue(element, in a), "set defaultValue"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // defaultChecked (read/write) — reflects the `checked` content attribute, which is exactly
+        // the state `checked` falls back to when no dirty checkedness has been set.
+        obj.FastAddProperty((KeyString)"defaultChecked",
+            new DomFunction((in _) => DomBridge.HasAttr(element, "checked") ? JSBoolean.True : JSBoolean.False, "get defaultChecked"),
+            new DomFunction((in a) => SetDefaultChecked(element, in a), "set defaultChecked"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // type (read/write) — for input/button elements; getter returns lowercase.
         obj.FastAddProperty((KeyString)"type",
             new DomFunction((in _) => GetType(element), "get type"),
@@ -84,16 +101,80 @@ internal sealed class FormControlBinding(IFormControlHost host)
             return new JSString(_host.GetSelectValue(element));
         if (_host.TryGetFormControlValue(element, out var sv))
             return new JSString(sv);
+        // A textarea has no `value` content attribute: its raw value starts as the child text
+        // content (HTML §4.10.11). Falling through to the attribute lookup meant an untouched
+        // textarea reported "" no matter what it contained — so a form read before the user typed
+        // anything submitted an empty field, and a page pre-filling a textarea through its markup
+        // could not read back what it had written.
+        if (string.Equals(element.TagName, "textarea", StringComparison.OrdinalIgnoreCase))
+            return new JSString(DefaultTextAreaValue(element));
         if (DomBridge.TryGetAttribute(element, "value", out var val))
             return new JSString(val);
         return new JSString(string.Empty);
+    }
+
+    /// <summary>
+    /// The value a control reverts to on reset: a textarea's child text content, and every other
+    /// control's <c>value</c> content attribute.
+    /// </summary>
+    private static JSValue GetDefaultValue(DomElement element) =>
+        string.Equals(element.TagName, "textarea", StringComparison.OrdinalIgnoreCase)
+            ? new JSString(DefaultTextAreaValue(element))
+            : new JSString(DomBridge.TryGetAttribute(element, "value", out var val) ? val : string.Empty);
+
+    /// <summary>
+    /// Writing <c>defaultValue</c> writes the default itself, not the current value — the
+    /// <c>value</c> content attribute, or for a textarea its child text, which is where its default
+    /// lives. A control with no dirty value flag then reports the new default as its value too,
+    /// which is the same coupling <c>setAttribute("value", …)</c> already has.
+    /// </summary>
+    private JSValue SetDefaultValue(DomElement element, in Arguments a)
+    {
+        var value = a.Length > 0 ? a[0].ToString() : string.Empty;
+        if (string.Equals(element.TagName, "textarea", StringComparison.OrdinalIgnoreCase))
+            _host.SetElementTextContent(element, value);
+        else
+            DomBridge.SetAttr(element, "value", value);
+        return JSUndefined.Value;
+    }
+
+    /// <summary>Writing <c>defaultChecked</c> sets or removes the <c>checked</c> content
+    /// attribute, which is the default it reflects.</summary>
+    private JSValue SetDefaultChecked(DomElement element, in Arguments a)
+    {
+        if (a.Length > 0 && a[0].BooleanValue)
+            DomBridge.SetAttr(element, "checked", string.Empty);
+        else
+            DomBridge.RemoveAttr(element, "checked");
+        _host.InvalidateStyleScope(element);
+        return JSUndefined.Value;
+    }
+
+    /// <summary>A textarea's default value: its child text content (HTML §4.10.11).</summary>
+    private static string DefaultTextAreaValue(DomElement element)
+    {
+        var text = new System.Text.StringBuilder();
+        foreach (var child in element.ChildNodes)
+        {
+            if (DomBridge.IsText(child))
+                text.Append(DomBridge.BridgeText(child));
+        }
+
+        return text.ToString();
     }
 
     private JSValue SetValue(DomElement element, in Arguments a)
     {
         var tag = element.TagName.ToLowerInvariant();
         var v = a.Length > 0 ? a[0].ToString() : string.Empty;
-        if (tag == "input")
+        // A textarea sets its dirty value flag exactly as an input does (HTML §4.10.11: "set the
+        // element's raw value ... set its dirty value flag to true"), and specifically does NOT
+        // touch its children — writing `value` does not rewrite the markup, which is what separates
+        // it from writing `defaultValue`. It used to fall through to a `value` content attribute
+        // that nothing reads on a textarea; harmless while the getter read that same attribute back,
+        // and a lost write once the getter started falling back to the child text the specification
+        // names as the default.
+        if (tag is "input" or "textarea")
             _host.SetFormControlValue(element, v); // IDL value, not reflected
         else if (tag == "select")
             _host.SetSelectValue(element, v);

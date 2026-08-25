@@ -43,6 +43,12 @@ internal sealed class FormBinding(IFormHost host)
             new DomFunction((in _) => DomBridge.TryGetAttribute(element, "action", out var act) ? new JSString(act) : new JSString(string.Empty), "get action"),
             new DomFunction((in a) => SetAction(element, in a), "set action"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+        // reset() — HTML §4.10.21.4. It did not exist, so `form.reset()` was a TypeError on
+        // undefined: the call that a "clear this form" control is written as aborted the handler
+        // rather than clearing anything, and every edited control kept its edited state.
+        obj.FastAddValue((KeyString)"reset",
+            new DomFunction((in _) => { _host.ResetForm(element); return JSUndefined.Value; }, "reset", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private JSObject BuildElementsCollection(DomElement form)

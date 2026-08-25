@@ -209,6 +209,12 @@ and deterministic detection behavior.
 - ~~The document-level `document.removeChild`/`document.insertBefore` no-op (or append) silently
   where `NotFoundError` is required.~~ **Fixed** — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed, still open — `input.form` and `input.labels` are `undefined`.** Found while closing
+  the form-control default/reset entry (see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior))
+  and left out of it deliberately: these are the form-*association* surface — an element's form owner
+  and its label list — rather than the dirty/default/reset family, and `labels` needs the
+  `NodeList` this track still owes.
 - **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
   an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
   lives in **`Broiler.DOM`** (`DomNameValidation`, which deliberately owns these rules rather than
@@ -271,7 +277,9 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 5. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.
 6. Connect live SVG DOM mutations to cascade and paint.
-7. Characterize form dirty/default/reset/radio behavior before promoting it from the retest queue.
+7. ~~Characterize form dirty/default/reset/radio behavior before promoting it from the retest
+   queue.~~ **Done** — characterized against Chromium and fixed; see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 
 **Exit gate:** claimed DOM interfaces have correct prototypes, collections, exceptions, and
 algorithms; Custom Elements, templates, shadow/composed trees, CSSOM, computed style, and SVG
@@ -350,8 +358,12 @@ smallest current-pointer reproduction exists.
   point stands, that a handful of runs cannot separate a 1-in-10 flake from a 1-in-10 regression,
   so it is not retired. One *related* order dependence has been removed since: compilation
   back ends registered from a `[ModuleInitializer]` that only ran if the host happened to load
-  the emitter assembly, which is now forced (below); and
-- form-control dirty/default/reset/radio semantics, which remain uncharacterized.
+  the emitter assembly, which is now forced (below).
+
+~~form-control dirty/default/reset/radio semantics, which remain uncharacterized.~~ **Characterized
+and closed** — the dirty half was already correct, the default and reset halves were absent
+outright. See
+[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 
 **Retest rule:** add the minimal current-pointer reproduction first. If it reproduces, move it to
 the owning track and apply the normal closure gate. If it does not, record the exact cases and

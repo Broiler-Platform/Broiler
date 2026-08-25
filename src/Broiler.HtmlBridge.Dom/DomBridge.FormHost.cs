@@ -13,4 +13,6 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge : IFormHost
 {
     JSObject IFormHost.ToJSObject(DomNode node) => ToJSObject(node);
+
+    void IFormHost.ResetForm(DomElement form) => ResetFormControls(form);
 }

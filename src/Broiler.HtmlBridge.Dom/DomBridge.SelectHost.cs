@@ -61,9 +61,24 @@ public sealed partial class DomBridge : ISelectHost
         return false;
     }
 
+    // defaultSelected reflects the `selected` CONTENT ATTRIBUTE (HTML §4.10.10), so the runtime slot
+    // is an override of it rather than the whole story. Reading the slot alone answered `false` for
+    // every option that carried `selected` in the markup — including the one the select was showing,
+    // so a page asking "is this the original selection?" was told no about the option it had just
+    // been handed. The slot still wins when a script has written the property.
     bool ISelectHost.GetOptionDefaultSelected(DomElement option) =>
-        FormControlStateFor(option).DefaultSelected.TryGet(out var ds) && ds is true;
+        FormControlStateFor(option).DefaultSelected.TryGet(out var ds)
+            ? ds is true
+            : HasAttr(option, "selected");
 
-    void ISelectHost.SetOptionDefaultSelected(DomElement option, bool value) =>
+    // Writing the property writes the attribute it reflects, so a later reset — which clears the
+    // slot — restores what was written rather than what the markup happened to say.
+    void ISelectHost.SetOptionDefaultSelected(DomElement option, bool value)
+    {
         FormControlStateFor(option).DefaultSelected.Set(value);
+        if (value)
+            SetAttr(option, "selected", string.Empty);
+        else
+            RemoveAttr(option, "selected");
+    }
 }

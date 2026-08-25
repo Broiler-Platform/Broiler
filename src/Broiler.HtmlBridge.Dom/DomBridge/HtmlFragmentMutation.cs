@@ -126,6 +126,13 @@ public sealed partial class DomBridge
             // A <link rel=stylesheet> only fetches once it is in the document, so insertion — not
             // createElement — is when its load event becomes due (HTML §4.2.4).
             FireDescendantStylesheetLinkLoads(insertedElement);
+
+            // An already-checked radio joining a group is the other way the "at most one checked"
+            // invariant breaks — the property setter's own exclusivity walk never runs, because the
+            // element was checked while it was still detached and in a group of one. Left alone, the
+            // group held two checked members: a state no interaction can produce, and one that
+            // submits two values for a single field.
+            EnforceRadioGroupExclusivityForInsertion(insertedElement);
         }
     }
 
