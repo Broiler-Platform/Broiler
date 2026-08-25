@@ -165,14 +165,9 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
   its own document fetch and hands the measurements, and the navigation start it took as the time
   origin, to the bridge. See
   [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
-- **Confirmed, newly characterized — a navigation entry's `duration` is a hardcoded `0`.**
-  Navigation Timing §4 defines it as `loadEventEnd - startTime`, and `startTime` is `0` for a
-  navigation entry, so after the load event it should be `loadEventEnd` — a figure the entry now
-  measures and reports beside it. It is pinned at `0` by `NavigationTimingMarksTests
-  .The_Existing_Entry_Members_Are_Unchanged`, whose own comment says duration "is 0 *until* the load
-  event ends", so the constant outlived its justification: the tests read the entry after load, where
-  `0` is wrong. Found while wiring the network phases and deliberately not fixed there, to keep that
-  change to the phases it was about; it is a one-line accessor plus the assertion that pins it.
+- ~~A navigation entry's `duration` is a hardcoded `0` where Navigation Timing makes it
+  `loadEventEnd`.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 
 See [the privacy inventory](privacy-test-page-gaps.md),
 [the Google current-script investigation](google-about-current-script.md), and

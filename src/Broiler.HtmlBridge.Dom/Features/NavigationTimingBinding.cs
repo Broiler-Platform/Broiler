@@ -35,11 +35,11 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// network marks then report the specification's "not observed" <c>0</c>.
 /// </para>
 /// <para>
-/// <b>What this entry deliberately does not carry.</b> <c>startTime</c> and <c>duration</c> are
-/// fixed rather than measured: a navigation entry's <c>startTime</c> is 0 by definition — the time
-/// origin <em>is</em> this navigation's start — and its <c>duration</c> is 0 until the load event
-/// ends. Paint timings, resource entries and user marks belong to buffers a capture does not keep,
-/// so the entry-list getters answer with an empty list for them rather than inventing one.
+/// <b>What this entry deliberately does not carry.</b> <c>startTime</c> is fixed at 0 rather than
+/// measured, by definition — the time origin <em>is</em> this navigation's start, which is also what
+/// makes <c>duration</c> equal to <c>loadEventEnd</c> outright. Paint timings, resource entries and
+/// user marks belong to buffers a capture does not keep, so the entry-list getters answer with an
+/// empty list for them rather than inventing one.
 /// </para>
 /// </remarks>
 internal static class NavigationTimingBinding
@@ -107,7 +107,15 @@ internal static class NavigationTimingBinding
         entry.FastAddValue((KeyString)"name", new JSString(pageUrl), JSPropertyAttributes.EnumerableConfigurableValue);
         entry.FastAddValue((KeyString)"entryType", new JSString("navigation"), JSPropertyAttributes.EnumerableConfigurableValue);
         entry.FastAddValue((KeyString)"startTime", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        entry.FastAddValue((KeyString)"duration", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // duration is loadEventEnd - startTime (Navigation Timing §4), and startTime is 0 for a
+        // navigation entry, so it *is* loadEventEnd. It was a hardcoded 0, which is right only until
+        // the load event ends — and a page reads this after load, where 0 is the one answer it cannot
+        // be. `entry.duration` is how the shortest form of "how long did this page take" is written,
+        // so reporting 0 was worse than reporting nothing: it is a plausible number rather than an
+        // absent one. An accessor, not a value, for the same reason the marks are: the entry is built
+        // before the load sequence runs, and reads 0 until it reaches the end of it.
+        AddTimingAccessor(entry, "duration", () => timing.LoadEventEnd);
 
         // PerformanceResourceTiming (Resource Timing §4.1), of which a navigation entry is a
         // subtype. `initiatorType` is fixed at "navigation" for one, and the protocol is the engine's

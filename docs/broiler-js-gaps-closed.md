@@ -390,6 +390,24 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **A navigation entry's `duration` was a hardcoded `0`.** Navigation Timing §4 defines it as
+  `loadEventEnd - startTime`, and a navigation entry's `startTime` is `0` by definition, so it *is*
+  `loadEventEnd`. `entry.duration` is the shortest way a page writes "how long did this take", so a
+  `0` there is a plausible number rather than an absent one and nothing distinguishes the two —
+  which is what made this worse than the network phases it sat beside, where at least the whole
+  family read `0` together.
+  <br>The constant was right for exactly one case, which is what kept it looking correct: read
+  *before* the load event ends, `0` is the specified value for a moment not yet reached. It was
+  pinned by an assertion whose own comment said duration "is 0 *until* the load event ends" — and the
+  fixture read it from a `load` listener, where the mark has genuinely not been stamped. **Fixed** as
+  a live accessor over `loadEventEnd`, so the before-load `0` is unchanged and a read afterwards
+  reports the figure the entry already measures beside it. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Features/NavigationTimingBinding.cs`); regressions `The_Duration_Is_LoadEventEnd` — which reads
+  from a task the load handler schedules, since `loadEventEnd` is stamped when the dispatch returns,
+  the same reason analytics read this from a timeout rather than from `onload` — and
+  `The_Duration_Is_Zero_Before_The_Load_Event`, which keeps the case the constant got right.
+  Found while wiring the network phases below and deliberately left out of that change, so each
+  landed as its own.
 - **The navigation entry's network phases were not measured.** `fetchStart`, `domainLookup*`,
   `connect*`, `secureConnectionStart`, `request*`, `response*` and the
   `transferSize`/`encodedBodySize`/`decodedBodySize` trio existed and reported `0` — which in
@@ -428,9 +446,8 @@ were deleted and the gitlinks point at commits that contain them. See
   `Broiler.Cli`'s `CaptureService`; landed directly rather than as a submodule patch. Regressions in
   `NavigationTimingNetworkPhasesTests`, which pin the supplied-timing, no-timing and collapsed-phase
   cases, the shared timeline, and one end-to-end capture against a local origin that measures its own
-  fetch. The entry's `duration` is still a hardcoded `0` where the specification makes it
-  `loadEventEnd`; that was found here, deliberately left alone, and recorded in
-  [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics).
+  fetch. The entry's `duration`, found here and deliberately left out of this change, is the entry
+  above.
 - `performance.now()` returned `Date.now() - timeOrigin`: whole-millisecond wall-clock arithmetic. It
   had no sub-millisecond resolution, and — being wall time — could run **backwards** when the system
   clock was stepped (NTP, a manual change), which HR-Time §3 forbids (the value "MUST be monotonically
