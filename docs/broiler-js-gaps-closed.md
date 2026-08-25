@@ -599,6 +599,52 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **The `document` surface that names the document's own contents was half missing and half the
+  wrong kind of object.** A probe of ~30 document properties against Chromium, run to decide whether
+  `document.doctype` was a standalone item, returned one coherent cluster instead.
+  <br>**Absent outright:** `anchors`, `embeds`, `plugins`, `doctype`, `dir` and `designMode`. Each
+  read `undefined`, so the ordinary `document.embeds.length` was a `TypeError` rather than `0`.
+  <br>**Present but the wrong kind of object:** `forms`, `images`, `links`, `scripts` and
+  `styleSheets` were plain `Array`s rebuilt on every read. That is wrong three ways at once, and only
+  the first is loud. An array is a **snapshot**, so `var f = document.forms; addForm(); f.length` did
+  not move; it carries `map`/`filter` but not `item`/`namedItem`, the opposite of a browser in both
+  directions, so feature detection branched wrongly either way; and a fresh object per read made
+  `document.forms === document.forms` **false**, where a browser hands back one cached object per
+  document. For `plugins` that identity is not a nicety but HTML §3.1.5's literal requirement — it
+  must return *the same object* `embeds` does.
+  <br>**`doctype` was the odd one: the node was already there.** The parser has produced a canonical
+  `DomDocumentType` and appended it as the document's first child for some time, and
+  `document.firstChild` returned it. Only the accessor DOM §4.5 names was missing — and
+  `document.childNodes` filtered to elements, so the same node was reachable by position and
+  invisible by name, with `childNodes[0]` and `firstChild` disagreeing about what the first child
+  was.
+  <br>**Fixed** by giving each collection the `HTMLCollection` machinery track 6 action 1 built —
+  live contents over a filter of the document's element list, Web IDL indexed and named access — plus
+  CSSOM's `StyleSheetList` (§6.1) for `styleSheets`, which is neither of the node collections and
+  gained its interface here. Each collection object is built once and closed over, so identity holds
+  and `plugins`/`embeds` are one object. `document.childNodes` became a live `NodeList` over every
+  child rather than an element-filtered array. `dir` reflects the document element's attribute
+  *limited to known values* — the getter answers a canonical keyword or the empty string while the
+  setter writes through unchanged, so `document.dir = 'LTR'` reads back `"ltr"` over an attribute
+  still spelled `LTR`; `designMode` is an enumerated state that ignores an unrecognized assignment
+  rather than storing it.
+  <br>**Two behaviours worth naming, because reasoning alone gets them wrong.** `links` and `anchors`
+  are not two names for one set: `links` is `a`/`area` *with an `href`* and `anchors` is `a` *with a
+  `name`*, so a page's anchors can land in one, the other, or neither. And the named getter is a
+  single pass testing both `id` and `name`, not all ids and then all names — DOM §4.2.10.2 asks for
+  the first element for which *at least one* is true, so over
+  `<form id=b><form name=a id=c><form name=b>`, `document.forms.b` is the first form. Chromium
+  agrees with both.
+  <br>Two existing `NodeMutationBindingModuleTests` characterizations counted `document.childNodes`
+  under the old element-only assumption and were re-taken from Chromium: a page with a `<!DOCTYPE>`
+  has two document children, and `replaceChildren` clears the doctype along with everything else, so
+  `document.doctype` is `null` afterwards.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/DocumentCollectionBinding.cs`,
+  `Features/DomCollectionBinding.cs`, `Features/NodeMutationBinding.cs`,
+  `DomBridge/Registration/DocumentSurface.cs`); regressions in `DocumentCollectionSurfaceTests`.
+  What the same audit found and did *not* fix — `document.all`, which needs an engine capability, and
+  the sub-documents' own older accessors — is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:
