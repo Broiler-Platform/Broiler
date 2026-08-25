@@ -266,15 +266,23 @@ and deterministic detection behavior.
   (the parser's `SetAttribute`, the cascade's matcher) are required to stay lenient. Checked against
   Chromium over a 149-case corpus. See
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-- **Confirmed, newly characterized — an unknown pseudo-class *with an argument* over-matches.**
-  `querySelector(':matches(a)')` returns the `<html>` element where a browser throws and where the
-  argument-less `:nope` already returns `null`; any unrecognized functional pseudo behaves the same
-  way. The cause is the lenient default arm of `CssSelectorMatcher.ProcessPseudoClasses` in
-  **`Broiler.CSS.Dom`** — a *matching* defect, not a syntax one, so the selector validation that
-  closed the entry above runs and passes before it is reached. It is the last remaining shape of the
-  "a selector silently matches the wrong element" family, and it is behind a submodule, so it is the
-  patch workflow. Pinned as a characterization in `DomApiSyntaxTests` so a fix trips the test rather
-  than passing unnoticed.
+- **Confirmed — the `:is()` aliases match every element. Fixed as a patch, not yet live.** Root-caused
+  and narrowed since it was first characterized, and it is worse than "an unknown functional pseudo
+  over-matches": `:matches()`, `:any()`, `:-webkit-any()` and `:-moz-any()` are the historical
+  spellings of `:is()`, all four sat in the matcher's recognized-but-unmodelled set, and so all four
+  fell through its lenient default and matched **every element**. The **cascade** uses the same
+  matcher, so `:-webkit-any(h1) { color: red }` painted the whole page — a rendering bug rather than
+  only a `querySelector` one.
+  <br>Measured against Chromium: only `-webkit-any` is still accepted and it behaves exactly like
+  `:is()`; the other three were removed from the platform and match nothing. The fix is in
+  **`Broiler.CSS.Dom`**'s `CssSelectorMatcher`, whose remote is outside this session's scope (the push
+  returns 403), so it ships as `patches/` → *Stop the `:is()` aliases matching every element*. **No
+  main-repo fallback is possible**: the damaging half is the cascade, which reaches the matcher
+  through the computed-style engine rather than the bridge's `MatchesSelector` wrapper, so there is no
+  seam to intercept. It is live only once the patch is applied.
+  <br>What stays lenient afterwards, deliberately, is an unknown *vendor-prefixed* pseudo-class,
+  which still matches everything. `DomApiSyntaxTests` pins the current answer so applying the patch
+  trips it; the patch index says what to change it to.
 - ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
   **Does not reproduce** — it returns the correct bitmask; see
   [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion
