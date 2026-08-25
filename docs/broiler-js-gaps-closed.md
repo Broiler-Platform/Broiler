@@ -2,8 +2,9 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names the pinned
-> `Broiler.JS` commit that carries it and the regression that holds it.
+> Statuses were last reconciled on **2026-08-24**. Every **fixed** entry names where it landed — the
+> pinned `Broiler.JS` commit, or the main-repo component for a host/DOM fix — and the regression that
+> holds it.
 
 Gaps that are resolved, in two kinds. **Fixed** entries were real defects and each keeps its root
 cause, what landed, and the evidence. **Retired** entries were investigated against the current
@@ -387,10 +388,278 @@ were deleted and the gitlinks point at commits that contain them. See
   the operator, including top-level await. Landed in `8e745b4`; regressions in
   `ModuleAwaitReservedTests`.
 
+### Track 5 — Essential browser JavaScript APIs
+
+- `performance.now()` returned `Date.now() - timeOrigin`: whole-millisecond wall-clock arithmetic. It
+  had no sub-millisecond resolution, and — being wall time — could run **backwards** when the system
+  clock was stepped (NTP, a manual change), which HR-Time §3 forbids (the value "MUST be monotonically
+  increasing and not subject to system clock adjustments"). **Fixed:** the `performance` object now
+  captures a `Stopwatch` timestamp at the same instant as the wall-clock `timeOrigin`, and
+  `performance.now()` measures monotonic elapsed time from it as fractional milliseconds. `timeOrigin`
+  stays the wall-clock estimate of the origin (HR-Time §5), so `timeOrigin + now()` still tracks
+  `Date.now()`, while `now()` itself is monotonic and sub-millisecond. Privacy coarsening of the
+  resolution is a separate decision and was not added. This is a main-repo `Broiler.HtmlBridge.Dom`
+  fix (`WindowDocumentMiscBinding.PerformanceNow` / `Window.RegisterPerformanceObject`), landed
+  directly rather than as a submodule patch; regression `Performance_Now_Is_Monotonic_And_SubMillisecond`
+  in `GoogleSearchPolyfillTests`. Performance Navigation Timing marks remain a separate open gap.
+- Seven script-visible document surfaces were absent — `document.charset`, `referrer`, `domain`,
+  `lastModified`, `activeElement`, `hasFocus()`, and the `onvisibilitychange` handler slot — the
+  audit line that also named `window.trustedTypes`. Each read `undefined` (or, for `hasFocus`, was
+  missing outright), which is not the same as answering "none": a page comparing
+  `document.domain === location.hostname`, stringifying `document.referrer` into a beacon, or calling
+  `new Date(document.lastModified)` saw a third state it had no branch for, and
+  `document.activeElement.tagName` threw. **Fixed**, each with the value the specification gives for a
+  directly-navigated, permanently-visible capture rather than a placeholder: `charset` is the third
+  historical alias of `characterSet` (DOM §4.5) and returns the same `UTF-8`; `referrer` is the empty
+  string, which is what HTML defines for a document with no referrer; `domain` is the origin's
+  effective domain, i.e. the page URL's host, and the empty string for the opaque origin of a
+  host-less URL such as `data:`; `lastModified` is the current local time in the specified
+  `MM/DD/YYYY hh:mm:ss` shape, which is HTML's own stated fallback when the source's modification date
+  is unknown; `activeElement` is the `body` element, because HTML's algorithm ends "if candidate is
+  null, set candidate to the body element" and a capture focuses nothing; and `hasFocus()` is `true`
+  for the same reason `visibilityState` is `"visible"` — one document in one viewport, never
+  backgrounded and never defocused. `onvisibilitychange` is a handler slot defaulting to `null` whose
+  event never fires, which is the accurate outcome rather than a missing implementation (a
+  permanently-visible document's visibility never *changes*); it has to exist because
+  `'onvisibilitychange' in document` is the feature test that decides whether a page uses the Page
+  Visibility API at all. `window.trustedTypes` was deliberately **not** added and stays in
+  [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics) as a capability
+  decision: it is an enforcement API, and a shape-only stub would claim a policy mechanism that does
+  not exist. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Registration/Document.cs`, `Features/WindowDocumentMiscBinding.cs`), landed directly rather than as
+  a submodule patch; regressions in `DocumentSurfaceTests`.
+- `fetch()` returned a self-returning thenable rather than a conforming Promise — track 5's action 1.
+  There were two such hand-rolled objects: the one `fetch()` returned, and the one behind every body
+  method (`.text()`, `.json()`, `.arrayBuffer()`, `.blob()`, `.formData()`, and a stream reader's
+  `read()`). Both carried a `then` that invoked the callback and returned **themselves**, and that is
+  the defect worth naming: `.then(a).then(b)` ran `b` against the ORIGINAL value instead of `a`'s
+  result, so the ordinary `fetch(u).then(r => r.json()).then(useData)` shape handed the second
+  callback the Response rather than the parsed body — a **silently wrong value, not an error**.
+  Alongside it: `.then`'s second (onRejected) argument was ignored entirely; `.finally` did not exist,
+  so calling it was a TypeError; a callback that threw was caught and logged rather than rejecting the
+  derived promise, so an error inside a handler vanished; the body thenable had no rejection path at
+  all, so a resolver that threw (`.json()` over a malformed body) threw synchronously out of `.then`
+  instead of rejecting; and neither object was `instanceof Promise`, which feature-detecting code
+  checks. **Fixed:** both are now real `JSPromise`s, settled from the outcome already in hand. The
+  engine's microtask queue is pumped in a capture — a plain `Promise.resolve().then(...)` callback
+  runs, which was verified before the change — so settling through the real machinery still delivers
+  the callbacks.
+  <br>Two existing tests asserted the **old** behavior and were updated with their intent preserved,
+  which is worth flagging rather than burying: `Fetch_Response_Json_InvalidJson_Throws_Clear_Error`
+  asserted the synchronous throw and now asserts the rejection (still checking the same clear message
+  and that `bodyUsed` is set) — renamed to `…_Rejects_With_A_Clear_Error`; and
+  `XHR_ReadyStateChange_Fires_For_Loading_State_Before_Done` read `readyState` history synchronously
+  after `send()`, which only worked because the polyfill's `response.text()` resolved synchronously.
+  XHR still reaches readyState 4 and delivers status and body — verified end to end — it now does so
+  on a microtask, the same asynchrony a browser has for an async XHR, so the test observes after the
+  queue drains and still asserts LOADING arrives, in order, before DONE. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`Features/FetchBinding.cs`, `Features/FetchBinding.Callbacks.cs`),
+  landed directly rather than as a submodule patch; regressions in `FetchPromiseConformanceTests`.
+- The `PerformanceNavigationTiming` entry carried **no timing attributes at all**, and absent is the
+  one thing they may not be: these are read inside subtraction far more often than alone, so the
+  ubiquitous RUM idioms — `responseEnd - requestStart`, `domComplete - domInteractive` — produced
+  **NaN** rather than a duration, silently. **Fixed**, with the attribute set split by what this
+  engine can honestly observe.
+  <br>The **document-lifecycle marks are measured**: `domInteractive`,
+  `domContentLoadedEventStart`/`End`, `domComplete` and `loadEventStart`/`End` are stamped by the
+  bridge's own load sequence at the moments it genuinely reaches — `readyState` becoming
+  "interactive", the `DOMContentLoaded` dispatch, `readyState` becoming "complete", the `load`
+  dispatch — using the same monotonic clock and time origin `performance.now()` measures from, so a
+  mark and a `now()` reading are two points on one timeline (a regression asserts
+  `domComplete <= performance.now()`, and another asserts the marks advance in order). An ordering
+  wrinkle had to be solved for this: the entry is built while `performance` is registered, which is
+  *before* any of these happen, so the entry reads them through a small mutable holder
+  (`NavigationTimingState`) rather than holding values fixed at construction.
+  <br>`redirectStart`/`End`, `unloadEventStart`/`End` and `workerStart` are `0` because the phase
+  genuinely did not occur — nothing redirected, there is no previous document to unload, no service
+  worker intercepted — which is the value the specification gives each.
+  <br>The **network phases are not measured and the zeros say so**. `fetchStart`, `domainLookup*`,
+  `connect*`, `request*`, `response*` and the body-size trio report `0`, the specification's "no
+  information" value, because nothing at this layer observed them: the document is fetched by the
+  capture host before the bridge exists, and the time origin is stamped after that fetch, so any real
+  value would be negative and `0` is the floor. They are present so the arithmetic yields a number
+  instead of NaN — a duration of `0` across an unobserved phase, **not** a claim that it was
+  instantaneous. Measuring them properly is a cross-layer change and is recorded in
+  [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics). Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`Features/NavigationTimingBinding.cs`, the new
+  `Features/NavigationTimingState.cs`, and the stamp points in `DomBridge.WindowLoad.cs`), landed
+  directly rather than as a submodule patch; regressions in `NavigationTimingMarksTests`.
+- `navigator`'s identity and hardware surface was absent — the privacy inventory's #1748, ten probes.
+  `appCodeName`, `appName`, `appVersion`, `product`, `productSub`, `webdriver`, `deviceMemory`,
+  `hardwareConcurrency` and `maxTouchPoints` all read `undefined`, which is the one answer none of
+  them may have: five are constants HTML §8.9 *mandates* for every user agent, and the rest are read
+  inside arithmetic and comparisons where an absent value propagates silently rather than announcing
+  itself — `navigator.appVersion.indexOf(…)`, still the shape of a great deal of legacy sniffing,
+  threw outright. **Fixed**, with each value chosen from what this engine actually is:
+  the five legacy constants are the specification's fixed strings (`"Mozilla"`, `"Netscape"`,
+  `"Gecko"`, `"20030107"`), which are *not* vendor identity claims — §8.9 pins them for every browser
+  regardless of engine precisely so that sniffing them tells a page nothing, and returning anything
+  else would be the deviation; `appVersion` is **derived** from the one user-agent string rather than
+  written out a second time, so it cannot drift from `navigator.userAgent` (a regression asserts
+  `'Mozilla/' + appVersion === userAgent`); `webdriver` is `true`, the honest answer rather than the
+  flattering one, because the attribute reports whether the agent is driven by automation and a
+  capture engine is exactly that; `hardwareConcurrency` is the machine's real logical-processor
+  count and `deviceMemory` its real memory coarsened as the Device Memory specification requires
+  (a power of two, clamped to 0.25–8), so both are measured rather than asserted; and
+  `maxTouchPoints` is `0` because a capture has no touch input.
+  <br>`vendor` was deliberately **left unchanged** at `""`. §8.9 permits exactly `""`,
+  `"Apple Computer, Inc."` or `"Google Inc."`; Broiler's user agent does not claim to be Chrome, so
+  `""` is both conforming and truthful, and changing it to match Chromium's answer would be an
+  identity claim rather than a fix. The object-valued surfaces beside these (`connection`,
+  `permissions`, `storage`, `mediaDevices`, `mediaCapabilities`, `userAgentData`) are whole APIs, not
+  values, and stay in [open](broiler-js-gaps-open.md#window-document-navigator-url-and-timing-semantics)
+  pending the same present-but-empty-object judgement that kept `speechSynthesis` out.
+  This also picked up `window.offscreenBuffering`, the one member of the window/screen block below
+  that the geometry fix missed. Main-repo `Broiler.HtmlBridge.Dom` fix (the new
+  `Features/NavigatorIdentityBinding.cs` and its registration), landed directly rather than as a
+  submodule patch; regressions in `NavigatorIdentityTests`.
+- Window and screen geometry plus the `BarProp` objects were absent: `window.screenX`/`screenY` (and
+  the `screenLeft`/`screenTop` spellings), `window.devicePixelRatio`, `screen.availLeft`/`availTop`,
+  and all six of `locationbar`, `menubar`, `personalbar`, `scrollbars`, `statusbar`, `toolbar`.
+  `innerWidth`/`outerWidth`/`screen.width` already answered, so this was the remainder of the pairs
+  around them. **Fixed**, each with the value that follows from what a capture is rather than a
+  placeholder: the viewport *is* the screen (`screen.width` is the viewport's own width), so the
+  window sits at the screen origin and all four position members are `0`, and nothing — no dock, no
+  taskbar — is reserved out of the available area, so `availLeft`/`availTop` are `0` beside the
+  avail sizes that already equalled the full screen. `devicePixelRatio` is `1` because the renderer
+  has no device-scale or backing-store-scale concept at all, so a CSS pixel is a rendered pixel;
+  page zoom is a separate axis and is already reported by `visualViewport.scale`. Every `BarProp`
+  reports `visible: false` because no browser user interface is painted and no scrollbar is painted
+  either — which the already-published `outerWidth == innerWidth` asserts independently, so the two
+  agree rather than contradict.
+  <br>The absence mattered most inside arithmetic, which is how these members are usually read: an
+  absent member is `undefined`, so the centre-on-parent popup idiom
+  (`screenX + (outerWidth - w) / 2`), the canvas backing-store idiom
+  (`width * devicePixelRatio`) and `availLeft + availWidth` each produced **NaN** rather than a
+  coordinate — silently, with no error to trace. A `BarProp` was worse than a wrong boolean: the
+  objects are containers, so the documented `window.locationbar.visible` threw "Cannot get property
+  visible of undefined", aborting the rest of the calling function. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`DomBridge/Registration/Window.cs` and the new
+  `Features/WindowBarPropBinding.cs`), landed directly rather than as a submodule patch; regressions
+  in `WindowScreenGeometryTests`.
+
+### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
+
+- The **document-level** `removeChild`/`insertBefore` had the same defect on their own code path
+  (`NodeMutationBinding`, reached by `document.removeChild(…)` / `document.insertBefore(…)`, distinct
+  from the element methods above). `document.removeChild` returned the node unchanged — what a
+  successful call returns — while mutating nothing. `document.insertBefore` was the worst shape in
+  the whole family: given a reference node that was *not* a child it fell through to **append**, so
+  the node was silently mutated into a position the caller never asked for, landing at the end of the
+  document instead of before the reference. **Fixed:** both raise `NotFoundError` (`code` 8) from the
+  pre-mutation validation point. The `insertBefore(node, null)` append is untouched and explicitly
+  pinned by a round-trip regression — a null reference *means* append per DOM §4.2.3, so the new
+  throw had to not swallow it. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Features/NodeMutationBinding.cs`), landed directly rather than as a submodule patch; regressions
+  in `DocumentMutationExceptionTests`. What remains of this family — `setAttribute` name validation
+  and `querySelector` selector validation — sits behind the `Broiler.DOM` and `Broiler.CSS`
+  submodules and stays in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- The element tree-mutation methods did not raise `NotFoundError` for a node that is not a child
+  (DOM §4.2.3, which puts the same rule in the pre-insert, pre-remove and replace steps).
+  `insertBefore` threw a plain error whose message merely *began* with the name — so
+  `e instanceof DOMException` was false, `e.name` was `"Error"`, `e.code` was `0` — while
+  `removeChild` and `replaceChild` did something worse: they **returned the value a successful call
+  returns** (the removed or replaced node) and mutated nothing. The caller was told the mutation had
+  happened. Code that removes a node and then re-parents the returned value silently operated on a
+  node still attached to its original parent, with no error anywhere to trace it to. **Fixed:** all
+  three raise a real `NotFoundError` `DOMException` (`code` 8) naming the method, from the validation
+  point *before* any mutation, which is where the specification puts it. (`replaceChild`'s second,
+  defensive index re-check runs after the new node has already been detached, so it still returns
+  rather than throwing out of a half-finished mutation.) Wiring rather than a new mechanism: the
+  `HierarchyRequestError` circular-reference guard beside these very call sites was already minting
+  correct exceptions through `DomBridge.ThrowDOMException`, and only the not-found branches were not
+  reaching it. Every successful mutation is unchanged — including `removeChild`'s return value and
+  the `insertBefore(node, null)` append form — and a `DOMException` is still an `Error`, so existing
+  message-based handling is unaffected. Main-repo `Broiler.HtmlBridge.Dom` fix
+  (`Features/TreeMutationBinding.cs`), landed directly rather than as a submodule patch; regressions
+  in `TreeMutationExceptionTests`. The document-level equivalents (`NodeMutationBinding`) and
+  `setAttribute`/`querySelector` name and selector validation remain in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- CharacterData failures were not proper `DOMException` objects. All four mutation methods —
+  `substringData`, `insertData`, `deleteData`, `replaceData` — plus `Text.splitText` threw a plain
+  error for an out-of-range offset, and the message was the string `"INDEX_SIZE_ERR"`: the legacy
+  constant's *name*, used as prose. Nothing a page can branch on came out of that.
+  `e instanceof DOMException` was false, `e.name` was `"Error"` and `e.code` was `0`, so both checks
+  a caller actually writes failed, and a specified, recoverable condition read as an internal fault.
+  **Fixed:** all five raise a real `IndexSizeError` `DOMException` (`code` 1) carrying a message that
+  names the method and the offending offset — DOM §4.10 opens each of these methods with "If offset
+  is greater than length, throw an IndexSizeError DOMException", and §4.11 gives `splitText` the same
+  rule. This is wiring rather than a new mechanism: the bridge's `ThrowDOMException` helper already
+  minted correct exceptions for `appendChild`'s `HierarchyRequestError` and `createElement`'s
+  `InvalidCharacterError`, and the CharacterData methods simply were not reaching it — they had no
+  `JSContext` to mint one in, so the binding's host contract now exposes it exactly as
+  `INodeMutationHost` already did. A `DOMException` is still an `Error`, so existing
+  `catch (e) { e.message }` handling is unaffected, and every in-range operation is unchanged
+  (including the `offset == length` boundary, which is in range and returns the empty string).
+  Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/CharacterDataBinding.cs`,
+  `Features/ICharacterDataHost.cs` and its bridge implementation), landed directly rather than as a
+  submodule patch; regressions in `CharacterDataExceptionTests`. The same sweep found the tree-mutation
+  half of this family still open — `insertBefore`/`removeChild`/`setAttribute`/`querySelector` — which
+  is recorded in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- The six `Node.DOCUMENT_POSITION_*` constants were `undefined` everywhere — on the `Node` global,
+  on its prototype, and on every node instance — while the node-type constants beside them were
+  defined. `compareDocumentPosition` returned a correct DOM §4.4 bitmask (this was checked and is
+  recorded under *Retired* below), but with the names absent a page could not decode it:
+  `result & Node.DOCUMENT_POSITION_CONTAINED_BY` is `result & undefined`, which evaluates to `0`
+  rather than throwing — so a containment test did not fail loudly, it silently answered "not
+  contained" for **every** pair of nodes. A right answer that cannot be read is the failure mode
+  here, which is why the bitmask being correct was not enough to close the item.
+  **Fixed:** all six position bits are now installed with their specified values (`0x01`…`0x20`)
+  on the `Node` global and prototype and on every node object.
+  <br>The type constants were installed from five hand-copied blocks that had drifted to different
+  subsets — the element and non-element wrappers carried eight of the twelve, the document and
+  sub-document only six (no `ATTRIBUTE_NODE`, no `CDATA_SECTION_NODE`) — and none carried the
+  position bits, so the omission was identical everywhere by construction and a sixth copy would
+  have inherited it. The five blocks are replaced by one `NodeConstantsBinding.Install` installer
+  carrying the complete interface: twelve type values (adding the genuinely-missing
+  `PROCESSING_INSTRUCTION_NODE`, plus the legacy `ENTITY_REFERENCE_NODE`/`ENTITY_NODE`/
+  `NOTATION_NODE` the `Node` global polyfill already listed, so an instance and the global agree)
+  and the six position bits. Net effect on the touched files is 20 fewer lines.
+  Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/NodeConstantsBinding.cs` and its five call
+  sites, plus the `Node` polyfill in `DomBridge/Utilities.NameValidation.cs`), landed directly
+  rather than as a submodule patch; regressions in `NodeConstantsTests`.
+
 ## Retired — did not reproduce
 
 Each was checked against the current pointer; the cases tried are recorded so the note is not
 carried again as an asserted gap.
+
+### Track 5 — URL parsing
+
+- Non-special URLs such as `data:` can report an empty `.protocol`. **Does not reproduce.** Checked
+  through a DomBridge-attached capture: `new URL('data:text/plain,hi').protocol` → `"data:"`,
+  `new URL('blob:https://x/y').protocol` → `"blob:"`, `new URL('mailto:a@b.c').protocol` →
+  `"mailto:"`, and the special-scheme control `new URL('https://a.b/c').protocol` → `"https:"`. All
+  four carry the trailing colon the URL Standard requires. Narrowed rather than retained: if a
+  specific non-special scheme still answers empty, it needs naming, because the general claim is not
+  current.
+
+### Track 6 — DOM and CSSOM
+
+- Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio` and `xlink:href` can be
+  inaccessible through canonical DOM lookup. **Does not reproduce.** Checked through a
+  DomBridge-attached capture over inline SVG carrying all three:
+  `svg.getAttribute('viewBox')` → `"0 0 10 10"`, `svg.getAttribute('preserveAspectRatio')` →
+  `"xMidYMid"`, and `a.getAttribute('xlink:href')` → `"#z"`. Each returned the authored value under
+  its authored spelling. Narrowed rather than retained: if a specific qualified name is still
+  unreachable it needs naming, because the general claim is not current.
+- `getComputedStyle().display` can report `inline` for every element. **Retired too broadly — see the
+  correction below.** The original check used an **inline `<style>` block**, where
+  `getComputedStyle` reported `block` and `flex` correctly, and that much stands: the computed value
+  does track the cascade for inline sheets. But the claim was never only about inline sheets, and a
+  later check with a **linked** stylesheet reproduced it. The accurate statement is the open entry
+  *A linked stylesheet's rules reach neither `cssRules` nor `getComputedStyle`*, which now carries
+  the evidence; this retirement should be read as covering the inline case only.
+
+- `compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.
+  **Does not reproduce.** Checked through a DomBridge-attached capture over a document with a
+  containing `div#a > span#b` and a following `p#c`: `a.compareDocumentPosition(b)` → `20`
+  (`DOCUMENT_POSITION_CONTAINED_BY` 16 | `DOCUMENT_POSITION_FOLLOWING` 4),
+  `a.compareDocumentPosition(c)` → `4`, `c.compareDocumentPosition(a)` → `2`
+  (`DOCUMENT_POSITION_PRECEDING`), and `a.compareDocumentPosition(a)` → `0`. Those are the DOM §4.4
+  bitmask values, not a `-1`/`0`/`1` comparator. The genuine remaining half — the
+  `Node.DOCUMENT_POSITION_*` constants being `undefined`, so the returned bits could not be named —
+  was found by the same check and has since been **fixed**; see the Track 6 entry above.
 
 ### Track 1 — language and built-ins
 

@@ -252,6 +252,28 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("GT0:true", result);
     }
 
+    // performance.now() is a DOMHighResTimeStamp read from a MONOTONIC clock (HR-Time §3): it must
+    // never run backwards, and it carries sub-millisecond resolution rather than the whole-millisecond
+    // wall-clock value it used to return. A run of samples is therefore non-decreasing, and — because
+    // the samples span real, sub-millisecond monotonic time — at least one lands on a fractional
+    // millisecond (whole-millisecond arithmetic could never produce one).
+    [Fact(Timeout = 600000)]
+    public void Performance_Now_Is_Monotonic_And_SubMillisecond()
+    {
+        var result = ExecJs(@"
+            var samples = [];
+            for (var i = 0; i < 2000; i++) samples.push(performance.now());
+            var monotonic = true, fractional = false;
+            for (var i = 1; i < samples.length; i++) {
+                if (samples[i] < samples[i - 1]) monotonic = false;
+                if (samples[i] % 1 !== 0) fractional = true;
+            }
+            document.getElementById('result').textContent = 'MONO:' + monotonic + ',FRAC:' + fractional;
+        ");
+        Assert.Contains("MONO:true", result);
+        Assert.Contains("FRAC:true", result);
+    }
+
     // ---------------------------------------------------------------
     //  Page Visibility — document.hidden / document.visibilityState
     // ---------------------------------------------------------------

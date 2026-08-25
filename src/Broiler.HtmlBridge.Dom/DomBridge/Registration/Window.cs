@@ -145,11 +145,16 @@ public sealed partial class DomBridge
         //  Google Search Compliance: Phase 1 (P0) — Critical polyfills
         // ---------------------------------------------------------------
 
-        // TODO-G2: performance object with performance.now() and timeOrigin
+        // TODO-G2: performance object with performance.now() and timeOrigin.
+        // timeOrigin is a wall-clock estimate of this context's origin instant (HR-Time §5), while
+        // now() must be MONOTONIC and sub-millisecond (HR-Time §3). Capture the two together: the
+        // wall-clock unix-ms for timeOrigin, and a Stopwatch timestamp at the same instant that now()
+        // measures its monotonic elapsed time from.
         var performanceTimeOrigin = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var performanceMonotonicOrigin = System.Diagnostics.Stopwatch.GetTimestamp();
         var performanceObj = new JSObject();
         performanceObj.FastAddValue((KeyString)"timeOrigin", new JSNumber(performanceTimeOrigin), JSPropertyAttributes.EnumerableConfigurableValue);
-        performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceTimeOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        performanceObj.FastAddValue((KeyString)"now", new DomFunction((in _) => Dom.Features.WindowDocumentMiscBinding.PerformanceNow(performanceMonotonicOrigin, in _), "now", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // The Performance Timeline getters (Performance Timeline §3), all three of which answer from
         // the one entry a document that has navigated once and loaded no instrumented resources has:
@@ -165,7 +170,12 @@ public sealed partial class DomBridge
         // "undefined is not a function" — taking the PerformanceObserver fallback in the same try
         // block with it, so the page never observed the paint it was asking about either. That name
         // is not the document's, so the pixel still finds nothing and still installs its observer.
-        Dom.Features.NavigationTimingBinding.Install(performanceObj, _pageUrl, _pageProtocol);
+        // The navigation entry's document-lifecycle marks are stamped by the load sequence, which
+        // runs after this, so the entry reads them through this holder rather than holding values.
+        // It shares the monotonic origin with performance.now() above, so a mark and a now() reading
+        // are two points on one timeline.
+        _navigationTiming = new Dom.Features.NavigationTimingState(performanceMonotonicOrigin);
+        Dom.Features.NavigationTimingBinding.Install(performanceObj, _pageUrl, _pageProtocol, _navigationTiming);
 
         // performance.memory — the same MemoryInfo console.memory reports (built with the console in
         // RegisterWindowBasics, which runs first).
@@ -317,7 +327,14 @@ public sealed partial class DomBridge
         navigatorObj.FastAddValue((KeyString)"cookieEnabled", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"onLine", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
         navigatorObj.FastAddValue((KeyString)"platform", new JSString("Win32"), JSPropertyAttributes.EnumerableConfigurableValue);
+        // Conforming and truthful: §8.9 allows exactly "", "Apple Computer, Inc." or "Google Inc.",
+        // and Broiler's user agent does not claim to be Chrome. See NavigatorIdentityBinding.
         navigatorObj.FastAddValue((KeyString)"vendor", new JSString(""), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // Who the browser is and what the machine underneath it has — the legacy identity constants
+        // §8.9 mandates for every user agent, `webdriver`, and the measured hardware members. Takes
+        // the same user-agent string registered above so `appVersion` cannot drift from `userAgent`.
+        Dom.Features.NavigatorIdentityBinding.Install(navigatorObj, Layout.Net.BroilerUserAgent.Value);
 
         // sendBeacon(url, data) — queues a fire-and-forget POST via fetch semantics
         navigatorObj.FastAddValue((KeyString)"sendBeacon", new DomFunction((in a) => Dom.Features.BeaconBinding.Send(window, in a), "sendBeacon", 2), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -350,6 +367,35 @@ public sealed partial class DomBridge
         window.FastAddProperty((KeyString)"pageXOffset", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
         window.FastAddProperty((KeyString)"pageYOffset", new DomFunction((in _) => new JSNumber(GetElementScrollOffset(DocumentElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
+        // The window's position on the screen (CSSOM View §4). Zero, and not as a placeholder: the
+        // capture's viewport IS its screen — `screen.width`/`height` below are the viewport's own
+        // dimensions — so the window is flush with the screen origin. `screenLeft`/`screenTop` are the
+        // older spelling of the same pair and must agree with it. Absent, all four read `undefined`,
+        // and the popup-positioning arithmetic that reads them (`screenX + (outerWidth - w) / 2`, the
+        // standard centre-on-parent idiom) produced NaN rather than a coordinate.
+        window.FastAddProperty((KeyString)"screenX", new DomFunction((in _) => new JSNumber(0), "get screenX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"screenY", new DomFunction((in _) => new JSNumber(0), "get screenY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"screenLeft", new DomFunction((in _) => new JSNumber(0), "get screenLeft"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        window.FastAddProperty((KeyString)"screenTop", new DomFunction((in _) => new JSNumber(0), "get screenTop"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // window.devicePixelRatio — physical pixels per CSS pixel. One, because that is what this
+        // renderer does: it has no device-scale or backing-store-scale concept at all, so a CSS pixel
+        // is a rendered pixel. (Page zoom is a separate axis and is reported by
+        // `visualViewport.scale` below, which is where a page should read it.) Absent, the near-universal
+        // `devicePixelRatio || 1` fallback happened to survive, but the equally common
+        // `canvas.width = rect.width * devicePixelRatio` produced NaN and collapsed the canvas.
+        window.FastAddProperty((KeyString)"devicePixelRatio", new DomFunction((in _) => new JSNumber(1), "get devicePixelRatio"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // The six BarProp objects. See WindowBarPropBinding for why every one reports not-visible.
+        Dom.Features.WindowBarPropBinding.Install(window);
+
+        // window.offscreenBuffering — a legacy Netscape-era property that survives on the Window
+        // interface and is still read by old feature-detection preambles. It has no standard
+        // definition left to satisfy; `true` is the value the reference engine reports, and the point
+        // of having it at all is that the read yields a boolean rather than `undefined`. Grouped with
+        // the geometry above because it is the last member of that same audited block.
+        window.FastAddProperty((KeyString)"offscreenBuffering", new DomFunction((in _) => JSBoolean.True, "get offscreenBuffering"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
         // window scroll / scrollTo / scrollBy, co-located in the WindowScrollBinding feature module (Phase 3).
         window.FastAddValue((KeyString)"scroll", new DomFunction((in a) => Dom.Features.WindowScrollBinding.Scroll(this, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue((KeyString)"scrollTo", new DomFunction((in a) => Dom.Features.WindowScrollBinding.ScrollTo(this, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -378,6 +424,13 @@ public sealed partial class DomBridge
         screenObj.FastAddValue((KeyString)"height", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"availWidth", new JSNumber(vpWidth), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"availHeight", new JSNumber(vpHeight), JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // The origin of the available area (CSSOM View §5). Zero for the same reason the avail sizes
+        // above equal the full screen: nothing — no dock, no taskbar — is reserved out of a capture's
+        // screen, so the available rectangle starts at the screen origin. They complete the pair the
+        // avail sizes belong to; a page computing `availLeft + availWidth` was getting NaN.
+        screenObj.FastAddValue((KeyString)"availLeft", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        screenObj.FastAddValue((KeyString)"availTop", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"colorDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
         screenObj.FastAddValue((KeyString)"pixelDepth", new JSNumber(24), JSPropertyAttributes.EnumerableConfigurableValue);
 

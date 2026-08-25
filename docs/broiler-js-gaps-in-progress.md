@@ -29,7 +29,10 @@ What already landed is in [closed](broiler-js-gaps-closed.md#track-0--conformanc
    - 52 that hang, nearly all dynamic `import()` of a module exporting a class or function
      → track 3;
    - 22 NullReferenceException crashes in module namespace and ambiguous-export paths →
-     track 3;
+     track 3. (A *distinct* module crash class — a read-only-write, not an NRE — was root-caused
+     and fixed since: the module top-level lexical scope leak, see
+     [track 3](#track-3--module-execution-semantics). Its effect on these 22 is unknown until the
+     corpus is re-run on a pointer that carries the fix.);
    - 12 "invalid program" IL failures on top-level `for await` → track 1, **fixed** (see
      track 1's async/generator entry); re-measure this line on the next corpus run;
    - the `$262` remainder, mostly cross-realm identity and missing-throw cases → track 1.
@@ -106,3 +109,92 @@ See [the current limitations](../Broiler.JS/Broiler.Regex/Broiler.Regex/README.m
 
 **Exit gate:** the pinned supported RegExp corpus is clean without sending unsupported syntax to
 the native backend, and all public RegExp operations consume the same conforming match data.
+
+## Track 3 — Module execution semantics
+
+**Status: two module-binding defects are root-caused and fixed, but both rides in `Broiler.JS`
+submodule patches that could not be pushed (the remote is outside this session's scope, so the push
+returned 403 and the gitlink was not bumped). A third, larger defect — imports are not live bindings
+— is newly characterized but not fixed, because it is an architectural change to how the engine
+links modules. The rest of track 3 — the host task model and the JSON-module / `import.meta` /
+attribute-enforcement decisions — stays in
+[open](broiler-js-gaps-open.md#track-3--scripts-tasks-and-modules).**
+
+### Fixed in a patch awaiting upstream
+
+- **A module's top-level `let`/`const`/`class` bindings shared one realm-wide slot per name.** They
+  were published into the realm's global lexical environment exactly as a script's top-level
+  lexicals are, so two modules declaring the same top-level name aliased one binding. A module that
+  declared a top-level `const x` and, while its body was still running, triggered a transitive
+  import of another module that also declared a top-level `const x` then wrote through the first
+  module's read-only binding and threw "Cannot assign to read only variable". (Sibling imports at
+  one level escaped only because each body had returned before the next ran, re-declaring the shared
+  slot rather than double-occupying it.) **Fixed** by keeping a module's top-level lexicals local to
+  its compiled body — the global-lexical publishing in `VisitProgram` is gated on the ES module
+  goal, and the names an `export const`/`let`/`class` introduces are collected so an exported
+  declaration follows the same module-local path as a bare one instead of falling through to a
+  global-lexical slot. This is also the spec-correct scoping: an indirect eval in the global
+  environment must not resolve a module's top-level bindings. The submodule commit is *Give a
+  module's top-level lexicals their own environment*; regressions in `ModuleScopeIsolationTests`.
+- **`export *` did not respect export precedence.** A star re-export republishes the source's names
+  onto this module's `exports` at run time, and it overwrote a name the module already exported
+  locally or via a named re-export — last-writer-wins, and a throw ("Cannot assign to read only
+  variable") when the overwritten name was a `const` export and the star followed it in source
+  order. ResolveExport (ES2024 16.2.1.5.3) consults a module's own local and indirect entries before
+  its star entries, so an explicitly exported name is never taken from `export *`. **Fixed** in the
+  same commit: the run-time copy skips a name the target already owns. (Two `export *` sources that
+  both carry one name — a genuinely *ambiguous* star export, which should be excluded from the
+  namespace and a SyntaxError to import by name — is a separate, unfixed case that the run-time-copy
+  model cannot yet represent; it now resolves to the first star rather than the last, neither being
+  conformant.)
+- **An imported binding was mutable.** An `ImportedBinding` is immutable (ES2024 16.2.1.5 creates it
+  as an immutable binding), but the engine seeded each import into an ordinary mutable local, so
+  `import { x } from 'm'; x = 2;` quietly overwrote the local snapshot and ran on. **Fixed** by
+  sealing every import binding — named, default, namespace, and renamed — read-only right after it is
+  seeded, so a later assignment throws in the strict module code, the same runtime read-only
+  TypeError a reassigned `const` gives. The spec makes assignment to an import an *early* SyntaxError;
+  this engine cannot raise that phase without whole-module scope analysis across its deferred function
+  bodies (an assignment inside a not-yet-compiled function body is not seen at module-compile time),
+  so it matches its own `const` treatment — a runtime read-only write — rather than leaving the write
+  to succeed. The submodule commit is *Make an imported binding immutable*; regressions in
+  `ModuleImportImmutabilityTests`.
+
+### Newly characterized — not yet fixed
+
+- **Imports are snapshots, not live bindings.** `import { count } from 'm'` copies `m`'s current
+  export *value* into a local at import time; a later mutation of `count` inside `m` (through an
+  exported mutator) is not seen by the importer — `import { count, inc } from 'm'; inc(); inc();
+  count` stays the import-time value instead of tracking the exporter's variable, and the same holds
+  for a namespace access `ns.count`. This is the run-time-copy export model: `export let count`
+  writes `exports.count = <value>` at its textual position rather than exposing the live binding.
+  Two consequences fall out of the same cause: a **cycle** where module `b`, imported while `a`'s
+  body is mid-run, reads a hoisted function export of `a` sees `undefined` (the value has not been
+  written to `a`'s `exports` yet — function exports are not hoisted into the namespace before bodies
+  run); and the immutability fix above lands as a *runtime* read-only error rather than the spec's
+  parse-phase SyntaxError. Fixing live bindings is an architectural change — the exporter must expose
+  each mutable export as a live accessor over its module-local variable, and every reference to an
+  imported name must read through the namespace on each access rather than a one-time local copy —
+  so it is scoped here, not attempted as part of these patches. Reproductions: `LiveBinding`,
+  `LiveNamespace`, `Cycle` shapes (characterized against the current pointer; no regression is
+  committed for them yet, per the retest rule, until the fix is designed).
+
+### Remaining work
+
+1. Land the two `Broiler.JS` patches — *Give a module's top-level lexicals their own environment* and
+   *Make an imported binding immutable* — on `Broiler-Platform/Broiler.JS` and bump the submodule
+   gitlink. They touch disjoint files and apply in order on the pinned commit. Until then CI clones
+   the pinned commit, which carries neither, so these cases stay red on CI and the files under
+   `patches/` are the only copies. There is no main-repo fallback and none is needed — both are
+   internal to the `Broiler.JS` compiler and runtime and name no type the parent references.
+2. Re-measure the module corpus against the landed fixes. Track 0's run recorded "22
+   NullReferenceException crashes in module namespace and ambiguous-export paths" and "52 that hang";
+   the scope-isolation fix targets a distinct read-only-write crash class (not those NREs), so its
+   effect on those totals is unknown until the corpus is re-run — do not assume it moves them.
+3. Design and implement live import bindings (the *Newly characterized* item). This is the
+   architectural piece the exit gate turns on, and it also converts the import-immutability error to
+   the spec's parse phase; it is not a patch-sized change.
+
+**Exit gate:** a module's top-level bindings are isolated per module under transitive and cyclic
+imports; `export *` obeys local/indirect/star precedence; imported bindings are immutable *and* live
+(a reference tracks the exporter's variable, and a hoisted function export is visible across a
+cycle); the module corpus is re-run on a pointer that carries the fixes and its manifest reconciled.

@@ -153,8 +153,11 @@ public sealed partial class DomBridge
         // document is "interactive" before DOMContentLoaded is dispatched, and "complete" once the
         // sub-resources are accounted for and `load` is about to fire.
         SetDocumentReadyState("interactive");
+        _navigationTiming?.MarkDomInteractive();
 
+        _navigationTiming?.MarkDomContentLoadedStart();
         FireDomContentLoadedEvent();
+        _navigationTiming?.MarkDomContentLoadedEnd();
 
         var htmlEl = Elements.FirstOrDefault(e =>
             string.Equals(e.TagName, "html", StringComparison.OrdinalIgnoreCase));
@@ -168,6 +171,8 @@ public sealed partial class DomBridge
         }
 
         SetDocumentReadyState("complete");
+        _navigationTiming?.MarkDomComplete();
+        _navigationTiming?.MarkLoadEventStart();
 
         // 1. Fire window.onload if it was set by script.
         //    In browsers, setting `window.onload = fn` registers a handler
@@ -218,7 +223,12 @@ public sealed partial class DomBridge
             body = ChildElements(htmlEl).FirstOrDefault(c =>
                 string.Equals(c.TagName, "body", StringComparison.OrdinalIgnoreCase));
         }
-        if (body == null) return;
+        if (body == null)
+        {
+            // No body to dispatch at: the load phase is over here, so close the mark on this path too.
+            _navigationTiming?.MarkLoadEventEnd();
+            return;
+        }
 
         // Ensure the body's JS object is created so inline event attributes are compiled
         ToJSObject(body);
@@ -236,6 +246,8 @@ public sealed partial class DomBridge
             RenderLogger.LogError(LogCategory.JavaScript, "DomBridge.FireWindowLoadEvent",
                 $"Error firing window load event: {ex.Message}", ex);
         }
+
+        _navigationTiming?.MarkLoadEventEnd();
     }
 
     /// <summary>

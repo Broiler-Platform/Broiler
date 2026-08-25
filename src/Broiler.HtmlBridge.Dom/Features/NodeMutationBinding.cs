@@ -17,6 +17,22 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class NodeMutationBinding
 {
+    /// <summary>
+    /// Throws the <c>NotFoundError</c> <c>DOMException</c> the pre-insert and pre-remove steps require
+    /// when the named child is not a child of this parent (DOM §4.2.3) — the document-level
+    /// counterpart of <c>TreeMutationBinding</c>'s helper, which carries the same rule for elements.
+    /// </summary>
+    private static void ThrowNotFoundError(INodeMutationHost host, string method, string detail)
+    {
+        var message = $"Failed to execute '{method}' on 'Node': {detail}";
+
+        if (host.JsContext is { } context)
+            DomBridge.ThrowDOMException(context, message, "NotFoundError");
+
+        // Only before the bridge is attached, when there is no realm to mint a DOMException in.
+        throw new JSException(message);
+    }
+
     public static JSValue GetChildNodes(INodeMutationHost host, in Arguments a)
     {
         var nodes = new List<JSValue>();
@@ -36,13 +52,20 @@ internal static class NodeMutationBinding
         {
             var doc = host.DocumentNode;
             var idx = DomBridge.ChildIndexOf(doc, childEl);
-            if (idx >= 0)
+            if (idx < 0)
             {
-                host.NotifyNodeIteratorPreRemoval(childEl);
-                DomBridge.RemoveNthChild(doc, idx);
-                DomBridge.SetParent(childEl, null);
-                host.NotifyChildRemoved(doc, childEl, idx);
+                // DOM §4.2.3 pre-remove: "If child's parent is not parent, then throw a NotFoundError
+                // DOMException." This fell straight through to `return a[0]` — and a[0] is what a
+                // SUCCESSFUL removeChild returns, so the caller was handed the node back as if it had
+                // been detached while the tree was untouched.
+                ThrowNotFoundError(host, "removeChild",
+                    "The node to be removed is not a child of this node.");
             }
+
+            host.NotifyNodeIteratorPreRemoval(childEl);
+            DomBridge.RemoveNthChild(doc, idx);
+            DomBridge.SetParent(childEl, null);
+            host.NotifyChildRemoved(doc, childEl, idx);
         }
 
         return a[0];
@@ -239,22 +262,28 @@ internal static class NodeMutationBinding
         var doc = host.DocumentNode;
         if (a.Length > 1 && a[1] is JSObject refObj && !a[1].IsNull)
         {
+            // A reference node WAS supplied, so it must be a child of this parent: DOM §4.2.3
+            // pre-insert says "If child is non-null and its parent is not parent, then throw a
+            // NotFoundError DOMException." This used to fall through to the append below, which is
+            // the worst outcome of the three shapes this family had — not a silent no-op but a
+            // silent mutation into a position the caller never asked for, leaving the node at the
+            // end of the document instead of before the reference.
             var refEl = host.FindDomNodeByJSObject(refObj);
-            if (refEl != null)
+            var idx = refEl != null ? DomBridge.ChildIndexOf(doc, refEl) : -1;
+            if (idx < 0)
             {
-                var idx = DomBridge.ChildIndexOf(doc, refEl);
-                if (idx >= 0)
-                {
-                    // Single canonical insert (newEl detached above); the prior SetParent-append +
-                    // reposition fired spurious add-at-end/remove records.
-                    DomBridge.InsertChildAt(doc, idx, newEl);
-                    host.NotifyChildAdded(doc, newEl, idx);
-                    return a[0];
-                }
+                ThrowNotFoundError(host, "insertBefore",
+                    "The node before which the new node is to be inserted is not a child of this node.");
             }
+
+            // Single canonical insert (newEl detached above); the prior SetParent-append +
+            // reposition fired spurious add-at-end/remove records.
+            DomBridge.InsertChildAt(doc, idx, newEl);
+            host.NotifyChildAdded(doc, newEl, idx);
+            return a[0];
         }
 
-        // If refChild is null or not found, append (single canonical op; newEl detached above).
+        // A null or absent refChild means append — that IS the specified behaviour, not a fallback.
         doc.AppendChild(newEl);
         host.NotifyChildAdded(doc, newEl, doc.ChildNodes.Count - 1);
         return a[0];

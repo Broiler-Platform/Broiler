@@ -38,8 +38,11 @@ documented separately and do not appear as ordinary failures.
 ## Track 3 — Scripts, tasks, and modules
 
 Module *syntax* is closed — see
-[closed](broiler-js-gaps-closed.md#track-3--module-syntax). What remains is host semantics and
-two decisions.
+[closed](broiler-js-gaps-closed.md#track-3--module-syntax). Module *binding* semantics are
+part-landed — scope isolation and import immutability are fixed in patches and live bindings are
+characterized-not-fixed, in
+[in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics). What remains
+below is host semantics and two decisions.
 
 ### Confirmed host-semantic gaps
 
@@ -123,7 +126,9 @@ shared-memory claim is made before the complete memory-model gate passes.
 
 ### Fetch, navigation, storage, and networking
 
-- `fetch()` returns a self-returning thenable rather than a conforming chainable Promise.
+- ~~`fetch()` returns a self-returning thenable rather than a conforming chainable Promise.~~
+  **Fixed** — `fetch()` and the body methods return real Promises; see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
 - `location.assign`, `replace`, `reload`, and `href=` record requests but do not navigate.
 - Some HTTP subresource, iframe, worker, socket, and navigation attempts never complete or call
   back to the probing script.
@@ -135,15 +140,37 @@ See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 
 ### Window, document, navigator, URL, and timing semantics
 
-- Navigator identity, hardware, connection, permissions, storage, media-device, media-capability,
-  and user-agent-data surfaces remain incomplete.
-- Window and screen geometry plus `BarProp` objects are absent.
-- `document.hasFocus`, `referrer`, `domain`, `lastModified`, `charset`, `activeElement`,
-  `window.trustedTypes`, and `onvisibilitychange` remain unresolved in the current audit.
-- Non-special URLs such as `data:` can report an empty `.protocol`.
-- `performance.now()` uses a whole-millisecond wall clock rather than a monotonic source, and
-  Performance Navigation Timing exposes no timing marks. These are API-semantic gaps, not speed
-  work.
+- Navigator's **object-valued** surfaces remain absent: `connection`, `permissions`, `storage`,
+  `mediaDevices`, `mediaCapabilities` and `userAgentData`. Each is a whole API rather than a value,
+  and each needs its own decision about whether a present-but-empty object answers a page's
+  `'x' in navigator` detection *more* misleadingly than absence does — the same test that kept
+  `speechSynthesis` and `navigator.bluetooth` deliberately absent (see
+  [the privacy inventory](privacy-test-page-gaps.md)). The scalar identity and hardware half of this
+  line is **fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+- ~~Window and screen geometry plus `BarProp` objects are absent.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+- `window.trustedTypes` is absent — a **capability decision**, not an omission: Trusted Types is an
+  enforcement API (policy creation, sink guarding, CSP integration), and a shape-only stub would
+  claim a policy mechanism that does not exist. The rest of that audit line —
+  `document.hasFocus`, `referrer`, `domain`, `lastModified`, `charset`, `activeElement`, and
+  `onvisibilitychange` — was confirmed missing and is now implemented; see
+  [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+- ~~Non-special URLs such as `data:` can report an empty `.protocol`.~~ **Does not reproduce** — see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
+- ~~Performance Navigation Timing exposes no timing marks.~~ **Fixed** for the document-lifecycle
+  half — see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis).
+  (`performance.now()` likewise no longer reports a whole-millisecond wall clock.)
+- **Confirmed, newly characterized — the navigation entry's network phases are not measured.**
+  `fetchStart`, `domainLookup*`, `connect*`, `secureConnectionStart`, `request*`, `response*` and the
+  `transferSize`/`encodedBodySize`/`decodedBodySize` trio now *exist* and report `0`, so the RUM
+  arithmetic built on them yields a number rather than `NaN`, but `0` there means "not observed"
+  rather than a measurement. Nothing at the bridge layer can observe them: the document is fetched by
+  the capture host (`CaptureService`/`LinkNavigator`) before the `DomBridge` exists, and the
+  `ResourceTrace` facility that does time that fetch is diagnostics-only and off by default.
+  Measuring them for real means plumbing the host's document-fetch timings — and the byte counts —
+  into the bridge so the entry can report them against the same time origin, which is a cross-layer
+  change rather than a binding fix.
 
 See [the privacy inventory](privacy-test-page-gaps.md),
 [the Google current-script investigation](google-about-current-script.md), and
@@ -151,8 +178,8 @@ See [the privacy inventory](privacy-test-page-gaps.md),
 
 ### Actions
 
-1. Replace the fetch thenable with Promise-conforming settlement and chaining while retaining
-   correct `await` behavior.
+1. ~~Replace the fetch thenable with Promise-conforming settlement and chaining while retaining
+   correct `await` behavior.~~ **Done.**
 2. Define capture-mode navigation semantics and a complete callback/error contract; do not expose
    browser-like methods whose only observable effect is silent non-navigation.
 3. Implement storage and networking APIs in independently testable slices with origin, lifetime,
@@ -173,10 +200,33 @@ and deterministic detection behavior.
 - DOM wrappers do not consistently use genuine interface/prototype chains.
 - `Blob`, `FileList`, `NodeList`, `HTMLCollection`, and per-tag `HTML*Element` constructors remain
   undefined; `childNodes` returns a JavaScript array instead of `NodeList`.
-- Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
-  be inaccessible through canonical DOM lookup.
-- CharacterData failures are not proper `DOMException` objects.
-- `compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.
+- ~~Qualified mixed-case attributes such as `viewBox`, `preserveAspectRatio`, and `xlink:href` can
+  be inaccessible through canonical DOM lookup.~~ **Does not reproduce** — see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
+- ~~CharacterData failures are not proper `DOMException` objects.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- ~~The element tree-mutation half of the same family: `insertBefore` threw a plain `Error`, and
+  `removeChild`/`replaceChild` silently no-opped, where DOM §4.2.3 requires `NotFoundError`.~~
+  **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- ~~The document-level `document.removeChild`/`document.insertBefore` no-op (or append) silently
+  where `NotFoundError` is required.~~ **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Confirmed, still open — the rest of that family, both behind a submodule.** `setAttribute` with
+  an invalid name returns normally where `InvalidCharacterError` is required; the validator it needs
+  lives in **`Broiler.DOM`** (`DomNameValidation`, which deliberately owns these rules rather than
+  the bridge re-copying them), so it is the patch workflow, and it also carries real-page risk — a
+  browser does throw on `setAttribute('@click', …)`, so pages relying on the permissive behaviour
+  would begin to fail. `querySelector` with an invalid selector returns `null` where `SyntaxError` is
+  required; surfacing that needs parse errors out of **`Broiler.CSS`**'s `CssSelectorParser`, plus
+  main-repo wiring. The DOMException machinery itself is sound, so both are wiring gaps rather than
+  missing mechanisms.
+- ~~`compareDocumentPosition` returns `-1`, `0`, or `1` instead of the required position bitmask.~~
+  **Does not reproduce** — it returns the correct bitmask; see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce). The companion
+  `Node.DOCUMENT_POSITION_*` constants *were* missing, which is what made the correct bitmask
+  undecodable; that half is now **fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 
 See [HTML5 exceptions](html5test-exceptions.md) and
 [the DOM bridge roadmap](../Broiler.DOM/docs/roadmap.md).
@@ -194,9 +244,36 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 
 ### CSSOM, fonts, SVG, and JS-visible layout algorithms
 
-- A linked stylesheet can report zero `cssRules`, while `getComputedStyle` ignores its
-  declarations.
-- `getComputedStyle().display` can report `inline` for every element.
+- **Confirmed with evidence — a linked stylesheet's rules reach neither `cssRules` nor
+  `getComputedStyle`.** Checked through `bridge.Attach(context, html, pageUrl)` — the same shape the
+  passing `StylesheetBaseHrefTests` uses — over a `file:` page with `#a { display: flex; color:
+  rgb(1,2,3); }` and `.z { margin-top: 7px }` in the sheet, against an **inline `<style>` control
+  carrying the identical rules**:
+
+  | sheet | `cssRules.length` | `display` | `color` | `marginTop` |
+  |---|---|---|---|---|
+  | inline `<style>` | 2 | `flex` | `rgb(1, 2, 3)` | `7px` |
+  | linked `<link>` | 0 | `inline` | `rgb(0, 0, 0)` | `0px` |
+
+  The linked sheet also appears in `document.styleSheets` with **no `href`**, so it is presented as an
+  inline sheet that happens to have no rules. `bridge.SetLocalBasePath` makes no difference. Note
+  this is what makes the retired *"`getComputedStyle().display` reports `inline` for every element"*
+  claim true after all for linked sheets — that retirement covered the inline case only.
+
+  Why it is not visible as a rendering bug: `HtmlRender` resolves and applies the link itself, which
+  is why the green-pixel assertion in `StylesheetBaseHrefTests` passes while the bridge's own CSSOM
+  never sees the sheet. Serialization confirms the split — the fetched rules do not appear in
+  `SerializeToHtml()` output either. So paint and CSSOM have two different stylesheet sets, and only
+  paint has the linked one.
+
+  **Open question, not yet answered:** whether this also fails over `http(s):`. The
+  `FetchStyleSheetText` seam says the loader dispatches file and http(s) alike, and the whole
+  collect → prefetch → fetch pipeline is present and does include external links
+  (`CollectStyleSheetCandidatesInTree` tests `IsExternalStylesheet`), so the fetch is failing
+  somewhere inside that path rather than the path being absent. Answer that before attempting a fix,
+  because it decides whether this is a `file:`-scheme defect or a general one.
+- ~~`getComputedStyle().display` can report `inline` for every element.~~ **Does not reproduce** — see
+  [closed](broiler-js-gaps-closed.md#retired--did-not-reproduce).
 - Font Loading is a synchronous compatibility facade and accepts malformed non-empty shorthands.
 - SVG lacks conforming live DOM integration for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from

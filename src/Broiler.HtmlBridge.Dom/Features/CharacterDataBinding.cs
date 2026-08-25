@@ -17,6 +17,32 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class CharacterDataBinding
 {
+    /// <summary>
+    /// Throws the <c>IndexSizeError</c> <c>DOMException</c> that an offset past the end of the data
+    /// must raise (DOM §4.10 — every one of these methods begins "If offset is greater than length,
+    /// throw an IndexSizeError DOMException").
+    /// </summary>
+    /// <remarks>
+    /// These used to throw a plain error whose <em>message</em> was the string <c>"INDEX_SIZE_ERR"</c>
+    /// — the legacy constant's name used as prose. Nothing a page can branch on came out of that:
+    /// <c>e instanceof DOMException</c> was false, <c>e.name</c> was <c>"Error"</c> and <c>e.code</c>
+    /// was <c>0</c>, so the two checks a caller actually writes both failed and the error read as an
+    /// internal fault rather than the specified, recoverable one. The bridge already had the
+    /// machinery — <c>appendChild</c>'s HierarchyRequestError and <c>createElement</c>'s
+    /// InvalidCharacterError go through this same helper and arrive correctly — so this is the
+    /// CharacterData methods being wired to it, not a new mechanism.
+    /// </remarks>
+    private static void ThrowIndexSizeError(ICharacterDataHost host, string method, int offset, int length)
+    {
+        var message = $"Failed to execute '{method}' on 'CharacterData': The offset {offset} is greater than the node's length ({length}).";
+
+        if (host.JsContext is { } context)
+            DomBridge.ThrowDOMException(context, message, "IndexSizeError");
+
+        // Only before the bridge is attached, when there is no realm to mint a DOMException in.
+        throw new JSException(message);
+    }
+
     public static JSValue GetData(DomNode node, in Arguments a)
     {
         if (DomBridge.IsText(node) || DomBridge.IsComment(node))
@@ -44,8 +70,10 @@ internal static class CharacterDataBinding
             throw new JSException("Failed to execute 'splitText' on 'Text': 1 argument required, but only 0 present.");
         var offset = (int)a[0].DoubleValue;
         var text = DomBridge.BridgeText(node);
+        // §4.11 splitText carries the same rule as the CharacterData methods: an offset past the end
+        // is an IndexSizeError DOMException, not a bare error.
         if (offset < 0 || offset > text.Length)
-            throw new JSException("Failed to execute 'splitText' on 'Text': The offset " + offset + " is larger than the node's length " + text.Length + ".");
+            ThrowIndexSizeError(host, "splitText", offset, text.Length);
         var remainingText = text[offset..];
         DomBridge.SetBridgeText(node, text[..offset]);
         var newNode = host.CreateBridgeTextNode(remainingText);
@@ -63,13 +91,13 @@ internal static class CharacterDataBinding
         return host.ToJSObject(newNode);
     }
 
-    public static JSValue SubstringData(DomNode node, in Arguments a)
+    public static JSValue SubstringData(ICharacterDataHost host, DomNode node, in Arguments a)
     {
         var offset = a.Length > 0 ? (int)a[0].DoubleValue : 0;
         var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
         var text = DomBridge.BridgeText(node);
         if (offset < 0 || offset > text.Length)
-            throw new JSException("INDEX_SIZE_ERR");
+            ThrowIndexSizeError(host, "substringData", offset, text.Length);
         var end = (int)Math.Min((long)offset + count, text.Length);
         return new JSString(text[offset..end]);
     }
@@ -87,7 +115,7 @@ internal static class CharacterDataBinding
         var count = a.Length > 1 ? Math.Max(0, (int)a[1].DoubleValue) : 0;
         var text = DomBridge.BridgeText(node);
         if (offset < 0 || offset > text.Length)
-            throw new JSException("INDEX_SIZE_ERR");
+            ThrowIndexSizeError(host, "deleteData", offset, text.Length);
         var end = (int)Math.Min((long)offset + count, text.Length);
         host.SetCharacterData(node, text.Remove(offset, end - offset));
         return JSUndefined.Value;
@@ -99,7 +127,7 @@ internal static class CharacterDataBinding
         var data = a.Length > 1 ? a[1].ToString() : string.Empty;
         var text = DomBridge.BridgeText(node);
         if (offset < 0 || offset > text.Length)
-            throw new JSException("INDEX_SIZE_ERR");
+            ThrowIndexSizeError(host, "insertData", offset, text.Length);
         host.SetCharacterData(node, text.Insert(offset, data));
         return JSUndefined.Value;
     }
@@ -111,7 +139,7 @@ internal static class CharacterDataBinding
         var data = a.Length > 2 ? a[2].ToString() : string.Empty;
         var text = DomBridge.BridgeText(node);
         if (offset < 0 || offset > text.Length)
-            throw new JSException("INDEX_SIZE_ERR");
+            ThrowIndexSizeError(host, "replaceData", offset, text.Length);
         var end = (int)Math.Min((long)offset + count, text.Length);
         host.SetCharacterData(node, text.Remove(offset, end - offset).Insert(offset, data));
         return JSUndefined.Value;
