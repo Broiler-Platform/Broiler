@@ -27,13 +27,21 @@ name: Documents And PDF
 #     application at all — Broiler.Documents.Tests/PdfDeliveryGuardTests.cs
 #     fails the build if that changes — so a host job today would gate nothing.
 #
-# The no-op guard below matters more than it looks. Three of the suites this
-# workflow runs (Graphics, Media.Image, Media.Image.Managed) are console runners
-# rather than xunit projects: `dotnet test` against them exits 0 having run
-# nothing at all. They are invoked with `dotnet run` so their exit code is the
-# failure count. The Documents solution is xunit and is checked for a plausible
-# executed-test count, because the roadmap is explicit that a skipped, empty, or
-# no-op job can never satisfy a later phase gate.
+# Scope: the Documents solution and its dependency closure, which today is
+# Broiler.Graphics and nothing else — Broiler.Documents.Model references it for
+# value types such as BColor. Broiler.Media is deliberately *not* gated here.
+# Nothing in the solution references it, so a Media failure would say nothing
+# about Documents, and its Windows leg turns on whether the runner image happens
+# to carry the Store-shipped WIC WebP codec, which is not a property of this
+# repository. Images reach the PDF codec at a later roadmap phase; the Media
+# paths and suites belong in this workflow then, not before.
+#
+# The no-op guard below matters more than it looks. The Graphics suite this
+# workflow runs is a console runner rather than an xunit project: `dotnet test`
+# against it exits 0 having run nothing at all. It is invoked with `dotnet run`
+# so its exit code is the failure count. The Documents solution is xunit and is
+# checked for a plausible executed-test count, because the roadmap is explicit
+# that a skipped, empty, or no-op job can never satisfy a later phase gate.
 
 on:
   # The two path lists are identical and must stay that way. They are written
@@ -42,7 +50,6 @@ on:
     paths:
       - 'Broiler.Documents/**'
       - 'Broiler.Graphics/**'
-      - 'Broiler.Media/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
@@ -52,7 +59,6 @@ on:
     paths:
       - 'Broiler.Documents/**'
       - 'Broiler.Graphics/**'
-      - 'Broiler.Media/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
@@ -144,16 +150,11 @@ jobs:
               throw "Only $executed tests executed, below the floor of $env:MINIMUM_EXECUTED_TESTS. A run this small means a project was skipped, not that the suite shrank."
           }
 
-      # The three suites below are console runners, not xunit projects. Their
-      # Main returns the failure count, so a non-zero exit fails the step.
+      # A console runner, not an xunit project: its Main returns the failure
+      # count, so a non-zero exit fails the step. It runs because
+      # Broiler.Documents.Model builds against Broiler.Graphics.
       - name: Run the Graphics test runner
         run: dotnet run --project Broiler.Graphics/Broiler.Graphics.Tests/Broiler.Graphics.Tests.csproj -c Release
-
-      - name: Run the Media image test runner
-        run: dotnet run --project Broiler.Media/Broiler.Media.Image.Tests/Broiler.Media.Image.Tests.csproj -c Release
-
-      - name: Run the managed image codec test runner
-        run: dotnet run --project Broiler.Media/Broiler.Media.Image.Managed.Tests/Broiler.Media.Image.Managed.Tests.csproj -c Release
 
       - name: Upload test results
         if: always()
