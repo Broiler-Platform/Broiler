@@ -371,6 +371,12 @@ public sealed partial class DomBridge
         Dom.Features.NavigatorCapabilityBinding.Install(navigatorObj, context);
         Dom.Features.StorageQuotaBinding.Install(navigatorObj);
 
+        // The object-valued surfaces that have a truthful answer: storage (zero usage, zero quota,
+        // not persisted), permissions (denied, for every capability this engine gates) and
+        // userAgentData (derived from the same user-agent string above). connection, mediaDevices
+        // and mediaCapabilities stay absent — see NavigatorSurfacesBinding for each decision.
+        Dom.Features.NavigatorSurfacesBinding.Install(navigatorObj, context, Layout.Net.BroilerUserAgent.Value);
+
         window.FastAddValue((KeyString)"navigator", navigatorObj, JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["navigator"] = navigatorObj;

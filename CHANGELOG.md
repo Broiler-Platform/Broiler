@@ -9,6 +9,38 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- Three of `navigator`'s object-valued surfaces: `storage` (`StorageManager`),
+  `permissions` (`Permissions`/`PermissionStatus`) and `userAgentData`
+  (`NavigatorUAData`).
+
+  Each is a whole API rather than a value, so each needed its own decision:
+  whether a present object answers a page's `'x' in navigator` detection *more*
+  misleadingly than absence does — the test that kept `speechSynthesis` and
+  `navigator.bluetooth` out. These three pass it because the question the
+  interface exists to answer is one Broiler can answer truthfully.
+
+  `navigator.storage` reports quota-managed storage — IndexedDB, the Cache API,
+  the origin private file system — of which Broiler implements none, so the
+  honest estimate is `{usage: 0, quota: 0}`. That is the same pair the
+  already-present `navigator.webkitTemporaryStorage` reports for the same
+  question; the two disagreed only by one of them being absent. `getDirectory()`
+  is deliberately not on it, because the origin private file system's
+  feature-detect is exactly `'getDirectory' in navigator.storage`.
+
+  Every permission query answers `"denied"`, which is the state
+  `Notification.permission` already reports and the honest one: Broiler grants no
+  permission-gated capability and has no surface to prompt on. Chromium answers
+  `"prompt"` — a promise of a dialog that never comes here.
+
+  `navigator.userAgentData` is derived entirely from the one
+  `BroilerUserAgent.Value` string, so the structured identity and the string
+  cannot disagree.
+
+  `navigator.connection`, `.mediaDevices` and `.mediaCapabilities` stay absent,
+  now as recorded decisions rather than omissions: `NetworkInformation` has no
+  "not known" state, so any value would be an invention, and the two media
+  surfaces belong with the rest of media.
+
 - Form-associated custom elements: `static formAssociated`, `attachInternals()`,
   and the `ElementInternals`, `ValidityState` and `CustomStateSet` interfaces.
 

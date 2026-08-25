@@ -134,21 +134,16 @@ shared-memory claim is made before the complete memory-model gate passes.
 - `location.assign`, `replace`, `reload`, and `href=` record requests but do not navigate.
 - Some HTTP subresource, iframe, worker, socket, and navigation attempts never complete or call
   back to the probing script.
-- IndexedDB, Cache API, service workers, `cookieStore`, `navigator.storage`, WebSocket,
-  EventSource, and `SharedWorker` are absent.
+- IndexedDB, Cache API, service workers, `cookieStore`, WebSocket, EventSource, and `SharedWorker`
+  are absent. `navigator.storage` exists and truthfully reports an empty quota, because none of the
+  backends it counts does — see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis);
+  it starts reporting real numbers when they land.
 
 See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 [the Location changelog entry](../CHANGELOG.md).
 
 ### Window, document, navigator, URL, and timing semantics
 
-- **Navigator's object-valued surfaces are absent:** `connection`, `permissions`, `storage`,
-  `mediaDevices`, `mediaCapabilities` and `userAgentData`. Each is a whole API rather than a value,
-  and each needs its own decision about whether a present-but-empty object answers a page's
-  `'x' in navigator` detection *more* misleadingly than absence does — the same test that kept
-  `speechSynthesis` and `navigator.bluetooth` deliberately absent (see
-  [the privacy inventory](privacy-test-page-gaps.md)). The scalar identity and hardware half of the
-  same audit line is done.
 - **`window.trustedTypes` is absent — a capability decision, not an omission.** Trusted Types is an
   enforcement API (policy creation, sink guarding, CSP integration), and a shape-only stub would
   claim a policy mechanism that does not exist.

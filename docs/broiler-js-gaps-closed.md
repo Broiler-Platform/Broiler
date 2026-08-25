@@ -441,6 +441,48 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **Three of `navigator`'s object-valued surfaces are decided and implemented, and three are decided
+  and absent.** Each is a whole API rather than a value, and the test the audit line named is whether
+  a present object answers a page's `'x' in navigator` detection *more* misleadingly than absence
+  does — the same test that kept `speechSynthesis` and `navigator.bluetooth` out. Six decisions, one
+  reason each.
+  <br>**`navigator.storage` (`StorageManager`) — implemented.** It reports quota-managed storage:
+  IndexedDB, the Cache API, the origin private file system. Broiler implements none of them, so the
+  honest estimate is `{usage: 0, quota: 0}` and the honest persistence answer is `false`. That is the
+  same pair the already-present `navigator.webkitTemporaryStorage` reports for the same question
+  through the deprecated interface — the two disagreed only by one of them being absent.
+  `getDirectory()` is deliberately *not* on it: the origin private file system's feature-detect is
+  exactly `'getDirectory' in navigator.storage`.
+  <br>**`navigator.permissions` — implemented, with one deliberate divergence.** Broiler grants no
+  permission-gated capability and has no surface to prompt on, so every query answers `"denied"` — a
+  real, specified state, and the one `Notification.permission` already reports for the single
+  capability that had an answer at all. Chromium answers `"prompt"`; that state promises a dialog
+  this engine cannot show. A name outside the `PermissionName` enum rejects with a `TypeError`
+  carrying Chromium's message, because the enum is validated before the permission is looked at, so a
+  typo is reported as a typo rather than as a denial.
+  <br>**`navigator.userAgentData` (`NavigatorUAData`) — implemented.** Identity is the one thing the
+  bridge already reports carefully, and every member here is derived from the single
+  `BroilerUserAgent.Value` string, so the structured form and the string cannot disagree — which is
+  the whole argument for exposing it. `brands` carries the major version only (that is what makes it
+  low-entropy) and `getHighEntropyValues` answers exactly the hints it is asked for, from the same
+  string. No GREASE brand is invented: the anti-ossification second entry a browser adds is a
+  browser-market argument rather than a correctness one, and it would name a product that does not
+  exist.
+  <br>**`navigator.connection` — absent, deliberately.** `NetworkInformation` claims the user agent
+  can report the connection's quality: `effectiveType`, `rtt`, `downlink`. Broiler measures none of
+  it, and the interface has no "not known" state, so any value would be an invention rather than a
+  negative answer.
+  <br>**`navigator.mediaDevices` and `navigator.mediaCapabilities` — absent, deferred.** Both are
+  media surfaces, and their capability decisions belong with the rest of media in
+  [open](broiler-js-gaps-open.md#media-communications-devices-and-security) rather than being taken
+  here on their own.
+  <br>The members live on the interface prototypes and each surface is a singleton, so an instance
+  carries no own properties. Over a 22-case corpus run, Broiler and Chromium agree on every case but
+  the permission state, which is the divergence above. The absences are pinned by a regression, so
+  they stay decisions rather than drifting back into omissions.
+  <br>Main-repo fix (the new `Features/NavigatorSurfacesBinding.cs` plus
+  `DomBridge/Registration/Window.cs`); regressions in `NavigatorSurfacesTests`.
+
 - **A navigation entry's `duration` was a hardcoded `0`.** Navigation Timing §4 defines it as
   `loadEventEnd - startTime`, and a navigation entry's `startTime` is `0` by definition, so it *is*
   `loadEventEnd`. `entry.duration` is the shortest way a page writes "how long did this take", so a

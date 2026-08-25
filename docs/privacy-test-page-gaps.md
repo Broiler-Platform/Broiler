@@ -104,9 +104,12 @@ than taking a fallback path. The 2D context works.
 `appCodeName`, `appName`, `appVersion`, `product`, `productSub`, `webdriver`,
 `deviceMemory`, `hardwareConcurrency`, `maxTouchPoints` are all `undefined`;
 `vendor` is `""`. `userAgent` answers, so this is a gap in the rest of the
-interface. `navigator.connection`, `.permissions`, `.storage`, `.mediaDevices`,
-`.mediaCapabilities` and `.userAgentData` are also absent, and their probes
-throw `Cannot get property … of undefined`.
+interface. Of the object-valued surfaces, `navigator.permissions`, `.storage` and
+`.userAgentData` have since landed — each answers the question its interface exists
+to ask, truthfully (denied, an empty quota, and an identity derived from the one
+user-agent string). `navigator.connection`, `.mediaDevices` and
+`.mediaCapabilities` remain absent as explicit decisions rather than omissions;
+see `docs/broiler-js-gaps-closed.md`.
 
 ### Window and screen geometry, and the `BarProp` objects — 13 probes (#1749)
 
@@ -193,7 +196,7 @@ Direct feature detection, rather than the pages' probe values:
 
 | Present | Absent |
 | --- | --- |
-| `localStorage`, `sessionStorage`, `document.cookie`, `fetch`, `XMLHttpRequest`, `navigator.sendBeacon`, `Worker` | `indexedDB`, `caches`, `navigator.serviceWorker`, `cookieStore`, `navigator.storage`, `WebSocket`, `EventSource`, `SharedWorker`, `RTCPeerConnection` |
+| `localStorage`, `sessionStorage`, `document.cookie`, `fetch`, `XMLHttpRequest`, `navigator.sendBeacon`, `Worker`, `navigator.storage` (reporting an empty quota) | `indexedDB`, `caches`, `navigator.serviceWorker`, `cookieStore`, `WebSocket`, `EventSource`, `SharedWorker`, `RTCPeerConnection` |
 
 `indexedDB` and `WebSocket` bound whole classes of site — offline storage and
 anything live — well beyond what this corpus measures.
