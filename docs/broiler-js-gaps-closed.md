@@ -599,6 +599,34 @@ were deleted and the gitlinks point at commits that contain them. See
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`template.content` was a snapshot, not the parser-owned fragment** (HTML §4.12.3). The fragment
+  was built from a deep *copy* of children that stayed in the template's own child list, and the
+  consequences went well past the two sides disagreeing.
+  <br>A template's contents were **reachable from the document**: `t.querySelector('.row')` found
+  them where a browser answers `null`, and `document.querySelector`/`getElementsByTagName` saw them
+  too — so a page walking itself processed the markup it was meant to stamp later. And writing
+  `t.innerHTML` rewrote the element's children while `content` kept the cached copy, so the ordinary
+  way to build a template dynamically and then stamp it produced the **old** markup, with nothing to
+  indicate the write had gone somewhere else.
+  <br>**Fixed** by doing what the specification has the parser do: at the end of the parse every
+  remaining `<template>`'s children are moved into its contents fragment and the element is left
+  childless. Ordering matters — it runs *after* the declarative-shadow-root pass, because a
+  `<template shadowrootmode>` is not inert and its children belong in the shadow tree rather than in
+  a fragment. Two consumers follow the children: serialization reaches through to the fragment (a
+  browser's `outerHTML` emits template contents for the same reason, and without it a template's
+  markup would vanish from the serialized document), and `innerHTML` reads and writes the fragment.
+  A template built by `createElement` is deliberately *not* diverted — only the parser diverts — so
+  `t.appendChild(x)` appends to the element as it does in a browser while `t.innerHTML` still reaches
+  the fragment.
+  <br>The serializer needed no submodule change: it takes a bridge-supplied adapter, so which node
+  list it walks was already the parent's to decide. Nothing rendered differently either way — a
+  template's contents are inert, and `DeclarativeShadowDomTests` already pinned that.
+  <br>Every expectation is a Chromium answer taken through Playwright. Main-repo
+  `Broiler.HtmlBridge.Dom` fix (`DomBridge/Utilities.cs`, `DomBridge.HtmlParsing.cs`,
+  `DomBridge.Serialization.cs`, `DomBridge/HtmlFragmentMutation.cs`); regressions in
+  `TemplateContentTests`. One difference from the reference is left standing and recorded in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model): the fragment's wrapper reports
+  `constructor.name` of `"Object"`, which is the wrapper-prototype item, not this one.
 - **Form association was entirely absent** — `control.form`, `control.labels`, `label.control` and
   `label.form` were all `undefined`. `control.form` is how a script reaches the form from a control
   it was handed (an event target, a query result), so the ordinary `input.form.submit()` threw on the

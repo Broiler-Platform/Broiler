@@ -279,22 +279,29 @@ public sealed partial class DomBridge
     private readonly Dictionary<DomElement, DomDocumentFragment> _templateContents = new();
 
     /// <summary>
-    /// The fragment behind <c>HTMLTemplateElement.content</c>.
+    /// The fragment behind <c>HTMLTemplateElement.content</c> — the template's <b>own</b> children,
+    /// held in the fragment the specification puts them in rather than copied out of the tree.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The spec has the parser put a template's children straight into this fragment, leaving the
-    /// element itself childless. Broiler's parser keeps them as ordinary children — that is what
-    /// lets a template round-trip through serialization — so the fragment is built here from a deep
-    /// copy of them, once, and cached.
+    /// HTML §4.12.3 has the parser put a template's children straight into this fragment, leaving
+    /// the element itself childless, and that is now what happens: <see cref="DivertTemplateContents"/>
+    /// moves them at the end of the parse. The element is the owner of the fragment, not a second
+    /// copy of it.
     /// </para>
     /// <para>
-    /// The deviation that follows: the fragment is a snapshot, not a live view. Mutating
-    /// <c>t.content</c> does not rewrite the <c>&lt;template&gt;</c>'s own children, and mutating
-    /// those children afterwards does not show up in <c>content</c>. Every ordinary use — stamping
-    /// with <c>importNode</c>/<c>cloneNode</c>, querying it, populating it before stamping — is
-    /// unaffected, because each reads or writes one side only. Nothing renders either way: a
-    /// template's contents are inert.
+    /// It used to build the fragment from a deep <em>copy</em>, leaving the children in the tree,
+    /// and the deviations that followed were not confined to the two sides disagreeing. A template's
+    /// contents were reachable from the document — <c>t.querySelector('.row')</c> found them, where
+    /// a browser answers <c>null</c> because they are not in the tree at all — so a page walking
+    /// itself processed markup it was meant to stamp later. And writing <c>t.innerHTML</c> rewrote
+    /// the element's children while <c>content</c> kept the cached copy, so building a template
+    /// dynamically and then stamping it produced the <em>old</em> markup, silently.
+    /// </para>
+    /// <para>
+    /// A template created by <c>createElement</c> starts empty and stays that way: only the parser
+    /// diverts, so <c>t.appendChild(x)</c> appends to the element as it does in a browser, and only
+    /// <c>t.innerHTML</c> and <c>t.content</c> reach the fragment.
     /// </para>
     /// </remarks>
     private DomDocumentFragment GetTemplateContent(DomElement template)
@@ -303,11 +310,36 @@ public sealed partial class DomBridge
             return existing;
 
         var fragment = CreateBridgeDocumentFragment();
-        foreach (var child in template.ChildNodes.ToArray())
-            fragment.AppendChild(CloneDomElement(child, deep: true));
-
         _templateContents[template] = fragment;
         return fragment;
+    }
+
+    /// <summary>
+    /// Moves every parsed <c>&lt;template&gt;</c>'s children into its contents fragment, so the
+    /// element is left childless as HTML §4.12.3 requires. Runs once, at the end of the parse.
+    /// </summary>
+    /// <remarks>
+    /// Depth-first over the whole tree including inside templates, because a template may contain
+    /// another: the inner one is diverted into the outer one's fragment first and must still be
+    /// diverted itself. Declarative shadow-root templates are already gone by this point — that pass
+    /// consumes them — so what is left here is the inert kind.
+    /// </remarks>
+    private void DivertTemplateContents(DomNode root)
+    {
+        foreach (var node in root.InclusiveDescendants().ToArray())
+        {
+            if (node is not DomElement element ||
+                !string.Equals(element.TagName, "template", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var fragment = GetTemplateContent(element);
+            foreach (var child in element.ChildNodes.ToArray())
+            {
+                element.RemoveChild(child);
+                fragment.AppendChild(child);
+                DivertTemplateContents(child);
+            }
+        }
     }
 
     /// <summary>

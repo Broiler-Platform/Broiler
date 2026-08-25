@@ -238,10 +238,17 @@ public sealed partial class DomBridge
     {
         html ??= string.Empty;
 
-        foreach (var child in element.ChildNodes.ToArray())
+        // A <template>'s children are its contents fragment, not its own child list (HTML §4.12.3),
+        // so innerHTML writes the fragment. Writing the element instead left `content` holding the
+        // markup from before the assignment, so a page that built a template dynamically and then
+        // stamped it got the OLD markup with nothing to indicate the write had gone elsewhere.
+        // The parsing context stays the element — the fragment has no tag to parse `<td>` against.
+        DomNode target = IsTemplateElement(element) ? GetTemplateContent(element) : element;
+
+        foreach (var child in target.ChildNodes.ToArray())
             RemoveElementsRecursive(child);
 
-        ClearChildren(element);
+        ClearChildren(target);
 
         if (!string.IsNullOrEmpty(html) &&
             TryBuildInnerHtmlFragmentContainer(element, html, out var fragmentContainer))
@@ -250,10 +257,15 @@ public sealed partial class DomBridge
             foreach (var child in fragmentContainer.ChildNodes.ToArray())
             {
                 // Single canonical move: AppendChild removes the child from the parsed fragment and
-                // appends it to element in one op. The prior SetParent(child, element) did the same
-                // move, leaving the following AppendChild a no-op — redundant, not wrong.
-                element.AppendChild(child);
+                // appends it to the target in one op. The prior SetParent(child, element) did the
+                // same move, leaving the following AppendChild a no-op — redundant, not wrong.
+                target.AppendChild(child);
             }
+
+            // A template written into may itself contain templates, and those are the parser's to
+            // divert exactly as the document's were.
+            if (!ReferenceEquals(target, element))
+                DivertTemplateContents(target);
         }
 
         ResetComputedStyleEngines();

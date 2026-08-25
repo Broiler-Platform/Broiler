@@ -199,7 +199,11 @@ and deterministic detection behavior.
   answer `instanceof` through the chain, which is action 1's "establish real interface prototypes"
   for the two interfaces it names. The *element* wrappers still do not: `Element`, `HTMLElement` and
   the per-tag `HTML*Element` interfaces answer through an `@@hasInstance` hook reading `tagName`,
-  and giving element objects genuine per-interface chains remains the larger open change.
+  and giving element objects genuine per-interface chains remains the larger open change. Nor do the
+  non-element wrappers: `template.content.constructor.name` is `"Object"` where a browser says
+  `"DocumentFragment"`, so `instanceof DocumentFragment` is false for a real fragment — measured
+  while closing the `template.content` entry below, and left there because it is this item rather
+  than that one.
 - ~~`NodeList` and `HTMLCollection` are undefined; `childNodes` returns a JavaScript array instead
   of `NodeList`.~~ **Fixed**, along with the liveness that came with it — see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
@@ -245,7 +249,9 @@ See [HTML5 exceptions](html5test-exceptions.md) and
 ### Custom Elements, templates, and Shadow DOM
 
 - WPT currently relies on a `customElements` runner shim; there is no production implementation.
-- `template.content` is a snapshot rather than the parser-owned fragment required by HTML.
+- ~~`template.content` is a snapshot rather than the parser-owned fragment required by HTML.~~
+  **Fixed** — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - Shadow DOM uses synthetic markers, selector rewriting, and light-child hiding rather than a
   canonical shadow and composed tree with slot assignment, fallback, hit-testing, traversal, and
   event retargeting.
@@ -283,7 +289,10 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
    The element-wrapper half is what remains.
 2. Fix attribute, CharacterData, position-bitmask, range, mutation, and exception semantics with
    focused DOM regressions.
-3. Implement production Custom Elements and parser-owned template contents.
+3. Implement production Custom Elements and ~~parser-owned template contents~~ (**template contents
+   done** — see
+   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);
+   Custom Elements is what remains of this action).
 4. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
 5. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.

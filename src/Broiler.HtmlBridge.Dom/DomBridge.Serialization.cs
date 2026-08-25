@@ -167,7 +167,23 @@ public sealed partial class DomBridge
         HtmlSerializer.Serialize(element, CreateSerializationAdapter(),
             new HtmlSerializationOptions(MaximumDepth: MaxSerializationDepth, EncodeTextNodes: false));
 
-    private string SerializeChildrenToHtml(DomElement element) => string.Concat(ChildElements(element).Select(SerializeElementToHtml));
+    /// <summary>
+    /// The children of <paramref name="element"/> as HTML — its contents fragment's children when it
+    /// is a <c>&lt;template&gt;</c>, which is where a template's children are (HTML §4.12.3).
+    /// </summary>
+    private string SerializeChildrenToHtml(DomElement element) =>
+        string.Concat(SerializationChildrenOf(element).OfType<DomElement>().Select(SerializeElementToHtml));
+
+    /// <summary>The node list serialization walks for <paramref name="node"/>: a template's contents
+    /// fragment stands in for its (empty) own child list.</summary>
+    private IEnumerable<DomNode> SerializationChildrenOf(DomNode node) =>
+        node is DomElement element && IsTemplateElement(element)
+            ? GetTemplateContent(element).ChildNodes
+            : node.ChildNodes;
+
+    /// <summary>Whether <paramref name="element"/> is an HTML <c>&lt;template&gt;</c>.</summary>
+    internal static bool IsTemplateElement(DomElement element) =>
+        string.Equals(element.TagName, "template", StringComparison.OrdinalIgnoreCase);
 
     private void ApplySerializationTransforms(DomElement root)
     {
@@ -750,7 +766,11 @@ public sealed partial class DomBridge
         // severed the #subdoc-root element); it is referenced off its <iframe>/<object>/<frame>
         // container and rasterised in isolation (srcdoc content round-trips via the srcdoc
         // attribute), so it can never appear in ChildNodes and needs no serialization skip.
-        GetChildren: static node => node.ChildNodes,
+        // A <template>'s children live in its contents fragment, not in its own child list (HTML
+        // §4.12.3), so serializing the element has to reach through to the fragment or the markup
+        // a template holds would vanish from innerHTML/outerHTML and from the serialized document.
+        // A browser's outerHTML emits template contents for the same reason.
+        GetChildren: SerializationChildrenOf,
         GetAttributes: node => node is DomElement element
             ? GetSerializableAttributes(element, sourceResolver?.Invoke(element))
             : [],
