@@ -4,9 +4,11 @@ Rendering <https://html5test.com/> has been reported four times: twice as four d
 exceptions, then twice as a single one. This is what each one actually is, what was fixed, and what
 was deliberately left alone.
 
-**The remaining exception is not a defect and will not be fixed.** It is html5test's WebRTC probe
-deliberately provoking a throw to detect that the feature is absent, and the page catches it itself.
-If you are here because that trace was reported again, read "Fourth report" below and stop.
+**The remaining exception is not a rendering defect and must not be suppressed.** It is html5test's
+WebRTC probe deliberately provoking a throw to detect that the feature is absent, and the page catches
+it itself. It disappears only when the separate [WebRTC implementation roadmap](webrtc-roadmap.md)
+delivers the real feature. If you are here because that trace was reported again, read "Fourth report"
+below and stop treating the caught probe as a renderer failure.
 
 Source of the page under test: <https://github.com/WebPlatformTest/HTML5test>.
 
@@ -165,8 +167,10 @@ o = new (window.RTCPeerConnection || window.msRTCPeerConnection || window.mozRTC
 All four are undefined, so this is `new undefined(…)`. Broiler implements no WebRTC surface anywhere —
 no `RTCPeerConnection`, no `RTCDataChannel`, no `navigator.mediaDevices`, no `getUserMedia`, in the main
 repo or any submodule. `webrtc/*` is listed in `tests/wpt-baseline/failed-tests.json` as a durable
-expected failure, and WebRTC does not appear in `docs/ROADMAP.md`. The whole `Peer To Peer` section of
-html5test scores 0/45 and did so before and after this round.
+expected failure. At the time of this measured report WebRTC did not appear in `docs/ROADMAP.md`; it is
+now an explicit feature project in the [root roadmap](ROADMAP.md#webrtc-browser-capability) and the
+[detailed implementation roadmap](webrtc-roadmap.md), while remaining absent from code. The whole
+`Peer To Peer` section of html5test scores 0/45 and did so before and after this round.
 
 This is the expected outcome of a feature probe against an engine without the feature — a browser with
 WebRTC disabled throws here too. Nothing to fix; implementing WebRTC is a feature project (an

@@ -158,7 +158,7 @@ gained real answers.
 
 | Absent | Why it is not stubbed |
 | --- | --- |
-| `RTCPeerConnection` | Needs an ICE/DTLS/SRTP stack, not an interface object. It sits with the other request paths in #1752, and the probe waits on a real ICE candidate that no stub can produce. |
+| `RTCPeerConnection` | Needs an ICE/DTLS/SRTP stack, not an interface object. It sits with the other request paths in #1752, the probe waits on a real ICE candidate that no stub can produce, and delivery is now planned in the [WebRTC implementation roadmap](webrtc-roadmap.md). |
 | `AmbientLightSensor`, `Gyroscope`, `Magnetometer` | No sensor hardware path. Chromium's own answer here is an error object, so these are not gaps against the reference either. |
 | `speechSynthesis` | No speech engine; `getVoices()` would return an empty list, and the interface's own detection is `'speechSynthesis' in window`, which a present-but-mute object answers wrongly. |
 | `navigator.bluetooth` | Same: a `getAvailability()` that resolves `false` makes `'bluetooth' in navigator` true, which is the more misleading of the two answers. |

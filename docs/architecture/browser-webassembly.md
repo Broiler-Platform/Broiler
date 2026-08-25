@@ -9,6 +9,10 @@ Broiler.Graphics and Broiler.UI applications in a browser. It is an application
 hosting architecture, not a port of the full Broiler HTML/JavaScript browser
 engine.
 
+It is also distinct from the [Broiler.VM WebAssembly language profile](../../Broiler.VM/docs/roadmap.md):
+this document runs managed Broiler applications on the browser's WebAssembly host platform,
+whereas that profile validates and executes WebAssembly guest modules.
+
 ## Target and ownership
 
 The first product workflow is Broiler Writer: in-memory rich-text editing,
