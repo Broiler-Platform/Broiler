@@ -792,8 +792,61 @@ were deleted and the gitlinks point at commits that contain them. See
   <br>**What this leaves:** the engine's members are still own properties of each wrapper rather than
   living on the prototypes, so an interface prototype carries nothing of its own; SVG elements report
   the base `SVGElement` because no per-tag SVG interfaces are registered to point at; and
-  `NamedNodeMap` is unregistered, so `element.attributes` still reports `"Object"`. All three are in
+  `NamedNodeMap` was unregistered, so `element.attributes` reported `"Object"` — that last one is the
+  entry below. The other two are in
   [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+- **`element.attributes` is a live `NamedNodeMap`, and an attribute is one `Attr` node with a live
+  value.** It was a fresh plain object per read, carrying the same four faults the document
+  collections had before they moved onto the shared collection machinery — and the fourth is the one
+  that made a page *throw* rather than answer wrongly.
+  <br>**No interface:** `constructor.name` was `"Object"`, and the bare name `NamedNodeMap` was a
+  `ReferenceError`, which aborts the whole script that names it rather than the expression that did.
+  **No identity:** `el.attributes === el.attributes` was `false`. **No named access:**
+  `el.attributes.id` was `undefined`, where DOM §4.9.1 makes a qualified name a supported property
+  name. **And half-live:** `length` was a getter over the current attributes while the indices were
+  materialized once at build time, so a map held across a `setAttribute` reported the new count with
+  nothing at the new index — the idiomatic `for (i = 0; i < m.length; i++) m[i].name` read
+  `undefined.name` and threw.
+  <br>**Fixed** by building it through `DomCollectionBinding`, the same machinery `NodeList`,
+  `HTMLCollection` and `StyleSheetList` already use, so both halves come from one contents function
+  and cannot disagree again. The members that mutate or that need the owning element cannot be
+  written against `this.length` and `this[i]` the way every other method there is, so they are host
+  functions — but still on the *prototype*, shared, each finding its element from a weak table keyed
+  on the receiver, so no per-instance slot appears and `Object.getOwnPropertyNames` stays the indices
+  alone. Calling one on a foreign object is a `TypeError`, as a browser gives.
+  <br>**`getNamedItem` cannot be `this[name]`,** which is how `HTMLCollection.namedItem` is written
+  and was the first attempt here. An interface member wins the property lookup over a named one, so
+  an element carrying `length="x"` has `attributes.length === 3` — correctly — while
+  `getNamedItem('length')` must still hand back the attribute. Measured; it is a host function for
+  that reason and the case is pinned.
+  <br>**The `Attr` nodes had to become real objects for any of this to mean anything.** A cached map
+  over freshly minted attribute nodes would still answer `el.attributes[0] === el.attributes[0]`
+  false, and a cached *node* holding a snapshot value would be worse than the old per-read one — the
+  single surviving object would report whatever the value was when first asked. So an attribute is
+  now one node per element and name across every access path (index, qualified name, `getNamedItem`,
+  `getAttributeNode`), its `value` reads through to the element and writing it writes back, and
+  removing the attribute detaches the node: it keeps the value it had, its `ownerElement` becomes
+  `null`, and re-adding mints a new node rather than reviving the old one. All measured, and the
+  detachment is observable — the old node and the new one report the old and the new value.
+  <br>**Two existing fixtures were measured wrong and are corrected.**
+  `Element_SetAttributeNode_Replaces_And_Returns_Old_Attr` asserted that re-setting an element's own
+  attribute node returns something reading the *previous* value, which only held while an `Attr` was
+  a per-read snapshot: a browser has one node with a live value, so after `attr.value = 'new'` the
+  returned node **is** `attr` and reads `'new'`. Replacing with a genuinely *different* node is the
+  other half and does detach the displaced one — DOM §4.9.2 distinguishes the two, and both are now
+  pinned from measurement.
+  <br>**One thing this corrected beyond its own scope:** the collection prototypes' members were
+  non-enumerable, on `NodeList` and `HTMLCollection` as well, where Web IDL makes an interface's
+  members enumerable and a browser agrees — `for (var k in el.childNodes)` yields `item`, `forEach`
+  and the rest beside the indices. One word in the shared `define` helper; verified against both
+  suites.
+  <br>Over the two measured corpora Broiler and Chromium now agree on every attribute-node case and
+  on every map case but one: `for...in` omits `length`, because it is answered by the host rather
+  than held as a prototype accessor, and the member order is definition order rather than Web IDL's.
+  Recorded rather than papered over.
+  <br>Main-repo `Broiler.HtmlBridge.Dom` fix (`Features/DomCollectionBinding.cs`,
+  `Features/AttributesBinding.cs`, `DomBridge/Utilities.DomInterfaces.cs`); regressions in
+  `NamedNodeMapTests`.
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

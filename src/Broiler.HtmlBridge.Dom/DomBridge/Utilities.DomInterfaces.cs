@@ -421,6 +421,9 @@ public sealed partial class DomBridge
         // before adding more compatibility-only constructor globals", so adding them in the shape
         // this file otherwise uses would have been the thing that action rules out.
         Dom.Features.DomCollectionBinding.RegisterInterfaces(context);
+        // The five NamedNodeMap members that need the owning element are host functions, so they
+        // are installed on the interface prototype after it exists.
+        Dom.Features.DomCollectionBinding.RegisterNamedNodeMapOperations(context);
     }
 
     /// <summary>

@@ -349,6 +349,27 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `element.attributes` is a live `NamedNodeMap`, and an attribute is one `Attr`
+  node with a live value. It was a fresh plain object per read: naming
+  `NamedNodeMap` was a `ReferenceError` (which aborts the whole script, not just
+  the expression), `el.attributes === el.attributes` was false, and
+  `el.attributes.id` was `undefined` where a qualified name is a supported
+  property name. The fourth fault made pages throw rather than answer wrongly —
+  `length` was live while the indices were fixed at build time, so a map held
+  across a `setAttribute` reported the new count with nothing at the new index
+  and the idiomatic `for (i = 0; i < m.length; i++) m[i].name` read
+  `undefined.name`.
+
+  Attribute nodes became real objects to match: one node per element and name
+  across every access path, whose `value` reads through to the element and
+  writes back, and which detaches on removal — keeping its last value, losing
+  its `ownerElement`, and letting a re-add mint a new node.
+
+  Beyond its own scope, this corrected the collection prototypes' members from
+  non-enumerable to enumerable on `NodeList` and `HTMLCollection` as well, which
+  is what Web IDL specifies and a browser has: `for (var k in el.childNodes)`
+  now yields `item`, `forEach` and the rest beside the indices.
+
 - DOM objects report the interface they implement. Every element, every
   attribute and the document itself answered `constructor.name` of `"Object"`,
   with `Object.getPrototypeOf(el) === Object.prototype` — so anything keyed on

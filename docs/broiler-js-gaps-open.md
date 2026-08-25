@@ -215,10 +215,10 @@ and deterministic detection behavior.
     a name can be reported is what this track's action 1 rules out — so it is a capability decision
     (implement the SVG interface set, or keep the base) rather than an oversight. Pinned as the
     current answer.
-  - **`NamedNodeMap` is not registered**, so `element.attributes.constructor.name` is `"Object"`. It
-    is a Web IDL collection rather than a node wrapper, so it belongs with the `NodeList` /
-    `HTMLCollection` work that gave those real prototypes and indexed access, not with the wrapper
-    linking.
+  - ~~`NamedNodeMap` is not registered.~~ **Fixed** — `element.attributes` is a live `NamedNodeMap`
+    on the shared collection machinery, and its `Attr` nodes are one object per attribute with a
+    live value. See
+    [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
 - ~~`document.doctype` is `undefined`.~~ **Fixed**, together with the document-collection family the
   follow-up audit found around it — `anchors`/`embeds`/`plugins` absent, the collections that did
   exist being snapshot arrays without identity or named access, and `document.childNodes` filtering
