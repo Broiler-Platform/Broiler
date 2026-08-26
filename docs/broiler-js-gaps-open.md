@@ -190,13 +190,20 @@ and deterministic detection behavior.
   <br>`Element` also has a question character data did not raise: several of its members are
   per-instance *values* rather than accessors (`tagName` is a captured `JSString`), and those have to
   become accessors before they can move.
-- **The three `EventTarget` members stay on every node instance**, and deliberately for now. The
-  realm carries its own `EventTarget.prototype` with `addEventListener`/`removeEventListener`/
-  `dispatchEvent`, which a node inherits, but those store listeners engine-side where the bridge's
-  dispatch never looks — so a node cannot simply inherit them, and shadowing them on `Node.prototype`
-  would put three members on a prototype no browser carries them on. Routing the realm's own
-  `EventTarget` to the bridge for a node receiver is the change that closes this; it is the last
-  three own properties on a text node.
+- **The window keeps its own `EventTarget` members**, the last receiver that does. The three are
+  routed on `EventTarget.prototype` now and every other receiver inherits them, but `window` here
+  *is* the realm's global object, whose prototype chain does not reach `EventTarget.prototype`, so
+  removing its own copies would leave it with none. Its copies shadow the routed ones and behave
+  identically, and the routing already answers for a `window` receiver — what is left is giving the
+  global the prototype chain a browser's `Window` has. Chromium reports
+  `window.addEventListener === EventTarget.prototype.addEventListener`.
+- **`new EventTarget().dispatchEvent(new Event('x'))` throws**, and predates any of this — it is the
+  realm's own `EventTarget` meeting the bridge's `Event`. The engine's `dispatchEvent` takes its own
+  `Event` class and cannot convert the object the page's `Event` constructor produces, so the call is
+  an `Error` naming the parameter rather than a dispatch. Only an engine-side target is affected: a
+  node, the document and the window all dispatch through the bridge. Characterized while routing
+  `EventTarget.prototype` and confirmed identical before and after that change, so it is stated here
+  rather than counted as a regression of it.
 - **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
   and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
   a name can be reported is what this track's action 1 rules out — so it is a capability decision

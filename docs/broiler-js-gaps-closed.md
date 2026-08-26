@@ -862,6 +862,39 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`EventTarget.prototype`'s methods did not work on a DOM node, and every wrapper carried its own
+  copies.** **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch.
+  <br>**Cause.** The realm carries its own `EventTarget`, a JS-engine class keeping its listeners in
+  fields on the C# instance. A DOM wrapper is a plain object and never one of those, so
+  `node instanceof EventTarget` answered `true` — the interface graph says so — while
+  `EventTarget.prototype.addEventListener.call(node, 'x', fn)` was a
+  `TypeError: Failed to convert this to EventTarget`. Borrowing a prototype method is what a library
+  does when it cannot trust the instance's own, so the listener was silently never added. The
+  bridge's own three were separate functions installed on every wrapper, so
+  `node.addEventListener === EventTarget.prototype.addEventListener` was `false` where a browser says
+  `true`, and each advertised a `length` of 3 against Web IDL's 2.
+  <br>**Fix.** `EventTarget.prototype`'s three methods are replaced with versions that route by
+  receiver: the window object, then any registered node wrapper — which covers elements, text,
+  comments, fragments *and* the document, since the document's wrapper is registered as its node's
+  and its listener store is the same per-node one — and otherwise the function the engine installed,
+  so `new EventTarget()` and every other engine-side target are untouched. With one function serving
+  every receiver the per-wrapper copies are redundant and are gone.
+  <br>**It completes the character-data move below.** That left three own properties on a text node
+  because these could not simply be inherited; a text or comment node now carries none at all, which
+  is the shape a browser gives it.
+  <br>**Evidence.** 11 regressions in `EventTargetPrototypeRoutingTests`, every expectation
+  Chromium's measured answer to the same markup — one function per receiver, the borrowed call now
+  registering, the Web IDL argument counts, each of element/text/document/window still registering
+  and dispatching with bubbling intact, removal still removing, an engine target untouched and a
+  foreign receiver still a `TypeError`. Whole-suite diffs against a same-container baseline show no
+  regression: `Broiler.Cli.Tests` 39 distinct failures → 39 and `Broiler.Wpt.Tests` 51 → 51, the one
+  difference being this session's own superseded assertion (the character-data test that pinned those
+  three own properties, updated to the empty list Chromium gives).
+  <br>**What it did not close.** The window keeps its own copies, and
+  `new EventTarget().dispatchEvent(new Event('x'))` still throws — a pre-existing mismatch between
+  the realm's `EventTarget` and the bridge's `Event`, confirmed identical before and after. Both are
+  in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+
 - **A character-data node's interface members were own properties of the wrapper, not on the
   interface prototypes.** **Fixed, and live** — entirely in the main repo
   (`Broiler.HtmlBridge.Dom`), so no patch. This is the first interface of track 6 action 1 to move;
@@ -886,9 +919,9 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   hold after `t.splitText(n)`; measured in Chromium it does, and here the next wrapper minted for the
   node was a different object. With the members reading the live node through the receiver there is
   nothing to invalidate, so the invalidation and its now-dead host member are gone.
-  <br>**What it leaves.** A text or comment node carries three own properties instead of 57 — the
-  `EventTarget` trio, which cannot simply be inherited and is stated in
-  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model) with the reason. Elements and
+  <br>**What it leaves.** A text or comment node carried three own properties instead of 57 — the
+  `EventTarget` trio, which could not simply be inherited; those went too, with the routing recorded
+  above, so it now carries none. Elements and
   documents are untouched, so the members installed on `Node.prototype` are shadowed for them and
   nothing about them changes; a wrapper minted before the realm carries the interfaces still installs
   its own members, which is the old shape rather than a broken one.

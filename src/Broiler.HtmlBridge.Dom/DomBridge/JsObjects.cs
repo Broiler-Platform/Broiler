@@ -522,20 +522,23 @@ public sealed partial class DomBridge
 
         // -- DOM events --
 
-        // addEventListener(type, listener, useCapture)
-        obj.FastAddValue((KeyString)"addEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, element, in a), "addEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,
+        // routed by receiver (DomBridge.EventTargetInterface.cs) — one function for every target, as
+        // in a browser. A wrapper minted before the realm carried it installs its own.
+        if (!_eventTargetRoutingReady)
+        {
+            obj.FastAddValue((KeyString)"addEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, element, in a), "addEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // removeEventListener(type, listener, useCapture)
-        obj.FastAddValue((KeyString)"removeEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, element, in a), "removeEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"removeEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, element, in a), "removeEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // dispatchEvent(event) — DOM Events Level 3 with capture/target/bubble phases
-        obj.FastAddValue((KeyString)"dispatchEvent",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, element, in a), "dispatchEvent", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"dispatchEvent",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, element, in a), "dispatchEvent", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
 
         // element.click() — creates and dispatches a MouseEvent
         // For checkboxes and radio buttons, toggles checked state.

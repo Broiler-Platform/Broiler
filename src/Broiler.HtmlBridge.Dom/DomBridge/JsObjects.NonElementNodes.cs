@@ -47,18 +47,23 @@ public sealed partial class DomBridge
         if (!_characterDataInterfaceReady)
             PopulateCharacterDataMembersOnInstance(obj, node);
 
-        // -- EventTarget --
-        obj.FastAddValue((KeyString)"addEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,
+        // routed by receiver (DomBridge.EventTargetInterface.cs) — one function for every target, as
+        // in a browser. A wrapper minted before the realm carried it installs its own.
+        if (!_eventTargetRoutingReady)
+        {
+            obj.FastAddValue((KeyString)"addEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"removeEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"removeEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"dispatchEvent",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"dispatchEvent",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
 
     }
 
@@ -349,18 +354,23 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, node, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // -- EventTarget --
-        obj.FastAddValue((KeyString)"addEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,
+        // routed by receiver (DomBridge.EventTargetInterface.cs) — one function for every target, as
+        // in a browser. A wrapper minted before the realm carried it installs its own.
+        if (!_eventTargetRoutingReady)
+        {
+            obj.FastAddValue((KeyString)"addEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"removeEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"removeEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"dispatchEvent",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"dispatchEvent",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
 
         // Node interface constants (exist on all Node objects) — types and DOCUMENT_POSITION_* bits.
         Dom.Features.NodeConstantsBinding.Install(obj);

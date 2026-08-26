@@ -44,13 +44,13 @@ namespace Broiler.HtmlBridge;
 /// binding modules — and it is what this makes mechanical rather than novel.
 /// </para>
 /// <para>
-/// <b>The three <c>EventTarget</c> members stay on the instance,</b> deliberately. The realm already
-/// carries an <c>EventTarget.prototype</c> with its own <c>addEventListener</c> /
-/// <c>removeEventListener</c> / <c>dispatchEvent</c>, and a node inherits from it; those store
-/// listeners engine-side, where the bridge's dispatch would never find them. Shadowing them on
-/// <c>Node.prototype</c> would fix the behaviour and put three members on a prototype no browser has
-/// them on. Routing the realm's own <c>EventTarget</c> to the bridge for node receivers is the change
-/// that resolves this, and it belongs with the rest of the migration rather than here.
+/// <b>The three <c>EventTarget</c> members are not here, and not on the instance either.</b> They
+/// stayed on the wrapper when this moved, because the realm's own <c>EventTarget.prototype</c> keeps
+/// its listeners engine-side where the bridge's dispatch would never find them — so a node could not
+/// simply inherit them, and shadowing them on <c>Node.prototype</c> would have put three members on a
+/// prototype no browser carries them on. That is resolved where it belongs, on
+/// <c>EventTarget.prototype</c> itself: see <c>DomBridge.EventTargetInterface.cs</c>, which routes
+/// those three by receiver. A text or comment node consequently carries no own properties at all.
 /// </para>
 /// </remarks>
 public sealed partial class DomBridge

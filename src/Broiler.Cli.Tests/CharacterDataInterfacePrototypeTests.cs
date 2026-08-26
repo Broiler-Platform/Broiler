@@ -50,15 +50,14 @@ document.getElementById('result').textContent = String({script});
         => Assert.Contains($">{expected}<", Run(expression));
 
     /// <summary>
-    /// And nothing of the interface is left on the instance. The three that remain are
-    /// <c>EventTarget</c>'s, which stay on the object deliberately — the realm's own
-    /// <c>EventTarget.prototype</c> stores listeners where this bridge's dispatch would not find
-    /// them, so they cannot simply be inherited.
+    /// And nothing of the interface is left on the instance — an empty list, as in a browser. The
+    /// three <c>EventTarget</c> members that this move originally left behind went with the routing
+    /// on <c>EventTarget.prototype</c>; see <see cref="EventTargetPrototypeRoutingTests"/>.
     /// </summary>
     [Fact(Timeout = 600000)]
     public void TheInstanceCarriesNoneOfTheInterface()
-        => Assert.Contains(">addEventListener,dispatchEvent,removeEventListener<",
-            Run("Object.getOwnPropertyNames(t).sort().join(',')"));
+        => Assert.Contains(">0|<", Run(
+            "[Object.getOwnPropertyNames(t).length, Object.getOwnPropertyNames(t).join(',')].join('|')"));
 
     /// <summary><c>splitText</c> is <c>Text</c>'s alone: a comment inherits <c>CharacterData</c> and
     /// must not answer it.</summary>

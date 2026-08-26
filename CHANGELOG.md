@@ -9,6 +9,34 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `EventTarget.prototype`'s `addEventListener`, `removeEventListener` and
+  `dispatchEvent` work on a DOM node, and are the one function every receiver
+  uses. In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  The realm carries its own `EventTarget`, a JS-engine class keeping its
+  listeners in fields on the C# instance. A DOM wrapper is a plain object and
+  never one of those, so `node instanceof EventTarget` answered `true` — the
+  interface graph says so — while
+  `EventTarget.prototype.addEventListener.call(node, 'x', fn)` was a
+  `TypeError: Failed to convert this to EventTarget`. Borrowing a prototype
+  method is what a library does when it cannot trust the instance's own, so the
+  listener was silently never added.
+
+  The three methods now route by receiver: the window object, then any
+  registered node wrapper — which covers elements, text, comments, fragments and
+  the document, whose wrapper is registered as its node's and whose listener
+  store is the same per-node one — and otherwise the function the engine
+  installed, so `new EventTarget()` and every other engine-side target are
+  untouched. With one function serving every receiver, the copies each wrapper
+  carried are gone: `node.addEventListener === EventTarget.prototype.addEventListener`
+  now holds as it does in a browser, the argument counts are Web IDL's 2, 2 and
+  1 rather than 3, 3 and 1, and a text or comment node carries no own properties
+  at all.
+
+  The window keeps its own copies for now: `window` here is the realm's global
+  object, whose prototype chain does not reach `EventTarget.prototype`. They
+  shadow the routed ones and behave identically.
+
 - A text or comment node's `Node`, `CharacterData` and `Text` members live on
   the interface prototypes instead of on every wrapper. In the main repository
   (`Broiler.HtmlBridge.Dom`), so it is live.

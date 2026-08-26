@@ -194,9 +194,15 @@ public sealed partial class DomBridge
     {
         // document-level addEventListener / removeEventListener / dispatchEvent, co-located in the
         // DocumentEventTargetBinding feature module (Phase 3).
-        document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
-        document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        // On EventTarget.prototype now, routed by receiver — the document's wrapper is registered
+        // as its node's and its listener store is the same per-node one, so the routed method
+        // reaches exactly what these did (DomBridge.EventTargetInterface.cs).
+        if (!_eventTargetRoutingReady)
+        {
+            document.FastAddValue((KeyString)"addEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.AddEventListener(this, in a), "addEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+            document.FastAddValue((KeyString)"removeEventListener", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.RemoveEventListener(this, in a), "removeEventListener", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+            document.FastAddValue((KeyString)"dispatchEvent", new JSFunction((in a) => Dom.Features.DocumentEventTargetBinding.DispatchEvent(this, in a), "dispatchEvent", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        }
 
         // document.contentType — returns the MIME type of the document
         document.FastAddProperty((KeyString)"contentType", new JSFunction((in a) => Dom.Features.WindowDocumentMiscBinding.GetContentType(this, in a), "get contentType"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
