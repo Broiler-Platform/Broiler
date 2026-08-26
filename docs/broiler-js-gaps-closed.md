@@ -897,6 +897,30 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **An `innerHTML` assignment broke every inherited member on the nodes it replaced.** **Fixed, and
+  live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. Found while moving
+  `Element`'s interface onto its prototype, and fixed before it, because each interface that moves
+  makes it worse.
+  <br>**Cause.** Wrapper identity lives in `JsObjectRegistry`, which keeps the pairs both ways: the
+  forward map so a node finds its wrapper, and a reverse map so a wrapper can name its node, which is
+  what a member on an interface prototype reads on every call. Assigning `innerHTML` unregisters the
+  whole subtree it replaces — reasonably, to stop the registry holding wrappers the document has
+  discarded — and that dropped the reverse entry too. So a node the page still had a reference to
+  answered its *own* members (they capture the node) and threw
+  `TypeError: Illegal invocation` for every *inherited* one. A browser keeps a removed node entirely
+  functional: `var gone = host.firstChild; host.innerHTML = '…'; gone.tagName` answers.
+  <br>**Fix.** The reverse map is a `ConditionalWeakTable` keyed by the wrapper and is no longer
+  dropped on unregistration. The node then stays reachable for exactly as long as script can still
+  reach the wrapper — the case a browser keeps working — and is released with it otherwise. The
+  forward map is still dropped, so the registry stops holding the pair outright and the memory intent
+  is unchanged; the weak key is what makes keeping the other half not a leak.
+  <br>**Scope.** Only `innerHTML`/`outerHTML` and sub-document teardown unregister, so
+  `removeChild`, `remove()` and `replaceChild` never had it. Before this it cost the `Node` members
+  and the `EventTarget` trio; after the element move it would have cost most of an element's surface.
+  <br>**Evidence.** 3 regressions in `DetachedNodeWrapperTests` — the replaced node's `nodeType`,
+  `tagName`, `getAttribute`, `className`, `textContent`, `parentNode` and `isConnected`, then
+  mutating and re-attaching it, then the ordinary removal path that never regressed.
+
 - **Three spec bugs a document answered wrongly, and the document's own `Node` members.**
   **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fourth
   instalment of track 6 action 1, and the piece the element instalment deferred: the document's
