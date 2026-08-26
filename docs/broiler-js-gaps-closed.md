@@ -866,6 +866,32 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **A frame's mutated scroll state never reached the serialized markup.** **Fixed, and live** —
+  main repo, so no patch.
+  <br>**Cause, and there were two.** A nested browsing context's document is severed from the main
+  tree, and the serialization pre-pass that records scroll offsets walks the main document element —
+  so it never reached a frame at all. The offset itself was always recorded correctly: the frame's
+  `scrollTop` read back exactly what `scrollIntoView` had set. It simply never reached the markup, so
+  a capture showed every frame at its initial scroll position. The pass now runs once per
+  materialised content document, which is sound for the same reason the top-layer passes already
+  re-run per frame — everything it reads is per-element or per-document (the recorded offset, and a
+  computed `overflow` resolved by that document's own style scope) and it needs no geometry, the one
+  thing this bridge measures only for the main frame. The visual-viewport scale is deliberately not
+  applied inside a frame: pinch zoom scales the frame's box as a whole, so scaling the offset it
+  scrolled *within* itself would count the same zoom twice.
+  <br>**The second cause was the test.** It asserted the `position: relative; top: -160px` wrapper
+  the pass used to bake, which had been deliberately retired in favour of handing the offset to the
+  layout engine as a data attribute — no wrapper div, no inline position writes, no fixed-descendant
+  reparenting. So it was red for two independent reasons and fixing only the behaviour would have
+  left it red. It now pins the form the top-level document produces for the identical mutation, and
+  checks it against the top level in the same run, so the two cannot drift apart again. This is the
+  [xUnit status](xunit-suite-status.md) doc's "deliberate change landed, the test pinning the old
+  behaviour left behind" category — worth separating from the real gap rather than treating the
+  whole failure as either one.
+  <br>**Evidence.** `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc`
+  red → green, and still red with the source fix stashed and only the test edit in place — which is
+  what shows the behaviour, not the assertion, is what closed it. Whole-suite diffs against a
+  same-container baseline: `Broiler.Cli.Tests` no regressions, `Broiler.Wpt.Tests` unchanged.
 - **SVG `elementFromPoint`.** **Fixed, and live** — this one is in the main repo, so unlike track 1's
   and track 3's engine fixes it needs no patch and CI sees it.
   <br>**Cause.** An SVG child is not in the CSS box tree, so nothing below the `<svg>` root had a

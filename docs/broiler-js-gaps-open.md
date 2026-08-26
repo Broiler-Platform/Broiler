@@ -231,8 +231,8 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 - **SVG lacks conforming live DOM integration** for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
-- **Two JS-visible failures remain in the current tests**: writing-mode `scrollIntoView`, and
-  mutated iframe state. SVG `elementFromPoint`, the third, is fixed — see
+- **One JS-visible failure remains in the current tests**: writing-mode `scrollIntoView`. The other
+  two — SVG `elementFromPoint` and mutated iframe state — are fixed; see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
   Two others once listed here no longer reproduce — a `@keyframes` rule read from style text answers
   the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`), and out-of-range

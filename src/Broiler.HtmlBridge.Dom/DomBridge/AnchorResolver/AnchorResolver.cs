@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.RegularExpressions;
 using Broiler.Dom;
 
@@ -250,6 +250,11 @@ public sealed partial class DomBridge
         // 8. Apply scroll simulation: shift content in scroll containers
         //    where JavaScript set scrollTop/scrollLeft to match Chromium output.
         ApplyScrollSimulation(DocumentElement);
+
+        // 8b. And for every nested browsing context, whose document is severed from the main tree
+        //     and so is never reached by the walk above — a frame's mutated scroll state used to be
+        //     recorded and then dropped on the way to the markup.
+        ApplySubDocumentScrollSimulation();
 
         // Drop any shared-layout-geometry snapshot built for anchor-box geometry
         // (TryGetAnchorLayoutBox) so later live geometry queries lay out fresh —

@@ -9,6 +9,20 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A frame's scroll state, mutated by script, reaches the serialized `srcdoc`.
+  In the main repository, so it is live.
+
+  A nested browsing context's document is severed from the main tree, and the
+  serialization pre-pass that records scroll offsets walks the main document
+  element — so it never reached a frame. The offset itself was always recorded
+  (the frame's `scrollTop` read back what `scrollIntoView` had set); it simply
+  never reached the markup, so a capture showed every frame at its initial
+  scroll position. The pass now runs once per materialised content document.
+
+  The visual-viewport scale is deliberately not applied inside a frame: pinch
+  zoom scales the frame's box as a whole, so scaling the offset it scrolled
+  within itself would count the same zoom twice.
+
 - `document.elementFromPoint` descends into an SVG, and an SVG shape reports a
   real `getBoundingClientRect`. Unlike the engine fixes above this is in the
   main repository, so it is live.

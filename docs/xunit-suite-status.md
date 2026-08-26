@@ -30,7 +30,7 @@ most of what is listed below, and it is worth fixing before the list is.
 | `Broiler.Layout.Tests` | 1 | green — 1 126 tests |
 | `src/*.Tests` except the two below | 8 | green |
 | `src/Broiler.Wpt.Tests` | 1 | **86 failing** of 1 194 |
-| `src/Broiler.Cli.Tests` | 1 | **50 failing** of 4 153 (46 distinct tests) |
+| `src/Broiler.Cli.Tests` | 1 | **48 failing** of 4 153 (44 distinct tests) |
 
 `Broiler.Wpt.Tests` was 54 of 1 083 when this file was first measured. Most of the
 difference is the container, not the code: that project's `Wpt_*_MatchReference`
@@ -56,6 +56,15 @@ has not been green in any history available here.
 The ones that *were* traceable to a change are fixed, and they share a shape:
 a deliberate behaviour change landed with its own reasoning, and the test that
 pinned the old behaviour was left behind.
+
+One of them was *both*, which is worth knowing before assuming a stale-looking
+assertion is only stale:
+`ScriptEngineExecuteTests.DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc`
+asserted the retired `position: relative; top: -160px` wrapper **and** covered a
+real gap — a frame's scroll state never reached the markup at all, because the
+pass that records it walked only the main document element. Editing the
+assertion alone would have made it pass while the capture still showed every
+frame unscrolled.
 
 * **`NamedPageTests.A_Page_Name_Inside_An_Out_Of_Flow_Subtree_Breaks_Nothing`**
   asserted that a page-name change inside an out-of-flow subtree does not break.
@@ -107,7 +116,7 @@ green together, from one change on the bridge side.
 
 | Kind | Count | Examples |
 | --- | --- | --- |
-| Engine feature gaps | 36 | `GoogleSearchPolyfillTests` alone is 10 of them: `scrollIntoView` under writing modes, `ch`/`lh`/`rlh` under `zoom`, scroll-offset clamping, and two SVG hit-test assertions that now fail on layout rather than on hit testing (`foreignObject` content is not laid out; an inline `<svg>` root is not placed in normal flow). The rest spread over `background-clip: border-area`, `var()` in shorthands, `:lang` against `xml:lang`, grid/flex content sizing, serialization of mutated iframe scroll state, and the sub-document module drain described below. |
+| Engine feature gaps | 35 | `GoogleSearchPolyfillTests` alone is 10 of them: `scrollIntoView` under writing modes, `ch`/`lh`/`rlh` under `zoom`, scroll-offset clamping, and two SVG hit-test assertions that now fail on layout rather than on hit testing (`foreignObject` content is not laid out; an inline `<svg>` root is not placed in normal flow). The rest spread over `background-clip: border-area`, `var()` in shorthands, `:lang` against `xml:lang`, grid/flex content sizing, and the sub-document module drain described below. Serialization of mutated iframe scroll state was one of these and is fixed — the pass that records scroll offsets now runs per nested browsing context, not only over the main document element. |
 | Acid targets not yet met | 4 | Acid3 scores 96; `PhaseD_…_At_Least_97` and `PhaseE_…_At_Least_100` state the targets, and `V7_Acid3_Image_Capture_Produces_Valid_Output` asserts 100. These are goals, not regressions. |
 | Architecture guards the code has drifted past | 4 | `HtmlBridgeArchitectureGuardTests` (files over the 750-line limit), `HtmlBridgeBoundaryGuardTests` (the frozen `Broiler.JavaScript.*` dependency set has grown to three), `DomWrapperFunctionTests` (`new JSFunction(` where `DomFunction` is wanted), `CssExtractionPhaseThreeTests`. Each names the refactor it wants; none can be closed by editing the test, which is the difference between these and the `CssExtractionPhaseZeroTests` fixed above. |
 | Missing artifact | 1 | `AcidRenderComparisonInfrastructureTests.Acid_Umbrella_Roadmap_Covers_All_Three_Tests` requires `docs/roadmap/acid-test-triage.md` with `## Acid1`, `## Acid2` and `## Acid3` headings. No such file has existed in this history, and writing one to satisfy the assertion would be inventing the plan it is meant to check. |
