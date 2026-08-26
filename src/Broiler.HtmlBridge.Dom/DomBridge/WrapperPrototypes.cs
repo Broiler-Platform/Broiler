@@ -33,13 +33,18 @@ namespace Broiler.HtmlBridge;
 /// nothing defined it. See <c>HtmlInterfaceForTag</c>.
 /// </para>
 /// <para>
-/// <b>What this does not do is move members onto the prototypes.</b> The bindings install every
-/// member as an own property of each wrapper, so <c>Text.prototype</c> stays empty and
-/// <c>Object.getOwnPropertyNames(node)</c> still lists the whole interface. Linking the prototype is
-/// nonetheless a real gain and not only cosmetic: a page that extends <c>Text.prototype</c> — the
-/// ordinary polyfill idiom — now reaches instances, where before the assignment went to an object
-/// nothing inherited from. Relocating the members is the larger object-model change and is recorded
-/// separately.
+/// <b>Moving the members onto those prototypes is a separate change, and it has started.</b> A
+/// character-data node's <c>Node</c>, <c>CharacterData</c> and <c>Text</c> members live on the
+/// interface prototypes and are found through the receiver — see
+/// <c>DomBridge.CharacterDataInterface.cs</c>, where the mechanism that makes that possible is also
+/// described. An element and a document still install their interface as own properties of each
+/// wrapper, so <c>Object.getOwnPropertyNames(element)</c> still lists all 166 of them; that is the
+/// rest of the item.
+/// <para>
+/// Linking the prototype was a real gain on its own even before any member moved: a page that
+/// extends <c>Text.prototype</c> — the ordinary polyfill idiom — reaches instances, where before the
+/// assignment went to an object nothing inherited from.
+/// </para>
 /// </para>
 /// </remarks>
 public sealed partial class DomBridge

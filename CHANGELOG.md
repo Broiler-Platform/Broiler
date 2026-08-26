@@ -9,6 +9,198 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Three things a `document` answered wrongly, found by checking its `Node`
+  members against the prototype's before removing them. In the main repository
+  (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  `document.ownerDocument` answered the document itself. DOM §4.4 makes it
+  null — a document *is* the node document rather than a node that has one.
+
+  `document.textContent` answered the empty string. DOM §4.4 makes it null for
+  a document and for a doctype, the two node kinds the algorithm has no text
+  for, so a page distinguishing them with `=== null` read the wrong branch.
+
+  `localName`, `prefix` and `namespaceURI` were on `Node.prototype`, where no
+  browser has them — DOM §4.9 gives them to `Element`, and to `Attr`
+  separately. A text node and the document answered `null` where a browser
+  answers `undefined`. They are on `Element.prototype` now.
+
+  With those settled, the document's five own `Node` members — `nodeType`,
+  `nodeName`, `childNodes`, `firstChild`, `lastChild` — were verified to answer
+  identically from the prototype and dropped, 101 own properties to 96. Unlike
+  every other wrapper the document's is built before the interface constructors
+  exist, so it cannot skip installing what it will inherit; the copies are
+  removed once the prototypes are up instead.
+
+  Cloning a document is still unsupported by the canonical DOM kernel, where a
+  browser succeeds. It now raises a `NotSupportedError` `DOMException` instead
+  of leaking the kernel's own exception, and an internal phrase, to the page.
+
+- `document.currentScript` names the script that is running, and
+  `document.write` inserts at it, once anything ahead of them has been skipped.
+  In the main repository (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so it is
+  live.
+
+  The capture host holds two lists that look parallel and are not: the program
+  texts it will evaluate, and the document's `<script>` elements. It paired them
+  by position, rebuilding the element list from the parsed tree with the same
+  classification the extractor applies — which works only while the two readings
+  stay identical, and they cannot. The extractor drops a script for reasons no
+  reader of the parsed elements can know: a source blocked by CSP, a fetch that
+  came back empty. Each one shifted every pairing after it by one, so on a page
+  whose first external script 404s, every later script reported its
+  *predecessor* as `document.currentScript`.
+
+  The extractor already knows which `<script>` it is looking at, so it now
+  records that — the element's ordinal among all of them in document order —
+  alongside each bucket entry, and execution pairs through it. There is no
+  classification left to reproduce and nothing to drift from, and because an
+  ordinal does not care what order a bucket runs in, a host that hoists its
+  `async` scripts is no longer approximate either.
+
+  Two other hosts still reconstruct the pairing: `ScriptEngine`, which receives
+  its buckets already extracted through a public API, and `WptTestRunner`, which
+  never sets the index at all.
+
+- An element inherits its `Node` members from `Node.prototype` instead of
+  carrying a copy of each. In the main repository (`Broiler.HtmlBridge.Dom`), so
+  it is live.
+
+  The members were already on `Node.prototype` — the character-data interface
+  move put them there — but an element shadowed every one with an own copy, so
+  `Object.prototype.hasOwnProperty.call(element, 'childNodes')` was `true` and
+  the prototype's copy was dead for every element in the document. Each copy was
+  a byte-identical call to the same binding the prototype's makes, checked one
+  by one, so deleting them changes nothing but where the members live. An
+  element is down from 166 own properties to 140.
+
+  `textContent` is deliberately not among them: an element's is a different
+  operation from a character-data node's — it reads the descendants' text and
+  writing it replaces every child with one text node — so it stays the element's
+  own and shadows the `Node.prototype` one. The document keeps all of its `Node`
+  members too, because unlike the element's they are separate implementations
+  rather than copies, and each needs checking against the prototype's answer
+  before it can go.
+
+- `EventTarget.prototype`'s `addEventListener`, `removeEventListener` and
+  `dispatchEvent` work on a DOM node, and are the one function every receiver
+  uses. In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  The realm carries its own `EventTarget`, a JS-engine class keeping its
+  listeners in fields on the C# instance. A DOM wrapper is a plain object and
+  never one of those, so `node instanceof EventTarget` answered `true` — the
+  interface graph says so — while
+  `EventTarget.prototype.addEventListener.call(node, 'x', fn)` was a
+  `TypeError: Failed to convert this to EventTarget`. Borrowing a prototype
+  method is what a library does when it cannot trust the instance's own, so the
+  listener was silently never added.
+
+  The three methods now route by receiver: the window object, then any
+  registered node wrapper — which covers elements, text, comments, fragments and
+  the document, whose wrapper is registered as its node's and whose listener
+  store is the same per-node one — and otherwise the function the engine
+  installed, so `new EventTarget()` and every other engine-side target are
+  untouched. With one function serving every receiver, the copies each wrapper
+  carried are gone: `node.addEventListener === EventTarget.prototype.addEventListener`
+  now holds as it does in a browser, the argument counts are Web IDL's 2, 2 and
+  1 rather than 3, 3 and 1, and a text or comment node carries no own properties
+  at all.
+
+  The window keeps its own copies for now: `window` here is the realm's global
+  object, whose prototype chain does not reach `EventTarget.prototype`. They
+  shadow the routed ones and behave identically.
+
+- A text or comment node's `Node`, `CharacterData` and `Text` members live on
+  the interface prototypes instead of on every wrapper. In the main repository
+  (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  Every DOM wrapper installed its interface as own properties of the object, so
+  an interface prototype carried nothing of its own: `Text.prototype.splitText`
+  was `undefined` and a text node listed 57 own properties where a browser gives
+  it none. The prototype *chain* was already real
+  (`Text → CharacterData → Node → EventTarget → Object`) and the interface
+  objects already existed; what had not happened is the engine putting its
+  members on them.
+
+  A member on a prototype has no node captured in a closure, so it finds one
+  from its receiver — which needed the wrapper→node lookup to stop being an O(n)
+  scan over every wrapper the document had minted. The members then go on
+  `Node.prototype`, `CharacterData.prototype` and `Text.prototype`, the split
+  Web IDL specifies, so `splitText` is `Text`'s alone rather than something a
+  `Comment` inherits and a page walking a prototype's own property names reads
+  the shape a browser has. Reaching the node through the receiver is also what
+  makes `Text.prototype.splitText.call({}, 1)` a `TypeError`.
+
+  This closed an identity bug with it: `splitText` used to drop the node's
+  wrapper afterwards, to invalidate members that captured state. DOM §4.11
+  splits a text node in place, so `target.firstChild === t` must hold after
+  `t.splitText(n)` — it does in Chromium, and here the next wrapper minted for
+  the node was a different object.
+
+  A text or comment node now carries three own properties instead of 57. Those
+  three are `EventTarget`'s and stay for now: the realm's own
+  `EventTarget.prototype` stores listeners where this bridge's dispatch would
+  not find them. Elements and documents are untouched — they shadow the
+  `Node.prototype` members with their own — and moving those is the rest of the
+  change.
+
+- `getComputedStyle` reports the user-agent stylesheet's `display`. In the main
+  repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  Every element whose display came from the UA sheet rather than an author rule
+  reported `inline`, the CSS initial value — a plain `<div>` as much as a
+  `<table>`, a `<script>` or a `<head>`. The bridge has both the table and the
+  resolution and applies them to the sparse projection its internal
+  layout/anchor/hit-test consumers read, but the JS binding's map is built by
+  the engine's `GetComputedStyle`, which backfills initial values; the seed
+  fills an *absent* `display`, and after that backfill the key is always
+  present. So nothing the UA sheet said about `display` reached script.
+
+  Rendering was never affected — the renderer reads the box tree — so this was
+  a CSSOM gap alone, which is why it survived so long. `getComputedStyle` now
+  takes `display` from the same memoised sparse projection, so the two paths
+  cannot answer differently, and the seed stays non-clobbering: an author rule,
+  an inline style, and `[hidden]`'s loss to an author rule all behave as before.
+
+  Two tags still differ from a browser, both gaps in the shared tag→display
+  table rather than in the path that now reads it, and both predating this
+  change: `<option>` is absent from the table, and `<summary>` is in it as
+  `list-item` unconditionally where HTML §15.3.9 scopes that to
+  `details > summary:first-of-type`.
+
+- The HTML content of an SVG `<foreignObject>` is laid out. In the main
+  repository (`Broiler.Layout`), so it is live.
+
+  An SVG subtree is not laid out by CSS box rules here — it is serialised back
+  to markup and drawn by `SvgRenderer` — so the style pass sets every child box
+  of an outermost `<svg>` to `display: none`. That is right for shapes and wrong
+  for `<foreignObject>`, which SVG 2 §12.1 makes the one place an SVG subtree
+  re-enters CSS layout. Hidden with the shapes, its content had no box at all: a
+  `<div>` inside one reported a `getBoundingClientRect` of `0,0,0,0` and an
+  `offsetWidth`/`offsetHeight` of `0`, so `elementFromPoint` over the child
+  answered the `<foreignObject>`. The element itself always had a rect, resolved
+  from its own geometry attributes like any other shape.
+
+  `SvgForeignObjectBoxes` now lifts each `<foreignObject>` back out after the
+  cascade and before layout: it becomes an absolutely positioned block at its
+  user-space `x`/`y`, sized from its `width`/`height`, inside the viewport box,
+  which is made a containing block only when the document actually holds one —
+  so a document without a `<foreignObject>` lays out exactly as before. One
+  reached through a `<g>` chain is re-parented onto the viewport box rather than
+  having the chain un-hidden, so the hiding of every other box is unchanged, and
+  the accumulated `translate()` is folded into the box's own offset. The bridge's
+  transform chain stops at the `<foreignObject>` boundary, since above it the
+  ancestors are SVG elements whose `transform` is already accounted for.
+
+  The viewport mapping modelled is the identity — one user unit is one CSS
+  pixel. A `viewBox` maps user space by a scale that is a function of the
+  viewport's used size, which a pass running before layout does not have, so
+  under one the content keeps no box rather than a confidently wrong placement.
+  The same holds inside a nested `<svg>` viewport. Of the ancestor `transform`
+  functions only `translate()` is accumulated, by the rule and the parser the
+  bridge's SVG geometry now shares, so an element's own rect and its content's
+  cannot disagree about which offsets counted.
+
 - An atomic inline-level box stands on its line's baseline instead of sitting at
   the top of the line. In the main repository (`Broiler.Layout`), so it is live.
 

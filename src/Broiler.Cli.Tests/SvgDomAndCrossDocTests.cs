@@ -11,22 +11,42 @@ public class SvgDomAndCrossDocTests
 {
     // ────────────────────── Test 66: localName property ──────────────────────
 
+    /// <summary>
+    /// <c>localName</c> is <c>undefined</c> on a node that is not an element.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This asserted <c>=== null</c>, which is DOM Level 2: <c>localName</c> was a <c>Node</c>
+    /// member there, null for everything that is not an element. DOM4 moved it to <c>Element</c>
+    /// (and <c>Attr</c>), so on a text node, a comment or the document it is simply not declared and
+    /// reads <c>undefined</c>. Measured in Chromium: all three are <c>undefined</c>, and
+    /// <c>'localName' in Node.prototype</c> is <see langword="false"/>.
+    /// </para>
+    /// <para>
+    /// Acid3's test 66 still checks the DOM Level 2 reading and so fails in every current browser;
+    /// it fails here now too. The Acid3 score is unchanged either way — measured at 96 before and
+    /// after — so nothing is traded for matching the browsers. See
+    /// <see cref="DocumentNodeMemberTests.TheNameMembersBelongToElementNotNode"/>, which pins where
+    /// the three members live.
+    /// </para>
+    /// </remarks>
     [Fact(Timeout = 600000)]
-    public void LocalName_TextNode_Returns_Null()
+    public void LocalName_IsUndefined_On_NonElement_Nodes()
     {
         var html = @"<!DOCTYPE html>
 <html><body>
 <div id=""result""></div>
 <script>
 var r = [];
-r.push(document.createTextNode('test').localName === null);
-r.push(document.createComment('test').localName === null);
+r.push(document.createTextNode('test').localName === undefined);
+r.push(document.createComment('test').localName === undefined);
+r.push(document.localName === undefined);
 document.getElementById('result').textContent = r.join(',');
 </script>
 </body></html>";
 
         var result = CaptureService.ExecuteScriptsWithDom(html, "file:///test.html");
-        Assert.Contains("true,true", result);
+        Assert.Contains("true,true,true", result);
     }
 
     [Fact(Timeout = 600000)]

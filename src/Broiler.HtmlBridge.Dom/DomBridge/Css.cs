@@ -274,6 +274,8 @@ public sealed partial class DomBridge
             {
                 ["overlay"] = ComputeOverlayValue(element),
             };
+
+            ApplyUserAgentDisplayToComputedStyle(element, map);
         }
 
         return Dom.Features.StyleDeclarationBinding.BuildComputedDeclaration(map);
@@ -532,6 +534,38 @@ public sealed partial class DomBridge
         return state.RulesMutated
             ? string.Join("\n", rules.Select(CssSerializer.Serialize))
             : state.RulesSourceText ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Puts the user-agent stylesheet's <c>display</c> into a <c>getComputedStyle</c> map.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="ApplyUserAgentDisplayDefaults"/> cannot be called on this map directly: it seeds
+    /// only an <em>absent</em> <c>display</c>, and the engine's <c>GetComputedStyle</c> backfills
+    /// initial values, so the key is always present — holding <c>inline</c>, the CSS initial value,
+    /// for every element the UA sheet styles and no author rule touches. Nothing the UA sheet said
+    /// about <c>display</c> therefore reached script: a plain <c>&lt;div&gt;</c> answered
+    /// <c>inline</c> rather than <c>block</c>, and a <c>&lt;script&gt;</c> or <c>&lt;head&gt;</c>
+    /// answered <c>inline</c> rather than <c>none</c>. Rendering was never affected — the renderer
+    /// reads the box tree, and the bridge's own internal consumers read the sparse projection this
+    /// borrows from — so it was a CSSOM gap alone.
+    /// </para>
+    /// <para>
+    /// The value is taken from <c>GetComputedProps</c> rather than recomputed: that map is the
+    /// engine's sparse projection (no initial-value backfill, so an undeclared property is absent)
+    /// with the explicit-<c>inherit</c> fold and the UA seed already applied, and it is memoised per
+    /// element. So an author or inline <c>display</c> still wins — the seed is non-clobbering — and
+    /// the two paths cannot answer differently about what an element's display is.
+    /// </para>
+    /// </remarks>
+    private void ApplyUserAgentDisplayToComputedStyle(DomElement element, Dictionary<string, string> map)
+    {
+        if (GetComputedProps(element).TryGetValue("display", out var display)
+            && !string.IsNullOrWhiteSpace(display))
+        {
+            map["display"] = display;
+        }
     }
 
     private static void ApplyUserAgentDisplayDefaults(Dictionary<string, string> computed, DomElement element)

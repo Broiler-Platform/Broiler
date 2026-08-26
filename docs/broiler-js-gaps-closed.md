@@ -372,6 +372,41 @@ empty and the directory is gone with it — a submodule fix is now checked with
 `git -C <Submodule> log --oneline --grep '<subject>'`, never by patch number.
 
 
+### Track 3 — Script attribution
+
+- **Every script was attributed to its predecessor once anything ahead of it had been skipped.**
+  **Fixed, and live** — entirely in the main repo (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so no
+  patch. Track 3 action 5.
+  <br>**Cause.** The capture host holds two lists that look parallel and are not: the program texts
+  it will evaluate, and the document's `<script>` elements. It paired them by position, rebuilding
+  the element list from the parsed tree with the same classification the extractor applies. That
+  works only while the two readings stay identical, and they cannot — the extractor drops a script
+  for reasons no reader of the parsed elements can know: a source blocked by CSP, a fetch that came
+  back empty. Each such script shifted every pairing after it by one.
+  <br>**What it looked like.** On a page whose first external script 404s, the script after it
+  reported that failed element as `document.currentScript`, the next reported *it*, and so on to the
+  end of the document. Measured: Broiler answered `missing | a | b` where Chromium answers
+  `a | b | last`. `document.write` reads the same attribution, so it inserted at the wrong element
+  too.
+  <br>**Fix.** The extractor already knows which `<script>` it is looking at, so it records that —
+  the element's ordinal among all `<script>` elements in document order — alongside each bucket
+  entry, and execution pairs through `ScriptElementMap.AllInDocumentOrder`. There is no
+  classification to reproduce and nothing to drift from: a data block, a blocked source and an
+  unfetchable one are all counted as the elements they are, and the ordinal does not care what order
+  a bucket runs in — which retires the second approximation the original investigation named, a host
+  that hoists its `async` scripts.
+  <br>**Evidence.** 6 regressions in `CurrentScriptAttributionTests`, every expectation Chromium's
+  measured answer to the same markup — an unresolved source, data blocks, a deferred script, a
+  module answering `null`, a mixed page with all of them, and the `document.write` insertion point.
+  3 of the 6 fail before the change. The tests assert which element each script names and never the
+  order they run in, because Broiler honours `defer` on an *inline* script where the specification
+  ignores it without a `src` — a separate divergence belonging to the task-model item. Whole-suite
+  diffs against a same-container baseline show no regression: `Broiler.Cli.Tests` 39 distinct
+  failures → 39 and `Broiler.Wpt.Tests` 51 → 51, byte-identical.
+  <br>**What it did not close.** Two other hosts, for two different reasons — `ScriptEngine` receives
+  its buckets already extracted through a public API, and `WptTestRunner` never sets the index at
+  all. Both are in [open](broiler-js-gaps-open.md#confirmed-host-semantic-gaps).
+
 ### Track 3 — Module syntax
 
 - The `export { … }` clause was rejected in every form, so the commonest way to export — declare
@@ -861,6 +896,245 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   in `WindowScreenGeometryTests`.
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
+
+- **Three spec bugs a document answered wrongly, and the document's own `Node` members.**
+  **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fourth
+  instalment of track 6 action 1, and the piece the element instalment deferred: the document's
+  `Node` members are separate implementations rather than copies of the prototype's, so each was to
+  be *checked* against the prototype's answer rather than deleted. Checking them is what found the
+  three bugs.
+  <br>**`ownerDocument` answered the document itself.** DOM §4.4 makes a document's `ownerDocument`
+  null — it *is* the node document rather than a node that has one. Chromium answers `null`; the
+  walk here handed back the document.
+  <br>**`textContent` answered the empty string.** DOM §4.4 makes it null for a document *and* for a
+  doctype — the two node kinds the algorithm has no text for, rather than kinds whose text happens to
+  be empty. A page distinguishing them with `=== null` read the wrong branch.
+  <br>**`localName`, `prefix` and `namespaceURI` were on `Node.prototype`,** where no browser has
+  them: DOM §4.9 gives them to `Element` (and `Attr` separately). They arrived there in the
+  character-data instalment — that wrapper carried all three as own properties and moving its members
+  wholesale took them along — and the element instalment then removed the element's own copies, which
+  is what exposed the mistake: a text node and the document answered `null` where a browser answers
+  `undefined`. They are on `Element.prototype` now. Measured in Chromium:
+  `'localName' in Node.prototype` is `false` and `Element.prototype` owns all three.
+  <br>**And the five copies are gone.** `nodeType`, `nodeName`, `childNodes`, `firstChild` and
+  `lastChild` were verified to answer identically from the prototype for a document receiver, then
+  dropped — 101 own properties to 96. The document wrapper is built during document registration,
+  before the interface constructors exist, so unlike every other wrapper it cannot skip installing
+  what it will inherit; the copies are removed once the prototypes are up instead.
+  <br>**One obsolete assertion updated, at no cost.** `SvgDomAndCrossDocTests` asserted
+  `textNode.localName === null`, which is DOM Level 2's reading and what Acid3's test 66 still
+  checks — so that test now fails here as it does in every current browser. The Acid3 score is
+  unchanged, measured at **96 before and after**, so nothing was traded for matching the browsers.
+  <br>**Evidence.** 22 regressions in `DocumentNodeMemberTests`, every expectation Chromium's
+  measured answer to the same markup. Whole-suite diffs against a same-container baseline show no
+  regression: `Broiler.Cli.Tests` 39 distinct failures → 39 and `Broiler.Wpt.Tests` 51 → 51, the one
+  difference in each being that obsolete assertion (updated) and the 20s render guard (a load flake,
+  8s in isolation).
+  <br>**What it did not close.** Cloning a document is unsupported by the canonical DOM kernel, where
+  a browser succeeds; it now fails as a `NotSupportedError` `DOMException` rather than leaking the
+  kernel's `InvalidOperationException` and an internal phrase to the page. Stated in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+
+- **An element shadowed every `Node.prototype` member with a copy of its own.** **Fixed, and
+  live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The third instalment of
+  track 6 action 1; what remains is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** The character-data move put the `Node` members on `Node.prototype`, but only
+  character-data wrappers read them: an element installed its own copy of each, so
+  `Object.prototype.hasOwnProperty.call(element, 'childNodes')` was `true` and the prototype's copy
+  was dead for every element in the document.
+  <br>**Fix.** The 23 copies are deleted and the element inherits them. Each was a *byte-identical*
+  call to the same binding the prototype's makes — checked one by one rather than assumed — so
+  nothing about them changes; only where they live does. An element is down from 166 own properties
+  to 140.
+  <br>**Two members deliberately not moved.** `textContent` stays the element's own: an element's is
+  a different operation from a character-data node's — it reads the descendants' text and writing it
+  replaces every child with one text node — so it shadows the `Node.prototype` one until a single
+  implementation serves both. And the document keeps all of its `Node` members, because unlike the
+  element's they are separate implementations rather than copies (`nodeType` is a literal `9`), so
+  each needs checking against the prototype's answer rather than deleting.
+  <br>**The one subtlety worth naming.** A `<form>`'s wrapper resolves an unknown name to the control
+  carrying it, so an inherited member has to be found *before* that fallback runs — otherwise a
+  control named `childNodes` would answer for the real one. It is: the named getter consults the
+  prototype chain first, and there is a regression pinning it.
+  <br>**Evidence.** 14 regressions in `ElementNodeMembersOnPrototypeTests` — each member inherited
+  rather than owned, the tree accessors and node operations still answering for an element receiver,
+  `textContent` still the element's own on both read and write, and the form named-getter case.
+  Whole-suite diffs against a same-container baseline show no regression: `Broiler.Cli.Tests` 39
+  distinct failures → 39 and `Broiler.Wpt.Tests` 51 → 51, byte-identical. Two tests differed between
+  the CLI runs and neither is this change — the thread-budget test whose own record says it fails
+  under CI load, and an idle-callback deadline — both verified to pass in isolation.
+
+- **`EventTarget.prototype`'s methods did not work on a DOM node, and every wrapper carried its own
+  copies.** **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch.
+  <br>**Cause.** The realm carries its own `EventTarget`, a JS-engine class keeping its listeners in
+  fields on the C# instance. A DOM wrapper is a plain object and never one of those, so
+  `node instanceof EventTarget` answered `true` — the interface graph says so — while
+  `EventTarget.prototype.addEventListener.call(node, 'x', fn)` was a
+  `TypeError: Failed to convert this to EventTarget`. Borrowing a prototype method is what a library
+  does when it cannot trust the instance's own, so the listener was silently never added. The
+  bridge's own three were separate functions installed on every wrapper, so
+  `node.addEventListener === EventTarget.prototype.addEventListener` was `false` where a browser says
+  `true`, and each advertised a `length` of 3 against Web IDL's 2.
+  <br>**Fix.** `EventTarget.prototype`'s three methods are replaced with versions that route by
+  receiver: the window object, then any registered node wrapper — which covers elements, text,
+  comments, fragments *and* the document, since the document's wrapper is registered as its node's
+  and its listener store is the same per-node one — and otherwise the function the engine installed,
+  so `new EventTarget()` and every other engine-side target are untouched. With one function serving
+  every receiver the per-wrapper copies are redundant and are gone.
+  <br>**It completes the character-data move below.** That left three own properties on a text node
+  because these could not simply be inherited; a text or comment node now carries none at all, which
+  is the shape a browser gives it.
+  <br>**Evidence.** 11 regressions in `EventTargetPrototypeRoutingTests`, every expectation
+  Chromium's measured answer to the same markup — one function per receiver, the borrowed call now
+  registering, the Web IDL argument counts, each of element/text/document/window still registering
+  and dispatching with bubbling intact, removal still removing, an engine target untouched and a
+  foreign receiver still a `TypeError`. Whole-suite diffs against a same-container baseline show no
+  regression: `Broiler.Cli.Tests` 39 distinct failures → 39 and `Broiler.Wpt.Tests` 51 → 51, the one
+  difference being this session's own superseded assertion (the character-data test that pinned those
+  three own properties, updated to the empty list Chromium gives).
+  <br>**What it did not close.** The window keeps its own copies, and
+  `new EventTarget().dispatchEvent(new Event('x'))` still throws — a pre-existing mismatch between
+  the realm's `EventTarget` and the bridge's `Event`, confirmed identical before and after. Both are
+  in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+
+- **A character-data node's interface members were own properties of the wrapper, not on the
+  interface prototypes.** **Fixed, and live** — entirely in the main repo
+  (`Broiler.HtmlBridge.Dom`), so no patch. This is the first interface of track 6 action 1 to move;
+  the rest is in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** The bindings install every member as an own property of each wrapper, so an
+  interface prototype carried nothing of its own: `Text.prototype.splitText` was `undefined` and a
+  text node listed 57 own properties where a browser gives it none. The prototype *chain* was already
+  real (`Text → CharacterData → Node → EventTarget → Object`) and the interface objects already
+  existed — what had not happened is the engine putting its members on them.
+  <br>**Fix, and the mechanism the rest of the item needs.** A member on a prototype has no node
+  captured in a closure, so it finds one from its receiver. That needed a wrapper→node lookup:
+  `JsObjectRegistry` had one, but it was an O(n) scan over every wrapper the document had minted —
+  fine for the handful of call sites that had it, and not fine per DOM operation, so it is now a
+  reverse map and constant-time. On top of that, the members a text or comment node exposes are
+  installed on `Node.prototype`, `CharacterData.prototype` and `Text.prototype` — the split Web IDL
+  specifies, so a page walking a prototype's own property names reads the shape a browser has, and
+  `splitText` is `Text`'s alone rather than something a `Comment` inherits. The 18 node constants
+  were already on `Node.prototype`; each instance carried a duplicate set, which is simply gone.
+  <br>**It closed an identity bug of its own.** `splitText` dropped the node's wrapper afterwards —
+  "invalidate the cached JSObject so length/data properties reflect the update" — from when the
+  members captured state. DOM §4.11 splits a text node *in place*, so `target.firstChild === t` must
+  hold after `t.splitText(n)`; measured in Chromium it does, and here the next wrapper minted for the
+  node was a different object. With the members reading the live node through the receiver there is
+  nothing to invalidate, so the invalidation and its now-dead host member are gone.
+  <br>**What it leaves.** A text or comment node carried three own properties instead of 57 — the
+  `EventTarget` trio, which could not simply be inherited; those went too, with the routing recorded
+  above, so it now carries none. Elements and
+  documents are untouched, so the members installed on `Node.prototype` are shadowed for them and
+  nothing about them changes; a wrapper minted before the realm carries the interfaces still installs
+  its own members, which is the old shape rather than a broken one.
+  <br>**Evidence.** 16 regressions in `CharacterDataInterfacePrototypeTests` — the members answering
+  from the prototype, the instance carrying none of the interface, `splitText` not reaching a
+  `Comment`, the constants inherited rather than copied, the operations still behaving, the split
+  keeping its identity, a foreign receiver being a `TypeError`, and a page extending
+  `CharacterData.prototype` reaching instances. Whole-suite diffs against a same-container baseline
+  show no regression: `Broiler.Cli.Tests` 39 distinct failures → 39, `Broiler.Wpt.Tests` 52 → 51.
+  Two tests differed and neither is this change — an image-prefetch test and a thread-budget one,
+  both verified to pass in isolation, and the 20s render guard the previous change had seen flake
+  passes here.
+
+- **`getComputedStyle` did not apply the user-agent stylesheet's `display`.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch.
+  <br>**Cause.** Every element whose display comes from the UA sheet rather than an author rule
+  reported `inline`, the CSS initial value — a plain `<div>` as much as a `<table>`, a `<script>` or
+  a `<head>`. The bridge has both the table and the resolution (`CssUserAgentDefaults.DisplayValues`
+  and `ApplyUserAgentDisplayDefaults`) and applies them to the *sparse* projection its ~90 internal
+  layout/anchor/hit-test consumers read, but the JS binding's map is built by the engine's
+  `GetComputedStyle`, which backfills initial values. So the seed could not simply be called on it:
+  `ApplyUserAgentDisplayDefaults` fills an *absent* `display`, and after the backfill the key is
+  always present — holding `inline`. Nothing the UA sheet said about `display` reached script.
+  <br>**Not a rendering defect.** The renderer reads the box tree and the internal consumers read
+  the sparse map, both of which carried the right value; only the CSSOM answer was wrong. That is
+  why it survived so long, and why it was mis-attributed once — the `foreignObject` record below
+  blamed the missing box for the `inline` its content reported, when a plain `<div>` in the body
+  answered `inline` too.
+  <br>**Fix.** `getComputedStyle`'s map takes `display` from `GetComputedProps` — the same memoised
+  sparse projection, with the explicit-`inherit` fold and the UA seed already applied — rather than
+  recomputing it. So the two paths cannot answer differently about what an element's display is, and
+  the seed stays non-clobbering: an author rule, an inline style and `[hidden]`'s loss to an author
+  rule all behave exactly as before.
+  <br>**Evidence.** 33 regressions in `UserAgentDisplayComputedStyleTests`, every expectation
+  Chromium's measured answer to the same markup from one probe run against both; 27 of them fail
+  before the change and all 33 pass after. A 32-tag probe went from every tag answering `inline` to
+  30 of 32 matching Chromium. Whole-suite diffs against a same-container baseline show no regression:
+  `Broiler.Cli.Tests` 38 distinct failures → 38, `Broiler.Wpt.Tests` 53 → 52. Three tests differed
+  between those runs and none is this change: `ScriptCompileAheadOverlapTests`'
+  thread-budget test (whose own record says it "fails on a loaded CI box for reasons that have
+  nothing to do with the code"), the 20s `ScrollWriteGeometryTimeoutTests` render guard, and two
+  `RunnerModuleScriptTests` — each verified to pass in isolation with the change in place, the render
+  guard in 8–9s against its 20s ceiling.
+  <br>**What it did not close.** Two tags where Broiler still differs from Chromium, both gaps in the
+  shared tag→display table rather than in the path that now reads it, and both predating this change
+  — they were invisible while every element answered `inline`. They are stated in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms) and pinned by
+  `TheTwoTagsWhereTheTableDivergesFromChromiumArePinned`.
+
+- **`foreignObject` content was not laid out at all.** **Fixed, and live** — entirely in the main
+  repo (`Broiler.Layout`), so no patch and no submodule pointer to bump.
+  <br>**Cause.** SVG internals are not CSS-visible here — the subtree is serialised back to markup
+  and drawn by `SvgRenderer` — so `DomParser.CascadeApplyStyles` set every child box of an outermost
+  `<svg>` to `display: none`. That is right for shapes and wrong for exactly one element: SVG 2 §12.1
+  makes `<foreignObject>` the one place an SVG subtree re-enters CSS layout. Hidden with the shapes,
+  its content had no box at all — a `<div>` inside one reported `0,0,0,0` and an
+  `offsetWidth`/`offsetHeight` of `0`, so `elementFromPoint` over the child answered the
+  `<foreignObject>`. The element *itself* always had a rect, resolved from its own geometry
+  attributes like any other shape, which is why the gap was in the subtree rather than in the
+  element.
+  <br>**Fix.** `Broiler.Layout.Engine.SvgForeignObjectBoxes` lifts each `<foreignObject>` back out
+  after the cascade and before layout: it becomes an absolutely positioned block at its user-space
+  `x`/`y`, sized from its `width`/`height`, inside the viewport box — which the pass makes a
+  containing block by giving it `position: relative`, and only when the document actually holds one,
+  so a document without one lays out exactly as before. The HTML children keep the styles the cascade
+  already gave them (the cascade descends through hidden boxes; only layout skips them) and lay out
+  by the ordinary rules, with no special case below that point. One reached through a `<g>` chain is
+  re-parented onto the viewport box rather than having the chain un-hidden, so the hiding of every
+  other box stays byte-identical. `SvgStructure` gains `foreignObject` as a non-painting container so
+  nothing inside one is also drawn by the renderer's shape passes.
+  <br>**Additive, so it needed no submodule push.** The natural call site is `DomParser`, which is in
+  `Broiler.HTML` and outside this session's GitHub scope — the push returns 403. Rather than ship the
+  fix as a patch that CI would not carry, the pass leaves the parser's hiding exactly as it is and
+  only un-hides the one box, which makes it a box fix-up rather than a change to the style pass. It
+  is driven from `FlexGridItemBlockification.Generate`, the same main-repo entry point
+  `DisplayContentsBoxes` is driven from and for the same reason, and it is idempotent, so adding the
+  direct parser call later is a no-op.
+  <br>**The second half was a double-count, not a placement error.** With the box placed, a `<div>`
+  under a `<g transform="translate(100,50)">` reported itself 100,50 *further on* than the
+  `<foreignObject>` containing it: the bridge's `ApplyTransformChain` walks DOM ancestors, and above a
+  `<foreignObject>` those are SVG elements whose `transform` is a user-space mapping already folded
+  into the box's position. The chain now stops at that boundary.
+  <br>**One source of truth for the translate rule.** The bridge's `TryParseSvgTranslate` moved to
+  `SvgForeignObjectBoxes.TryParseLoneTranslate` and both callers share it, so the element's own rect
+  and its content's cannot disagree about which offsets counted.
+  <br>**Bounded on purpose.** The viewport mapping modelled is the identity — one user unit is one
+  CSS pixel. A `viewBox` that maps user space is not: its scale is a function of the viewport's
+  *used* size, which a style-phase pass does not have. Under one the content keeps no box, exactly as
+  before, rather than a confidently wrong placement; the same holds inside a nested `<svg>` viewport,
+  whose own box position is not SVG-accurate to begin with. That remainder is stated in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms) and pinned by a
+  test, so closing it is a deliberate change.
+  <br>**Evidence.** 7 regressions in `SvgForeignObjectContentTests`, every expectation Chromium's
+  measured answer to the same markup from one probe run against both — placement at the element's
+  corner, ordinary stacking of two block children, an accumulated `translate()` chain, hit testing
+  descending into the content, percentage geometry against the viewport, the shape siblings and the
+  viewport's own box left unchanged, and the `viewBox` remainder pinned as it stands.
+  `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate`
+  and its twin `Broiler.Wpt.Tests` assertion
+  `Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_Images_ForeignObject_And_Translate` both go
+  red → green — the same two-for-one the SVG `elementFromPoint` fix below had for its pair.
+  Whole-suite diffs against a same-container baseline show no regression in any of the three:
+  `Broiler.Layout.Tests` 1317/1317; `Broiler.Cli.Tests` 39 distinct failures → 38, the difference
+  being exactly that test; `Broiler.Wpt.Tests` 52 → 51, likewise.
+  <br>**What it did not close.** The same roadmap bullet also recorded a computed `display` of
+  `inline` rather than `block` for the content, and attributed it to the missing box. That
+  attribution was wrong and the box did not change it: a plain `<div>` in the body answers `inline`
+  too. It is a general `getComputedStyle` gap — the JS binding does not consult
+  `ApplyUserAgentDisplayDefaults` — and is now stated as its own item in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms).
 
 - **An atomic inline-level box was left at the top of its line instead of standing on its
   baseline.** **Fixed, and live** — `Broiler.Layout` is main-repo, so no patch.

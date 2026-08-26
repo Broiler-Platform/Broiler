@@ -86,8 +86,13 @@ internal static class CharacterDataBinding
             DomBridge.InsertChildAt(DomBridge.ParentEl(node), idx + 1, newNode);
         }
 
-        // Invalidate the cached JSObject so length/data properties reflect the update.
-        host.RemoveJsObject(node);
+        // The split node keeps its wrapper. This used to drop it — "invalidate the cached JSObject so
+        // length/data properties reflect the update" — from when a text node's members were own
+        // properties of the wrapper. They are accessors on CharacterData.prototype now and read the
+        // live node through the receiver, so there is nothing stale to invalidate, and dropping the
+        // wrapper cost the node its script identity: DOM §4.11 splits a text node in place, so
+        // `target.firstChild === t` holds after `t.splitText(n)` — measured in Chromium — where the
+        // next wrapper minted for it was a different object.
         return host.ToJSObject(newNode);
     }
 

@@ -51,6 +51,12 @@ public sealed partial class DomBridge
         // @@hasInstance it installs.
         RegisterDomInterfaceConstructors(context);
 
+        // The Node/CharacterData/Text members a text or comment node exposes, onto those interface
+        // prototypes. After the constructors above, which is what there is a prototype to install on,
+        // and before the first wrapper is minted, which is what lets one inherit them instead of
+        // carrying its own copies.
+        RegisterCharacterDataInterface();
+
         // SVGLength interface constants
         RegisterSVGLength(context);
 

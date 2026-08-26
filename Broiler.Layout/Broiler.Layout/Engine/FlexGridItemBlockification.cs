@@ -50,6 +50,13 @@ internal static class FlexGridItemBlockification
         // pipeline it belongs at. Idempotent, so adding the direct call later is a no-op here.
         DisplayContentsBoxes.Generate(root);
 
+        // Likewise driven from here rather than from `DomParser`, and for the same reason: the
+        // <foreignObject> boxes the style pass hid with the rest of the SVG subtree are lifted back
+        // out and placed before layout reads them. Idempotent, so a direct call added later is a
+        // no-op. It runs after the `contents` splice so a foreign object spliced in from a wrapper
+        // is placed too.
+        SvgForeignObjectBoxes.Generate(root);
+
         Blockify(root);
     }
 

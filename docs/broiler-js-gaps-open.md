@@ -57,8 +57,24 @@ below is host semantics and two decisions.
   buckets instead of one ordered task model. See [HtmlBridge architecture](architecture/htmlbridge.md).
 - A subdocument module can start without deadlocking but its continuation and DOM effect are not
   drained in the engine-only module path. See [xUnit status](xunit-suite-status.md).
-- `document.currentScript` remains approximate for unresolved or CSP-blocked sources and hosts
-  that hoist async scripts. See [the focused investigation](google-about-current-script.md).
+- `document.currentScript` is correct in the capture host and still approximate in the other two.
+  The capture host records which `<script>` each bucket entry came from and no longer reconstructs
+  it, so an unresolved or CSP-blocked source no longer shifts the scripts after it; see
+  [closed](broiler-js-gaps-closed.md#track-3--script-attribution). What is left is the other two
+  hosts, and they are two different problems.
+  <br>**`ScriptEngine`** (the interactive and browser-app path) still pairs its buckets against the
+  reconstructed classification, so it keeps the drift the capture host had. The ordinals cannot
+  simply be recorded there: `ScriptEngine.Execute` receives the buckets already extracted, across
+  four public overloads and `ITypedScriptEngine`/`IScriptEngineCapabilities`, so the fix is to carry
+  the ordinal alongside each bucket entry through that API — a change to the public surface and to
+  `PageContent`, not a change to the pairing.
+  <br>**`WptTestRunner`** never sets the index at all, so `document.currentScript` is always `null`
+  under the WPT runner — a different gap from a wrong answer, and one that would hide any
+  currentScript-dependent WPT test rather than fail it.
+  <br>The remaining approximation named in the original investigation — a host that hoists its
+  `async` scripts to the end of the classic bucket — is gone from the capture host with the rest,
+  since an ordinal does not care what order the bucket runs in. See
+  [the focused investigation](google-about-current-script.md).
 
 ### Needs a product decision
 
@@ -178,13 +194,42 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- **The engine's own members are still own properties of each wrapper**, so an interface prototype
-  carries nothing of its own: `Text.prototype.splitText` is `undefined` and
-  `Object.getOwnPropertyNames(node)` lists the whole interface. The prototype *chain* is real, so a
-  page can extend `Element.prototype` and be heard; what has not happened is the engine putting its
-  members there. Relocating them is the larger object-model change, and the one this item turns on.
-  `Range`, `Selection` and `Blob` are the worked examples of the target shape — their members do
-  live on their prototypes, with per-instance state in a weak table.
+- **The rest of an element's members, and all of a document's, are still own properties of each
+  wrapper.** Character data has moved whole, and an element's `Node` members with it — both are in
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  An element is down from **166** own properties to **140**, and a document is still at **104**,
+  where a browser gives either none.
+  <br>What is left divides into three, and only the first is mechanical:
+  <br>1. **`Element`'s own interface** — `getAttribute`, `querySelector`, `classList` and the rest,
+  spread across some forty binding modules. The receiver-resolution mechanism and the constant-time
+  wrapper→node map exist, so each moves the same way; the interface must land whole so no prototype
+  ends up with a shape no browser has.
+  <br>2. **The per-instance *values*.** Several element members are captured values rather than
+  accessors — `tagName` is a `JSString` fixed when the wrapper is built — and each has to become an
+  accessor before it can move.
+  <br>3. **`textContent`.** An element's is a different operation from a character-data node's, so
+  it stays the element's own and shadows the `Node.prototype` one until there is a single
+  implementation that serves both. The document's `Node` members have gone — checking them against
+  the prototype's answer is what turned up three spec bugs, all now
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Cloning a document throws.** `document.cloneNode(false)` answers a fresh node of type `9` in a
+  browser; here the canonical DOM kernel does not clone a document at all, so it raises a
+  `NotSupportedError` `DOMException` — explicit and detectable, but still a gap rather than a rule.
+  Closing it is a `Broiler.DOM` change, which this session cannot push, so it would ship as a patch.
+- **The window keeps its own `EventTarget` members**, the last receiver that does. The three are
+  routed on `EventTarget.prototype` now and every other receiver inherits them, but `window` here
+  *is* the realm's global object, whose prototype chain does not reach `EventTarget.prototype`, so
+  removing its own copies would leave it with none. Its copies shadow the routed ones and behave
+  identically, and the routing already answers for a `window` receiver — what is left is giving the
+  global the prototype chain a browser's `Window` has. Chromium reports
+  `window.addEventListener === EventTarget.prototype.addEventListener`.
+- **`new EventTarget().dispatchEvent(new Event('x'))` throws**, and predates any of this — it is the
+  realm's own `EventTarget` meeting the bridge's `Event`. The engine's `dispatchEvent` takes its own
+  `Event` class and cannot convert the object the page's `Event` constructor produces, so the call is
+  an `Error` naming the parameter rather than a dispatch. Only an engine-side target is affected: a
+  node, the document and the window all dispatch through the bridge. Characterized while routing
+  `EventTarget.prototype` and confirmed identical before and after that change, so it is stated here
+  rather than counted as a regression of it.
 - **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
   and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
   a name can be reported is what this track's action 1 rules out — so it is a capability decision
@@ -231,40 +276,40 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 - **SVG lacks conforming live DOM integration** for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
-- **The three JS-visible failures this line was written for are all fixed** — SVG
-  `elementFromPoint`, mutated iframe state, and writing-mode `scrollIntoView`; see
+- **The JS-visible failures this line was written for are all fixed** — SVG `elementFromPoint`,
+  mutated iframe state, writing-mode `scrollIntoView`, and the `foreignObject` layout gap that
+  outlived them; see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  What is left of the line is the layout gap below, which is a different kind of thing.
   Two others once listed here no longer reproduce — a `@keyframes` rule read from style text answers
   the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`), and out-of-range
   `scrollTop`/`scrollLeft` writes clamp identically. That was a spot check of one shape each rather
   than the failing cases the line was written from, so the owning manifests are what should settle
   those two.
-- **`foreignObject` content is not laid out at all**, which is layout rather than scripting and is
-  why fixing SVG geometry did not close it. The `<foreignObject>` element itself resolves a rect
-  from its own `x`/`y`/`width`/`height`, but the HTML subtree inside it has no box: a `<div>` in one
-  reports `0,0,0,0`, `offsetWidth`/`offsetHeight` of `0`, and a computed `display` of `inline`
-  rather than `block` — the initial value, because no box means no cascade result to read. So
-  `elementFromPoint` over the child reports the `foreignObject`. Chromium on the same markup lays
-  the child out against the `foreignObject`'s viewport rect: a `<div>` at
-  `x=20 y=30 width=100 height=40` inside a `foreignObject` at `(20,30) 150×90` reports
-  `20,30,100,40`, `display: block`, and `elementsFromPoint` returns
-  `foDiv, fo, svgRoot, BODY, HTML`.
-  <br>The parser is what suppresses it: `DomParser.CascadeApplyStyles` gives an outermost `<svg>`
-  `display: inline-block` and then sets every child box to `display: none`, because SVG internals
-  are not CSS-visible here and the subtree is serialized for `SvgRenderer` instead.
-  `<foreignObject>` is the one place SVG re-enters CSS layout, so it is the one child that must not
-  be hidden — it needs a box positioned at its viewport coordinates whose HTML children lay out
-  normally. That is a `Broiler.HTML` change.
-  <br>`GoogleSearchPolyfillTests`'s
-  `Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate` fails for this reason and
-  nothing else. Its companion, `Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow`, was
-  listed here as a second layout gap — "an inline `<svg>` root is not placed in normal flow against
-  its siblings: two stacked `<svg>` elements both report `top: 0` instead of the second clearing the
-  first". That reading was wrong in both halves and is
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior):
-  the roots were already in normal flow, they do not stack in any browser, and the one number that
-  was wrong belonged to line-box alignment rather than to SVG.
+- **A `viewBox` leaves `foreignObject` content unplaced.** The remainder of the layout gap above.
+  A `<foreignObject>`'s HTML content is laid out against the element's viewport rect, but only where
+  one user unit is one CSS pixel. A `viewBox` maps user space by a scale that is a function of the
+  viewport's *used* size, and the placement pass runs before layout, so it cannot know it; under one
+  the content keeps no box while the element itself still reports the rect its attributes resolve to.
+  Chromium on `<svg width="200" height="100" viewBox="0 0 100 100">` with a `foreignObject` at
+  `(10,10) 40×40` holding a 20×20 `<div>` answers `60,10,40,40` for the element and `60,10,20,20`
+  for the `<div>`; Broiler answers the element's rect and `0,0,0,0` for the `<div>`. Pinned by
+  `SvgForeignObjectContentTests.UnderAViewBoxTheContentKeepsNoBox`, so closing it is a deliberate
+  change. Resolving it means placing the box after the viewport's used size is known rather than
+  during the box fix-ups — the same "resolve against used size" shape as the nested-`<svg>` viewport
+  whose own box position is not SVG-accurate either.
+- **Two tags in the UA `display` table do not match a browser.** The remainder of the
+  `getComputedStyle` gap above, and a different kind of thing: the path is fixed, so what is left is
+  the content of `CssUserAgentDefaults.DisplayValues` — the table the renderer reads too, which is
+  why correcting it is a rendering change and not a CSSOM one.
+  <br>`<option>` is absent from the table, so it falls back to the CSS initial value and answers
+  `inline` where Chromium says `block`. `<summary>` is in it as `list-item` unconditionally, but HTML
+  §15.3.9 scopes that to `details > summary:first-of-type`: Chromium answers `list-item` for a
+  summary inside a `<details>` and `block` for a bare one. A flat tag→display map cannot express the
+  second, so that entry is a structural limit of the table rather than a missing row — closing it
+  means the UA sheet becoming selectors the cascade runs, not one more entry. Both are pinned by
+  `UserAgentDisplayComputedStyleTests.TheTwoTagsWhereTheTableDivergesFromChromiumArePinned`.
+  <br>The table lives in `Broiler.CSS`, a submodule this session cannot push to, so a fix there ships
+  as a patch rather than live — worth weighing against how small the two cases are.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),

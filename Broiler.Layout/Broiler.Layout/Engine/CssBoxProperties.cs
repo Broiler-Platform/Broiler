@@ -1083,6 +1083,17 @@ internal abstract partial class CssBoxProperties
     /// </summary>
     public bool PositionHidden { get; set; }
 
+    /// <summary>
+    /// Runtime flag marking a <c>&lt;foreignObject&gt;</c> box that
+    /// <see cref="SvgForeignObjectBoxes"/> has already lifted out of its hidden SVG subtree and
+    /// placed. The placement folds the ancestor <c>translate()</c> chain into the box's own
+    /// <c>left</c>/<c>top</c> and re-parents the box onto the viewport, so those ancestors are no
+    /// longer above it — running the pass a second time would recompute the offset as zero and move
+    /// the box. This is what makes the pass idempotent. Not a CSS property — never cascaded or
+    /// copied.
+    /// </summary>
+    public bool SvgForeignObjectPlaced { get; set; }
+
     public string LineHeight
     {
         get { return _lineHeight; }

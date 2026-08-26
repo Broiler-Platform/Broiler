@@ -46,6 +46,15 @@ public sealed partial class DomBridge
         var transformed = false;
         for (DomElement? current = element; current is not null; current = ParentEl(current))
         {
+            // The chain stops at a <foreignObject>. Above it the ancestors are SVG elements whose
+            // `transform` is a user-space mapping, not a CSS transform on a box, and the element's
+            // box has already been placed at the position that mapping puts it (see
+            // SvgForeignObjectBoxes) — walking on would apply the same translate a second time, so
+            // a <div> inside a <g transform="translate(100,50)"> reported itself 100,50 further on
+            // than the <foreignObject> that contains it.
+            if (SvgLocalName(current) == "foreignobject")
+                break;
+
             var transformValue = GetElementTransformValue(current);
             if (string.IsNullOrWhiteSpace(transformValue))
                 continue;

@@ -196,70 +196,12 @@ public sealed partial class DomBridge
 
         // -- DOM tree navigation --
 
-        // parentNode (read-only, dynamic)
-        obj.FastAddProperty((KeyString)"parentNode",
-            new DomFunction((in a) => element.ParentNode != null ? ToJSObject(element.ParentNode) : JSNull.Value, "get parentNode"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"isConnected",
-            new DomFunction((in _) => Dom.Features.NodeAccessorsBinding.GetIsConnected(this, element, in _), "get isConnected"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // childNodes (read-only, dynamic)
-        obj.FastAddProperty((KeyString)"childNodes",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetChildNodes(this, element, in a), "get childNodes"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // firstChild (read-only, dynamic)
-        obj.FastAddProperty((KeyString)"firstChild",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetFirstChild(this, element, in a), "get firstChild"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // lastChild (read-only, dynamic)
-        obj.FastAddProperty((KeyString)"lastChild",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetLastChild(this, element, in a), "get lastChild"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // nextSibling (read-only, dynamic)
-        obj.FastAddProperty((KeyString)"nextSibling",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNextSibling(this, element, in a), "get nextSibling"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // previousSibling (read-only, dynamic)
-        obj.FastAddProperty((KeyString)"previousSibling",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetPreviousSibling(this, element, in a), "get previousSibling"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // nodeType (read-only)
-        obj.FastAddProperty((KeyString)"nodeType",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeType(element, in a), "get nodeType"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // nodeName (read-only)
-        obj.FastAddProperty((KeyString)"nodeName",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeName(element, in a), "get nodeName"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // localName (read-only) — null for non-element nodes; local part of tag name for elements
-        obj.FastAddProperty((KeyString)"localName",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetLocalName(element, in a), "get localName"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // prefix (read-only) — namespace prefix or null
-        obj.FastAddProperty((KeyString)"prefix",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetPrefix(element, in a), "get prefix"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // namespaceURI (read-only) — returns namespace URI for elements created via createElementNS
-        obj.FastAddProperty((KeyString)"namespaceURI",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNamespaceURI(element, in a), "get namespaceURI"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // nodeValue (read/write) — null for elements, text content for text/comment nodes
-        obj.FastAddProperty((KeyString)"nodeValue",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeValue(element, in a), "get nodeValue"),
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.SetNodeValue(this, element, in a), "set nodeValue"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
+        // The Node members are on Node.prototype and this wrapper inherits them
+        // (DomBridge.CharacterDataInterface.cs). Each was a byte-identical copy of what lives
+        // there, so nothing about them changes; only their location does. A wrapper minted before
+        // the realm carried the interfaces inherits nothing and still installs its own.
+        if (!_nodeInterfacePrototypesReady)
+            PopulateElementNodeMembersOnInstance(obj, element);
 
         // data (read/write) — for text nodes and comment nodes (alias for nodeValue/textContent)
         obj.FastAddProperty((KeyString)"data",
@@ -303,21 +245,6 @@ public sealed partial class DomBridge
                 new DomFunction((in a) => Dom.Features.CharacterDataBinding.ReplaceData(this, element, in a), "replaceData", 3),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
-
-        // ownerDocument (read-only) — returns the Document node (nodeType=9)
-        obj.FastAddProperty((KeyString)"ownerDocument",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetOwnerDocument(this, element, in a), "get ownerDocument"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // parentElement (read-only, dynamic) — like parentNode but returns null for non-element parents
-        obj.FastAddProperty((KeyString)"parentElement",
-            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetParentElement(this, element, in a), "get parentElement"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // hasChildNodes()
-        obj.FastAddValue((KeyString)"hasChildNodes",
-            new DomFunction((in a) => element.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // hasAttribute(name)
         obj.FastAddValue((KeyString)"hasAttribute",
@@ -378,40 +305,6 @@ public sealed partial class DomBridge
         // hasAttributeNS(namespace, localName)
         obj.FastAddValue((KeyString)"hasAttributeNS",
             new DomFunction((in a) => _attributes.HasAttributeNS(element, in a), "hasAttributeNS", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // contains(otherNode) — returns true if otherNode is a descendant
-        obj.FastAddValue((KeyString)"contains",
-            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.Contains(this, element, in a), "contains", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // compareDocumentPosition(otherNode)
-        obj.FastAddValue((KeyString)"compareDocumentPosition",
-            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.CompareDocumentPosition(this, element, in a), "compareDocumentPosition", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // isSameNode(otherNode)
-        obj.FastAddValue((KeyString)"isSameNode",
-            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsSameNode(this, element, in a), "isSameNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // normalize()
-        obj.FastAddValue((KeyString)"normalize",
-            new DomFunction((in _) => Dom.Features.NodeRelationshipsBinding.Normalize(this, element, in _), "normalize", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // isEqualNode(otherNode)
-        obj.FastAddValue((KeyString)"isEqualNode",
-            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsEqualNode(this, element, in a), "isEqualNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"getRootNode",
-            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, element, in a), "getRootNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // cloneNode(deep)
-        obj.FastAddValue((KeyString)"cloneNode",
-            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.CloneNode(this, element, in a), "cloneNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // insertBefore(newChild, refChild)
@@ -522,20 +415,23 @@ public sealed partial class DomBridge
 
         // -- DOM events --
 
-        // addEventListener(type, listener, useCapture)
-        obj.FastAddValue((KeyString)"addEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, element, in a), "addEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,
+        // routed by receiver (DomBridge.EventTargetInterface.cs) — one function for every target, as
+        // in a browser. A wrapper minted before the realm carried it installs its own.
+        if (!_eventTargetRoutingReady)
+        {
+            obj.FastAddValue((KeyString)"addEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, element, in a), "addEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // removeEventListener(type, listener, useCapture)
-        obj.FastAddValue((KeyString)"removeEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, element, in a), "removeEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"removeEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, element, in a), "removeEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // dispatchEvent(event) — DOM Events Level 3 with capture/target/bubble phases
-        obj.FastAddValue((KeyString)"dispatchEvent",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, element, in a), "dispatchEvent", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"dispatchEvent",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, element, in a), "dispatchEvent", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
 
         // element.click() — creates and dispatches a MouseEvent
         // For checkboxes and radio buttons, toggles checked state.
@@ -642,4 +538,126 @@ public sealed partial class DomBridge
         return obj;
     }
 
+
+    /// <summary>
+    /// The <c>Node</c> members as own properties of one element wrapper — the shape every element
+    /// had before they moved to <c>Node.prototype</c>, kept for the one case that cannot use them: a
+    /// wrapper minted before the realm carried the interfaces, which inherits from nothing.
+    /// </summary>
+    private void PopulateElementNodeMembersOnInstance(JSObject obj, DomElement element)
+    {
+        // parentNode (read-only, dynamic)
+        obj.FastAddProperty((KeyString)"parentNode",
+            new DomFunction((in a) => element.ParentNode != null ? ToJSObject(element.ParentNode) : JSNull.Value, "get parentNode"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        obj.FastAddProperty((KeyString)"isConnected",
+            new DomFunction((in _) => Dom.Features.NodeAccessorsBinding.GetIsConnected(this, element, in _), "get isConnected"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // childNodes (read-only, dynamic)
+        obj.FastAddProperty((KeyString)"childNodes",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetChildNodes(this, element, in a), "get childNodes"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // firstChild (read-only, dynamic)
+        obj.FastAddProperty((KeyString)"firstChild",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetFirstChild(this, element, in a), "get firstChild"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // lastChild (read-only, dynamic)
+        obj.FastAddProperty((KeyString)"lastChild",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetLastChild(this, element, in a), "get lastChild"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nextSibling (read-only, dynamic)
+        obj.FastAddProperty((KeyString)"nextSibling",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNextSibling(this, element, in a), "get nextSibling"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // previousSibling (read-only, dynamic)
+        obj.FastAddProperty((KeyString)"previousSibling",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetPreviousSibling(this, element, in a), "get previousSibling"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeType (read-only)
+        obj.FastAddProperty((KeyString)"nodeType",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeType(element, in a), "get nodeType"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeName (read-only)
+        obj.FastAddProperty((KeyString)"nodeName",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeName(element, in a), "get nodeName"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // localName (read-only) — null for non-element nodes; local part of tag name for elements
+        obj.FastAddProperty((KeyString)"localName",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetLocalName(element, in a), "get localName"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // prefix (read-only) — namespace prefix or null
+        obj.FastAddProperty((KeyString)"prefix",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetPrefix(element, in a), "get prefix"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // namespaceURI (read-only) — returns namespace URI for elements created via createElementNS
+        obj.FastAddProperty((KeyString)"namespaceURI",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNamespaceURI(element, in a), "get namespaceURI"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // nodeValue (read/write) — null for elements, text content for text/comment nodes
+        obj.FastAddProperty((KeyString)"nodeValue",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeValue(element, in a), "get nodeValue"),
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.SetNodeValue(this, element, in a), "set nodeValue"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // ownerDocument (read-only) — returns the Document node (nodeType=9)
+        obj.FastAddProperty((KeyString)"ownerDocument",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetOwnerDocument(this, element, in a), "get ownerDocument"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // parentElement (read-only, dynamic) — like parentNode but returns null for non-element parents
+        obj.FastAddProperty((KeyString)"parentElement",
+            new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetParentElement(this, element, in a), "get parentElement"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // hasChildNodes()
+        obj.FastAddValue((KeyString)"hasChildNodes",
+            new DomFunction((in a) => element.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // contains(otherNode) — returns true if otherNode is a descendant
+        obj.FastAddValue((KeyString)"contains",
+            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.Contains(this, element, in a), "contains", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // compareDocumentPosition(otherNode)
+        obj.FastAddValue((KeyString)"compareDocumentPosition",
+            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.CompareDocumentPosition(this, element, in a), "compareDocumentPosition", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // isSameNode(otherNode)
+        obj.FastAddValue((KeyString)"isSameNode",
+            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsSameNode(this, element, in a), "isSameNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // normalize()
+        obj.FastAddValue((KeyString)"normalize",
+            new DomFunction((in _) => Dom.Features.NodeRelationshipsBinding.Normalize(this, element, in _), "normalize", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // isEqualNode(otherNode)
+        obj.FastAddValue((KeyString)"isEqualNode",
+            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.IsEqualNode(this, element, in a), "isEqualNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        obj.FastAddValue((KeyString)"getRootNode",
+            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, element, in a), "getRootNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // cloneNode(deep)
+        obj.FastAddValue((KeyString)"cloneNode",
+            new DomFunction((in a) => Dom.Features.NodeRelationshipsBinding.CloneNode(this, element, in a), "cloneNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+    }
 }

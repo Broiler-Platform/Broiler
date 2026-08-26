@@ -36,6 +36,45 @@ public sealed partial class DomBridge
     {
         var bridge = this;
 
+        // The Node, CharacterData and Text members live on the interface prototypes
+        // (DomBridge.CharacterDataInterface.cs), which this wrapper inherits — so there is nothing
+        // to install here and Object.getOwnPropertyNames(textNode) is the [] a browser gives.
+        //
+        // Unless the realm was not up when this wrapper was minted, in which case
+        // ApplyInterfacePrototype linked nothing and there is no prototype to inherit from. Then the
+        // members go on the instance exactly as they always did, which is the old shape rather than
+        // a broken one.
+        if (!_nodeInterfacePrototypesReady)
+            PopulateCharacterDataMembersOnInstance(obj, node);
+
+        // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,
+        // routed by receiver (DomBridge.EventTargetInterface.cs) — one function for every target, as
+        // in a browser. A wrapper minted before the realm carried it installs its own.
+        if (!_eventTargetRoutingReady)
+        {
+            obj.FastAddValue((KeyString)"addEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue((KeyString)"removeEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+
+            obj.FastAddValue((KeyString)"dispatchEvent",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
+
+    }
+
+    /// <summary>
+    /// The <c>Node</c>, <c>CharacterData</c> and <c>Text</c> members as own properties of one
+    /// wrapper — the shape every character-data node had before those members moved to the interface
+    /// prototypes, kept for the one case that cannot use them: a wrapper minted before the realm
+    /// carried the interfaces, which inherits from nothing.
+    /// </summary>
+    private void PopulateCharacterDataMembersOnInstance(JSObject obj, DomNode node)
+    {
         // -- Node identity --
         obj.FastAddProperty((KeyString)"nodeType",
             new DomFunction((in a) => Dom.Features.NodeAccessorsBinding.GetNodeType(node, in a), "get nodeType"),
@@ -192,20 +231,8 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, node, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // -- EventTarget --
-        obj.FastAddValue((KeyString)"addEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"removeEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"dispatchEvent",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // Node interface constants (exist on all Node objects) — types and DOCUMENT_POSITION_* bits.
+        // The constants are on Node.prototype for every other wrapper; this one inherits nothing.
         Dom.Features.NodeConstantsBinding.Install(obj);
     }
 
@@ -327,18 +354,23 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, node, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // -- EventTarget --
-        obj.FastAddValue((KeyString)"addEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,
+        // routed by receiver (DomBridge.EventTargetInterface.cs) — one function for every target, as
+        // in a browser. A wrapper minted before the realm carried it installs its own.
+        if (!_eventTargetRoutingReady)
+        {
+            obj.FastAddValue((KeyString)"addEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.AddEventListener(this, node, in a), "addEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"removeEventListener",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"removeEventListener",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.RemoveEventListener(this, node, in a), "removeEventListener", 3),
+                JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"dispatchEvent",
-            new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue((KeyString)"dispatchEvent",
+                new DomFunction((in a) => Dom.Features.EventTargetBinding.DispatchEvent(this, node, in a), "dispatchEvent", 1),
+                JSPropertyAttributes.EnumerableConfigurableValue);
+        }
 
         // Node interface constants (exist on all Node objects) — types and DOCUMENT_POSITION_* bits.
         Dom.Features.NodeConstantsBinding.Install(obj);

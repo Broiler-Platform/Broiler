@@ -18,7 +18,6 @@ public sealed partial class DomBridge : Dom.Features.ICharacterDataHost
 
     JSObject Dom.Features.ICharacterDataHost.ToJSObject(DomNode node) => ToJSObject(node);
 
-    void Dom.Features.ICharacterDataHost.RemoveJsObject(DomNode node) => _jsObjects.Remove(node);
 
     JSContext? Dom.Features.ICharacterDataHost.JsContext => _jsContext;
 }

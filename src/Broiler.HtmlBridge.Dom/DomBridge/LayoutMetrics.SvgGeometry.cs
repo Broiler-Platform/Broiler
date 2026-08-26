@@ -1,5 +1,6 @@
 using System.Globalization;
 using Broiler.Dom;
+using Broiler.Layout.Engine;
 
 namespace Broiler.HtmlBridge;
 
@@ -321,7 +322,7 @@ public sealed partial class DomBridge
         double x = 0, y = 0;
         for (var current = element; current != null && current != viewport; current = ParentEl(current))
         {
-            if (TryParseSvgTranslate(GetElementTransformValue(current), out var dx, out var dy))
+            if (SvgForeignObjectBoxes.TryParseLoneTranslate(GetElementTransformValue(current), out var dx, out var dy))
             {
                 x += dx;
                 y += dy;
@@ -331,59 +332,4 @@ public sealed partial class DomBridge
         return (x, y);
     }
 
-    /// <summary>
-    /// The offset of a <c>translate(x[, y])</c>, if that is what this transform list is.
-    /// </summary>
-    /// <remarks>
-    /// Deliberately narrow: a list containing anything else answers <see langword="false"/> and the
-    /// subtree keeps its untranslated rect, rather than having some functions applied and others
-    /// dropped — which would place a shape confidently and wrongly.
-    /// </remarks>
-    private static bool TryParseSvgTranslate(string? transform, out double x, out double y)
-    {
-        x = 0;
-        y = 0;
-        if (string.IsNullOrWhiteSpace(transform))
-            return false;
-
-        var value = transform.Trim();
-        if (!value.StartsWith("translate", StringComparison.OrdinalIgnoreCase))
-            return false;
-
-        var open = value.IndexOf('(');
-        var close = value.IndexOf(')');
-        if (open < 0 || close <= open)
-            return false;
-
-        // One function only: anything after the closing paren is a list this does not model.
-        if (value[(close + 1)..].Trim().Length > 0)
-            return false;
-
-        var parts = value[(open + 1)..close]
-            .Split([' ', '\t', '\r', '\n', ','], StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length is 0 or > 2)
-            return false;
-
-        foreach (var part in parts)
-        {
-            // A CSS `transform: translate(10px, 20px)` reaches here too, since the computed value is
-            // preferred over the attribute; strip the unit that an SVG attribute never carries.
-            var scalar = part.EndsWith("px", StringComparison.OrdinalIgnoreCase) ? part[..^2] : part;
-            if (!double.TryParse(scalar, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
-                return false;
-        }
-
-        x = double.Parse(
-            parts[0].EndsWith("px", StringComparison.OrdinalIgnoreCase) ? parts[0][..^2] : parts[0],
-            NumberStyles.Float, CultureInfo.InvariantCulture);
-
-        if (parts.Length == 2)
-        {
-            y = double.Parse(
-                parts[1].EndsWith("px", StringComparison.OrdinalIgnoreCase) ? parts[1][..^2] : parts[1],
-                NumberStyles.Float, CultureInfo.InvariantCulture);
-        }
-
-        return true;
-    }
 }

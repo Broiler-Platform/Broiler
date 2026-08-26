@@ -93,6 +93,13 @@ public sealed partial class DomBridge
     private void RegisterDocumentCore(JSContext context)
     {
         _jsContext = context;
+
+        // EventTarget.prototype's three methods, routed by receiver
+        // (DomBridge.EventTargetInterface.cs). First, because every wrapper registration below asks
+        // whether the routing is in place before installing its own copies — the document's included.
+        // It depends only on the realm's own EventTarget, which the context already carries.
+        RegisterEventTargetRouting();
+
         var document = new JSObject();
 
         // Map the document JSObject to the canonical DomDocument so that ToJSObject(_document)
