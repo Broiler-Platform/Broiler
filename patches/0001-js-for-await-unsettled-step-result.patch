@@ -1,0 +1,447 @@
+From 142774c661a4a9eea76b065c6eda6a87f7f898aa Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 26 Aug 2026 05:17:54 +0000
+Subject: [PATCH] Stop for-await deadlocking on a step result that is not
+ already settled
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+for await…of unwrapped the result of next() inside JSIterator with
+promise.Task.GetAwaiter().GetResult() — a blocking wait, on the one thread allowed
+to run a context's JavaScript. That works only while the promise is already
+settled, which is why every shape the suite covered passed: an array, an async
+generator, an iterator returning Promise.resolve(record). The moment next() hands
+back the ordinary something.then(...), the job that would settle it can never run,
+because the queue that runs it drains on the way out of the execution the thread
+is stuck inside. JSMicrotaskQueue's own documentation names that exact pattern as
+the one it cannot support. The agent hung until the process was killed — a
+deadlock rather than a wrong answer, which is why it never showed up as a failing
+test.
+
+The step is now three pieces with the state machine's own await between them.
+IElementEnumerator.AsyncNextRaw calls next() and hands the result back unexamined;
+the compiled loop awaits it exactly as it awaits anything else; AsyncIterationStep
+reads done and value off the settled record. Nothing blocks, so the settling job
+runs at the checkpoint it was queued for.
+
+The result is deliberately not validated before the await: for a real async
+iterator the object that has to be an object is what the promise resolves to, so
+checking it earlier tested the wrong value. The synchronous fallback — for await
+over an array — goes through the same three pieces via the interface's default
+implementation, which synthesises the record a real iterator would have resolved
+to; awaiting a plain object is a tick and nothing more, which is what the
+specification's async-from-sync wrapper does anyway.
+
+AwaitIfNeeded survives for return() and throw(), which for-await reaches only on
+an abrupt completion, and now unwraps only an already-completed task. An unsettled
+closing result is left as the promise rather than waited for: that loses the
+closing value and does not hang the agent, which is the better of the two.
+
+Seven regressions in ForAwaitUnsettledResultTests, each of which hung rather than
+failed before this change. Full engine suite: 5167 integration, 2215 built-ins,
+1400 compiler, 104 modules and 32 core tests pass, with only the pre-existing
+failures (two known-gap parameter-shadowing cases and one documentation-file
+check).
+---
+ .../Statements/FastCompiler.VisitFor.cs       |  48 ++++++--
+ .../ForAwaitUnsettledResultTests.cs           | 110 ++++++++++++++++++
+ .../IElementEnumeratorBuilder.cs              |  23 ++++
+ .../AsyncIterationStep.cs                     |  69 +++++++++++
+ .../IElementEnumerator.cs                     |  14 +++
+ .../Broiler.JavaScript.Runtime/JSIterator.cs  |  39 ++++++-
+ 6 files changed, 291 insertions(+), 12 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Integration.Tests/ForAwaitUnsettledResultTests.cs
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Runtime/AsyncIterationStep.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitFor.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitFor.cs
+index 8f8fb1ae..70e211e3 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitFor.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitFor.cs
+@@ -195,9 +195,19 @@ partial class FastCompiler
+         var returnableVar = BExpression.Variable(typeof(IReturnableEnumerator));
+         var iterDoneVar = BExpression.Variable(typeof(bool));
+ 
++        // for-await steps in three pieces so the *async function* awaits the iterator's result:
++        // call next(), await what it returned, then read done/value off the settled record. The
++        // enumerator used to unwrap the promise itself with a blocking wait, which works only while
++        // the promise is already settled — the moment next() returns `something.then(…)`, the job
++        // that would settle it can never run, because the queue that runs it drains on the way out
++        // of the execution the thread is blocked inside. See Runtime/AsyncIterationStep.
++        var asyncStepVar = forOfStatement.IsAwait ? BExpression.Variable(typeof(JSValue)) : null;
++
+         var pList = new Sequence<BParameterExpression> { en, returnableVar, iterDoneVar, completionVar };
+         if (iterationValueVariable != null)
+             pList.Add(iterationValueVariable);
++        if (asyncStepVar != null)
++            pList.Add(asyncStepVar);
+ 
+         var bodyListItems = new Sequence<BExpression>
+         {
+@@ -207,13 +217,29 @@ partial class FastCompiler
+             // iterator "done" while stepping and reading the value so a throw from MoveNext
+             // skips the finally/catch close, then clear it once the value is in hand.
+             BExpression.Assign(iterDoneVar, BExpression.Constant(true)),
++        };
++
++        if (asyncStepVar != null)
++        {
++            bodyListItems.Add(BExpression.Assign(asyncStepVar, IElementEnumeratorBuilder.AsyncNextRaw(en)));
++            bodyListItems.Add(BExpression.Assign(asyncStepVar, BExpression.Await(asyncStepVar)));
++            // When the settled record says done the iterator finished normally; leave it marked
++            // done so finally does NOT call return().
++            bodyListItems.Add(BExpression.IfThen(
++                IElementEnumeratorBuilder.AsyncStepIsDone(asyncStepVar),
++                BExpression.Goto(s.Break)));
++            bodyListItems.Add(BExpression.Assign(identifier, IElementEnumeratorBuilder.AsyncStepValue(asyncStepVar)));
++        }
++        else
++        {
+             // When MoveNext returns false the iterator finished normally;
+             // leave it marked done so finally does NOT call return().
+-            BExpression.IfThen(
++            bodyListItems.Add(BExpression.IfThen(
+                 BExpression.Not(IElementEnumeratorBuilder.MoveNext(en, identifier)),
+-                BExpression.Goto(s.Break)),
+-            BExpression.Assign(iterDoneVar, BExpression.Constant(false))
+-        };
++                BExpression.Goto(s.Break)));
++        }
++
++        bodyListItems.Add(BExpression.Assign(iterDoneVar, BExpression.Constant(false)));
+ 
+         if (forOfStatement.IsAwait)
+             bodyListItems.Add(BExpression.Assign(identifier, BExpression.Await(identifier)));
+@@ -361,17 +387,17 @@ partial class FastCompiler
+ 
+         // The update clause's value is discarded, so an `i++` on a numeric local needs no
+         // boxed result (docs/performance-roadmap.md P2-2 item 3).
+-        // The same holds for an assignment update (`for (…; …; i = i + 1)` / `i += 1`): its
+-        // value is discarded, so a numeric local's store need not be boxed either.
+-        var updateIsAssignment = forStatement.Update is AstBinaryExpression updateAssignment
+-            && updateAssignment.Operator > TokenTypes.BeginAssignTokens
+-            && updateAssignment.Operator < TokenTypes.EndAssignTokens;
+-        discardAssignmentResult = updateIsAssignment;
++        // The same holds for an assignment update (`for (…; …; i = i + 1)` / `i += 1`): its
++        // value is discarded, so a numeric local's store need not be boxed either.
++        var updateIsAssignment = forStatement.Update is AstBinaryExpression updateAssignment
++            && updateAssignment.Operator > TokenTypes.BeginAssignTokens
++            && updateAssignment.Operator < TokenTypes.EndAssignTokens;
++        discardAssignmentResult = updateIsAssignment;
+         var update = forStatement.Update is AstUnaryExpression
+             { Operator: UnaryOperator.Increment or UnaryOperator.Decrement } counterUpdate
+             ? InternalVisitUpdateExpression(counterUpdate, discardResult: true)
+             : Visit(forStatement.Update);
+-        discardAssignmentResult = false;
++        discardAssignmentResult = false;
+         var test = Visit(forStatement.Test);
+ 
+         if (test != null)
+diff --git a/Broiler.JS/Broiler.JavaScript.Integration.Tests/ForAwaitUnsettledResultTests.cs b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ForAwaitUnsettledResultTests.cs
+new file mode 100644
+index 00000000..04772fe4
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Integration.Tests/ForAwaitUnsettledResultTests.cs
+@@ -0,0 +1,110 @@
++using Broiler.JavaScript.Engine;
++
++namespace Broiler.JavaScript.Integration.Tests;
++
++/// <summary>
++/// <c>for await…of</c> over an iterator whose <c>next()</c> hands back a promise that is not
++/// already settled.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>The defect was a deadlock, not a wrong answer.</b> Async iteration unwrapped the result of
++/// <c>next()</c> inside <c>JSIterator</c> with <c>promise.Task.GetAwaiter().GetResult()</c> — a
++/// blocking wait, on the one thread allowed to run this context's JavaScript. That works only while
++/// the promise is <em>already</em> settled, which is why the shapes already covered elsewhere
++/// (arrays, async generators, an iterator returning <c>Promise.resolve(record)</c>) all passed. The
++/// moment <c>next()</c> returns the ordinary <c>something.then(…)</c>, the job that would settle it
++/// can never run: the queue that runs it drains on the way out of the execution the thread is stuck
++/// inside, which <c>JSMicrotaskQueue</c>'s own documentation names as the one pattern it cannot
++/// support. The agent hung until the process was killed.
++/// </para>
++/// <para>
++/// The step is now three pieces with the state machine's own <c>await</c> between them —
++/// <c>IElementEnumerator.AsyncNextRaw</c>, the await, then <c>AsyncIterationStep</c>'s
++/// <c>IsDone</c>/<c>Value</c>. Nothing blocks, so the settling job runs at the checkpoint it was
++/// queued for.
++/// </para>
++/// <para>
++/// Every test here would hang rather than fail before the change, which is why they are worth
++/// carrying separately from the shapes that merely returned the wrong value.
++/// </para>
++/// </remarks>
++public class ForAwaitUnsettledResultTests
++{
++    private static string Drive(string body)
++    {
++        using var ctx = new JSContext();
++        ctx.Eval("globalThis.r = '<unset>'; globalThis.log = [];");
++        ctx.Eval(body);
++        return ctx.Eval("'' + globalThis.r").ToString();
++    }
++
++    /// <summary>The shape that hung: <c>next()</c> returns a chained promise.</summary>
++    [Fact(Timeout = 600000)]
++    public void ChainedNextResult() => Assert.Equal("1,2", Drive(
++        "var it = { i: 0 };" +
++        "it[Symbol.asyncIterator] = function () { return this; };" +
++        "it.next = function () { var self = this; return Promise.resolve(0).then(function () {" +
++        "    return self.i++ < 2 ? { value: self.i, done: false } : { value: undefined, done: true }; }); };" +
++        "(async function () { var g = []; for await (const v of it) g.push(v); globalThis.r = g.join(','); })();"));
++
++    /// <summary>A promise nothing has resolved when the loop reaches it.</summary>
++    [Fact(Timeout = 600000)]
++    public void DeferredNextResult() => Assert.Equal("ready", Drive(
++        "var release;" +
++        "var gate = new Promise(function (resolve) { release = resolve; });" +
++        "var it = { done: false };" +
++        "it[Symbol.asyncIterator] = function () { return this; };" +
++        "it.next = function () { var self = this;" +
++        "    if (self.done) return Promise.resolve({ value: undefined, done: true });" +
++        "    self.done = true;" +
++        "    return gate.then(function (v) { return { value: v, done: false }; }); };" +
++        "(async function () { var g = []; for await (const v of it) g.push(v); globalThis.r = g.join(','); })();" +
++        "release('ready');"));
++
++    /// <summary>The already-settled shape still works — it is what used to be the only one that did.</summary>
++    [Fact(Timeout = 600000)]
++    public void SettledNextResult() => Assert.Equal("1,2", Drive(
++        "var it = { i: 0 };" +
++        "it[Symbol.asyncIterator] = function () { return this; };" +
++        "it.next = function () { var self = this;" +
++        "    return Promise.resolve(self.i++ < 2 ? { value: self.i, done: false } : { value: undefined, done: true }); };" +
++        "(async function () { var g = []; for await (const v of it) g.push(v); globalThis.r = g.join(','); })();"));
++
++    /// <summary>A rejected step result rejects the loop rather than hanging it.</summary>
++    [Fact(Timeout = 600000)]
++    public void RejectedNextResult() => Assert.Equal("caught:boom", Drive(
++        "var it = {};" +
++        "it[Symbol.asyncIterator] = function () { return this; };" +
++        "it.next = function () { return Promise.resolve(0).then(function () { throw new Error('boom'); }); };" +
++        "(async function () { try { for await (const v of it) { } globalThis.r = 'no throw'; }" +
++        "  catch (e) { globalThis.r = 'caught:' + e.message; } })();"));
++
++    /// <summary>A step result that settles to a non-object is the specified TypeError, checked after
++    /// the await rather than before it.</summary>
++    [Fact(Timeout = 600000)]
++    public void NonObjectNextResult() => Assert.Equal("TypeError", Drive(
++        "var it = {};" +
++        "it[Symbol.asyncIterator] = function () { return this; };" +
++        "it.next = function () { return Promise.resolve(0).then(function () { return 7; }); };" +
++        "(async function () { try { for await (const v of it) { } globalThis.r = 'no throw'; }" +
++        "  catch (e) { globalThis.r = e.name; } })();"));
++
++    /// <summary>The synchronous fallback — <c>for await</c> over an array — goes through the same
++    /// three pieces and still iterates.</summary>
++    [Fact(Timeout = 600000)]
++    public void SyncIterableFallback() => Assert.Equal("1,2", Drive(
++        "(async function () { var g = []; for await (const v of [1, 2]) g.push(v); globalThis.r = g.join(','); })();"));
++
++    /// <summary>An early <c>break</c> still closes the iterator through <c>return()</c>.</summary>
++    [Fact(Timeout = 600000)]
++    public void BreakClosesTheIterator() => Assert.Equal("1/closed", Drive(
++        "var it = { i: 0, closed: false };" +
++        "it[Symbol.asyncIterator] = function () { return this; };" +
++        "it.next = function () { var self = this;" +
++        "    return Promise.resolve(0).then(function () { return { value: ++self.i, done: false }; }); };" +
++        "it['return'] = function () { this.closed = true; return Promise.resolve({ value: undefined, done: true }); };" +
++        "(async function () { var g = [];" +
++        "  for await (const v of it) { g.push(v); break; }" +
++        "  globalThis.r = g.join(',') + '/' + (it.closed ? 'closed' : 'open'); })();"));
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/IElementEnumeratorBuilder.cs b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/IElementEnumeratorBuilder.cs
+index 17231859..a2ebe0ea 100644
+--- a/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/IElementEnumeratorBuilder.cs
++++ b/Broiler.JS/Broiler.JavaScript.LinqExpressions/LinqExpressions/IElementEnumeratorBuilder.cs
+@@ -29,6 +29,29 @@ public class IElementEnumeratorBuilder
+ 
+     public static Expression MoveNext(Expression target, Expression item) => target.CallExpression<IElementEnumerator, JSValue, bool>(() => (x, a) => x.MoveNext(out a), item);
+ 
++    /// <summary>
++    /// One <c>for await…of</c> step: the raw <c>next()</c> result, for the async function to await.
++    /// See <see cref="AsyncIterationStep"/> — the awaiting cannot happen inside the enumerator.
++    /// </summary>
++    public static Expression AsyncNextRaw(Expression target)
++        => target.CallExpression<IElementEnumerator, JSValue>(() => (x) => x.AsyncNextRaw());
++
++    private static readonly System.Reflection.MethodInfo AsyncStepIsDoneMethod =
++        typeof(AsyncIterationStep).GetMethod(nameof(AsyncIterationStep.IsDone), [typeof(JSValue)])
++        ?? throw new InvalidOperationException("AsyncIterationStep.IsDone(JSValue) not found");
++
++    private static readonly System.Reflection.MethodInfo AsyncStepValueMethod =
++        typeof(AsyncIterationStep).GetMethod(nameof(AsyncIterationStep.Value), [typeof(JSValue)])
++        ?? throw new InvalidOperationException("AsyncIterationStep.Value(JSValue) not found");
++
++    /// <summary>Reads the settled step result's <c>done</c>.</summary>
++    public static Expression AsyncStepIsDone(Expression settledResult)
++        => Expression.Call(null, AsyncStepIsDoneMethod, settledResult);
++
++    /// <summary>Reads the settled step result's <c>value</c>.</summary>
++    public static Expression AsyncStepValue(Expression settledResult)
++        => Expression.Call(null, AsyncStepValueMethod, settledResult);
++
+     public static Expression AssignMoveNext(Expression assignee, Expression target) => Expression.Assign(assignee,
+             target.CallExpression<IElementEnumerator, JSValue, JSValue>(() => (x, a) => x.NextOrDefault(a), JSUndefinedBuilder.Value));
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/AsyncIterationStep.cs b/Broiler.JS/Broiler.JavaScript.Runtime/AsyncIterationStep.cs
+new file mode 100644
+index 00000000..bb8e85a4
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/AsyncIterationStep.cs
+@@ -0,0 +1,69 @@
++using Broiler.JavaScript.Storage;
++
++namespace Broiler.JavaScript.Runtime;
++
++/// <summary>
++/// One step of <c>for await…of</c>, split so the async function itself awaits the iterator's result
++/// instead of the host blocking on it.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <b>The defect this exists to fix was a deadlock, not a wrong answer.</b> Async iteration used to
++/// unwrap the result of <c>next()</c> inside <see cref="JSIterator"/> with
++/// <c>promise.Task.GetAwaiter().GetResult()</c> — a blocking wait, on the one thread that is allowed
++/// to run this context's JavaScript. That works only while the promise is <em>already</em> settled.
++/// The moment <c>next()</c> hands back a promise that still needs a job to run — the ordinary shape,
++/// <c>return somePromise.then(…)</c> — the settling job can never run, because the queue that would
++/// run it drains on the way out of the execution the thread is stuck inside.
++/// <c>JSMicrotaskQueue</c> names this exact pattern as the one it cannot support.
++/// </para>
++/// <para>
++/// So the step is now three pieces the compiler can put an <c>await</c> between:
++/// <see cref="IElementEnumerator.AsyncNextRaw"/> calls <c>next()</c> and hands back its result
++/// unexamined, the state machine awaits that value the way it awaits any other, and
++/// <see cref="IsDone"/> / <see cref="Value"/> read the settled record. Nothing blocks, so the
++/// settling job runs at the checkpoint it was queued for.
++/// </para>
++/// <para>
++/// <b>The sync-iterable fallback goes through the same three pieces.</b> <c>for await</c> over an
++/// array reaches an ordinary element enumerator, whose default <c>AsyncNextRaw</c> synthesises the
++/// same <c>{value, done}</c> record; awaiting a plain object is a tick and nothing more, which is
++/// what the specification's async-from-sync wrapper does anyway.
++/// </para>
++/// </remarks>
++public static class AsyncIterationStep
++{
++    /// <summary>Whether the settled step result says the iterator is exhausted.</summary>
++    public static bool IsDone(JSValue result) => Validate(result)[KeyStrings.done].BooleanValue;
++
++    /// <summary>The value carried by a settled step result.</summary>
++    public static JSValue Value(JSValue result) => Validate(result)[KeyStrings.value];
++
++    /// <summary>The record an exhausted synchronous enumerator reports.</summary>
++    public static JSValue DoneResult() => Record(JSUndefined.Value, done: true);
++
++    /// <summary>The record a synchronous enumerator reports for one element.</summary>
++    public static JSValue ValueResult(JSValue value) => Record(value, done: false);
++
++    /// <summary>
++    /// IteratorResult's own check, applied after the await rather than before it: for a real async
++    /// iterator the object under test is what the promise resolved to, so validating the promise
++    /// would have tested the wrong thing.
++    /// </summary>
++    private static JSValue Validate(JSValue result)
++    {
++        if (!result.IsObject)
++            throw JSValue.NewTypeError("Iterator next result is not an object");
++
++        return result;
++    }
++
++    private static JSValue Record(JSValue value, bool done)
++    {
++        var record = JSObject.NewWithProperties();
++        record.FastAddValue(KeyStrings.value, value, JSPropertyAttributes.EnumerableConfigurableValue);
++        record.FastAddValue(KeyStrings.done, done ? JSValue.BooleanTrue : JSValue.BooleanFalse,
++            JSPropertyAttributes.EnumerableConfigurableValue);
++        return record;
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/IElementEnumerator.cs b/Broiler.JS/Broiler.JavaScript.Runtime/IElementEnumerator.cs
+index c8501df9..516e0dd9 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/IElementEnumerator.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/IElementEnumerator.cs
+@@ -9,4 +9,18 @@ public interface IElementEnumerator
+     bool MoveNext(out JSValue value);
+     bool MoveNextOrDefault(out JSValue value, JSValue @default);
+     JSValue NextOrDefault(JSValue @default);
++
++    /// <summary>
++    /// One step of <c>for await…of</c>: the result of <c>next()</c>, handed back <em>unexamined</em>
++    /// so the async function can await it itself. See <see cref="AsyncIterationStep"/> for why the
++    /// awaiting cannot happen here.
++    /// </summary>
++    /// <remarks>
++    /// The default is the synchronous fallback — <c>for await</c> over an array or any other
++    /// non-async iterable — which has no promise to await and so synthesises the same
++    /// <c>{value, done}</c> record a real iterator would resolve to. <see cref="JSIterator"/>
++    /// overrides it to call the iterator's own <c>next()</c>.
++    /// </remarks>
++    JSValue AsyncNextRaw() =>
++        MoveNext(out var value) ? AsyncIterationStep.ValueResult(value) : AsyncIterationStep.DoneResult();
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Runtime/JSIterator.cs b/Broiler.JS/Broiler.JavaScript.Runtime/JSIterator.cs
+index 63290ad3..121df0b5 100644
+--- a/Broiler.JS/Broiler.JavaScript.Runtime/JSIterator.cs
++++ b/Broiler.JS/Broiler.JavaScript.Runtime/JSIterator.cs
+@@ -40,14 +40,51 @@ public struct JSIterator(JSValue iterator, bool awaitResult = false) : IElementE
+         }
+     }
+ 
++    /// <summary>
++    /// Unwraps a promise the iterator handed back, for the two members <c>for await</c> reaches only
++    /// on an abrupt completion — <c>return()</c> and <c>throw()</c>.
++    /// </summary>
++    /// <remarks>
++    /// <b>Only when the promise is already settled.</b> This is a blocking wait on the one thread
++    /// allowed to run this context's JavaScript, so a promise that still needs a job to run could
++    /// never settle here — the queue that would run it drains on the way out of the execution this
++    /// thread is inside. The loop's own stepping no longer comes through here at all: it hands the
++    /// raw result to the async function and lets it await (see <see cref="AsyncIterationStep"/>).
++    /// An unsettled <c>return()</c>/<c>throw()</c> result is left as the promise rather than waited
++    /// for, which loses the closing value but does not hang the agent.
++    /// </remarks>
+     private readonly JSValue AwaitIfNeeded(JSValue result)
+     {
+-        if (awaitResult && result is IJSPromise promise)
++        if (awaitResult && result is IJSPromise promise && promise.Task.IsCompleted)
+             return promise.Task.GetAwaiter().GetResult();
+ 
+         return result;
+     }
+ 
++    /// <summary>
++    /// One step of <c>for await…of</c>: the iterator's own <c>next()</c> result, unexamined, so the
++    /// async function awaits it rather than the host blocking on it.
++    /// </summary>
++    /// <remarks>
++    /// The result is not validated here: for a real async iterator the object that has to be an
++    /// object is what the promise <em>resolves to</em>, so checking it before the await would test
++    /// the wrong value. <see cref="AsyncIterationStep.IsDone"/> checks it afterwards. A throwing
++    /// <c>next()</c> still marks the iterator done, which is what stops IteratorClose calling
++    /// <c>return()</c> on it.
++    /// </remarks>
++    public JSValue AsyncNextRaw()
++    {
++        try
++        {
++            return nextMethod.InvokeFunction(new Arguments(iterator));
++        }
++        catch
++        {
++            done = true;
++            throw;
++        }
++    }
++
+     private readonly JSValue ValidateIteratorResult(JSValue result, string methodName)
+     {
+         result = AwaitIfNeeded(result);
+-- 
+2.43.0
+

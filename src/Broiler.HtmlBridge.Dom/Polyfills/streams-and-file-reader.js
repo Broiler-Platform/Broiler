@@ -8,10 +8,10 @@
 // has. The one thing the host provides is a Blob's bytes, which live where blobs do.
 //
 // NOT implemented, and detectably so: pipeTo and pipeThrough, which need a WritableStream; BYOB
-// readers, which need a byte-stream controller; and async iteration, which is blocked on the engine
-// rather than on the stream (see the comment where values() would go). Each is its own capability
-// rather than a piece of this one; getReader({mode: 'byob'}) throws rather than handing back a
-// reader that is not one.
+// readers, which need a byte-stream controller; and async iteration, which is written below and held
+// back on an engine fix that is not live yet (see the comment where values() would go). Each is its
+// own capability rather than a piece of this one; getReader({mode: 'byob'}) throws rather than
+// handing back a reader that is not one.
 //
 // __broilerBlobBytes is the host hook; it is captured into this closure and deleted from the global
 // so a page cannot reach a blob's bytes out of band.
@@ -399,15 +399,40 @@
         return [branch(0), branch(1)];
     };
 
-    // values() and @@asyncIterator are deliberately NOT installed, and the reason is the engine
-    // rather than the stream. `for await` never completes here: it does not resume its async
-    // function even over a plain array — `for await (const v of [1, 2])` leaves the function
-    // suspended forever — and over an object carrying @@asyncIterator it takes the capture's drain
-    // loop with it. Installing the hook would turn the ordinary
-    // `for await (const chunk of response.body)` from a TypeError a page's script survives into a
-    // capture that never settles, which is strictly worse. A reader still works:
-    // `stream.getReader()` and `await reader.read()` are exercised end to end. The hook goes on when
-    // the engine's `for await` does; the gap is recorded against the language track.
+    // values() and @@asyncIterator are written and correct, and are deliberately NOT installed
+    // until the engine fix they depend on is live. `for await` deadlocks the agent when the
+    // iterator's next() hands back a promise that is not already settled — it blocks the one thread
+    // allowed to run this context's JavaScript, so the job that would settle the promise can never
+    // run — and `reader.read().then(…)`, which is exactly what an iterator over a stream returns, is
+    // that shape. The fix is patches/0001-js-for-await-unsettled-step-result.patch against
+    // Broiler.JS; with it applied, `for await (const chunk of response.body)` iterates correctly,
+    // verified in this host and in a capture. Without it, installing the hook would turn that line
+    // from a TypeError a page's script survives into a capture that never settles, which is strictly
+    // worse. Uncomment both statements when the patch lands.
+    //
+    // ReadableStream.prototype.values = function (options) {
+    //     var reader = this.getReader();
+    //     var preventCancel = !!(options && options.preventCancel);
+    //     var iterator = {
+    //         next: function () {
+    //             return reader.read().then(function (result) {
+    //                 if (result.done)
+    //                     reader.releaseLock();
+    //                 return result;
+    //             });
+    //         },
+    //         'return': function (value) {
+    //             if (!preventCancel)
+    //                 reader.cancel(value);
+    //             reader.releaseLock();
+    //             return Promise.resolve({ value: value, done: true });
+    //         },
+    //     };
+    //     iterator[Symbol.asyncIterator] = function () { return this; };
+    //     return iterator;
+    // };
+    //
+    // ReadableStream.prototype[Symbol.asyncIterator] = ReadableStream.prototype.values;
 
     globalThis.ReadableStream = ReadableStream;
     globalThis.ReadableStreamDefaultReader = ReadableStreamDefaultReader;

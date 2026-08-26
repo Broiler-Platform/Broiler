@@ -232,12 +232,21 @@ public sealed class ReadableStreamTests
     /// Async iteration is deliberately absent, and the reason is the engine rather than the stream.
     /// </summary>
     /// <remarks>
-    /// <c>for await</c> never completes here — it leaves its async function suspended even over a
-    /// plain array — and over an object carrying <c>@@asyncIterator</c> it takes a capture's drain
-    /// loop with it. Installing the hook would turn the ordinary
-    /// <c>for await (const chunk of response.body)</c> from a <c>TypeError</c> a page's script
-    /// survives into a capture that never settles, which is strictly worse. Pinned so it goes back on
-    /// with the engine fix rather than by accident.
+    /// <para>
+    /// <c>for await</c> deadlocks the agent when the iterator's <c>next()</c> hands back a promise
+    /// that is not <em>already</em> settled: the engine blocks the one thread allowed to run this
+    /// context's JavaScript, so the job that would settle the promise can never run. An iterator over
+    /// a stream returns exactly that — <c>reader.read().then(…)</c> — so installing the hook would
+    /// turn the ordinary <c>for await (const chunk of response.body)</c> from a <c>TypeError</c> a
+    /// page's script survives into a capture that never settles.
+    /// </para>
+    /// <para>
+    /// The engine fix is written and verified and ships as
+    /// <c>patches/0001-js-for-await-unsettled-step-result.patch</c>; with it applied, iteration over
+    /// a page stream, a blob stream and a response body all answer what Chromium answers. This test
+    /// pins the interim state so turning the hook on is a decision that comes with the patch rather
+    /// than a drift.
+    /// </para>
     /// </remarks>
     [Fact(Timeout = 600000)]
     public void Async_Iteration_Is_Absent_Until_The_Engine_Can_Drive_It()

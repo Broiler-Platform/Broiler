@@ -19,14 +19,22 @@ A confirmed gap closes only under the rules in
 
 ## Track 1 — Core language and built-ins
 
-- **`for await` never completes.** An `async` function that reaches a `for await…of` loop is
-  suspended and never resumed — over a plain array, over an object carrying `@@asyncIterator`, over
-  anything. Ordinary `await` is fine, so this is the loop rather than async resumption: the
-  reproduction is `(async () => { for await (const v of [1, 2]) {} ; done(); })()`, whose `done()`
-  never runs, and over an `@@asyncIterator` object it additionally keeps a capture's drain loop
-  spinning until the run is killed. Characterized against the current pointer while implementing
-  `ReadableStream`, which is why that interface's `values()` / `@@asyncIterator` are deliberately not
-  installed — see [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **A method call whose argument is a method call is silently skipped inside an `async` function.**
+  `trace.push(items.join('+'))` does not run: the statement is not executed, no error is raised, and
+  the statement after it runs normally. The inner call *is* evaluated — twice, measured with a
+  side-effecting one — so the outer call is what goes missing. The same source in a non-async
+  function is correct, which places it in the generator rewrite rather than in call compilation.
+  <br>Characterized as a matrix against the current pointer: an argument that is a plain-function
+  call (`trace.push(String(n))`) is fine, an argument that is a member *access*
+  (`trace.push(items.length)`) is fine, and hoisting the inner call into a variable first is fine —
+  only a member-call argument to a member call fails. The receiver's kind does not matter (a local
+  array, a global, a nested member), a loop is not needed, and neither is an `await`: the smallest
+  reproduction is
+  `(async function () { trace.push('1'); var got = ['a']; trace.push(got.join('+')); trace.push('3'); })()`,
+  which records `1,3`. This is a common shape — `console.log(list.join(', '))` inside any `async`
+  function vanishes — so it is worth more than its position in this list suggests. Not yet
+  root-caused; the pipeline to look at is `GeneratorRewriter` → `FlattenBlocks.VisitCall`, whose
+  operand hoisting is what a member-call argument goes through.
 - Remaining Annex B cases must be reduced from the current manifest rather than reconstructed
   from deleted issue snapshots.
 - `slice/create-proto-from-ctor-realm-array.js` — the one array case that still fails, a

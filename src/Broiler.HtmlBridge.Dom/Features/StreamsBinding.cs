@@ -17,9 +17,9 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// <c>ReadableStream</c> did not exist, and what stood in for it was a shape-only object that
 /// <c>response.body</c> handed back: it carried a <c>getReader</c> whose reader had <c>read</c>,
 /// <c>cancel</c> and <c>releaseLock</c> and nothing else — no <c>closed</c>, no <c>tee</c>, no
-/// <c>cancel</c> on the stream itself, no async iteration, and no constructor for a page to build one
+/// <c>cancel</c> on the stream itself, and no constructor for a page to build one
 /// of its own. So <c>new ReadableStream(...)</c> was a <c>ReferenceError</c>, which aborts the script
-/// rather than the statement, and <c>for await (const chunk of response.body)</c> threw.
+/// rather than the statement.
 /// <c>Blob.prototype.stream()</c> was left out for exactly this reason and is now in.
 /// </para>
 /// <para>
@@ -32,9 +32,11 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </para>
 /// <para>
 /// <b>Not implemented, and detectably so:</b> <c>pipeTo</c> and <c>pipeThrough</c>, which need a
-/// <c>WritableStream</c>, and BYOB readers, which need a byte-stream controller. Each is its own
-/// capability rather than a piece of this one, and <c>getReader({mode: 'byob'})</c> throws rather
-/// than handing back a default reader that would ignore the caller's buffer.
+/// <c>WritableStream</c>; BYOB readers, which need a byte-stream controller, so
+/// <c>getReader({mode: 'byob'})</c> throws rather than handing back a default reader that would
+/// ignore the caller's buffer; and async iteration, which is written and verified and held back on
+/// an engine fix that is not live yet — see the comment in the asset and
+/// <c>patches/0001-js-for-await-unsettled-step-result.patch</c>.
 /// </para>
 /// </remarks>
 internal sealed class StreamsBinding

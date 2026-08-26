@@ -7,6 +7,33 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Fixed
+
+- `for await…of` no longer deadlocks the agent when the iterator's `next()`
+  hands back a promise that is not already settled. Delivered as
+  `patches/0001-js-for-await-unsettled-step-result.patch` against `Broiler.JS`
+  — the push to that repository is outside this environment's GitHub scope —
+  so it is **not live until the patch is applied**.
+
+  Async iteration unwrapped the result of `next()` with a blocking wait on the
+  one thread allowed to run a context's JavaScript. That works only while the
+  promise is already settled, which is why every shape the engine's suite
+  covered passed: an array, an async generator, an iterator returning
+  `Promise.resolve(record)`. The moment `next()` returns the ordinary
+  `something.then(…)`, the job that would settle it can never run, because the
+  queue that runs it drains on the way out of the execution the thread is stuck
+  inside. The agent hung until the process was killed — which is why it never
+  showed up as a failing test.
+
+  The step is now three pieces with the state machine's own `await` between
+  them, so nothing blocks. Seven regressions come with it, each of which hung
+  rather than failed before.
+
+  This is what `ReadableStream`'s async iteration is waiting on: `values()` and
+  its `@@asyncIterator` are written and verified and stay commented out until
+  the patch lands, because an iterator over a stream returns exactly the
+  unsettled shape.
+
 ### Added
 
 - `ReadableStream` (with its default reader and controller), `FileReader`,
