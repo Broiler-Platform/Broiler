@@ -77,18 +77,6 @@ internal sealed class FormControlBinding(IFormControlHost host)
             new DomFunction((in a) => SetDisabled(element, in a), "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // hidden (read/write) — global reflected boolean attribute.
-        obj.FastAddProperty((KeyString)"hidden",
-            new DomFunction((in _) => DomBridge.HasAttr(element, "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
-            new DomFunction((in a) => SetHidden(element, in a), "set hidden"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // tabIndex (read/write) — global reflected numeric attribute.
-        obj.FastAddProperty((KeyString)"tabIndex",
-            new DomFunction((in _) => GetTabIndex(element), "get tabIndex"),
-            new DomFunction((in a) => SetTabIndex(element, in a), "set tabIndex"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
         // required (read/write) — form validation.
         obj.FastAddProperty((KeyString)"required",
             new DomFunction((in _) => DomBridge.HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
@@ -103,6 +91,27 @@ internal sealed class FormControlBinding(IFormControlHost host)
         obj.FastAddProperty((KeyString)"files",
             new DomFunction((in _) => GetFiles(element), "get files"),
             null,
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+    }
+
+    /// <summary>
+    /// The two global reflected attributes that came with this module and are not form-control
+    /// members at all: <c>hidden</c> and <c>tabIndex</c> belong to <c>HTMLElement</c> (HTML §3.2.6,
+    /// and <c>tabIndex</c> through the <c>HTMLOrSVGElement</c> mixin), so they go on its prototype
+    /// while the reflectors above stay per-instance until each control interface has one.
+    /// </summary>
+    internal void InstallHtmlElementMembers(JSObject target, ElementSource element)
+    {
+        // hidden (read/write) — global reflected boolean attribute.
+        target.FastAddProperty((KeyString)"hidden",
+            new DomFunction((in a) => DomBridge.HasAttr(element(in a, "hidden"), "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
+            new DomFunction((in a) => SetHidden(element(in a, "hidden"), in a), "set hidden"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // tabIndex (read/write) — global reflected numeric attribute.
+        target.FastAddProperty((KeyString)"tabIndex",
+            new DomFunction((in a) => GetTabIndex(element(in a, "tabIndex")), "get tabIndex"),
+            new DomFunction((in a) => SetTabIndex(element(in a, "tabIndex"), in a), "set tabIndex"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 

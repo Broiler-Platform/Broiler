@@ -9,6 +9,29 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `HTMLElement`'s interface lives on `HTMLElement.prototype`, and the root element
+  inherits like every other. In the main repository (`Broiler.HtmlBridge.Dom`), so
+  it is live.
+
+  The prototype owned nothing but its `constructor` while every element wrapper
+  installed the 37 members HTML gives every HTML element as own properties of
+  itself, so `HTMLElement.prototype.click` was `undefined` and
+  `el.click === otherEl.click` was `false`. Those members — the global
+  reflectors, `style`, `dataset`, `innerText`/`outerText`, `hidden`/`tabIndex`,
+  `click`/`focus`/`blur`, `attachInternals`, the seventeen `on*` handlers and the
+  `offset*` metrics — are on the prototype now, taking an element from 77 own
+  properties to 40. `el.style === el.style` and `el.dataset === el.dataset` still
+  hold: both are memoized per element rather than built with the wrapper.
+
+  `document.documentElement` was the one element wrapper minted before those
+  prototypes existed, because it was materialized as a value during document
+  registration. It carried its own copy of everything *and* the prototype — 164
+  own properties against an ordinary element's — so a page patching
+  `Element.prototype` reached every element except the root one. It is a getter
+  now, like the `scrollingElement` beside it, so its wrapper is minted on first
+  read like any other; that also stops a re-parse handing back the previous
+  document's wrapper.
+
 - `Element`'s interface lives on `Element.prototype`, where a page can reach it.
   In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
 

@@ -897,6 +897,48 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`HTMLElement`'s interface was copied onto every element wrapper too.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The sixth instalment of track 6
+  action 1 and the direct sequel to the `Element` one below, whose `ElementSource` mechanism it reuses
+  unchanged; what remains is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** `HTMLElement.prototype` owned nothing but its `constructor`, while every element
+  wrapper installed the 37 members HTML gives every HTML element as own properties of itself — so
+  `HTMLElement.prototype.click` was `undefined`, and `el.click === otherEl.click` was `false` where a
+  browser says `true`.
+  <br>**Fix.** Web IDL's `HTMLElement` and the mixins it includes — `ElementCSSInlineStyle` (`style`),
+  `HTMLOrSVGElement` (`dataset`, `tabIndex`, `focus`, `blur`), `GlobalEventHandlers` (the seventeen
+  `on*` reflectors), the global reflectors, `innerText`/`outerText`, `hidden`, `click`,
+  `attachInternals` and the CSSOM View `offset*` metrics — are on the prototype and resolve their
+  element from the receiver. An element is down from **77** own properties to **40**.
+  <br>**Two more per-instance objects.** `style` was a declaration built with the wrapper and captured
+  by the accessor; `dataset` was a self-replacing accessor that wrote its map back onto the wrapper it
+  closed over, which memoized it *and* left an own property behind. Both are weak per-element caches
+  now — the shape `classList` and `attributes` already use — so `el.style === el.style` and
+  `el.dataset === el.dataset` hold while the element carries neither.
+  <br>**What deliberately did not move.** The per-control reflectors installed beside them — `value`,
+  `checked`, `defaultValue`, `defaultChecked`, `type`, `name`, `disabled`, `required`, `files`, and
+  `checkValidity`/`reportValidity`/`submit` — are on *every* element here where a browser gives them
+  only to the interfaces that declare them, so relocating them is a decision about dropping them from
+  a `<div>` rather than a relocation. `textContent` stays each wrapper's own for the reason it always
+  has.
+  <br>**An SVG element keeps its own copies, and that is a pinned deviation rather than an
+  oversight.** `SVGElement` derives straight from `Element`, so it inherits none of these; installing
+  them on itself preserves exactly the surface it had. That surface is not a browser's — an
+  `SVGElement` shares only `style`, `dataset`, `tabIndex`, `focus`/`blur` and the `on*` handlers, and
+  has no `title` or `offsetWidth` — and narrowing it is the per-tag SVG interface decision this track
+  already holds open, which would mean minting a prototype shape from a specification reading rather
+  than from a measurement.
+  <br>**Evidence.** 30 regressions in `HtmlElementInterfacePrototypeTests` — each member inherited
+  rather than owned and owned by `HTMLElement.prototype`, one function shared across elements, the
+  inline style keeping its identity and still writing through to the `style` attribute (including
+  through the `el.style = "…"` assignment), the dataset keeping its identity and leaving no own
+  property, the reflectors, each `on*` handler answering for its own event, `click`/`focus`/`blur`
+  still dispatching, the `offset*` metrics, a non-element receiver as an illegal invocation, the SVG
+  deviation, and the members that stay each wrapper's own. Five superseded assertions updated in
+  `ElementInterfacePrototypeTests`, which pinned those five as the element's own when only `Element`
+  had moved.
+
 - **The root element inherited none of the interface the others do.** **Fixed, and live** — entirely
   in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. Found while checking what the element
   instalment below actually reached.

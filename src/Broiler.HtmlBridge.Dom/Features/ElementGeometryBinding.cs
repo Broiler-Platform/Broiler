@@ -100,35 +100,39 @@ internal static class ElementGeometryBinding
     }
 
     /// <summary>
-    /// The metrics <c>HTMLElement</c> owns — the <c>offset*</c> family — plus the bridge's own
-    /// <c>scrollParent</c>. Still installed on each wrapper: the first group until
-    /// <c>HTMLElement</c>'s interface moves, and <c>scrollParent</c> because it is on no browser's
-    /// prototype at all.
+    /// The metrics <c>HTMLElement</c> owns — the <c>offset*</c> family — on its prototype. Like the
+    /// <c>Element</c> half above, the viewport test is asked per call rather than snapshotted at
+    /// install.
     /// </summary>
-    public static void InstallHtmlElementMembers(IElementGeometryHost host, JSObject obj, DomElement element)
+    public static void InstallHtmlElementMembers(IElementGeometryHost host, JSObject target, ElementSource element)
     {
-        var isViewportElement = host.IsViewportElementForMetrics(element);
-
-        obj.FastAddProperty((KeyString)"offsetWidth",
-            new DomFunction((in _) => new JSNumber(host.GetOffsetWidthForDomElement(element, isViewportElement)), "get offsetWidth"),
+        target.FastAddProperty((KeyString)"offsetWidth",
+            new DomFunction((in a) => Metric(host, element(in a, "offsetWidth"), host.GetOffsetWidthForDomElement), "get offsetWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"offsetHeight",
-            new DomFunction((in _) => new JSNumber(host.GetOffsetHeightForDomElement(element, isViewportElement)), "get offsetHeight"),
+        target.FastAddProperty((KeyString)"offsetHeight",
+            new DomFunction((in a) => Metric(host, element(in a, "offsetHeight"), host.GetOffsetHeightForDomElement), "get offsetHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"offsetTop",
-            new DomFunction((in _) => new JSNumber(host.GetOffsetTopForDomElement(element)), "get offsetTop"),
+        target.FastAddProperty((KeyString)"offsetTop",
+            new DomFunction((in a) => new JSNumber(host.GetOffsetTopForDomElement(element(in a, "offsetTop"))), "get offsetTop"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"offsetLeft",
-            new DomFunction((in _) => new JSNumber(host.GetOffsetLeftForDomElement(element)), "get offsetLeft"),
+        target.FastAddProperty((KeyString)"offsetLeft",
+            new DomFunction((in a) => new JSNumber(host.GetOffsetLeftForDomElement(element(in a, "offsetLeft"))), "get offsetLeft"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"offsetParent",
-            new DomFunction((in _) => GetOffsetParent(host, element), "get offsetParent"),
+        target.FastAddProperty((KeyString)"offsetParent",
+            new DomFunction((in a) => GetOffsetParent(host, element(in a, "offsetParent")), "get offsetParent"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
+    }
 
+    /// <summary>
+    /// <c>scrollParent</c>, the bridge's own — on no browser's prototype at all, so it stays an own
+    /// property of each element wrapper rather than being smuggled onto one.
+    /// </summary>
+    public static void InstallBridgeMembers(IElementGeometryHost host, JSObject obj, DomElement element)
+    {
         obj.FastAddValue((KeyString)"scrollParent",
             new DomFunction((in _) => GetScrollParent(host, element), "scrollParent", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);

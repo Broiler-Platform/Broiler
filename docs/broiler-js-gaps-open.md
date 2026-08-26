@@ -194,33 +194,35 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- **`HTMLElement`'s members, `Node`'s tree mutations, and all of a document's, are still own
+- **`Node`'s tree mutations, the per-tag interfaces, and all of a document's members are still own
   properties of each wrapper.** Character data has moved whole, an element's `Node` members with it,
-  and now `Element`'s own interface — all three are in
+  and now `Element`'s and `HTMLElement`'s interfaces — all in
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  An element is down from **166** own properties to **77**, and a document is at **96**, where a
+  An element is down from **166** own properties to **40**, and a document is at **96**, where a
   browser gives either none.
   <br>What is left divides into four:
-  <br>1. **`HTMLElement`'s interface** — `style`, `dataset`, `innerText`/`outerText`,
-  `title`/`lang`/`dir`/`draggable`/`accessKey`/`hidden`/`tabIndex`, `click`/`focus`/`blur`,
-  `attachInternals`, the `offset*` metrics and the seventeen `on*` handlers. The mechanism is the one
-  `Element` used and the installers are already written against it, so this is the same move again —
-  except for `style` and `dataset`, which are per-instance objects and need the memoization
-  `classList` got.
-  <br>2. **`Node`'s five tree mutations** — `appendChild`, `insertBefore`, `removeChild`,
+  <br>1. **`Node`'s five tree mutations** — `appendChild`, `insertBefore`, `removeChild`,
   `replaceChild` and `moveBefore` — are still the element's own, and `Node.prototype` has none of
   them, so `document.createTextNode('x').appendChild` is `undefined` where a browser has a method
   that throws `HierarchyRequestError`. Moving them is not the mechanical case the others were: the
   bindings take a `DomElement`, while a document and a fragment carry their own separate
   implementations that a prototype member would have to route to rather than shadow. The eighteen
   `Node` constants beside them are pure duplicates of `Node.prototype`'s and can simply go.
-  <br>3. **The per-tag interfaces.** `HTMLInputElement.value`, `HTMLTableElement.rows`,
+  <br>2. **The per-tag interfaces.** `HTMLInputElement.value`, `HTMLTableElement.rows`,
   `HTMLFormElement.elements` and the rest are installed per tag on the instance; the globals and
   their prototype chains all exist, so each has somewhere correct to go. The form-control reflectors
-  are the odd ones: `value`, `checked`, `type`, `name`, `disabled`, `required`, `files`,
-  `checkValidity`, `reportValidity` and `submit` are installed on *every* element, where a browser
-  gives them only to the interfaces that declare them, so moving them is also a decision about
-  dropping them from a `<div>`.
+  are the odd ones: `value`, `checked`, `defaultValue`, `defaultChecked`, `type`, `name`, `disabled`,
+  `required`, `files`, `checkValidity`, `reportValidity` and `submit` are installed on *every*
+  element, where a browser gives them only to the interfaces that declare them, so moving them is
+  also a decision about dropping them from a `<div>` — as are the `data` and `length` a `<div>`
+  carries from the character-data facade, and `scrollParent`, which is the bridge's own.
+  <br>3. **An SVG element carries what an HTML one now inherits.** It does not inherit
+  `HTMLElement.prototype` — `SVGElement` derives straight from `Element` — so it installs those 37
+  members on itself, which is exactly the surface it had before. It is not a browser's: an
+  `SVGElement` shares only `style`, `dataset`, `tabIndex`, `focus`/`blur` and the `on*` handlers with
+  `HTMLElement`, and has no `title`, `innerText` or `offsetWidth`. Narrowing it is part of the per-tag
+  SVG interface decision below, since doing it needs a measured `SVGElement` shape rather than a
+  reading of the specification. Pinned as the current answer.
   <br>4. **`textContent`.** An element's is a different operation from a character-data node's, so
   it stays the element's own and shadows the `Node.prototype` one until there is a single
   implementation that serves both. The document's `Node` members have gone — checking them against

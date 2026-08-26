@@ -235,20 +235,21 @@ document.getElementById('result').textContent = String({script});
             + "   && !Object.prototype.hasOwnProperty.call(d, 'removeAttributeNodeNS')].join('|')"));
 
     /// <summary>
-    /// The members that are <em>not</em> <c>Element</c>'s stay where they were: <c>textContent</c> is
-    /// <c>Node</c>'s and deliberately the element's own, the <c>HTMLElement</c> half is still on the
-    /// instance, and so are the <c>Node</c> tree mutations.
+    /// The members that are <em>not</em> <c>Element</c>'s are not on its prototype. <c>textContent</c>
+    /// and the tree mutations are <c>Node</c>'s and still each wrapper's own; <c>style</c>,
+    /// <c>dataset</c>, <c>title</c>, <c>offsetWidth</c> and the <c>on*</c> handlers are
+    /// <c>HTMLElement</c>'s and are on <em>its</em> prototype — see
+    /// <c>HtmlElementInterfacePrototypeTests</c>, which is what pins where each of those lives now.
     /// </summary>
     [Theory(Timeout = 600000)]
     [InlineData("textContent")]
+    [InlineData("appendChild")]
     [InlineData("style")]
     [InlineData("dataset")]
     [InlineData("title")]
     [InlineData("offsetWidth")]
     [InlineData("onclick")]
-    [InlineData("appendChild")]
     public void WhatIsNotElementsIsNotOnItsPrototype(string member)
-        => Assert.Contains(">true|false<", Run(
-            $"[Object.prototype.hasOwnProperty.call(d, '{member}'),"
-            + $" Object.prototype.hasOwnProperty.call(Element.prototype, '{member}')].join('|')"));
+        => Assert.Contains(">false<", Run(
+            $"Object.prototype.hasOwnProperty.call(Element.prototype, '{member}')"));
 }

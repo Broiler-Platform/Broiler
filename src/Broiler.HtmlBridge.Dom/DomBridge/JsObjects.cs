@@ -86,8 +86,6 @@ public sealed partial class DomBridge
             return obj;
         }
 
-        var bridge = this;
-
         // Element's whole interface — tagName, id/className, the attribute surface, classList,
         // innerHTML/outerHTML, the shadow-host pair, the ParentNode/ChildNode/element-sibling members,
         // the selector lookups, the box metrics, requestFullscreen and animate — lives on
@@ -97,65 +95,18 @@ public sealed partial class DomBridge
         if (!_elementInterfacePrototypeReady)
             PopulateElementInterfaceOnInstance(obj, element);
 
-        // The global content-attribute reflectors HTMLElement owns (title, lang, accessKey, dir,
-        // draggable) — Phase 3 P3.54: extracted into the co-located GlobalAttributeBinding feature
-        // module. dir invalidates the style scope on write through the one-member IGlobalAttributeHost
-        // contract (DomBridge.GlobalAttributeHost.cs); id and className are Element's and are on its
-        // prototype.
-        Dom.Features.GlobalAttributeBinding.InstallHtmlElementMembers(this, obj, element);
+        // HTMLElement's — the global reflectors, style, dataset, innerText/outerText, click/focus/blur,
+        // attachInternals, the on* handlers and the offset* metrics — the same way, on
+        // HTMLElement.prototype (DomBridge.HtmlElementInterface.cs). An SVG element installs them on
+        // itself: SVGElement derives straight from Element, so it inherits none of them, and keeping
+        // its own copies is what preserves the surface it has today.
+        if (!_htmlElementInterfacePrototypeReady || !IsHtmlNamespace(element))
+            PopulateHtmlElementInterfaceOnInstance(obj, element);
 
-        // textContent (read/write) + innerText / outerText (read) — Phase 3 P3.57: ElementContentBinding.
+        // textContent (read/write) — Node's member, and deliberately the element's own: its operation
+        // differs from the character-data one on Node.prototype (Phase 3 P3.57:
+        // ElementContentBinding).
         Dom.Features.ElementContentBinding.InstallTextContent(this, obj, element);
-
-        // style object — CSS property access and manipulation.
-        // In browsers, `element.style` is a read-only property: assigning a
-        // string sets `style.cssText` instead of replacing the object.
-        // Phase 4 item 2: after every element.style mutation (per-property set, cssText, setProperty,
-        // removeProperty, cssFloat — all route through this onMutation), write the dict through to the
-        // canonical style= attribute so element.style and getAttribute("style") observe one state,
-        // then invalidate computed style.
-        // Phase 4 item 2: every element.style mutation writes the inline-style dict through to the
-        // canonical style= attribute (so element.style and getAttribute("style") observe one state) and
-        // then invalidates computed style. Shared by the declaration object's per-property/cssText
-        // mutations and the `element.style = "..."` assignment setter (Phase 3 P3.63:
-        // StyleDeclarationBinding.SetInlineStyleCssText).
-        void OnStyleMutation()
-        {
-            bridge.SyncStyleAttributeFromInlineStyle(element);
-            bridge.InvalidateStyleScope(element);
-        }
-
-        var styleObj = Dom.Features.StyleDeclarationBinding.BuildInlineDeclaration(bridge, element, OnStyleMutation,
-            onPositionAreaInvalidate: bridge.ClearPositionAreaResolution);
-        obj.FastAddProperty((KeyString)"style",
-            new DomFunction((in a) => styleObj, "get style"),
-            new DomFunction((in a) => Dom.Features.StyleDeclarationBinding.SetInlineStyleCssText(bridge, element, OnStyleMutation, in a), "set style"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // dataset — the live DOMStringMap over the element's data-* attributes.
-        //
-        // Built on first read rather than with the rest of the element: a document has thousands of
-        // elements and few of them are ever asked for their dataset, so building every map up front
-        // would allocate a proxy and four callbacks per element for nothing. The built map replaces
-        // this accessor with a value property, which both memoizes it and keeps
-        // `el.dataset === el.dataset` true as it is in a browser — the map reads and writes the
-        // attributes on every trap, so one instance is already live and a second would be redundant
-        // rather than fresher.
-        obj.FastAddProperty((KeyString)"dataset",
-            new DomFunction((in _) =>
-            {
-                if (bridge._jsContext is not { } datasetContext
-                    || Dom.Features.DatasetBinding.Build(datasetContext, element, bridge.InvalidateStyleScope) is not { } dataset)
-                {
-                    // No Proxy in this realm to build the map from. Undefined is honest: an absent
-                    // dataset is at least not one that silently drops writes.
-                    return JSUndefined.Value;
-                }
-
-                obj.FastAddValue((KeyString)"dataset", dataset, JSPropertyAttributes.EnumerableConfigurableValue);
-                return dataset;
-            }, "get dataset"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // -- DOM tree navigation --
 
@@ -236,17 +187,9 @@ public sealed partial class DomBridge
         if (string.Equals(element.TagName, "template", StringComparison.OrdinalIgnoreCase))
         {
             obj.FastAddProperty((KeyString)"content",
-                new DomFunction((in a) => bridge.ToJSObject(bridge.GetTemplateContent(element)), "get content"),
+                new DomFunction((in a) => ToJSObject(GetTemplateContent(element)), "get content"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
-
-        // attachInternals() — form-associated custom elements (HTML §4.13.5). On every element
-        // rather than only the custom ones, because that is where a browser puts it: it is a member
-        // of HTMLElement, and it refuses at call time for an element that is not a custom element.
-        // Being absent instead would make the standard feature-detect answer the wrong way.
-        obj.FastAddValue((KeyString)"attachInternals",
-            new DomFunction((in a) => ElementInternals.AttachInternals(element, in a), "attachInternals", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild(child)
         obj.FastAddValue((KeyString)"appendChild",
@@ -283,39 +226,18 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
-        // element.click() — creates and dispatches a MouseEvent
-        // For checkboxes and radio buttons, toggles checked state.
-        obj.FastAddValue((KeyString)"click",
-            new DomFunction((in _) => Dom.Features.EventTargetBinding.Click(this, element, in _), "click", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // element.focus() — creates and dispatches a FocusEvent-like object
-        obj.FastAddValue((KeyString)"focus",
-            new DomFunction((in _) => Dom.Features.EventTargetBinding.Focus(this, element, in _), "focus", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // element.blur() — creates and dispatches a FocusEvent-like object
-        obj.FastAddValue((KeyString)"blur",
-            new DomFunction((in _) => Dom.Features.EventTargetBinding.Blur(this, element, in _), "blur", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // on* inline event handler properties (onclick, onload, etc.)
-        foreach (var eventName in InlineEventNames)
-        {
-            obj.FastAddProperty((KeyString)$"on{eventName}",
-                new DomFunction((in _) => Dom.Features.EventHandlerReflectorBinding.GetOn(this, element, eventName, in _), $"get on{eventName}"),
-                new DomFunction((in a) => Dom.Features.EventHandlerReflectorBinding.SetOn(this, element, eventName, in a), $"set on{eventName}"),
-                JSPropertyAttributes.EnumerableConfigurableProperty);
-        }
-
-        // Compile on* HTML attributes into inline event handler functions
+        // click/focus/blur and the on* handlers are HTMLElement's and are on its prototype
+        // (DomBridge.HtmlElementInterface.cs). Compiling the on* HTML attributes into handlers is not
+        // a member and still belongs to each element.
         CompileInlineEventAttributes(element);
 
         // -- Form element support --
 
-        // Form-control IDL reflectors (value/checked/type/name/disabled/hidden/tabIndex/required) —
-        // Phase 3 P3.60: extracted into the co-located FormControlBinding feature module, reached
-        // through the IFormControlHost contract (DomBridge.FormControlHost.cs).
+        // Form-control IDL reflectors (value/checked/type/name/disabled/required/files) — Phase 3
+        // P3.60: extracted into the co-located FormControlBinding feature module, reached through the
+        // IFormControlHost contract (DomBridge.FormControlHost.cs). Installed on every element, where
+        // a browser gives them only to the interfaces that declare them; the two that are genuinely
+        // HTMLElement's, hidden and tabIndex, are on its prototype.
         _formControl.Install(obj, element);
 
         // checkValidity() — form validation (Phase 3 P3.9: FormBinding owns the validity check)

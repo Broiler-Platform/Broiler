@@ -62,6 +62,12 @@ public sealed partial class DomBridge
         // (localName/prefix/namespaceURI) on the same prototype.
         RegisterElementInterface();
 
+        // HTMLElement's, onto HTMLElement.prototype. The custom-elements pass replaces the
+        // HTMLElement *constructor* later with a constructible one, deliberately keeping this same
+        // prototype object — so installing here rather than after it is what every element wrapper
+        // already linked to that object needs.
+        RegisterHtmlElementInterface();
+
         // SVGLength interface constants
         RegisterSVGLength(context);
 

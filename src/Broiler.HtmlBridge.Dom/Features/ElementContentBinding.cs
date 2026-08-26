@@ -42,21 +42,32 @@ internal static class ElementContentBinding
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 
-    /// <summary>Installs the text-content members: <c>textContent</c> (read/write), <c>innerText</c> and <c>outerText</c> (read-only).</summary>
+    /// <summary>
+    /// <c>textContent</c> (read/write), which stays each element wrapper's own: it is <c>Node</c>'s
+    /// member, and an element's operation — read the descendants' text, and on write replace every
+    /// child with one text node — differs from the character-data one already on
+    /// <c>Node.prototype</c>, so it shadows that one until a single implementation serves both.
+    /// </summary>
     public static void InstallTextContent(IElementContentHost host, JSObject obj, DomElement element)
     {
-        // textContent (read/write)
         obj.FastAddProperty((KeyString)"textContent",
             new DomFunction((in _) => host.GetNodeTextValue(element), "get textContent"),
             new DomFunction((in a) => SetTextContent(host, element, in a), "set textContent"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+    }
 
-        obj.FastAddProperty((KeyString)"innerText",
-            new DomFunction((in _) => host.GetNodeTextValue(element), "get innerText"),
+    /// <summary>
+    /// <c>innerText</c> and <c>outerText</c> (read-only), which are <c>HTMLElement</c>'s and go on its
+    /// prototype.
+    /// </summary>
+    public static void InstallHtmlElementMembers(IElementContentHost host, JSObject target, ElementSource element)
+    {
+        target.FastAddProperty((KeyString)"innerText",
+            new DomFunction((in a) => host.GetNodeTextValue(element(in a, "innerText")), "get innerText"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"outerText",
-            new DomFunction((in _) => host.GetNodeTextValue(element), "get outerText"),
+        target.FastAddProperty((KeyString)"outerText",
+            new DomFunction((in a) => host.GetNodeTextValue(element(in a, "outerText")), "get outerText"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 
