@@ -897,6 +897,29 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **The root element inherited none of the interface the others do.** **Fixed, and live** — entirely
+  in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. Found while checking what the element
+  instalment below actually reached.
+  <br>**Cause.** `document.documentElement` was a value materialized during document registration
+  (`ToJSObject(DocumentElement)`), which is the one place an element wrapper is minted before the
+  interface constructors exist — they are registered by the polyfill pass afterwards. So `<html>`
+  alone took the pre-realm fallback and installed its own copy of every interface member, and the
+  re-link sweep at the end of registration then gave it the prototype as well. It carried both:
+  **164** own properties against an ordinary element's 77, with
+  `document.documentElement.getAttribute === Element.prototype.getAttribute` answering `false`. A page
+  patching `Element.prototype` — the idiom the element instalment exists to make work — reached every
+  element except the root one.
+  <br>**Fix.** The member is a getter, like the `scrollingElement` beside it that answers with the
+  same element and like the accessor a browser has on `Document.prototype`. Deferring the mint to the
+  first read makes the fallback unreachable for it rather than compensated for afterwards, and
+  `documentElement` now carries exactly what any other element does.
+  <br>**One other thing it fixed.** A re-parse clears the wrapper registry, and a value property is
+  not cleared — so `document.documentElement` handed back the previous document's wrapper. The getter
+  mints against the current registry.
+  <br>**Evidence.** A regression in `ElementInterfacePrototypeTests`: the root element owns no
+  `getAttribute`, shares the prototype's function, has the same own-property count as a `<div>`, and
+  still reports `HTML`.
+
 - **`Element`'s whole interface was copied onto every element wrapper.** **Fixed, and live** —
   entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fifth instalment of track 6
   action 1, and the one its first sub-item named; what remains is in

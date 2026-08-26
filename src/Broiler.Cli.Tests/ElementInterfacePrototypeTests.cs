@@ -192,6 +192,24 @@ document.getElementById('result').textContent = String({script});
             + " Element.prototype.matches.call(svg, 'rect')].join('|'); })()"));
 
     /// <summary>
+    /// The root element is an element like any other. It was not: <c>document.documentElement</c> was
+    /// a value materialized during document registration, which runs before the interface prototypes
+    /// exist — so <c>&lt;html&gt;</c> alone took the pre-realm fallback, installed its own copy of
+    /// every member, and was then given the prototype as well by the re-link sweep at the end of
+    /// registration. It carried both, and the payoff of this whole move — one function per member,
+    /// reachable through the prototype — did not reach it. The member is a getter now, so the wrapper
+    /// is minted on first read like every other element's.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void TheDocumentElementInheritsTheInterfaceLikeAnyOtherElement()
+        => Assert.Contains(">false|true|true|HTML<", Run(
+            "[Object.prototype.hasOwnProperty.call(document.documentElement, 'getAttribute'),"
+            + " document.documentElement.getAttribute === Element.prototype.getAttribute,"
+            + " Object.getOwnPropertyNames(document.documentElement).length"
+            + "   === Object.getOwnPropertyNames(d).length,"
+            + " document.documentElement.tagName].join('|')"));
+
+    /// <summary>
     /// The polyfill idiom reaches instances now: assigning to <c>Element.prototype</c> used to write
     /// to an object every element shadowed with its own copy of the same name.
     /// </summary>
