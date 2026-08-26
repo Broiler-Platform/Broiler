@@ -366,13 +366,34 @@ public sealed partial class DomBridge
 
         var paddingBox = box.PaddingBox;
         var contentBox = box.ContentBox;
+
+        // This measured overflow only toward larger physical coordinates — a descendant's Right or
+        // Bottom, against the padding box's Left or Top. That is the whole story for an axis that
+        // grows that way, and it found nothing at all for one that does not: a `vertical-rl` block
+        // axis runs right-to-left, its content overflows to the LEFT, and scrollWidth therefore came
+        // back equal to clientWidth. With no range, GetScrollBounds collapsed to [0, 0] and every
+        // block-axis `scrollIntoView` clamped to zero. Chromium reports 600 for the 600px child in a
+        // 300px `vertical-rl` scroller where this reported 300.
+        //
+        // A reversed axis measures BOTH ways and takes the larger, rather than simply measuring the
+        // other way, because this engine's layout is not consistent about which side it mirrors:
+        // `direction: rtl` in a horizontal writing mode lays the overflow out to the right (the
+        // bridge mirrors it later, in the scroll-coordinate conversion), while `vertical-rl` lays it
+        // out to the left. Measuring only the reversed side fixes the second and breaks the first.
+        // Taking the larger is right whichever side the engine chose, and it cannot regress a
+        // forward axis, which is measured exactly as before.
+        var reversed = AxisUsesReversedScrollDirection(element, vertical);
         var origin = vertical ? paddingBox.Top : paddingBox.Left;
+        var reversedOrigin = vertical ? paddingBox.Bottom : paddingBox.Right;
         // The scrolling area is at least the padding-box (client) extent, and the
         // scrollable overflow region includes the container's end padding.
         var max = vertical ? (double)paddingBox.Height : paddingBox.Width;
         var endPadding = vertical
             ? Math.Max(0, paddingBox.Bottom - contentBox.Bottom)
             : Math.Max(0, paddingBox.Right - contentBox.Right);
+        var reversedEndPadding = vertical
+            ? Math.Max(0, contentBox.Top - paddingBox.Top)
+            : Math.Max(0, contentBox.Left - paddingBox.Left);
 
         // Trailing margins only extend the *viewport's* scrolling area (see
         // GetScrollableOverflowEndMargin). Percentage margins resolve against the containing
@@ -384,10 +405,27 @@ public sealed partial class DomBridge
         {
             if (!TryGetSharedLayoutGeometry(descendant, out var childBox))
                 continue;
+
             double childEnd = vertical ? childBox.BorderBox.Bottom : childBox.BorderBox.Right;
             if (includeEndMargins)
-                childEnd += GetScrollableOverflowEndMargin(descendant, vertical, marginPercentageBasis);
+            {
+                childEnd += GetScrollableOverflowEndMargin(
+                    descendant, vertical, reversed: false, marginPercentageBasis);
+            }
+
             max = Math.Max(max, (childEnd - origin) + endPadding);
+
+            if (!reversed)
+                continue;
+
+            double childStart = vertical ? childBox.BorderBox.Top : childBox.BorderBox.Left;
+            if (includeEndMargins)
+            {
+                childStart -= GetScrollableOverflowEndMargin(
+                    descendant, vertical, reversed: true, marginPercentageBasis);
+            }
+
+            max = Math.Max(max, (reversedOrigin - childStart) + reversedEndPadding);
         }
 
         // The snapshot is in zoom-baked space; report the extent in the element's own
@@ -420,7 +458,32 @@ public sealed partial class DomBridge
     /// descendants, so a margin that collapses up through several ancestors is counted once at
     /// whichever box carries it rather than accumulating.</para>
     /// </summary>
-    private double GetScrollableOverflowEndMargin(DomElement descendant, bool vertical, double percentageBasis)
+    /// <summary>
+    /// Whether this axis's scroll coordinates run backwards — the axis grows toward smaller physical
+    /// coordinates, so its scroll offsets are negative and its content overflows toward the physical
+    /// start edge.
+    /// </summary>
+    /// <remarks>
+    /// The single owner of that question. <see cref="GetScrollBounds"/> asked it to decide the sign
+    /// of the scroll range and <see cref="TryGetSharedScrollExtent"/> has to ask it to decide which
+    /// way to measure overflow; the two disagreeing is exactly the bug that made a `vertical-rl`
+    /// container report a scroll range of zero while its bounds were ready to go negative.
+    /// </remarks>
+    private bool AxisUsesReversedScrollDirection(DomElement element, bool vertical)
+    {
+        var props = GetComputedProps(element);
+        var writingMode = props.GetValueOrDefault("writing-mode")?.Trim().ToLowerInvariant();
+        var isRtl = string.Equals(props.GetValueOrDefault("direction"), "rtl", StringComparison.OrdinalIgnoreCase);
+        var isVertical = CssWritingMode.IsVertical(writingMode);
+
+        return vertical
+            ? isVertical && isRtl
+            : (isVertical && writingMode?.EndsWith("-rl", StringComparison.Ordinal) == true)
+                || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
+    }
+
+    private double GetScrollableOverflowEndMargin(
+        DomElement descendant, bool vertical, bool reversed, double percentageBasis)
     {
         var props = GetComputedProps(descendant);
 
@@ -431,8 +494,12 @@ public sealed partial class DomBridge
         if (string.Equals(props.GetValueOrDefault("position"), "fixed", StringComparison.OrdinalIgnoreCase))
             return 0;
 
+        // The margin on the axis's END side, which a reversed axis puts on the opposite physical
+        // edge from a forward one.
         var margin = ParseCssLengthToPixelsWithViewport(
-            props.GetValueOrDefault(vertical ? "margin-bottom" : "margin-right"),
+            props.GetValueOrDefault(vertical
+                ? (reversed ? "margin-top" : "margin-bottom")
+                : (reversed ? "margin-left" : "margin-right")),
             descendant,
             percentageBasis: percentageBasis);
 

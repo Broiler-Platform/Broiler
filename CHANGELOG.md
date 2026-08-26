@@ -9,6 +9,27 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `scrollIntoView` moves the block axis in a vertical writing mode. In the main
+  repository, so it is live.
+
+  The block/inline to physical axis mapping was already right; what was missing
+  sat under it. The scrollable-overflow measurement only looked toward larger
+  physical coordinates — a descendant's right/bottom edge against the padding
+  box's left/top — which finds nothing for an axis that runs the other way. A
+  `vertical-rl` block axis runs right-to-left and its content overflows to the
+  left, so `scrollWidth` came back equal to `clientWidth`: no extent, therefore
+  no scroll range, therefore every block-axis `scrollIntoView` clamped to zero.
+
+  A reversed axis now measures both ways and takes the larger, rather than
+  simply measuring the other way, because the layout is not consistent about
+  which side it mirrors — `direction: rtl` in a horizontal writing mode lays
+  the overflow out to the right while `vertical-rl` lays it out to the left.
+  A forward axis is measured exactly as before.
+
+  `scrollWidth`, `scrollHeight` and the sign of the scroll range are corrected
+  with it, so a `vertical-rl` or `sideways-rl` container reports the extent and
+  the negative range a browser reports.
+
 - A frame's scroll state, mutated by script, reaches the serialized `srcdoc`.
   In the main repository, so it is live.
 

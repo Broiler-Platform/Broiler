@@ -572,14 +572,10 @@ public sealed partial class DomBridge
         var maxLeft = Math.Max(0, GetScrollWidthForDomElement(element, isRoot) - GetClientWidthForDomElement(element, isRoot));
         var maxTop = Math.Max(0, GetScrollHeightForDomElement(element, isRoot) - GetClientHeightForDomElement(element, isRoot));
 
-        var props = GetComputedProps(element);
-        var writingMode = props.GetValueOrDefault("writing-mode")?.Trim().ToLowerInvariant();
-        var direction = props.GetValueOrDefault("direction");
-        var isRtl = string.Equals(direction, "rtl", StringComparison.OrdinalIgnoreCase);
-        var isVertical = CssWritingMode.IsVertical(writingMode);
-        var usesNegativeLeft = (isVertical && writingMode?.EndsWith("-rl", StringComparison.Ordinal) == true)
-            || (string.Equals(writingMode, "horizontal-tb", StringComparison.OrdinalIgnoreCase) && isRtl);
-        var usesNegativeTop = isVertical && isRtl;
+        // Shared with the overflow-extent measurement, which has to agree with this about which way
+        // each axis grows — see AxisUsesReversedScrollDirection.
+        var usesNegativeLeft = AxisUsesReversedScrollDirection(element, vertical: false);
+        var usesNegativeTop = AxisUsesReversedScrollDirection(element, vertical: true);
 
         var minLeft = usesNegativeLeft ? -maxLeft : 0;
         var boundedMaxLeft = usesNegativeLeft ? 0 : maxLeft;

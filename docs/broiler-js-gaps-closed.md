@@ -866,6 +866,41 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **Writing-mode `scrollIntoView` mapped the block axis onto nothing.** **Fixed, and live** — main
+  repo, so no patch.
+  <br>**Cause, and it was not the axis mapping.** The block/inline → physical mapping was already
+  right; what was missing sat under it. The scrollable-overflow measurement only ever looked toward
+  larger physical coordinates — a descendant's `Right`/`Bottom` against the padding box's
+  `Left`/`Top`. That is the whole story for an axis that grows that way, and it found nothing at all
+  for one that does not: a `vertical-rl` block axis runs right-to-left and its content overflows to
+  the **left**, so `scrollWidth` came back equal to `clientWidth`. With no extent there was no range,
+  `GetScrollBounds` collapsed to `[0, 0]`, and every block-axis `scrollIntoView` in a vertical
+  writing mode clamped to zero.
+  <br>**Fix.** A reversed axis measures **both** ways and takes the larger, rather than simply
+  measuring the other way — because this engine's layout is not consistent about which side it
+  mirrors: `direction: rtl` in a horizontal writing mode lays the overflow out to the right (the
+  bridge mirrors it later, in the scroll-coordinate conversion) while `vertical-rl` lays it out to
+  the left. Measuring only the reversed side fixes the second and breaks the first; that was tried,
+  and the whole-suite diff caught it. Taking the larger is right whichever side the engine chose and
+  cannot regress a forward axis, which is measured exactly as before. The "is this axis reversed"
+  predicate now has one owner shared with `GetScrollBounds`, since the two disagreeing is what the
+  bug was.
+  <br>**On not trusting the failing test.** The existing assertion's expected values matched neither
+  Chromium nor Broiler when this started, which normally means a stale pin — so rather than code to
+  it, a *clean* probe was built (target inside the oversized content, so both engines agree) and both
+  engines measured on it. That gave a trustworthy oracle and the root cause; the original test then
+  turned out to be a correct pin of the mapping after all, and passes untouched. Its construction —
+  an absolutely positioned target overflowing opposite to the content — is simply one the two engines
+  legitimately answer differently, which is why it could not be used to tell a mapping bug from a
+  layout difference.
+  <br>**Evidence.** 29 regressions in `ScrollWritingModeGeometryTests` covering the extent, the range
+  sign, and the mapping across four writing modes and both directions; every value is Chromium's
+  measured answer, and 9 of the 29 fail before the change. Four tests go red → green across two
+  projects: `ScrollIntoView_Maps_Block_And_Inline_Axes_For_WritingModes` and
+  `Element_ScrollOffsets_Clamp_And_Respect_WritingMode_Direction` in `Broiler.Cli.Tests`, and
+  `Wpt_CssomView_ScrollIntoView_Maps_WritingMode_Block_And_Inline_Axes` and
+  `Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped` in `Broiler.Wpt.Tests`.
+  Whole-suite diffs against same-container baselines show no regressions in either.
 - **A frame's mutated scroll state never reached the serialized markup.** **Fixed, and live** —
   main repo, so no patch.
   <br>**Cause, and there were two.** A nested browsing context's document is severed from the main
