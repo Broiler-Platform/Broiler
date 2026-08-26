@@ -1,0 +1,324 @@
+From 4a6644d3c53bc11bf852d46e7f4eb81e82873491 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 26 Aug 2026 07:44:38 +0000
+Subject: [PATCH] Give a JSON module the ES namespace ESM wants and require the
+ value CommonJS wants
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`import d from './data.json'` was `undefined`, which made JSON modules
+unusable. One wrapper served both callers — `module.exports = <json>` — which
+is exactly what CommonJS require wants and exactly wrong for ESM: a default
+import reads `.default` off the parsed value and finds nothing. Every JSON
+import was undefined, for every JSON shape. A file whose whole content is
+`null` was worse: JSModule's Exports setter refuses null, so it threw on load
+rather than importing as null.
+
+The two specifications disagree about what a JSON file exports and they cannot
+be satisfied by one object. ES2025 gives a JSON module exactly one export,
+`default`, holding the parsed value, and no named exports; CommonJS
+require('./x.json') hands back the parsed value itself. So the module now
+STORES the ES namespace — `module.exports = { default: (<json>) }` — and the
+CommonJS view unwraps it. LoadModuleAsync takes an `esModule` flag for that,
+defaulting to the ES view, and the two require call sites pass false; the flag
+changes nothing except the shape a JSON module is presented in.
+
+Storing the namespace is also what lets `null` through, and what makes arrays,
+numbers, strings and booleans work: none of them can carry a `default`
+property, so no amount of decorating the parsed value could have fixed them.
+
+Deliberate deviation, now pinned rather than incidental: `import { a } from
+'./x.json'` used to read `a` off the parsed object and is now undefined. Per
+spec it is a link error — a JSON module has no named exports — and raising that
+needs whole-module link analysis this engine does not do, so the nearer of the
+two available answers is taken. Browsers and Node both reject the form.
+
+Fourteen regressions in JsonModuleTests: the default import over six JSON
+shapes, the namespace holding only `default`, a dynamic import resolving to the
+same namespace, require over three shapes, both views of one file agreeing on
+the value, the named-import deviation, and a JavaScript module pinned as
+unaffected. Eleven of the fourteen fail before this change.
+
+Engine suites: modules 118/118, module-extensions 5/5, built-ins 2215/2215,
+integration 5167/5168, compiler 1400/1402 — the three failures pre-existing and
+unrelated. Broiler.Cli.Tests module/subdocument/import selection 322/323, its
+one failure the known iframe-module drain gap, which reproduces with this
+change stashed.
+---
+ .../JsonModuleTests.cs                        | 143 ++++++++++++++++++
+ .../JSModuleContext.cs                        |  68 ++++++++-
+ 2 files changed, 203 insertions(+), 8 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Modules.Tests/JsonModuleTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules.Tests/JsonModuleTests.cs b/Broiler.JS/Broiler.JavaScript.Modules.Tests/JsonModuleTests.cs
+new file mode 100644
+index 00000000..24161c85
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Modules.Tests/JsonModuleTests.cs
+@@ -0,0 +1,143 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Threading.Tasks;
++using Broiler.JavaScript.Modules;
++using Xunit;
++
++namespace Broiler.JavaScript.Modules.Tests;
++
++/// <summary>
++/// JSON modules, and the one place where <c>import</c> and <c>require</c> deliberately see a
++/// different shape of the same file.
++/// </summary>
++/// <remarks>
++/// <para>
++/// <c>import d from './data.json'</c> was <c>undefined</c>. One wrapper served both callers —
++/// <c>module.exports = &lt;json&gt;</c> — which is what CommonJS <c>require</c> wants and is exactly
++/// wrong for ESM: a default import reads <c>.default</c> off the parsed value and finds nothing. So
++/// every JSON import was <c>undefined</c>, for every JSON shape, and JSON modules were unusable.
++/// A file whose whole content was <c>null</c> was worse than unusable — <c>JSModule</c>'s exports
++/// setter refuses null, so it threw on load.
++/// </para>
++/// <para>
++/// The decision this pins: the module <b>stores the ES namespace</b>, <c>{ default: value }</c> —
++/// ES2025 gives a JSON module exactly one export, <c>default</c>, and no named exports — and the
++/// CommonJS view unwraps it. Both callers get what their own specification says, which one object
++/// cannot do.
++/// </para>
++/// <para>
++/// The deliberate deviation is <c>import { a } from './x.json'</c>: per spec a link error, here
++/// <c>undefined</c>, because raising the link error needs whole-module analysis this engine does not
++/// do. It used to read <c>a</c> off the parsed object. Browsers and Node both reject the form, so
++/// nothing portable is losing a behaviour it could rely on.
++/// </para>
++/// </remarks>
++public class JsonModuleTests
++{
++    private sealed class UrlModuleContext(Dictionary<string, string> files) : JSModuleContext
++    {
++        protected override string Resolve(string dirPath, string relativePath)
++        {
++            if (Uri.TryCreate(relativePath, UriKind.Absolute, out var abs)) return abs.AbsoluteUri;
++            return Uri.TryCreate(new Uri(dirPath), relativePath, out var rel) ? rel.AbsoluteUri : null;
++        }
++
++        protected override string GetModuleDirectory(string fullPath) => fullPath;
++
++        protected override Task<string> ReadModuleSourceAsync(JSModule module) =>
++            Task.FromResult(files.TryGetValue(module.filePath, out var src)
++                ? src
++                : throw new FileNotFoundException(module.filePath));
++    }
++
++    private static async Task<string> Run(string json, string main)
++    {
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/data.json"] = json,
++            ["file:///app/main.js"] = main,
++        };
++
++        using var ctx = new UrlModuleContext(files);
++        await ctx.RunScriptAsync(main, "file:///app/main.js", uniqueModuleID: "file:///app/main.js");
++        return ctx.Eval("String(globalThis.r)").ToString();
++    }
++
++    /// <summary>The default import is the parsed value — for every JSON shape, not only objects.
++    /// Each of these was <c>undefined</c>, and <c>null</c> threw on load.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("{\"a\":1}", "{\"a\":1}")]
++    [InlineData("[1,2]", "[1,2]")]
++    [InlineData("5", "5")]
++    [InlineData("\"s\"", "\"s\"")]
++    [InlineData("true", "true")]
++    [InlineData("null", "null")]
++    public async Task ADefaultImportIsTheParsedValue(string json, string expected)
++        => Assert.Equal(expected, await Run(
++            json, "import d from './data.json'; globalThis.r = JSON.stringify(d);"));
++
++    /// <summary>The namespace holds exactly one name, <c>default</c> — not the JSON's own keys,
++    /// which is what it used to expose.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task TheNamespaceHoldsOnlyDefault()
++        => Assert.Equal("default|{\"a\":1}", await Run(
++            "{\"a\":1,\"b\":2}",
++            "import * as ns from './data.json'; "
++            + "globalThis.r = Object.keys(ns).join(',') + '|' + JSON.stringify(ns.default).replace(',\"b\":2', '');"));
++
++    /// <summary>A dynamic import resolves to the same namespace a static one binds against.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task ADynamicImportResolvesToTheSameNamespace()
++        => Assert.Equal("default|{\"a\":1}", await Run(
++            "{\"a\":1}",
++            "globalThis.r = 'pending'; import('./data.json').then(function (m) { "
++            + "globalThis.r = Object.keys(m).join(',') + '|' + JSON.stringify(m.default); });"));
++
++    /// <summary><c>require</c> is unchanged: it hands back the parsed value itself, which is what
++    /// CommonJS says and what it already did.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("{\"a\":1}", "{\"a\":1}")]
++    [InlineData("[1,2]", "[1,2]")]
++    [InlineData("null", "null")]
++    public async Task RequireStillHandsBackTheParsedValue(string json, string expected)
++        => Assert.Equal(expected, await Run(
++            json, "globalThis.r = JSON.stringify(require('./data.json'));"));
++
++    /// <summary>The two views of one file coexist in one module, and neither disturbs the other —
++    /// the point of splitting them rather than picking a winner.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task BothViewsOfOneFileAgreeOnTheValue()
++        => Assert.Equal("{\"a\":1}|{\"a\":1}|true", await Run(
++            "{\"a\":1}",
++            "import d from './data.json'; var r = require('./data.json'); "
++            + "globalThis.r = JSON.stringify(d) + '|' + JSON.stringify(r) + '|' + (d === r);"));
++
++    /// <summary>
++    /// The deliberate deviation, pinned so it is a decision rather than a drift: a named import from
++    /// a JSON module is <c>undefined</c> rather than the link error the spec asks for. It used to
++    /// read the property off the parsed object.
++    /// </summary>
++    [Fact(Timeout = 600000)]
++    public async Task ANamedImportFromAJsonModuleIsUndefined()
++        => Assert.Equal("undefined", await Run(
++            "{\"a\":1}", "import { a } from './data.json'; globalThis.r = String(a);"));
++
++    /// <summary>A JavaScript module is untouched by any of this — the split is JSON-only.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task AJavaScriptModuleIsUnaffected()
++    {
++        var files = new Dictionary<string, string>
++        {
++            ["file:///app/dep.js"] = "export const a = 1; export default 9;",
++            ["file:///app/main.js"] =
++                "import d, { a } from './dep.js'; import * as ns from './dep.js'; "
++                + "globalThis.r = d + '|' + a + '|' + Object.keys(ns).sort().join(',');",
++        };
++
++        using var ctx = new UrlModuleContext(files);
++        await ctx.RunScriptAsync(files["file:///app/main.js"], "file:///app/main.js",
++            uniqueModuleID: "file:///app/main.js");
++        Assert.Equal("9|1|a,default", ctx.Eval("String(globalThis.r)").ToString());
++    }
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+index e675f39c..1a87f4a9 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+@@ -268,7 +268,7 @@ public class JSModuleContext : JSContext
+             if (!name.IsString)
+                 throw NewTypeError("require method's parameter must be a string");
+ 
+-            var result = LoadModuleAsync(dirPath, name.StringValue);
++            var result = LoadModuleAsync(dirPath, name.StringValue, esModule: false);
+             return AsyncPump.Run(() => result);
+         });
+ 
+@@ -319,13 +319,57 @@ public class JSModuleContext : JSContext
+ 
+     public JSModule Main { get; set; }
+ 
+-    protected virtual async Task<JSValue> LoadModuleAsync(string currentPath, string name)
++    /// <summary>
++    /// Whether a resolved module key names a JSON module. JSON is the one format this context serves
++    /// to <c>import</c> and to <c>require</c> in two different shapes, because the two specifications
++    /// disagree about what a JSON file exports.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// ES2025 gives a JSON module exactly one export, <c>default</c>, holding the parsed value, and no
++    /// named exports. CommonJS <c>require('./x.json')</c> hands back the parsed value itself. Both are
++    /// right for their own caller and they cannot be the same object, so the module *stores* the ES
++    /// namespace — <c>{ default: value }</c> — and the CommonJS view unwraps it.
++    /// </para>
++    /// <para>
++    /// Before this, one wrapper served both: <c>module.exports = &lt;json&gt;</c>. <c>require</c> was
++    /// correct and every <c>import</c> was not — a default import read <c>.default</c> off the parsed
++    /// value and found nothing, so <c>import d from './data.json'</c> was <c>undefined</c> for every
++    /// JSON shape, which made JSON modules unusable.
++    /// </para>
++    /// <para>
++    /// <b>Deviation, deliberate:</b> <c>import { a } from './x.json'</c> used to read <c>a</c> off the
++    /// parsed object and now reads <c>undefined</c>. Per spec it is a link error — a JSON module has no
++    /// named exports — and raising that needs whole-module link analysis this engine does not do, so
++    /// the nearer of the two available answers is taken. Browsers and Node both reject the form, so no
++    /// portable code writes it.
++    /// </para>
++    /// </remarks>
++    private static bool IsJsonModule(string moduleKey) =>
++        moduleKey != null && moduleKey.EndsWith(".json", StringComparison.Ordinal);
++
++    /// <summary>
++    /// The value a loaded module presents to its importer: the module's own exports, except that a
++    /// JSON module's stored ES namespace is unwrapped to the parsed value for a CommonJS
++    /// <c>require</c>.
++    /// </summary>
++    private static JSValue ViewOf(JSModule module, string moduleKey, bool esModule) =>
++        esModule || !IsJsonModule(moduleKey)
++            ? module.Exports
++            : module.Exports[KeyStrings.@default];
++
++    /// <param name="esModule">
++    /// Whether the caller is <c>import</c> (the ES view) rather than <c>require</c> (the CommonJS
++    /// view). It changes nothing except the shape a JSON module is presented in — see
++    /// <see cref="IsJsonModule"/>.
++    /// </param>
++    protected virtual async Task<JSValue> LoadModuleAsync(string currentPath, string name, bool esModule = true)
+     {
+         var relativePath = name;
+ 
+         // fetch system modules 
+         if (moduleCache.TryGetValue(relativePath, out var m))
+-            return m.Exports;
++            return ViewOf(m, relativePath, esModule);
+ 
+         // resolve full name..
+         var fullPath = Resolve(currentPath, relativePath) ?? throw NewTypeError($"{relativePath} module not found");
+@@ -349,7 +393,7 @@ public class JSModuleContext : JSContext
+                 if (!name.IsString)
+                     throw NewTypeError("require method's parameter must be a string");
+ 
+-                var result = LoadModuleAsync(dirPath, name.StringValue);
++                var result = LoadModuleAsync(dirPath, name.StringValue, esModule: false);
+                 return AsyncPump.Run(() => result);
+             });
+ 
+@@ -366,7 +410,7 @@ public class JSModuleContext : JSContext
+         });
+ 
+         await m.InitAsync();
+-        return m.Exports;
++        return ViewOf(m, fullPath, esModule);
+     }
+ 
+     /// <summary>
+@@ -399,8 +443,16 @@ public class JSModuleContext : JSContext
+ 
+         var code = module.Code;
+ 
+-        if (filePath.EndsWith(".json"))
+-            code = $"module.exports = {code};";
++        // A JSON module's ONE export is `default` (ES2025 16.2.1.6.1: a JSON module record has
++        // exactly one export, `default`, and no named exports), so what is stored is the namespace
++        // rather than the parsed value. The CommonJS view unwraps it in LoadModuleAsync; see
++        // IsJsonModule for why the two views have to differ at all.
++        //
++        // Storing the namespace rather than the value is also what lets `null` through: JSModule's
++        // Exports setter refuses null or undefined, so the old `module.exports = null;` wrapper made
++        // a file whose whole content is `null` throw on load rather than import as `null`.
++        if (IsJsonModule(filePath))
++            code = $"module.exports = {{ default: ({code}) }};";
+ 
+         // var factory = FastEval(code, filePath);
+         JSFunctionDelegate factory;
+@@ -417,7 +469,7 @@ public class JSModuleContext : JSContext
+                 // Parsed with the module goal symbol, which is what makes `await` a reserved word
+                 // here. A .json file is wrapped as CommonJS above and is not module source, so it
+                 // keeps the script goal.
+-            ], codeCache: CodeCache, isModule: !filePath.EndsWith(".json"));
++            ], codeCache: CodeCache, isModule: !IsJsonModule(filePath));
+         }
+ 
+         if (factory(new Arguments(module,
+-- 
+2.43.0
+

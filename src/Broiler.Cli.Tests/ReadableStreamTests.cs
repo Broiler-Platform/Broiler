@@ -20,7 +20,9 @@ namespace Broiler.Cli.Tests;
 /// Every expectation is Chromium's measured answer over the same probe run against both. The reads
 /// are written as <c>then</c> chains rather than <c>await</c> because this test host has no
 /// microtask synchronization context — a real capture drives <c>await</c> fine, and a capture-level
-/// probe confirms it.
+/// probe confirms it. The async-iteration tests at the end are the exception: <c>for await</c> is
+/// what they are testing, and the loop runs to completion inside the microtask checkpoint that ends
+/// the evaluation which started it.
 /// </para>
 /// </remarks>
 public sealed class ReadableStreamTests
@@ -59,7 +61,7 @@ public sealed class ReadableStreamTests
 
         Assert.Equal(
             "function/function/function/" +
-            "cancel,constructor,getReader,locked,tee/" +
+            "cancel,constructor,getReader,locked,tee,values/" +
             "cancel,closed,constructor,read,releaseLock/" +
             "close,constructor,desiredSize,enqueue,error/TypeError",
             Eval(context, """
@@ -228,34 +230,182 @@ public sealed class ReadableStreamTests
             """));
     }
 
-    /// <summary>
-    /// Async iteration is deliberately absent, and the reason is the engine rather than the stream.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <c>for await</c> deadlocks the agent when the iterator's <c>next()</c> hands back a promise
-    /// that is not <em>already</em> settled: the engine blocks the one thread allowed to run this
-    /// context's JavaScript, so the job that would settle the promise can never run. An iterator over
-    /// a stream returns exactly that — <c>reader.read().then(…)</c> — so installing the hook would
-    /// turn the ordinary <c>for await (const chunk of response.body)</c> from a <c>TypeError</c> a
-    /// page's script survives into a capture that never settles.
-    /// </para>
-    /// <para>
-    /// The engine fix is written and verified and ships as
-    /// <c>patches/0001-js-for-await-unsettled-step-result.patch</c>; with it applied, iteration over
-    /// a page stream, a blob stream and a response body all answer what Chromium answers. This test
-    /// pins the interim state so turning the hook on is a decision that comes with the patch rather
-    /// than a drift.
-    /// </para>
-    /// </remarks>
+    // ------------------------------------------------------------------ async iteration
+    //
+    // These were the one piece of the stream that could not be turned on when the rest landed.
+    // `for await` used to deadlock the agent whenever the iterator's next() handed back a promise
+    // that was not *already* settled — the engine blocked the one thread allowed to run this
+    // context's JavaScript, so the job that would settle the promise could never run — and
+    // `reader.read().then(…)` is exactly that shape. The engine fix ("Stop for-await deadlocking on
+    // a step result that is not already settled") is upstream and the pinned Broiler.JS pointer
+    // carries it, so the hook is installed and these regressions replace the test that pinned its
+    // absence. Every expectation below is Chromium's measured answer to the same probe.
+    //
+    // Unlike the read tests above, these are written with `await` rather than a `then` chain,
+    // because `for await` is the thing under test. The async function runs to completion inside the
+    // microtask checkpoint that ends the evaluation which started it, so the log is complete by the
+    // next evaluation — the same EvalAfterMicrotasks shape.
+
+    /// <summary>Every chunk arrives in order, and running the loop to completion releases the
+    /// reader's lock rather than leaving the stream locked forever.</summary>
     [Fact(Timeout = 600000)]
-    public void Async_Iteration_Is_Absent_Until_The_Engine_Can_Drive_It()
+    public void Async_Iteration_Yields_Every_Chunk_And_Then_Unlocks_The_Stream()
     {
         using var bridge = Attach(out var context);
 
-        Assert.Equal("undefined/undefined", Eval(context, """
+        Assert.Equal("a|b|c|locked=false", EvalAfterMicrotasks(context, """
+            var log = [];
+            (async function () {
+                var stream = new ReadableStream({
+                    start: function (c) { c.enqueue('a'); c.enqueue('b'); c.enqueue('c'); c.close(); },
+                });
+                for await (const chunk of stream) log.push(chunk);
+                log.push('locked=' + stream.locked);
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary>A blob's stream is async-iterable, and yields its bytes as one chunk.</summary>
+    [Fact(Timeout = 600000)]
+    public void A_Blobs_Stream_Is_Async_Iterable()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("chunk:6|locked=false", EvalAfterMicrotasks(context, """
+            var log = [];
+            (async function () {
+                var stream = new Blob(['abcdef']).stream();
+                for await (const chunk of stream) log.push('chunk:' + chunk.length);
+                log.push('locked=' + stream.locked);
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary>A response body is async-iterable, which is the shape a page actually writes.</summary>
+    [Fact(Timeout = 600000)]
+    public void A_Response_Body_Is_Async_Iterable()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("bytes=5", EvalAfterMicrotasks(context, """
+            var log = [];
+            (async function () {
+                var total = 0;
+                for await (const chunk of new Response('hello').body) total += chunk.length;
+                log.push('bytes=' + total);
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary>Leaving the loop early runs the iterator's <c>return</c>, which cancels the stream —
+    /// with the loop's completion value as the reason — and releases the lock.</summary>
+    [Fact(Timeout = 600000)]
+    public void Leaving_An_Async_Iteration_Early_Cancels_The_Stream()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("a|cancelled=yes:undefined|locked=false", EvalAfterMicrotasks(context, """
+            var log = [];
+            var cancelled = 'no';
+            (async function () {
+                var stream = new ReadableStream({
+                    start: function (c) { c.enqueue('a'); c.enqueue('b'); c.close(); },
+                    cancel: function (reason) { cancelled = 'yes:' + reason; },
+                });
+                for await (const chunk of stream) { log.push(chunk); break; }
+                log.push('cancelled=' + cancelled);
+                log.push('locked=' + stream.locked);
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary><c>values({preventCancel: true})</c> still releases the lock on the way out but does
+    /// not cancel the source, so the rest of the stream stays readable by someone else.</summary>
+    [Fact(Timeout = 600000)]
+    public void preventCancel_Releases_The_Lock_Without_Cancelling()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("a|cancelled=no|locked=false", EvalAfterMicrotasks(context, """
+            var log = [];
+            var cancelled = 'no';
+            (async function () {
+                var stream = new ReadableStream({
+                    start: function (c) { c.enqueue('a'); c.enqueue('b'); c.close(); },
+                    cancel: function () { cancelled = 'yes'; },
+                });
+                for await (const chunk of stream.values({ preventCancel: true })) { log.push(chunk); break; }
+                log.push('cancelled=' + cancelled);
+                log.push('locked=' + stream.locked);
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary>An errored stream throws into the loop rather than ending it quietly. The chunk
+    /// queued before the error is discarded, because <c>error()</c> clears the queue.</summary>
+    [Fact(Timeout = 600000)]
+    public void An_Errored_Stream_Throws_Into_The_Async_Loop()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("caught:TypeError:boom", EvalAfterMicrotasks(context, """
+            var log = [];
+            (async function () {
+                try {
+                    var stream = new ReadableStream({
+                        start: function (c) { c.enqueue('a'); c.error(new TypeError('boom')); },
+                    });
+                    for await (const chunk of stream) log.push(chunk);
+                    log.push('no-throw');
+                } catch (e) { log.push('caught:' + e.name + ':' + e.message); }
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary>Async-iterating a stream that is already locked throws, because acquiring the
+    /// iterator acquires a reader.</summary>
+    [Fact(Timeout = 600000)]
+    public void Async_Iterating_A_Locked_Stream_Throws()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("caught:TypeError", EvalAfterMicrotasks(context, """
+            var log = [];
+            var stream = new Blob(['xy']).stream();
+            stream.getReader();
+            (async function () {
+                try { for await (const chunk of stream) log.push(chunk); }
+                catch (e) { log.push('caught:' + e.name); }
+            })();
+            """, """
+            log.join('|')
+            """));
+    }
+
+    /// <summary><c>@@asyncIterator</c> is the same function object as <c>values</c>, both on the
+    /// prototype rather than on the instance.</summary>
+    [Fact(Timeout = 600000)]
+    public void AsyncIterator_Is_The_Same_Function_As_values()
+    {
+        using var bridge = Attach(out var context);
+
+        Assert.Equal("function/true/true", Eval(context, """
             var stream = new Blob(['a']).stream();
-            return (typeof stream[Symbol.asyncIterator]) + '/' + (typeof stream.values);
+            return (typeof stream.values) + '/' +
+                   (ReadableStream.prototype[Symbol.asyncIterator] === ReadableStream.prototype.values) + '/' +
+                   (Object.getOwnPropertyNames(stream).length === 0);
             """));
     }
 }

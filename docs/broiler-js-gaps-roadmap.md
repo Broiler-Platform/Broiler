@@ -2,7 +2,7 @@
 
 - **Status:** Active
 - **Scope:** Missing, incomplete, unsupported, or observably incorrect JavaScript behavior
-- **Last reconciled:** 2026-08-25
+- **Last reconciled:** 2026-08-26
 - **Evidence basis:** Repository-wide Markdown audit plus the current component revisions
 
 This document consolidates JavaScript gaps recorded anywhere in the Broiler repository, not
@@ -50,14 +50,26 @@ work remaining on that track.
 | # | Track | What is left | Lives in | Required outcome |
 |---:|---|---|---|---|
 | 0 | Conformance evidence | The pinned-corpus CI run, and product decisions for three `$262` hooks | in progress · closed | Test failures and timeouts are trustworthy |
-| 1 | Core language and built-ins | A skipped nested-call statement in async functions, the Annex B remainder and the cross-realm cases; a `for await` fix awaiting its patch | open · in progress · closed | Supported Test262 language clusters are clean |
+| 1 | Core language and built-ins | The Annex B remainder and the cross-realm cases; one fix awaiting its patch | open · closed | Supported Test262 language clusters are clean |
 | 2 | RegExp | Matcher performance, then non-Unicode routing, then retiring the translator | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
-| 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; three capability decisions | open · in progress · closed | Parsing and task ordering match observable browser behavior |
+| 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; `import defer`, `import.meta.resolve`, and whether a JSON import must carry its attribute | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | The excluded Worker capabilities, concurrent-context safety, cross-agent shared memory | open | Claimed agent capabilities are complete and deterministic |
 | 5 | Essential browser JavaScript APIs | Navigation semantics; storage and networking; Trusted Types | open · closed | A tested support matrix replaces accidental omissions |
-| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; live SVG DOM; three capability decisions (`document.all`, per-tag SVG interfaces, Font Loading) | open · closed | Script-visible objects and algorithms meet their claimed standards |
+| 6 | DOM, CSSOM, and SVG from JavaScript | Members onto the interface prototypes; canonical Shadow DOM; live SVG DOM and the two layout gaps under it; three capability decisions (`document.all`, per-tag SVG interfaces, Font Loading) | open · closed | Script-visible objects and algorithms meet their claimed standards |
 | 7 | Graphics, media, and advanced APIs | Every surface — large capability decisions first | open | Each surface is implemented or explicitly excluded |
 | 8 | Portable/Native-AOT profile | Everything past the numeric seed, and the profile decision that gates it | open | Optional profile decision and, if approved, a truthful capability set |
+
+**Four engine fixes are decided, written, tested and *not live*.** They are in `Broiler.JS` and the
+push to that repository is outside this environment's GitHub scope (403), so they ship as files under
+[`patches/`](../patches/README.md) with the submodule pointer deliberately unbumped — CI clones by
+pointer, and bumping to a commit that was never pushed would break the clone. Two of them are counted
+above as remaining work for that reason, even though the work itself is done: track 1's nested
+member call, and track 3's `import.meta`. Track 3's JSON module and its import-attribute enforcement
+are the others. None has a main-repo fallback, and for the member-call fix none is possible — it is
+in how the compiler allocates temps.
+Applying them needs an environment whose GitHub scope includes `Broiler-Platform/Broiler.*`, which is
+an environment-config change rather than something to attempt from inside a session. Read a patch's
+index entry before assuming a gap it names is still open.
 
 Tracks 1 and 2 can proceed in parallel once track 0 makes their results trustworthy. Tracks 3
 through 7 share host and DOM dependencies and must use one published support matrix rather than

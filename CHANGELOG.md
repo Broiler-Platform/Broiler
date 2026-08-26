@@ -9,11 +9,143 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
-- `for await…of` no longer deadlocks the agent when the iterator's `next()`
-  hands back a promise that is not already settled. Delivered as
-  `patches/0001-js-for-await-unsettled-step-result.patch` against `Broiler.JS`
-  — the push to that repository is outside this environment's GitHub scope —
+- `scrollIntoView` moves the block axis in a vertical writing mode. In the main
+  repository, so it is live.
+
+  The block/inline to physical axis mapping was already right; what was missing
+  sat under it. The scrollable-overflow measurement only looked toward larger
+  physical coordinates — a descendant's right/bottom edge against the padding
+  box's left/top — which finds nothing for an axis that runs the other way. A
+  `vertical-rl` block axis runs right-to-left and its content overflows to the
+  left, so `scrollWidth` came back equal to `clientWidth`: no extent, therefore
+  no scroll range, therefore every block-axis `scrollIntoView` clamped to zero.
+
+  A reversed axis now measures both ways and takes the larger, rather than
+  simply measuring the other way, because the layout is not consistent about
+  which side it mirrors — `direction: rtl` in a horizontal writing mode lays
+  the overflow out to the right while `vertical-rl` lays it out to the left.
+  A forward axis is measured exactly as before.
+
+  `scrollWidth`, `scrollHeight` and the sign of the scroll range are corrected
+  with it, so a `vertical-rl` or `sideways-rl` container reports the extent and
+  the negative range a browser reports.
+
+- A frame's scroll state, mutated by script, reaches the serialized `srcdoc`.
+  In the main repository, so it is live.
+
+  A nested browsing context's document is severed from the main tree, and the
+  serialization pre-pass that records scroll offsets walks the main document
+  element — so it never reached a frame. The offset itself was always recorded
+  (the frame's `scrollTop` read back what `scrollIntoView` had set); it simply
+  never reached the markup, so a capture showed every frame at its initial
+  scroll position. The pass now runs once per materialised content document.
+
+  The visual-viewport scale is deliberately not applied inside a frame: pinch
+  zoom scales the frame's box as a whole, so scaling the offset it scrolled
+  within itself would count the same zoom twice.
+
+- `document.elementFromPoint` descends into an SVG, and an SVG shape reports a
+  real `getBoundingClientRect`. Unlike the engine fixes above this is in the
+  main repository, so it is live.
+
+  An SVG child is not in the CSS box tree, so nothing below the `<svg>` root
+  had a rect: every shape measured `0,0,0,0`, and hit testing — which skips an
+  element with an empty rect — could not descend past the root, so
+  `elementFromPoint` over a `<rect>` returned the `<svg>`.
+
+  A shape's rect now comes from its own geometry attributes, composing the
+  viewport's rendered origin, the `viewBox` transform and the accumulated
+  `translate()` of the ancestor `<g>` chain. `getBoundingClientRect` and hit
+  testing go through the same resolution, so they cannot disagree about where a
+  shape is, and a group's rect is the union of its children's — which is what
+  having shape rects at all makes possible.
+
+  `rect`, `image`, `foreignObject`, `circle`, `ellipse`, `line`, `polyline` and
+  `polygon` resolve exactly. `path` and `use` report no rect, as before, rather
+  than a wrong one; a transform list containing anything but `translate()`
+  leaves its subtree untranslated; `preserveAspectRatio` is modelled at its
+  default. Each of those is pinned by its own test.
+
+- Import attributes are enforced rather than parsed and dropped. Delivered as
+  `patches/0004-js-import-attribute-enforcement.patch` against `Broiler.JS`,
   so it is **not live until the patch is applied**.
+
+  `with { type: 'json' }` — the portable form, and the only one a browser
+  accepts on a JSON module — was accepted and ignored, and so was
+  `with { flavour: 'nonsense' }`. Nothing read the parsed attributes, the
+  `export … from` forms discarded theirs, and the loader was passed only the
+  specifier.
+
+  An unknown attribute key and a duplicate key are now early `SyntaxError`s on
+  a static declaration, where the keys are literals. An unknown module type,
+  and a `type` that does not match the module it resolves to, are load-time
+  `TypeError`s, because only the module can settle them. A dynamic `import()`
+  reports both as `TypeError`s, since its keys are a runtime value — and it
+  now validates its options object properly (the options an object, `with` an
+  object, every value a string). Each error kind and message matches a browser.
+
+  `type: 'css'` is reported as a module type this engine does not implement
+  rather than as a typo, so a page can tell the two apart.
+
+  One divergence is deliberate: a `.json` module imported with no attribute
+  still loads. On the web the attribute defends against a server returning
+  JSON where script was expected, which cannot arise in a host whose locally
+  resolved key is itself the type — and the same host serves `require`, which
+  has no attributes at all.
+
+- `import d from './data.json'` is the parsed value rather than `undefined`.
+  Delivered as `patches/0002-js-json-module-default-export.patch` against
+  `Broiler.JS`, so it is **not live until the patch is applied**.
+
+  One wrapper served both callers — `module.exports = <json>` — which is what
+  CommonJS `require` wants and exactly wrong for ESM: a default import reads
+  `.default` off the parsed value and finds nothing, so every JSON import was
+  `undefined` and JSON modules were unusable. A file whose whole content is
+  `null` threw on load instead, because the exports setter refuses null.
+
+  The two specifications disagree about what a JSON file exports and one
+  object cannot satisfy both, so the module now stores the ES namespace —
+  `{ default: value }`, the one export ES2025 gives a JSON module — and the
+  CommonJS view unwraps it. That is also what makes arrays, numbers, strings,
+  booleans and `null` work, none of which can carry a `default` property.
+
+  One behaviour is deliberately removed: `import { a } from './x.json'` used to
+  read `a` off the parsed object and is now `undefined`. A JSON module has no
+  named exports; the spec makes the form a link error, browsers and Node both
+  reject it, and raising the link error here would need whole-module analysis
+  the engine does not do.
+
+- A method call whose argument is a method call is no longer silently skipped
+  inside an `async` function or a generator. Delivered as
+  `patches/0001-js-nested-member-call-clobbers-outer-call.patch` against
+  `Broiler.JS` — the push to that repository is outside this environment's
+  GitHub scope — so it is **not live until the patch is applied**, and no
+  main-repo fallback is possible for it.
+
+  `trace.push(items.join('+'))` did not run. No error was raised and the
+  statement after it ran normally, so the failure was silent;
+  `console.log(list.join(', '))` is the same shape.
+
+  A member call's receiver and resolved method live in two temps taken from a
+  per-function pool, and the arguments are compiled before those temps are
+  acquired, so a nested call in the arguments is handed the same two back.
+  Ordinary code survives that because both values are on the evaluation stack
+  by the time an argument runs. A generator or async body does not: the
+  rewrite hoists any block-valued operand's statements out to statement level,
+  and a nested member call compiles to exactly such a block — so its two
+  assignments land between the outer call's assignments and its invocation,
+  and the outer call goes to the inner callee.
+
+  The guard that was supposed to prevent this looked in the source for an
+  `await` or a `yield`, which is how the bug was first found but not what
+  causes it. It now asks what the operands compiled to: an operand that is a
+  bare parameter or a constant emits no statements and cannot be hoisted, so
+  the pool stays safe; anything else gets locals of its own. Ordinary
+  functions still pay nothing.
+
+- `for await…of` no longer deadlocks the agent when the iterator's `next()`
+  hands back a promise that is not already settled. The fix is upstream in
+  `Broiler.JS` and the pinned pointer carries it, so it is live.
 
   Async iteration unwrapped the result of `next()` with a blocking wait on the
   one thread allowed to run a context's JavaScript. That works only while the
@@ -29,12 +161,34 @@ are versioned in lockstep during the preview.
   them, so nothing blocks. Seven regressions come with it, each of which hung
   rather than failed before.
 
-  This is what `ReadableStream`'s async iteration is waiting on: `values()` and
-  its `@@asyncIterator` are written and verified and stay commented out until
-  the patch lands, because an iterator over a stream returns exactly the
-  unsettled shape.
-
 ### Added
+
+- `import.meta`, which was a SyntaxError ("import.meta not supported").
+  Delivered as `patches/0003-js-import-meta.patch` against `Broiler.JS`, so it
+  is **not live until the patch is applied**.
+
+  It carries `url` — the module's own absolute URL, so a transitively imported
+  module reports its own rather than the entry point's — and is otherwise an
+  empty, extensible, null-prototype object created once per module, so
+  `import.meta === import.meta` and a module can hang its own state off it.
+  Outside module code it stays an early SyntaxError, which is what a
+  `try { eval('import.meta') }` feature-detect expects to see.
+
+  `import.meta.resolve` is deliberately absent. The module resolver is
+  existence-based — it probes for the file and answers null when nothing is
+  there — while `resolve` is specified to hand back a URL whether or not
+  anything is at it, so building it on today's resolver would throw where a
+  browser answers. A page can feature-detect the absence; it cannot detect the
+  wrongness.
+
+- `ReadableStream` async iteration: `values()` and `@@asyncIterator`, so
+  `for await (const chunk of response.body)` works. These were written with the
+  stream but held back on the `for await` fix above, because an iterator over a
+  stream returns exactly the unsettled shape that used to hang the agent. With
+  that fix live they are installed, and seven regressions in
+  `ReadableStreamTests` cover chunk order, lock release, early exit cancelling
+  the source, `preventCancel`, an errored stream throwing into the loop, and a
+  locked stream rejecting — each against Chromium's measured answer.
 
 - `ReadableStream` (with its default reader and controller), `FileReader`,
   `ProgressEvent`, and `Blob.prototype.stream()`.

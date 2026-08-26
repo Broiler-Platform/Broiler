@@ -7,11 +7,11 @@
 // promises, and expressing it in C# would mean re-deriving the promise plumbing the engine already
 // has. The one thing the host provides is a Blob's bytes, which live where blobs do.
 //
-// NOT implemented, and detectably so: pipeTo and pipeThrough, which need a WritableStream; BYOB
-// readers, which need a byte-stream controller; and async iteration, which is written below and held
-// back on an engine fix that is not live yet (see the comment where values() would go). Each is its
-// own capability rather than a piece of this one; getReader({mode: 'byob'}) throws rather than
-// handing back a reader that is not one.
+// NOT implemented, and detectably so: pipeTo and pipeThrough, which need a WritableStream, and BYOB
+// readers, which need a byte-stream controller. Each is its own capability rather than a piece of
+// this one; getReader({mode: 'byob'}) throws rather than handing back a reader that is not one.
+// Async iteration — values() and @@asyncIterator — is implemented; it was the one piece held back on
+// an engine fix, and that fix is live in the pinned Broiler.JS pointer.
 //
 // __broilerBlobBytes is the host hook; it is captured into this closure and deleted from the global
 // so a page cannot reach a blob's bytes out of band.
@@ -399,40 +399,43 @@
         return [branch(0), branch(1)];
     };
 
-    // values() and @@asyncIterator are written and correct, and are deliberately NOT installed
-    // until the engine fix they depend on is live. `for await` deadlocks the agent when the
-    // iterator's next() hands back a promise that is not already settled — it blocks the one thread
-    // allowed to run this context's JavaScript, so the job that would settle the promise can never
-    // run — and `reader.read().then(…)`, which is exactly what an iterator over a stream returns, is
-    // that shape. The fix is patches/0001-js-for-await-unsettled-step-result.patch against
-    // Broiler.JS; with it applied, `for await (const chunk of response.body)` iterates correctly,
-    // verified in this host and in a capture. Without it, installing the hook would turn that line
-    // from a TypeError a page's script survives into a capture that never settles, which is strictly
-    // worse. Uncomment both statements when the patch lands.
+    // values() and @@asyncIterator, so `for await (const chunk of response.body)` works.
     //
-    // ReadableStream.prototype.values = function (options) {
-    //     var reader = this.getReader();
-    //     var preventCancel = !!(options && options.preventCancel);
-    //     var iterator = {
-    //         next: function () {
-    //             return reader.read().then(function (result) {
-    //                 if (result.done)
-    //                     reader.releaseLock();
-    //                 return result;
-    //             });
-    //         },
-    //         'return': function (value) {
-    //             if (!preventCancel)
-    //                 reader.cancel(value);
-    //             reader.releaseLock();
-    //             return Promise.resolve({ value: value, done: true });
-    //         },
-    //     };
-    //     iterator[Symbol.asyncIterator] = function () { return this; };
-    //     return iterator;
-    // };
+    // These were held back for a while, and the reason is worth keeping: `for await` used to
+    // deadlock the agent whenever the iterator's next() handed back a promise that was not
+    // *already* settled — the engine blocked the one thread allowed to run this context's
+    // JavaScript, so the job that would settle the promise could never run. `reader.read().then(…)`
+    // below is exactly that shape, so installing the hook would have turned the ordinary line above
+    // from a TypeError a page's script survives into a capture that never settles. The engine fix
+    // ("Stop for-await deadlocking on a step result that is not already settled") is upstream and
+    // the pinned Broiler.JS pointer carries it, so the hold is released.
     //
-    // ReadableStream.prototype[Symbol.asyncIterator] = ReadableStream.prototype.values;
+    // next() deliberately releases the lock on done rather than on the *next* call, so a loop that
+    // runs to completion leaves the stream unlocked; return() — which the engine calls when a loop
+    // is left by break, return or throw — cancels unless preventCancel was asked for, then releases.
+    ReadableStream.prototype.values = function (options) {
+        var reader = this.getReader();
+        var preventCancel = !!(options && options.preventCancel);
+        var iterator = {
+            next: function () {
+                return reader.read().then(function (result) {
+                    if (result.done)
+                        reader.releaseLock();
+                    return result;
+                });
+            },
+            'return': function (value) {
+                if (!preventCancel)
+                    reader.cancel(value);
+                reader.releaseLock();
+                return Promise.resolve({ value: value, done: true });
+            },
+        };
+        iterator[Symbol.asyncIterator] = function () { return this; };
+        return iterator;
+    };
+
+    ReadableStream.prototype[Symbol.asyncIterator] = ReadableStream.prototype.values;
 
     globalThis.ReadableStream = ReadableStream;
     globalThis.ReadableStreamDefaultReader = ReadableStreamDefaultReader;

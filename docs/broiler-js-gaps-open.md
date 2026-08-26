@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · **open** · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-25**.
+> Statuses were last reconciled on **2026-08-26**.
 
 Gaps that are real and not started, plus the surfaces that need an explicit product decision
 before anything can be built. Work that is part-landed with named remaining steps lives in
@@ -19,22 +19,6 @@ A confirmed gap closes only under the rules in
 
 ## Track 1 — Core language and built-ins
 
-- **A method call whose argument is a method call is silently skipped inside an `async` function.**
-  `trace.push(items.join('+'))` does not run: the statement is not executed, no error is raised, and
-  the statement after it runs normally. The inner call *is* evaluated — twice, measured with a
-  side-effecting one — so the outer call is what goes missing. The same source in a non-async
-  function is correct, which places it in the generator rewrite rather than in call compilation.
-  <br>Characterized as a matrix against the current pointer: an argument that is a plain-function
-  call (`trace.push(String(n))`) is fine, an argument that is a member *access*
-  (`trace.push(items.length)`) is fine, and hoisting the inner call into a variable first is fine —
-  only a member-call argument to a member call fails. The receiver's kind does not matter (a local
-  array, a global, a nested member), a loop is not needed, and neither is an `await`: the smallest
-  reproduction is
-  `(async function () { trace.push('1'); var got = ['a']; trace.push(got.join('+')); trace.push('3'); })()`,
-  which records `1,3`. This is a common shape — `console.log(list.join(', '))` inside any `async`
-  function vanishes — so it is worth more than its position in this list suggests. Not yet
-  root-caused; the pipeline to look at is `GeneratorRewriter` → `FlattenBlocks.VisitCall`, whose
-  operand hoisting is what a member-call argument goes through.
 - Remaining Annex B cases must be reduced from the current manifest rather than reconstructed
   from deleted issue snapshots.
 - `slice/create-proto-from-ctor-realm-array.js` — the one array case that still fails, a
@@ -78,19 +62,26 @@ below is host semantics and two decisions.
 
 ### Needs a product decision
 
-- **A JSON module's default import is `undefined`.** `import d from './data.json'` yields
-  `undefined`, so JSON modules are effectively unusable. The module host wraps a `.json` file as
-  `module.exports = <json>`, which replaces the exports object with the parsed value, and a default
-  import then reads `.default` off that value and finds nothing. Per ES2025 a JSON module has
-  exactly one export, `default`, and no named exports — but this engine serves both `require` (which
-  wants the object itself) and `import` from the same wrapper, so making the two agree is a product
-  decision about the CommonJS/ESM boundary rather than a mechanical fix. Characterized, not guessed
-  at.
-- **`import.meta`** reports "import.meta not supported" (deterministic, not a crash), and
-  `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
-- **Import-attribute enforcement.** Import attributes now parse everywhere the grammar allows, but
-  nothing acts on them. Rejecting a module whose type does not match its attribute is a separate
-  capability.
+- **`import defer`** (stage 3) is not parsed — a capability decision rather than a defect.
+  `import.meta`, listed here with it, is decided and implemented; see
+  [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics). What that decision left
+  open is **`import.meta.resolve`**, which is absent for a reason that is itself the next
+  decision: `JSModuleContext.Resolve` is existence-based — it probes for the file and answers null
+  when nothing is there — while `import.meta.resolve` resolves a specifier to a URL whether or not
+  anything is at it. Building it on today's resolver would throw where a browser answers. Making
+  the resolver able to answer without loading is the change that would unblock it, and it is
+  shared with anything else that needs to resolve without fetching.
+- **Requiring an import attribute on a JSON module** — the one part of attribute enforcement left
+  open, and deliberately. Enforcement is otherwise done and is in
+  [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics): an unknown key and a
+  duplicate key are early SyntaxErrors, an unknown module type and a `type` that does not match the
+  resolved module are load-time TypeErrors. What is *not* enforced is the converse — a `.json`
+  module imported with no attribute at all loads here, where a browser rejects it.
+  <br>The argument for leaving it is written up with the fix: on the web the attribute defends
+  against a server returning JSON where script was expected, a mismatch that cannot arise in a host
+  whose locally resolved key is itself the type, and this context serves `require` from the same
+  place, where no attribute exists at all. The argument against is portability — source that works
+  here and not in a browser. It is pinned by a test either way, so changing it is a decision.
 
 ### Actions
 
@@ -240,12 +231,24 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 - **SVG lacks conforming live DOM integration** for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
-- **Three JS-visible failures remain in the current tests**: SVG `elementFromPoint`, writing-mode
-  `scrollIntoView`, and mutated iframe state. Two others once listed here no longer reproduce — a
-  `@keyframes` rule read from style text answers the same `type`/`name`/`cssRules.length` triple
-  (`7`/`spin`/`2`), and out-of-range `scrollTop`/`scrollLeft` writes clamp identically. That was a
-  spot check of one shape each rather than the failing cases the line was written from, so the
-  owning manifests are what should settle those two.
+- **The three JS-visible failures this line was written for are all fixed** — SVG
+  `elementFromPoint`, mutated iframe state, and writing-mode `scrollIntoView`; see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  What is left of the line is the two layout gaps below, which are a different kind of thing.
+  Two others once listed here no longer reproduce — a `@keyframes` rule read from style text answers
+  the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`), and out-of-range
+  `scrollTop`/`scrollLeft` writes clamp identically. That was a spot check of one shape each rather
+  than the failing cases the line was written from, so the owning manifests are what should settle
+  those two.
+- **Two layout gaps sit behind the remaining SVG hit-test assertions**, and they are layout rather
+  than scripting, which is why fixing SVG geometry did not close them. `foreignObject` content is
+  not laid out at all — an HTML child inside one has no box and does not even resolve a `display`,
+  so `elementFromPoint` over it reports the `foreignObject` rather than the child. And an inline
+  `<svg>` root is not placed in normal flow against its siblings: two stacked `<svg>` elements both
+  report `top: 0` instead of the second clearing the first. `GoogleSearchPolyfillTests`'s
+  `Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate` and
+  `Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow` are the two, and each now fails for
+  exactly one of these reasons and nothing else.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),

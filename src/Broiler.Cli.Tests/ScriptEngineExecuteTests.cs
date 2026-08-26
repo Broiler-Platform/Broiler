@@ -1312,14 +1312,38 @@ document.getElementById('out').appendChild(p);
         Assert.Contains("data-broiler-top-layer=", result);
     }
 
+    /// <summary>
+    /// A frame's scroll state, mutated by script, reaches the serialized <c>srcdoc</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A frame's document is severed from the main tree, so the serialization pre-pass that records
+    /// scroll offsets — which walks the main document element — never reached it. The offset itself
+    /// was always recorded correctly (the frame's <c>scrollTop</c> read back what
+    /// <c>scrollIntoView</c> had set); it simply never reached the markup, so the capture showed the
+    /// frame at its initial scroll position.
+    /// </para>
+    /// <para>
+    /// This asserted the <c>position: relative; top: -160px</c> wrapper the pass used to bake, which
+    /// was deliberately retired in favour of handing the offset to the layout engine as a data
+    /// attribute — no wrapper div, no inline position writes, no fixed-descendant reparenting. So it
+    /// was failing for two independent reasons, and the assertion now pins the form the top-level
+    /// document produces for the identical mutation, checked against it in the same run so the two
+    /// cannot drift apart again.
+    /// </para>
+    /// </remarks>
     [Fact(Timeout = 600000)]
     public void DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc()
     {
-        const string html = """
+        const string frameBody =
+            "<div id='scroller' style='width:100px;height:60px;overflow:hidden'>"
+            + "<div style='height:200px'></div><div id='target' style='height:20px'></div></div>";
+
+        const string html = $"""
 <!DOCTYPE html>
 <html>
 <body>
-  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body><div id='scroller' style='width:100px;height:60px;overflow:hidden'><div style='height:200px'></div><div id='target' style='height:20px'></div></div></body></html>"></iframe>
+  <iframe id="frame" srcdoc="<!DOCTYPE html><html><body>{frameBody}</body></html>"></iframe>
 </body>
 </html>
 """;
@@ -1337,8 +1361,21 @@ document.getElementById('out').appendChild(p);
 
         var result = bridge.SerializeToHtml();
 
-        Assert.Contains("srcdoc=\"&lt;html&gt;&lt;head&gt;&lt;/head&gt;&lt;body&gt;&lt;div id=&quot;scroller&quot; style=&quot;width: 100px; height: 60px; overflow: hidden&quot;&gt;&lt;div style=&quot;position: relative; top: -160px&quot;&gt;", result);
+        // The frame's scroller carries the offset its script scrolled to, inside the srcdoc.
+        Assert.Contains(
+            "&lt;div id=&quot;scroller&quot; data-broiler-scroll-top=&quot;160&quot;",
+            result);
         Assert.DoesNotContain("&gt;&lt;html&gt;&lt;head&gt;", result);
+
+        // ...and it is the same form the top level produces for the same markup and mutation.
+        using var topContext = new JSContext();
+        var topBridge = new DomBridge();
+        topBridge.Attach(topContext, $"<!DOCTYPE html><html><body>{frameBody}</body></html>", "file:///top.html");
+        topBridge.FireWindowLoadEvent();
+        topContext.Eval("document.getElementById('target').scrollIntoView();");
+        topBridge.ResolveAnchorPositions();
+
+        Assert.Contains("<div id=\"scroller\" data-broiler-scroll-top=\"160\"", topBridge.SerializeToHtml());
     }
 
     [Fact(Timeout = 600000)]

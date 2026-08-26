@@ -1,0 +1,834 @@
+From 159608bfc986a6dca38fbc5971da922071a464c9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Wed, 26 Aug 2026 08:51:23 +0000
+Subject: [PATCH] Enforce import attributes instead of parsing and dropping
+ them
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Import attributes parsed everywhere the grammar allows and nothing acted on
+them: nothing read AstImportStatement.Attributes, the three `export … from`
+forms discarded theirs outright, and the compiler's call to the loader passed
+only the specifier. So `with { type: 'json' }` — the portable form, and the
+only one a browser accepts on a JSON module — was accepted and ignored, and so
+was `with { flavour: 'nonsense' }`. Silence is the one answer an assertion
+mechanism must never give.
+
+Where each failure is raised is measured from Chromium rather than chosen, and
+the split turns out to be principled. On a static declaration the keys are
+literals, so a key outside the vocabulary and a duplicate key are early
+SyntaxErrors, decided in the parser. Whether the `type` VALUE names a module
+type, and whether the module it resolves to is of that type, depends on the
+module, so both are load-time TypeErrors raised by the host. A dynamic
+import()'s keys are a runtime value and can only be judged at load, so it
+reports both as TypeErrors — which is exactly what Chromium does. Every message
+is Chromium's own.
+
+Attributes reach the host in one of two shapes and are validated through one
+path. A dynamic import passes its runtime options object in slot 1, with the
+full object-shape validation the spec asks for (options an object, `with` an
+object, every value a string). A static declaration has no options object, so
+its clause travels in slot 2 as a flat array of alternating key/value strings —
+flat because every part of it is a literal the grammar already fixed, and in
+source order so the FIRST offending key is the one reported. `export … from`
+now carries its clause through AstExportStatement to the same place, so all
+three forms are enforced like the import they perform.
+
+The type/module match is the one rule this host cannot implement the way the
+web does. A browser checks the assertion against the response MIME type; there
+are no MIME types here, so it checks the resolved module key — the same fact by
+the only means available, and the one that already decided the module would be
+parsed as JSON, so the check and the parse cannot disagree.
+
+`css` is told apart from a typo: it is a real module type and a real capability
+this engine does not have, so it reports that rather than "not a valid module
+type". A page can distinguish "not implemented here" from "not a thing".
+
+One deliberate divergence, pinned by a test: a .json module imported with NO
+attribute still loads, where a browser rejects it. There the attribute defends
+against a server returning JSON where script was expected — a mismatch that
+cannot arise in a host whose locally resolved key is itself the type. This
+context also serves require, which has no attributes at all, so demanding one
+from import would make the two halves of one host disagree about one file.
+
+Thirty-three regressions in ImportAttributeEnforcementTests, twenty-three of
+which fail before this change; each error-name assertion goes through a dynamic
+import so the JS-visible name, not just the message, is pinned.
+ModuleAttributeClauseTests keeps every grammar case it pinned but retargeted:
+it was written against `with { type: 'javascript' }`, which is not a module type
+any platform defines and which enforcement now correctly rejects, so each case
+now uses the one clause valid on a module this host serves. It also gains the
+empty clause, which is the only one a JavaScript module can carry.
+
+Engine suites: modules 160/160, module-extensions 5/5, built-ins 2215/2215,
+integration 5167/5168, compiler 1400/1402, parser 198/198, core/runtime/ast
+clean — the three failures pre-existing and unrelated.
+---
+ .../Statements/AstExportStatement.cs          |  20 +-
+ .../FastCompiler.VisitExportStatement.cs      |   6 +-
+ .../FastCompiler.VisitImportStatement.cs      |  59 ++++-
+ .../ImportAttributeEnforcementTests.cs        | 214 ++++++++++++++++++
+ .../ModuleAttributeClauseTests.cs             |  39 ++--
+ .../JSModuleContext.cs                        | 142 +++++++++++-
+ .../FastParser.Export.cs                      |  21 +-
+ .../FastParser.Import.cs                      |  29 +++
+ 8 files changed, 495 insertions(+), 35 deletions(-)
+ create mode 100644 Broiler.JS/Broiler.JavaScript.Modules.Tests/ImportAttributeEnforcementTests.cs
+
+diff --git a/Broiler.JS/Broiler.JavaScript.Ast/Statements/AstExportStatement.cs b/Broiler.JS/Broiler.JavaScript.Ast/Statements/AstExportStatement.cs
+index f10a57be..dbd2265b 100644
+--- a/Broiler.JS/Broiler.JavaScript.Ast/Statements/AstExportStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Ast/Statements/AstExportStatement.cs
+@@ -26,10 +26,24 @@ public class AstExportStatement : AstStatement
+     /// </remarks>
+     public readonly IFastEnumerable<(StringSpan name, StringSpan asName)>? Members;
+ 
++    /// <summary>
++    /// The <c>with { … }</c> clause of a re-export, or null when there is none.
++    /// </summary>
++    /// <remarks>
++    /// An ExportDeclaration with a FromClause takes a WithClause exactly as an ImportDeclaration
++    /// does, and it means the same thing: the module named by <see cref="Source"/> is loaded, so the
++    /// attribute constrains that load. It is carried here for the same reason
++    /// <c>AstImportStatement.Attributes</c> is — so the compiler can hand it to the module host,
++    /// which is what makes the attribute enforced rather than parsed and dropped.
++    /// </remarks>
++    public readonly IFastEnumerable<(StringSpan key, AstLiteral value)>? Attributes;
++
+     /// <summary>A NamedExports clause, with <paramref name="source"/> for a re-export.</summary>
+-    public AstExportStatement(FastToken token, IFastEnumerable<(StringSpan, StringSpan)> members, AstLiteral? source, FastToken end)
++    public AstExportStatement(FastToken token, IFastEnumerable<(StringSpan, StringSpan)> members, AstLiteral? source, FastToken end,
++        IFastEnumerable<(StringSpan, AstLiteral)>? attributes = null)
+         : base(token, FastNodeType.ExportStatement, end)
+     {
++        Attributes = attributes;
+         Members = members;
+         Source = source;
+         Declaration = null;
+@@ -44,8 +58,10 @@ public class AstExportStatement : AstStatement
+         Source = null;
+     }
+ 
+-    public AstExportStatement(FastToken token, AstNode? argument, AstNode source) : base(token, FastNodeType.ExportStatement, source.End)
++    public AstExportStatement(FastToken token, AstNode? argument, AstNode source,
++        IFastEnumerable<(StringSpan, AstLiteral)>? attributes = null) : base(token, FastNodeType.ExportStatement, source.End)
+     {
++        Attributes = attributes;
+         Declaration = argument;
+         IsDefault = false;
+         ExportAll = argument == null;
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs
+index c237a2e3..59e6881a 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitExportStatement.cs
+@@ -125,7 +125,7 @@ partial class FastCompiler
+                         var tempRequire = BExpression.Parameter(typeof(JSValue));
+                         var import = scope.Top.GetVariable("import");
+                         var source = VisitExpression((AstExpression)exportStatement.Source);
+-                        var args = ArgumentsBuilder.New(JSUndefinedBuilder.Value, source);
++                        var args = ImportArguments(source, exportStatement.Attributes);
+ 
+                         return BExpression.Block(
+                             tempRequire.AsSequence(),
+@@ -184,7 +184,7 @@ partial class FastCompiler
+         var imported = BExpression.Parameter(typeof(JSValue));
+         var import = scope.Top.GetVariable("import");
+         var source = VisitExpression((AstExpression)exportStatement.Source);
+-        var args = ArgumentsBuilder.New(JSUndefinedBuilder.Value, source);
++        var args = ImportArguments(source, exportStatement.Attributes);
+ 
+         list.Add(BExpression.Assign(
+             imported,
+@@ -219,7 +219,7 @@ partial class FastCompiler
+             var imported = BExpression.Parameter(typeof(JSValue));
+             var import = scope.Top.GetVariable("import");
+             var source = VisitExpression((AstExpression)exportStatement.Source);
+-            var args = ArgumentsBuilder.New(JSUndefinedBuilder.Value, source);
++            var args = ImportArguments(source, exportStatement.Attributes);
+ 
+             list.Add(BExpression.Assign(
+                 imported,
+diff --git a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitImportStatement.cs b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitImportStatement.cs
+index 024aaca0..858d0239 100644
+--- a/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitImportStatement.cs
++++ b/Broiler.JS/Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitImportStatement.cs
+@@ -1,4 +1,5 @@
+-﻿using Broiler.JavaScript.Ast.Statements;
++﻿using Broiler.JavaScript.Ast.Misc;
++using Broiler.JavaScript.Ast.Statements;
+ using Broiler.JavaScript.ExpressionCompiler.Core;
+ using Broiler.JavaScript.ExpressionCompiler.Expressions;
+ using Broiler.JavaScript.LinqExpressions.LinqExpressions;
+@@ -13,7 +14,9 @@ partial class FastCompiler
+         var tempRequire = BExpression.Parameter(typeof(JSValue));
+         var require = scope.Top.GetVariable("import");
+         var source = VisitExpression(importStatement.Source);
+-        var args = ArgumentsBuilder.New(JSUndefinedBuilder.Value, source);
++
++        var args = ImportArguments(source, importStatement.Attributes);
++
+         var stmts = new Sequence<BExpression>
+         {
+             BExpression.Assign(tempRequire, BExpression.Yield(JSFunctionBuilder.InvokeFunction(require.Expression, args)))
+@@ -63,4 +66,56 @@ partial class FastCompiler
+         return importExp;
+     }
+ 
++    /// <summary>
++    /// The argument list for a call to the host's module loader: the specifier, and a static
++    /// declaration's <c>with { … }</c> clause when it has one.
++    /// </summary>
++    /// <remarks>
++    /// Shared by <c>import</c> declarations and by the three <c>export … from</c> forms, which load
++    /// a module for exactly the same reason and take the same clause. The loader's argument list is
++    /// shared with dynamic <c>import()</c>, which puts its runtime options object in slot 1; a static
++    /// declaration has no options object, so its attributes travel in slot 2 and the host validates
++    /// both shapes through one path. Passing them rather than dropping them is what lets
++    /// <c>with { type: 'json' }</c> be enforced instead of parsed and ignored.
++    /// </remarks>
++    private static BExpression ImportArguments(
++        BExpression source, IFastEnumerable<(StringSpan key, AstLiteral value)> attributes)
++    {
++        var pairs = ImportAttributePairs(attributes);
++        return pairs == null
++            ? ArgumentsBuilder.New(JSUndefinedBuilder.Value, source)
++            : ArgumentsBuilder.New(JSUndefinedBuilder.Value,
++                new BExpression[] { source, JSUndefinedBuilder.Value, pairs });
++    }
++
++    /// <summary>
++    /// A static import's attribute clause as a flat JS array of alternating key/value strings, or
++    /// <see langword="null"/> when there is no clause and nothing to pass.
++    /// </summary>
++    /// <remarks>
++    /// Flat rather than an object because every part of it is a string literal the grammar already
++    /// fixed — <c>AttributeKey : IdentifierName | StringLiteral</c> and a StringLiteral value — so
++    /// there is nothing to evaluate and nothing an object would carry that this does not. It also
++    /// keeps the pairs in source order, which is what lets the host report the *first* offending key
++    /// rather than whichever one a property table happened to yield first.
++    /// </remarks>
++    private static BExpression ImportAttributePairs(IFastEnumerable<(StringSpan key, AstLiteral value)> attributes)
++    {
++        if (attributes == null)
++            return null;
++
++        var inits = new Sequence<BElementInit>();
++        var e = attributes.GetFastEnumerator();
++        while (e.MoveNext(out var attribute))
++        {
++            inits.Add(BExpression.ElementInit(JSArrayBuilder._Add,
++                [JSStringBuilder.New(BExpression.Constant(attribute.key.ToString()))]));
++            inits.Add(BExpression.ElementInit(JSArrayBuilder._Add,
++                [JSStringBuilder.New(BExpression.Constant(attribute.value.StringValue.ToString()))]));
++        }
++
++        // `with { }` is legal and means no attributes; it must still be distinguishable from no
++        // clause at all only in that both are unconstrained, so an empty array is fine to skip.
++        return inits.Count == 0 ? null : JSArrayBuilder.New(inits);
++    }
+ }
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules.Tests/ImportAttributeEnforcementTests.cs b/Broiler.JS/Broiler.JavaScript.Modules.Tests/ImportAttributeEnforcementTests.cs
+new file mode 100644
+index 00000000..ec3109b8
+--- /dev/null
++++ b/Broiler.JS/Broiler.JavaScript.Modules.Tests/ImportAttributeEnforcementTests.cs
+@@ -0,0 +1,214 @@
++using System;
++using System.Collections.Generic;
++using System.IO;
++using System.Threading.Tasks;
++using Broiler.JavaScript.Modules;
++using Xunit;
++
++namespace Broiler.JavaScript.Modules.Tests;
++
++/// <summary>
++/// What an import attribute <em>means</em>. The grammar — which clause shapes compile, and where a
++/// clause may appear — is <see cref="ModuleAttributeClauseTests"/>.
++/// </summary>
++/// <remarks>
++/// <para>
++/// Attributes parsed everywhere the grammar allows and then nothing acted on them: nothing read
++/// <c>AstImportStatement.Attributes</c>, the export forms discarded theirs outright, and the
++/// compiler's call to the loader passed only the specifier. So <c>with { type: 'json' }</c> — the
++/// portable form, and the only one a browser accepts on a JSON module — was accepted and ignored,
++/// and so was <c>with { flavour: 'nonsense' }</c>. Silence is the one answer an assertion mechanism
++/// must never give.
++/// </para>
++/// <para>
++/// <b>Where each failure is raised is measured from Chromium, not chosen.</b> On a static
++/// declaration the keys are literals, so a bad key and a duplicate key are early
++/// <b>SyntaxError</b>s; whether the <c>type</c> <em>value</em> names a module type, and whether the
++/// module it resolves to is of that type, depends on the module and is a load-time
++/// <b>TypeError</b>. A dynamic <c>import()</c>'s keys are a runtime value, so it reports both as
++/// TypeErrors. The messages are Chromium's own, measured from the same probe.
++/// </para>
++/// <para>
++/// <b>One deliberate divergence.</b> A <c>.json</c> module imported with no attribute at all loads
++/// here; a browser rejects it. There the attribute defends against a server returning JSON where
++/// script was expected — a mismatch that cannot arise in this host, where the key resolved locally
++/// is itself the type. This context also serves <c>require</c>, which has no attributes at all, so
++/// demanding one from <c>import</c> would make the two halves of one host disagree about one file.
++/// Pinned below so it stays a decision.
++/// </para>
++/// </remarks>
++public class ImportAttributeEnforcementTests
++{
++    private sealed class UrlModuleContext(Dictionary<string, string> files) : JSModuleContext
++    {
++        protected override string Resolve(string dirPath, string relativePath)
++        {
++            if (Uri.TryCreate(relativePath, UriKind.Absolute, out var abs)) return abs.AbsoluteUri;
++            return Uri.TryCreate(new Uri(dirPath), relativePath, out var rel) ? rel.AbsoluteUri : null;
++        }
++
++        protected override string GetModuleDirectory(string fullPath) => fullPath;
++
++        protected override Task<string> ReadModuleSourceAsync(JSModule module) =>
++            Task.FromResult(files.TryGetValue(module.filePath, out var src)
++                ? src
++                : throw new FileNotFoundException(module.filePath));
++    }
++
++    private static Dictionary<string, string> Files() => new()
++    {
++        ["file:///app/data.json"] = "{\"a\":1}",
++        ["file:///app/mod.js"] = "export const x = 1; export default 9;",
++    };
++
++    private static async Task<string> Run(string main)
++    {
++        var files = Files();
++        files["file:///app/main.js"] = main;
++
++        using var ctx = new UrlModuleContext(files);
++        await ctx.RunScriptAsync(main, "file:///app/main.js", uniqueModuleID: "file:///app/main.js");
++        return ctx.Eval("String(globalThis.r)").ToString();
++    }
++
++    /// <summary>
++    /// Loads <paramref name="moduleSource"/> through a dynamic import so its failure is caught in
++    /// JavaScript and the error's NAME is visible — which is the whole point for the static cases,
++    /// where the difference between SyntaxError and TypeError is what is being pinned.
++    /// </summary>
++    private static async Task<string> ErrorFrom(string moduleSource)
++    {
++        var files = Files();
++        files["file:///app/bad.js"] = moduleSource;
++        var main =
++            "globalThis.r = 'pending'; (async () => { try { await import('./bad.js'); "
++            + "globalThis.r = 'NO_THROW'; } catch (e) { globalThis.r = e.name + '|' + e.message; } })();";
++        files["file:///app/main.js"] = main;
++
++        using var ctx = new UrlModuleContext(files);
++        await ctx.RunScriptAsync(main, "file:///app/main.js", uniqueModuleID: "file:///app/main.js");
++        return ctx.Eval("String(globalThis.r)").ToString();
++    }
++
++    private static async Task<string> DynamicError(string call)
++    {
++        var main =
++            "globalThis.r = 'pending'; (async () => { try { const m = " + call
++            + "; globalThis.r = 'OK:' + Object.keys(m).sort().join(','); } "
++            + "catch (e) { globalThis.r = e.name + '|' + e.message; } })();";
++        return await Run(main);
++    }
++
++    // ---------------------------------------------------------------- what a clause may say
++
++    /// <summary><c>type</c> is the only key the platform defines. An unknown one is an early
++    /// SyntaxError on a static declaration, exactly as in a browser.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("import d from './mod.js' with { flavour: 'x' };", "flavour")]
++    [InlineData("import d from './data.json' with { type: 'json', extra: '1' };", "extra")]
++    [InlineData("import d from './mod.js' with { assert: 'json' };", "assert")]
++    [InlineData("export { x } from './mod.js' with { flavour: 'x' };", "flavour")]
++    [InlineData("export * from './mod.js' with { flavour: 'x' };", "flavour")]
++    public async Task AnUnknownAttributeKeyIsAnEarlySyntaxError(string source, string key)
++        => Assert.Equal($"SyntaxError|Invalid attribute key \"{key}\".", await ErrorFrom(source));
++
++    /// <summary>A duplicate key is a Syntax Error in the proposal itself, whichever spelling the
++    /// two keys use.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("import d from './mod.js' with { type: 'json', type: 'json' };")]
++    [InlineData("import d from './mod.js' with { type: 'json', \"type\": 'json' };")]
++    [InlineData("export { x } from './mod.js' with { \"type\": 'json', type: 'json' };")]
++    public async Task ADuplicateAttributeKeyIsAnEarlySyntaxError(string source)
++        => Assert.Equal("SyntaxError|Import attribute has duplicate key 'type'", await ErrorFrom(source));
++
++    /// <summary>The module-type vocabulary is the platform's, so a value outside it is a typo and
++    /// says so — at load time, because only the module can settle it.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("import d from './mod.js' with { type: 'bogus' };", "bogus")]
++    [InlineData("import d from './data.json' with { type: 'javascript' };", "javascript")]
++    [InlineData("export * as n from './mod.js' with { type: 'nope' };", "nope")]
++    public async Task AnUnknownModuleTypeIsALoadTimeTypeError(string source, string type)
++        => Assert.Equal($"TypeError|\"{type}\" is not a valid module type.", await ErrorFrom(source));
++
++    /// <summary>
++    /// <c>css</c> is a real module type and a real capability this engine does not have, so it is
++    /// told apart from a typo: a page can distinguish "not implemented here" from "not a thing".
++    /// </summary>
++    [Fact(Timeout = 600000)]
++    public async Task ACssModuleTypeIsRejectedAsUnimplementedRatherThanAsATypo()
++        => Assert.Equal("TypeError|CSS module scripts are not implemented.",
++            await ErrorFrom("import d from './mod.js' with { type: 'css' };"));
++
++    // ---------------------------------------------------------------- and whether it is true
++
++    /// <summary>A <c>type</c> that does not match the resolved module fails the load. The web
++    /// checks the response MIME type; this host has no MIME types and checks the resolved module
++    /// key, which is the same fact by the only means available — it is what decided the module
++    /// would be parsed as JSON in the first place.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("import d from './mod.js' with { type: 'json' };")]
++    [InlineData("export { x } from './mod.js' with { type: 'json' };")]
++    [InlineData("export * from './mod.js' with { type: 'json' };")]
++    public async Task AssertingJsonForAModuleThatIsNotJsonFailsTheLoad(string source)
++    {
++        var error = await ErrorFrom(source);
++        Assert.StartsWith("TypeError|Failed to load module \"file:///app/mod.js\"", error);
++        Assert.Contains("it was imported with type: \"json\" but it is not a JSON module.", error);
++    }
++
++    /// <summary>A matching assertion loads, on every import form that takes a clause.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("import d from './data.json' with { type: 'json' }; globalThis.r = d.a;", "1")]
++    [InlineData("import * as ns from './data.json' with { type: 'json' }; globalThis.r = Object.keys(ns).join(',');", "default")]
++    [InlineData("import d from './mod.js' with { }; globalThis.r = d;", "9")]
++    [InlineData("import d from './mod.js'; globalThis.r = d;", "9")]
++    public async Task AMatchingOrEmptyClauseLoads(string main, string expected)
++        => Assert.Equal(expected, await Run(main));
++
++    /// <summary>
++    /// The deliberate divergence: a JSON module with no attribute loads here and would not in a
++    /// browser. Pinned so turning it into a rejection is a decision rather than a drift — and note
++    /// the same file read through <c>require</c>, which has no attributes at all and must keep
++    /// agreeing with it.
++    /// </summary>
++    [Fact(Timeout = 600000)]
++    public async Task AJsonModuleWithNoAttributeStillLoads()
++        => Assert.Equal("1|1", await Run(
++            "import d from './data.json'; globalThis.r = d.a + '|' + require('./data.json').a;"));
++
++    // ---------------------------------------------------------------- the dynamic form
++
++    /// <summary>A dynamic import's keys are a runtime value, so the key check that is an early
++    /// SyntaxError on a declaration is a TypeError here — as in a browser.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task ADynamicImportReportsABadKeyAsATypeError()
++        => Assert.Equal("TypeError|Invalid attribute key \"flavour\".",
++            await DynamicError("await import('./mod.js', { with: { flavour: 'x' } })"));
++
++    [Theory(Timeout = 600000)]
++    [InlineData("await import('./mod.js', 'nonsense')", "The second argument to import() must be an object")]
++    [InlineData("await import('./mod.js', null)", "The second argument to import() must be an object")]
++    [InlineData("await import('./mod.js', { with: 5 })", "The 'with' option must be an object")]
++    [InlineData("await import('./mod.js', { with: null })", "The 'with' option must be an object")]
++    [InlineData("await import('./mod.js', { with: { type: 123 } })", "Import attribute value must be a string")]
++    [InlineData("await import('./mod.js', { with: { type: undefined } })", "Import attribute value must be a string")]
++    [InlineData("await import('./mod.js', { with: { type: 'bogus' } })", "\"bogus\" is not a valid module type.")]
++    public async Task ADynamicImportValidatesItsOptionsObject(string call, string message)
++        => Assert.Equal("TypeError|" + message, await DynamicError(call));
++
++    /// <summary>Options that assert nothing are not an error: no second argument, an options object
++    /// with no <c>with</c>, and a matching assertion all load.</summary>
++    [Theory(Timeout = 600000)]
++    [InlineData("await import('./mod.js')", "OK:default,x")]
++    [InlineData("await import('./mod.js', { other: 1 })", "OK:default,x")]
++    [InlineData("await import('./mod.js', { with: { } })", "OK:default,x")]
++    [InlineData("await import('./data.json', { with: { type: 'json' } })", "OK:default")]
++    public async Task ADynamicImportThatAssertsNothingOrAssertsTrulyLoads(string call, string expected)
++        => Assert.Equal(expected, await DynamicError(call));
++
++    /// <summary><c>require</c> takes no attributes and is untouched by any of this.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task RequireIsUnaffected()
++        => Assert.Equal("{\"a\":1}|9", await Run(
++            "globalThis.r = JSON.stringify(require('./data.json')) + '|' + require('./mod.js').default;"));
++}
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModuleAttributeClauseTests.cs b/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModuleAttributeClauseTests.cs
+index 48cebd8b..95f14c32 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModuleAttributeClauseTests.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules.Tests/ModuleAttributeClauseTests.cs
+@@ -1,4 +1,4 @@
+-using System;
++﻿using System;
+ using System.Collections.Generic;
+ using System.IO;
+ using System.Threading.Tasks;
+@@ -19,9 +19,15 @@ namespace Broiler.JavaScript.Modules.Tests;
+ /// <c>WithClause</c> exactly as an <c>ImportDeclaration</c> does, but none of the three export
+ /// <c>from</c> forms accepted one.
+ /// <para>
+-/// The attributes are parsed and not yet acted on — nothing reads
+-/// <c>AstImportStatement.Attributes</c> either — so what this fixes is valid source failing to
+-/// compile, not attribute enforcement, which remains a separate capability.
++/// These pin the <b>grammar</b>: which clause shapes compile, and where a clause may appear. What a
++/// clause then <em>means</em> — an unknown key, an unknown module type, a type that does not match
++/// the module — is enforcement, and lives in <see cref="ImportAttributeEnforcementTests"/>.
++/// </para>
++/// <para>
++/// They were originally written against <c>with { type: 'javascript' }</c>, which is not a module
++/// type any platform defines and which enforcement now rejects. Each one keeps exactly what it
++/// pinned — a quoted key, an identifier key, each import and export form — against the one clause
++/// that is valid on a module this host can serve: <c>with { type: 'json' }</c> on a JSON module.
+ /// </para>
+ /// </remarks>
+ public class ModuleAttributeClauseTests
+@@ -47,6 +53,7 @@ public class ModuleAttributeClauseTests
+         var files = new Dictionary<string, string>
+         {
+             ["file:///app/dep.js"] = "export const a = 1; export const b = 2; export default 9;",
++            ["file:///app/data.json"] = "{\"a\":1}",
+         };
+ 
+         using var ctx = new UrlModuleContext(files);
+@@ -57,40 +64,46 @@ public class ModuleAttributeClauseTests
+     // ---- AttributeKey may be a StringLiteral, not only an identifier ----
+ 
+     [Theory(Timeout = 600000)]
+-    [InlineData("import { a } from './dep.js' with { \"type\": 'javascript' }; globalThis.r = a;")]
+-    [InlineData("import { a } from './dep.js' with { type: 'javascript' }; globalThis.r = a;")]
+-    [InlineData("import { a } from './dep.js' with { \"type\": 'javascript', \"other\": 'x' }; globalThis.r = a;")]
++    [InlineData("import d from './data.json' with { \"type\": 'json' }; globalThis.r = d.a;")]
++    [InlineData("import d from './data.json' with { type: 'json' }; globalThis.r = d.a;")]
++    [InlineData("import d from './data.json' with { \"type\": \"json\" }; globalThis.r = d.a;")]
+     public async Task AnAttributeKeyMayBeAStringOrAnIdentifier(string main)
+         => Assert.Equal("1", await Run(main));
+ 
++    /// <summary>An empty clause is legal and constrains nothing, so it is the one clause a
++    /// JavaScript module can carry.</summary>
++    [Fact(Timeout = 600000)]
++    public async Task AnEmptyClauseIsAccepted()
++        => Assert.Equal("1", await Run("import { a } from './dep.js' with { }; globalThis.r = a;"));
++
+     [Fact(Timeout = 600000)]
+     public async Task ADefaultImportTakesAttributes()
+-        => Assert.Equal("9", await Run(
+-            "import d from './dep.js' with { \"type\": 'javascript' }; globalThis.r = d;"));
++        => Assert.Equal("1", await Run(
++            "import d from './data.json' with { \"type\": 'json' }; globalThis.r = d.a;"));
+ 
+     [Fact(Timeout = 600000)]
+     public async Task ANamespaceImportTakesAttributes()
+         => Assert.Equal("1", await Run(
+-            "import * as ns from './dep.js' with { type: 'javascript' }; globalThis.r = ns.a;"));
++            "import * as ns from './data.json' with { type: 'json' }; globalThis.r = ns.default.a;"));
+ 
+     // ---- Every export `from` form takes a WithClause too ----
+ 
+     [Fact(Timeout = 600000)]
+     public async Task AReExportClauseTakesAttributes()
+         => Assert.Equal("1", await Run(
+-            "export { a } from './dep.js' with { type: 'javascript' };"
++            "export { default as d } from './data.json' with { type: 'json' };"
+             + "import { a } from './dep.js'; globalThis.r = a;"));
+ 
+     [Fact(Timeout = 600000)]
+     public async Task AStarReExportTakesAttributes()
+         => Assert.Equal("3", await Run(
+-            "export * from './dep.js' with { \"type\": 'javascript' };"
++            "export * from './data.json' with { \"type\": 'json' };"
+             + "import { a, b } from './dep.js'; globalThis.r = a + b;"));
+ 
+     [Fact(Timeout = 600000)]
+     public async Task AStarAsNamespaceReExportTakesAttributes()
+         => Assert.Equal("1", await Run(
+-            "export * as ns from './dep.js' with { type: 'javascript' };"
++            "export * as ns from './data.json' with { type: 'json' };"
+             + "import { a } from './dep.js'; globalThis.r = a;"));
+ 
+     // A malformed clause is still rejected: the value must be a string literal.
+diff --git a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+index 6d97672a..9169b9f4 100644
+--- a/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
++++ b/Broiler.JS/Broiler.JavaScript.Modules/JSModuleContext.cs
+@@ -259,7 +259,8 @@ public class JSModuleContext : JSContext
+             if (!name.IsString)
+                 throw NewTypeError("import method's parameter must be a string");
+ 
+-            return TaskToPromise(LoadModuleAsync(dirPath, name.StringValue));
++            var type = ValidatedModuleType(a[1], a[2]);
++            return TaskToPromise(LoadModuleAsync(dirPath, name.StringValue, requiredType: type));
+         });
+ 
+         newModule.Require = new JSFunction((in Arguments a) =>
+@@ -345,6 +346,38 @@ public class JSModuleContext : JSContext
+     /// portable code writes it.
+     /// </para>
+     /// </remarks>
++    /// <summary>The one module type this host implements, and the value <c>with { type: … }</c>
++    /// may name.</summary>
++    private const string JsonModuleType = "json";
++
++    /// <summary>
++    /// Rejects a resolved module whose type is not the one an import attribute asserted.
++    /// </summary>
++    /// <remarks>
++    /// The web checks the assertion against the response's MIME type; this host has no MIME types,
++    /// so it checks the resolved module key, which is the same fact by the only means available —
++    /// the key is what decided the module would be parsed as JSON in the first place, so the check
++    /// and the parse cannot disagree.
++    /// <para>
++    /// The converse is deliberately <b>not</b> enforced: a <c>.json</c> module imported with no
++    /// attribute at all loads. A browser rejects that, because there the attribute defends against a
++    /// server returning JSON where script was expected — a mismatch that cannot arise here, since
++    /// the key resolved locally is itself the type. This context also serves <c>require</c>, where
++    /// no attribute exists at all, so demanding one from <c>import</c> would make the two halves of
++    /// the same host disagree about the same file. Stated as a divergence rather than left to be
++    /// discovered.
++    /// </para>
++    /// </remarks>
++    private void CheckModuleType(string moduleKey, string requiredType)
++    {
++        if (requiredType == JsonModuleType && !IsJsonModule(moduleKey))
++        {
++            throw NewTypeError(
++                $"Failed to load module \"{moduleKey}\": it was imported with " +
++                "type: \"json\" but it is not a JSON module.");
++        }
++    }
++
+     private static bool IsJsonModule(string moduleKey) =>
+         moduleKey != null && moduleKey.EndsWith(".json", StringComparison.Ordinal);
+ 
+@@ -358,21 +391,121 @@ public class JSModuleContext : JSContext
+             ? module.Exports
+             : module.Exports[KeyStrings.@default];
+ 
++    /// <summary>
++    /// The module type an import attribute clause asked for — <c>"json"</c>, or null when no
++    /// <c>type</c> was asserted — after validating the clause itself.
++    /// </summary>
++    /// <remarks>
++    /// <para>
++    /// Attributes reach here in one of two shapes and are validated through one path so both report
++    /// the same thing: a dynamic <c>import(specifier, options)</c> passes its runtime options object
++    /// in <paramref name="options"/>, and a static declaration's <c>with { … }</c> clause — all
++    /// string literals the grammar already fixed — arrives in <paramref name="staticPairs"/> as a
++    /// flat array of alternating key/value strings.
++    /// </para>
++    /// <para>
++    /// The clause is checked <b>before the specifier is resolved</b>, which is the order a browser
++    /// uses: an unknown key or an unknown module type is a fault in the source, not in what the
++    /// specifier turned out to name, so it must not depend on whether the module exists. The
++    /// messages are Chromium's own, measured, so a page that matches on them sees what it expects.
++    /// </para>
++    /// </remarks>
++    private string ValidatedModuleType(JSValue options, JSValue staticPairs)
++    {
++        string requested = null;
++
++        if (staticPairs != null && staticPairs.IsArray)
++        {
++            var length = staticPairs.Length;
++            for (var i = 0; i + 1 < length; i += 2)
++            {
++                requested = CheckAttribute(staticPairs[(uint)i].ToString(), staticPairs[(uint)(i + 1)].ToString())
++                    ?? requested;
++            }
++
++            return requested;
++        }
++
++        if (options == null || options.IsUndefined)
++            return null;
++
++        // `import(spec, null)` is rejected too: null is not an object, and a browser says so with
++        // this same message rather than treating it as "no options".
++        if (options is not JSObject || options.IsNull)
++            throw NewTypeError("The second argument to import() must be an object");
++
++        var with = options[(KeyString)"with"];
++        if (with == null || with.IsUndefined)
++            return null;
++
++        if (with is not JSObject || with.IsNull)
++            throw NewTypeError("The 'with' option must be an object");
++
++        // Own enumerable string keys, in the object's own order, so a `with` built at runtime is
++        // read the way any other options bag is.
++        var keys = with.GetAllKeys(showEnumerableOnly: true, inherited: false);
++        while (keys.MoveNext(out var key))
++        {
++            var value = with[key];
++            if (value == null || !value.IsString)
++                throw NewTypeError("Import attribute value must be a string");
++
++            requested = CheckAttribute(key.ToString(), value.StringValue) ?? requested;
++        }
++
++        return requested;
++    }
++
++    /// <summary>
++    /// Validates one attribute, returning the module type it asks for or null when it asks for none.
++    /// </summary>
++    private string CheckAttribute(string key, string value)
++    {
++        // `type` is the only attribute key the platform defines. On a STATIC declaration this can no
++        // longer be reached — the keys are literals, so the parser rejects an unknown one as the
++        // early SyntaxError a browser gives. It is reached from a dynamic `import()`, whose keys are
++        // a runtime value and can only be judged here, and where a browser reports the same thing as
++        // a TypeError.
++        if (key != "type")
++            throw NewTypeError($"Invalid attribute key \"{key}\".");
++
++        // The module-type vocabulary is the platform's, not this host's, so that a page asking for a
++        // type Broiler does not implement is told *that* rather than told it made a typo. `css` is a
++        // real module type and a real capability this engine does not have; the two are different
++        // failures and a page can tell them apart.
++        if (value == JsonModuleType)
++            return JsonModuleType;
++
++        if (value == "css")
++            throw NewTypeError("CSS module scripts are not implemented.");
++
++        throw NewTypeError($"\"{value}\" is not a valid module type.");
++    }
++
+     /// <param name="esModule">
+     /// Whether the caller is <c>import</c> (the ES view) rather than <c>require</c> (the CommonJS
+     /// view). It changes nothing except the shape a JSON module is presented in — see
+     /// <see cref="IsJsonModule"/>.
+     /// </param>
+-    protected virtual async Task<JSValue> LoadModuleAsync(string currentPath, string name, bool esModule = true)
++    /// <param name="requiredType">
++    /// The module type an import attribute asserted, from <see cref="ValidatedModuleType"/>, or null
++    /// when none was. A mismatch is a load failure.
++    /// </param>
++    protected virtual async Task<JSValue> LoadModuleAsync(
++        string currentPath, string name, bool esModule = true, string requiredType = null)
+     {
+         var relativePath = name;
+ 
+-        // fetch system modules 
++        // fetch system modules
+         if (moduleCache.TryGetValue(relativePath, out var m))
++        {
++            CheckModuleType(relativePath, requiredType);
+             return ViewOf(m, relativePath, esModule);
++        }
+ 
+         // resolve full name..
+         var fullPath = Resolve(currentPath, relativePath) ?? throw NewTypeError($"{relativePath} module not found");
++        CheckModuleType(fullPath, requiredType);
+         m = moduleCache.GetOrCreate(fullPath, () =>
+         {
+             var newModule = new JSModule(this, fullPath);
+@@ -384,7 +517,8 @@ public class JSModuleContext : JSContext
+                 if (!name.IsString)
+                     throw NewTypeError("import method's parameter must be a string");
+ 
+-                return TaskToPromise(LoadModuleAsync(dirPath, name.StringValue));
++                var type = ValidatedModuleType(a[1], a[2]);
++                return TaskToPromise(LoadModuleAsync(dirPath, name.StringValue, requiredType: type));
+             });
+ 
+             newModule.Require = new JSFunction((in Arguments a) =>
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Export.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Export.cs
+index 76737cb8..0db31405 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Export.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Export.cs
+@@ -1,4 +1,4 @@
+-#nullable enable
++﻿#nullable enable
+ using Broiler.JavaScript.Ast.Expressions;
+ using Broiler.JavaScript.Ast.Misc;
+ using Broiler.JavaScript.Ast.Statements;
+@@ -88,24 +88,23 @@ partial class FastParser
+ 
+                 var namespaceSource = ExpectStringLiteral();
+                 // An ExportDeclaration with a FromClause takes a WithClause exactly as an
+-                // ImportDeclaration does, and all three `from` forms below accept one too. As on
+-                // the import side, the attributes are parsed and not yet acted on — nothing reads
+-                // AstImportStatement.Attributes either — so this makes valid source compile rather
+-                // than claiming the attribute is enforced.
+-                ImportAttributes();
++                // ImportDeclaration does, and all three `from` forms below accept one too. The
++                // clause constrains the load of the module named by the FromClause, so it is
++                // carried to the compiler and handed to the host exactly as an import's is.
++                var namespaceAttrs = ImportAttributes();
+                 isAsync = true;
+-                statement = new AstExportStatement(start, namespaceIdentifier, namespaceSource);
++                statement = new AstExportStatement(start, namespaceIdentifier, namespaceSource, namespaceAttrs);
+                 return true;
+             }
+ 
+             stream.ExpectContextualKeyword(FastKeywords.from);
+ 
+             var literal = ExpectStringLiteral();
+-            ImportAttributes();
++            var starAttrs = ImportAttributes();
+             // Like the `* as ns` form above: the module has to be imported before its names can be
+             // republished, and that import is awaited.
+             isAsync = true;
+-            statement = new AstExportStatement(start, null, literal);
++            statement = new AstExportStatement(start, null, literal, starAttrs);
+             return true;
+         }
+ 
+@@ -124,9 +123,9 @@ partial class FastParser
+             if (stream.CheckAndConsumeContextualKeyword(FastKeywords.from))
+             {
+                 var reexportSource = ExpectStringLiteral();
+-                ImportAttributes();
++                var reexportAttrs = ImportAttributes();
+                 isAsync = true;
+-                statement = new AstExportStatement(start, members!, reexportSource, reexportSource.End);
++                statement = new AstExportStatement(start, members!, reexportSource, reexportSource.End, reexportAttrs);
+                 return true;
+             }
+ 
+diff --git a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Import.cs b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Import.cs
+index a52fea4b..951f537c 100644
+--- a/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Import.cs
++++ b/Broiler.JS/Broiler.JavaScript.Parser/FastParser.Import.cs
+@@ -149,6 +149,21 @@ partial class FastParser
+     /// Parse optional import attributes: <c>with { key: "value", ... }</c>
+     /// (ES2025 §2.3 Import Attributes).
+     /// </summary>
++    /// <remarks>
++    /// Two of the three things that can be wrong with a clause are decided here, because on a static
++    /// declaration they are properties of the source rather than of what the specifier turned out to
++    /// name, and both are early errors in a browser:
++    /// <list type="bullet">
++    /// <item>a duplicate key, which the proposal itself makes a Syntax Error; and</item>
++    /// <item>a key outside the vocabulary, where <c>type</c> is the only key the platform
++    /// defines.</item>
++    /// </list>
++    /// The third — whether the <c>type</c> <em>value</em> names a module type, and whether the module
++    /// it resolves to is of that type — is a load-time TypeError, raised by the module host, because
++    /// the answer depends on the module. That split is measured from Chromium rather than chosen: a
++    /// bad key is a SyntaxError there and a bad type value is a TypeError, and a dynamic
++    /// <c>import()</c>, whose keys are a runtime value, reports both as TypeErrors.
++    /// </remarks>
+     IFastEnumerable<(StringSpan, AstLiteral)>? ImportAttributes()
+     {
+         // The `with` keyword is a reserved keyword, so use CheckAndConsume(FastKeywords)
+@@ -187,6 +202,20 @@ partial class FastParser
+                 throw stream.Unexpected();
+             }
+ 
++            // `type` is the only attribute key the platform defines. Accepting anything else and
++            // then ignoring it is what this rejects: a page that writes `assert` (the clause's old
++            // spelling) or misspells `type` got silence, and silence from an assertion mechanism is
++            // the one answer it must never give.
++            if (!key.Equals("type"))
++                throw new FastParseException(keyToken, $"Invalid attribute key \"{key}\".");
++
++            var duplicates = list.GetFastEnumerator();
++            while (duplicates.MoveNext(out var seen))
++            {
++                if (seen.Item1.Equals(key))
++                    throw new FastParseException(keyToken, $"Import attribute has duplicate key '{key}'");
++            }
++
+             // Expect colon separator
+             if (!stream.CheckAndConsume(TokenTypes.Colon))
+                 throw stream.Unexpected();
+-- 
+2.43.0
+

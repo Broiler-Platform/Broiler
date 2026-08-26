@@ -29,8 +29,21 @@ most of what is listed below, and it is worth fixing before the list is.
 | `Broiler.UI.*.Tests` | 11 | green |
 | `Broiler.Layout.Tests` | 1 | green — 1 126 tests |
 | `src/*.Tests` except the two below | 8 | green |
-| `src/Broiler.Wpt.Tests` | 1 | **54 failing** of 1 083 |
-| `src/Broiler.Cli.Tests` | 1 | **50 failing** of 3 482 (46 distinct tests) |
+| `src/Broiler.Wpt.Tests` | 1 | **84 failing** of 1 194 |
+| `src/Broiler.Cli.Tests` | 1 | **46 failing** of 4 182 (43 distinct tests) |
+
+These tables state what is failing **now**. A failure that has been fixed is
+removed rather than annotated — its root cause and evidence live with the fix,
+in `docs/broiler-js-gaps-closed.md` and the changelog — so this stays a list of
+work rather than a changelog of it.
+
+`Broiler.Wpt.Tests` was 54 of 1 083 when this file was first measured. Most of the
+difference is the container, not the code: that project's `Wpt_*_MatchReference`
+cases compare rendered pixels, and a bare container's fonts move a lot of them
+across the threshold (the `Wpt_BackgroundSizeVector_*` families are the bulk of
+it). **Diff a failure list against a baseline built in the same container before
+attributing any of it to a change** — the absolute number here is only meaningful
+against the machine that produced it.
 
 `Broiler.Media.*` and `Broiler.Input.*` also live under `*.Tests` names but are
 not xUnit — they are `Exe` projects with their own `Main`, and nothing here
@@ -48,6 +61,15 @@ has not been green in any history available here.
 The ones that *were* traceable to a change are fixed, and they share a shape:
 a deliberate behaviour change landed with its own reasoning, and the test that
 pinned the old behaviour was left behind.
+
+One of them was *both*, which is worth knowing before assuming a stale-looking
+assertion is only stale:
+`ScriptEngineExecuteTests.DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc`
+asserted the retired `position: relative; top: -160px` wrapper **and** covered a
+real gap — a frame's scroll state never reached the markup at all, because the
+pass that records it walked only the main document element. Editing the
+assertion alone would have made it pass while the capture still showed every
+frame unscrolled.
 
 * **`NamedPageTests.A_Page_Name_Inside_An_Out_Of_Flow_Subtree_Breaks_Nothing`**
   asserted that a page-name change inside an out-of-flow subtree does not break.
@@ -73,29 +95,33 @@ pinned the old behaviour was left behind.
   `HtmlDocumentParser.ParseDocument` is static and one call site still
   constructed a parser (CS0176), the same fix `Broiler.Documents.Html` and
   `Broiler.Cli.Tests` already took. `Broiler.DOM`'s own `Broiler.Dom.Html.Tests`
-  has it too, in two files; that fix is `patches/0001-…` (its remote is outside
-  this session's scope, so the pointer is not bumped) and takes that project
-  from "does not build" to 41 green tests.
+  had it too, in two files; that fix is upstream now — `Broiler.DOM`'s
+  "Call HtmlDocumentParser.ParseDocument on the type, not an instance", which is
+  the pinned pointer — and takes that project from "does not build" to 41 green
+  tests.
 
 ## `src/Broiler.Wpt.Tests` — 54
 
 | Kind | Count | What it means |
 | --- | --- | --- |
 | Pixel comparison below threshold | 31 | The render differs from the checked-in Chromium reference by more than 1%. Real layout/paint gaps: `align-content-block-00{2,4,6,8,10}` land at 92–96% with content displaced by tens of pixels, the six `position-area-*` tests at 90–96%, `writing-modes/select[size]` at 55.6%. |
-| Scripted DOM / geometry assertion | 21 | A feature the test drives from script does not behave as asserted: SVG hit-testing through `elementFromPoint`, `scrollIntoView` axis mapping under writing modes, `position-visibility`, `position-try` fallbacks, keyframes collected from a `<style>` element's text content. |
+| Scripted DOM / geometry assertion | 18 | A feature the test drives from script does not behave as asserted: `position-visibility`, `position-try` fallbacks, keyframes collected from a `<style>` element's text content. |
 | Wall-clock | 2 | `ScrollWriteGeometryTimeoutTests.OverflowAlignment_ScrollWrites_RenderWellWithinRunnerTimeout` (20 s budget) and `WptTestRunnerTests.RunTestWithTimeout_GridTemplateColumnsCrash_Completes_Without_Timing_Out` (6 s). Both are sensitive to what else is running on the box. |
 
 The scripted-DOM group overlaps `Broiler.Cli.Tests` almost test for test — the
 same features are covered on both sides of the bridge, so a fix there closes
 two failures at once. `Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_…` and
 `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Groups_…` are the same
-assertion.
+assertion. The SVG-geometry fix is the worked example: it took
+`Wpt_CssomView_ElementFromPoint_Uses_Svg_Viewport_And_Rect_Geometry` and
+`GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry`
+green together, from one change on the bridge side.
 
 ## `src/Broiler.Cli.Tests` — 46 distinct tests (50 cases)
 
 | Kind | Count | Examples |
 | --- | --- | --- |
-| Engine feature gaps | 37 | `GoogleSearchPolyfillTests` alone is 11 of them: SVG hit-testing, `scrollIntoView` under writing modes, `ch`/`lh`/`rlh` under `zoom`, scroll-offset clamping. The rest spread over `background-clip: border-area`, `var()` in shorthands, `:lang` against `xml:lang`, grid/flex content sizing, serialization of mutated iframe scroll state, and the sub-document module drain described below. |
+| Engine feature gaps | 33 | `GoogleSearchPolyfillTests` alone is 7 of them: `ch`/`lh`/`rlh` under `zoom`, `scrollIntoView` into a percentage-positioned target and into an assigned slot, and two SVG hit-test assertions that fail on *layout* rather than on hit testing (`foreignObject` content is not laid out; an inline `<svg>` root is not placed in normal flow). The rest spread over `background-clip: border-area`, `var()` in shorthands, `:lang` against `xml:lang`, grid/flex content sizing, and the sub-document module drain described below. |
 | Acid targets not yet met | 4 | Acid3 scores 96; `PhaseD_…_At_Least_97` and `PhaseE_…_At_Least_100` state the targets, and `V7_Acid3_Image_Capture_Produces_Valid_Output` asserts 100. These are goals, not regressions. |
 | Architecture guards the code has drifted past | 4 | `HtmlBridgeArchitectureGuardTests` (files over the 750-line limit), `HtmlBridgeBoundaryGuardTests` (the frozen `Broiler.JavaScript.*` dependency set has grown to three), `DomWrapperFunctionTests` (`new JSFunction(` where `DomFunction` is wanted), `CssExtractionPhaseThreeTests`. Each names the refactor it wants; none can be closed by editing the test, which is the difference between these and the `CssExtractionPhaseZeroTests` fixed above. |
 | Missing artifact | 1 | `AcidRenderComparisonInfrastructureTests.Acid_Umbrella_Roadmap_Covers_All_Three_Tests` requires `docs/roadmap/acid-test-triage.md` with `## Acid1`, `## Acid2` and `## Acid3` headings. No such file has existed in this history, and writing one to satisfy the assertion would be inventing the plan it is meant to check. |
@@ -152,8 +178,9 @@ failed in one full run and passed in the next and in isolation.
   A site is addressed by its index in the repository now, so the sites live and
   die with the compiled code that can still reach them. Same 49 tests, same
   runtime, ~1 KB retained per function instead of ~86 KB, and the collection's
-  peak is ~1.5 GB and bounded rather than 8.7 GB and climbing. The fix is in
-  `Broiler.JS` — see `patches/` if the pointer has not been bumped yet.
+  peak is ~1.5 GB and bounded rather than 8.7 GB and climbing. The fix is
+  upstream in `Broiler.JS` — "Address a compiled site by its index, not by a
+  GCHandle never freed" — and the pinned pointer carries it.
 * Some `Wpt_*_MatchesReference` tests and the PDF conversion tests can fail in a
   bare container for environmental reasons. Baseline before attributing a
   failure to your change.

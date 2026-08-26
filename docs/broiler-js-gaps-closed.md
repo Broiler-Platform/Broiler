@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names where it landed — the
+> Statuses were last reconciled on **2026-08-26**. Every **fixed** entry names where it landed — the
 > pinned `Broiler.JS` commit, or the main-repo component for a host/DOM fix — and the regression that
 > holds it.
 
@@ -87,6 +87,64 @@ the ones marked **fixed** carry a minimal regression in
   loop is at function depth 0; `for await` where no await is allowed — an ordinary script's top
   level, a non-async function body — stays the SyntaxError it was. Landed in the pinned
   `Broiler.JS` submodule (`98db1fc`); regressions in `Track1LanguageTests`.
+- **A method call whose argument is a method call is silently skipped inside an `async` function.**
+  **Root-caused and fixed — but delivered as a submodule patch, so it is not live in CI.**
+  `trace.push(items.join('+'))` did not run: no error was raised and the statement after it ran
+  normally, and `console.log(list.join(', '))` is the same shape, which is what made a
+  small-looking bug worth chasing.
+  <br>**Cause.** The receiver and the resolved method of a member call live in two temps taken from
+  a per-function pool, and the arguments are compiled *before* those temps are acquired, so a nested
+  call in the arguments is handed the very same two back. Ordinary code survives that, because both
+  values are on the IL evaluation stack by the time an argument runs. A generator or async body does
+  not: `FlattenBlocks` — the generator rewrite's last pass — lifts any block-valued operand's
+  statements out as siblings and passes a spilled temp in its place, and a nested member call
+  compiles to exactly such a block (`Assign(recv, target); Assign(callee, recv[name]);
+  Invoke(callee, …)`). Once hoisted, *its* two assignments run between the outer call's assignments
+  and the outer call's invocation, so the outer call invokes the inner callee on the inner receiver.
+  `var r = t.push(g.join('+'))` leaving `r` holding the **inner** call's value is the observation
+  that named it. The roadmap's own guess — `FlattenBlocks.VisitCall`'s operand hoisting — was half
+  right: hoisting is the trigger, but the argument reaches it through `VisitNew` (the `Arguments`
+  constructor), which is why neutralizing `VisitCall` alone changed nothing.
+  <br>**Fix.** This is the same defect already fixed for `obj.hit(await Promise.resolve(1))`, but
+  the suspension was never the cause — the hoist is. That fix guarded on an AST scan of the source
+  for `await`/`yield`, which cannot see the far more common plain nested call. The guard now asks
+  what the operands *compiled to*: a bare parameter or a constant emits no statements, so nothing
+  can be hoisted out of it and the pool stays safe; anything else gets locals on the call's own
+  block, which cannot be handed to another call. That direction of approximation costs two locals
+  and cannot be wrong, where the old one could and was. Ordinary functions still pay nothing. The
+  private-name key temp is pooled the same way and reachable by `this.#a(this.#b())`; it gets the
+  same treatment.
+  <br>**Evidence.** Eleven regressions in `SuspendedCallArgumentTests`, none containing an `await`
+  or a `yield`; ten of the eleven fail before the change and the class is 31/31 after. Engine suites
+  with the patch applied: integration 5178/5179, built-ins 2215/2215, compiler 1400/1402, modules
+  104/104, core/parser/runtime/module-extensions clean — the three failures are pre-existing and
+  unrelated, and reproduce with the change stashed.
+  <br>**Not live.** The push to `Broiler-Platform/Broiler.JS` returns 403, so this ships as
+  `patches/`'s *Stop a nested member call clobbering the outer call inside a generator body* and the
+  pointer is deliberately not bumped. There is no main-repo fallback and there cannot be one — the
+  defect is in how the compiler allocates temps for a member call, and nothing at a main-repo layer
+  can intercept call compilation. Until the patch is applied, every `async` function that writes
+  `a.b(c.d())` still skips that statement.
+- `for await…of` **hangs the agent** when the step result is not already settled. **Fixed.** This
+  was a deadlock rather than a wrong answer, which is why it never appeared as a failing test:
+  `JSIterator` unwrapped the result of `next()` with `promise.Task.GetAwaiter().GetResult()` — a
+  blocking wait, on the one thread allowed to run a context's JavaScript. That works only while the
+  promise is *already* settled, which is why every shape the engine's suite covered passed: an array,
+  an async generator, an iterator returning `Promise.resolve(record)`. The moment `next()` hands back
+  the ordinary `something.then(…)`, the job that would settle it can never run — the queue that runs
+  it drains on the way out of the execution the thread is stuck inside, which `JSMicrotaskQueue`'s own
+  documentation names as the one pattern it cannot support — so the agent hung until the process was
+  killed.
+  <br>The step is now three pieces with the state machine's own `await` between them:
+  `IElementEnumerator.AsyncNextRaw` calls `next()` and hands the result back unexamined, the compiled
+  loop awaits it exactly as it awaits anything else, and `AsyncIterationStep` reads `done`/`value` off
+  the settled record. Nothing blocks, so the settling job runs at the checkpoint it was queued for.
+  Landed in the pinned `Broiler.JS` submodule (`ab5f797`); seven regressions in
+  `ForAwaitUnsettledResultTests`, each of which hung rather than failed before.
+  <br>**What it unblocked.** This is what `ReadableStream`'s async iteration was held on — see this
+  document's [track 5](#track-5--essential-browser-javascript-apis) entry — and it is the fix behind
+  track 0's "12 invalid-program IL failures on top-level `for await`" line, which is why that line
+  needs re-measuring on the next corpus run rather than carrying forward.
 - A parameter named `undefined` does not shadow the global binding. **Fixed:** the compiler
   folded every identifier of that name to the undefined value; it now folds only a reference
   that resolves to no binding.
@@ -395,6 +453,101 @@ The part-landed half of track 3. Live import bindings, the remaining defect of t
 family, are characterized but not fixed and stay in
 [in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
 
+- **Import attributes parse but nothing acts on them.** **Decided and implemented — delivered as a
+  submodule patch, so it is not live in CI.** Nothing read `AstImportStatement.Attributes`, the three
+  `export … from` forms discarded theirs outright, and the compiler's call to the loader passed only
+  the specifier. So `with { type: 'json' }` — the portable form, and the only one a browser accepts
+  on a JSON module — was accepted and ignored, and so was `with { flavour: 'nonsense' }`.
+  <br>**Where each failure is raised was measured from Chromium, and the split is principled.** On a
+  static declaration the keys are literals, so an unknown key and a duplicate key are early
+  **SyntaxError**s, decided in the parser. Whether the `type` *value* names a module type, and
+  whether the module it resolves to is of that type, depends on the module, so both are load-time
+  **TypeError**s from the host. A dynamic `import()`'s keys are a runtime value, so it reports both
+  as TypeErrors — which is what Chromium does. Every message is Chromium's own.
+  <br>Attributes reach the host in two shapes through one validation path: a dynamic import's
+  runtime options object (validated in full — options an object, `with` an object, every value a
+  string), and a static clause as a flat array of alternating key/value strings, flat because every
+  part of it is a literal the grammar already fixed and in source order so the *first* offending key
+  is the one reported. `export … from` carries its clause through `AstExportStatement` to the same
+  place, so all three forms are enforced like the import they perform.
+  <br>**The type/module match is the one rule this host cannot implement the way the web does.** A
+  browser checks the assertion against the response MIME type; there are none here, so it checks the
+  resolved module key — the same fact by the only means available, and the one that already decided
+  the module would be parsed as JSON, so the check and the parse cannot disagree. `css` is told apart
+  from a typo: a real module type this engine does not implement, reported as such, so a page can
+  distinguish "not implemented here" from "not a thing".
+  <br>**Deliberate divergence, pinned by a test and still open as a decision:** a `.json` module
+  imported with *no* attribute loads. See
+  [open](broiler-js-gaps-open.md#needs-a-product-decision).
+  <br>**Evidence.** 33 regressions in `ImportAttributeEnforcementTests`, 23 of which fail before the
+  change; each error-name assertion goes through a dynamic import so the JS-visible *name*, not just
+  the message, is pinned. `ModuleAttributeClauseTests` keeps every grammar case it pinned, retargeted
+  — it was written against `with { type: 'javascript' }`, which is not a module type any platform
+  defines and which enforcement now correctly rejects. Modules 160/160, parser 198/198, integration
+  5178/5179, compiler 1400/1402, built-ins 2215/2215.
+  <br>**Not live.** Ships as `patches/`'s *Enforce import attributes instead of parsing and dropping
+  them*, the one patch in the backlog with a real ordering dependency — it extends a signature the
+  JSON-module patch introduces.
+- **`import.meta` is a SyntaxError.** **Decided and implemented — delivered as a submodule patch, so
+  it is not live in CI.** "import.meta not supported" came from the compiler's meta-property path,
+  which handled only `new.target`; deterministic rather than a crash, so it was carried as a
+  capability decision. **Decided: implement it, with `url` on it, and leave `resolve` out.**
+  <br>It compiles to a read of `meta` off the module record the body already receives as its
+  `module` parameter, so the object's identity, its lazy creation and everything on it belong to the
+  module host rather than to the compiler — which is what keeps `import.meta === import.meta` true
+  and lets a host with its own key form report its own URL without the compiler knowing what a
+  module key is. `JSModule.Meta` creates it once and then returns the same object (ES2025 §16.2.1.9;
+  a module is entitled to hang state off it), with a **null prototype**, carrying `url` and nothing
+  else. The URL comes from a new `JSModuleContext.GetModuleUrl` virtual: an absolute URI verbatim, a
+  filesystem path as a `file://` URL. Returning null is meaningful — the object then carries no
+  `url` rather than an invented one, so a key that cannot be a URL reads `undefined`, which a script
+  can detect.
+  <br>**`resolve` is out, and the reason is the resolver rather than the code.**
+  `JSModuleContext.Resolve` is existence-based, while `import.meta.resolve` resolves to a URL
+  whether or not anything is at it; built on today's resolver it would throw where a browser
+  answers — a wrong answer to a resolution question rather than a missing one, and a page can
+  feature-detect the absence but not the wrongness. The remainder is stated in
+  [open](broiler-js-gaps-open.md#needs-a-product-decision).
+  <br>Outside module code it stays an early SyntaxError (§13.3.12), which is what a
+  `try { eval('import.meta') }` feature-detect expects; inside module code compiled with no module
+  record it is a deterministic ReferenceError rather than a silent `undefined`.
+  <br>**Evidence.** Eight regressions in `ImportMetaTests`; every expectation except `resolve` is
+  Chromium's measured answer for a module in a page, from the same probe — identity stable,
+  prototype `null`, `Object.keys` `['url']`, and a transitively imported module reporting its own
+  URL rather than the entry point's.
+  <br>**Not live.** Ships as `patches/`'s *Implement import.meta, with url on it and resolve
+  deliberately absent*; the pointer is not bumped. No main-repo fallback is needed — without the
+  patch `import.meta` stays the deterministic SyntaxError it was.
+- **A JSON module's default import is `undefined`.** **Decided and fixed — but delivered as a
+  submodule patch, so it is not live in CI.** This was listed as needing a product decision, and it
+  did: the two specifications disagree about what a JSON file exports and one object cannot satisfy
+  both, which is why the obvious mechanical fixes all fail. ES2025 gives a JSON module exactly one
+  export, `default`, holding the parsed value, and no named exports; CommonJS
+  `require('./x.json')` hands back the parsed value itself.
+  <br>**The decision: the module stores the ES namespace, and the CommonJS view unwraps it.** The
+  wrapper becomes `module.exports = { default: (<json>) }`, and `LoadModuleAsync` takes an
+  `esModule` flag — defaulting to the ES view, with the two `require` call sites passing `false` —
+  that changes nothing except the shape a JSON module is presented in. Storing the namespace rather
+  than decorating the value is what makes arrays, numbers, strings, booleans and `null` work: none
+  of them can carry a `default` property. `null` was the sharpest case — `JSModule`'s exports setter
+  refuses null, so a file whose whole content is `null` used to *throw on load* rather than import
+  as `null`.
+  <br>**Deliberate deviation, pinned by a test:** `import { a } from './x.json'` used to read `a`
+  off the parsed object and is now `undefined`. Per spec it is a link error, which needs
+  whole-module link analysis this engine does not do, so the nearer of the two available answers is
+  taken; browsers and Node both reject the form, so nothing portable relied on it.
+  <br>**Evidence.** Fourteen regressions in `JsonModuleTests` — the default import over six JSON
+  shapes, the namespace holding only `default`, a dynamic import resolving to the same namespace,
+  `require` over three shapes, both views of one file agreeing on the value, the named-import
+  deviation, and a JavaScript module pinned as unaffected. Eleven of the fourteen fail before the
+  change. Modules 118/118, module-extensions 5/5, built-ins 2215/2215, integration 5167/5168,
+  compiler 1400/1402, with the three failures pre-existing and unrelated.
+  <br>**Not live.** Ships as `patches/`'s *Give a JSON module the ES namespace ESM wants and require
+  the value CommonJS wants*; the push to `Broiler-Platform/Broiler.JS` returns 403 and the pointer
+  is deliberately not bumped. No main-repo fallback is needed to keep CI honest — without the patch
+  JSON modules stay exactly as broken as they were rather than half-working, and
+  `BridgeModuleContext` overrides only the resolution/read seams, so it is unaffected either way.
+
 The two `Broiler.JS` patches carrying these three fixes were written as submodule patches because
 the push to the submodule remote returned 403 (it is outside this session's GitHub scope). They have
 since been applied upstream and the gitlink bumped: `12839186` *Give a module's top-level lexicals their own environment* and
@@ -441,6 +594,27 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **Async iteration over a `ReadableStream` is on.** `ReadableStream.prototype.values` and its
+  `@@asyncIterator` were written, correct and verified when the stream landed, and were deliberately
+  left commented out: `for await` deadlocked the agent on an iterator whose `next()` returned a
+  promise that was not already settled, and `reader.read().then(…)` — what an iterator over a stream
+  returns — is exactly that shape. Installing them then would have turned the ordinary
+  `for await (const chunk of response.body)` from a `TypeError` a page's script survives into a
+  capture that never settles, which is strictly worse than the `TypeError`. The engine fix is upstream
+  and the pinned `Broiler.JS` pointer carries it (track 1, *`for await…of` hangs the agent when the
+  step result is not already settled*), so both statements are installed.
+  <br>`next()` releases the reader's lock on `done` rather than on the following call, so a loop that
+  runs to completion leaves the stream unlocked; `return()` — which the engine calls when a loop is
+  left by `break`, `return` or `throw` — cancels the source unless `preventCancel` was asked for, then
+  releases. Seven regressions in `ReadableStreamTests` replace the one that pinned the absence
+  (`Async_Iteration_Is_Absent_Until_The_Engine_Can_Drive_It`, now deleted): chunk order and lock
+  release over a page stream, a blob stream and a response body; early exit cancelling the source with
+  the loop's completion value as the reason; `preventCancel` releasing without cancelling; an errored
+  stream throwing into the loop with the queued chunk discarded; a locked stream rejecting with a
+  `TypeError`; and `@@asyncIterator` being the same function object as `values`, on the prototype.
+  Every expectation is Chromium's measured answer to the same probe — the two agree on all seven.
+  `pipeTo`/`pipeThrough` and BYOB readers stay absent and detectably so; they are their own
+  capabilities, not pieces of this one.
 - **Three of `navigator`'s object-valued surfaces are decided and implemented, and three are decided
   and absent.** Each is a whole API rather than a value, and the test the audit line named is whether
   a present object answers a page's `'x' in navigator` detection *more* misleadingly than absence
@@ -692,6 +866,99 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **Writing-mode `scrollIntoView` mapped the block axis onto nothing.** **Fixed, and live** — main
+  repo, so no patch.
+  <br>**Cause, and it was not the axis mapping.** The block/inline → physical mapping was already
+  right; what was missing sat under it. The scrollable-overflow measurement only ever looked toward
+  larger physical coordinates — a descendant's `Right`/`Bottom` against the padding box's
+  `Left`/`Top`. That is the whole story for an axis that grows that way, and it found nothing at all
+  for one that does not: a `vertical-rl` block axis runs right-to-left and its content overflows to
+  the **left**, so `scrollWidth` came back equal to `clientWidth`. With no extent there was no range,
+  `GetScrollBounds` collapsed to `[0, 0]`, and every block-axis `scrollIntoView` in a vertical
+  writing mode clamped to zero.
+  <br>**Fix.** A reversed axis measures **both** ways and takes the larger, rather than simply
+  measuring the other way — because this engine's layout is not consistent about which side it
+  mirrors: `direction: rtl` in a horizontal writing mode lays the overflow out to the right (the
+  bridge mirrors it later, in the scroll-coordinate conversion) while `vertical-rl` lays it out to
+  the left. Measuring only the reversed side fixes the second and breaks the first; that was tried,
+  and the whole-suite diff caught it. Taking the larger is right whichever side the engine chose and
+  cannot regress a forward axis, which is measured exactly as before. The "is this axis reversed"
+  predicate now has one owner shared with `GetScrollBounds`, since the two disagreeing is what the
+  bug was.
+  <br>**On not trusting the failing test.** The existing assertion's expected values matched neither
+  Chromium nor Broiler when this started, which normally means a stale pin — so rather than code to
+  it, a *clean* probe was built (target inside the oversized content, so both engines agree) and both
+  engines measured on it. That gave a trustworthy oracle and the root cause; the original test then
+  turned out to be a correct pin of the mapping after all, and passes untouched. Its construction —
+  an absolutely positioned target overflowing opposite to the content — is simply one the two engines
+  legitimately answer differently, which is why it could not be used to tell a mapping bug from a
+  layout difference.
+  <br>**Evidence.** 29 regressions in `ScrollWritingModeGeometryTests` covering the extent, the range
+  sign, and the mapping across four writing modes and both directions; every value is Chromium's
+  measured answer, and 9 of the 29 fail before the change. Four tests go red → green across two
+  projects: `ScrollIntoView_Maps_Block_And_Inline_Axes_For_WritingModes` and
+  `Element_ScrollOffsets_Clamp_And_Respect_WritingMode_Direction` in `Broiler.Cli.Tests`, and
+  `Wpt_CssomView_ScrollIntoView_Maps_WritingMode_Block_And_Inline_Axes` and
+  `Wpt_CssomView_ScrollLeftTop_WritingMode_Direction_Signs_Are_Clamped` in `Broiler.Wpt.Tests`.
+  Whole-suite diffs against same-container baselines show no regressions in either.
+- **A frame's mutated scroll state never reached the serialized markup.** **Fixed, and live** —
+  main repo, so no patch.
+  <br>**Cause, and there were two.** A nested browsing context's document is severed from the main
+  tree, and the serialization pre-pass that records scroll offsets walks the main document element —
+  so it never reached a frame at all. The offset itself was always recorded correctly: the frame's
+  `scrollTop` read back exactly what `scrollIntoView` had set. It simply never reached the markup, so
+  a capture showed every frame at its initial scroll position. The pass now runs once per
+  materialised content document, which is sound for the same reason the top-layer passes already
+  re-run per frame — everything it reads is per-element or per-document (the recorded offset, and a
+  computed `overflow` resolved by that document's own style scope) and it needs no geometry, the one
+  thing this bridge measures only for the main frame. The visual-viewport scale is deliberately not
+  applied inside a frame: pinch zoom scales the frame's box as a whole, so scaling the offset it
+  scrolled *within* itself would count the same zoom twice.
+  <br>**The second cause was the test.** It asserted the `position: relative; top: -160px` wrapper
+  the pass used to bake, which had been deliberately retired in favour of handing the offset to the
+  layout engine as a data attribute — no wrapper div, no inline position writes, no fixed-descendant
+  reparenting. So it was red for two independent reasons and fixing only the behaviour would have
+  left it red. It now pins the form the top-level document produces for the identical mutation, and
+  checks it against the top level in the same run, so the two cannot drift apart again. This is the
+  [xUnit status](xunit-suite-status.md) doc's "deliberate change landed, the test pinning the old
+  behaviour left behind" category — worth separating from the real gap rather than treating the
+  whole failure as either one.
+  <br>**Evidence.** `ScriptEngineExecuteTests.DomBridge_SerializeToHtml_Preserves_Mutated_Iframe_Scroll_State_In_SrcDoc`
+  red → green, and still red with the source fix stashed and only the test edit in place — which is
+  what shows the behaviour, not the assertion, is what closed it. Whole-suite diffs against a
+  same-container baseline: `Broiler.Cli.Tests` no regressions, `Broiler.Wpt.Tests` unchanged.
+- **SVG `elementFromPoint`.** **Fixed, and live** — this one is in the main repo, so unlike track 1's
+  and track 3's engine fixes it needs no patch and CI sees it.
+  <br>**Cause.** An SVG child is not in the CSS box tree, so nothing below the `<svg>` root had a
+  rect at all: `getBoundingClientRect` answered `0,0,0,0` for every shape, and hit testing — which
+  asks each element for a rect and skips anything empty — could never descend past the root.
+  `document.elementFromPoint` over a `<rect>` returned the `<svg>`. The group path that already
+  existed (a `<g>`'s rect is the union of its children's) could not help, because it had nothing to
+  union.
+  <br>**Fix.** A shape's client rect is resolved from its own geometry attributes, composing three
+  mappings outermost-first: the viewport's rendered origin from the box tree, the `viewBox`
+  transform, and the accumulated `translate()` of the ancestor `<g>` chain. One entry point serves
+  both `getBoundingClientRect` and hit testing, so the two cannot disagree about where a shape is —
+  wiring only the hit-test half would have left `elementFromPoint` finding a shape whose own
+  `getBoundingClientRect` still said zero.
+  <br>**Bounded on purpose.** `rect`, `image`, `foreignObject`, `circle`, `ellipse`, `line`,
+  `polyline` and `polygon` resolve exactly. `path` and `use` do not — a path needs the curve and
+  `use` needs its referent — and report no rect, which is what every shape did before, rather than a
+  confidently wrong one. Only `translate()` is accumulated; any other transform function leaves its
+  subtree untranslated rather than having some functions applied and others dropped.
+  `preserveAspectRatio` is modelled at its default. Each gap is pinned by its own test.
+  <br>**Evidence.** 17 regressions in `SvgShapeGeometryTests`, every expectation Chromium's measured
+  answer to the same markup from one probe run against both — including the two `viewBox` cases that
+  separate a plausible formula from the real one (a viewport whose aspect differs from the box's, and
+  a non-zero `min-x`/`min-y`). `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry`
+  and its twin `Broiler.Wpt.Tests` assertion
+  `Wpt_CssomView_ElementFromPoint_Uses_Svg_Viewport_And_Rect_Geometry` both go red → green, which is
+  the two-for-one the [xUnit status](xunit-suite-status.md) predicted for this pair. Whole-suite
+  diffs against a same-container baseline show no regression in either project.
+  <br>**What it did not close,** and why: two other SVG hit-test assertions still fail, each now for
+  exactly one reason and both of them *layout* rather than scripting — `foreignObject` content is not
+  laid out, and an inline `<svg>` root is not placed in normal flow. Both are stated in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms).
 - **The `document` surface that names the document's own contents was half missing and half the
   wrong kind of object.** A probe of ~30 document properties against Chromium, run to decide whether
   `document.doctype` was a standalone item, returned one coherent cluster instead.
@@ -989,8 +1256,11 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   `CustomElementsTests`.
   <br>**Left out deliberately, and not faked:** customized built-ins (`extends`/`is=`), which
   `define` rejected rather than accepting and ignoring; form-associated custom elements; and
-  `adoptedCallback`. The first and third have since landed, below; form association is what remains
-  in [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
+  `adoptedCallback`. All three have since landed, below — form association among them, so nothing
+  from this list is still open. The one reaction that never fires is `formStateRestoreCallback`, and
+  deliberately: it reports a value restored by session history or an autofill pass, and this engine
+  performs neither. See [open](broiler-js-gaps-open.md#templates-and-shadow-dom), which carries only
+  the synthetic-shadow-tree remainder.
 - **Customized built-in elements and `adoptedCallback`.** `define` rejected an `extends` option with
   a `NotSupportedError`, so `class Fancy extends HTMLButtonElement` — the idiom for keeping a native
   control's behaviour and adding to it — lost its component at the `define` call, which takes the
@@ -1109,16 +1379,16 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   its high-water mark is zero precisely so construction does not pull and mark the body used before
   anything read it. `text()`, `json()` and `clone()` refuse a body that is disturbed *or* locked, and
   the locked half is answered by the stream itself.
-  <br>**Not implemented, and detectably so:** `pipeTo`/`pipeThrough`, which need a `WritableStream`;
-  BYOB readers, which need a byte-stream controller, so `getReader({mode: 'byob'})` throws rather
-  than handing back a default reader that would ignore the caller's buffer; and async iteration,
-  which is blocked on the engine rather than on the stream. `for await` never completes here — it
-  leaves its async function suspended even over a plain array — and over an object carrying
-  `@@asyncIterator` it keeps a capture's drain loop spinning. Installing the hook would turn the
-  ordinary `for await (const chunk of response.body)` from a `TypeError` a page's script survives
-  into a capture that never settles, which is strictly worse; the engine gap is recorded in
-  [open](broiler-js-gaps-open.md#track-1--core-language-and-built-ins) and the hook goes on with the
-  fix. A capture-level probe confirms `await reader.read()` itself works end to end.
+  <br>**Not implemented, and detectably so:** `pipeTo`/`pipeThrough`, which need a `WritableStream`,
+  and BYOB readers, which need a byte-stream controller, so `getReader({mode: 'byob'})` throws rather
+  than handing back a default reader that would ignore the caller's buffer.
+  <br>**Async iteration was the third of those and is no longer** — it was blocked on the engine
+  rather than on the stream, and that block is gone. `for await` used to leave its async function
+  suspended, so installing the hook would have turned the ordinary
+  `for await (const chunk of response.body)` from a `TypeError` a page's script survives into a
+  capture that never settles. The engine fix landed (track 1, *`for await` over a step result that
+  is not already settled*) and `values()`/`@@asyncIterator` went on with it — recorded as its own
+  entry in this track below.
   <br>`FileReader` brought `ProgressEvent` with it, which also did not exist: its events are
   `ProgressEvent`s and a handler reads `e.constructor.name` as much as `e.loaded`. The reader's own
   event plumbing is its own, because this realm's `EventTarget` is not subclassable — a deviation

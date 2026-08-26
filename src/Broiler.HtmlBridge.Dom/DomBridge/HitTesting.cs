@@ -129,11 +129,12 @@ public sealed partial class DomBridge
         if (TryGetListItemMarkerHitTestRect(element, out var listItemRect))
             return listItemRect;
 
-        if (IsSvgGroupElement(element) &&
-            TryGetSvgChildrenUnionRect(element, out var svgGroupRect))
-        {
-            return svgGroupRect;
-        }
+        // An SVG shape's rect comes from its own geometry attributes, not from the CSS box tree it
+        // is not in — see LayoutMetrics.SvgGeometry.cs. Without this every shape measured 0×0, the
+        // empty-rect guard in IsElementHitTestCandidate dropped it, and a group's union-of-children
+        // had nothing to union, so hit testing stopped at the <svg> root.
+        if (TryGetSvgClientRect(element, out var svgRect))
+            return svgRect;
 
         if (IsSvgTextContentElement(element) &&
             TryGetSvgTextHitTestRect(element, out var svgTextRect))

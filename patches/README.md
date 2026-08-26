@@ -26,43 +26,198 @@ cd ..
 git add <Submodule>           # bump the pointer only after the push succeeds
 ```
 
+**Apply them in numeric order.** `0001`–`0003` are independent and each applies to the pinned pointer
+on its own; `0004` is not — it extends a signature `0002` introduces and shares a file with `0003`,
+and its entry says so. The four were verified as a series: `git am` of `0001`…`0004` in order against
+`ab5f797a`, then the engine suites on the resulting stack. Applying all four is a tested path rather
+than an assumed one.
+
+### If `git am` reports "patch does not apply" but `git apply --check` passes
+
+That combination means line endings, not a real conflict. `git am` strips CR from the mail body, so
+a hunk touching one of the repository's **mixed CRLF/LF** files (`FastCompiler.VisitImportStatement.cs`
+is one) stops matching. `git am --keep-cr` applies it. None of the patches here needs that today —
+each was rebuilt so it does not rewrite any file's line endings — but it is the first thing to check
+rather than hand-editing a patch. The same hazard is why a patch should be inspected with
+`git show --stat` before it ships: a two-line change reported as two thousand is an editor having
+normalized the file, not a diff.
+
 ---
 
-## `0001-js-for-await-unsettled-step-result.patch`
+## `0001-js-nested-member-call-clobbers-outer-call.patch`
 
-- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Runtime/JSIterator.cs`, the new
-  `Broiler.JavaScript.Runtime/AsyncIterationStep.cs`, `Broiler.JavaScript.Runtime/IElementEnumerator.cs`,
-  `Broiler.JavaScript.LinqExpressions/…/IElementEnumeratorBuilder.cs`,
-  `Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitFor.cs`, plus the new
-  `Broiler.JavaScript.Integration.Tests/ForAwaitUnsettledResultTests.cs`)
-- **Subject:** *Stop for-await deadlocking on a step result that is not already settled*
-- **Based on:** `2619c49`, the currently pinned pointer
+- **Targets:** `Broiler.JS`
+  (`Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitCallExpression.cs`, plus regressions
+  in `Broiler.JavaScript.Integration.Tests/SuspendedCallArgumentTests.cs`)
+- **Subject:** *Stop a nested member call clobbering the outer call inside a generator body*
+- **Based on:** `ab5f797a`, the currently pinned pointer
 
-`for await…of` unwrapped the result of `next()` inside `JSIterator` with
-`promise.Task.GetAwaiter().GetResult()` — a blocking wait, on the one thread allowed to run a
-context's JavaScript. That works only while the promise is **already settled**, which is why every
-shape the suite covered passed: an array, an async generator, an iterator returning
-`Promise.resolve(record)`. The moment `next()` hands back the ordinary `something.then(…)`, the job
-that would settle it can never run, because the queue that runs it drains on the way out of the
-execution the thread is stuck inside — `JSMicrotaskQueue`'s own documentation names that exact
-pattern as the one it cannot support. **The agent hangs until the process is killed**, which is why
-it never showed up as a failing test.
+`trace.push(items.join('+'))` does not run inside an `async` function. No error is raised and the
+statement after it runs normally, so the failure is **silent** — and `console.log(list.join(', '))`
+is the same shape, which is what makes a small-looking bug worth its patch.
 
-The step becomes three pieces with the state machine's own `await` between them:
-`IElementEnumerator.AsyncNextRaw` calls `next()` and hands the result back unexamined, the compiled
-loop awaits it, and `AsyncIterationStep` reads `done`/`value` off the settled record.
+The receiver and the resolved method of a member call live in two temps taken from a per-function
+pool, and the arguments are compiled *before* those temps are acquired, so a nested call in the
+arguments is handed the very same two back. Ordinary code survives that because both values are on
+the IL evaluation stack by the time an argument runs. A generator or async body does not:
+`FlattenBlocks`, the generator rewrite's last pass, lifts any block-valued operand's statements out
+as siblings and passes a spilled temp in its place, and a nested member call compiles to exactly
+such a block. Once hoisted, *its* two assignments run between the outer call's assignments and the
+outer call's invocation, so the outer call invokes the inner callee on the inner receiver.
+`var r = t.push(g.join('+'))` leaving `r` holding the *inner* call's value is what named the cause.
 
-Seven regressions come with it, each of which **hung rather than failed** before the change. With the
-patch applied the whole engine suite passes bar its pre-existing failures (two known-gap
-parameter-shadowing cases and one documentation-file check).
+This is the same defect that was fixed for `obj.hit(await Promise.resolve(1))`, but the suspension
+was never the cause — the hoist is. That fix guarded on an AST scan of the source for `await` or
+`yield`, which cannot see the far more common plain nested call. The guard now asks what the
+operands **compiled to**: a bare parameter or a constant emits no statements, so nothing can be
+hoisted out of it and the pool stays safe; anything else gets locals on the call's own block. That
+direction of approximation costs two locals and cannot be wrong, where the old one could and was.
+Ordinary functions still pay nothing. The private-name key temp is pooled the same way and reachable
+the same way by `this.#a(this.#b())`; it gets the same treatment.
 
-**Main-repo fallback, and what it gates.** The bug is reachable from any page that writes
-`for await (const x of asyncThing)` where the iterator returns a chained promise, and nothing in the
-main repo can intercept that. What the main repo *can* do — and does — is refuse to hand pages one
-more way to hit it: `ReadableStream.prototype.values` and its `@@asyncIterator` are written, correct
-and verified, and are left commented out in
-`src/Broiler.HtmlBridge.Dom/Polyfills/streams-and-file-reader.js` until this patch is live. Without
-the patch, installing them would turn `for await (const chunk of response.body)` from a `TypeError` a
-script survives into a capture that never settles. **Uncomment both statements when the patch lands**
-— the comment there says so, and `ReadableStreamTests.Async_Iteration_Is_Absent_Until_The_Engine_Can_Drive_It`
-pins the current state so the switch is a decision rather than a drift.
+Eleven regressions come with it, all without an `await` or a `yield`; ten of the eleven fail before
+the change. Engine suites with the patch applied: integration 5178/5179, built-ins 2215/2215,
+compiler 1400/1402, modules 104/104, and core, parser, runtime and module-extensions clean — the
+three failures are pre-existing and unrelated (one documentation-file check, two known-gap
+parameter-shadowing pins) and reproduce with the change stashed.
+
+**There is no main-repo fallback, and there cannot be one.** The defect is in how the JavaScript
+compiler allocates temps for a member call; nothing at a main-repo layer can intercept call
+compilation. Until this patch is applied, every `async` function in every page that writes
+`a.b(c.d())` silently skips that statement. That is the cost of the pointer staying where it is —
+worth stating plainly rather than leaving to be rediscovered.
+
+---
+
+## `0002-js-json-module-default-export.patch`
+
+- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModuleContext.cs`, plus the new
+  `Broiler.JavaScript.Modules.Tests/JsonModuleTests.cs`)
+- **Subject:** *Give a JSON module the ES namespace ESM wants and require the value CommonJS wants*
+- **Based on:** `ab5f797a`, the currently pinned pointer
+
+`import d from './data.json'` was `undefined`, which made JSON modules unusable. One wrapper served
+both callers — `module.exports = <json>` — which is exactly what CommonJS `require` wants and
+exactly wrong for ESM: a default import reads `.default` off the parsed value and finds nothing. A
+file whose whole content is `null` was worse than unusable: `JSModule`'s exports setter refuses
+null, so it threw on load.
+
+**The decision.** The two specifications disagree about what a JSON file exports, and one object
+cannot satisfy both. ES2025 gives a JSON module exactly one export, `default`, holding the parsed
+value, and no named exports; CommonJS hands back the parsed value itself. So the module now *stores*
+the ES namespace — `module.exports = { default: (<json>) }` — and the CommonJS view unwraps it.
+`LoadModuleAsync` takes an `esModule` flag for that, defaulting to the ES view; the two `require`
+call sites pass `false`. Storing the namespace is also what makes arrays, numbers, strings, booleans
+and `null` work — none of them can carry a `default` property, so decorating the parsed value could
+never have fixed them.
+
+**Deliberate deviation, pinned by a test:** `import { a } from './x.json'` used to read `a` off the
+parsed object and is now `undefined`. Per spec it is a link error, which needs whole-module link
+analysis this engine does not do; browsers and Node both reject the form, so nothing portable
+relied on it.
+
+Fourteen regressions in `JsonModuleTests`, eleven of which fail before the change. Engine suites
+with the patch applied: modules 118/118, module-extensions 5/5, built-ins 2215/2215, integration
+5167/5168, compiler 1400/1402 — the three failures pre-existing and unrelated.
+
+**Main-repo fallback:** none, and none is needed to keep CI honest — without the patch JSON modules
+stay exactly as broken as they were, rather than half-working. `BridgeModuleContext` (the main
+repo's `JSModuleContext` subclass) overrides only `Resolve` / `GetModuleDirectory` /
+`ReadModuleSourceAsync`, so it is unaffected either way; it was rebuilt and its
+module/subdocument/import tests run against the patched engine, 322/323, the one failure being the
+known iframe-module drain gap.
+
+---
+
+## `0003-js-import-meta.patch`
+
+- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitMeta.cs`,
+  `Broiler.JavaScript.Modules/JSModule.cs`, `Broiler.JavaScript.Modules/JSModuleContext.cs`, plus the
+  new `Broiler.JavaScript.Modules.Tests/ImportMetaTests.cs`)
+- **Subject:** *Implement import.meta, with url on it and resolve deliberately absent*
+- **Based on:** `ab5f797a`, the currently pinned pointer
+
+`import.meta` was a SyntaxError — *"import.meta not supported"* — from the compiler's meta-property
+path, which handled only `new.target`. Deterministic rather than a crash, so it was carried as a
+capability decision. **The decision: `import.meta` is implemented, `url` is on it, `resolve` is not.**
+
+It compiles to a read of `meta` off the module record the body already receives as its `module`
+parameter, so the object's identity, its lazy creation and everything on it belong to the module host
+rather than to the compiler. `JSModule.Meta` creates it once and then returns the same object — a
+module is entitled to hang state off it — with a null prototype, carrying `url` and nothing else. The
+URL comes from a new `JSModuleContext.GetModuleUrl` virtual, because only the host knows what its
+keys are: an absolute URI is reported verbatim, a filesystem path becomes a `file://` URL. Returning
+null is meaningful — the object then carries no `url` rather than an invented one.
+
+**`resolve` is absent, and the reason is this context's resolver rather than the amount of code.**
+`Resolve` is existence-based: it probes the filesystem and answers null for a specifier that does not
+name a file that is there, while `import.meta.resolve` resolves a specifier to a URL whether or not
+anything is at it. Built on this resolver it would throw where a browser answers — a wrong answer to
+a resolution question rather than a missing one, and a page can feature-detect the absence but not
+the wrongness.
+
+Outside module code `import.meta` stays an early SyntaxError (ES2025 §13.3.12), which is what a
+`try { eval('import.meta') }` feature-detect expects.
+
+Eight regressions in `ImportMetaTests`; every expectation except `resolve` is Chromium's measured
+answer for a module in a page, from the same probe.
+
+**Verified as a series.** All three patches apply to the pinned pointer in numeric order with
+`git am`, and were tested together on that stack: integration 5178/5179, modules 126/126,
+module-extensions 5/5, built-ins 2215/2215, compiler 1400/1402, core/parser/runtime/ast clean — the
+three failures pre-existing and unrelated. `Broiler.Cli.Tests` against the fully patched engine has
+the **same 50 failures as the pinned pointer** (bare-container font/layout noise), with one
+additional load-sensitive worker-budget test that passes 3/3 in isolation on both.
+
+**Main-repo fallback:** none needed. Without the patch `import.meta` stays the deterministic
+SyntaxError it was.
+
+---
+
+## `0004-js-import-attribute-enforcement.patch`
+
+- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Parser/FastParser.Import.cs` and
+  `FastParser.Export.cs`, `Broiler.JavaScript.Ast/Statements/AstExportStatement.cs`,
+  `Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitImportStatement.cs` and
+  `FastCompiler.VisitExportStatement.cs`, `Broiler.JavaScript.Modules/JSModuleContext.cs`, plus the
+  new `Broiler.JavaScript.Modules.Tests/ImportAttributeEnforcementTests.cs` and an update to
+  `ModuleAttributeClauseTests.cs`)
+- **Subject:** *Enforce import attributes instead of parsing and dropping them*
+- **Based on:** `ab5f797a` **plus `0002` and `0003`** — see *Ordering* below
+
+Import attributes parsed everywhere the grammar allows and nothing acted on them: nothing read
+`AstImportStatement.Attributes`, the three `export … from` forms discarded theirs outright, and the
+compiler's call to the loader passed only the specifier. `with { type: 'json' }` — the portable
+form, and the only one a browser accepts on a JSON module — was accepted and ignored, and so was
+`with { flavour: 'nonsense' }`.
+
+**Where each failure is raised is measured from Chromium, and the split is principled.** On a static
+declaration the keys are literals, so an unknown key and a duplicate key are early **SyntaxError**s,
+decided in the parser. Whether the `type` *value* names a module type, and whether the module it
+resolves to is of that type, depends on the module — both are load-time **TypeError**s from the
+host. A dynamic `import()`'s keys are a runtime value, so it reports both as TypeErrors. Every
+message is Chromium's own.
+
+The type/module match is the one rule this host cannot implement the way the web does: a browser
+checks the assertion against the response MIME type, and there are no MIME types here, so it checks
+the resolved module key — the same fact by the only means available, and the one that already
+decided the module would be parsed as JSON. `css` is told apart from a typo: a real module type this
+engine does not implement, reported as such.
+
+**Deliberate divergence, pinned by a test:** a `.json` module imported with *no* attribute still
+loads, where a browser rejects it. There the attribute defends against a server returning JSON where
+script was expected — a mismatch that cannot arise in a host whose locally resolved key is itself the
+type — and this context also serves `require`, which has no attributes at all.
+
+33 regressions in `ImportAttributeEnforcementTests`, 23 of which fail before the change; each
+error-name assertion goes through a dynamic import so the JS-visible *name*, not just the message, is
+pinned. `ModuleAttributeClauseTests` keeps every grammar case it pinned, retargeted: it was written
+against `with { type: 'javascript' }`, which is not a module type any platform defines and which
+enforcement now correctly rejects.
+
+**Ordering.** This is the one patch in the backlog with a real dependency: it extends
+`LoadModuleAsync`'s signature and reuses `IsJsonModule`, both of which `0002` introduces, and it
+shares `JSModuleContext.cs` with `0003`. It was generated on top of `0001`–`0003` and the four apply
+in numeric order with plain `git am`, verified.
+
+**Main-repo fallback:** none needed. Without the patch, attributes stay parsed and ignored.

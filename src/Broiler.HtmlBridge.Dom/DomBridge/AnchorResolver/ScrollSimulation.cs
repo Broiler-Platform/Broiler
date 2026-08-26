@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Broiler.Dom;
 using Broiler.CSS;
 
@@ -16,9 +16,45 @@ public sealed partial class DomBridge
     /// with negative margins.  Combined with <c>overflow: hidden</c>, this
     /// produces the same visual output as a real browser scroll.
     /// </summary>
-    private void ApplyScrollSimulation(DomElement root) => ApplyScrollSimulationTree(root);
+    private void ApplyScrollSimulation(DomElement root) =>
+        ApplyScrollSimulationTree(root, GetScrollSimulationScaleFactor());
 
-    private void ApplyScrollSimulationTree(DomElement el)
+    /// <summary>
+    /// The same pass for every nested browsing context this session has materialised.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A frame's document is severed from the main tree (P4.4b), so walking
+    /// <see cref="DocumentElement"/> never reaches it: a frame whose script had scrolled something
+    /// serialized with none of that state, and the capture showed the frame at its initial scroll
+    /// position. The scroll offset was recorded correctly — <c>scrollTop</c> read back the value
+    /// <c>scrollIntoView</c> had set — it simply never reached the markup.
+    /// </para>
+    /// <para>
+    /// Sound to re-run per frame for the reason the top-layer passes are
+    /// (<see cref="ApplySubDocumentTopLayer"/>): everything this reads is already per-element or
+    /// per-document — the recorded scroll state, and a computed <c>overflow</c> resolved by that
+    /// document's own style scope — and it needs no geometry, which is the thing this bridge only
+    /// measures for the main frame.
+    /// </para>
+    /// <para>
+    /// The visual-viewport scale is deliberately not applied inside a frame. Pinch zoom scales the
+    /// frame's box as a whole, so scaling the offset the frame scrolled *within* itself would count
+    /// the same zoom twice.
+    /// </para>
+    /// </remarks>
+    private void ApplySubDocumentScrollSimulation()
+    {
+        // Snapshot: reading a computed style can materialise a further frame, which would otherwise
+        // mutate the map mid-iteration.
+        foreach (var contentDocument in _browsingContexts.ContentDocuments.ToList())
+        {
+            if (GetDocumentElement(contentDocument) is { } subRoot)
+                ApplyScrollSimulationTree(subRoot, scrollScale: 1);
+        }
+    }
+
+    private void ApplyScrollSimulationTree(DomElement el, double scrollScale)
     {
         if (!IsText(el))
         {
@@ -29,7 +65,6 @@ public sealed partial class DomBridge
             if (ScrollStateFor(el).Left.TryGet(out var sl) && sl is double slv)
                 scrollLeft = slv;
 
-            var scrollScale = GetScrollSimulationScaleFactor();
             if (!AreClose(scrollScale, 1))
             {
                 scrollTop *= scrollScale;
@@ -70,7 +105,7 @@ public sealed partial class DomBridge
                     // Recurse into children (nested scroll containers) and skip the DOM-shift.
                     for (int i = 0; i < el.ChildNodes.Count; i++)
                         if (ChildAt(el, i) is DomElement scrolledChild)
-                            ApplyScrollSimulationTree(scrolledChild);
+                            ApplyScrollSimulationTree(scrolledChild, scrollScale);
                     return;
                 }
             }
@@ -80,7 +115,7 @@ public sealed partial class DomBridge
         // (wrapper insertion above).
         for (int i = 0; i < el.ChildNodes.Count; i++)
             if (ChildAt(el, i) is DomElement child)
-                ApplyScrollSimulationTree(child);
+                ApplyScrollSimulationTree(child, scrollScale);
     }
 
     private double GetScrollSimulationScaleFactor() => HasActiveVisualViewport() ? GetVisualViewportScale() : 1;
