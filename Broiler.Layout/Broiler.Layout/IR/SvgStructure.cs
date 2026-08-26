@@ -41,6 +41,9 @@ internal sealed partial class SvgStructure
     private static readonly HashSet<string> NonRenderingContainers = new(StringComparer.OrdinalIgnoreCase)
     {
         "defs", "symbol", "pattern", "mask", "marker", "clipPath", "filter",
+        // <foreignObject> content is an HTML subtree the CSS box tree lays out and paints
+        // (SvgForeignObjectBoxes); anything shape-shaped inside one must not also be drawn here.
+        "foreignObject",
         "linearGradient", "radialGradient", "style", "script", "title", "desc", "metadata",
         "font", "font-face", "font-face-src", "font-face-uri", "glyph", "missing-glyph",
         "altGlyphDef", "view", "hatch", "animate", "animateMotion", "animateTransform", "set",

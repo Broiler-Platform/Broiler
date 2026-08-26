@@ -231,40 +231,40 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 - **SVG lacks conforming live DOM integration** for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
-- **The three JS-visible failures this line was written for are all fixed** — SVG
-  `elementFromPoint`, mutated iframe state, and writing-mode `scrollIntoView`; see
+- **The JS-visible failures this line was written for are all fixed** — SVG `elementFromPoint`,
+  mutated iframe state, writing-mode `scrollIntoView`, and the `foreignObject` layout gap that
+  outlived them; see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  What is left of the line is the layout gap below, which is a different kind of thing.
   Two others once listed here no longer reproduce — a `@keyframes` rule read from style text answers
   the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`), and out-of-range
   `scrollTop`/`scrollLeft` writes clamp identically. That was a spot check of one shape each rather
   than the failing cases the line was written from, so the owning manifests are what should settle
   those two.
-- **`foreignObject` content is not laid out at all**, which is layout rather than scripting and is
-  why fixing SVG geometry did not close it. The `<foreignObject>` element itself resolves a rect
-  from its own `x`/`y`/`width`/`height`, but the HTML subtree inside it has no box: a `<div>` in one
-  reports `0,0,0,0`, `offsetWidth`/`offsetHeight` of `0`, and a computed `display` of `inline`
-  rather than `block` — the initial value, because no box means no cascade result to read. So
-  `elementFromPoint` over the child reports the `foreignObject`. Chromium on the same markup lays
-  the child out against the `foreignObject`'s viewport rect: a `<div>` at
-  `x=20 y=30 width=100 height=40` inside a `foreignObject` at `(20,30) 150×90` reports
-  `20,30,100,40`, `display: block`, and `elementsFromPoint` returns
-  `foDiv, fo, svgRoot, BODY, HTML`.
-  <br>The parser is what suppresses it: `DomParser.CascadeApplyStyles` gives an outermost `<svg>`
-  `display: inline-block` and then sets every child box to `display: none`, because SVG internals
-  are not CSS-visible here and the subtree is serialized for `SvgRenderer` instead.
-  `<foreignObject>` is the one place SVG re-enters CSS layout, so it is the one child that must not
-  be hidden — it needs a box positioned at its viewport coordinates whose HTML children lay out
-  normally. That is a `Broiler.HTML` change.
-  <br>`GoogleSearchPolyfillTests`'s
-  `Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate` fails for this reason and
-  nothing else. Its companion, `Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow`, was
-  listed here as a second layout gap — "an inline `<svg>` root is not placed in normal flow against
-  its siblings: two stacked `<svg>` elements both report `top: 0` instead of the second clearing the
-  first". That reading was wrong in both halves and is
-  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior):
-  the roots were already in normal flow, they do not stack in any browser, and the one number that
-  was wrong belonged to line-box alignment rather than to SVG.
+- **A `viewBox` leaves `foreignObject` content unplaced.** The remainder of the layout gap above.
+  A `<foreignObject>`'s HTML content is laid out against the element's viewport rect, but only where
+  one user unit is one CSS pixel. A `viewBox` maps user space by a scale that is a function of the
+  viewport's *used* size, and the placement pass runs before layout, so it cannot know it; under one
+  the content keeps no box while the element itself still reports the rect its attributes resolve to.
+  Chromium on `<svg width="200" height="100" viewBox="0 0 100 100">` with a `foreignObject` at
+  `(10,10) 40×40` holding a 20×20 `<div>` answers `60,10,40,40` for the element and `60,10,20,20`
+  for the `<div>`; Broiler answers the element's rect and `0,0,0,0` for the `<div>`. Pinned by
+  `SvgForeignObjectContentTests.UnderAViewBoxTheContentKeepsNoBox`, so closing it is a deliberate
+  change. Resolving it means placing the box after the viewport's used size is known rather than
+  during the box fix-ups — the same "resolve against used size" shape as the nested-`<svg>` viewport
+  whose own box position is not SVG-accurate either.
+- **`getComputedStyle` does not apply the UA stylesheet's `display`**, so every element whose display
+  comes from the UA sheet rather than an author rule reports the CSS initial value: a plain `<div>`
+  in the body answers `inline`, not `block`, and a `<script>` or `<noscript>` answers `inline` rather
+  than `none`. The bridge has the table and the resolution — `CssUserAgentDefaults.DisplayValues` and
+  `ApplyUserAgentDisplayDefaults` — but only the anchor resolver consults them; the JS binding's
+  computed map does not, so nothing the UA sheet says about `display` reaches script. It does reach
+  *rendering*, which is why this is a CSSOM gap and not a layout one: the elements lay out correctly.
+  <br>Recorded before now on a single element in `NoscriptRenderingTests` ("it reports `inline` for a
+  `<script>` too, and for every other element the UA stylesheet hides … it wants its own change") and
+  measured across elements while closing the `foreignObject` gap above, whose own record wrongly
+  attributed the `inline` to the missing box. Fixing it is a narrow change at one call site; what it
+  needs is a pass over the assertions written against the current answer, since it moves a value many
+  tests read.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),

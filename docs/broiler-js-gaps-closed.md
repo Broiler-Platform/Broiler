@@ -862,6 +862,68 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`foreignObject` content was not laid out at all.** **Fixed, and live** — entirely in the main
+  repo (`Broiler.Layout`), so no patch and no submodule pointer to bump.
+  <br>**Cause.** SVG internals are not CSS-visible here — the subtree is serialised back to markup
+  and drawn by `SvgRenderer` — so `DomParser.CascadeApplyStyles` set every child box of an outermost
+  `<svg>` to `display: none`. That is right for shapes and wrong for exactly one element: SVG 2 §12.1
+  makes `<foreignObject>` the one place an SVG subtree re-enters CSS layout. Hidden with the shapes,
+  its content had no box at all — a `<div>` inside one reported `0,0,0,0` and an
+  `offsetWidth`/`offsetHeight` of `0`, so `elementFromPoint` over the child answered the
+  `<foreignObject>`. The element *itself* always had a rect, resolved from its own geometry
+  attributes like any other shape, which is why the gap was in the subtree rather than in the
+  element.
+  <br>**Fix.** `Broiler.Layout.Engine.SvgForeignObjectBoxes` lifts each `<foreignObject>` back out
+  after the cascade and before layout: it becomes an absolutely positioned block at its user-space
+  `x`/`y`, sized from its `width`/`height`, inside the viewport box — which the pass makes a
+  containing block by giving it `position: relative`, and only when the document actually holds one,
+  so a document without one lays out exactly as before. The HTML children keep the styles the cascade
+  already gave them (the cascade descends through hidden boxes; only layout skips them) and lay out
+  by the ordinary rules, with no special case below that point. One reached through a `<g>` chain is
+  re-parented onto the viewport box rather than having the chain un-hidden, so the hiding of every
+  other box stays byte-identical. `SvgStructure` gains `foreignObject` as a non-painting container so
+  nothing inside one is also drawn by the renderer's shape passes.
+  <br>**Additive, so it needed no submodule push.** The natural call site is `DomParser`, which is in
+  `Broiler.HTML` and outside this session's GitHub scope — the push returns 403. Rather than ship the
+  fix as a patch that CI would not carry, the pass leaves the parser's hiding exactly as it is and
+  only un-hides the one box, which makes it a box fix-up rather than a change to the style pass. It
+  is driven from `FlexGridItemBlockification.Generate`, the same main-repo entry point
+  `DisplayContentsBoxes` is driven from and for the same reason, and it is idempotent, so adding the
+  direct parser call later is a no-op.
+  <br>**The second half was a double-count, not a placement error.** With the box placed, a `<div>`
+  under a `<g transform="translate(100,50)">` reported itself 100,50 *further on* than the
+  `<foreignObject>` containing it: the bridge's `ApplyTransformChain` walks DOM ancestors, and above a
+  `<foreignObject>` those are SVG elements whose `transform` is a user-space mapping already folded
+  into the box's position. The chain now stops at that boundary.
+  <br>**One source of truth for the translate rule.** The bridge's `TryParseSvgTranslate` moved to
+  `SvgForeignObjectBoxes.TryParseLoneTranslate` and both callers share it, so the element's own rect
+  and its content's cannot disagree about which offsets counted.
+  <br>**Bounded on purpose.** The viewport mapping modelled is the identity — one user unit is one
+  CSS pixel. A `viewBox` that maps user space is not: its scale is a function of the viewport's
+  *used* size, which a style-phase pass does not have. Under one the content keeps no box, exactly as
+  before, rather than a confidently wrong placement; the same holds inside a nested `<svg>` viewport,
+  whose own box position is not SVG-accurate to begin with. That remainder is stated in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms) and pinned by a
+  test, so closing it is a deliberate change.
+  <br>**Evidence.** 7 regressions in `SvgForeignObjectContentTests`, every expectation Chromium's
+  measured answer to the same markup from one probe run against both — placement at the element's
+  corner, ordinary stacking of two block children, an accumulated `translate()` chain, hit testing
+  descending into the content, percentage geometry against the viewport, the shape siblings and the
+  viewport's own box left unchanged, and the `viewBox` remainder pinned as it stands.
+  `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate`
+  and its twin `Broiler.Wpt.Tests` assertion
+  `Wpt_CssomView_ElementFromPoint_Uses_Svg_Groups_Images_ForeignObject_And_Translate` both go
+  red → green — the same two-for-one the SVG `elementFromPoint` fix below had for its pair.
+  Whole-suite diffs against a same-container baseline show no regression in any of the three:
+  `Broiler.Layout.Tests` 1317/1317; `Broiler.Cli.Tests` 39 distinct failures → 38, the difference
+  being exactly that test; `Broiler.Wpt.Tests` 52 → 51, likewise.
+  <br>**What it did not close.** The same roadmap bullet also recorded a computed `display` of
+  `inline` rather than `block` for the content, and attributed it to the missing box. That
+  attribution was wrong and the box did not change it: a plain `<div>` in the body answers `inline`
+  too. It is a general `getComputedStyle` gap — the JS binding does not consult
+  `ApplyUserAgentDisplayDefaults` — and is now stated as its own item in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms).
+
 - **An atomic inline-level box was left at the top of its line instead of standing on its
   baseline.** **Fixed, and live** — `Broiler.Layout` is main-repo, so no patch.
   <br>**The gap this was filed as does not exist.** It was recorded as the second of two SVG layout

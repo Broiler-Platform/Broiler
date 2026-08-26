@@ -9,6 +9,39 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- The HTML content of an SVG `<foreignObject>` is laid out. In the main
+  repository (`Broiler.Layout`), so it is live.
+
+  An SVG subtree is not laid out by CSS box rules here — it is serialised back
+  to markup and drawn by `SvgRenderer` — so the style pass sets every child box
+  of an outermost `<svg>` to `display: none`. That is right for shapes and wrong
+  for `<foreignObject>`, which SVG 2 §12.1 makes the one place an SVG subtree
+  re-enters CSS layout. Hidden with the shapes, its content had no box at all: a
+  `<div>` inside one reported a `getBoundingClientRect` of `0,0,0,0` and an
+  `offsetWidth`/`offsetHeight` of `0`, so `elementFromPoint` over the child
+  answered the `<foreignObject>`. The element itself always had a rect, resolved
+  from its own geometry attributes like any other shape.
+
+  `SvgForeignObjectBoxes` now lifts each `<foreignObject>` back out after the
+  cascade and before layout: it becomes an absolutely positioned block at its
+  user-space `x`/`y`, sized from its `width`/`height`, inside the viewport box,
+  which is made a containing block only when the document actually holds one —
+  so a document without a `<foreignObject>` lays out exactly as before. One
+  reached through a `<g>` chain is re-parented onto the viewport box rather than
+  having the chain un-hidden, so the hiding of every other box is unchanged, and
+  the accumulated `translate()` is folded into the box's own offset. The bridge's
+  transform chain stops at the `<foreignObject>` boundary, since above it the
+  ancestors are SVG elements whose `transform` is already accounted for.
+
+  The viewport mapping modelled is the identity — one user unit is one CSS
+  pixel. A `viewBox` maps user space by a scale that is a function of the
+  viewport's used size, which a pass running before layout does not have, so
+  under one the content keeps no box rather than a confidently wrong placement.
+  The same holds inside a nested `<svg>` viewport. Of the ancestor `transform`
+  functions only `translate()` is accumulated, by the rule and the parser the
+  bridge's SVG geometry now shares, so an element's own rect and its content's
+  cannot disagree about which offsets counted.
+
 - An atomic inline-level box stands on its line's baseline instead of sitting at
   the top of the line. In the main repository (`Broiler.Layout`), so it is live.
 
