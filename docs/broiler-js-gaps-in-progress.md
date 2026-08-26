@@ -33,7 +33,9 @@ What already landed is in [closed](broiler-js-gaps-closed.md#track-0--conformanc
      [track 3](#track-3--module-execution-semantics). Its effect on these 22 is unknown until the
      corpus is re-run on a pointer that carries the fix.);
    - 12 "invalid program" IL failures on top-level `for await` → track 1, **fixed** (see
-     track 1's async/generator entry); re-measure this line on the next corpus run;
+     [closed](broiler-js-gaps-closed.md#track-1--direct-eval-parser-scope-and-control-flow), where
+     both the top-level-`for await` flag and the unsettled-step-result deadlock are recorded);
+     re-measure this line on the next corpus run;
    - the `$262` remainder, mostly cross-realm identity and missing-throw cases → track 1.
 2. Record product decisions for the three excluded `$262` hooks: `$262.agent` (112 files,
    multi-agent Atomics — owned by track 4), `$262.IsHTMLDDA` (42 files) and
@@ -43,42 +45,6 @@ What already landed is in [closed](broiler-js-gaps-closed.md#track-0--conformanc
 **Exit gate:** deliberately failing and never-settling async fixtures fail deterministically;
 every Test262 file is executed by an appropriate host mode or has a precise product-scope
 exclusion; the dashboard records exact engine and suite revisions.
-
-## Track 1 — `for await` over an unsettled step result
-
-**Status: fixed and verified, but delivered as a submodule patch rather than a pointer bump — the
-push to `Broiler-Platform/Broiler.JS` returns 403, so the fix is not live in CI. The remaining work
-is applying it.**
-
-`for await…of` unwrapped the result of `next()` inside `JSIterator` with
-`promise.Task.GetAwaiter().GetResult()` — a blocking wait, on the one thread allowed to run a
-context's JavaScript. That works only while the promise is **already settled**, which is why every
-shape the engine's suite covered passed: an array, an async generator, an iterator returning
-`Promise.resolve(record)`. The moment `next()` hands back the ordinary `something.then(…)`, the job
-that would settle it can never run — the queue that runs it drains on the way out of the execution
-the thread is stuck inside, which `JSMicrotaskQueue`'s own documentation names as the one pattern it
-cannot support. **The agent hangs until the process is killed**, which is why it never appeared as a
-failing test.
-
-The fix makes the step three pieces with the state machine's own `await` between them:
-`IElementEnumerator.AsyncNextRaw` calls `next()` and hands the result back unexamined, the compiled
-loop awaits it, and `AsyncIterationStep` reads `done`/`value` off the settled record. Seven
-regressions come with it, each of which hung rather than failed before; the whole engine suite passes
-bar its pre-existing failures.
-
-### Remaining work
-
-1. Apply `patches/0001-js-for-await-unsettled-step-result.patch` to `Broiler.JS` from an environment
-   whose GitHub scope includes the submodule remote, push it, and bump the pointer.
-2. Uncomment `ReadableStream.prototype.values` and its `@@asyncIterator` in
-   `src/Broiler.HtmlBridge.Dom/Polyfills/streams-and-file-reader.js`. They are written, correct and
-   verified against Chromium's answers with the patch applied; they are held back because without it
-   `for await (const chunk of response.body)` would turn from a `TypeError` a script survives into a
-   capture that never settles. `ReadableStreamTests.Async_Iteration_Is_Absent_Until_The_Engine_Can_Drive_It`
-   pins the current state so the switch is a decision rather than a drift.
-
-**Exit gate:** the patch is upstream, the pinned pointer carries it, and async iteration over a
-`ReadableStream` is on with its own regressions.
 
 ## Track 2 — Complete ECMAScript RegExp behavior
 

@@ -87,6 +87,26 @@ the ones marked **fixed** carry a minimal regression in
   loop is at function depth 0; `for await` where no await is allowed — an ordinary script's top
   level, a non-async function body — stays the SyntaxError it was. Landed in the pinned
   `Broiler.JS` submodule (`98db1fc`); regressions in `Track1LanguageTests`.
+- `for await…of` **hangs the agent** when the step result is not already settled. **Fixed.** This
+  was a deadlock rather than a wrong answer, which is why it never appeared as a failing test:
+  `JSIterator` unwrapped the result of `next()` with `promise.Task.GetAwaiter().GetResult()` — a
+  blocking wait, on the one thread allowed to run a context's JavaScript. That works only while the
+  promise is *already* settled, which is why every shape the engine's suite covered passed: an array,
+  an async generator, an iterator returning `Promise.resolve(record)`. The moment `next()` hands back
+  the ordinary `something.then(…)`, the job that would settle it can never run — the queue that runs
+  it drains on the way out of the execution the thread is stuck inside, which `JSMicrotaskQueue`'s own
+  documentation names as the one pattern it cannot support — so the agent hung until the process was
+  killed.
+  <br>The step is now three pieces with the state machine's own `await` between them:
+  `IElementEnumerator.AsyncNextRaw` calls `next()` and hands the result back unexamined, the compiled
+  loop awaits it exactly as it awaits anything else, and `AsyncIterationStep` reads `done`/`value` off
+  the settled record. Nothing blocks, so the settling job runs at the checkpoint it was queued for.
+  Landed in the pinned `Broiler.JS` submodule (`ab5f797`); seven regressions in
+  `ForAwaitUnsettledResultTests`, each of which hung rather than failed before.
+  <br>**What it unblocked.** This is what `ReadableStream`'s async iteration was held on — see this
+  document's [track 5](#track-5--essential-browser-javascript-apis) entry — and it is the fix behind
+  track 0's "12 invalid-program IL failures on top-level `for await`" line, which is why that line
+  needs re-measuring on the next corpus run rather than carrying forward.
 - A parameter named `undefined` does not shadow the global binding. **Fixed:** the compiler
   folded every identifier of that name to the undefined value; it now folds only a reference
   that resolves to no binding.
@@ -441,6 +461,27 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **Async iteration over a `ReadableStream` is on.** `ReadableStream.prototype.values` and its
+  `@@asyncIterator` were written, correct and verified when the stream landed, and were deliberately
+  left commented out: `for await` deadlocked the agent on an iterator whose `next()` returned a
+  promise that was not already settled, and `reader.read().then(…)` — what an iterator over a stream
+  returns — is exactly that shape. Installing them then would have turned the ordinary
+  `for await (const chunk of response.body)` from a `TypeError` a page's script survives into a
+  capture that never settles, which is strictly worse than the `TypeError`. The engine fix is upstream
+  and the pinned `Broiler.JS` pointer carries it (track 1, *`for await…of` hangs the agent when the
+  step result is not already settled*), so both statements are installed.
+  <br>`next()` releases the reader's lock on `done` rather than on the following call, so a loop that
+  runs to completion leaves the stream unlocked; `return()` — which the engine calls when a loop is
+  left by `break`, `return` or `throw` — cancels the source unless `preventCancel` was asked for, then
+  releases. Seven regressions in `ReadableStreamTests` replace the one that pinned the absence
+  (`Async_Iteration_Is_Absent_Until_The_Engine_Can_Drive_It`, now deleted): chunk order and lock
+  release over a page stream, a blob stream and a response body; early exit cancelling the source with
+  the loop's completion value as the reason; `preventCancel` releasing without cancelling; an errored
+  stream throwing into the loop with the queued chunk discarded; a locked stream rejecting with a
+  `TypeError`; and `@@asyncIterator` being the same function object as `values`, on the prototype.
+  Every expectation is Chromium's measured answer to the same probe — the two agree on all seven.
+  `pipeTo`/`pipeThrough` and BYOB readers stay absent and detectably so; they are their own
+  capabilities, not pieces of this one.
 - **Three of `navigator`'s object-valued surfaces are decided and implemented, and three are decided
   and absent.** Each is a whole API rather than a value, and the test the audit line named is whether
   a present object answers a page's `'x' in navigator` detection *more* misleadingly than absence
@@ -1109,16 +1150,16 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   its high-water mark is zero precisely so construction does not pull and mark the body used before
   anything read it. `text()`, `json()` and `clone()` refuse a body that is disturbed *or* locked, and
   the locked half is answered by the stream itself.
-  <br>**Not implemented, and detectably so:** `pipeTo`/`pipeThrough`, which need a `WritableStream`;
-  BYOB readers, which need a byte-stream controller, so `getReader({mode: 'byob'})` throws rather
-  than handing back a default reader that would ignore the caller's buffer; and async iteration,
-  which is blocked on the engine rather than on the stream. `for await` never completes here — it
-  leaves its async function suspended even over a plain array — and over an object carrying
-  `@@asyncIterator` it keeps a capture's drain loop spinning. Installing the hook would turn the
-  ordinary `for await (const chunk of response.body)` from a `TypeError` a page's script survives
-  into a capture that never settles, which is strictly worse; the engine gap is recorded in
-  [open](broiler-js-gaps-open.md#track-1--core-language-and-built-ins) and the hook goes on with the
-  fix. A capture-level probe confirms `await reader.read()` itself works end to end.
+  <br>**Not implemented, and detectably so:** `pipeTo`/`pipeThrough`, which need a `WritableStream`,
+  and BYOB readers, which need a byte-stream controller, so `getReader({mode: 'byob'})` throws rather
+  than handing back a default reader that would ignore the caller's buffer.
+  <br>**Async iteration was the third of those and is no longer** — it was blocked on the engine
+  rather than on the stream, and that block is gone. `for await` used to leave its async function
+  suspended, so installing the hook would have turned the ordinary
+  `for await (const chunk of response.body)` from a `TypeError` a page's script survives into a
+  capture that never settles. The engine fix landed (track 1, *`for await` over a step result that
+  is not already settled*) and `values()`/`@@asyncIterator` went on with it — recorded as its own
+  entry in this track below.
   <br>`FileReader` brought `ProgressEvent` with it, which also did not exist: its events are
   `ProgressEvent`s and a handler reads `e.constructor.name` as much as `e.loaded`. The reader's own
   event plumbing is its own, because this realm's `EventTarget` is not subclassable — a deviation

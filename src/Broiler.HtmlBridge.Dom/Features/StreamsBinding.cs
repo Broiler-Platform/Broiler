@@ -32,11 +32,16 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </para>
 /// <para>
 /// <b>Not implemented, and detectably so:</b> <c>pipeTo</c> and <c>pipeThrough</c>, which need a
-/// <c>WritableStream</c>; BYOB readers, which need a byte-stream controller, so
+/// <c>WritableStream</c>, and BYOB readers, which need a byte-stream controller, so
 /// <c>getReader({mode: 'byob'})</c> throws rather than handing back a default reader that would
-/// ignore the caller's buffer; and async iteration, which is written and verified and held back on
-/// an engine fix that is not live yet — see the comment in the asset and
-/// <c>patches/0001-js-for-await-unsettled-step-result.patch</c>.
+/// ignore the caller's buffer.
+/// </para>
+/// <para>
+/// Async iteration — <c>values()</c> and <c>@@asyncIterator</c> — <b>is</b> implemented. It was the
+/// one piece held back when the rest landed, because <c>for await</c> deadlocked the agent on an
+/// iterator whose <c>next()</c> returned a promise that was not already settled, which is exactly
+/// what an iterator over a stream returns. The engine fix is upstream and the pinned
+/// <c>Broiler.JS</c> pointer carries it.
 /// </para>
 /// </remarks>
 internal sealed class StreamsBinding

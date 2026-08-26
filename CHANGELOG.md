@@ -10,10 +10,8 @@ are versioned in lockstep during the preview.
 ### Fixed
 
 - `for await…of` no longer deadlocks the agent when the iterator's `next()`
-  hands back a promise that is not already settled. Delivered as
-  `patches/0001-js-for-await-unsettled-step-result.patch` against `Broiler.JS`
-  — the push to that repository is outside this environment's GitHub scope —
-  so it is **not live until the patch is applied**.
+  hands back a promise that is not already settled. The fix is upstream in
+  `Broiler.JS` and the pinned pointer carries it, so it is live.
 
   Async iteration unwrapped the result of `next()` with a blocking wait on the
   one thread allowed to run a context's JavaScript. That works only while the
@@ -29,12 +27,16 @@ are versioned in lockstep during the preview.
   them, so nothing blocks. Seven regressions come with it, each of which hung
   rather than failed before.
 
-  This is what `ReadableStream`'s async iteration is waiting on: `values()` and
-  its `@@asyncIterator` are written and verified and stay commented out until
-  the patch lands, because an iterator over a stream returns exactly the
-  unsettled shape.
-
 ### Added
+
+- `ReadableStream` async iteration: `values()` and `@@asyncIterator`, so
+  `for await (const chunk of response.body)` works. These were written with the
+  stream but held back on the `for await` fix above, because an iterator over a
+  stream returns exactly the unsettled shape that used to hang the agent. With
+  that fix live they are installed, and seven regressions in
+  `ReadableStreamTests` cover chunk order, lock release, early exit cancelling
+  the source, `preventCancel`, an errored stream throwing into the loop, and a
+  locked stream rejecting — each against Chromium's measured answer.
 
 - `ReadableStream` (with its default reader and controller), `FileReader`,
   `ProgressEvent`, and `Blob.prototype.stream()`.
