@@ -9,6 +9,40 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A text or comment node's `Node`, `CharacterData` and `Text` members live on
+  the interface prototypes instead of on every wrapper. In the main repository
+  (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  Every DOM wrapper installed its interface as own properties of the object, so
+  an interface prototype carried nothing of its own: `Text.prototype.splitText`
+  was `undefined` and a text node listed 57 own properties where a browser gives
+  it none. The prototype *chain* was already real
+  (`Text → CharacterData → Node → EventTarget → Object`) and the interface
+  objects already existed; what had not happened is the engine putting its
+  members on them.
+
+  A member on a prototype has no node captured in a closure, so it finds one
+  from its receiver — which needed the wrapper→node lookup to stop being an O(n)
+  scan over every wrapper the document had minted. The members then go on
+  `Node.prototype`, `CharacterData.prototype` and `Text.prototype`, the split
+  Web IDL specifies, so `splitText` is `Text`'s alone rather than something a
+  `Comment` inherits and a page walking a prototype's own property names reads
+  the shape a browser has. Reaching the node through the receiver is also what
+  makes `Text.prototype.splitText.call({}, 1)` a `TypeError`.
+
+  This closed an identity bug with it: `splitText` used to drop the node's
+  wrapper afterwards, to invalidate members that captured state. DOM §4.11
+  splits a text node in place, so `target.firstChild === t` must hold after
+  `t.splitText(n)` — it does in Chromium, and here the next wrapper minted for
+  the node was a different object.
+
+  A text or comment node now carries three own properties instead of 57. Those
+  three are `EventTarget`'s and stay for now: the realm's own
+  `EventTarget.prototype` stores listeners where this bridge's dispatch would
+  not find them. Elements and documents are untouched — they shadow the
+  `Node.prototype` members with their own — and moving those is the rest of the
+  change.
+
 - `getComputedStyle` reports the user-agent stylesheet's `display`. In the main
   repository (`Broiler.HtmlBridge.Dom`), so it is live.
 

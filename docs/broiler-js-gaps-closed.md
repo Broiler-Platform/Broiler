@@ -862,6 +862,46 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **A character-data node's interface members were own properties of the wrapper, not on the
+  interface prototypes.** **Fixed, and live** — entirely in the main repo
+  (`Broiler.HtmlBridge.Dom`), so no patch. This is the first interface of track 6 action 1 to move;
+  the rest is in [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** The bindings install every member as an own property of each wrapper, so an
+  interface prototype carried nothing of its own: `Text.prototype.splitText` was `undefined` and a
+  text node listed 57 own properties where a browser gives it none. The prototype *chain* was already
+  real (`Text → CharacterData → Node → EventTarget → Object`) and the interface objects already
+  existed — what had not happened is the engine putting its members on them.
+  <br>**Fix, and the mechanism the rest of the item needs.** A member on a prototype has no node
+  captured in a closure, so it finds one from its receiver. That needed a wrapper→node lookup:
+  `JsObjectRegistry` had one, but it was an O(n) scan over every wrapper the document had minted —
+  fine for the handful of call sites that had it, and not fine per DOM operation, so it is now a
+  reverse map and constant-time. On top of that, the members a text or comment node exposes are
+  installed on `Node.prototype`, `CharacterData.prototype` and `Text.prototype` — the split Web IDL
+  specifies, so a page walking a prototype's own property names reads the shape a browser has, and
+  `splitText` is `Text`'s alone rather than something a `Comment` inherits. The 18 node constants
+  were already on `Node.prototype`; each instance carried a duplicate set, which is simply gone.
+  <br>**It closed an identity bug of its own.** `splitText` dropped the node's wrapper afterwards —
+  "invalidate the cached JSObject so length/data properties reflect the update" — from when the
+  members captured state. DOM §4.11 splits a text node *in place*, so `target.firstChild === t` must
+  hold after `t.splitText(n)`; measured in Chromium it does, and here the next wrapper minted for the
+  node was a different object. With the members reading the live node through the receiver there is
+  nothing to invalidate, so the invalidation and its now-dead host member are gone.
+  <br>**What it leaves.** A text or comment node carries three own properties instead of 57 — the
+  `EventTarget` trio, which cannot simply be inherited and is stated in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model) with the reason. Elements and
+  documents are untouched, so the members installed on `Node.prototype` are shadowed for them and
+  nothing about them changes; a wrapper minted before the realm carries the interfaces still installs
+  its own members, which is the old shape rather than a broken one.
+  <br>**Evidence.** 16 regressions in `CharacterDataInterfacePrototypeTests` — the members answering
+  from the prototype, the instance carrying none of the interface, `splitText` not reaching a
+  `Comment`, the constants inherited rather than copied, the operations still behaving, the split
+  keeping its identity, a foreign receiver being a `TypeError`, and a page extending
+  `CharacterData.prototype` reaching instances. Whole-suite diffs against a same-container baseline
+  show no regression: `Broiler.Cli.Tests` 39 distinct failures → 39, `Broiler.Wpt.Tests` 52 → 51.
+  Two tests differed and neither is this change — an image-prefetch test and a thread-budget one,
+  both verified to pass in isolation, and the 20s render guard the previous change had seen flake
+  passes here.
+
 - **`getComputedStyle` did not apply the user-agent stylesheet's `display`.** **Fixed, and live** —
   entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch.
   <br>**Cause.** Every element whose display comes from the UA sheet rather than an author rule

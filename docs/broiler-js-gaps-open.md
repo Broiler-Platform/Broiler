@@ -178,13 +178,25 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- **The engine's own members are still own properties of each wrapper**, so an interface prototype
-  carries nothing of its own: `Text.prototype.splitText` is `undefined` and
-  `Object.getOwnPropertyNames(node)` lists the whole interface. The prototype *chain* is real, so a
-  page can extend `Element.prototype` and be heard; what has not happened is the engine putting its
-  members there. Relocating them is the larger object-model change, and the one this item turns on.
-  `Range`, `Selection` and `Blob` are the worked examples of the target shape — their members do
-  live on their prototypes, with per-instance state in a weak table.
+- **An element's and a document's members are still own properties of each wrapper.** Character data
+  has moved — a text or comment node's `Node`, `CharacterData` and `Text` members are on the
+  interface prototypes, so `Text.prototype.splitText` is a function and an instance carries none of
+  them; see [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  What is left is the larger half: an element carries **166** own properties and a document **104**,
+  spread across some forty binding modules, so `Object.getOwnPropertyNames(element)` still lists the
+  whole interface. The work is now mechanical rather than novel — the receiver-resolution mechanism
+  and the constant-time wrapper→node map exist, and each interface moves the same way — but it is
+  large, and each interface must land whole so no prototype ends up with a shape no browser has.
+  <br>`Element` also has a question character data did not raise: several of its members are
+  per-instance *values* rather than accessors (`tagName` is a captured `JSString`), and those have to
+  become accessors before they can move.
+- **The three `EventTarget` members stay on every node instance**, and deliberately for now. The
+  realm carries its own `EventTarget.prototype` with `addEventListener`/`removeEventListener`/
+  `dispatchEvent`, which a node inherits, but those store listeners engine-side where the bridge's
+  dispatch never looks — so a node cannot simply inherit them, and shadowing them on `Node.prototype`
+  would put three members on a prototype no browser carries them on. Routing the realm's own
+  `EventTarget` to the bridge for a node receiver is the change that closes this; it is the last
+  three own properties on a text node.
 - **An SVG element reports `SVGElement`** where a browser says `SVGRectElement`, `SVGSVGElement`
   and the rest. The per-tag SVG interfaces are not registered at all, and minting globals purely so
   a name can be reported is what this track's action 1 rules out — so it is a capability decision
