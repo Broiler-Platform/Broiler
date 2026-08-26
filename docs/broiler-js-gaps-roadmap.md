@@ -50,7 +50,7 @@ work remaining on that track.
 | # | Track | What is left | Lives in | Required outcome |
 |---:|---|---|---|---|
 | 0 | Conformance evidence | The pinned-corpus CI run, and product decisions for three `$262` hooks | in progress · closed | Test failures and timeouts are trustworthy |
-| 1 | Core language and built-ins | The Annex B remainder and the cross-realm cases; one fix awaiting its patch | open · closed | Supported Test262 language clusters are clean |
+| 1 | Core language and built-ins | The Annex B remainder and the cross-realm cases | open · closed | Supported Test262 language clusters are clean |
 | 2 | RegExp | Matcher performance, then non-Unicode routing, then retiring the translator | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
 | 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; `import defer`, `import.meta.resolve`, and whether a JSON import must carry its attribute | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | The excluded Worker capabilities, concurrent-context safety, cross-agent shared memory | open | Claimed agent capabilities are complete and deterministic |
@@ -59,17 +59,11 @@ work remaining on that track.
 | 7 | Graphics, media, and advanced APIs | Every surface — large capability decisions first | open | Each surface is implemented or explicitly excluded |
 | 8 | Portable/Native-AOT profile | Everything past the numeric seed, and the profile decision that gates it | open | Optional profile decision and, if approved, a truthful capability set |
 
-**Four engine fixes are decided, written, tested and *not live*.** They are in `Broiler.JS` and the
-push to that repository is outside this environment's GitHub scope (403), so they ship as files under
-[`patches/`](../patches/README.md) with the submodule pointer deliberately unbumped — CI clones by
-pointer, and bumping to a commit that was never pushed would break the clone. Two of them are counted
-above as remaining work for that reason, even though the work itself is done: track 1's nested
-member call, and track 3's `import.meta`. Track 3's JSON module and its import-attribute enforcement
-are the others. None has a main-repo fallback, and for the member-call fix none is possible — it is
-in how the compiler allocates temps.
-Applying them needs an environment whose GitHub scope includes `Broiler-Platform/Broiler.*`, which is
-an environment-config change rather than something to attempt from inside a session. Read a patch's
-index entry before assuming a gap it names is still open.
+**Everything this document records as fixed is live.** Four fixes that an earlier session could only
+hand over as patch files — track 1's nested member call, and track 3's `import.meta`, JSON modules
+and import-attribute enforcement — are upstream in `Broiler.JS` and carried by the pinned submodule
+pointer, so CI compiles them. Nothing on the table above is waiting on a delivery step; a row states
+work that has not been done.
 
 Tracks 1 and 2 can proceed in parallel once track 0 makes their results trustworthy. Tracks 3
 through 7 share host and DOM dependencies and must use one published support matrix rather than

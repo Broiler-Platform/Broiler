@@ -66,9 +66,9 @@ are versioned in lockstep during the preview.
   leaves its subtree untranslated; `preserveAspectRatio` is modelled at its
   default. Each of those is pinned by its own test.
 
-- Import attributes are enforced rather than parsed and dropped. Delivered as
-  `patches/0004-js-import-attribute-enforcement.patch` against `Broiler.JS`,
-  so it is **not live until the patch is applied**.
+- Import attributes are enforced rather than parsed and dropped. In `Broiler.JS`
+  as *Enforce import attributes instead of parsing and dropping them*, carried
+  by the pinned submodule pointer.
 
   `with { type: 'json' }` — the portable form, and the only one a browser
   accepts on a JSON module — was accepted and ignored, and so was
@@ -94,8 +94,8 @@ are versioned in lockstep during the preview.
   has no attributes at all.
 
 - `import d from './data.json'` is the parsed value rather than `undefined`.
-  Delivered as `patches/0002-js-json-module-default-export.patch` against
-  `Broiler.JS`, so it is **not live until the patch is applied**.
+  In `Broiler.JS` as *Give a JSON module the ES namespace ESM wants and require
+  the value CommonJS wants*, carried by the pinned submodule pointer.
 
   One wrapper served both callers — `module.exports = <json>` — which is what
   CommonJS `require` wants and exactly wrong for ESM: a default import reads
@@ -116,11 +116,9 @@ are versioned in lockstep during the preview.
   the engine does not do.
 
 - A method call whose argument is a method call is no longer silently skipped
-  inside an `async` function or a generator. Delivered as
-  `patches/0001-js-nested-member-call-clobbers-outer-call.patch` against
-  `Broiler.JS` — the push to that repository is outside this environment's
-  GitHub scope — so it is **not live until the patch is applied**, and no
-  main-repo fallback is possible for it.
+  inside an `async` function or a generator. In `Broiler.JS` as *Stop a nested
+  member call clobbering the outer call inside a generator body*, carried by the
+  pinned submodule pointer.
 
   `trace.push(items.join('+'))` did not run. No error was raised and the
   statement after it ran normally, so the failure was silent;
@@ -164,8 +162,8 @@ are versioned in lockstep during the preview.
 ### Added
 
 - `import.meta`, which was a SyntaxError ("import.meta not supported").
-  Delivered as `patches/0003-js-import-meta.patch` against `Broiler.JS`, so it
-  is **not live until the patch is applied**.
+  In `Broiler.JS` as *Implement import.meta, with url on it and resolve
+  deliberately absent*, carried by the pinned submodule pointer.
 
   It carries `url` — the module's own absolute URL, so a transitively imported
   module reports its own rather than the entry point's — and is otherwise an
