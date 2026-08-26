@@ -12,7 +12,7 @@ conformance, and implementation work belongs with that component.
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
 | [WebRTC implementation roadmap](webrtc-roadmap.md) | The cross-component architecture, security boundary, native-backend decision, phased delivery, conformance, interoperability, platform, and release gates for peer connections, data channels, and real-time media |
 | [Broiler Code roadmap](broiler-code-roadmap.md) | The phased plan for a shared C#/.NET IDE, multi-project editing, diagnostics, and .NET/Android/WebAssembly builds |
-| [Broiler.VM roadmap](../Broiler.VM/docs/roadmap.md) | The NativeAOT-compatible bytecode execution component, its statically composed built-in profile model, and the JavaScript and WebAssembly delivery, conformance, resource, and release gates |
+| [Broiler.VM roadmap](../Broiler.VM/docs/roadmap.md) and [status](../Broiler.VM/docs/roadmap.status.md) | The NativeAOT-compatible bytecode execution component, its public source-level/static built-in profile model, JavaScript and WebAssembly delivery gates, and authoritative current evidence ledger |
 | [JavaScript modernization roadmap](../Broiler.JS/docs/roadmap/Modernization.md) | Current cross-track execution authority for JavaScript performance, assembly/AOT boundaries, package decomposition, compile-ahead, context isolation, Workers, profile-led optimization, and the JavaScript built-in VM profile |
 | [JavaScript modernization delivery roadmap](../Broiler.JS/docs/roadmap/ModernizationDelivery.md) | **Subordinate delivery/reference view, not a sequencing or state authority.** Groups multi-phase waves, handoffs, and first increments under the authoritative modernization and owning plan/status gates |
 | [Performance campaign crosswalk](../Broiler.JS/docs/roadmap/Roadmap.md) | **Moved into the `Broiler.JS` submodule on 2026-08-07.** Preserves the IL campaign, Octane/probe history, optimization catalogue, and phase crosswalk. Where sequencing conflicts, the modernization roadmap and the owning phase plan/status pair take precedence |
@@ -51,7 +51,9 @@ The component roadmaps are the source of truth for component-local work:
 - [Broiler.Input](../Broiler.Input/docs/roadmap.md)
 - [Broiler.VM](../Broiler.VM/docs/roadmap.md) — planned NativeAOT-compatible bytecode
   runtime with JavaScript and WebAssembly as required statically linked built-in
-  profiles and a closed-world extension contract for future built-ins
+  profiles and a public source-level, closed-world extension contract for future Broiler or
+  application-local built-ins; [current status](../Broiler.VM/docs/roadmap.status.md) is tracked
+  separately from the plan
 - [Broiler.JS](../Broiler.JS/docs/roadmap/) — indexed component-owned plans for
   modernization, the IL performance campaign and phases, assemblies, the JavaScript
   built-in profile for Broiler.VM, concurrency, and component capability work. Start with
