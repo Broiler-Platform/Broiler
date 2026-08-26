@@ -13,7 +13,8 @@ and no language semantics of its own.
 This roadmap plans the core only. **JavaScript** and **WebAssembly** are the two intended first
 profiles, each a separate component with its own roadmap written after the core contract is
 accepted. Section 9 records what those profiles are expected to require, so the contract is
-designed for them rather than retrofitted to them. Section 10 records the boundary against the
+designed for them rather than retrofitted to them. Sections 10 and 11 record where compilers live
+and how a host gets from source to an artifact, and section 12 records the boundary against the
 legacy `Broiler.JS` component, which Broiler.VM does not depend on.
 
 ---
@@ -169,7 +170,7 @@ procedure is:
 
 An additive amendment may leave existing profile packages source-compatible; changing an existing
 transition or category may not. Neither is a reason to fork the contract: a second core state
-machine maintained for one language is a stop condition under section 13.
+machine maintained for one language is a stop condition under section 16.
 
 ---
 
@@ -549,12 +550,126 @@ its first version, which makes it the useful counterweight when judging whether 
 feature is genuinely general or is one language's need in disguise.
 
 Its conformance corpus is distributed as text scripts, so its roadmap will need a test-only
-ingestion path. The core's obligation is only the general rule already in section 12: test tooling
+ingestion path. The core's obligation is only the general rule already in section 14: test tooling
 and text parsing stay out of every product package and Native AOT closure.
 
 ---
 
-## 10. Relationship to the legacy Broiler.JS component
+## 10. The toolchain boundary
+
+The core executes verified artifacts and produces none. Section 1 keeps source compilers, parsers,
+and text formats out of it. This section records where they do live, so the gap is owned rather
+than merely excluded. Like section 9, it plans nothing: the toolchain is a separate component with
+its own roadmap.
+
+Four concerns hide behind the word *compiler*, and they do not share a home:
+
+| Concern | Language-specific | Home |
+|---|---|---|
+| **Format** — opcodes, schema, encoder and decoder | yes | `Broiler.VM.Profile.<Language>.Format` |
+| **Lowering** — source to bytecode | yes, and only where Broiler compiles the language itself | `Broiler.VM.Profile.<Language>.Compiler` |
+| **Toolchain driver** — CLI, build integration, caching, deterministic output, diagnostics | no | the toolchain component |
+| **Artifact tooling** — verify, inspect, disassemble, envelope pack and unpack | no | the toolchain component |
+
+**The format package is the pivot.** A compiler and an executor must agree on the bytecode, and
+neither may depend on the other, so the format is one authority that both reference. The compiler
+is a **sibling** of the profile rather than a part of it, which is what makes an execution-only
+image contain a format, a verifier, and an interpreter and no compiler at all.
+
+There is no generic compiler host with pluggable language profiles, and section 8's extraction
+gate is why. A generic compiler core would own no compilation: parsing, analysis, lowering, and
+optimization are all language-specific, leaving only driver plumbing. Participation is also
+lopsided in a way execution is not — a WebAssembly profile consumes artifacts that external
+toolchains already produce, so it contributes no Broiler compiler at all. Execution is genuinely a
+many-language problem; compilation is a one-language problem wearing the same shape.
+
+Three rules bind the toolchain to the core:
+
+1. **One verifier.** A tool that verifies an artifact calls the profile's verifier, never a
+   build-time reimplementation. Two verifiers that are supposed to agree are a security defect
+   with a schedule attached.
+2. **One lowering, two hosts.** The same lowering package serves offline compilation and, where a
+   composition declares one, runtime compilation behind the artifact-provider capability. The
+   composition decides which is present; the code is not written twice.
+3. **Deterministic output.** The same source, compiler version, and format version produce a
+   byte-identical artifact. Content-addressed caching, reproducible builds, and any future signing
+   all depend on it, and it is far cheaper to require now than to retrofit.
+
+The toolchain's language-neutral half is real as soon as the core is: verifying, inspecting, and
+unpacking an artifact needs no profile-specific compiler. Its language half arrives with a profile
+that brings one. VM-0 chooses the component name, noting that in .NET an `Sdk` suffix implies an
+MSBuild SDK a project file can reference, while a `Tools` suffix promises only a toolbox; the name
+should be whichever of those it actually intends to be.
+
+---
+
+## 11. Embedding: how source reaches the core
+
+A host that starts from source rather than from an artifact needs a defined path to one. The
+browser is the demanding case and the one to design against.
+
+**A browser is always a runtime-compiler composition.** There is no ahead-of-time path for the
+open web, because a page cannot be compiled before it is visited. Its composition links the
+parser, front end, and lowering into the image, and its Native AOT gate proves that closure
+publishes and runs — not the smaller execution-only one.
+
+**The host keeps its own seam.** An embedder already talks to script through its own interface in
+terms of source text, a document or resource identity, and a realm. That interface does not
+change: an adapter behind it compiles to the profile's format, verifies, instantiates, and
+invokes. The embedder never handles bytecode, and swapping the engine behind the seam stays a
+bounded change.
+
+**Source arrives in two directions, and each already has a contract:**
+
+- **Caller-driven.** The host found the script, fetched it, and decides when it runs. Nothing is
+  executing yet, so the adapter compiles, verifies, and invokes directly. Top-level and deferred
+  scripts take this path.
+- **Guest-driven.** Code is already running when it asks for more — `eval`, a function
+  constructor, a dynamic import, a module dependency. This is the guest-initiated-load contract in
+  section 6: the host registers an artifact-provider capability, and the core mediates, bounds,
+  and charges each request to the operation that made it.
+
+**The division of labour is strict.** The host owns identity resolution, transport, content
+policy, integrity checks, the module map, and the event loop; the core never fetches anything. A
+useful consequence for a browser is that a content policy forbidding dynamic evaluation is
+expressed by registering no artifact-provider capability, so the refusal is a contract outcome
+rather than an ad-hoc check inside an engine.
+
+**The code cache is the persisted envelope.** Compile once, key by source identity, compiler
+version, and format version, store the envelope, and skip compilation next time. Because verified
+handles are immutable and shareable across runtimes with matching identity, two realms running the
+same script can share one compiled artifact instead of compiling it twice.
+
+### Three decisions this forces on VM-0
+
+Each is cheap to settle now and expensive to retrofit, and each is invisible until a host with a
+latency budget arrives.
+
+1. **Whether locally produced bytecode must round-trip through bytes.** Invariant 3 is written for
+   bytes that came from outside. When the compiler that produced them is in the same process and
+   inside the same trust boundary, serializing and re-decoding on every load is pure critical-path
+   cost. VM-0 decides whether the format may expose a compile-directly-to-verified-handle path
+   that skips serialization while still running every type and control-flow check, or whether the
+   round trip is mandatory. VM-5 measures verification throughput so the choice rests on numbers.
+2. **Whether verification may be lazy per section.** Hosts that compile function bodies on first
+   call do not want to verify an entire bundle to run one entry point. Either the profile verifies
+   eagerly, or the format supports independently verified sections, each verified before its own
+   first execution so that nothing unverified ever runs.
+3. **Whether an artifact may be verified incrementally as it arrives.** The contract today is
+   whole-bytes to handle. Streaming would be a core contract amendment; deciding it deliberately
+   beats discovering it during a latency regression.
+
+### The tool-facing surface
+
+The public surface described so far is aimed at hosts: create a runtime, register capabilities,
+execute. Tools need a different shape — verify without executing, read and write an envelope,
+inspect a descriptor, resolve a format version. VM-0 names that surface as supported and VM-6
+baselines it beside the host API. If it is left second-class, the toolchain will reimplement it and
+break rule 1 above by accident.
+
+---
+
+## 12. Relationship to the legacy Broiler.JS component
 
 `Broiler.JS` is a **legacy component**. It keeps its own roadmap, its own status ledger, its own
 release cadence, and its current consumers, and it is not part of Broiler.VM's graph, gates, or
@@ -570,12 +685,12 @@ Consequences worth stating plainly, because the alternative is discovering them 
   not Broiler.VM evidence, and no core gate may cite them.
 - **The legacy IL/bytecode differential is not a core oracle.** A future profile chooses its own
   oracle; the core's oracle is the fixture profile and its own contract tests.
-- **Copying is allowed; depending is not.** Sections 9's seeding conditions govern any code taken
+- **Copying is allowed; depending is not.** Section 9's seeding conditions govern any code taken
   from the legacy component.
 
 ---
 
-## 11. Milestones
+## 13. Milestones
 
 Current state lives in [the status ledger](roadmap.status.md), which is the authority for what has
 been accepted. This section states planned work and objective exit gates only; a milestone is
@@ -592,8 +707,11 @@ never complete because its design appears here.
   shape, the external-suspension transitions, whether asynchronous instantiation is admitted, and
   whether aggregate budgets are a core object or a host responsibility — each explicitly, even
   where the first release ships no implementation. State the section 4 profile-facing checklist
-  and the section 8 sharing rule and extraction gate. Record the legacy boundary in section 10 as
-  an architecture-tested rule, not a convention.
+  and the section 8 sharing rule and extraction gate. Record the legacy boundary in section 12 as
+  an architecture-tested rule, not a convention. Name the tool-facing surface as supported, and
+  settle section 11's three embedding decisions: whether locally produced bytecode must round-trip
+  through bytes, whether verification may be lazy per section, and whether an artifact may be
+  verified incrementally as it arrives.
 - **Dependencies:** Named ownership for the core contract and its amendments. No dependency on any
   profile, on the legacy component, or on the legacy component's in-flight work.
 - **Objective exit gate:** An acyclic shell graph builds; architecture tests express every
@@ -602,7 +720,9 @@ never complete because its design appears here.
   result/payload ownership, resource authority, verified-artifact ownership, and the supported
   source-level profile contract; core contract version 1 is assigned and its amendment procedure
   is published; the guest-initiated-load, asynchronous-instantiation, external-suspension, and
-  aggregate-budget questions each carry a recorded decision rather than silence.
+  aggregate-budget questions each carry a recorded decision rather than silence; the tool-facing
+  surface is named and separated from the host surface; and section 11's round-trip, lazy-section,
+  and incremental-verification decisions are recorded with the reasoning that settled them.
 
 ### VM-1 — Build the semantics-neutral runtime, catalog, and fixture profile
 
@@ -705,8 +825,9 @@ never complete because its design appears here.
 
 - **Owner:** Broiler.VM release owner with package, security, API, and documentation owners.
 - **Next action:** Finalize only the package boundaries justified by VM-0 evidence; create
-  pristine feed consumers and samples that use public APIs only; freeze the API, the source-level
-  profile contract, the core contract version, and the artifact promises; publish support and
+  pristine feed consumers and samples that use public APIs only; freeze the host API, the
+  tool-facing API, the source-level profile contract, the core contract version, and the artifact
+  promises; publish support and
   exclusion tables; complete dependency, license, security, and human review; and wire graph,
   catalog, AOT, and contract drift checks into required CI and the status ledger.
 - **Dependencies:** VM-0 through VM-4. VM-5 is required only where a product threshold says the
@@ -737,7 +858,7 @@ a core gate.
 
 ---
 
-## 12. Test and evidence matrix
+## 14. Test and evidence matrix
 
 | Area | Required tests/evidence | Failure that blocks release |
 |---|---|---|
@@ -758,7 +879,7 @@ and raw outputs.
 
 ---
 
-## 13. Release gates
+## 15. Release gates
 
 A Broiler.VM core preview or stable release must satisfy all applicable gates:
 
@@ -793,7 +914,7 @@ representative workload changes.
 
 ---
 
-## 14. Risks and stop conditions
+## 16. Risks and stop conditions
 
 | Risk | Mitigation / stop condition |
 |---|---|
@@ -807,8 +928,10 @@ representative workload changes.
 | External pause becomes an unbounded or privileged side channel | Declare who may request external suspension, keep it distinct from guest suspension and terminal cancellation, bound how long a paused operation may block disposal, and leave what a paused profile exposes to the profile. |
 | Static registration silently stops being extensible | Prove an application-local consumer profile through the public source contract, governed IDs, catalog drift tests, and direct composition roots. Do not replace compile-time extensibility with reflection or imply a binary plug-in ABI. |
 | Trimming removes a profile or host path | Root factories and capabilities directly and publish and run every named composition. A linker annotation without execution is insufficient. |
+| A tool reimplements the verifier because the core did not expose one | Name the tool-facing surface in VM-0 and freeze it in VM-6. A tool verifies by calling the profile's verifier; two verifiers that must agree are a security defect with a schedule. |
+| A host's critical path pays for contracts written for untrusted input | Settle section 11's round-trip, lazy-section, and incremental-verification decisions in VM-0 and measure verification throughput in VM-5. A latency regression discovered after the contract is frozen costs an amendment. |
 | Legacy code is copied into a profile and quietly becomes a dependency | Enforce section 9's seeding conditions with an architecture test on the graph, record the snapshot commit, and state that fixes do not flow across the fork. |
-| The legacy component is treated as Broiler.VM evidence | No core gate may cite legacy conformance, benchmarks, or AOT samples. Section 10 is a gate, not a preference. |
+| The legacy component is treated as Broiler.VM evidence | No core gate may cite legacy conformance, benchmarks, or AOT samples. Section 12 is a gate, not a preference. |
 | Malicious input exhausts the verifier or runtime | Checked and bounded readers, pre-execution verification, fuel and cancellation, depth and allocation budgets, fuzzing, and stable resource failure results are release gates. |
 | An artifact weakens host policy by declaring larger limits | Treat the host ceiling as authoritative, allow the profile to tighten it, allow the artifact only to request less, compute the intersection before allocation, and record the effective policy in the verified handle. |
 | Caller-owned bytes change after verification | Snapshot or fully decode into an immutable profile-bound handle and execute only that handle. Mutation, disposal, and concurrent overwrite tests are release blockers. |
@@ -824,7 +947,7 @@ stop condition; an untruthful support claim is.
 
 ---
 
-## 15. Platform references
+## 17. Platform references
 
 VM-0 records immutable revisions for implementation and release evidence; these moving links are
 discovery entry points, not substitutes for the pinned manifests:
