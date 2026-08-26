@@ -28,15 +28,45 @@ git add <Submodule>           # bump the pointer only after the push succeeds
 
 ---
 
-## The backlog is currently empty
+## `0001-js-nested-member-call-clobbers-outer-call.patch`
 
-No submodule fix is waiting to be applied. The last entry — *Stop for-await deadlocking on a step
-result that is not already settled*, against `Broiler.JS` — is upstream: it is commit `ab5f797a`,
-which is the pointer this repository pins, so CI sees it. Its patch file was deleted per the rule
-above, and the main-repo hold it gated was released with it —
-`ReadableStream.prototype.values` and its `@@asyncIterator` are now installed in
-`src/Broiler.HtmlBridge.Dom/Polyfills/streams-and-file-reader.js`.
+- **Targets:** `Broiler.JS`
+  (`Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitCallExpression.cs`, plus regressions
+  in `Broiler.JavaScript.Integration.Tests/SuspendedCallArgumentTests.cs`)
+- **Subject:** *Stop a nested member call clobbering the outer call inside a generator body*
+- **Based on:** `ab5f797a`, the currently pinned pointer
 
-When the next fix has to ship this way, add it back as `0001-…` with the heading shape the deleted
-entry used: **Targets**, **Subject**, **Based on**, then what the change does, what it is verified
-against, and — if a main-repo fallback exists — what that fallback is and when it should be removed.
+`trace.push(items.join('+'))` does not run inside an `async` function. No error is raised and the
+statement after it runs normally, so the failure is **silent** — and `console.log(list.join(', '))`
+is the same shape, which is what makes a small-looking bug worth its patch.
+
+The receiver and the resolved method of a member call live in two temps taken from a per-function
+pool, and the arguments are compiled *before* those temps are acquired, so a nested call in the
+arguments is handed the very same two back. Ordinary code survives that because both values are on
+the IL evaluation stack by the time an argument runs. A generator or async body does not:
+`FlattenBlocks`, the generator rewrite's last pass, lifts any block-valued operand's statements out
+as siblings and passes a spilled temp in its place, and a nested member call compiles to exactly
+such a block. Once hoisted, *its* two assignments run between the outer call's assignments and the
+outer call's invocation, so the outer call invokes the inner callee on the inner receiver.
+`var r = t.push(g.join('+'))` leaving `r` holding the *inner* call's value is what named the cause.
+
+This is the same defect that was fixed for `obj.hit(await Promise.resolve(1))`, but the suspension
+was never the cause — the hoist is. That fix guarded on an AST scan of the source for `await` or
+`yield`, which cannot see the far more common plain nested call. The guard now asks what the
+operands **compiled to**: a bare parameter or a constant emits no statements, so nothing can be
+hoisted out of it and the pool stays safe; anything else gets locals on the call's own block. That
+direction of approximation costs two locals and cannot be wrong, where the old one could and was.
+Ordinary functions still pay nothing. The private-name key temp is pooled the same way and reachable
+the same way by `this.#a(this.#b())`; it gets the same treatment.
+
+Eleven regressions come with it, all without an `await` or a `yield`; ten of the eleven fail before
+the change. Engine suites with the patch applied: integration 5178/5179, built-ins 2215/2215,
+compiler 1400/1402, modules 104/104, and core, parser, runtime and module-extensions clean — the
+three failures are pre-existing and unrelated (one documentation-file check, two known-gap
+parameter-shadowing pins) and reproduce with the change stashed.
+
+**There is no main-repo fallback, and there cannot be one.** The defect is in how the JavaScript
+compiler allocates temps for a member call; nothing at a main-repo layer can intercept call
+compilation. Until this patch is applied, every `async` function in every page that writes
+`a.b(c.d())` silently skips that statement. That is the cost of the pointer staying where it is —
+worth stating plainly rather than leaving to be rediscovered.

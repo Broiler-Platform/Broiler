@@ -50,7 +50,7 @@ work remaining on that track.
 | # | Track | What is left | Lives in | Required outcome |
 |---:|---|---|---|---|
 | 0 | Conformance evidence | The pinned-corpus CI run, and product decisions for three `$262` hooks | in progress · closed | Test failures and timeouts are trustworthy |
-| 1 | Core language and built-ins | A skipped nested-call statement in async functions, the Annex B remainder and the cross-realm cases | open · closed | Supported Test262 language clusters are clean |
+| 1 | Core language and built-ins | The Annex B remainder and the cross-realm cases; one fix awaiting its patch | open · closed | Supported Test262 language clusters are clean |
 | 2 | RegExp | Matcher performance, then non-Unicode routing, then retiring the translator | in progress · closed | ECMAScript syntax and matching semantics use a complete backend |
 | 3 | Scripts, tasks, and modules | Live import bindings; the ordered host task model; three capability decisions | open · in progress · closed | Parsing and task ordering match observable browser behavior |
 | 4 | Workers and shared memory | The excluded Worker capabilities, concurrent-context safety, cross-agent shared memory | open | Claimed agent capabilities are complete and deterministic |

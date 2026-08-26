@@ -87,6 +87,44 @@ the ones marked **fixed** carry a minimal regression in
   loop is at function depth 0; `for await` where no await is allowed — an ordinary script's top
   level, a non-async function body — stays the SyntaxError it was. Landed in the pinned
   `Broiler.JS` submodule (`98db1fc`); regressions in `Track1LanguageTests`.
+- **A method call whose argument is a method call is silently skipped inside an `async` function.**
+  **Root-caused and fixed — but delivered as a submodule patch, so it is not live in CI.**
+  `trace.push(items.join('+'))` did not run: no error was raised and the statement after it ran
+  normally, and `console.log(list.join(', '))` is the same shape, which is what made a
+  small-looking bug worth chasing.
+  <br>**Cause.** The receiver and the resolved method of a member call live in two temps taken from
+  a per-function pool, and the arguments are compiled *before* those temps are acquired, so a nested
+  call in the arguments is handed the very same two back. Ordinary code survives that, because both
+  values are on the IL evaluation stack by the time an argument runs. A generator or async body does
+  not: `FlattenBlocks` — the generator rewrite's last pass — lifts any block-valued operand's
+  statements out as siblings and passes a spilled temp in its place, and a nested member call
+  compiles to exactly such a block (`Assign(recv, target); Assign(callee, recv[name]);
+  Invoke(callee, …)`). Once hoisted, *its* two assignments run between the outer call's assignments
+  and the outer call's invocation, so the outer call invokes the inner callee on the inner receiver.
+  `var r = t.push(g.join('+'))` leaving `r` holding the **inner** call's value is the observation
+  that named it. The roadmap's own guess — `FlattenBlocks.VisitCall`'s operand hoisting — was half
+  right: hoisting is the trigger, but the argument reaches it through `VisitNew` (the `Arguments`
+  constructor), which is why neutralizing `VisitCall` alone changed nothing.
+  <br>**Fix.** This is the same defect already fixed for `obj.hit(await Promise.resolve(1))`, but
+  the suspension was never the cause — the hoist is. That fix guarded on an AST scan of the source
+  for `await`/`yield`, which cannot see the far more common plain nested call. The guard now asks
+  what the operands *compiled to*: a bare parameter or a constant emits no statements, so nothing
+  can be hoisted out of it and the pool stays safe; anything else gets locals on the call's own
+  block, which cannot be handed to another call. That direction of approximation costs two locals
+  and cannot be wrong, where the old one could and was. Ordinary functions still pay nothing. The
+  private-name key temp is pooled the same way and reachable by `this.#a(this.#b())`; it gets the
+  same treatment.
+  <br>**Evidence.** Eleven regressions in `SuspendedCallArgumentTests`, none containing an `await`
+  or a `yield`; ten of the eleven fail before the change and the class is 31/31 after. Engine suites
+  with the patch applied: integration 5178/5179, built-ins 2215/2215, compiler 1400/1402, modules
+  104/104, core/parser/runtime/module-extensions clean — the three failures are pre-existing and
+  unrelated, and reproduce with the change stashed.
+  <br>**Not live.** The push to `Broiler-Platform/Broiler.JS` returns 403, so this ships as
+  `patches/`'s *Stop a nested member call clobbering the outer call inside a generator body* and the
+  pointer is deliberately not bumped. There is no main-repo fallback and there cannot be one — the
+  defect is in how the compiler allocates temps for a member call, and nothing at a main-repo layer
+  can intercept call compilation. Until the patch is applied, every `async` function that writes
+  `a.b(c.d())` still skips that statement.
 - `for await…of` **hangs the agent** when the step result is not already settled. **Fixed.** This
   was a deadlock rather than a wrong answer, which is why it never appeared as a failing test:
   `JSIterator` unwrapped the result of `next()` with `promise.Task.GetAwaiter().GetResult()` — a

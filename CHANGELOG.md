@@ -9,6 +9,34 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- A method call whose argument is a method call is no longer silently skipped
+  inside an `async` function or a generator. Delivered as
+  `patches/0001-js-nested-member-call-clobbers-outer-call.patch` against
+  `Broiler.JS` — the push to that repository is outside this environment's
+  GitHub scope — so it is **not live until the patch is applied**, and no
+  main-repo fallback is possible for it.
+
+  `trace.push(items.join('+'))` did not run. No error was raised and the
+  statement after it ran normally, so the failure was silent;
+  `console.log(list.join(', '))` is the same shape.
+
+  A member call's receiver and resolved method live in two temps taken from a
+  per-function pool, and the arguments are compiled before those temps are
+  acquired, so a nested call in the arguments is handed the same two back.
+  Ordinary code survives that because both values are on the evaluation stack
+  by the time an argument runs. A generator or async body does not: the
+  rewrite hoists any block-valued operand's statements out to statement level,
+  and a nested member call compiles to exactly such a block — so its two
+  assignments land between the outer call's assignments and its invocation,
+  and the outer call goes to the inner callee.
+
+  The guard that was supposed to prevent this looked in the source for an
+  `await` or a `yield`, which is how the bug was first found but not what
+  causes it. It now asks what the operands compiled to: an operand that is a
+  bare parameter or a constant emits no statements and cannot be hoisted, so
+  the pool stays safe; anything else gets locals of its own. Ordinary
+  functions still pay nothing.
+
 - `for await…of` no longer deadlocks the agent when the iterator's `next()`
   hands back a promise that is not already settled. The fix is upstream in
   `Broiler.JS` and the pinned pointer carries it, so it is live.
