@@ -374,6 +374,34 @@ empty and the directory is gone with it — a submodule fix is now checked with
 
 ### Track 3 — Script attribution
 
+- **`document.currentScript` was `null` for every script the WPT runner ran.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.Wpt`), so no patch. The second of the three hosts named in
+  track 3's current-script item; `ScriptEngine` is the one left, in
+  [open](broiler-js-gaps-open.md#confirmed-host-semantic-gaps).
+  <br>**Cause.** The runner never recorded which `<script>` each collected program came from, so the
+  bridge's current-script index stayed at its `-1` default. That is a different failure from a wrong
+  answer and a worse one for a conformance runner: a test whose script reads `currentScript` took its
+  "not supported" branch and was then *scored* on a page that had never done its work, so the result
+  says nothing about the feature under test. The `document.write` insertion point, which resolves
+  through the same index, was equally adrift.
+  <br>**Fix.** The scan records each collected program's ordinal among all the `<script>` elements in
+  document order, and the eval loops resolve it through `ScriptElementMap.AllInDocumentOrder` against
+  the parsed tree — the same mechanism the capture host uses, and for the same reason: the runner
+  skips scripts that are `<script>` elements all the same (a data block, a module, a testharness
+  include it stubs), so pairing the collected programs against a re-derived classification would
+  shift every entry after each one it skipped. The runner's own injected stubs came from no element
+  and run with no current script.
+  <br>**And nothing is current outside script execution.** The index is cleared as soon as a program
+  returns, before the microtask/timer drain that follows it, so a `setTimeout` callback reads `null`
+  as it does in a browser rather than naming whichever script scheduled it.
+  <br>**Evidence.** 3 regressions in `CurrentScriptUnderTheRunnerTests`, each asserting through the
+  render the suite can observe — the running script names itself, a JSON-LD data block ahead of it
+  does not shift the answer (the case that separates a recorded ordinal from a re-derived
+  classification), and a timer callback has no current script. Whole-suite diff against a
+  same-container baseline shows no regression: `Broiler.Wpt.Tests` 55 distinct failures → 55, the one
+  difference being a wall-clock budget test (`ScrollWriteGeometryTimeoutTests`, whose own name says it
+  measures "well within the runner timeout") that passes in isolation in 7s.
+
 - **Every script was attributed to its predecessor once anything ahead of it had been skipped.**
   **Fixed, and live** — entirely in the main repo (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so no
   patch. Track 3 action 5.
@@ -912,6 +940,11 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   to **25**, and a sub-document's `document` from 70 to **52**.
   <br>**Evidence.** A regression in `ElementNodeMembersOnPrototypeTests`: the values still answer for
   an element, the document, a fragment and a doctype, and none of the four owns them.
+  <br>**Whole-suite evidence for this and the four instalments beside it,** measured against a
+  same-container baseline at the branch point: `Broiler.Cli.Tests` 42 distinct failures → 42 with 90
+  tests added, and `Broiler.Wpt.Tests` 55 → 55, byte-identical. Two tests differed between the CLI
+  runs and neither is these changes — the compile-ahead worker-budget test and an idle-callback
+  deadline, both verified to pass in isolation, both load-sensitive by construction.
 
 - **`HTMLElement`'s interface was copied onto every element wrapper too.** **Fixed, and live** —
   entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The sixth instalment of track 6
@@ -1048,7 +1081,8 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   and the `EventTarget` trio; after the element move it would have cost most of an element's surface.
   <br>**Evidence.** 3 regressions in `DetachedNodeWrapperTests` — the replaced node's `nodeType`,
   `tagName`, `getAttribute`, `className`, `textContent`, `parentNode` and `isConnected`, then
-  mutating and re-attaching it, then the ordinary removal path that never regressed.
+  mutating and re-attaching it, then the ordinary removal path that never regressed. Whole-suite
+  diffs for this and the four instalments beside it are recorded with the last of them.
 
 - **Three spec bugs a document answered wrongly, and the document's own `Node` members.**
   **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fourth

@@ -57,22 +57,18 @@ below is host semantics and two decisions.
   buckets instead of one ordered task model. See [HtmlBridge architecture](architecture/htmlbridge.md).
 - A subdocument module can start without deadlocking but its continuation and DOM effect are not
   drained in the engine-only module path. See [xUnit status](xunit-suite-status.md).
-- `document.currentScript` is correct in the capture host and still approximate in the other two.
-  The capture host records which `<script>` each bucket entry came from and no longer reconstructs
-  it, so an unresolved or CSP-blocked source no longer shifts the scripts after it; see
-  [closed](broiler-js-gaps-closed.md#track-3--script-attribution). What is left is the other two
-  hosts, and they are two different problems.
+- `document.currentScript` is correct in the capture host and the WPT runner, and still approximate
+  in `ScriptEngine`. Both of the fixed ones record which `<script>` each bucket entry came from
+  rather than reconstructing it, so an unresolved or CSP-blocked source no longer shifts the scripts
+  after it; see [closed](broiler-js-gaps-closed.md#track-3--script-attribution).
   <br>**`ScriptEngine`** (the interactive and browser-app path) still pairs its buckets against the
   reconstructed classification, so it keeps the drift the capture host had. The ordinals cannot
   simply be recorded there: `ScriptEngine.Execute` receives the buckets already extracted, across
   four public overloads and `ITypedScriptEngine`/`IScriptEngineCapabilities`, so the fix is to carry
   the ordinal alongside each bucket entry through that API — a change to the public surface and to
   `PageContent`, not a change to the pairing.
-  <br>**`WptTestRunner`** never sets the index at all, so `document.currentScript` is always `null`
-  under the WPT runner — a different gap from a wrong answer, and one that would hide any
-  currentScript-dependent WPT test rather than fail it.
   <br>The remaining approximation named in the original investigation — a host that hoists its
-  `async` scripts to the end of the classic bucket — is gone from the capture host with the rest,
+  `async` scripts to the end of the classic bucket — is gone from the two fixed hosts with the rest,
   since an ordinal does not care what order the bucket runs in. See
   [the focused investigation](google-about-current-script.md).
 

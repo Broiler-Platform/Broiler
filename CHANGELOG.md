@@ -9,6 +9,26 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `document.currentScript` names the running script under the WPT runner, where
+  it was `null` for every script on every test. In the main repository
+  (`Broiler.Wpt`), so it is live.
+
+  The runner never recorded which `<script>` each collected program came from,
+  so the bridge's current-script index stayed at its default. For a conformance
+  runner that is worse than a wrong answer: a test whose script reads
+  `currentScript` took its "not supported" branch and was then scored on a page
+  that had never done its work, so the result said nothing about the feature
+  under test. The `document.write` insertion point, which resolves through the
+  same index, was equally adrift.
+
+  Each collected program now carries its ordinal among the document's
+  `<script>` elements, resolved against the parsed tree — the mechanism the
+  capture host already uses, and for the same reason: the runner skips scripts
+  that are `<script>` elements all the same (a data block, a module, a
+  testharness include it stubs), so re-deriving the classification would shift
+  every entry after each skipped one. The index is cleared as soon as a program
+  returns, so a `setTimeout` callback reads `null` as it does in a browser.
+
 - Every node wrapper stopped carrying its own copy of the eighteen `Node`
   constants. In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
 

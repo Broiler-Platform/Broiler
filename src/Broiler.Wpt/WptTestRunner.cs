@@ -3331,6 +3331,20 @@ internal sealed partial class WptTestRunner
 
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
+
+        // Which <script> each collected entry came from, as that element's ordinal among all of them
+        // in document order — what document.currentScript and the document.write insertion point are
+        // resolved through below. The runner never recorded it, so CurrentScriptIndex stayed at its
+        // -1 default and document.currentScript was null for every script on every test: not a wrong
+        // answer but no answer, which hides a currentScript-dependent test rather than failing it.
+        //
+        // Recorded rather than reconstructed, for the reason ScriptElementMap.AllInDocumentOrder
+        // gives: this scan skips scripts that are <script> elements all the same — a data block, a
+        // module, a testharness include the runner stubs — and pairing the collected entries against
+        // a re-derived classification would shift every entry after each one it skipped.
+        var scriptOrdinals = new List<int>();
+        var deferredScriptOrdinals = new List<int>();
+
         var microTasks = new MicroTaskQueue();
 
         // Determine the base directory for resolving relative script paths.
@@ -3350,8 +3364,13 @@ internal sealed partial class WptTestRunner
         bool needsStubs = false;
         bool hasModuleScript = false;
 
+        // Every <script> the scan sees advances this, including the ones it goes on to skip — the
+        // ordinal has to count elements, not collected entries.
+        var scriptOrdinal = -1;
+
         foreach (Match match in ScriptTagPattern.Matches(html))
         {
+            scriptOrdinal++;
             var attrs = match.Groups["attrs"].Value;
 
             // Skip non-JavaScript types (e.g. type="text/template").
@@ -3423,9 +3442,15 @@ internal sealed partial class WptTestRunner
                         scriptContent += Environment.NewLine + TestDriverStubs;
 
                     if (isDefer)
+                    {
                         deferredScripts.Add(scriptContent);
+                        deferredScriptOrdinals.Add(scriptOrdinal);
+                    }
                     else
+                    {
                         scripts.Add(scriptContent);
+                        scriptOrdinals.Add(scriptOrdinal);
+                    }
                 }
 
                 continue;
@@ -3436,9 +3461,15 @@ internal sealed partial class WptTestRunner
             if (string.IsNullOrEmpty(content)) continue;
 
             if (isDefer)
+            {
                 deferredScripts.Add(content);
+                deferredScriptOrdinals.Add(scriptOrdinal);
+            }
             else
+            {
                 scripts.Add(content);
+                scriptOrdinals.Add(scriptOrdinal);
+            }
         }
 
         // Insert testharness stubs at the beginning if needed.
@@ -3539,6 +3570,20 @@ internal sealed partial class WptTestRunner
         bridge.RegisterNamedElementGlobals(context);
         attachScope.Dispose();
 
+        // The parsed document's <script> elements, in document order and with no classification —
+        // what the ordinals recorded during the scan index into. Available only now, because it
+        // reads the tree the attach above built.
+        var allScriptElements = ScriptElementMap.AllInDocumentOrder(bridge.Elements);
+
+        int ElementIndexFor(IReadOnlyList<int> ordinals, int bucketPosition)
+        {
+            if (bucketPosition < 0 || bucketPosition >= ordinals.Count)
+                return -1;
+
+            var ordinal = ordinals[bucketPosition];
+            return ordinal >= 0 && ordinal < allScriptElements.Count ? allScriptElements[ordinal] : -1;
+        }
+
         void DrainAsyncWork()
         {
             // Match the broader DomBridge timer drain cap so promise/timer chains
@@ -3579,6 +3624,11 @@ internal sealed partial class WptTestRunner
         {
             for (var si = 0; si < scripts.Count; si++)
             {
+                // The injected stubs are the runner's own sources and came from no element, so they
+                // run with no current script — which is also what keeps the ordinals lined up, since
+                // they were inserted at the front after the scan.
+                bridge.CurrentScriptIndex = ElementIndexFor(scriptOrdinals, si - injectedScriptCount);
+
                 try
                 {
                     if (si < injectedScriptCount)
@@ -3595,6 +3645,12 @@ internal sealed partial class WptTestRunner
                         using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
                             context.Eval(scripts[si], ScriptLabel.Inline(si - injectedScriptCount));
                     }
+
+                    // The program has finished, so nothing is the current script any more — the
+                    // drain below runs the page's microtasks and timers, and a browser reports null
+                    // in those rather than whichever script scheduled them.
+                    bridge.CurrentScriptIndex = -1;
+
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
                         PromoteWindowGlobalsToContext(bridge);
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
@@ -3602,18 +3658,26 @@ internal sealed partial class WptTestRunner
                 }
                 catch (Exception ex)
                 {
+                    bridge.CurrentScriptIndex = -1;
                     RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
                         $"Script execution error: {ex.Message}", ex);
                 }
             }
 
+            bridge.CurrentScriptIndex = -1;
+
             for (var di = 0; di < deferredScripts.Count; di++)
             {
+                bridge.CurrentScriptIndex = ElementIndexFor(deferredScriptOrdinals, di);
                 var deferredLabel = ScriptLabel.Deferred(di);
                 try
                 {
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalPage))
                         context.Eval(deferredScripts[di], deferredLabel);
+
+                    // As above: the drain is not the script's own execution.
+                    bridge.CurrentScriptIndex = -1;
+
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalSync))
                         PromoteWindowGlobalsToContext(bridge);
                     using (WptPhaseTrace.Measure(WptPhaseTrace.Phases.EvalDrain))
@@ -3621,10 +3685,16 @@ internal sealed partial class WptTestRunner
                 }
                 catch (Exception ex)
                 {
+                    bridge.CurrentScriptIndex = -1;
                     RenderLogger.LogError(LogCategory.JavaScript, "WptTestRunner.ExecuteScriptsWithDom",
                         $"Script {deferredLabel} failed: {ex.Message}", ex);
                 }
             }
+
+            // Nothing after this point is a script the document owns — the module roots below run
+            // through the engine's own machinery, and everything after that is the runner's — so no
+            // current script from here on, which is what a browser reports outside script execution.
+            bridge.CurrentScriptIndex = -1;
 
             // Modules are deferred, so the roots run after the classic deferred scripts — and each
             // on the realm the DOM is attached to, with the engine resolving and fetching its
