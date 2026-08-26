@@ -15,4 +15,10 @@ public sealed partial class DomBridge : IFormHost
     JSObject IFormHost.ToJSObject(DomNode node) => ToJSObject(node);
 
     void IFormHost.ResetForm(DomElement form) => ResetFormControls(form);
+
+    IReadOnlyList<DomElement> IFormHost.CollectFormControls(DomElement form) =>
+        CollectFormControlsIncludingCustom(form);
+
+    bool IFormHost.IsCustomElementValid(DomElement element) =>
+        !CustomElements.IsFormAssociated(element) || ElementInternals.IsValid(element);
 }

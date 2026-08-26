@@ -63,7 +63,7 @@ public sealed class BlobInterfaceTests
         Assert.Equal("THREW TypeError", Outcome(context, "Blob()"));
         // Members on the prototype, nothing on the instance.
         Assert.Equal("", Outcome(context, "Object.getOwnPropertyNames(new Blob()).join(',')"));
-        Assert.Equal("arrayBuffer,constructor,size,slice,text,type",
+        Assert.Equal("arrayBuffer,constructor,size,slice,stream,text,type",
             Outcome(context, "Object.getOwnPropertyNames(Blob.prototype).sort().join(',')"));
         // Both constructor parameters are optional, so Web IDL gives it a length of 0.
         Assert.Equal("0", Outcome(context, "Blob.length"));
@@ -174,17 +174,18 @@ public sealed class BlobInterfaceTests
     }
 
     /// <summary>
-    /// <c>stream()</c> is deliberately absent: it returns a <c>ReadableStream</c>, and this engine has
-    /// one partial stream already — the one <c>response.body</c> hands back — which a second copy
-    /// should not be written against. A page feature-detecting it takes its <c>arrayBuffer()</c>
-    /// fallback, which works. Pinned so that adding it is a decision rather than a drift.
+    /// <c>stream()</c> hands back a real <c>ReadableStream</c>. It was deliberately absent while the
+    /// engine had only a partial stream — the object <c>response.body</c> used to hand back — and
+    /// that decision has since been taken the other way; the stream's own behaviour is pinned in
+    /// <c>ReadableStreamTests</c>.
     /// </summary>
     [Fact(Timeout = 600000)]
-    public void Stream_Is_Absent()
+    public void Stream_Returns_A_ReadableStream()
     {
         using var bridge = Attach(out var context);
 
-        Assert.Equal("undefined", Outcome(context, "typeof Blob.prototype.stream"));
+        Assert.Equal("function", Outcome(context, "typeof Blob.prototype.stream"));
+        Assert.Equal("ReadableStream", Outcome(context, "new Blob(['a']).stream().constructor.name"));
     }
 
     // ---------------- File ----------------

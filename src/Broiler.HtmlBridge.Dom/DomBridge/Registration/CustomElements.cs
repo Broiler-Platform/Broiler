@@ -62,13 +62,21 @@ public sealed partial class DomBridge
         // reserved prefix and deleted from the global once the base has closed over it, so a page
         // cannot call it and mint an element out of band.
         context["__broilerConstructCustomElement"] =
-            new DomFunction((in a) => CustomElements.ConstructForNewTarget(in a), "constructCustomElement", 1);
+            new DomFunction((in a) => CustomElements.ConstructForNewTarget(in a), "constructCustomElement", 2);
         context["__broilerCustomElementRegistry"] = registry;
 
         context.Eval("""
             (function () {
                 var construct = __broilerConstructCustomElement;
                 var registry = __broilerCustomElementRegistry;
+
+                // The per-tag interface globals were registered before this pass and left their
+                // construction hook unbound, because constructing is this registry's job: a
+                // customized built-in reaches HTMLButtonElement (or whichever) through super(), and
+                // the element it must produce is one of ours. Binding it here, once, is what makes
+                // `class Fancy extends HTMLButtonElement` work; the setter deletes itself.
+                if (typeof __broilerBindInterfaceConstructor === 'function')
+                    __broilerBindInterfaceConstructor(construct);
 
                 // The custom element base. Replaces the illegal-constructor HTMLElement, which is
                 // still what a bare `new HTMLElement()` gets: without a new.target there is no
@@ -78,10 +86,13 @@ public sealed partial class DomBridge
                     if (!target) throw new TypeError('Illegal constructor');
                     // The host answers null for a new.target with no definition — a bare
                     // `new HTMLElement()`, whose new.target is HTMLElement itself, and any subclass
-                    // that was never registered. Throwing here rather than there is what makes it a
-                    // real TypeError with a name and a message: a host throw would surface as a bare
+                    // that was never registered — and a string when the definition exists but names
+                    // a different interface, which is a customized built-in reached through
+                    // HTMLElement. Throwing here rather than there is what makes either a real
+                    // TypeError with a name and a message: a host throw would surface as a bare
                     // string with neither.
-                    var element = construct(target);
+                    var element = construct(target, 'HTMLElement');
+                    if (typeof element === 'string') throw new TypeError(element);
                     if (!element) throw new TypeError('Illegal constructor');
                     // The element carries its DOM members as own properties, so re-pointing the
                     // prototype adds the class without taking anything away.
@@ -129,7 +140,29 @@ public sealed partial class DomBridge
 
         _customElementReactionsSubscribed = true;
         _document.Mutated += OnCustomElementRelevantMutation;
+        foreach (var other in _browsingContextDocuments)
+            other.Mutated += OnCustomElementRelevantMutation;
     }
+
+    /// <summary>
+    /// Subscribes a document this bridge minted for a detached browsing context, so a node adopted
+    /// <em>into</em> it is heard.
+    /// </summary>
+    /// <remarks>
+    /// Adoption publishes its record on the document the node is moving to, not the one it is leaving
+    /// — so listening to the main document alone hears an adoption into the page and misses the
+    /// symmetric one out of it. There is one registry across every document this bridge owns, so the
+    /// same handler serves them all.
+    /// </remarks>
+    private void SubscribeBrowsingContextDocument(DomDocument document)
+    {
+        if (!_browsingContextDocuments.Add(document) || !_customElementReactionsSubscribed)
+            return;
+
+        document.Mutated += OnCustomElementRelevantMutation;
+    }
+
+    private readonly HashSet<DomDocument> _browsingContextDocuments = [];
 
     private bool _customElementReactionsSubscribed;
 
@@ -138,6 +171,12 @@ public sealed partial class DomBridge
         if (_customElements is not { } registry)
             return;
 
+        if (record.Type == DomMutationType.Adoption)
+        {
+            registry.OnAdoption(record.Target, DocumentValue(record.OldDocument), DocumentValue(record.NewDocument));
+            return;
+        }
+
         if (record.Type == DomMutationType.ChildList)
         {
             // Both lists are optional on the record, and a childList record normally carries only
@@ -145,6 +184,9 @@ public sealed partial class DomBridge
             registry.OnChildListMutation(
                 record.AddedNodes ?? [],
                 record.RemovedNodes ?? []);
+            // A move changes a form-associated custom element's owner and can change its disabled
+            // state (an ancestor fieldset), and both are computed from the tree rather than stored.
+            registry.SyncFormState();
             return;
         }
 
@@ -152,6 +194,24 @@ public sealed partial class DomBridge
             record.AttributeName is { } attributeName)
         {
             registry.OnAttributeMutation(element, attributeName, record.OldValue);
+            // `disabled`, `form` and `id` each move a form-associated custom element between states;
+            // the sweep costs one pass over the elements a page actually upgraded.
+            registry.SyncFormState();
         }
+    }
+
+    /// <summary>The JS object for a document node — the window's <c>document</c> for the page, its own
+    /// wrapper for a document this bridge minted, and <c>null</c> for one that has neither.</summary>
+    private JSValue DocumentValue(DomDocument? document)
+    {
+        if (document is null)
+            return JavaScript.BuiltIns.Null.JSNull.Value;
+
+        if (ReferenceEquals(document, _document))
+            return _documentJSObject ?? (JSValue)JavaScript.BuiltIns.Null.JSNull.Value;
+
+        return _jsObjects.TryGetDocument(document, out var wrapper)
+            ? wrapper
+            : JavaScript.BuiltIns.Null.JSNull.Value;
     }
 }

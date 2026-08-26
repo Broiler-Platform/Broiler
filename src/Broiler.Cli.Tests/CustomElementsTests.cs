@@ -143,23 +143,6 @@ public sealed class CustomElementsTests
             """));
     }
 
-    /// <summary>
-    /// Customized built-ins are rejected rather than silently ignored — accepting the option and
-    /// doing nothing would leave a page believing its <c>&lt;button is="…"&gt;</c> was upgraded.
-    /// </summary>
-    [Fact(Timeout = 600000)]
-    public void A_Customized_Builtin_Is_Rejected_Rather_Than_Ignored()
-    {
-        using var bridge = Attach(out var context);
-
-        Assert.Equal("NotSupportedError", Eval(context, """
-            try {
-                customElements.define('ce-btn', class extends HTMLElement {}, { extends: 'button' });
-                return 'ok';
-            } catch (e) { return e.name; }
-            """));
-    }
-
     [Fact(Timeout = 600000)]
     public void Get_GetName_And_WhenDefined_Answer()
     {

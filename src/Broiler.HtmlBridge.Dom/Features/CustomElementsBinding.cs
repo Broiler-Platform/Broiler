@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Broiler.Dom;
+using Broiler.JavaScript.BuiltIns.Boolean;
 using Broiler.JavaScript.BuiltIns.Function;
 using Broiler.JavaScript.BuiltIns.Null;
 using Broiler.JavaScript.BuiltIns.String;
@@ -49,10 +50,18 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// is a microtask — would have put every reaction one checkpoint late.
 /// </para>
 /// <para>
-/// <b>Not in this slice, and deliberately:</b> customized built-ins (the <c>extends</c> option and
-/// <c>is=</c> attribute), form-associated custom elements, and <c>adoptedCallback</c>. Each is a
-/// separate capability rather than a piece of this one, and none is faked — <c>define</c> rejects an
-/// <c>extends</c> option rather than accepting it and ignoring it.
+/// <b>Customized built-ins and <c>adoptedCallback</c> are in.</b> A definition may name the built-in
+/// it extends, and an element then has an <em>is value</em> as well as a local name — which is what
+/// <see cref="_isValues"/> holds and what <see cref="DefinitionFor"/> matches on. The is value is not
+/// the <c>is</c> content attribute: an element parsed from <c>&lt;button is="fancy-b"&gt;</c> has
+/// both, but <c>new FancyButton()</c> and <c>createElement('button', {is: 'fancy-b'})</c> produce an
+/// element whose <c>getAttribute('is')</c> is <see langword="null"/> while it still serializes as
+/// <c>&lt;button is="fancy-b"&gt;</c>. Measured against Chromium, both halves.
+/// </para>
+/// <para>
+/// <b>Not in this slice:</b> form-associated custom elements (<c>formAssociated</c>,
+/// <c>attachInternals</c>, <c>ElementInternals</c>). It is a separate capability rather than a piece
+/// of this one.
 /// </para>
 /// </remarks>
 internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
@@ -76,11 +85,35 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     /// <summary><c>whenDefined</c> resolvers waiting on a name that is not defined yet.</summary>
     private readonly Dictionary<string, List<JSObject>> _whenDefined = new(StringComparer.Ordinal);
 
+    /// <summary>
+    /// The <em>is value</em> of an element that has one without carrying an <c>is</c> content
+    /// attribute — what <c>new FancyButton()</c> and <c>createElement('button', {is: …})</c> produce.
+    /// </summary>
+    /// <remarks>
+    /// Kept beside the registry rather than on the element, because it is only meaningful to the
+    /// registry: it is what decides which definition an element belongs to, and it is the one piece
+    /// of custom-element state a content attribute cannot always carry. An element parsed with
+    /// <c>is="fancy-b"</c> is not in this table — its attribute is the is value — which is why
+    /// <see cref="IsValueOf"/> reads both.
+    /// </remarks>
+    private readonly Dictionary<DomElement, string> _isValues = [];
+
+    /// <summary>
+    /// One definition. <paramref name="Name"/> is the custom element name the registry is keyed by;
+    /// <paramref name="LocalName"/> is the tag an element of it actually has — the same string for an
+    /// autonomous element, and the <c>extends</c> option's value for a customized built-in.
+    /// </summary>
     private sealed record CustomElementDefinition(
         string Name,
+        string LocalName,
         JSObject Constructor,
         HashSet<string> ObservedAttributes,
-        bool HasAttributeChangedCallback);
+        bool HasAttributeChangedCallback,
+        bool FormAssociated)
+    {
+        /// <summary>Whether this definition extends a built-in element rather than defining a new tag.</summary>
+        public bool IsCustomizedBuiltIn => !string.Equals(Name, LocalName, StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// A valid custom element name (HTML §4.13.1): starts with an ASCII lower alpha, contains a
@@ -108,6 +141,70 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     /// interface lookup so a defined element reports its own class.</summary>
     internal bool IsDefined(string tagName) => _byName.ContainsKey(tagName);
 
+    /// <summary>Whether the element is a custom element — the gate <c>attachInternals</c> applies,
+    /// which a browser refuses for an ordinary one.</summary>
+    internal bool IsCustom(DomElement element) => _upgraded.Contains(element);
+
+    /// <summary>Whether the element is an upgraded custom element whose definition declared
+    /// <c>static formAssociated = true</c>.</summary>
+    internal bool IsFormAssociated(DomElement element) =>
+        _upgraded.Contains(element) && DefinitionFor(element) is { FormAssociated: true };
+
+    /// <summary>
+    /// The element's <em>is value</em>: the name of the definition it claims to belong to, or
+    /// <see langword="null"/> for an ordinary element.
+    /// </summary>
+    /// <remarks>
+    /// The internal value wins over the content attribute because it is the one an element created
+    /// through <c>createElement(tag, {is})</c> or a constructor has, and such an element carries no
+    /// <c>is</c> attribute at all. An element parsed from markup has only the attribute. Neither
+    /// alone covers both shapes.
+    /// </remarks>
+    private string? IsValueOf(DomElement element) =>
+        _isValues.TryGetValue(element, out var recorded) ? recorded
+        : DomBridge.TryGetAttribute(element, "is", out var attribute) && attribute.Length > 0 ? attribute
+        : null;
+
+    /// <summary>
+    /// Notes an element's is value. Called for an element created with an <c>is</c> option whose name
+    /// is not defined yet — the value has to survive so a later <c>define</c> can upgrade it, and so
+    /// serialization can report it.
+    /// </summary>
+    internal void RecordIsValue(DomElement element, string isValue) => _isValues[element] = isValue;
+
+    /// <summary>The is value serialization should report for <paramref name="element"/>, or
+    /// <see langword="null"/> when the element has none of its own.</summary>
+    internal string? SerializedIsValue(DomElement element) =>
+        _isValues.TryGetValue(element, out var recorded) ? recorded : null;
+
+    /// <summary>
+    /// The definition <paramref name="element"/> belongs to, or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// An is value is authoritative when there is one: it selects the definition, and the definition
+    /// only applies if its local name is the element's tag. That last test is what keeps
+    /// <c>&lt;div is="fancy-b"&gt;</c> an ordinary <c>&lt;div&gt;</c> — measured, a browser leaves it
+    /// alone rather than upgrading it against the wrong interface. With no is value the element can
+    /// only be an autonomous custom element, which is why a customized-built-in definition is
+    /// excluded here: <c>&lt;button&gt;</c> with a <c>button</c>-extending definition in the registry
+    /// is still a plain button.
+    /// </remarks>
+    private CustomElementDefinition? DefinitionFor(DomElement element)
+    {
+        var tag = DomBridge.AsciiToLower(element.TagName);
+        if (IsValueOf(element) is { } isValue)
+        {
+            return _byName.TryGetValue(isValue, out var customized) &&
+                   string.Equals(customized.LocalName, tag, StringComparison.Ordinal)
+                ? customized
+                : null;
+        }
+
+        return _byName.TryGetValue(tag, out var autonomous) && !autonomous.IsCustomizedBuiltIn
+            ? autonomous
+            : null;
+    }
+
     // ---------------- registry ----------------
 
     /// <summary><c>customElements.define(name, constructor)</c>.</summary>
@@ -129,17 +226,14 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
             return JSUndefined.Value;
         }
 
+        // The `extends` option names the built-in this definition customizes; absent, null or
+        // undefined all mean an autonomous element whose local name is its own name.
+        var localName = name;
         if (a.Length > 2 && a[2] is JSObject options && options[(KeyString)"extends"] is { } extends &&
             !extends.IsUndefined && !extends.IsNull)
         {
-            // Customized built-ins are a separate capability. Rejecting is the honest answer:
-            // accepting and ignoring would leave a page believing its <button is="..."> was upgraded.
-            DomBridge.ThrowDOMException(
-                context,
-                "Failed to execute 'define' on 'CustomElementRegistry': customized built-in elements " +
-                "(the 'extends' option) are not supported.",
-                "NotSupportedError");
-            return JSUndefined.Value;
+            if (!TryResolveExtends(context, extends.ToString(), out localName))
+                return JSUndefined.Value;
         }
 
         if (_byName.ContainsKey(name))
@@ -162,10 +256,15 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
 
         var definition = new CustomElementDefinition(
             name,
+            localName,
             constructor,
             ReadObservedAttributes(constructor),
             constructor[(KeyString)"prototype"] is JSObject prototype &&
-                prototype[(KeyString)"attributeChangedCallback"] is JSFunction);
+                prototype[(KeyString)"attributeChangedCallback"] is JSFunction,
+            // formAssociated is read off the constructor, not the prototype: it is a static, and an
+            // instance getter of the same name deliberately does not count — measured, a class
+            // declaring `get formAssociated()` gets a NotSupportedError from attachInternals.
+            constructor[(KeyString)"formAssociated"] is { } formAssociated && formAssociated.BooleanValue);
 
         _byName[name] = definition;
         _byConstructor[constructor] = definition;
@@ -173,6 +272,42 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
         UpgradeDefined(definition);
         ResolveWhenDefined(name, constructor);
         return JSUndefined.Value;
+    }
+
+    /// <summary>
+    /// Validates an <c>extends</c> option and yields the local name it names, or reports the
+    /// specified failure and answers <see langword="false"/>.
+    /// </summary>
+    /// <remarks>
+    /// Two rejections, and they are distinct rather than one "bad tag" case: a name that is itself a
+    /// valid custom element name cannot be extended (a customized built-in customizes a
+    /// <em>built-in</em>), and a name no HTML element has is an <c>HTMLUnknownElement</c>, which has
+    /// no interface to extend either. Both messages are Chromium's, measured rather than invented —
+    /// a page that logs the failure sees the same text it would in a browser.
+    /// </remarks>
+    private static bool TryResolveExtends(JSContext context, string extendsName, out string localName)
+    {
+        localName = DomBridge.AsciiToLower(extendsName);
+
+        if (IsValidCustomElementName(localName))
+        {
+            DomBridge.ThrowDOMException(
+                context,
+                $"Failed to execute 'define' on 'CustomElementRegistry': \"{extendsName}\" is a valid custom element name",
+                "NotSupportedError");
+            return false;
+        }
+
+        if (DomBridge.HtmlInterfaceForTag(localName) == "HTMLUnknownElement")
+        {
+            DomBridge.ThrowDOMException(
+                context,
+                $"Failed to execute 'define' on 'CustomElementRegistry': \"{extendsName}\" is an HTMLUnknownElement",
+                "NotSupportedError");
+            return false;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -246,7 +381,7 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
 
         foreach (var element in InclusiveElements(root))
         {
-            if (_byName.TryGetValue(element.TagName, out var definition))
+            if (DefinitionFor(element) is { } definition)
                 TryUpgrade(element, definition);
         }
 
@@ -260,14 +395,48 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     /// read, hands back the element the constructor should become.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// An element already being upgraded is returned as it is — that is the construction stack, and
     /// it is what lets an upgrade run the author's constructor against the node already in the tree
-    /// rather than a replacement. Otherwise a fresh element is minted for the definition's tag name.
-    /// A <c>new.target</c> with no definition, and a bare <c>new HTMLElement()</c> (no
-    /// <c>new.target</c> at all), are both <c>TypeError</c>s, as in a browser.
+    /// rather than a replacement. Otherwise a fresh element is minted for the definition's
+    /// <em>local</em> name, which is the extended tag for a customized built-in.
+    /// </para>
+    /// <para>
+    /// <paramref name="a"/>[1] is the interface whose constructor is running — HTML §4.13.3's "active
+    /// function object", and the reason it has to be passed rather than inferred. The base a class
+    /// extends must be the one its definition names: <c>class X extends HTMLButtonElement</c>
+    /// registered without an <c>extends</c> option is a <c>TypeError</c>, and so is an
+    /// <c>HTMLElement</c> subclass registered with one. Without the active interface both would
+    /// silently construct the wrong element — an autonomous <c>&lt;x-thing&gt;</c> reached through
+    /// <c>HTMLButtonElement</c>, which a browser refuses.
+    /// </para>
+    /// <para>
+    /// A refusal is returned as a string, not thrown: the JavaScript base turns it into a real
+    /// <c>TypeError</c> carrying that message, where a host throw would surface as a bare string with
+    /// no name. <see cref="JSNull"/> means the generic "Illegal constructor" — a
+    /// <c>new.target</c> with no definition, and a bare <c>new HTMLElement()</c> with no
+    /// <c>new.target</c> at all.
+    /// </para>
     /// </remarks>
     internal JSValue ConstructForNewTarget(in Arguments a)
     {
+        if (a.Length == 0 || a[0] is not JSObject newTarget ||
+            !_byConstructor.TryGetValue(newTarget, out var definition))
+            return JSNull.Value;
+
+        var activeInterface = a.Length > 1 ? a[1].ToString() : "HTMLElement";
+        var requiredInterface = definition.IsCustomizedBuiltIn
+            ? DomBridge.HtmlInterfaceForTag(definition.LocalName)
+            : "HTMLElement";
+
+        if (!string.Equals(activeInterface, requiredInterface, StringComparison.Ordinal))
+        {
+            return new JSString($"Failed to construct '{activeInterface}': Illegal constructor: " +
+                (definition.IsCustomizedBuiltIn
+                    ? "localName does not match the HTML element interface"
+                    : "autonomous custom elements must extend HTMLElement"));
+        }
+
         if (_constructionStack.Count > 0)
         {
             var pending = _constructionStack[^1];
@@ -275,15 +444,14 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
             return _host.ToJSObject(pending);
         }
 
-        if (a.Length == 0 || a[0] is not JSObject newTarget ||
-            !_byConstructor.TryGetValue(newTarget, out var definition))
+        var created = _host.CreateBridgeElement(definition.LocalName);
+        if (definition.IsCustomizedBuiltIn)
         {
-            // Null rather than a throw: the JavaScript base turns this into a real TypeError, which
-            // a host throw could not carry a name and message for.
-            return JSNull.Value;
+            // The is value, not an `is` attribute: a constructed customized built-in reports
+            // getAttribute('is') as null while still serializing as <button is="…">. Measured.
+            _isValues[created] = definition.Name;
         }
 
-        var created = _host.CreateBridgeElement(definition.Name);
         // A constructed element is upgraded by definition — it was built from its own class. Marking
         // it here is what makes its reactions fire: without it a `document.createElement('x-thing')`
         // instance took no attributeChangedCallback, because the reaction dispatch only knows about
@@ -295,12 +463,16 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     /// <summary>
     /// Creates an element for a defined custom tag by running its constructor, which is what makes
     /// <c>document.createElement('x-thing')</c> hand back an instance of the class rather than a
-    /// plain element. Returns <see langword="null"/> when the tag has no definition, so the ordinary
-    /// path takes over.
+    /// plain element. <paramref name="isValue"/> is <c>createElement</c>'s <c>is</c> option, which
+    /// selects a customized built-in. Returns <see langword="null"/> when nothing matches, so the
+    /// ordinary path takes over.
     /// </summary>
-    internal JSObject? CreateDefined(string tagName)
+    internal JSObject? CreateDefined(string tagName, string? isValue)
     {
-        if (!_byName.TryGetValue(tagName, out var definition))
+        var lookup = isValue ?? tagName;
+        if (!_byName.TryGetValue(lookup, out var definition) ||
+            !string.Equals(definition.LocalName, tagName, StringComparison.Ordinal) ||
+            (isValue is null && definition.IsCustomizedBuiltIn))
             return null;
 
         return _host.Construct(definition.Constructor) is { } created ? created : null;
@@ -312,7 +484,7 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     {
         foreach (var element in _host.Elements)
         {
-            if (string.Equals(element.TagName, definition.Name, StringComparison.Ordinal))
+            if (ReferenceEquals(DefinitionFor(element), definition))
                 TryUpgrade(element, definition);
         }
     }
@@ -364,8 +536,83 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
             }
         }
 
+        if (definition.FormAssociated)
+        {
+            // The form-association reaction comes before the connected one and is not conditional on
+            // being connected: an upgrade inside a form reports that form, and one outside any form
+            // reports null only once something moves it. Tracked from here so the first observation
+            // is the upgrade itself rather than a later mutation.
+            _formAssociated.Add(element);
+            _formOwners[element] = _host.FormOwnerOf(element);
+            _disabled[element] = _host.IsFormControlDisabled(element);
+            if (_formOwners[element] is { } owner)
+                InvokeReaction(element, "formAssociatedCallback", _host.ToJSObject(owner));
+        }
+
         if (_host.IsConnected(element))
             InvokeReaction(element, "connectedCallback");
+    }
+
+    /// <summary>The upgraded form-associated custom elements, and the two pieces of state whose
+    /// changes they are told about.</summary>
+    private readonly HashSet<DomElement> _formAssociated = [];
+    private readonly Dictionary<DomElement, DomElement?> _formOwners = [];
+    private readonly Dictionary<DomElement, bool> _disabled = [];
+
+    /// <summary>
+    /// Re-reads every form-associated custom element's owner and disabled state and reports what
+    /// changed. Called after each mutation, because both are computed from the tree rather than
+    /// stored: a form owner changes when the element moves, when its <c>form</c> attribute changes,
+    /// and when the form it names appears; a disabled state changes with its own attribute and with
+    /// any ancestor <c>&lt;fieldset&gt;</c>'s.
+    /// </summary>
+    /// <remarks>
+    /// Sweeping rather than deriving which element a given mutation could have affected: the set is
+    /// only the form-associated custom elements a page has actually upgraded, and the alternatives —
+    /// mapping a fieldset mutation to its descendants, an id change to the elements naming it — are
+    /// the kind of partial dependency tracking that silently misses a case.
+    /// </remarks>
+    internal void SyncFormState()
+    {
+        if (_formAssociated.Count == 0)
+            return;
+
+        foreach (var element in _formAssociated.ToList())
+        {
+            var owner = _host.FormOwnerOf(element);
+            if (!_formOwners.TryGetValue(element, out var previousOwner) || !ReferenceEquals(previousOwner, owner))
+            {
+                _formOwners[element] = owner;
+                InvokeReaction(element, "formAssociatedCallback",
+                    owner is null ? JSNull.Value : _host.ToJSObject(owner));
+            }
+
+            var disabled = _host.IsFormControlDisabled(element);
+            if (!_disabled.TryGetValue(element, out var previousDisabled) || previousDisabled != disabled)
+            {
+                _disabled[element] = disabled;
+                InvokeReaction(element, "formDisabledCallback",
+                    disabled ? JSBoolean.True : JSBoolean.False);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports a form reset to the form-associated custom elements among
+    /// <paramref name="controls"/> — the reaction a component resets its own value in.
+    /// </summary>
+    /// <remarks>
+    /// <c>formStateRestoreCallback</c> has no equivalent hook and is deliberately never fired: it
+    /// reports a value restored by session history or an autofill pass, and this engine performs
+    /// neither, so firing it would be an invention rather than a restoration.
+    /// </remarks>
+    internal void OnFormReset(IReadOnlyList<DomElement> controls)
+    {
+        foreach (var control in controls)
+        {
+            if (_formAssociated.Contains(control))
+                InvokeReaction(control, "formResetCallback");
+        }
     }
 
     // ---------------- reactions ----------------
@@ -414,7 +661,7 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
                 // now — the shape a page produces with `innerHTML` or by appending parsed markup
                 // after its component script ran. Upgrading dispatches the connected reaction itself,
                 // so it must not be dispatched twice.
-                if (!_upgraded.Contains(element) && _byName.TryGetValue(element.TagName, out var definition))
+                if (!_upgraded.Contains(element) && DefinitionFor(element) is { } definition)
                 {
                     TryUpgrade(element, definition);
                     continue;
@@ -430,7 +677,7 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
     internal void OnAttributeMutation(DomElement element, string attributeName, string? oldValue)
     {
         if (!_upgraded.Contains(element) ||
-            !_byName.TryGetValue(element.TagName, out var definition) ||
+            DefinitionFor(element) is not { } definition ||
             !definition.ObservedAttributes.Contains(attributeName))
             return;
 
@@ -442,6 +689,22 @@ internal sealed partial class CustomElementsBinding(ICustomElementsHost host)
             new JSString(attributeName),
             oldValue is null ? JSNull.Value : new JSString(oldValue),
             newValue);
+    }
+
+    /// <summary>
+    /// Dispatches <c>adoptedCallback(oldDocument, newDocument)</c> for a node that changed document.
+    /// </summary>
+    /// <remarks>
+    /// The whole adopted subtree receives it, not only the node named on the record: adoption moves
+    /// every descendant's node document, so every upgraded custom element in it has changed document
+    /// too. The removal from the old tree that adoption performs first is an ordinary child-list
+    /// mutation, so <c>disconnectedCallback</c> has already run by the time this does — which is the
+    /// order a browser produces and is measured rather than assumed.
+    /// </remarks>
+    internal void OnAdoption(DomNode node, JSValue oldDocument, JSValue newDocument)
+    {
+        foreach (var element in InclusiveElements(node))
+            InvokeReaction(element, "adoptedCallback", oldDocument, newDocument);
     }
 
     private static IEnumerable<DomElement> InclusiveElements(DomNode node) =>

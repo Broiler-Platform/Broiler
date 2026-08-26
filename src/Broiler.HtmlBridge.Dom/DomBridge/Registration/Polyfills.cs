@@ -63,6 +63,16 @@ public sealed partial class DomBridge
         // polyfills, which is where the URL constructor these attach to comes from.
         _blobs.RegisterInterfaces(context);
 
+        // ReadableStream (with its default reader and controller), ProgressEvent and FileReader,
+        // plus blob.stream(). After blobs, because the stream reads a blob's bytes and the stream
+        // member goes onto Blob.prototype.
+        _streams.Register(context, _blobs);
+
+        // ElementInternals/ValidityState/CustomStateSet — the objects a form-associated custom
+        // element's attachInternals() hands back. Registered here rather than with the custom-element
+        // pass because they are ordinary interface globals a page can name and feature-detect.
+        ElementInternals.RegisterInterfaces(context);
+
         // Storage interface global — the name a page tests before it touches an area.
         RegisterStorageConstructor(context);
 

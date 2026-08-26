@@ -1,5 +1,6 @@
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Engine;
+using Broiler.JavaScript.Storage;
 
 namespace Broiler.HtmlBridge.Dom.Features;
 
@@ -24,14 +25,56 @@ internal static class DocumentFactoryBinding
         DomBridge.ValidateElementName(tag, context);
         tag = DomBridge.AsciiToLower(tag);
 
+        // The options argument's only member is `is`, which asks for a customized built-in: the
+        // element is still a <button>, and the definition it belongs to is the one that name selects.
+        var isValue = a.Length > 1 && a[1] is JSObject options &&
+                      options[(KeyString)"is"] is { } requested && !requested.IsUndefined && !requested.IsNull
+            ? requested.ToString()
+            : null;
+
         // A defined custom element is created by running its own constructor, which is what makes
         // document.createElement('x-thing') an instance of the class rather than a plain element
         // that happens to carry the tag (HTML 4.13.6).
-        if (host.CreateDefinedCustomElement(tag) is { } upgraded)
+        if (host.CreateDefinedCustomElement(tag, isValue) is { } upgraded)
             return upgraded;
 
         var el = host.CreateBridgeElement(tag);
+        if (isValue is not null)
+        {
+            // Nothing is defined for this name yet. The is value is still the element's — a later
+            // define() upgrades it, and a browser serializes it meanwhile: measured,
+            // createElement('button', {is: 'nope'}) reports <button is="nope"> while
+            // getAttribute('is') stays null.
+            host.RecordCustomElementIsValue(el, isValue);
+        }
+
         return host.ToJSObject(el);
+    }
+
+    /// <summary>
+    /// <c>document.adoptNode(node)</c> — moves <paramref name="a"/>[0] and its subtree into this
+    /// document, removing it from wherever it was (DOM §4.5). Unlike <c>importNode</c> it is the same
+    /// node afterwards, not a copy, which is what makes it observable to a custom element: an
+    /// upgraded one in the moved subtree receives <c>adoptedCallback(oldDocument, newDocument)</c>.
+    /// </summary>
+    public static JSValue AdoptNode(IDocumentFactoryHost host, JSContext context, in Arguments a)
+    {
+        if (a.Length == 0 || a[0] is not JSObject source || host.FindDomNodeByJSObject(source) is not { } node)
+        {
+            DomBridge.ThrowDOMException(context, "adoptNode requires a node to adopt.", "TypeError");
+            return JSUndefined.Value;
+        }
+
+        if (node is Broiler.Dom.DomDocument)
+        {
+            DomBridge.ThrowDOMException(
+                context,
+                "Failed to execute 'adoptNode' on 'Document': The node provided is of type '#document', which may not be adopted.",
+                "NotSupportedError");
+            return JSUndefined.Value;
+        }
+
+        return host.ToJSObject(host.AdoptNode(node));
     }
 
     public static JSValue CreateTextNode(IDocumentFactoryHost host, in Arguments a)

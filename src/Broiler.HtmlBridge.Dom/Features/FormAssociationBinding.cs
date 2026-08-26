@@ -97,6 +97,32 @@ internal static class FormAssociationBinding
             : JSNull.Value;
     }
 
+    /// <summary>
+    /// The form owner of <paramref name="element"/> — the shared entry point, so a form-associated
+    /// custom element's <c>ElementInternals.form</c> resolves it by the same rule an ordinary
+    /// control's <c>form</c> does rather than by a second one.
+    /// </summary>
+    internal static DomElement? FormOwnerOf(IFormAssociationHost host, DomElement element) =>
+        FormOwner(host, element);
+
+    /// <summary>
+    /// A control's live <c>labels</c> <c>NodeList</c>, without the hidden-input <c>null</c> case —
+    /// the shape <c>ElementInternals.labels</c> reports, which is always a list.
+    /// </summary>
+    internal static JSValue LabelsNodeList(IFormAssociationHost host, DomElement element) =>
+        DomCollectionBinding.NodeList(host.JsContext, () =>
+        {
+            var labels = new List<JSValue>();
+            foreach (var candidate in host.Elements)
+            {
+                if (string.Equals(candidate.TagName, "label", StringComparison.OrdinalIgnoreCase) &&
+                    ReferenceEquals(LabeledControl(host, candidate), element))
+                    labels.Add(host.ToJSObject(candidate));
+            }
+
+            return labels;
+        });
+
     private static DomElement? FormOwner(IFormAssociationHost host, DomElement element)
     {
         // The `form` content attribute wins over ancestry, and names a form by id anywhere in the
@@ -131,18 +157,7 @@ internal static class FormAssociationBinding
             string.Equals(type, "hidden", StringComparison.OrdinalIgnoreCase))
             return JSNull.Value;
 
-        return DomCollectionBinding.NodeList(host.JsContext, () =>
-        {
-            var labels = new List<JSValue>();
-            foreach (var candidate in host.Elements)
-            {
-                if (string.Equals(candidate.TagName, "label", StringComparison.OrdinalIgnoreCase) &&
-                    ReferenceEquals(LabeledControl(host, candidate), element))
-                    labels.Add(host.ToJSObject(candidate));
-            }
-
-            return labels;
-        });
+        return LabelsNodeList(host, element);
     }
 
     /// <summary>
@@ -163,20 +178,25 @@ internal static class FormAssociationBinding
                 return null;
 
             var target = host.GetElementById(forId);
-            return target is not null && IsLabelable(target) ? target : null;
+            return target is not null && IsLabelable(host, target) ? target : null;
         }
 
         foreach (var descendant in label.Descendants())
         {
-            if (descendant is DomElement candidate && IsLabelable(candidate))
+            if (descendant is DomElement candidate && IsLabelable(host, candidate))
                 return candidate;
         }
 
         return null;
     }
 
-    private static bool IsLabelable(DomElement element)
+    private static bool IsLabelable(IFormAssociationHost host, DomElement element)
     {
+        // A form-associated custom element is labelable (HTML §4.13.5) and no tag list can say so —
+        // its tag is whatever the page named it.
+        if (host.IsFormAssociatedCustomElement(element))
+            return true;
+
         if (!LabelableTags.Contains(element.TagName))
             return false;
 

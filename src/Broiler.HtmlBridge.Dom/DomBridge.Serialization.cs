@@ -794,6 +794,13 @@ public sealed partial class DomBridge
         DomElement element,
         DomElement? sourceElement = null)
     {
+        // A customized built-in created by its constructor or by createElement's `is` option has an
+        // is value and no `is` attribute, and HTML §13.3 serializes it — before the other attributes
+        // — precisely so the markup can be re-parsed into the same element. Measured against
+        // Chromium: getAttribute('is') is null while outerHTML reads <button is="fancy-b">.
+        if (_customElements?.SerializedIsValue(element) is { Length: > 0 } isValue && !HasAttr(element, "is"))
+            yield return new("is", isValue);
+
         if (!string.IsNullOrEmpty(element.Id))
             yield return new("id", element.Id);
         if (!string.IsNullOrEmpty(element.ClassName))

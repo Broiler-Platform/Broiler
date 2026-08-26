@@ -17,4 +17,7 @@ public sealed partial class DomBridge : Dom.Features.IFormAssociationHost
         FindInSubTree(DocumentElement, element => element.Id == id);
 
     Broiler.JavaScript.Engine.JSContext? Dom.Features.IFormAssociationHost.JsContext => _jsContext;
+
+    bool Dom.Features.IFormAssociationHost.IsFormAssociatedCustomElement(DomElement element) =>
+        CustomElements.IsFormAssociated(element);
 }

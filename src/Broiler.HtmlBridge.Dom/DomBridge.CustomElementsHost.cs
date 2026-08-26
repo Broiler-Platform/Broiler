@@ -28,21 +28,32 @@ public sealed partial class DomBridge : ICustomElementsHost
     DomElement ICustomElementsHost.CreateBridgeElement(string tagName) => CreateBridgeElement(tagName);
 
     /// <summary>
-    /// Whether the element is in the document tree. The connected test walks to the root and asks
-    /// whether it is the document, rather than testing for a parent: a subtree assembled off-tree
+    /// Whether the element is in a document tree. The connected test walks to the root and asks
+    /// whether it is a document, rather than testing for a parent: a subtree assembled off-tree
     /// has parents all the way up and is still not connected, and <c>connectedCallback</c> must not
     /// run for it.
     /// </summary>
+    /// <remarks>
+    /// Any document, not only the page's. A node adopted into a frame's or a
+    /// <c>createHTMLDocument</c>'s tree is connected there, and a browser runs its
+    /// <c>connectedCallback</c> — measured, the cross-document <c>appendChild</c> shape reports
+    /// connected, disconnected, adopted, connected.
+    /// </remarks>
     bool ICustomElementsHost.IsConnected(DomElement element)
     {
         for (DomNode? node = element; node is not null; node = node.ParentNode)
         {
-            if (ReferenceEquals(node, _document))
+            if (node is DomDocument)
                 return true;
         }
 
         return false;
     }
+
+    DomElement? ICustomElementsHost.FormOwnerOf(DomElement element) =>
+        Dom.Features.FormAssociationBinding.FormOwnerOf(this, element);
+
+    bool ICustomElementsHost.IsFormControlDisabled(DomElement element) => IsFormControlDisabled(element);
 
     JSObject? ICustomElementsHost.Construct(JSObject constructor) =>
         constructor is JavaScript.BuiltIns.Function.JSFunction function

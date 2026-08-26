@@ -19,6 +19,22 @@ A confirmed gap closes only under the rules in
 
 ## Track 1 — Core language and built-ins
 
+- **A method call whose argument is a method call is silently skipped inside an `async` function.**
+  `trace.push(items.join('+'))` does not run: the statement is not executed, no error is raised, and
+  the statement after it runs normally. The inner call *is* evaluated — twice, measured with a
+  side-effecting one — so the outer call is what goes missing. The same source in a non-async
+  function is correct, which places it in the generator rewrite rather than in call compilation.
+  <br>Characterized as a matrix against the current pointer: an argument that is a plain-function
+  call (`trace.push(String(n))`) is fine, an argument that is a member *access*
+  (`trace.push(items.length)`) is fine, and hoisting the inner call into a variable first is fine —
+  only a member-call argument to a member call fails. The receiver's kind does not matter (a local
+  array, a global, a nested member), a loop is not needed, and neither is an `await`: the smallest
+  reproduction is
+  `(async function () { trace.push('1'); var got = ['a']; trace.push(got.join('+')); trace.push('3'); })()`,
+  which records `1,3`. This is a common shape — `console.log(list.join(', '))` inside any `async`
+  function vanishes — so it is worth more than its position in this list suggests. Not yet
+  root-caused; the pipeline to look at is `GeneratorRewriter` → `FlattenBlocks.VisitCall`, whose
+  operand hoisting is what a member-call argument goes through.
 - Remaining Annex B cases must be reduced from the current manifest rather than reconstructed
   from deleted issue snapshots.
 - `slice/create-proto-from-ctor-realm-array.js` — the one array case that still fails, a
@@ -134,21 +150,16 @@ shared-memory claim is made before the complete memory-model gate passes.
 - `location.assign`, `replace`, `reload`, and `href=` record requests but do not navigate.
 - Some HTTP subresource, iframe, worker, socket, and navigation attempts never complete or call
   back to the probing script.
-- IndexedDB, Cache API, service workers, `cookieStore`, `navigator.storage`, WebSocket,
-  EventSource, and `SharedWorker` are absent.
+- IndexedDB, Cache API, service workers, `cookieStore`, WebSocket, EventSource, and `SharedWorker`
+  are absent. `navigator.storage` exists and truthfully reports an empty quota, because none of the
+  backends it counts does — see [closed](broiler-js-gaps-closed.md#track-5--essential-browser-javascript-apis);
+  it starts reporting real numbers when they land.
 
 See [the privacy-page gap inventory](privacy-test-page-gaps.md) and
 [the Location changelog entry](../CHANGELOG.md).
 
 ### Window, document, navigator, URL, and timing semantics
 
-- **Navigator's object-valued surfaces are absent:** `connection`, `permissions`, `storage`,
-  `mediaDevices`, `mediaCapabilities` and `userAgentData`. Each is a whole API rather than a value,
-  and each needs its own decision about whether a present-but-empty object answers a page's
-  `'x' in navigator` detection *more* misleadingly than absence does — the same test that kept
-  `speechSynthesis` and `navigator.bluetooth` deliberately absent (see
-  [the privacy inventory](privacy-test-page-gaps.md)). The scalar identity and hardware half of the
-  same audit line is done.
 - **`window.trustedTypes` is absent — a capability decision, not an omission.** Trusted Types is an
   enforcement API (policy creation, sink guarding, CSP integration), and a shape-only stub would
   claim a policy mechanism that does not exist.
@@ -195,10 +206,6 @@ and deterministic detection behavior.
   behaviour is not; adding it as an ordinary object would make the standard `document.all`
   feature-detect (which reads truthiness, precisely to exclude it) answer the wrong way round. This
   needs a `Broiler.JS` capability before it is a bridge question at all.
-- **`FileReader` is absent**, and `Blob.prototype.stream()` with it. `stream()` returns a
-  `ReadableStream`, and this engine already carries one partial stream — the object `response.body`
-  hands back — that a second copy should not be written against; building a real `ReadableStream` is
-  its own capability decision, and `FileReader` is the other half of the same File API slice.
 - **There is no *user* selection.** `Selection` is implemented for everything a script drives, but
   nothing populates it on its own, no `selectionchange` fires (nothing but script can change it),
   and the selection is not painted — a rendering question rather than a scripting one.
@@ -209,13 +216,13 @@ and deterministic detection behavior.
 See [HTML5 exceptions](html5test-exceptions.md) and
 [the DOM bridge roadmap](../Broiler.DOM/docs/roadmap.md).
 
-### Custom Elements, templates, and Shadow DOM
+### Templates and Shadow DOM
 
-- **Three Custom Elements capabilities remain**, each deliberately left out of the core slice rather
-  than faked: customized built-ins (the `extends` option and `is=` attribute), which `define`
-  rejects with a `NotSupportedError` instead of accepting and ignoring; form-associated custom
-  elements (`formAssociated`, `ElementInternals`, `attachInternals`); and `adoptedCallback`, which
-  needs the document-adoption path to report ownership changes.
+Custom Elements are complete — the core slice, customized built-ins, `adoptedCallback` and form
+association are all in [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+`formStateRestoreCallback` is the one reaction that never fires, and deliberately: it reports a value
+restored by session history or an autofill pass, and this engine performs neither.
+
 - **Shadow DOM uses synthetic markers**, selector rewriting, and light-child hiding rather than a
   canonical shadow and composed tree with slot assignment, fallback, hit-testing, traversal, and
   event retargeting.
@@ -247,17 +254,17 @@ See [open WPT gaps](wpt-rendering-gaps-open.md),
 
 ### Actions
 
-Actions 1, 2 and 7 of the original list are complete and are recorded in
-[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior);
-what is left of action 1 is the element-wrapper half named in the first bullet above. The rest:
+Most of the original list is complete and recorded in
+[closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior),
+production Custom Elements among it; what is left of its first action is the element-wrapper half
+named in the first bullet above. The rest:
 
 1. Relocate the engine's own interface members onto the interface prototypes, so an instance
    carries no members of its own.
-2. Implement production Custom Elements: customized built-ins, form association, `adoptedCallback`.
-3. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
-4. Make CSSOM rules and computed style read from the same declarations used by cascade and
+2. Replace the synthetic Shadow DOM model with canonical shadow/composed-tree ownership.
+3. Make CSSOM rules and computed style read from the same declarations used by cascade and
    rendering.
-5. Connect live SVG DOM mutations to cascade and paint.
+4. Connect live SVG DOM mutations to cascade and paint.
 
 **Exit gate:** claimed DOM interfaces have correct prototypes, collections, exceptions, and
 algorithms; Custom Elements, templates, shadow/composed trees, CSSOM, computed style, and SVG

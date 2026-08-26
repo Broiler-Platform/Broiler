@@ -441,6 +441,48 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 5 — Essential browser JavaScript APIs
 
+- **Three of `navigator`'s object-valued surfaces are decided and implemented, and three are decided
+  and absent.** Each is a whole API rather than a value, and the test the audit line named is whether
+  a present object answers a page's `'x' in navigator` detection *more* misleadingly than absence
+  does — the same test that kept `speechSynthesis` and `navigator.bluetooth` out. Six decisions, one
+  reason each.
+  <br>**`navigator.storage` (`StorageManager`) — implemented.** It reports quota-managed storage:
+  IndexedDB, the Cache API, the origin private file system. Broiler implements none of them, so the
+  honest estimate is `{usage: 0, quota: 0}` and the honest persistence answer is `false`. That is the
+  same pair the already-present `navigator.webkitTemporaryStorage` reports for the same question
+  through the deprecated interface — the two disagreed only by one of them being absent.
+  `getDirectory()` is deliberately *not* on it: the origin private file system's feature-detect is
+  exactly `'getDirectory' in navigator.storage`.
+  <br>**`navigator.permissions` — implemented, with one deliberate divergence.** Broiler grants no
+  permission-gated capability and has no surface to prompt on, so every query answers `"denied"` — a
+  real, specified state, and the one `Notification.permission` already reports for the single
+  capability that had an answer at all. Chromium answers `"prompt"`; that state promises a dialog
+  this engine cannot show. A name outside the `PermissionName` enum rejects with a `TypeError`
+  carrying Chromium's message, because the enum is validated before the permission is looked at, so a
+  typo is reported as a typo rather than as a denial.
+  <br>**`navigator.userAgentData` (`NavigatorUAData`) — implemented.** Identity is the one thing the
+  bridge already reports carefully, and every member here is derived from the single
+  `BroilerUserAgent.Value` string, so the structured form and the string cannot disagree — which is
+  the whole argument for exposing it. `brands` carries the major version only (that is what makes it
+  low-entropy) and `getHighEntropyValues` answers exactly the hints it is asked for, from the same
+  string. No GREASE brand is invented: the anti-ossification second entry a browser adds is a
+  browser-market argument rather than a correctness one, and it would name a product that does not
+  exist.
+  <br>**`navigator.connection` — absent, deliberately.** `NetworkInformation` claims the user agent
+  can report the connection's quality: `effectiveType`, `rtt`, `downlink`. Broiler measures none of
+  it, and the interface has no "not known" state, so any value would be an invention rather than a
+  negative answer.
+  <br>**`navigator.mediaDevices` and `navigator.mediaCapabilities` — absent, deferred.** Both are
+  media surfaces, and their capability decisions belong with the rest of media in
+  [open](broiler-js-gaps-open.md#media-communications-devices-and-security) rather than being taken
+  here on their own.
+  <br>The members live on the interface prototypes and each surface is a singleton, so an instance
+  carries no own properties. Over a 22-case corpus run, Broiler and Chromium agree on every case but
+  the permission state, which is the divergence above. The absences are pinned by a regression, so
+  they stay decisions rather than drifting back into omissions.
+  <br>Main-repo fix (the new `Features/NavigatorSurfacesBinding.cs` plus
+  `DomBridge/Registration/Window.cs`); regressions in `NavigatorSurfacesTests`.
+
 - **A navigation entry's `duration` was a hardcoded `0`.** Navigation Timing §4 defines it as
   `loadEventEnd - startTime`, and a navigation entry's `startTime` is `0` by definition, so it *is*
   `loadEventEnd`. `entry.duration` is the shortest way a page writes "how long did this take", so a
@@ -946,9 +988,149 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   `Features/DocumentFactoryBinding.cs` and `src/Broiler.Wpt/WptTestRunner.cs`); regressions in
   `CustomElementsTests`.
   <br>**Left out deliberately, and not faked:** customized built-ins (`extends`/`is=`), which
-  `define` rejects rather than accepting and ignoring; form-associated custom elements; and
-  `adoptedCallback`. All three are in
-  [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
+  `define` rejected rather than accepting and ignoring; form-associated custom elements; and
+  `adoptedCallback`. The first and third have since landed, below; form association is what remains
+  in [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
+- **Customized built-in elements and `adoptedCallback`.** `define` rejected an `extends` option with
+  a `NotSupportedError`, so `class Fancy extends HTMLButtonElement` — the idiom for keeping a native
+  control's behaviour and adding to it — lost its component at the `define` call, which takes the
+  rest of the script with it. `adoptedCallback` never fired, because there was no document-adoption
+  path to fire it from: `document.adoptNode` had no implementation at all.
+  <br>**Each per-tag interface global is now a real constructor**, because a customized class reaches
+  one through `super()`. They are still not directly constructible — without a `new.target`, or
+  through a class no definition names, they throw the same `Illegal constructor` they always did —
+  and the construction hook is a closure the custom-element registration binds once, so no page-
+  reachable global mints elements out of band. The interface a `super()` goes through is *passed* to
+  the registry rather than inferred from the definition, which is HTML §4.13.3's active-function-object
+  check: without it, `class I extends HTMLButtonElement` registered with no `extends` option would
+  silently build an autonomous `<bad-3>` through `HTMLButtonElement`, and an `HTMLElement` subclass
+  registered *with* one would silently build a `<button>`. Both are `TypeError`s, with Chromium's
+  distinct messages.
+  <br>**An element's is value is not its `is` attribute**, and that is the part that could not be
+  guessed. An element parsed from `<button is="fancy-b">` has both; `new FancyButton()` and
+  `createElement('button', {is: 'fancy-b'})` produce one whose `getAttribute('is')` is `null` and
+  which still serializes as `<button is="fancy-b">` — HTML §13.3 writes the is value out so the
+  markup re-parses into the same element. An `is` naming nothing defined is kept as well, so a later
+  `define` upgrades it. A definition only reaches the tag it extends: a plain `<button>` is untouched,
+  and `<div is="fancy-b">` stays a plain `<div>` rather than running a button subclass's constructor
+  against something that is not a button.
+  <br>**Adoption is the operation a custom element can observe**, which is why `importNode` is not a
+  substitute for it: importing copies, so the node the page holds afterwards is a different one.
+  `adoptNode` is on the page's document and on a sub-document, and both *directions* are heard —
+  adoption publishes its mutation on the document a node moves **to**, so listening to the page's own
+  document alone would hear an adoption into the page and miss the symmetric one out of it. Every
+  document this bridge mints is subscribed. The whole adopted subtree is reported, not only the node
+  named on the record.
+  <br>**Two fixes fell out of the same work.** A class statically inherits `@@hasInstance` from the
+  interface it extends, so `class Fancy extends HTMLButtonElement` answered the interface's *tag*
+  test and reported every `<button>` on the page as one of its own instances; a subclass now gets the
+  ordinary prototype-chain answer. And the connected test asked for the page's document specifically,
+  so an element inserted into a frame's or a `createHTMLDocument`'s tree was never connected — a
+  browser runs its `connectedCallback` there, measured as connected, disconnected, adopted, connected
+  over a cross-document `appendChild`.
+  <br>Over a 26-case corpus run against both engines, Broiler and Chromium agree on every case but
+  one: the parsed element's `outerHTML` orders attributes `id` before `is` where a browser preserves
+  source order, which is the bridge's pre-existing serialization order for every attribute and not
+  this change's.
+  <br>Main-repo fix (`Features/CustomElementsBinding.cs`, `DomBridge/Registration/CustomElements.cs`,
+  `DomBridge/Utilities.DomInterfaces.cs`, `DomBridge.CustomElementsHost.cs`,
+  `DomBridge.Serialization.cs`, `Features/DocumentFactoryBinding.cs`,
+  `Features/SubDocumentBinding*.cs`); regressions in `CustomizedBuiltInElementsTests` and
+  `CustomElementAdoptionTests`.
+- **Form-associated custom elements** — the last of the three the Custom Elements slice named.
+  `attachInternals()` was undefined, so the line every such component's constructor opens with,
+  `this.internals_ = this.attachInternals()`, was a `TypeError` that took the constructor down and
+  with it the upgrade of every instance on the page. A component could sit inside a form; it could
+  not *be* a control.
+  <br>**`ElementInternals`, `ValidityState` and `CustomStateSet` are real interfaces**, with their
+  members on their prototypes and per-instance state in a weak table — the shape `Range`,
+  `Selection` and `Blob` established, and the one Chromium reports (zero own property names on an
+  `ElementInternals`). `ValidityState` is keyed into the same table, so `internals.validity` is one
+  live object rather than a snapshot. `CustomStateSet` is written in JavaScript over a real `Set`,
+  which gets the setlike iteration protocol — `for…of`, `values`/`keys`/`entries`, `forEach` — right
+  by construction rather than by re-deriving it through host functions.
+  <br>**Every form-related member refuses on an element that is not form-associated**, rather than
+  answering an empty or neutral value: `form`, `labels`, `willValidate`, `validity`,
+  `validationMessage`, `setFormValue`, `setValidity`, `checkValidity` and `reportValidity` are each a
+  `NotSupportedError` naming that reason, while `states` and `shadowRoot` work regardless. Answering
+  `null` for `form` there would say "this control has no form" where the truth is "this is not a
+  control". `formAssociated` is read as the static it is: an instance getter of the same name
+  deliberately does not count, which is measured rather than assumed.
+  <br>**Nothing here is a shape-only stub, and making that true needed the form entry list.**
+  `new FormData(form)` enumerated the *wrapper's* own string properties, so it produced the element
+  object's members — `tagName`, `innerHTML` and the rest — instead of the form's fields. That is also
+  the place a browser reads a form-associated custom element's submission value, so `setFormValue`
+  would have had nowhere to be observed. The entry list is built properly now (HTML §4.10.21.4), with
+  the specified exclusions: a disabled control, a nameless control, an unchecked checkbox or radio,
+  and a button that is not the submitter each submit nothing. A `FormData` submission value
+  contributes its own entries and the element's `name` is not used; `null` means it submits nothing.
+  `setValidity`'s flags are likewise what the owning form's `checkValidity` answers from, and
+  `checkValidity` fires the `invalid` event at the element.
+  <br>**The three reactions that can fire, do.** `formAssociatedCallback` reports the owner at the
+  upgrade that made the element custom — but only when that owner is non-null, which is measured and
+  is not the plausible reading — and again on every later owner change; `formDisabledCallback`
+  reports a change from the element's own `disabled` attribute *or* an ancestor
+  `<fieldset disabled>`; `formResetCallback` reaches the custom controls of a form being reset, which
+  is the whole of what a reset can mean for a control with no dirty flags to clear. Both tracked
+  states are computed from the tree rather than stored, so they are re-read after each mutation over
+  the form-associated elements a page actually upgraded — the alternatives (mapping a fieldset
+  mutation to its descendants, an id change to the elements naming it) are the kind of partial
+  dependency tracking that silently misses a case.
+  <br>**`formStateRestoreCallback` is deliberately never fired.** It reports a value restored by
+  session history or an autofill pass, and this engine performs neither; firing it with the value the
+  page just set would be an invention rather than a restoration.
+  <br>`form.elements` lists a form-associated custom element among its controls, and such an element
+  is labelable in its own right — neither is answerable from a tag list, which is why the control
+  collection is re-walked in the bridge, where the registry that knows is.
+  <br>Over a 36-case corpus run against both engines, Broiler and Chromium agree on every one.
+  <br>Main-repo fix (the new `Features/ElementInternalsBinding.cs`,
+  `Features/IElementInternalsHost.cs`, `DomBridge.ElementInternalsHost.cs`,
+  `DomBridge/FormEntryList.cs`, plus `Features/CustomElementsBinding.cs`,
+  `Features/FormAssociationBinding.cs`, `Features/FormBinding.cs`, `Features/FetchBinding.cs`,
+  `DomBridge/FormReset.cs`); regressions in `FormAssociatedCustomElementTests`.
+- **`ReadableStream` and `FileReader`, and `Blob.prototype.stream()` with them.** Two of track 6's
+  capability decisions, taken together because they are one slice: `stream()` was left out precisely
+  because it returns a `ReadableStream`, and the engine had only a partial one — the shape-only
+  object `response.body` handed back, carrying a `getReader` whose reader had `read`, `cancel` and
+  `releaseLock` and nothing else. No `closed`, no `tee`, no `cancel` on the stream, and no
+  constructor: `new ReadableStream(...)` was a `ReferenceError`, the kind that aborts the script
+  rather than the statement. `FileReader` was absent outright, so the standard way a page turns a
+  dropped file into text, a preview data URL or an `ArrayBuffer` was a `ReferenceError` too.
+  <br>**The stream is JavaScript, and that is the point rather than a shortcut.** The specification
+  is a state machine over promises — a queue, a list of pending read requests, and a pull signal that
+  must not re-enter — and writing it in host functions would mean re-deriving the promise plumbing
+  the engine already has. It ships as an embedded asset beside the content-rendering polyfills. The
+  only thing the host provides is a blob's bytes; that hook is captured into the asset's closure and
+  deleted from the global, so a page cannot reach a blob's bytes through it.
+  <br>**One stream, three producers.** `blob.stream()`, a fetch body and a page's own
+  `new ReadableStream` now hand back the same interface. A fetch body is the case that needed care:
+  the Body mixin's `bodyUsed` is "disturbed", and it is reported from the underlying source's `pull`
+  rather than from a wrapper on the instance, so the stream a page holds still has no own properties;
+  its high-water mark is zero precisely so construction does not pull and mark the body used before
+  anything read it. `text()`, `json()` and `clone()` refuse a body that is disturbed *or* locked, and
+  the locked half is answered by the stream itself.
+  <br>**Not implemented, and detectably so:** `pipeTo`/`pipeThrough`, which need a `WritableStream`;
+  BYOB readers, which need a byte-stream controller, so `getReader({mode: 'byob'})` throws rather
+  than handing back a default reader that would ignore the caller's buffer; and async iteration,
+  which is blocked on the engine rather than on the stream. `for await` never completes here — it
+  leaves its async function suspended even over a plain array — and over an object carrying
+  `@@asyncIterator` it keeps a capture's drain loop spinning. Installing the hook would turn the
+  ordinary `for await (const chunk of response.body)` from a `TypeError` a page's script survives
+  into a capture that never settles, which is strictly worse; the engine gap is recorded in
+  [open](broiler-js-gaps-open.md#track-1--core-language-and-built-ins) and the hook goes on with the
+  fix. A capture-level probe confirms `await reader.read()` itself works end to end.
+  <br>`FileReader` brought `ProgressEvent` with it, which also did not exist: its events are
+  `ProgressEvent`s and a handler reads `e.constructor.name` as much as `e.loaded`. The reader's own
+  event plumbing is its own, because this realm's `EventTarget` is not subclassable — a deviation
+  worth naming: `addEventListener`, `removeEventListener` and `dispatchEvent` are own members of
+  `FileReader.prototype` where a browser inherits them.
+  <br>Over a 36-case corpus run against both engines, Broiler and Chromium agree on every one: the
+  event order and what each event reports, the four conversions (including that a typeless blob reads
+  as `data:application/octet-stream;…`), the busy and no-argument refusals, abort firing only
+  `abort` and `loadend`, and the stream's read, close, error, pull, empty, cancel and tee behaviour.
+  <br>Main-repo fix (the new `Polyfills/streams-and-file-reader.js` and `Features/StreamsBinding.cs`,
+  plus `Features/BlobBinding.cs`, `Features/FetchBinding.cs` and the registration); regressions in
+  `ReadableStreamTests` and `FileReaderTests`.
 - **No DOM wrapper had a real prototype** — every one reported `constructor.name` of `"Object"`.
   `instanceof` already answered, because the interface globals carry an `@@hasInstance` hook that
   reads `nodeType`, which made the gap narrower than it looks and also more confusing:

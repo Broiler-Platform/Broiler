@@ -160,6 +160,13 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => CreateElementNS(docRoot, in a), "createElementNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
+        // adoptNode(node) — the one document method that moves a node between documents rather than
+        // copying it. A frame's document needs it as much as the page's: the interesting direction is
+        // adopting *into* this document, which is exactly what the page's own adoptNode cannot do.
+        doc.FastAddValue((KeyString)"adoptNode",
+            new DomFunction((in a) => AdoptNode(docRoot, in a), "adoptNode", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
         // createEvent(type)
         doc.FastAddValue((KeyString)"createEvent",
             new DomFunction((in a) => CreateEvent(in a), "createEvent", 1),

@@ -42,6 +42,11 @@ public sealed partial class DomBridge
 
         EnforceRadioGroupExclusivity(form);
         InvalidateStyleScope(form);
+
+        // A form-associated custom element has no dirty flags to clear — its value is whatever it
+        // chose to submit — so a reset reaches it as a reaction instead, which is where a component
+        // restores its own default.
+        _customElements?.OnFormReset(CollectFormControlsIncludingCustom(form));
     }
 
     /// <summary>

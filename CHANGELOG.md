@@ -7,7 +7,169 @@ are versioned in lockstep during the preview.
 
 ## [Unreleased]
 
+### Fixed
+
+- `for await…of` no longer deadlocks the agent when the iterator's `next()`
+  hands back a promise that is not already settled. Delivered as
+  `patches/0001-js-for-await-unsettled-step-result.patch` against `Broiler.JS`
+  — the push to that repository is outside this environment's GitHub scope —
+  so it is **not live until the patch is applied**.
+
+  Async iteration unwrapped the result of `next()` with a blocking wait on the
+  one thread allowed to run a context's JavaScript. That works only while the
+  promise is already settled, which is why every shape the engine's suite
+  covered passed: an array, an async generator, an iterator returning
+  `Promise.resolve(record)`. The moment `next()` returns the ordinary
+  `something.then(…)`, the job that would settle it can never run, because the
+  queue that runs it drains on the way out of the execution the thread is stuck
+  inside. The agent hung until the process was killed — which is why it never
+  showed up as a failing test.
+
+  The step is now three pieces with the state machine's own `await` between
+  them, so nothing blocks. Seven regressions come with it, each of which hung
+  rather than failed before.
+
+  This is what `ReadableStream`'s async iteration is waiting on: `values()` and
+  its `@@asyncIterator` are written and verified and stay commented out until
+  the patch lands, because an iterator over a stream returns exactly the
+  unsettled shape.
+
 ### Added
+
+- `ReadableStream` (with its default reader and controller), `FileReader`,
+  `ProgressEvent`, and `Blob.prototype.stream()`.
+
+  Two of the File API slice's capability decisions, taken together because they
+  are one: `stream()` was left out precisely because it returns a
+  `ReadableStream`, and the engine had only a partial one — the shape-only
+  object `response.body` handed back, carrying a `getReader` whose reader had
+  `read`, `cancel` and `releaseLock` and nothing else. There was no `closed`, no
+  `tee`, no `cancel` on the stream, and no constructor, so
+  `new ReadableStream(...)` was a `ReferenceError` — the kind that aborts the
+  script rather than the statement. `FileReader` was absent outright, so the
+  standard way a page turns a dropped file into text, a preview data URL or an
+  `ArrayBuffer` was a `ReferenceError` too.
+
+  The stream is written in JavaScript, as an embedded asset beside the
+  content-rendering polyfills, because the specification is: a queue, a list of
+  pending read requests and a pull signal that must not re-enter. `blob.stream()`,
+  a fetch body and a page's own `new ReadableStream` all hand back the same
+  interface now. A fetch body reports its `bodyUsed` from the underlying source's
+  `pull` rather than from a wrapper, so the stream a page holds still has no own
+  properties, and `text()`/`json()`/`clone()` refuse a body that is disturbed
+  *or* locked.
+
+  Not implemented, and detectably so: `pipeTo`/`pipeThrough` (they need a
+  `WritableStream`), BYOB readers (they need a byte-stream controller), and async
+  iteration — that last one blocked on the engine rather than the stream, since
+  `for await` never completes here even over a plain array. Installing the hook
+  would turn `for await (const chunk of response.body)` from a `TypeError` a
+  script survives into a capture that never settles.
+
+- Three of `navigator`'s object-valued surfaces: `storage` (`StorageManager`),
+  `permissions` (`Permissions`/`PermissionStatus`) and `userAgentData`
+  (`NavigatorUAData`).
+
+  Each is a whole API rather than a value, so each needed its own decision:
+  whether a present object answers a page's `'x' in navigator` detection *more*
+  misleadingly than absence does — the test that kept `speechSynthesis` and
+  `navigator.bluetooth` out. These three pass it because the question the
+  interface exists to answer is one Broiler can answer truthfully.
+
+  `navigator.storage` reports quota-managed storage — IndexedDB, the Cache API,
+  the origin private file system — of which Broiler implements none, so the
+  honest estimate is `{usage: 0, quota: 0}`. That is the same pair the
+  already-present `navigator.webkitTemporaryStorage` reports for the same
+  question; the two disagreed only by one of them being absent. `getDirectory()`
+  is deliberately not on it, because the origin private file system's
+  feature-detect is exactly `'getDirectory' in navigator.storage`.
+
+  Every permission query answers `"denied"`, which is the state
+  `Notification.permission` already reports and the honest one: Broiler grants no
+  permission-gated capability and has no surface to prompt on. Chromium answers
+  `"prompt"` — a promise of a dialog that never comes here.
+
+  `navigator.userAgentData` is derived entirely from the one
+  `BroilerUserAgent.Value` string, so the structured identity and the string
+  cannot disagree.
+
+  `navigator.connection`, `.mediaDevices` and `.mediaCapabilities` stay absent,
+  now as recorded decisions rather than omissions: `NetworkInformation` has no
+  "not known" state, so any value would be an invention, and the two media
+  surfaces belong with the rest of media.
+
+- Form-associated custom elements: `static formAssociated`, `attachInternals()`,
+  and the `ElementInternals`, `ValidityState` and `CustomStateSet` interfaces.
+
+  This is the last of the three capabilities the Custom Elements slice named and
+  left out. `attachInternals()` was undefined, so the line every such
+  component's constructor opens with — `this.internals_ =
+  this.attachInternals()` — was a `TypeError` that took the constructor down,
+  and with it the upgrade of every instance on the page. A component could sit
+  inside a form; it could not *be* a control.
+
+  The members live on the prototypes with per-instance state in a weak table, so
+  an instance carries no own properties — the shape `Range`, `Selection` and
+  `Blob` established. Every form-related member refuses on an element whose
+  definition did not declare `formAssociated`, rather than answering an empty
+  value: answering `null` for `form` there would say "this control has no form"
+  where the truth is "this is not a control".
+
+  **`setFormValue` is not a shape-only stub, and making that true needed the
+  form entry list.** `new FormData(form)` enumerated the *wrapper's* own string
+  properties, so it produced the element object's members — `tagName`,
+  `innerHTML` and the rest — instead of the form's fields. That is also where a
+  browser reads a form-associated custom element's submission value. The entry
+  list is built properly now, with the specified exclusions, and a `FormData`
+  submission value contributes its own entries.
+
+  `formAssociatedCallback`, `formDisabledCallback` (which an ancestor
+  `<fieldset disabled>` triggers as much as the element's own attribute) and
+  `formResetCallback` all fire. `formStateRestoreCallback` deliberately never
+  does: it reports a value restored by session history or an autofill pass, and
+  this engine performs neither.
+
+- Customized built-in elements — the `extends` option, the `is` value, and the
+  `document.adoptNode` and `adoptedCallback` pair.
+
+  The Custom Elements slice deliberately left both out and said so: `define`
+  rejected an `extends` option with a `NotSupportedError` rather than accepting
+  it and ignoring it, and `adoptedCallback` never fired because there was no
+  document-adoption path to fire it from. So the idiom for keeping a native
+  control's behaviour and adding to it — `class Fancy extends
+  HTMLButtonElement` — lost its component at the `define` call, which takes the
+  rest of the script with it.
+
+  Each per-tag interface global (`HTMLButtonElement`, `HTMLInputElement`, all of
+  them) is now a real constructor rather than an unconditional throw, because a
+  customized class reaches one through `super()`. It is still not directly
+  constructible: without a `new.target`, or through a class no definition names,
+  it throws the same `Illegal constructor` it always did. The interface a
+  `super()` goes through is passed to the registry rather than inferred, which is
+  what makes the two ways of mismatching a class and its definition report the
+  way a browser reports them instead of silently building the wrong element.
+
+  An element's **is value is not its `is` attribute**, and both halves are
+  measured: an element parsed from `<button is="fancy-b">` has both, while `new
+  FancyButton()` and `createElement('button', {is: 'fancy-b'})` produce one whose
+  `getAttribute('is')` is `null` — and which still serializes as `<button
+  is="fancy-b">`, because HTML §13.3 writes the is value out so the markup
+  re-parses into the same element. An `is` naming nothing defined is kept too, so
+  a later `define` upgrades it.
+
+  `document.adoptNode` had no implementation at all, and `importNode` is not a
+  substitute: importing copies, so the node a page holds afterwards is a
+  different one. Adoption moves the node itself, which is why it is the operation
+  a custom element can observe. Both directions are heard — adoption publishes on
+  the document a node moves *to*, so every document this bridge mints is
+  subscribed, not only the page's.
+
+  Two fixes fell out of the same work. A class statically inherits
+  `@@hasInstance` from the interface it extends, so `class Fancy extends
+  HTMLButtonElement` reported *every* `<button>` on the page as one of its own
+  instances; a subclass now gets the ordinary prototype-chain answer. And
+  `connectedCallback` tested for the page's document specifically, so an element
+  inserted into a frame's or a `createHTMLDocument`'s tree was never connected.
 
 - The File API data surfaces: `Blob`, `File`, `FileList`,
   `URL.createObjectURL`/`revokeObjectURL`, and a file input's `files`.

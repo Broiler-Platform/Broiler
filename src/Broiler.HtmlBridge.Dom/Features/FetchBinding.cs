@@ -235,7 +235,11 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
             return builder.ToString();
         }
-        static JSObject CreateFormDataObject(JSValue? initValue = null)
+        // Not static: a FormData built from a <form> reads that form's entry list through the host,
+        // which is what `new FormData(form)` means. It used to enumerate the wrapper's own string
+        // properties instead, so it produced the element object's members — tagName, innerHTML and
+        // the rest — rather than the form's fields.
+        JSObject CreateFormDataObject(JSValue? initValue = null)
         {
             var formDataObject = new JSObject();
             var entries = new List<KeyValuePair<string, string>>();
@@ -271,8 +275,16 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
             {
                 if (initValue is JSObject initObject)
                 {
-                    foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
-                        AppendEntry(key, value);
+                    if (_host.FormEntriesFor(initObject) is { } formEntries)
+                    {
+                        foreach (var entry in formEntries)
+                            AppendEntry(entry.Key, entry.Value);
+                    }
+                    else
+                    {
+                        foreach (var (key, value) in EnumerateObjectStringEntries(initObject))
+                            AppendEntry(key, value);
+                    }
                 }
                 else
                 {
@@ -376,78 +388,24 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
             _host.CreateBlob(
                 Encoding.UTF8.GetBytes(bodyText),
                 TryGetJsPropertyString(headersObject, "content-type", "Content-Type") ?? string.Empty);
-        static bool IsBodyUnavailable(JSObject owner)
-            => (owner[(KeyString)"bodyUsed"]?.BooleanValue ?? false) || (owner[(KeyString)"_bodyStreamLocked"]?.BooleanValue ?? false);
-        static JSObject CreateReadableStreamReadResult(JSValue value, bool done)
-        {
-            var result = new JSObject();
-            result[(KeyString)"value"] = value;
-            result[(KeyString)"done"] = done ? JSBoolean.True : JSBoolean.False;
-            return result;
-        }
-        JSValue CreateUint8Array(byte[] bytes)
-        {
-            if (context[(KeyString)"Uint8Array"] is JSFunction uint8ArrayCtor)
-                return uint8ArrayCtor.CreateInstance(new Arguments(JSUndefined.Value, new JSArrayBuffer(bytes)));
+        // "Disturbed or locked", the Body mixin's own test. Disturbed is bodyUsed, which the body
+        // stream sets the first time it is read or cancelled; locked is the stream's own answer, so
+        // a getReader() that has not read yet still blocks text()/json()/clone() — which is what a
+        // browser does and what a page holding a reader expects.
+        bool IsBodyUnavailable(JSObject owner)
+            => (owner[(KeyString)"bodyUsed"]?.BooleanValue ?? false)
+               || (owner[(KeyString)"body"] is JSObject bodyStream && _host.IsStreamLocked(bodyStream));
+        // A real ReadableStream over the body's bytes, the same interface a page's own
+        // `new ReadableStream` and `blob.stream()` produce. What stood here before was a shape-only
+        // object: a getReader whose reader had read/cancel/releaseLock and nothing else — no
+        // `closed`, no `tee`, no `cancel` on the stream, and no async iteration, so
+        // `for await (const chunk of response.body)` threw on a body that was there.
+        JSValue CreateReadableStreamBody(JSObject owner, string bodyText) =>
+            // bodyUsed is the Body mixin's "disturbed" flag, and it is the stream being read that
+            // sets it — reported from the underlying source, so the stream a page holds is an
+            // ordinary one with no own properties of its own.
+            _host.StreamOverTextObserved(bodyText, () => owner[(KeyString)"bodyUsed"] = JSBoolean.True);
 
-            return new JSArrayBuffer(bytes);
-        }
-        JSObject CreateReadableStreamBody(JSObject owner, string bodyText)
-        {
-            var bytes = Encoding.UTF8.GetBytes(bodyText);
-            var streamObject = new JSObject();
-            var readerLocked = false;
-            var chunkDelivered = false;
-
-            void SetLocked(bool locked)
-            {
-                readerLocked = locked;
-                var lockedValue = locked ? JSBoolean.True : JSBoolean.False;
-                owner[(KeyString)"_bodyStreamLocked"] = lockedValue;
-                streamObject[(KeyString)"locked"] = lockedValue;
-            }
-
-            streamObject[(KeyString)"locked"] = JSBoolean.False;
-            JSValue JsRegistrationGetReader097(in Arguments _)
-            {
-                if (IsBodyUnavailable(owner) || readerLocked)
-                    throw new JSException("Failed to execute 'getReader' on 'ReadableStream': stream is already locked or disturbed.");
-                SetLocked(true);
-                var readerObject = new JSObject();
-                JSValue JsRegistrationRead094(in Arguments _)
-                {
-                    if (!readerLocked)
-                        throw new JSException("Failed to execute 'read' on 'ReadableStreamDefaultReader': reader is released.");
-                    if (chunkDelivered)
-                        return CreateThenable(() => CreateReadableStreamReadResult(JSUndefined.Value, true));
-                    chunkDelivered = true;
-                    owner[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    return CreateThenable(() => CreateReadableStreamReadResult(CreateUint8Array(bytes), false));
-                }
-
-                readerObject.FastAddValue((KeyString)"read", new JSFunction(JsRegistrationRead094, "read", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-                JSValue JsRegistrationCancel095(in Arguments _)
-                {
-                    if (readerLocked && !chunkDelivered)
-                        owner[(KeyString)"bodyUsed"] = JSBoolean.True;
-                    chunkDelivered = true;
-                    return CreateThenable(() => JSUndefined.Value);
-                }
-
-                readerObject.FastAddValue((KeyString)"cancel", new JSFunction(JsRegistrationCancel095, "cancel", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-                JSValue JsRegistrationReleaseLock096(in Arguments _)
-                {
-                    SetLocked(false);
-                    return JSUndefined.Value;
-                }
-
-                readerObject.FastAddValue((KeyString)"releaseLock", new JSFunction(JsRegistrationReleaseLock096, "releaseLock", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-                return readerObject;
-            }
-            streamObject.FastAddValue((KeyString)"getReader", new JSFunction(JsRegistrationGetReader097, "getReader", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-
-            return streamObject;
-        }
         JSObject CreateRequestObject(JSValue inputValue, JSValue? initValue = null)
         {
             string url;
@@ -508,7 +466,6 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
             requestObject[(KeyString)"method"] = new JSString(method);
             requestObject[(KeyString)"headers"] = headersObject;
             requestObject[(KeyString)"bodyUsed"] = JSBoolean.False;
-            requestObject[(KeyString)"_bodyStreamLocked"] = JSBoolean.False;
             requestObject[(KeyString)"_bodyInit"] = body == null ? JSNull.Value : new JSString(body);
             requestObject[(KeyString)"body"] = body == null ? JSNull.Value : CreateReadableStreamBody(requestObject, body);
             requestObject[(KeyString)"signal"] = signalValue;
@@ -583,7 +540,6 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
             responseObject[(KeyString)"redirected"] = redirected ? JSBoolean.True : JSBoolean.False;
             responseObject[(KeyString)"type"] = new JSString(type);
             responseObject[(KeyString)"bodyUsed"] = JSBoolean.False;
-            responseObject[(KeyString)"_bodyStreamLocked"] = JSBoolean.False;
             responseObject[(KeyString)"headers"] = headersObject;
             responseObject[(KeyString)"_bodyText"] = new JSString(body);
             responseObject[(KeyString)"body"] = CreateReadableStreamBody(responseObject, body);

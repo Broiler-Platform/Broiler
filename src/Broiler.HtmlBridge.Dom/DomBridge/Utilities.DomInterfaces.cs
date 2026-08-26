@@ -459,20 +459,67 @@ public sealed partial class DomBridge
     /// </para>
     /// <para>
     /// The declarations are generated rather than written out because the table is the interface
-    /// list: a <c>function</c> declaration per name is what makes the bare identifier resolve (the
-    /// same mechanism the hand-written interfaces above use), and pairing each with its tags in one
-    /// place keeps the name and the test it answers with from drifting apart.
+    /// list: pairing each name with its tags in one place keeps the name and the test it answers with
+    /// from drifting apart.
+    /// </para>
+    /// <para>
+    /// Each one is constructible, because a customized built-in extends it — see the comment in the
+    /// method. Constructing is delegated to the custom-element registry through a hook this pass
+    /// leaves unbound; until that hook arrives, and for any call with no <c>new.target</c>, they
+    /// throw the <c>Illegal constructor</c> they always did.
     /// </para>
     /// </remarks>
     private static void RegisterHtmlElementInterfaces(JSContext context)
     {
         var script = new StringBuilder();
 
-        // HTMLMediaElement is declared here rather than beside HTMLElement because it belongs to
-        // this table's world: it is abstract, so it owns no tag and appears only as a base.
-        script.Append("function HTMLMediaElement() { throw new TypeError('Illegal constructor'); }\n");
+        // Each interface is a real constructor rather than an unconditional throw, because a
+        // customized built-in extends one of them: `class Fancy extends HTMLButtonElement` reaches
+        // HTMLButtonElement through super(), and the element it must produce is a <button> carrying
+        // the class. The construction itself belongs to the custom-element registry, which registers
+        // later — so the hook is a closure variable bound by the one-shot setter below, and the
+        // interfaces throw the same "Illegal constructor" they always did until it is bound and
+        // whenever there is no new.target. The name is passed along because HTML §4.13.3 checks it:
+        // an autonomous definition may only be reached through HTMLElement, and a customized one only
+        // through the interface of the tag it extends.
+        //
+        // HTMLMediaElement is in the list rather than declared beside HTMLElement because it belongs
+        // to this table's world: it is abstract, so it owns no tag and appears only as a base.
+        script.Append("(function () {\n");
+        script.Append("    var construct = null;\n");
+        script.Append("""
+                globalThis.__broilerBindInterfaceConstructor = function (hook) {
+                    construct = hook;
+                    delete globalThis.__broilerBindInterfaceConstructor;
+                };
+
+                function define(name) {
+                    var ctor = function () {
+                        var target = new.target;
+                        if (!target || !construct) throw new TypeError('Illegal constructor');
+                        var element = construct(target, name);
+                        // A string is the registry's refusal with the message it wants reported;
+                        // null is the generic case. Throwing here rather than in the host is what
+                        // makes either a real TypeError with a name.
+                        if (typeof element === 'string') throw new TypeError(element);
+                        if (!element) throw new TypeError('Illegal constructor');
+                        Object.setPrototypeOf(element, target.prototype);
+                        return element;
+                    };
+                    Object.defineProperty(ctor, 'name', { value: name, writable: false, enumerable: false, configurable: true });
+                    globalThis[name] = ctor;
+                    Object.defineProperty(ctor.prototype, 'constructor', {
+                        value: ctor, writable: true, enumerable: false, configurable: true
+                    });
+                }
+
+            """);
+        script.Append("    var interfaceNames = ['HTMLMediaElement'");
         foreach (var (name, _) in HtmlElementInterfaces)
-            script.Append("function ").Append(name).Append("() { throw new TypeError('Illegal constructor'); }\n");
+            script.Append(", '").Append(name).Append('\'');
+        script.Append("];\n");
+        script.Append("    for (var n = 0; n < interfaceNames.length; n++) define(interfaceNames[n]);\n");
+        script.Append("})();\n");
 
         script.Append("(function () {\n");
         script.Append("    var ownTags = {\n");
@@ -511,11 +558,27 @@ public sealed partial class DomBridge
                     if (!Object.prototype.hasOwnProperty.call(effective, name)) continue;
                     var ctor = ctorOf(name);
                     if (!ctor) continue;
-                    // The set is captured per iteration through the factory rather than through the
-                    // loop body, whose `var` bindings are one shared pair by the time a test runs.
+                    // The set and the constructor are captured per iteration through the factory
+                    // rather than through the loop body, whose `var` bindings are one shared pair by
+                    // the time a test runs.
+                    //
+                    // The `this !== owner` arm is what keeps a *subclass* honest. A class statically
+                    // inherits @@hasInstance from the constructor it extends, so
+                    // `class Fancy extends HTMLButtonElement` would otherwise answer the tag test —
+                    // and report every <button> on the page as a Fancy, upgraded or not. A subclass
+                    // has a genuine prototype chain to walk (its instances are elements whose
+                    // prototype was re-pointed at it), so it gets the ordinary instanceof answer.
                     Object.defineProperty(ctor, Symbol.hasInstance, {
-                        value: (function (tagSet) {
+                        value: (function (tagSet, owner) {
                             return function (o) {
+                                if (this !== owner) {
+                                    if (!o || (typeof o !== 'object' && typeof o !== 'function')) return false;
+                                    var target = this.prototype;
+                                    for (var p = Object.getPrototypeOf(o); p; p = Object.getPrototypeOf(p)) {
+                                        if (p === target) return true;
+                                    }
+                                    return false;
+                                }
                                 if (!o || typeof o !== 'object' || o.nodeType !== 1) return false;
                                 var ns = o.namespaceURI;
                                 if (ns !== 'http://www.w3.org/1999/xhtml' && ns !== null && typeof ns !== 'undefined')
@@ -523,7 +586,7 @@ public sealed partial class DomBridge
                                 var tag = typeof o.tagName === 'string' ? o.tagName.toLowerCase() : '';
                                 return tagSet[tag] === true;
                             };
-                        })(effective[name]),
+                        })(effective[name], ctor),
                         writable: false, enumerable: false, configurable: true
                     });
                 }
