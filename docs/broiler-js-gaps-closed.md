@@ -897,6 +897,54 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`Element`'s whole interface was copied onto every element wrapper.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fifth instalment of track 6
+  action 1, and the one its first sub-item named; what remains is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** `Element.prototype` carried three members — `localName`, `prefix`, `namespaceURI` —
+  and nothing else, while each element wrapper installed the other 63 as own properties of itself. So
+  `Element.prototype.getAttribute` was `undefined`, which is not only a shape difference: borrowing a
+  prototype method is what a library does when it cannot trust the instance's own, and
+  `Element.prototype.matches.call(el, sel)` threw rather than answering. The polyfill idiom failed
+  the same way round — assigning to `Element.prototype` reached an object every element shadowed with
+  its own copy of the same name.
+  <br>**Fix.** The 63 members Web IDL's `Element` declares — with the mixins it includes: `ParentNode`,
+  `ChildNode`, `NonDocumentTypeChildNode`, the CSSOM View box metrics, Fullscreen and `Animatable` —
+  are installed on `Element.prototype` and found through the receiver. An element is down from **140**
+  own properties to **77**, and `el.getAttribute === Element.prototype.getAttribute` holds, as does
+  `el.matches === otherEl.matches`.
+  <br>**One installer, both places.** Each member is written once against an `ElementSource` that
+  answers either the element captured when the wrapper was built or the element the receiver names.
+  The prototype takes the receiver-resolving one; a wrapper minted before the realm exists — which
+  inherits from nothing — takes the capturing one. The earlier instalments had to establish "a
+  byte-identical copy" by reading each pair by hand; this makes it structural.
+  <br>**Two per-instance things had to change shape first.** `tagName` was a `JSString` fixed when the
+  wrapper was built — the roadmap's second sub-item — and is an accessor now, which is what a browser
+  has. `classList` was a value built with the wrapper, so its identity came for free; it is a
+  prototype accessor over a weak per-element cache now, the same shape `attributes` already used, and
+  `el.classList === el.classList` still holds.
+  <br>**One member the wrapper never had.** `Element.prototype.replaceChildren` — the third member of
+  the `ParentNode` mixin, beside the `append`/`prepend` that were bound. The document's counterpart
+  has been here since that mixin was bound there; an element's, which is how a page empties a node,
+  threw on an undefined function.
+  <br>**And one it has that no browser does.** `removeAttributeNodeNS` stays the instance's:
+  DOM §4.9 pairs `setAttributeNode` with `setAttributeNodeNS` but gives `removeAttributeNode` no
+  namespace-qualified sibling, so putting it on `Element.prototype` would give that prototype a member
+  a browser's has not got. Same for the bridge's own `scrollParent`.
+  <br>**A latent staleness went with it.** The box metrics captured "is this the viewport element?"
+  once at install; the test walks the element's ancestors, so a `<body>` whose wrapper was built
+  before it was attached under `<html>` kept the answer it had then. A prototype member has to ask per
+  call, which is also the truthful answer.
+  <br>**Evidence.** 47 regressions in `ElementInterfacePrototypeTests` — each member inherited rather
+  than owned and owned by `Element.prototype`, one function shared across elements, the borrowed call
+  answering, a non-element receiver (a plain object, the document, a text node) an illegal invocation,
+  `tagName` an accessor, `classList` and `attributes` keeping their identity, the attribute
+  operations, the tree and selector members, `replaceChildren`, a form's named getter not shadowing an
+  inherited member, an SVG element inheriting the same functions, the polyfill idiom reaching
+  instances, and the members that are *not* `Element`'s staying where they were. One superseded
+  assertion updated: `DomInterfacePrototypeTests` pinned `tagName` as the element's own, which was
+  what the prototype link was measured against before any member moved.
+
 - **An `innerHTML` assignment broke every inherited member on the nodes it replaced.** **Fixed, and
   live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. Found while moving
   `Element`'s interface onto its prototype, and fixed before it, because each interface that moves

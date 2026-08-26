@@ -24,31 +24,90 @@ namespace Broiler.HtmlBridge.Dom.Features;
 internal static class ElementGeometryBinding
 {
     /// <summary>
-    /// Installs the box-model metrics and scrolling members on <paramref name="obj"/> for
-    /// <paramref name="element"/>, reading all geometry through <paramref name="host"/>.
+    /// The box metrics and scrolling members CSSOM View puts on <c>Element</c>, installed on
+    /// <paramref name="target"/> — <c>Element.prototype</c>, or one wrapper before the realm is up.
     /// </summary>
-    public static void Install(IElementGeometryHost host, JSObject obj, DomElement element)
+    /// <remarks>
+    /// The viewport test is asked per call rather than once at install, which is what a prototype
+    /// member has to do and is also the more truthful answer: it walks the element's ancestors, so a
+    /// <c>&lt;body&gt;</c> whose wrapper was built before it was attached under <c>&lt;html&gt;</c> used
+    /// to keep the answer it had then for the rest of the document's life.
+    /// </remarks>
+    public static void InstallElementMembers(IElementGeometryHost host, JSObject target, ElementSource element)
     {
         // -- TODO-G4 / TODO-G19: Box model properties for all elements --
-        // clientWidth/clientHeight, offsetWidth/offsetHeight, scrollWidth/scrollHeight,
-        // scrollTop/scrollLeft, and getBoundingClientRect()
+        // clientWidth/clientHeight, scrollWidth/scrollHeight, scrollTop/scrollLeft, and
+        // getBoundingClientRect()
+        target.FastAddProperty((KeyString)"clientTop",
+            new DomFunction((in a) => new JSNumber(host.GetClientTopForDomElement(element(in a, "clientTop"))), "get clientTop"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"clientLeft",
+            new DomFunction((in a) => new JSNumber(host.GetClientLeftForDomElement(element(in a, "clientLeft"))), "get clientLeft"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"clientWidth",
+            new DomFunction((in a) => Metric(host, element(in a, "clientWidth"), host.GetClientWidthForDomElement), "get clientWidth"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"clientHeight",
+            new DomFunction((in a) => Metric(host, element(in a, "clientHeight"), host.GetClientHeightForDomElement), "get clientHeight"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"scrollWidth",
+            new DomFunction((in a) => Metric(host, element(in a, "scrollWidth"), host.GetScrollWidthForDomElement), "get scrollWidth"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"scrollHeight",
+            new DomFunction((in a) => Metric(host, element(in a, "scrollHeight"), host.GetScrollHeightForDomElement), "get scrollHeight"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"scrollTop",
+            new DomFunction((in a) => GetScrollTop(host, element(in a, "scrollTop")), "get scrollTop"),
+            new DomFunction((in a) => SetScrollTop(host, element(in a, "scrollTop"), in a), "set scrollTop"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        target.FastAddProperty((KeyString)"scrollLeft",
+            new DomFunction((in a) => GetScrollLeft(host, element(in a, "scrollLeft")), "get scrollLeft"),
+            new DomFunction((in a) => SetScrollLeft(host, element(in a, "scrollLeft"), in a), "set scrollLeft"),
+            JSPropertyAttributes.EnumerableConfigurableProperty);
+
+        // getBoundingClientRect() — returns DOMRect-like object
+        target.FastAddValue((KeyString)"getBoundingClientRect",
+            new DomFunction((in a) => Rect(host, element(in a, "getBoundingClientRect"), GetBoundingClientRect), "getBoundingClientRect", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        // getClientRects() — returns array with one DOMRect for root elements
+        target.FastAddValue((KeyString)"getClientRects",
+            new DomFunction((in a) => Rect(host, element(in a, "getClientRects"), GetClientRects), "getClientRects", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        target.FastAddValue((KeyString)"scrollIntoView",
+            new DomFunction((in a) => ScrollIntoView(host, element(in a, "scrollIntoView"), in a), "scrollIntoView", 1),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        target.FastAddValue((KeyString)"scroll",
+            new DomFunction((in a) => Scroll(host, element(in a, "scroll"), in a), "scroll", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        target.FastAddValue((KeyString)"scrollTo",
+            new DomFunction((in a) => Scroll(host, element(in a, "scrollTo"), in a), "scrollTo", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+
+        target.FastAddValue((KeyString)"scrollBy",
+            new DomFunction((in a) => ScrollBy(host, element(in a, "scrollBy"), in a), "scrollBy", 2),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+    }
+
+    /// <summary>
+    /// The metrics <c>HTMLElement</c> owns — the <c>offset*</c> family — plus the bridge's own
+    /// <c>scrollParent</c>. Still installed on each wrapper: the first group until
+    /// <c>HTMLElement</c>'s interface moves, and <c>scrollParent</c> because it is on no browser's
+    /// prototype at all.
+    /// </summary>
+    public static void InstallHtmlElementMembers(IElementGeometryHost host, JSObject obj, DomElement element)
+    {
         var isViewportElement = host.IsViewportElementForMetrics(element);
-
-        obj.FastAddProperty((KeyString)"clientTop",
-            new DomFunction((in _) => new JSNumber(host.GetClientTopForDomElement(element)), "get clientTop"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"clientLeft",
-            new DomFunction((in _) => new JSNumber(host.GetClientLeftForDomElement(element)), "get clientLeft"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"clientWidth",
-            new DomFunction((in _) => new JSNumber(host.GetClientWidthForDomElement(element, isViewportElement)), "get clientWidth"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"clientHeight",
-            new DomFunction((in _) => new JSNumber(host.GetClientHeightForDomElement(element, isViewportElement)), "get clientHeight"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetWidth",
             new DomFunction((in _) => new JSNumber(host.GetOffsetWidthForDomElement(element, isViewportElement)), "get offsetWidth"),
@@ -57,24 +116,6 @@ internal static class ElementGeometryBinding
         obj.FastAddProperty((KeyString)"offsetHeight",
             new DomFunction((in _) => new JSNumber(host.GetOffsetHeightForDomElement(element, isViewportElement)), "get offsetHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"scrollWidth",
-            new DomFunction((in _) => new JSNumber(host.GetScrollWidthForDomElement(element, isViewportElement)), "get scrollWidth"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"scrollHeight",
-            new DomFunction((in _) => new JSNumber(host.GetScrollHeightForDomElement(element, isViewportElement)), "get scrollHeight"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"scrollTop",
-            new DomFunction((in _) => GetScrollTop(host, element), "get scrollTop"),
-            new DomFunction((in a) => SetScrollTop(host, element, in a), "set scrollTop"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        obj.FastAddProperty((KeyString)"scrollLeft",
-            new DomFunction((in _) => GetScrollLeft(host, element), "get scrollLeft"),
-            new DomFunction((in a) => SetScrollLeft(host, element, in a), "set scrollLeft"),
-            JSPropertyAttributes.EnumerableConfigurableProperty);
 
         obj.FastAddProperty((KeyString)"offsetTop",
             new DomFunction((in _) => new JSNumber(host.GetOffsetTopForDomElement(element)), "get offsetTop"),
@@ -88,36 +129,19 @@ internal static class ElementGeometryBinding
             new DomFunction((in _) => GetOffsetParent(host, element), "get offsetParent"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // getBoundingClientRect() — returns DOMRect-like object
-        obj.FastAddValue((KeyString)"getBoundingClientRect",
-            new DomFunction((in _) => GetBoundingClientRect(host, element, isViewportElement), "getBoundingClientRect", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // getClientRects() — returns array with one DOMRect for root elements
-        obj.FastAddValue((KeyString)"getClientRects",
-            new DomFunction((in a2) => GetClientRects(host, element, isViewportElement), "getClientRects", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"scrollIntoView",
-            new DomFunction((in a) => ScrollIntoView(host, element, in a), "scrollIntoView", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"scroll",
-            new DomFunction((in a) => Scroll(host, element, in a), "scroll", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"scrollTo",
-            new DomFunction((in a) => Scroll(host, element, in a), "scrollTo", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"scrollBy",
-            new DomFunction((in a) => ScrollBy(host, element, in a), "scrollBy", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
         obj.FastAddValue((KeyString)"scrollParent",
             new DomFunction((in _) => GetScrollParent(host, element), "scrollParent", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
+
+    /// <summary>One metric read, with the viewport test the metrics take resolved for this element.</summary>
+    private static JSValue Metric(IElementGeometryHost host, DomElement element, Func<DomElement, bool, double> read) =>
+        new JSNumber(read(element, host.IsViewportElementForMetrics(element)));
+
+    /// <summary>The same, for the two rect readers.</summary>
+    private static JSValue Rect(IElementGeometryHost host, DomElement element,
+        Func<IElementGeometryHost, DomElement, bool, JSValue> read) =>
+        read(host, element, host.IsViewportElementForMetrics(element));
 
     private static JSValue GetScrollTop(IElementGeometryHost host, DomElement element)
     {

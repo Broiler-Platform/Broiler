@@ -57,6 +57,11 @@ public sealed partial class DomBridge
         // carrying its own copies.
         RegisterCharacterDataInterface();
 
+        // Element's own interface, onto Element.prototype. After the constructors for the same reason,
+        // and after the character-data pass because that one puts Element's three name accessors
+        // (localName/prefix/namespaceURI) on the same prototype.
+        RegisterElementInterface();
+
         // SVGLength interface constants
         RegisterSVGLength(context);
 

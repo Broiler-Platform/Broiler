@@ -9,6 +9,48 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `Element`'s interface lives on `Element.prototype`, where a page can reach it.
+  In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  The prototype carried three members and nothing else, while every element
+  wrapper installed the other 63 as own properties of itself. So
+  `Element.prototype.getAttribute` was `undefined` — and that is not only a
+  shape difference: borrowing a prototype method is what a library does when it
+  cannot trust the instance's own, and `Element.prototype.matches.call(el, sel)`
+  threw instead of answering. The polyfill idiom failed the same way round:
+  assigning to `Element.prototype` reached an object every element shadowed with
+  a copy of the same name.
+
+  The members Web IDL's `Element` declares — with the mixins it includes,
+  `ParentNode`, `ChildNode`, `NonDocumentTypeChildNode`, the CSSOM View box
+  metrics, Fullscreen and `Animatable` — are on the prototype now and find their
+  element from the receiver. An element is down from 140 own properties to 77,
+  `el.getAttribute === Element.prototype.getAttribute` holds, and a receiver that
+  is not an element — a plain object, the document, a text node — is the
+  `TypeError` a browser raises.
+
+  `Element.prototype.replaceChildren` arrived with them: it is the third member
+  of the `ParentNode` mixin beside the `append`/`prepend` that were bound, the
+  document's has been here since that mixin was bound there, and an element's —
+  which is how a page empties a node — threw on an undefined function.
+
+  What stays on each wrapper is what is not `Element`'s: `HTMLElement`'s members,
+  `Node`'s five tree mutations, and the two members no browser puts on
+  `Element.prototype` at all (`removeAttributeNodeNS`, and the bridge's own
+  `scrollParent`).
+
+- A node the page still holds keeps working after `innerHTML` drops it. In the
+  main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  Assigning `innerHTML` unregisters the subtree it replaces, so the registry
+  stops holding wrappers the document has discarded — and it dropped the
+  wrapper→node entry with it, which is the one a member living on an interface
+  prototype reads. A node the page had a reference to then answered its own
+  members and threw `TypeError: Illegal invocation` for every inherited one,
+  where a browser keeps a removed node entirely functional. The reverse map is
+  weakly keyed now and outlives the unregistration, so the node stays reachable
+  for exactly as long as script can still reach the wrapper.
+
 - Three things a `document` answered wrongly, found by checking its `Node`
   members against the prototype's before removing them. In the main repository
   (`Broiler.HtmlBridge.Dom`), so it is live.

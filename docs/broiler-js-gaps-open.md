@@ -194,20 +194,34 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- **The rest of an element's members, and all of a document's, are still own properties of each
-  wrapper.** Character data has moved whole, and an element's `Node` members with it — both are in
+- **`HTMLElement`'s members, `Node`'s tree mutations, and all of a document's, are still own
+  properties of each wrapper.** Character data has moved whole, an element's `Node` members with it,
+  and now `Element`'s own interface — all three are in
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  An element is down from **166** own properties to **140**, and a document is still at **104**,
-  where a browser gives either none.
-  <br>What is left divides into three, and only the first is mechanical:
-  <br>1. **`Element`'s own interface** — `getAttribute`, `querySelector`, `classList` and the rest,
-  spread across some forty binding modules. The receiver-resolution mechanism and the constant-time
-  wrapper→node map exist, so each moves the same way; the interface must land whole so no prototype
-  ends up with a shape no browser has.
-  <br>2. **The per-instance *values*.** Several element members are captured values rather than
-  accessors — `tagName` is a `JSString` fixed when the wrapper is built — and each has to become an
-  accessor before it can move.
-  <br>3. **`textContent`.** An element's is a different operation from a character-data node's, so
+  An element is down from **166** own properties to **77**, and a document is at **96**, where a
+  browser gives either none.
+  <br>What is left divides into four:
+  <br>1. **`HTMLElement`'s interface** — `style`, `dataset`, `innerText`/`outerText`,
+  `title`/`lang`/`dir`/`draggable`/`accessKey`/`hidden`/`tabIndex`, `click`/`focus`/`blur`,
+  `attachInternals`, the `offset*` metrics and the seventeen `on*` handlers. The mechanism is the one
+  `Element` used and the installers are already written against it, so this is the same move again —
+  except for `style` and `dataset`, which are per-instance objects and need the memoization
+  `classList` got.
+  <br>2. **`Node`'s five tree mutations** — `appendChild`, `insertBefore`, `removeChild`,
+  `replaceChild` and `moveBefore` — are still the element's own, and `Node.prototype` has none of
+  them, so `document.createTextNode('x').appendChild` is `undefined` where a browser has a method
+  that throws `HierarchyRequestError`. Moving them is not the mechanical case the others were: the
+  bindings take a `DomElement`, while a document and a fragment carry their own separate
+  implementations that a prototype member would have to route to rather than shadow. The eighteen
+  `Node` constants beside them are pure duplicates of `Node.prototype`'s and can simply go.
+  <br>3. **The per-tag interfaces.** `HTMLInputElement.value`, `HTMLTableElement.rows`,
+  `HTMLFormElement.elements` and the rest are installed per tag on the instance; the globals and
+  their prototype chains all exist, so each has somewhere correct to go. The form-control reflectors
+  are the odd ones: `value`, `checked`, `type`, `name`, `disabled`, `required`, `files`,
+  `checkValidity`, `reportValidity` and `submit` are installed on *every* element, where a browser
+  gives them only to the interfaces that declare them, so moving them is also a decision about
+  dropping them from a `<div>`.
+  <br>4. **`textContent`.** An element's is a different operation from a character-data node's, so
   it stays the element's own and shadows the `Node.prototype` one until there is a single
   implementation that serves both. The document's `Node` members have gone — checking them against
   the prototype's answer is what turned up three spec bugs, all now

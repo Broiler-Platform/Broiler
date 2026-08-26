@@ -157,6 +157,46 @@ internal static class TreeMutationBinding
         return JSUndefined.Value;
     }
 
+    /// <summary>
+    /// DOM §4.2.6 <c>ParentNode.replaceChildren()</c> on an element: remove every existing child,
+    /// then insert the arguments. Called with none, it empties the element.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The wrapper bound <c>append</c> and <c>prepend</c> but not this third member of the same mixin,
+    /// so <c>container.replaceChildren()</c> — the modern way to empty a node, and the reason most
+    /// pages reach for it — threw on an undefined function. The document's counterpart has been here
+    /// since the mixin was bound there (<c>NodeMutationBinding.ReplaceChildren</c>); this is its
+    /// element half, and it mirrors it step for step.
+    /// </para>
+    /// <para>
+    /// The arguments are resolved before anything is removed, because one of them may be a current
+    /// child: clearing first would detach and re-insert it, which reaches the same tree by a different
+    /// set of mutation records.
+    /// </para>
+    /// </remarks>
+    public static JSValue ReplaceChildren(ITreeMutationHost host, DomElement element, in Arguments a)
+    {
+        var nodes = a.Length == 0 ? [] : host.BuildChildNodeArgumentNodes(a);
+
+        for (var index = element.ChildNodes.Count - 1; index >= 0; index--)
+        {
+            var child = DomBridge.ChildAt(element, index);
+            host.NotifyNodeIteratorPreRemoval(child);
+            DomBridge.RemoveNthChild(element, index);
+            DomBridge.SetParent(child, null);
+            host.NotifyChildRemoved(element, child, index, null, null);
+        }
+
+        host.InvalidateStyleScope(element);
+
+        var insertIndex = 0;
+        foreach (var node in nodes)
+            host.InsertNodeAt(element, node, insertIndex++);
+
+        return JSUndefined.Value;
+    }
+
     public static JSValue RemoveChild(ITreeMutationHost host, DomElement element, in Arguments a)
     {
         if (a.Length == 0)

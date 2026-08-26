@@ -257,24 +257,27 @@ public sealed class DomInterfacePrototypeTests
     }
 
     /// <summary>
-    /// Linking the prototype must not change what an element *owns*. The bindings still install every
-    /// member as an own property, so this is what confirms the link added inheritance without moving
-    /// anything — and that <c>for...in</c> gained nothing, since a prototype's <c>constructor</c> is
+    /// The link itself, and what it now carries. When this test was written the bindings still
+    /// installed every member as an own property, so it pinned <c>tagName</c> as the element's own to
+    /// confirm the link had added inheritance without moving anything. <c>Element</c>'s interface has
+    /// since moved onto <c>Element.prototype</c> (<c>ElementInterfacePrototypeTests</c>), so
+    /// <c>tagName</c> is inherited — which is what the link was for. What this still pins is the link,
+    /// and that <c>for...in</c> gained nothing from it: a prototype's <c>constructor</c> is
     /// non-enumerable and setPrototypeOf preserved it.
     /// </summary>
     [Fact(Timeout = 600000)]
-    public void Linking_The_Prototype_Does_Not_Change_What_An_Element_Owns()
+    public void LinkingThePrototypeIsWhatCarriesTheInterfaceToAnElement()
     {
         using var bridge = Attach(out var context);
 
-        Assert.Equal("true|true|false", Eval(context, """
+        Assert.Equal("false|DIV|true|false", Eval(context, """
             (() => {
                 var d = document.getElementById('a');
                 var ownsTagName = Object.prototype.hasOwnProperty.call(d, 'tagName');
                 var protoIsInterface = Object.getPrototypeOf(d) === HTMLDivElement.prototype;
                 var enumeratesConstructor = false;
                 for (var k in d) { if (k === 'constructor') enumeratesConstructor = true; }
-                return ownsTagName + '|' + protoIsInterface + '|' + enumeratesConstructor;
+                return ownsTagName + '|' + d.tagName + '|' + protoIsInterface + '|' + enumeratesConstructor;
             })()
             """));
     }

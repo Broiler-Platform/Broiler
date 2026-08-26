@@ -88,29 +88,21 @@ public sealed partial class DomBridge
 
         var bridge = this;
 
-        obj.FastAddValue((KeyString)"tagName",
-            new JSString(string.IsNullOrEmpty(element.NamespaceUri) ||
-                string.Equals(element.NamespaceUri, "http://www.w3.org/1999/xhtml", StringComparison.OrdinalIgnoreCase)
-                    ? element.TagName.ToUpperInvariant()
-                    : element.TagName),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // Element's whole interface — tagName, id/className, the attribute surface, classList,
+        // innerHTML/outerHTML, the shadow-host pair, the ParentNode/ChildNode/element-sibling members,
+        // the selector lookups, the box metrics, requestFullscreen and animate — lives on
+        // Element.prototype and this wrapper inherits it (DomBridge.ElementInterface.cs). A wrapper
+        // minted before the realm carried the interfaces inherits nothing and installs its own, from
+        // the same installer, so the two shapes cannot drift.
+        if (!_elementInterfacePrototypeReady)
+            PopulateElementInterfaceOnInstance(obj, element);
 
-        // HTMLElement global content-attribute reflectors (id, className, title, lang, accessKey, dir,
-        // draggable) — Phase 3 P3.54: extracted into the co-located GlobalAttributeBinding feature module.
-        // The selector-affecting three (id/className/dir) invalidate the style scope on write through the
-        // one-member IGlobalAttributeHost contract (DomBridge.GlobalAttributeHost.cs).
-        Dom.Features.GlobalAttributeBinding.Install(this, obj, element);
-
-        // innerHTML / outerHTML (read/write) — Phase 3 P3.57: extracted into the co-located
-        // ElementContentBinding feature module (reached through IElementContentHost;
-        // DomBridge.ElementContentHost.cs). Split around shadowRoot to preserve property order.
-        Dom.Features.ElementContentBinding.InstallHtmlSerialization(this, obj, element);
-
-        // shadowRoot (read-only) — Phase 3 P3.62: co-located ShadowDomBinding feature module, reached
-        // through IShadowDomHost (DomBridge.ShadowDomHost.cs).
-        obj.FastAddProperty((KeyString)"shadowRoot",
-            new DomFunction((in _) => Dom.Features.ShadowDomBinding.GetShadowRoot(this, element, in _), "get shadowRoot"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        // The global content-attribute reflectors HTMLElement owns (title, lang, accessKey, dir,
+        // draggable) — Phase 3 P3.54: extracted into the co-located GlobalAttributeBinding feature
+        // module. dir invalidates the style scope on write through the one-member IGlobalAttributeHost
+        // contract (DomBridge.GlobalAttributeHost.cs); id and className are Element's and are on its
+        // prototype.
+        Dom.Features.GlobalAttributeBinding.InstallHtmlElementMembers(this, obj, element);
 
         // textContent (read/write) + innerText / outerText (read) — Phase 3 P3.57: ElementContentBinding.
         Dom.Features.ElementContentBinding.InstallTextContent(this, obj, element);
@@ -140,11 +132,6 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.StyleDeclarationBinding.SetInlineStyleCssText(bridge, element, OnStyleMutation, in a), "set style"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        // classList — class list manipulation (Phase 3 P3.6: co-located ClassListBinding module)
-        obj.FastAddValue((KeyString)"classList",
-            Dom.Features.ClassListBinding.Build(element, bridge.InvalidateStyleScope),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
         // dataset — the live DOMStringMap over the element's data-* attributes.
         //
         // Built on first read rather than with the rest of the element: a document has thousands of
@@ -169,30 +156,6 @@ public sealed partial class DomBridge
                 return dataset;
             }, "get dataset"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // attributes — NamedNodeMap interface
-        obj.FastAddProperty((KeyString)"attributes",
-            new DomFunction((in _) => _attributes.BuildNamedNodeMap(element, obj), "get attributes"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // setAttribute(name, value)
-        var bridgeForSet = this;
-        obj.FastAddValue((KeyString)"setAttribute",
-            new DomFunction((in a) => _attributes.SetAttribute(element, in a), "setAttribute", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // getAttribute(name)
-        obj.FastAddValue((KeyString)"getAttribute",
-            new DomFunction((in a) => _attributes.GetAttribute(element, in a), "getAttribute", 1),
-             JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"getAttributeNode",
-            new DomFunction((in a) => _attributes.GetAttributeNode(element, obj, in a), "getAttributeNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"getAttributeNodeNS",
-            new DomFunction((in a) => _attributes.GetAttributeNodeNS(element, obj, in a), "getAttributeNodeNS", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM tree navigation --
 
@@ -246,65 +209,12 @@ public sealed partial class DomBridge
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
-        // hasAttribute(name)
-        obj.FastAddValue((KeyString)"hasAttribute",
-            new DomFunction((in a) => _attributes.HasAttribute(element, in a), "hasAttribute", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // hasAttributes()
-        obj.FastAddValue((KeyString)"hasAttributes",
-            new DomFunction((in _) => element.Attributes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasAttributes", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // getAttributeNames()
-        obj.FastAddValue((KeyString)"getAttributeNames",
-            new DomFunction((in _) => new JSArray([.. AttributeNames(element).Select(static name => (JSValue)new JSString(name))]), "getAttributeNames", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // removeAttribute(name)
-        obj.FastAddValue((KeyString)"removeAttribute",
-            new DomFunction((in a) => _attributes.RemoveAttribute(element, in a), "removeAttribute", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // toggleAttribute(name, force)
-        obj.FastAddValue((KeyString)"toggleAttribute",
-            new DomFunction((in a) => _attributes.ToggleAttribute(element, in a), "toggleAttribute", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"setAttributeNode",
-            new DomFunction((in a) => _attributes.SetAttributeNode(element, obj, in a), "setAttributeNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"setAttributeNodeNS",
-            new DomFunction((in a) => _attributes.SetAttributeNodeNS(element, obj, in a), "setAttributeNodeNS", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"removeAttributeNode",
-            new DomFunction((in a) => _attributes.RemoveAttributeNode(element, obj, in a), "removeAttributeNode", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
+        // removeAttributeNodeNS(attr) — the one attribute member that stays the wrapper's own. DOM
+        // §4.9 pairs setAttributeNode with setAttributeNodeNS but gives removeAttributeNode no
+        // namespace-qualified sibling (an Attr already knows its namespace), so no browser has one and
+        // putting it on Element.prototype would give that prototype a member a browser's has not got.
         obj.FastAddValue((KeyString)"removeAttributeNodeNS",
             new DomFunction((in a) => _attributes.RemoveAttributeNodeNS(element, obj, in a), "removeAttributeNodeNS", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // setAttributeNS(namespace, qualifiedName, value)
-        obj.FastAddValue((KeyString)"setAttributeNS",
-            new DomFunction((in a) => _attributes.SetAttributeNS(element, in a), "setAttributeNS", 3),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // getAttributeNS(namespace, localName)
-        obj.FastAddValue((KeyString)"getAttributeNS",
-            new DomFunction((in a) => _attributes.GetAttributeNS(element, in a), "getAttributeNS", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // removeAttributeNS(namespace, localName)
-        obj.FastAddValue((KeyString)"removeAttributeNS",
-            new DomFunction((in a) => _attributes.RemoveAttributeNS(element, in a), "removeAttributeNS", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // hasAttributeNS(namespace, localName)
-        obj.FastAddValue((KeyString)"hasAttributeNS",
-            new DomFunction((in a) => _attributes.HasAttributeNS(element, in a), "hasAttributeNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // insertBefore(newChild, refChild)
@@ -316,36 +226,6 @@ public sealed partial class DomBridge
         obj.FastAddValue((KeyString)"moveBefore",
             new DomFunction((in a) => Dom.Features.TreeMutationBinding.MoveBefore(this, element, in a), "moveBefore", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // children (read-only) — element children only (no text nodes)
-        obj.FastAddProperty((KeyString)"children",
-            new DomFunction((in a) => Dom.Features.ElementTraversalBinding.GetChildren(this, element, in a), "get children"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // childElementCount (read-only)
-        obj.FastAddProperty((KeyString)"childElementCount",
-            new DomFunction((in a) => new JSNumber(ChildElements(element).Count(c => !IsText(c))), "get childElementCount"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // firstElementChild (read-only)
-        obj.FastAddProperty((KeyString)"firstElementChild",
-            new DomFunction((in a) => Dom.Features.ElementTraversalBinding.GetFirstElementChild(this, element, in a), "get firstElementChild"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // lastElementChild (read-only)
-        obj.FastAddProperty((KeyString)"lastElementChild",
-            new DomFunction((in a) => Dom.Features.ElementTraversalBinding.GetLastElementChild(this, element, in a), "get lastElementChild"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // nextElementSibling (read-only)
-        obj.FastAddProperty((KeyString)"nextElementSibling",
-            new DomFunction((in a) => Dom.Features.ElementTraversalBinding.GetNextElementSibling(this, element, in a), "get nextElementSibling"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
-
-        // previousElementSibling (read-only)
-        obj.FastAddProperty((KeyString)"previousElementSibling",
-            new DomFunction((in a) => Dom.Features.ElementTraversalBinding.GetPreviousElementSibling(this, element, in a), "get previousElementSibling"),
-            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // -- DOM manipulation methods --
 
@@ -360,11 +240,6 @@ public sealed partial class DomBridge
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
-        // attachShadow(init) — Phase 3 P3.62: co-located ShadowDomBinding feature module.
-        obj.FastAddValue((KeyString)"attachShadow",
-            new DomFunction((in a) => Dom.Features.ShadowDomBinding.AttachShadow(this, element, in a), "attachShadow", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
         // attachInternals() — form-associated custom elements (HTML §4.13.5). On every element
         // rather than only the custom ones, because that is where a browser puts it: it is a member
         // of HTMLElement, and it refuses at call time for an element that is not a custom element.
@@ -378,14 +253,6 @@ public sealed partial class DomBridge
             new DomFunction((in a) => Dom.Features.TreeMutationBinding.AppendChild(this, element, in a), "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"append",
-            new DomFunction((in a) => Dom.Features.TreeMutationBinding.Append(this, element, in a), "append", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"prepend",
-            new DomFunction((in a) => Dom.Features.TreeMutationBinding.Prepend(this, element, in a), "prepend", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
         // removeChild(child)
         obj.FastAddValue((KeyString)"removeChild",
             new DomFunction((in a) => Dom.Features.TreeMutationBinding.RemoveChild(this, element, in a), "removeChild", 1),
@@ -394,23 +261,6 @@ public sealed partial class DomBridge
         // replaceChild(newChild, oldChild)
         obj.FastAddValue((KeyString)"replaceChild",
             new DomFunction((in a) => Dom.Features.TreeMutationBinding.ReplaceChild(this, element, in a), "replaceChild", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // remove() — ChildNode.remove() per DOM Living Standard
-        obj.FastAddValue((KeyString)"remove",
-            new DomFunction((in a) => Dom.Features.ChildNodeBinding.Remove(this, element, in a), "remove", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"before",
-            new DomFunction((in a) => Dom.Features.ChildNodeBinding.Before(this, element, in a), "before", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"after",
-            new DomFunction((in a) => Dom.Features.ChildNodeBinding.After(this, element, in a), "after", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"replaceWith",
-            new DomFunction((in a) => Dom.Features.ChildNodeBinding.ReplaceWith(this, element, in a), "replaceWith", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // -- DOM events --
@@ -482,41 +332,6 @@ public sealed partial class DomBridge
         // reached through IFormSubmitHost; DomBridge.FormSubmitHost.cs).
         obj.FastAddValue((KeyString)"submit",
             new DomFunction((in a) => Dom.Features.FormSubmitBinding.Submit(this, element, obj, in a), "submit", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // querySelector on elements
-        obj.FastAddValue((KeyString)"querySelector",
-            new DomFunction((in a) => Dom.Features.SelectorsBinding.QuerySelector(this, element, in a), "querySelector", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // querySelectorAll on elements
-        obj.FastAddValue((KeyString)"querySelectorAll",
-            new DomFunction((in a) => Dom.Features.SelectorsBinding.QuerySelectorAll(this, element, in a), "querySelectorAll", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"matches",
-            new DomFunction((in a) => Dom.Features.SelectorsBinding.Matches(this, element, in a), "matches", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        obj.FastAddValue((KeyString)"closest",
-            new DomFunction((in a) => Dom.Features.SelectorsBinding.Closest(this, element, in a), "closest", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // insertAdjacentElement / insertAdjacentText / insertAdjacentHTML — Phase 3 P3.56: extracted into
-        // the co-located InsertAdjacentBinding feature module (reached through IInsertAdjacentHost;
-        // DomBridge.InsertAdjacentHost.cs).
-        Dom.Features.InsertAdjacentBinding.Install(this, obj, element);
-
-        // getElementsByTagName on elements — searches descendants in tree order
-        obj.FastAddValue((KeyString)"getElementsByTagName",
-            new DomFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByTagName(this, element, in a), "getElementsByTagName", 1),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        // getElementsByClassName on elements — the same descendant search by class. DOM §4.9 puts it on
-        // Element as well as Document, and only the document half was here; scoping a class lookup to a
-        // container is how pages narrow a search, so its absence threw rather than merely finding nothing.
-        obj.FastAddValue((KeyString)"getElementsByClassName",
-            new DomFunction((in a) => Dom.Features.SelectorsBinding.GetElementsByClassName(this, element, in a), "getElementsByClassName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getContext(contextType) — for <canvas> elements. Phase 3 P3.64: extracted into the co-located

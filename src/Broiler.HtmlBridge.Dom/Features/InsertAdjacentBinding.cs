@@ -20,19 +20,22 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class InsertAdjacentBinding
 {
-    /// <summary>Installs the insertAdjacent* methods on <paramref name="obj"/>.</summary>
-    public static void Install(IInsertAdjacentHost host, JSObject obj, DomElement element)
+    /// <summary>
+    /// Installs the insertAdjacent* methods on <paramref name="target"/>. All three are
+    /// <c>Element</c>'s, so that is <c>Element.prototype</c>.
+    /// </summary>
+    public static void Install(IInsertAdjacentHost host, JSObject target, ElementSource element)
     {
-        obj.FastAddValue((KeyString)"insertAdjacentElement",
-            new DomFunction((in a) => InsertAdjacentElement(host, element, in a), "insertAdjacentElement", 2),
+        target.FastAddValue((KeyString)"insertAdjacentElement",
+            new DomFunction((in a) => InsertAdjacentElement(host, element(in a, "insertAdjacentElement"), in a), "insertAdjacentElement", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"insertAdjacentText",
-            new DomFunction((in a) => InsertAdjacentText(host, element, in a), "insertAdjacentText", 2),
+        target.FastAddValue((KeyString)"insertAdjacentText",
+            new DomFunction((in a) => InsertAdjacentText(host, element(in a, "insertAdjacentText"), in a), "insertAdjacentText", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        obj.FastAddValue((KeyString)"insertAdjacentHTML",
-            new DomFunction((in a) => InsertAdjacentHtml(host, element, in a), "insertAdjacentHTML", 2),
+        target.FastAddValue((KeyString)"insertAdjacentHTML",
+            new DomFunction((in a) => InsertAdjacentHtml(host, element(in a, "insertAdjacentHTML"), in a), "insertAdjacentHTML", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
