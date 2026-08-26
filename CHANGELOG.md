@@ -9,6 +9,33 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Import attributes are enforced rather than parsed and dropped. Delivered as
+  `patches/0004-js-import-attribute-enforcement.patch` against `Broiler.JS`,
+  so it is **not live until the patch is applied**.
+
+  `with { type: 'json' }` — the portable form, and the only one a browser
+  accepts on a JSON module — was accepted and ignored, and so was
+  `with { flavour: 'nonsense' }`. Nothing read the parsed attributes, the
+  `export … from` forms discarded theirs, and the loader was passed only the
+  specifier.
+
+  An unknown attribute key and a duplicate key are now early `SyntaxError`s on
+  a static declaration, where the keys are literals. An unknown module type,
+  and a `type` that does not match the module it resolves to, are load-time
+  `TypeError`s, because only the module can settle them. A dynamic `import()`
+  reports both as `TypeError`s, since its keys are a runtime value — and it
+  now validates its options object properly (the options an object, `with` an
+  object, every value a string). Each error kind and message matches a browser.
+
+  `type: 'css'` is reported as a module type this engine does not implement
+  rather than as a typo, so a page can tell the two apart.
+
+  One divergence is deliberate: a `.json` module imported with no attribute
+  still loads. On the web the attribute defends against a server returning
+  JSON where script was expected, which cannot arise in a host whose locally
+  resolved key is itself the type — and the same host serves `require`, which
+  has no attributes at all.
+
 - `import d from './data.json'` is the parsed value rather than `undefined`.
   Delivered as `patches/0002-js-json-module-default-export.patch` against
   `Broiler.JS`, so it is **not live until the patch is applied**.

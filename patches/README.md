@@ -26,10 +26,21 @@ cd ..
 git add <Submodule>           # bump the pointer only after the push succeeds
 ```
 
-The numbering is an ordering hint, not a dependency: each patch below applies to the pinned pointer
-on its own. They were also verified as a series — `git am` of `0001`, `0002`, `0003` in that order
-against `ab5f797a` — and the engine suites were run on the resulting stack, so applying all three is
-a tested path rather than an assumed one.
+**Apply them in numeric order.** `0001`–`0003` are independent and each applies to the pinned pointer
+on its own; `0004` is not — it extends a signature `0002` introduces and shares a file with `0003`,
+and its entry says so. The four were verified as a series: `git am` of `0001`…`0004` in order against
+`ab5f797a`, then the engine suites on the resulting stack. Applying all four is a tested path rather
+than an assumed one.
+
+### If `git am` reports "patch does not apply" but `git apply --check` passes
+
+That combination means line endings, not a real conflict. `git am` strips CR from the mail body, so
+a hunk touching one of the repository's **mixed CRLF/LF** files (`FastCompiler.VisitImportStatement.cs`
+is one) stops matching. `git am --keep-cr` applies it. None of the patches here needs that today —
+each was rebuilt so it does not rewrite any file's line endings — but it is the first thing to check
+rather than hand-editing a patch. The same hazard is why a patch should be inspected with
+`git show --stat` before it ships: a two-line change reported as two thousand is an editor having
+normalized the file, not a diff.
 
 ---
 
@@ -160,3 +171,53 @@ additional load-sensitive worker-budget test that passes 3/3 in isolation on bot
 
 **Main-repo fallback:** none needed. Without the patch `import.meta` stays the deterministic
 SyntaxError it was.
+
+---
+
+## `0004-js-import-attribute-enforcement.patch`
+
+- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Parser/FastParser.Import.cs` and
+  `FastParser.Export.cs`, `Broiler.JavaScript.Ast/Statements/AstExportStatement.cs`,
+  `Broiler.JavaScript.Compiler/Statements/FastCompiler.VisitImportStatement.cs` and
+  `FastCompiler.VisitExportStatement.cs`, `Broiler.JavaScript.Modules/JSModuleContext.cs`, plus the
+  new `Broiler.JavaScript.Modules.Tests/ImportAttributeEnforcementTests.cs` and an update to
+  `ModuleAttributeClauseTests.cs`)
+- **Subject:** *Enforce import attributes instead of parsing and dropping them*
+- **Based on:** `ab5f797a` **plus `0002` and `0003`** — see *Ordering* below
+
+Import attributes parsed everywhere the grammar allows and nothing acted on them: nothing read
+`AstImportStatement.Attributes`, the three `export … from` forms discarded theirs outright, and the
+compiler's call to the loader passed only the specifier. `with { type: 'json' }` — the portable
+form, and the only one a browser accepts on a JSON module — was accepted and ignored, and so was
+`with { flavour: 'nonsense' }`.
+
+**Where each failure is raised is measured from Chromium, and the split is principled.** On a static
+declaration the keys are literals, so an unknown key and a duplicate key are early **SyntaxError**s,
+decided in the parser. Whether the `type` *value* names a module type, and whether the module it
+resolves to is of that type, depends on the module — both are load-time **TypeError**s from the
+host. A dynamic `import()`'s keys are a runtime value, so it reports both as TypeErrors. Every
+message is Chromium's own.
+
+The type/module match is the one rule this host cannot implement the way the web does: a browser
+checks the assertion against the response MIME type, and there are no MIME types here, so it checks
+the resolved module key — the same fact by the only means available, and the one that already
+decided the module would be parsed as JSON. `css` is told apart from a typo: a real module type this
+engine does not implement, reported as such.
+
+**Deliberate divergence, pinned by a test:** a `.json` module imported with *no* attribute still
+loads, where a browser rejects it. There the attribute defends against a server returning JSON where
+script was expected — a mismatch that cannot arise in a host whose locally resolved key is itself the
+type — and this context also serves `require`, which has no attributes at all.
+
+33 regressions in `ImportAttributeEnforcementTests`, 23 of which fail before the change; each
+error-name assertion goes through a dynamic import so the JS-visible *name*, not just the message, is
+pinned. `ModuleAttributeClauseTests` keeps every grammar case it pinned, retargeted: it was written
+against `with { type: 'javascript' }`, which is not a module type any platform defines and which
+enforcement now correctly rejects.
+
+**Ordering.** This is the one patch in the backlog with a real dependency: it extends
+`LoadModuleAsync`'s signature and reuses `IsJsonModule`, both of which `0002` introduces, and it
+shares `JSModuleContext.cs` with `0003`. It was generated on top of `0001`–`0003` and the four apply
+in numeric order with plain `git am`, verified.
+
+**Main-repo fallback:** none needed. Without the patch, attributes stay parsed and ignored.

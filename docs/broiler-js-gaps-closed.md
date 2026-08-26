@@ -453,6 +453,41 @@ The part-landed half of track 3. Live import bindings, the remaining defect of t
 family, are characterized but not fixed and stay in
 [in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
 
+- **Import attributes parse but nothing acts on them.** **Decided and implemented — delivered as a
+  submodule patch, so it is not live in CI.** Nothing read `AstImportStatement.Attributes`, the three
+  `export … from` forms discarded theirs outright, and the compiler's call to the loader passed only
+  the specifier. So `with { type: 'json' }` — the portable form, and the only one a browser accepts
+  on a JSON module — was accepted and ignored, and so was `with { flavour: 'nonsense' }`.
+  <br>**Where each failure is raised was measured from Chromium, and the split is principled.** On a
+  static declaration the keys are literals, so an unknown key and a duplicate key are early
+  **SyntaxError**s, decided in the parser. Whether the `type` *value* names a module type, and
+  whether the module it resolves to is of that type, depends on the module, so both are load-time
+  **TypeError**s from the host. A dynamic `import()`'s keys are a runtime value, so it reports both
+  as TypeErrors — which is what Chromium does. Every message is Chromium's own.
+  <br>Attributes reach the host in two shapes through one validation path: a dynamic import's
+  runtime options object (validated in full — options an object, `with` an object, every value a
+  string), and a static clause as a flat array of alternating key/value strings, flat because every
+  part of it is a literal the grammar already fixed and in source order so the *first* offending key
+  is the one reported. `export … from` carries its clause through `AstExportStatement` to the same
+  place, so all three forms are enforced like the import they perform.
+  <br>**The type/module match is the one rule this host cannot implement the way the web does.** A
+  browser checks the assertion against the response MIME type; there are none here, so it checks the
+  resolved module key — the same fact by the only means available, and the one that already decided
+  the module would be parsed as JSON, so the check and the parse cannot disagree. `css` is told apart
+  from a typo: a real module type this engine does not implement, reported as such, so a page can
+  distinguish "not implemented here" from "not a thing".
+  <br>**Deliberate divergence, pinned by a test and still open as a decision:** a `.json` module
+  imported with *no* attribute loads. See
+  [open](broiler-js-gaps-open.md#needs-a-product-decision).
+  <br>**Evidence.** 33 regressions in `ImportAttributeEnforcementTests`, 23 of which fail before the
+  change; each error-name assertion goes through a dynamic import so the JS-visible *name*, not just
+  the message, is pinned. `ModuleAttributeClauseTests` keeps every grammar case it pinned, retargeted
+  — it was written against `with { type: 'javascript' }`, which is not a module type any platform
+  defines and which enforcement now correctly rejects. Modules 160/160, parser 198/198, integration
+  5178/5179, compiler 1400/1402, built-ins 2215/2215.
+  <br>**Not live.** Ships as `patches/`'s *Enforce import attributes instead of parsing and dropping
+  them*, the one patch in the backlog with a real ordering dependency — it extends a signature the
+  JSON-module patch introduces.
 - **`import.meta` is a SyntaxError.** **Decided and implemented — delivered as a submodule patch, so
   it is not live in CI.** "import.meta not supported" came from the compiler's meta-property path,
   which handled only `new.target`; deterministic rather than a crash, so it was carried as a

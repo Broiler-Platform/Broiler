@@ -71,20 +71,17 @@ below is host semantics and two decisions.
   anything is at it. Building it on today's resolver would throw where a browser answers. Making
   the resolver able to answer without loading is the change that would unblock it, and it is
   shared with anything else that needs to resolve without fetching.
-- **Import-attribute enforcement.** Import attributes now parse everywhere the grammar allows, but
-  nothing acts on them: nothing reads `AstImportStatement.Attributes`, and the compiler's `import`
-  call passes only the specifier, so enforcing anything means threading the attributes through to
-  the host first. Rejecting a module whose type does not match its attribute is a separate
-  capability.
-  <br>What changed under it: JSON modules now work (see
-  [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics)), so
-  `import d from './data.json' with { type: 'json' }` — the portable form, and the only one a
-  browser accepts — is now a *correct* import whose attribute is ignored rather than a broken one.
-  That makes the decision narrower than it looks, and it has three parts: whether an attribute that
-  is present is honoured (a `type` that does not match the resolved module rejects), whether an
-  absent attribute on a JSON import is rejected the way the web does, and what an unknown key or an
-  unknown type does. The middle one is the only one that would take a working import away, and the
-  engine serves CommonJS from the same host, where no attribute is expected at all.
+- **Requiring an import attribute on a JSON module** — the one part of attribute enforcement left
+  open, and deliberately. Enforcement is otherwise done and is in
+  [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics): an unknown key and a
+  duplicate key are early SyntaxErrors, an unknown module type and a `type` that does not match the
+  resolved module are load-time TypeErrors. What is *not* enforced is the converse — a `.json`
+  module imported with no attribute at all loads here, where a browser rejects it.
+  <br>The argument for leaving it is written up with the fix: on the web the attribute defends
+  against a server returning JSON where script was expected, a mismatch that cannot arise in a host
+  whose locally resolved key is itself the type, and this context serves `require` from the same
+  place, where no attribute exists at all. The argument against is portability — source that works
+  here and not in a browser. It is pinned by a test either way, so changing it is a decision.
 
 ### Actions
 
