@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > **closed** · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-25**. Every **fixed** entry names where it landed — the
+> Statuses were last reconciled on **2026-08-26**. Every **fixed** entry names where it landed — the
 > pinned `Broiler.JS` commit, or the main-repo component for a host/DOM fix — and the regression that
 > holds it.
 
@@ -1128,8 +1128,11 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   `CustomElementsTests`.
   <br>**Left out deliberately, and not faked:** customized built-ins (`extends`/`is=`), which
   `define` rejected rather than accepting and ignoring; form-associated custom elements; and
-  `adoptedCallback`. The first and third have since landed, below; form association is what remains
-  in [open](broiler-js-gaps-open.md#custom-elements-templates-and-shadow-dom).
+  `adoptedCallback`. All three have since landed, below — form association among them, so nothing
+  from this list is still open. The one reaction that never fires is `formStateRestoreCallback`, and
+  deliberately: it reports a value restored by session history or an autofill pass, and this engine
+  performs neither. See [open](broiler-js-gaps-open.md#templates-and-shadow-dom), which carries only
+  the synthetic-shadow-tree remainder.
 - **Customized built-in elements and `adoptedCallback`.** `define` rejected an `extends` option with
   a `NotSupportedError`, so `class Fancy extends HTMLButtonElement` — the idiom for keeping a native
   control's behaviour and adding to it — lost its component at the `define` call, which takes the

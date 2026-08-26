@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · [open](broiler-js-gaps-open.md) · [in progress](broiler-js-gaps-in-progress.md) · **won't fix**.
-> Statuses were last reconciled on **2026-08-25**.
+> Statuses were last reconciled on **2026-08-26**.
 
 Records that look like open gaps and are not. Some are already landed and only older Markdown
 still calls them pending; some are deliberate product or profile boundaries; one is a deliberate

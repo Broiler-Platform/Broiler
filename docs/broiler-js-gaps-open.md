@@ -2,7 +2,7 @@
 
 > Part of the [Broiler.JS gaps](broiler-js-gaps-roadmap.md) set:
 > [closed](broiler-js-gaps-closed.md) · **open** · [in progress](broiler-js-gaps-in-progress.md) · [won't fix](broiler-js-gaps-wont-fix.md).
-> Statuses were last reconciled on **2026-08-25**.
+> Statuses were last reconciled on **2026-08-26**.
 
 Gaps that are real and not started, plus the surfaces that need an explicit product decision
 before anything can be built. Work that is part-landed with named remaining steps lives in
