@@ -9,6 +9,26 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- An element inherits its `Node` members from `Node.prototype` instead of
+  carrying a copy of each. In the main repository (`Broiler.HtmlBridge.Dom`), so
+  it is live.
+
+  The members were already on `Node.prototype` — the character-data interface
+  move put them there — but an element shadowed every one with an own copy, so
+  `Object.prototype.hasOwnProperty.call(element, 'childNodes')` was `true` and
+  the prototype's copy was dead for every element in the document. Each copy was
+  a byte-identical call to the same binding the prototype's makes, checked one
+  by one, so deleting them changes nothing but where the members live. An
+  element is down from 166 own properties to 140.
+
+  `textContent` is deliberately not among them: an element's is a different
+  operation from a character-data node's — it reads the descendants' text and
+  writing it replaces every child with one text node — so it stays the element's
+  own and shadows the `Node.prototype` one. The document keeps all of its `Node`
+  members too, because unlike the element's they are separate implementations
+  rather than copies, and each needs checking against the prototype's answer
+  before it can go.
+
 - `EventTarget.prototype`'s `addEventListener`, `removeEventListener` and
   `dispatchEvent` work on a DOM node, and are the one function every receiver
   uses. In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.

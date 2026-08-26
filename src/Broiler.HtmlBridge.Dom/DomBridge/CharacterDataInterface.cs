@@ -38,10 +38,17 @@ namespace Broiler.HtmlBridge;
 /// inherit it.
 /// </para>
 /// <para>
-/// <b>Elements and documents are untouched.</b> They keep their own-property surface, so the members
-/// installed on <c>Node.prototype</c> here are shadowed for them and nothing about them changes.
-/// Moving those is the rest of the item — an element carries 166 own properties across some forty
-/// binding modules — and it is what this makes mechanical rather than novel.
+/// <b>An element inherits the <c>Node.prototype</c> members installed here too.</b> It shadowed
+/// every one with a byte-identical copy of its own; those copies are gone, so the prototype is where
+/// they live for an element as well — see <c>PopulateElementNodeMembersOnInstance</c>, which is now
+/// only the pre-realm fallback. <c>textContent</c> is the exception and stays the element's own: an
+/// element's is a different operation from a character-data node's.
+/// </para>
+/// <para>
+/// A document still keeps its own. Its <c>Node</c> members are separate implementations rather than
+/// copies — <c>nodeType</c> is a literal <c>9</c>, <c>childNodes</c> a different binding — so each
+/// has to be checked against the prototype's answer rather than deleted, which is its own piece of
+/// work. The rest of <c>Element</c>'s surface is the larger remainder.
 /// </para>
 /// <para>
 /// <b>The three <c>EventTarget</c> members are not here, and not on the instance either.</b> They
@@ -56,8 +63,9 @@ namespace Broiler.HtmlBridge;
 public sealed partial class DomBridge
 {
     /// <summary>
-    /// Whether the character-data interface prototypes carry their members yet, which is what lets a
-    /// wrapper stop installing them.
+    /// Whether the node interface prototypes carry their members yet, which is what lets a wrapper
+    /// stop installing them — a character-data wrapper its whole interface, an element the <c>Node</c>
+    /// members it used to duplicate.
     /// </summary>
     /// <remarks>
     /// A wrapper minted before the realm is up has no prototype to inherit from —
@@ -65,7 +73,7 @@ public sealed partial class DomBridge
     /// exactly as before. Without that fallback such a node would have neither, and the shape it gets
     /// is the old one rather than a broken one.
     /// </remarks>
-    private bool _characterDataInterfaceReady;
+    private bool _nodeInterfacePrototypesReady;
 
     /// <summary>
     /// Installs the <c>Node</c>, <c>CharacterData</c> and <c>Text</c> members a character-data node
@@ -88,7 +96,7 @@ public sealed partial class DomBridge
             (in Arguments a) => Dom.Features.CharacterDataBinding.SplitText(
                 this, RequireNode(in a, "Text", "splitText"), in a));
 
-        _characterDataInterfaceReady = true;
+        _nodeInterfacePrototypesReady = true;
     }
 
     /// <summary>The prototype object of a registered interface global, if the realm has one.</summary>

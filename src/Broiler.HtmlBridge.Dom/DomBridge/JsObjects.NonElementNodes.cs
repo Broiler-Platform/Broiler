@@ -44,7 +44,7 @@ public sealed partial class DomBridge
         // ApplyInterfacePrototype linked nothing and there is no prototype to inherit from. Then the
         // members go on the instance exactly as they always did, which is the old shape rather than
         // a broken one.
-        if (!_characterDataInterfaceReady)
+        if (!_nodeInterfacePrototypesReady)
             PopulateCharacterDataMembersOnInstance(obj, node);
 
         // addEventListener / removeEventListener / dispatchEvent are on EventTarget.prototype,

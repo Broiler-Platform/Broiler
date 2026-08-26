@@ -178,18 +178,25 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- **An element's and a document's members are still own properties of each wrapper.** Character data
-  has moved — a text or comment node's `Node`, `CharacterData` and `Text` members are on the
-  interface prototypes, so `Text.prototype.splitText` is a function and an instance carries none of
-  them; see [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  What is left is the larger half: an element carries **166** own properties and a document **104**,
-  spread across some forty binding modules, so `Object.getOwnPropertyNames(element)` still lists the
-  whole interface. The work is now mechanical rather than novel — the receiver-resolution mechanism
-  and the constant-time wrapper→node map exist, and each interface moves the same way — but it is
-  large, and each interface must land whole so no prototype ends up with a shape no browser has.
-  <br>`Element` also has a question character data did not raise: several of its members are
-  per-instance *values* rather than accessors (`tagName` is a captured `JSString`), and those have to
-  become accessors before they can move.
+- **The rest of an element's members, and all of a document's, are still own properties of each
+  wrapper.** Character data has moved whole, and an element's `Node` members with it — both are in
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  An element is down from **166** own properties to **140**, and a document is still at **104**,
+  where a browser gives either none.
+  <br>What is left divides into three, and only the first is mechanical:
+  <br>1. **`Element`'s own interface** — `getAttribute`, `querySelector`, `classList` and the rest,
+  spread across some forty binding modules. The receiver-resolution mechanism and the constant-time
+  wrapper→node map exist, so each moves the same way; the interface must land whole so no prototype
+  ends up with a shape no browser has.
+  <br>2. **The per-instance *values*.** Several element members are captured values rather than
+  accessors — `tagName` is a `JSString` fixed when the wrapper is built — and each has to become an
+  accessor before it can move.
+  <br>3. **The document.** Its `Node` members are not copies of the prototype's but separate
+  implementations (`nodeType` is a literal `9`, `childNodes` a different binding), so unlike the
+  element's they cannot simply be deleted — each has to be checked against the prototype's answer
+  first. `textContent` is the same shape of question on the element: an element's is a different
+  operation from a character-data node's, so it stays the element's own and shadows the
+  `Node.prototype` one until there is a single implementation that serves both.
 - **The window keeps its own `EventTarget` members**, the last receiver that does. The three are
   routed on `EventTarget.prototype` now and every other receiver inherits them, but `window` here
   *is* the realm's global object, whose prototype chain does not reach `EventTarget.prototype`, so

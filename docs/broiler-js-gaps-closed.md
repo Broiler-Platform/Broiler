@@ -862,6 +862,36 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **An element shadowed every `Node.prototype` member with a copy of its own.** **Fixed, and
+  live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The third instalment of
+  track 6 action 1; what remains is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** The character-data move put the `Node` members on `Node.prototype`, but only
+  character-data wrappers read them: an element installed its own copy of each, so
+  `Object.prototype.hasOwnProperty.call(element, 'childNodes')` was `true` and the prototype's copy
+  was dead for every element in the document.
+  <br>**Fix.** The 23 copies are deleted and the element inherits them. Each was a *byte-identical*
+  call to the same binding the prototype's makes — checked one by one rather than assumed — so
+  nothing about them changes; only where they live does. An element is down from 166 own properties
+  to 140.
+  <br>**Two members deliberately not moved.** `textContent` stays the element's own: an element's is
+  a different operation from a character-data node's — it reads the descendants' text and writing it
+  replaces every child with one text node — so it shadows the `Node.prototype` one until a single
+  implementation serves both. And the document keeps all of its `Node` members, because unlike the
+  element's they are separate implementations rather than copies (`nodeType` is a literal `9`), so
+  each needs checking against the prototype's answer rather than deleting.
+  <br>**The one subtlety worth naming.** A `<form>`'s wrapper resolves an unknown name to the control
+  carrying it, so an inherited member has to be found *before* that fallback runs — otherwise a
+  control named `childNodes` would answer for the real one. It is: the named getter consults the
+  prototype chain first, and there is a regression pinning it.
+  <br>**Evidence.** 14 regressions in `ElementNodeMembersOnPrototypeTests` — each member inherited
+  rather than owned, the tree accessors and node operations still answering for an element receiver,
+  `textContent` still the element's own on both read and write, and the form named-getter case.
+  Whole-suite diffs against a same-container baseline show no regression: `Broiler.Cli.Tests` 39
+  distinct failures → 39 and `Broiler.Wpt.Tests` 51 → 51, byte-identical. Two tests differed between
+  the CLI runs and neither is this change — the thread-budget test whose own record says it fails
+  under CI load, and an idle-callback deadline — both verified to pass in isolation.
+
 - **`EventTarget.prototype`'s methods did not work on a DOM node, and every wrapper carried its own
   copies.** **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch.
   <br>**Cause.** The realm carries its own `EventTarget`, a JS-engine class keeping its listeners in
