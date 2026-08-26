@@ -667,6 +667,26 @@ public class GoogleSearchPolyfillTests
         Assert.Contains("180|140|svgRoot|svgRect|svgRect|svgRoot", result);
     }
 
+    /// <summary>
+    /// Two inline <c>&lt;svg&gt;</c> roots share a line, and a shape in the second is hit through
+    /// its root.
+    /// </summary>
+    /// <remarks>
+    /// This asserted that the second root cleared the first — <c>top: 0</c> then <c>top: 98</c> —
+    /// and that a point below both hit the shape. Neither is what a browser does with this markup.
+    /// An outermost <c>&lt;svg&gt;</c> is inline-level, so at this viewport width the two sit side
+    /// by side on one line rather than stacking, and the point the test probed is below the line
+    /// entirely, where Chromium reports the root element. The expectation was never measured; it
+    /// describes a block-stacking model no engine implements, and the failure it produced was read
+    /// as "inline svg roots are not placed in normal flow" when the flow was already right.
+    /// <para>
+    /// What was actually wrong is one number: the shorter root's <c>top</c>. Both roots reported
+    /// <c>0</c>, because an atomic inline-level box was left at the top of its line instead of
+    /// standing on the line's baseline — see <see cref="AtomicInlineBaselineTests"/>. Retargeted to
+    /// Chromium's measured answer, and the probe moved onto the shape so the hit test still has
+    /// something to descend into.
+    /// </para>
+    /// </remarks>
     [Fact(Timeout = 600000)]
     public void Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow()
     {
@@ -693,21 +713,29 @@ public class GoogleSearchPolyfillTests
             second.appendChild(rect);
             document.body.insertBefore(second, document.getElementById('result'));
 
-            var firstRect = first.getBoundingClientRect();
-            var secondRect = second.getBoundingClientRect();
-            var hit = document.elementFromPoint(80, 160);
-            var hits = document.elementsFromPoint(80, 160);
+            var firstBox = first.getBoundingClientRect();
+            var secondBox = second.getBoundingClientRect();
+            var shapeBox = rect.getBoundingClientRect();
+            var px = shapeBox.left + shapeBox.width / 2;
+            var py = shapeBox.top + shapeBox.height / 2;
+            var hit = document.elementFromPoint(px, py);
+            var hits = document.elementsFromPoint(px, py);
 
             document.getElementById('result').textContent = [
-                firstRect.top,
-                secondRect.top,
+                firstBox.top,
+                secondBox.top,
+                secondBox.left,
+                shapeBox.left,
+                shapeBox.top,
                 hit && (hit.id || hit.tagName),
                 hits[0] && (hits[0].id || hits[0].tagName),
                 hits[1] && (hits[1].id || hits[1].tagName)
             ].join('|');
         ");
 
-        Assert.Contains("0|98|secondRect|secondRect|secondSvg", result);
+        // Chromium at the same viewport width: the roots sit side by side, the shorter standing on
+        // the taller's bottom (42 = 140 - 98), and the shape resolves through its own root.
+        Assert.Contains("42|0|180|230|50|secondRect|secondRect|secondSvg", result);
     }
 
     [Fact(Timeout = 600000)]

@@ -862,6 +862,56 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **An atomic inline-level box was left at the top of its line instead of standing on its
+  baseline.** **Fixed, and live** — `Broiler.Layout` is main-repo, so no patch.
+  <br>**The gap this was filed as does not exist.** It was recorded as the second of two SVG layout
+  gaps — "an inline `<svg>` root is not placed in normal flow against its siblings: two stacked
+  `<svg>` elements both report `top: 0` instead of the second clearing the first" — and the test
+  pinning it,
+  `GoogleSearchPolyfillTests.Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow`, expected
+  `0|98`. Measured against Chromium at Broiler's own viewport width, both halves are wrong. An
+  outermost `<svg>` is inline-level, so the two roots sit **side by side on one line** in every
+  browser — they do not stack, and the expected `98` describes a block-stacking model nothing
+  implements. Broiler already put them side by side, at the same coordinates Chromium does, and the
+  hit results already agreed. Exactly one number differed: the shorter root's `top`, `0` where
+  Chromium says `42`.
+  <br>**Cause, and it is not about SVG.** CSS2.1 §10.8.1 gives an *atomic* inline — an
+  `inline-block` with no in-flow line box, or one whose `overflow` is not `visible` — a baseline at
+  its **bottom margin edge**, so two of different heights on one line come out bottom-flush.
+  `CssLineBox.SetBaseLine` implemented that for `<img>` and returned early for an `inline-block`
+  using the initial `vertical-align: baseline`, on a premise written into the comment beside it:
+  that an inline-block's flow position is already on the baseline. It is not — the flow puts it at
+  the top of the line, exactly like an image. So every atomic inline-block was top-aligned. An
+  inline `<svg>` is one of them only because the parser gives it `display: inline-block` and
+  `overflow: hidden`; a plain empty `<span style="display:inline-block">` measured identically
+  wrong, which is what showed the gap was in line layout rather than in SVG.
+  <br>**Fix.** `CssBox.UsesBottomMarginEdgeBaseline` names the spec's two conditions, and
+  `ApplyVerticalAlignment` bottom-aligns the atomic inlines on a line to the tallest of them,
+  margin boxes included. `SetBaseLine` then moves the box with `OffsetTop` so its descendants go
+  with it. An `inline-block` that lays out its own text is deliberately untouched: its baseline
+  comes from its last line box, which this engine does not track.
+  <br>**Why the alignment target is the tallest atomic inline and not the line's baseline.** The
+  spec's answer is the line's baseline, and using it was tried first. It moves boxes *down* onto a
+  strut baseline this engine computes without the half-leading `line-height` contributes, so a
+  `font-size: 100px; line-height: 1` line put its baseline about a quarter of the font height too
+  low and dragged the box down with it — `NativeAnchorInlineCbPipelineTests` and
+  `NativeAnchorAbsInlineCbPipelineTests` both caught that, and Chromium leaves the box at the line
+  top there. Adding the half-leading term was tried too and did not reach the case (the owning
+  block's `ActualLineHeight` is `normal` on that line). Aligning the atomic inlines to each other
+  fixes what is measurably wrong without resting on a number that is not yet right: it can only
+  move a box down onto a taller neighbour, and a line with one atomic inline or none is untouched.
+  The strut half-leading is a separate defect and is not fixed here.
+  <br>**Evidence.** Nine regressions in `AtomicInlineBaselineTests`, every expectation Chromium's
+  measured answer to the same markup at the same viewport width — the two `<svg>` roots, the same
+  pair as plain inline-blocks, equal heights unmoved, three boxes all aligning to the tallest, an
+  explicit `vertical-align` still winning, and a border and a bottom margin each counted into the
+  aligned box. One pins the known limit above. The mis-stated test is retargeted to Chromium's
+  answer, `42|0|180|230|50|secondRect|secondRect|secondSvg`, with the probe moved onto the shape so
+  it still exercises hit-test descent, and it passes. `Broiler.Layout.Tests` 1317/1317; the
+  `Broiler.Cli.Tests` failure list is byte-identical to the pre-change baseline with that one test
+  moving from failing to passing; the WPT pixel suite is unchanged at 101 passed / 34 failed with
+  the same failure list.
+
 - **Writing-mode `scrollIntoView` mapped the block axis onto nothing.** **Fixed, and live** — main
   repo, so no patch.
   <br>**Cause, and it was not the axis mapping.** The block/inline → physical mapping was already

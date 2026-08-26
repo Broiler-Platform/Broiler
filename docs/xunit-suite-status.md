@@ -27,10 +27,10 @@ most of what is listed below, and it is worth fixing before the list is.
 | --- | --- | --- |
 | `Broiler.Documents.*.Tests` | 7 | green |
 | `Broiler.UI.*.Tests` | 11 | green |
-| `Broiler.Layout.Tests` | 1 | green — 1 126 tests |
+| `Broiler.Layout.Tests` | 1 | green — 1 317 tests |
 | `src/*.Tests` except the two below | 8 | green |
 | `src/Broiler.Wpt.Tests` | 1 | **84 failing** of 1 194 |
-| `src/Broiler.Cli.Tests` | 1 | **46 failing** of 4 182 (43 distinct tests) |
+| `src/Broiler.Cli.Tests` | 1 | **45 failing** of 4 190 (42 distinct tests) |
 
 These tables state what is failing **now**. A failure that has been fixed is
 removed rather than annotated — its root cause and evidence live with the fix,
@@ -117,11 +117,11 @@ assertion. The SVG-geometry fix is the worked example: it took
 `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry`
 green together, from one change on the bridge side.
 
-## `src/Broiler.Cli.Tests` — 46 distinct tests (50 cases)
+## `src/Broiler.Cli.Tests` — 42 distinct tests (45 cases)
 
 | Kind | Count | Examples |
 | --- | --- | --- |
-| Engine feature gaps | 33 | `GoogleSearchPolyfillTests` alone is 7 of them: `ch`/`lh`/`rlh` under `zoom`, `scrollIntoView` into a percentage-positioned target and into an assigned slot, and two SVG hit-test assertions that fail on *layout* rather than on hit testing (`foreignObject` content is not laid out; an inline `<svg>` root is not placed in normal flow). The rest spread over `background-clip: border-area`, `var()` in shorthands, `:lang` against `xml:lang`, grid/flex content sizing, and the sub-document module drain described below. |
+| Engine feature gaps | 32 | `GoogleSearchPolyfillTests` alone is 6 of them: `ch`/`lh`/`rlh` under `zoom`, `scrollIntoView` into a percentage-positioned target and into an assigned slot, and one SVG hit-test assertion that fails on *layout* rather than on hit testing — `foreignObject` content is not laid out, so nothing inside one has a box to hit. The rest spread over `background-clip: border-area`, `var()` in shorthands, `:lang` against `xml:lang`, grid/flex content sizing, and the sub-document module drain described below. |
 | Acid targets not yet met | 4 | Acid3 scores 96; `PhaseD_…_At_Least_97` and `PhaseE_…_At_Least_100` state the targets, and `V7_Acid3_Image_Capture_Produces_Valid_Output` asserts 100. These are goals, not regressions. |
 | Architecture guards the code has drifted past | 4 | `HtmlBridgeArchitectureGuardTests` (files over the 750-line limit), `HtmlBridgeBoundaryGuardTests` (the frozen `Broiler.JavaScript.*` dependency set has grown to three), `DomWrapperFunctionTests` (`new JSFunction(` where `DomFunction` is wanted), `CssExtractionPhaseThreeTests`. Each names the refactor it wants; none can be closed by editing the test, which is the difference between these and the `CssExtractionPhaseZeroTests` fixed above. |
 | Missing artifact | 1 | `AcidRenderComparisonInfrastructureTests.Acid_Umbrella_Roadmap_Covers_All_Three_Tests` requires `docs/roadmap/acid-test-triage.md` with `## Acid1`, `## Acid2` and `## Acid3` headings. No such file has existed in this history, and writing one to satisfy the assertion would be inventing the plan it is meant to check. |

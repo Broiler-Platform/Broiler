@@ -333,6 +333,63 @@ internal partial class CssBox : CssBoxProperties, IDisposable
 
     public bool IsImage => Words.Count == 1 && Words[0].IsImage;
 
+    /// <summary>
+    /// Whether this <c>inline-block</c>'s baseline is its bottom margin edge rather than the
+    /// baseline of a line box inside it — CSS2.1 §10.8.1.
+    /// </summary>
+    /// <remarks>
+    /// The spec gives an <c>inline-block</c> the baseline of its <em>last in-flow line box</em>,
+    /// and falls back to the bottom margin edge in two cases: it has no in-flow line box, or its
+    /// <c>overflow</c> is not <c>visible</c>. Both are common and neither was modelled — an empty
+    /// <c>inline-block</c> and an inline <c>&lt;svg&gt;</c> (which the parser gives
+    /// <c>overflow: hidden</c>) were left at the top of the line instead of standing on its
+    /// baseline, so two of different heights came out top-aligned rather than bottom-aligned.
+    /// <para>
+    /// An <c>inline-block</c> that does have line boxes and clips nothing is deliberately not
+    /// covered: its baseline comes from its own text, which this engine does not yet track, and
+    /// leaving it at the flow position is the answer it has always given.
+    /// </para>
+    /// </remarks>
+    internal bool UsesBottomMarginEdgeBaseline =>
+        Display == CssConstants.InlineBlock
+        && ((!string.IsNullOrEmpty(Overflow) && Overflow != CssConstants.Visible)
+            || !HasInFlowLineContent(this));
+
+    /// <summary>
+    /// Whether <paramref name="box"/> lays any text out in a line box of its own or of an in-flow
+    /// descendant — the "has in-flow line boxes" side of CSS2.1 §10.8.1's inline-block baseline.
+    /// </summary>
+    /// <remarks>
+    /// It asks for a line box carrying a <em>word</em> rather than for
+    /// <c>LineBoxes.Count == 0</c>, because an empty <c>inline-block</c> is still given one line
+    /// box here — for its strut — so the count is never zero and the spec's own test never fired.
+    /// The walk skips out-of-flow and undisplayed children, which contribute no line box to the
+    /// box they are written in.
+    /// </remarks>
+    private static bool HasInFlowLineContent(CssBox box)
+    {
+        foreach (var line in box.LineBoxes)
+        {
+            if (line.Words.Count > 0)
+                return true;
+        }
+
+        foreach (var child in box.Boxes)
+        {
+            if (child.Display == CssConstants.None
+                || child.Position == CssConstants.Absolute
+                || child.Position == CssConstants.Fixed)
+            {
+                continue;
+            }
+
+            if (HasInFlowLineContent(child))
+                return true;
+        }
+
+        return false;
+    }
+
     public ReadOnlyMemory<char> Text
     {
         get { return _text; }

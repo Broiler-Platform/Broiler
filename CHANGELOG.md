@@ -9,6 +9,31 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- An atomic inline-level box stands on its line's baseline instead of sitting at
+  the top of the line. In the main repository (`Broiler.Layout`), so it is live.
+
+  CSS2.1 §10.8.1 puts the baseline of an `inline-block` with no in-flow line box,
+  or one that clips its overflow, at its bottom margin edge — so two of different
+  heights on one line come out bottom-flush. Only `<img>` was aligned that way.
+  The inline-block half of `CssLineBox.SetBaseLine` returned early for the initial
+  `vertical-align: baseline`, on the premise that an inline-block's flow position
+  is already on the baseline; the flow in fact places it at the top of the line,
+  exactly like an image, so every atomic inline-block came out top-aligned. An
+  inline `<svg>` is one of them, because the parser lays it out as a replaced
+  `inline-block` with `overflow: hidden`: two `<svg>` roots of different heights
+  on one line had their tops flush where a browser has their bottoms flush.
+
+  The boxes are aligned to the tallest atomic inline on the line rather than to
+  the line's baseline, which is what the spec says. That is a deliberate limit:
+  this engine computes the strut baseline without the half-leading `line-height`
+  contributes, so on a line whose strut is the taller of the two the baseline sits
+  well below the text, and aligning to it moves boxes further from a browser than
+  leaving them alone does. Aligning them to each other can only move a box down
+  onto a taller neighbour, and a line carrying one atomic inline or none is left
+  as it was. An `inline-block` that lays out its own text is also untouched — its
+  baseline comes from its last line box, which is not tracked. The strut's missing
+  half-leading is a separate defect and is not fixed here.
+
 - `scrollIntoView` moves the block axis in a vertical writing mode. In the main
   repository, so it is live.
 
