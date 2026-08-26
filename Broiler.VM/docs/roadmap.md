@@ -1,49 +1,63 @@
 # Broiler.VM roadmap
 
-**Status:** Proposed component roadmap. No Broiler.VM milestone is complete merely because
-this document exists.
+**Status:** Proposed component roadmap for the generic execution core. [The evidence
+ledger](roadmap.status.md) records VM-0 through VM-6 as not started. No milestone is complete
+merely because this document exists.
 
-Broiler.VM is the statically composed, NativeAOT-compatible bytecode execution component.
-It executes validated artifacts through built-in bytecode-language profiles. **JavaScript**
-and **WebAssembly** are the required initial built-ins. More built-in profiles may be added
-as source/build-time contributions, but runtime assembly scanning, name-based activation,
-downloadable plug-ins, and extension-directory loading are outside the supported model.
+Broiler.VM is a new, statically composed, NativeAOT-compatible component that executes verified
+bytecode artifacts. It is a **host for language profiles, not a language.** It owns profile
+selection, bounded loading, the verification boundary, the execution lifecycle, resource
+authority, diagnostics, and composition evidence. It owns no opcode set, no value representation,
+and no language semantics of its own.
 
-The JavaScript portions of this plan reuse the existing Broiler.JS bytecode roadmap. They do
-not restart its capability decision, fork JavaScript semantics, or turn the numeric portable
-seed into evidence for a general engine. The WebAssembly profile is an independent semantic
-implementation with its own format, verifier, conformance manifest, and measurements.
+This roadmap plans the core only. **JavaScript** and **WebAssembly** are the two intended first
+profiles, each a separate component with its own roadmap written after the core contract is
+accepted. Section 9 records what those profiles are expected to require, so the contract is
+designed for them rather than retrofitted to them. Section 10 records the boundary against the
+legacy `Broiler.JS` component, which Broiler.VM does not depend on.
 
 ---
 
 ## 1. Terminology and support claims
 
-The repository already uses the word *profile* for several different boundaries. Documents,
-APIs, test names, and release manifests must qualify the term when ambiguity is possible.
+The repository already uses the word *profile* for several different boundaries. Documents, APIs,
+test names, and release manifests must qualify the term when ambiguity is possible.
 
 | Term | Meaning in this roadmap |
 |---|---|
-| **VM profile** | A bytecode language plus its format, feature/version manifest, verifier, value/frame model, and executor. `JavaScript` and `WebAssembly` are VM profiles. |
-| **JavaScript bootstrap profile** | A Broiler.JS realm/global-feature selection such as `JavaScriptBootstrapProfile.Full`; it is not a VM profile. |
-| **Deployment/compiler composition** | Which tools are present at run time: `execution-only`, `narrow-runtime-compiler`, or `general-runtime-compiler`. These are not separate VM profile identities. |
-| **Feature manifest** | The exact language/proposal/host surface accepted by one version of a VM profile. A profile name alone is not a conformance claim. |
-| **Built-in profile** | A profile whose factory and dependencies are directly referenced at build time and rooted in a static catalog. Built-in does not mean that every product must carry every profile package. |
+| **VM profile** | A bytecode language plus its format, feature/version manifest, verifier, value/frame model, and executor. It is a separate component that references the core; the core never references it. |
+| **Core contract version** | The numbered revision of the profile-neutral lifecycle, operation-result, resource-authority, guest-initiated-load, external-control, and host-capability contract frozen by VM-0 and implemented by VM-1. Profiles and artifacts version independently of it. |
+| **Feature manifest** | The exact language surface accepted by one version of a profile. The core fixes the manifest's shape and identity rules; a profile fixes its content. A profile name alone is never a conformance claim. |
+| **Built-in profile** | A profile whose factory and dependencies are directly referenced at build time and rooted in a static catalog. A built-in may be Broiler-provided or application-local; it is never discovered at run time. |
+| **Fixture profile** | A deliberately trivial profile owned by the core's own tests. It proves contracts, closures, and failure paths without waiting for a product profile, and it never ships in a product package. |
+| **Verified artifact** | The opaque, immutable, profile-bound output of successful verification. Execution and instantiation consume this handle, never caller-owned raw bytes. |
+| **Guest-initiated load** | A verification requested by executing guest code rather than by the caller. It produces an ordinary verified artifact through the ordinary verification path. |
+| **Artifact-provider capability** | The typed, allowlisted host capability that answers a guest-initiated load with a descriptor and bytes. It is a distinct capability kind from a value-returning import and is never implied by one. |
+| **External suspension** | A pause requested by the host or a diagnostic client rather than by guest code, from which execution may resume. It is distinct from guest-initiated suspension and from terminal cancellation. |
+| **Deployment composition** | The exact set of profiles, host capabilities, and tools statically linked into one product image. Compositions are named, and each claimed one carries its own evidence. |
 
-The aggregate Broiler.VM product contains both required built-ins. A size-sensitive product may
-use a statically defined JavaScript-only or WebAssembly-only composition, but it may not claim
-the aggregate surface. An unknown profile, unsupported feature manifest, or incompatible format
-version is a deterministic load failure, never a best-effort fallback to another profile.
+A core release claims the core: its contract version, its lifecycle and safety guarantees, and the
+compositions it can publish and run. It never claims a language. An unknown profile, unsupported
+feature manifest, or incompatible format version is a deterministic load failure, never a
+best-effort fallback to another profile.
 
 ### Scope
 
 Broiler.VM owns:
 
 - explicit profile selection and an immutable built-in catalog;
-- bounded artifact loading and profile/version matching;
-- execution lifecycle, cancellation or fuel, resource budgets, diagnostics, and result/trap
-  transport;
-- typed host-capability registration and per-runtime ownership; and
-- composition, trimming, Native AOT, and package evidence for the component boundary.
+- bounded artifact loading and profile/version matching, including bounded mediation of
+  guest-initiated loads;
+- the common verify/load/instantiate/invoke/suspend/resume/cancel/dispose lifecycle, per-runtime
+  and shared aggregate resource-budget authority, diagnostics, and profile-neutral
+  operation-result envelopes;
+- typed host-capability registration, including artifact-provider capabilities, and per-runtime
+  ownership;
+- the bounded binary-reading and bounded-allocation primitives every profile needs, so that no
+  profile writes its own unchecked reader;
+- the numbered core contract version and the amendment procedure that changes it;
+- the public source-level contract by which a profile is written and statically composed; and
+- composition, trimming, Native AOT, and package evidence for the core boundary.
 
 Each VM profile owns:
 
@@ -51,574 +65,772 @@ Each VM profile owns:
 - decoding, validation, and profile-specific resource checks;
 - its value, frame, call, control-flow, trap/exception, and suspension model;
 - imports, exports, and conversions at its host boundary;
-- conformance fixtures and profile-specific optimizations; and
-- any compatibility promise for persisted artifacts.
+- the language meaning of any guest-initiated load it declares, including specifier resolution,
+  linking, lexical context, evaluation ordering, and what it exposes while externally suspended;
+- its typed normal-result and fault payloads and the projection API that exposes them without
+  adding language cases to the core;
+- conformance fixtures, its own oracle, and profile-specific optimizations; and
+- any compatibility promise for its persisted profile payload.
 
-Source compilers do not belong in the execution core. Broiler.JS owns JavaScript parsing,
-backend-neutral semantic analysis, and JavaScript-bytecode lowering. The WebAssembly profile
-accepts binary modules; WAT parsing and source-language compilation are not initial-profile
-requirements.
+### Non-goals
 
-### Non-goals for the first release
-
-- one universal JavaScript/WebAssembly opcode set, tagged value, or frame ABI;
-- reflection-based or unloadable runtime plug-ins;
+- one universal opcode set, tagged value, or frame ABI shared across languages;
+- reflection-based or unloadable runtime plug-ins, and any binary plug-in ABI;
 - automatic artifact/profile detection by trying multiple decoders;
-- an implied JavaScript-to-WebAssembly invocation bridge;
-- every WebAssembly proposal, the component model, WAT, or a Wasm source compiler;
-- JavaScript IL tier-up, deoptimization, or OSR in the VM core; and
-- performance claims before correct uninstrumented baselines exist for each profile.
+- an implied invocation bridge between two profiles hosted in the same process;
+- source compilers, parsers, or text formats in the core;
+- a debug wire protocol, a cross-profile inspection API, or a profile-neutral breakpoint model.
+  VM-0 freezes only the external-suspension transitions that a profile-owned debug surface needs;
+- delivering the JavaScript or WebAssembly profile. Those are separate components with their own
+  roadmaps, and no gate in this document depends on either existing; and
+- performance claims about any language. The core measures only its own overhead.
 
 ---
 
 ## 2. Engineering invariants
 
 1. **A profile is selected explicitly.** The caller supplies a stable profile identity, or a
-   checked Broiler.VM envelope supplies it and the caller confirms it. Raw WebAssembly remains
-   usable under explicit `WebAssembly` selection. The runtime never guesses by probing every
-   registered decoder.
-2. **Registration is static and typed.** The default catalog directly references the JavaScript
-   and WebAssembly factories. There is no `Assembly.Load`, `Type.GetType`, assembly scan,
-   `Activator.CreateInstance`, magic type name, or module-initializer ordering dependency.
-3. **Verification precedes execution.** Every external artifact is parsed with checked lengths
-   and budgets and passes its selected profile verifier before an instruction executes.
-4. **The core is semantics-neutral.** It provides lifecycle and safety contracts, not a lowest-
-   common-denominator ISA. JavaScript and WebAssembly may share a primitive only after dependency,
-   correctness, and representation evidence proves that sharing useful.
+   checked Broiler.VM envelope supplies it and the caller confirms it. The runtime never guesses
+   by probing every registered decoder.
+2. **Registration is static and typed.** Composition roots directly reference their profile
+   factories; the generic runtime references no concrete profile. There is no `Assembly.Load`,
+   `Type.GetType`, assembly scan, `Activator.CreateInstance`, magic type name, or
+   module-initializer ordering dependency.
+3. **Verification produces the only executable input.** Every external artifact is parsed with
+   checked lengths and budgets. Verification snapshots or fully decodes caller-owned bytes into an
+   opaque immutable handle, and only that handle may be instantiated or executed. Later mutation,
+   disposal, or concurrent reuse of the caller's buffer cannot affect verified instructions. Bytes
+   a profile obtains while executing take the same path: they become their own verified handle
+   before anything in them runs, and no profile may execute source or bytes it acquired without
+   one.
+4. **The core is semantics-neutral.** It provides lifecycle and safety contracts, not a
+   lowest-common-denominator ISA. Two profiles may share a primitive only after section 8's
+   evidence rule is satisfied.
 5. **Mutable state has an owner.** Frames, feedback, inline caches, quickening, host handles, and
    compiled artifacts belong to a runtime, realm/module, program, or function. Canonical bytecode
    and persisted artifacts contain no warmed state or process-local identities.
-6. **Compiler closures are explicit.** A JavaScript execution-only application contains no
-   parser or source compiler. A runtime-compiler application is a separate composition and must
-   publish and execute that larger closure under Native AOT before it is supported.
-7. **Native AOT is demonstrated, not inferred.** Analyzer success, a trimmed build, and the
-   existing numeric seed are inputs. Each claimed deployment composition must publish and run its
-   representative workload on every declared RID with trim/AOT warnings treated as errors.
-8. **Unsupported surface is truthful.** A missing JavaScript construct, WebAssembly proposal,
-   import type, host capability, or deployment mode has a documented deterministic failure. A
-   shape-only stub cannot satisfy a capability gate.
+6. **Tool closures are explicit.** A product image contains a compiler, parser, or text-format
+   reader only when its composition declares one, and that larger closure must publish and run
+   under Native AOT before it is supported.
+7. **Native AOT is demonstrated, not inferred.** Analyzer success and a trimmed build are inputs.
+   Each claimed composition must publish and run its representative workload on every declared RID
+   with trim/AOT warnings treated as errors.
+8. **Unsupported surface is truthful.** A missing capability, host capability, or deployment mode
+   has a documented deterministic failure. A shape-only stub cannot satisfy a capability gate.
+9. **Resource authority is trusted and monotonic.** At runtime creation the host supplies explicit
+   ceilings or explicitly adopts bounded profile defaults; omission never means unbounded. Each
+   profile may impose a stricter hard maximum, and artifact declarations may only request lower
+   limits. Verification fixes their intersection as the handle's verification/instantiation
+   ceilings before an untrusted allocation. Instance or invocation budgets may tighten those
+   ceilings or allocate a remaining fuel/time allowance; they never raise them without producing a
+   newly verified handle. Ceilings also compose: a host may create runtimes under one shared
+   aggregate budget, a per-runtime ceiling may never exceed the parent's remaining allowance, and
+   creating more runtimes may not multiply a host maximum.
+10. **The common lifecycle is stable within a core contract version.** VM-0/VM-1 define ownership,
+   state transitions, thread affinity, reentrancy, cancellation, suspension, resumption, and
+   idempotent disposal. Profiles refine observable language behavior without changing the core
+   state machine or adding language cases to a core result enum. A capability the frozen contract
+   cannot express is added by a numbered amendment, never by a profile-specific special case.
+11. **Guest-initiated loads are mediated, bounded, and refusable.** A profile may obtain further
+   artifacts while executing only through a declared artifact-provider capability. Each request is
+   charged to the operation that made it, bounded in depth, fan-out, and cumulative bytes, and
+   deterministically refused when the composition registers no provider. A profile never reaches
+   the filesystem, the network, or a source compiler on its own.
+12. **External control is a lifecycle state, not a side channel.** A host or diagnostic client may
+   pause and resume execution only through transitions the core contract declares. Suspension
+   requested from outside is distinct from guest-initiated suspension and from terminal
+   cancellation, and what a paused profile exposes remains the profile's own surface.
+13. **The core is provable without a product profile.** Every core gate closes against the fixture
+   profile and an application-local consumer profile. A gate that cannot be demonstrated without
+   shipping a language is a core-design defect, not a scheduling problem.
+
+### Core contract version and amendment
+
+The profile-neutral contract frozen by VM-0 and implemented by VM-1 — lifecycle states and legal
+transitions, operation-result categories, resource authority, verified-artifact ownership,
+guest-initiated loads, external control, and the host-capability shape — carries one integer
+**core contract version**, starting at 1. It is versioned separately from any profile format,
+feature manifest, or package version, and every support table, catalog entry, and evidence bundle
+names it.
+
+Amendment is an expected event, not a failure. One is required whenever an approved profile
+capability cannot be expressed by the frozen contract. Because this roadmap freezes the contract
+before either intended profile is designed, at least one amendment should be planned for. The
+procedure is:
+
+1. record the driving capability, the profile that needs it, and why no profile-owned design
+   satisfies it;
+2. mint core contract version *n+1* as a dated revision of the VM-0 ADR, stating which
+   transitions, categories, or contracts changed and whether the change is additive;
+3. re-evaluate accepted evidence against the new version, recording what recertifies unchanged,
+   what must be re-collected, and what is superseded, under the
+   [status ledger](roadmap.status.md) update rules; and
+4. publish the new version in the support table beside the profiles and packages that require it.
+
+An additive amendment may leave existing profile packages source-compatible; changing an existing
+transition or category may not. Neither is a reason to fork the contract: a second core state
+machine maintained for one language is a stop condition under section 13.
 
 ---
 
 ## 3. Static profile registration
 
-The exact public names are deferred to VM-0, but the required shape is a builder/catalog whose
-entries contain immutable descriptors and direct factory delegates:
+The exact public names are deferred to VM-0, but the required shape is a generic builder/catalog
+whose entries contain immutable descriptors and direct factory delegates supplied by a composition
+root:
 
 ```csharp
-var vm = VmRuntime.CreateBuilder()
-    .AddBuiltIn(BuiltInVmProfiles.JavaScript)
-    .AddBuiltIn(BuiltInVmProfiles.WebAssembly)
+var catalog = VmCatalog.CreateBuilder()
+    .Add(FixtureVmProfile.Descriptor)
     .Build();
+
+var vm = VmRuntime.Create(catalog);
 ```
 
-This example expresses dependency rooting, not a frozen API. A hand-maintained catalog is the
-initial preference because two entries do not justify generator complexity. A source generator
-may replace the table later if it emits direct calls, produces a reviewable manifest, and has a
-test proving that generated and documented catalogs agree. Runtime reflection is not an allowed
-substitute.
+Each profile exposes its own descriptor accessor from its own package. There is no aggregate
+`BuiltInProfiles` type that names several profiles at once: such a type would reference every
+profile assembly and defeat the exact-closure gates in VM-3. A composition that wants two profiles
+names both descriptors; a composition that wants one names one and links only that one.
 
 Every catalog entry must provide:
 
 - a stable, non-localized profile ID and display name;
 - a supported profile-format range and feature-manifest IDs;
 - an AOT-rooted verifier and per-runtime executor factory;
-- profile-specific limit defaults and host-capability descriptors;
+- bounded profile limit defaults that a host must explicitly adopt or override, plus
+  host-capability descriptors;
+- the core contract version it was built against, and whether it declares guest-initiated loads,
+  asynchronous instantiation, or external suspension;
 - a conformance manifest/version and diagnostics identity; and
 - package and ownership metadata used by architecture and release checks.
 
 Registration rejects duplicate IDs, alias collisions, missing factories, unsupported versions,
-and descriptors whose declared identity differs from the produced executor. Catalog order has no
-semantic effect. A future built-in is added by referencing its assembly and adding its descriptor
-factory to an explicit composition root; it does not require a switch inside the execution loop.
+unsupported core contract versions, and descriptors whose declared identity differs from the
+produced executor. Catalog order has no semantic effect. A hand-maintained catalog is the initial
+preference; a source generator may replace it later only if it emits direct calls, produces a
+reviewable manifest, and has a test proving that generated and documented catalogs agree. Runtime
+reflection is not an allowed substitute.
+
+Broiler-owned IDs use the reserved `Broiler.*` namespace; application-local IDs use a documented
+reverse-domain namespace. The public contract is an AOT-safe source-level composition API, not a
+binary plug-in ABI: a profile is compiled with the application, its generic instantiations and
+factories are rooted directly, and its compatibility is checked at build and test time as well as
+at catalog construction.
 
 ---
 
-## 4. Package-boundary hypotheses
+## 4. What a profile must be able to do
 
-These names are hypotheses, not authorization to create assemblies. VM-0 must prove the graph
-with project shells and the same assembly/package-budget discipline used by the
-[Broiler.JS assembly roadmap](../../Broiler.JS/docs/roadmap/Assemblies.md).
+The core is only as generic as the hardest profile it can host. VM-0 states the profile-facing
+contract as a checklist, and VM-1 proves each item against the fixture profile:
+
+| Capability | Core obligation |
+|---|---|
+| Decode a binary payload | Bounded readers, checked arithmetic, section/segment framing, and no allocation from an untrusted count before it clears its bound. |
+| Validate before execution | A verification entry point that produces an immutable handle and a stable failure taxonomy, with no partial state escaping a failed verification. |
+| Own a value and frame model | The core stores no values and inspects no frames. Handles are opaque to the core and typed to the profile. |
+| Report language outcomes | Typed profile payloads behind profile-neutral operation-result envelopes, with a projection API that adds no language case to the core. |
+| Suspend and resume | Guest-initiated suspension, and external suspension where the composition allows it. |
+| Acquire code while running | Guest-initiated loads through an artifact-provider capability, bounded and charged to the requesting operation. |
+| Call the host | Typed, allowlisted, versioned capabilities with declared reentrancy, affinity, and exception translation. |
+| Be budgeted | Fuel, wall-clock, allocation, depth, and host-call accounting that a profile charges into and cannot enlarge. |
+| Persist and invalidate | An opaque profile section inside a core-owned envelope, with the profile owning its own cache key and migration. |
+| Be composed exactly | A direct descriptor and factory, rooted for trimming and Native AOT, with a reviewable closure. |
+
+A profile that cannot be expressed through this checklist is either misdesigned or evidence that
+the contract needs an amendment. Both outcomes are recorded; neither is worked around inside the
+core's execution loop.
+
+---
+
+## 5. Package boundaries and the dependency graph
+
+These names are hypotheses, not authorization to create assemblies. VM-0 must prove the graph with
+project shells and an explicit assembly/package budget.
 
 | Logical boundary | Candidate package | Responsibility and dependency rule |
 |---|---|---|
-| Contracts | `Broiler.VM.Abstractions` | Profile IDs/descriptors, execution options/results, budgets, diagnostics, and typed host contracts; references no concrete profile. |
-| Core runtime | `Broiler.VM.Runtime` | Builder, immutable catalog, bounded load/execute lifecycle, cancellation, and ownership; references abstractions, not Broiler.JS or a Wasm implementation. |
-| JavaScript built-in | `Broiler.VM.JavaScript` | JavaScript payload reader/verifier/interpreter and adapter to the approved AOT-clean Broiler.JS runtime contracts; never references the IL emitter or optional CLR host. |
-| WebAssembly built-in | `Broiler.VM.WebAssembly` | Wasm decoder/validator/interpreter, typed stack, module instance, memories/tables/globals, imports/exports, and traps; does not reference Broiler.JS. |
-| Aggregate composition | `Broiler.VM` | Statically registers both required built-ins and supplies the default package/sample surface; contains no profile semantics of its own. |
-| JavaScript compiler | Name selected by Broiler.JS MOD-M2/MOD-M9 | Parser, shared semantic IR, and JavaScript-bytecode lowering; outside the execution-only closure and independent of the IL emitter. |
+| Contracts | `Broiler.VM.Abstractions` | Profile IDs/descriptors, execution options/results, budgets, diagnostics, typed host contracts, and the core contract version. References no concrete profile. |
+| Bounded input primitives | `Broiler.VM.Binary` | Checked readers, variable-length integer decoding, bounded framing, and allocation guards used by the core envelope and by every profile verifier. Contains no format, no schema, and no semantics. |
+| Core runtime | `Broiler.VM.Runtime` | Builder, immutable catalog, bounded load/execute lifecycle, resource authority, guest-initiated-load mediation, cancellation, diagnostics, and ownership. References abstractions and binary primitives only. |
+| Fixture profile | `Broiler.VM.Fixtures` *(test-only)* | The trivial profile and application-local consumer profile used to prove contracts and closures. Never referenced by a product package. |
+| Profile (future) | `Broiler.VM.Profile.<Language>` | One language: format, verifier, value/frame model, executor, imports, conformance. References the core; never references another profile. |
 
-Single-profile composition roots may be provided when package and image evidence justifies them.
-They remain explicit packages/samples rather than a runtime option that dynamically removes an
-already rooted profile. No new assembly is accepted merely to shorten a file: it must enforce a
-dependency, AOT, deployment, ownership, test, or package boundary.
+Single-profile and multi-profile composition roots are explicit packages or samples, never a
+runtime option that removes an already rooted profile. No new assembly is accepted merely to
+shorten a file: it must enforce a dependency, AOT, deployment, ownership, test, or package
+boundary.
 
-The target direction is:
+The target direction is below; arrows mean **depends on**:
 
 ```text
-Broiler.JS FrontEnd/Semantics ─→ JavaScript bytecode compiler ─→ JS artifact
-              │                                                   │
-              └──────────────→ existing IL backend                ▼
-
-Broiler.VM.Abstractions ← Broiler.VM.Runtime ← aggregate/static composition
-          ↑                       ↑                   │
-          ├── Broiler.VM.JavaScript ─────────────────┤
-          └── Broiler.VM.WebAssembly ────────────────┘
+Broiler.VM.Binary      ──→ (nothing)
+Broiler.VM.Abstractions ─→ (nothing)
+Broiler.VM.Runtime     ──→ Abstractions + Binary
+Broiler.VM.Profile.X   ──→ Abstractions + Binary (+ Runtime contracts)
+Broiler.VM.Profile.Y   ──→ Abstractions + Binary (+ Runtime contracts)
+composition root       ──→ Runtime + the profiles it names
 ```
 
-The verified project graph may adjust names and split points, but it must retain these rules:
-the core knows no concrete profile; the two profiles do not depend on one another; JavaScript
-bytecode compilation does not reach IL; and only the aggregate or an explicit host composition
-knows which built-ins it includes.
+The verified graph may adjust names and split points, but it must retain these rules: the core
+knows no concrete profile; no profile references another profile; nothing in the product graph
+references a fixture or test project; and only a composition root knows which profiles it
+includes. Broiler.VM references no legacy Broiler component, in either direction.
 
 ---
 
-## 5. Artifact and versioning model
+## 6. Artifact, verification, and versioning model
 
-### Explicit descriptor plus profile-owned payload
+### Explicit descriptor, immutable verification result, and profile-owned payload
 
-The execution API receives an immutable artifact descriptor and bytes. The descriptor identifies
-the VM profile, profile-format version, feature-manifest ID, and applicable resource policy. The
-selected profile owns decoding of the payload:
+The verification API receives an immutable artifact descriptor plus caller-owned bytes. The
+descriptor identifies the profile, profile-format version, feature-manifest ID, and any
+artifact-requested limits. Those requests can only tighten the host/profile ceilings in section 7.
+If an artifact omits a limit, it adds no restriction; it does not remove the materialized ceiling.
+The selected profile owns decoding of the payload, and a caller that mislabels bytes receives that
+profile's deterministic validation failure rather than a search for a decoder that accepts them.
 
-- JavaScript uses the canonical, versioned format and verifier developed by Broiler.JS Phase 6.
-- WebAssembly accepts a standard binary module under explicit `WebAssembly` selection and checks
-  the Wasm binary version plus the selected proposal/feature manifest.
+Successful verification returns an opaque handle bound to the exact profile descriptor, feature
+manifest, verifier/semantic version, effective verification/instantiation ceilings, core contract
+version, and host-signature assumptions used during validation. The handle owns a byte snapshot or
+fully decoded immutable representation; it never aliases mutable caller storage. Instantiate and
+execute APIs accept only that handle. Sharing a handle across runtimes is allowed only when those
+identities match and the profile declares the representation shareable; mutable instances,
+memories, realms, feedback, imports, and host handles are never part of it.
 
-Raw payload support avoids wrapping interoperable `.wasm` modules merely to execute them. It does
-not permit sniffing: a caller that labels JavaScript bytes as WebAssembly receives a deterministic
-WebAssembly validation failure.
+VM-0 also fixes handle lifetime. A handle is either ordinary managed immutable data or owns
+explicitly disposable resources; it cannot be ambiguously borrowed from a runtime. Where sharing
+and disposal are both supported, explicit leases, idempotent disposal, and deterministic
+use-after-dispose behavior prevent one runtime from invalidating another's input.
 
 ### Optional persisted envelope
 
-If persistence is approved by the cold-start gate, a Broiler.VM cache/envelope records at least:
+If persistence is approved, ownership is split explicitly. The core owns a small bounded outer
+header, profile dispatch, byte ownership, atomic storage and replacement, corruption reporting,
+and compatibility of the outer schema, while treating the profile section as opaque. The profile
+owns its payload, semantic cache-key contribution, compiler/debug metadata, migration,
+invalidation, and composition-specific fallback.
 
-- envelope magic and schema version;
-- stable profile ID, profile-format version, and feature-manifest ID;
-- engine semantic/cache version and compiler identity when applicable;
-- payload and section lengths with configured upper bounds;
-- canonical source/module identity and host-capability/cache-key inputs;
-- integrity/checksum data and atomic replacement state; and
-- optional source/debug metadata whose positions are validated by the profile.
+The outer envelope plus the opaque profile section record at least: envelope magic and schema
+version; profile ID, profile-format version, and feature-manifest ID; core contract version;
+engine semantic/cache version; payload and section lengths with configured upper bounds; canonical
+source/module identity and host-capability cache-key inputs; corruption-detection checksum data
+and atomic replacement state; and optional debug metadata whose positions the profile validates.
 
-It never persists object references, delegates, intern-table indexes, process-local shape IDs,
-warmed inline caches, quickened authoritative opcodes, host handles, or other mutable execution
-state. Loading always re-verifies the envelope and profile payload. Runtime-compiler JavaScript
-may recompile known source after an invalid cache; execution-only JavaScript and WebAssembly
-report a defined load failure and accept a separately supplied fresh verified artifact.
+It never persists object references, delegates, intern-table indexes, process-local identities,
+warmed caches, quickened authoritative opcodes, or host handles. Loading always re-verifies the
+envelope and the profile payload. Outer-envelope compatibility never implies profile payload
+compatibility, and silently interpreting old bytes under new semantics is prohibited. A checksum
+detects accidental corruption; it does not authenticate code. Hosts accepting artifacts from
+outside their trust boundary must separately bind an approved hash, signature, or distribution
+identity, and verification remains mandatory even then.
 
-Compatibility is opt-in. Internal formats may evolve before a version is declared persisted.
-Supporting an old version requires a tested reader/migration or a documented rejection; silently
-interpreting old bytes under new semantics is prohibited.
+### Guest-initiated loads
 
----
+A profile may need code the caller never supplied. The core treats that as an ordinary load
+requested from an unusual place, not as a second execution path.
 
-## 6. Built-in profiles
+- The composition, not the guest, decides whether it is possible at all. A profile declares that
+  it may request loads; the host either registers a typed artifact-provider capability or does
+  not. A composition that registers none refuses every request deterministically.
+- The provider returns a descriptor and bytes exactly as a caller would. The profile does not read
+  files, open sockets, or invoke a compiler itself. A composition that includes a compiler
+  supplies it behind the provider capability, which keeps invariant 6 intact and keeps the
+  compiler inside the declared Native AOT closure.
+- The returned bytes become their own immutable verified handle before anything in them runs.
+  Nesting relaxes no bound, skips no descriptor match, and inherits no ceiling implicitly.
+- Work is charged to the requesting operation. Nested verification and instantiation draw on the
+  invoking operation's remaining fuel, time, and allocation allowance, and the nested handle's
+  effective ceilings are the intersection of that remainder with the host and profile maxima. A
+  nested load can exhaust an invocation; it can never enlarge one.
+- Depth, fan-out, and cumulative nested bytes and verifier work have configured bounds. Detecting
+  cycles in a dependency graph is the profile's problem; bounding recursion through the provider
+  is the core's.
+- Failures map onto existing categories rather than adding one. The nested load returns its own
+  load/verification result, and the requesting operation reports the language-defined `profile
+  fault`, or `host failure` and `resource exhaustion` when the provider or the budget failed
+  rather than the artifact.
+- The provider identity, capability version, and resolved artifact identity are cache-key inputs
+  wherever a persisted envelope or semantic cache depends on them.
 
-### JavaScript
-
-The JavaScript VM profile is the Broiler.VM home for the bytecode interpreter planned in
-[Broiler.JS Phase 6](../../Broiler.JS/docs/roadmap/Phase-6.md). Broiler.JS continues to own
-parsing, early errors, binding, scope, hoisting, private names, direct-eval rules, free-name
-analysis, backend-neutral lowering, JavaScript runtime operations, and the independent expected-
-result manifest. Broiler.VM supplies the static profile host and bounded execution lifecycle.
-
-The VM profile identity remains `JavaScript` across deployment compositions:
-
-| Composition | Runtime contents | Required evidence |
-|---|---|---|
-| `execution-only` | JavaScript profile runtime, verifier, and precompiled bytecode; no parser/compiler | approved artifacts execute under Native AOT on every claimed RID |
-| `narrow-runtime-compiler` | plus parser, shared semantic front end, and lowering for a named subset | approved source compiles inside the published AOT process and executes; exclusions are deterministic |
-| `general-runtime-compiler` | plus the approved general source/compiler surface | independent expected/IL/VM conformance and the complete declared AOT closure |
-
-The existing `Broiler.JavaScript.Portable` implementation is seed evidence only. Its numeric,
-`double`-oriented bytecode must not freeze the general JavaScript ISA or value ABI, and migrating
-or retaining it is decided by the graph/compatibility ADR rather than assumed.
-
-Phase ownership remains:
-
-- [Phase 6](../../Broiler.JS/docs/roadmap/Phase-6.md): shared semantic IR, JavaScript value/frame
-  ABI, format/verifier, vertical interpreter slices, hard semantics, and the expected/IL/VM gate;
-- [Phase 7](../../Broiler.JS/docs/roadmap/Phase-7.md): the uninstrumented JavaScript VM baseline
-  and measured shippability work;
-- [Phase 8](../../Broiler.JS/docs/roadmap/Phase-8.md): independently gated JavaScript feedback,
-  quickening, dispatch, Native AOT PGO, and persistence; and
-- [Phase 9](../../Broiler.JS/docs/roadmap/Phase-9.md): optional JavaScript bytecode-to-IL
-  promotion, deoptimization, and OSR for dynamic-code-capable hosts. Phase 9 is not a generic
-  Broiler.VM requirement and does not apply to WebAssembly by analogy.
-
-### WebAssembly
-
-The WebAssembly built-in owns a separate typed execution model. VM-0 pins the initial supported
-standard edition and proposal set before implementation. A reasonable first vertical plan covers
-binary decoding and validation, numeric types, structured control flow, functions and calls,
-globals, linear memory, tables, module instantiation, imports/exports, and traps. SIMD, threads,
-multiple memories, reference types beyond the selected baseline, exception handling, GC, tail
-calls, memory64, the component model, and later proposals are supported only when named in a
-versioned feature manifest and backed by their own tests.
-
-The Wasm verifier checks types and stack states, structured branches, section order and indexes,
-function/code agreement, memory/table/global limits, constant expressions, declared features,
-and configured aggregate resources before instantiation. Runtime limits cover at least call depth,
-instruction fuel or cancellation checks, memory pages/growth, table entries, module/function/
-local counts, element/data segments, and host calls.
-
-WebAssembly traps are profile results, not CLR process failures. Imports are resolved through a
-typed, allowlisted host-capability registry; arbitrary reflection over host objects is not an
-interop mechanism. Floating-point, conversion, memory, and trap edge cases follow the pinned
-WebAssembly conformance oracle rather than JavaScript behavior.
-
-### Future built-ins
-
-A future profile is acceptable only when it has a named product requirement and owner. Its entry
-proposal must include format provenance, feature/version policy, verifier design, resource model,
-host boundary, conformance oracle, AOT RID matrix, package cost, maintenance budget, and explicit
-reason it belongs in Broiler.VM rather than a separate component.
-
-Adding one follows this sequence:
-
-1. reserve a stable profile ID and approve the dependency/security ADR;
-2. add the profile assembly and directly referenced descriptor/factory;
-3. add malformed-input, conformance, lifecycle, and architecture tests;
-4. add single-profile and aggregate Native AOT publish-and-run samples; and
-5. update the catalog, support manifest, public API baseline, package graph, notices, and roadmap.
-
-An out-of-tree consumer may build a custom statically linked composition from public contracts if
-that API is approved later, but Broiler does not advertise or support a binary plug-in ABI.
+VM-0 freezes this contract even though the first core release ships no provider and no profile
+that requests one. Retrofitting re-entrant verification into an already frozen lifecycle is a core
+contract amendment; specifying it now is a paragraph.
 
 ---
 
 ## 7. Security, resources, and host boundary
 
-Bytecode is untrusted input even when a local compiler produced it. Verification and resource
+Bytecode is untrusted input even when a local tool produced it. Verification and resource
 accounting are part of correctness, not optional hardening.
+
+### Lifecycle and result boundary
+
+VM-0 freezes the state model and VM-1 implements it:
+
+1. an immutable catalog is built by a composition root;
+2. a runtime is created with typed host capabilities, authoritative resource ceilings, and
+   declared affinity/reentrancy rules;
+3. raw bytes, or profile bytes extracted from a bounded persisted envelope, are verified into an
+   immutable profile-bound handle;
+4. a verified artifact is instantiated into profile-owned mutable state;
+5. execution or export invocation completes, suspends where the profile and host contract permit
+   it, or returns a generic invocation outcome with a profile-owned typed payload;
+6. a suspended operation resumes, is cancelled, or is disposed. Guest-initiated suspension resumes
+   on the profile's own terms; external suspension resumes at the host's request and cannot be
+   used to observe state the profile does not expose; and
+7. cancellation and idempotent disposal transition sessions, instances, and any explicitly
+   disposable verified handles to documented terminal states and reject later use
+   deterministically.
+
+Steps 3 and 4 may recur inside step 5 when a profile makes a guest-initiated load. The nested
+operation is an ordinary instance of the same steps, runs under the requesting operation's
+remaining budget, and may neither reorder nor skip them.
+
+All public stages use a profile-neutral **operation-result envelope**, but their legal categories
+are stage-specific:
+
+- load/verification returns a verified handle or `invalid artifact`, `resource exhaustion`, or
+  `cancellation`. Optional envelope loading is a bounded preprocessing step whose outer-schema,
+  corruption, migration, profile, and version failures use `invalid artifact`; it never yields an
+  executable handle or bypasses profile verification;
+- instantiation returns an instance or `profile fault`, `resource exhaustion`, `cancellation`,
+  `host failure`, or `suspension` where the profile's declared manifest permits asynchronous
+  instantiation. VM-0 records whether core contract version 1 admits it, and adding it afterwards
+  is an amendment; and
+- invocation returns `normal`, `profile fault`, `suspension`, `cancellation`, `resource
+  exhaustion`, or `host failure`. External suspension reuses `suspension` and adds no category,
+  and neither does a guest-initiated load.
+
+Selecting a profile the composition does not contain is not an invalid artifact: it is a distinct
+`unsupported profile` outcome naming the requested ID and the catalog's contents. Conflating it
+with a malformed payload misreports a composition mistake as a corrupt file, which is the most
+likely diagnostic error for single-profile products.
+
+Illegal lifecycle transitions and use-after-dispose return one stable core `invalid state`
+outcome. Language faults are typed payloads owned and interpreted by their profiles; adding a
+profile does not add a case to the common core. VM-0 also decides which calls may originate on
+another thread, whether cancellation may be requested cross-thread, when reentrant execution is
+rejected, whether external suspension may be requested and by whom, and how suspended state
+retains and releases resources. The reentrancy rules must state explicitly whether a
+guest-initiated load may re-enter the runtime that requested it.
 
 ### Load-time requirements
 
 - Checked arithmetic for every length, count, offset, index, and allocation calculation.
-- Bounds on artifact bytes, sections, constants, functions, locals, metadata, nesting, and
-  aggregate verifier work.
-- Control/data-flow validation before execution, including unreachable regions and profile-
-  specific handler or structured-control rules.
-- Deterministic rejection for unknown opcodes, sections, features, versions, imports, and invalid
-  metadata.
+- Effective limits computed from profile hard maxima, host ceilings, and artifact requests before
+  reading or allocating from an untrusted declared count; artifact metadata cannot raise a limit.
+- Bounds on artifact bytes, sections, constants, metadata, nesting, and aggregate verifier work.
+- Deterministic rejection for unknown identifiers, sections, features, and versions.
 - No allocation based on an untrusted declared count before the count passes its configured bound.
+- Configured bounds on guest-initiated loads: nesting depth, fan-out per operation, cumulative
+  nested bytes, and cumulative nested verifier work, each charged to the requesting operation.
+- Successful verification owns or fully decodes its input. Unit and stress tests mutate, dispose,
+  and concurrently overwrite the original caller buffer after verification and prove that the
+  verified handle and execution result cannot change.
 
 ### Run-time requirements
 
-- Per-execution instruction fuel or bounded cancellation polling, call/frame depth, allocation,
-  memory/table growth, host-call, and wall-clock policy supplied by the host.
-- A defined result taxonomy separating normal completion, JavaScript throw, WebAssembly trap,
-  cancellation, resource exhaustion, invalid artifact, and host failure.
-- Host exceptions cannot tear down or corrupt another runtime; profile adapters translate them
-  according to the declared host contract.
-- Runtime, program/module, and profile-owned state is reclaimed on dispose and reaches a measured
-  memory plateau under repeated load/run/evict cycles.
-- Concurrent runtimes share only immutable verified artifacts unless a later ownership ADR and
-  stress evidence explicitly approve more.
+- Per-instance or per-invocation fuel/cancellation polling, call/frame depth, allocation,
+  host-call, and wall-clock budgets materialized from the verified handle and current host
+  request. An omitted invocation override inherits the handle/runtime budget; an explicit override
+  may only tighten it. Raising a verification/instantiation ceiling requires re-verification.
+  Variable-work operations charge proportional work rather than one nominal instruction.
+- Where a host creates several runtimes under one shared aggregate budget, fuel, wall-clock,
+  allocation, and live-runtime counts are metered against the parent as well as each runtime.
+  Exhausting the parent is reported as `resource exhaustion` to whichever operation observes it,
+  and no runtime may be created or resumed once the parent has no remaining allowance.
+- Host exceptions cannot tear down or corrupt another runtime; the core translates them according
+  to the declared host contract.
+- Runtime, artifact, and profile-owned state is reclaimed on dispose and reaches a measured memory
+  plateau under repeated load/run/evict cycles.
+- Concurrent runtimes share only immutable verified artifacts by default. Any mutable sharing
+  requires a manifest-declared ownership/lease contract and the applicable VM-4 stress evidence;
+  it is never inferred from using the same host registry.
 
 ### Host capabilities
 
-Hosts register narrow typed capabilities explicitly. A profile import names a declared capability
-and signature; it cannot enumerate arbitrary CLR members. Capability lookup, permissions,
-reentrancy, thread affinity, cancellation, and exception translation are part of the cache key or
-runtime identity where they affect semantics. The initial shared host registry does not itself
-bridge JavaScript values to WebAssembly imports.
+Hosts register narrow typed capabilities explicitly. A profile import names a stable capability
+ID, version, and signature; it cannot enumerate arbitrary CLR members. Capability lookup,
+permissions, reentrancy, thread affinity, cancellation, and exception translation are part of the
+cache key or runtime identity where they affect semantics. A shared host registry does not itself
+bridge values between profiles or grant an ambient platform surface.
+
+An artifact-provider capability is a distinct capability kind rather than an ordinary import: it
+answers a guest-initiated load with a descriptor and bytes instead of a value. It is declared,
+allowlisted, versioned, and audited separately; registering value capabilities never implies one;
+and a composition that omits it makes every guest-initiated load fail deterministically.
 
 ---
 
-## 8. Milestones
+## 8. Sharing between profiles without a lowest-common-denominator core
 
-Every milestone records current evidence separately from plan statements. A status update may
-mark an item complete only when its objective exit gate has durable commands, logs, manifests, and
-source identities.
+Two profiles written independently will otherwise duplicate real work: bounded binary reading,
+control-flow validation, dispatch scaffolding, position tables. The rule that keeps that from
+becoming either duplication or a mushy common core is:
+
+> **Share mechanism. Never share semantics.**
+
+Mechanism is *how* something is done safely — reading an untrusted length, running a worklist to
+fixpoint, charging a budget. Semantics is *what* the thing means — values, frames, types, opcodes,
+syntax trees. Mechanism generalizes across languages because it is language-free. Semantics does
+not generalize; an attempt to share it produces a lowest-common-denominator model that fits no
+language well, which invariant 4 exists to prevent.
+
+Applied to the concrete candidates:
+
+| Candidate | Verdict |
+|---|---|
+| Bounded binary reading: checked arithmetic, variable-length integers, framing, allocation guards | **Core-owned from day one** (`Broiler.VM.Binary`). The core's own envelope needs it and every profile verifier needs it, so it has two consumers before any profile exists. |
+| Descriptor matching, verified handles, limit intersection, envelope, lifecycle, budgets, diagnostics identity, host registry | **Already core-owned.** No new component; the rule is simply that a profile never re-implements them. |
+| A verification framework: worklist and fixpoint over a control-flow graph, parameterized by the profile's abstract domain | **Extract later, do not predict.** Two verifiers will share the shape and share no domain. Open it when the second verifier exists and the duplication is measured. |
+| Lexing, source positions, diagnostic formatting | **Only when a second text front end exists.** Until then it is one profile's private code wearing a shared name. |
+| A shared syntax tree or parser (`Broiler.VM.Parser.AST` and similar) | **No.** A syntax tree is the most language-specific artifact in a pipeline, and a binary-format profile has no parser and no tree at all. Such a component would have one consumer and would encode one language's grammar into the core's namespace. |
+| Shared value representation, frame layout, or opcode set | **No.** These are the semantics the core exists not to own. |
+
+**The extraction gate.** A new shared component is opened only when all four hold: two or more
+profiles already implement the behavior; the implementations are compared and the shared part is
+identified from real code rather than anticipated; the shared part is expressible without naming
+any language concept; and extracting it does not create a profile-to-profile dependency. Failing
+any one, the duplication is documented and kept. Duplicated mechanism is cheap; a wrong shared
+abstraction is not.
+
+---
+
+## 9. The intended first profiles
+
+Neither profile is planned by this roadmap and no core gate depends on either. They are recorded
+here so the contract is designed against real requirements rather than an imagined average
+language, and so that a later profile roadmap can be written without renegotiating the core.
+
+### JavaScript
+
+Expected to require, beyond the baseline in section 4:
+
+- **guest-initiated loads** for `eval`, the Function constructor, dynamic `import()`, and module
+  specifier resolution;
+- **asynchronous instantiation** if module graphs with top-level await are in its approved scope;
+- **external suspension** if breakpoints and stepping are in its approved scope;
+- **shared aggregate budgets** if Worker-style agents place several runtimes under one host
+  ceiling; and
+- suspension and resumption for generators and async functions.
+
+Each of those is why the corresponding core contract exists. Together they are the reason section
+2's amendment procedure is written before the first profile rather than after it.
+
+**Seeding.** The JavaScript profile will be started from a **copy** of the legacy `Broiler.JS`
+component taken after its in-flight fix programme completes, used as a base and template rather
+than as a dependency. That decision carries conditions:
+
+- the snapshot is a named commit, recorded in the profile's own roadmap, and it is taken only once
+  the legacy fix work has landed and the core contract is accepted, so the copy is adapted to a
+  stable contract instead of chasing one;
+- the copy is a fork with its own history. No project reference, package reference, or shared
+  source link runs between Broiler.VM and any legacy Broiler component in either direction, and an
+  architecture test enforces that;
+- fixes do not flow across the fork in either direction after the snapshot. Each side owns its own
+  defects from that point, and neither is described as the other's upstream; and
+- because the seed is a large existing codebase rather than a greenfield interpreter, the core's
+  profile-facing contract must be reachable by code that was not written for it. VM-1 checks this
+  by shaping the fixture profile's adapter after a non-trivial existing runtime, not only after a
+  contract-shaped toy.
+
+### WebAssembly
+
+Expected to require, beyond the baseline in section 4: binary decoding and type/stack validation
+of structured control flow; an immutable verified module distinct from each mutable instance;
+typed imports and exports resolved through an explicit linker; traps as profile results rather
+than process failures; imported memories, tables, and globals with declared aliasing and lifetime
+rules across instances; and a pinned specification and conformance-suite revision that its own
+manifest fixes.
+
+It is also expected to need **no** parser, **no** text format, and **no** guest-initiated loads in
+its first version, which makes it the useful counterweight when judging whether a proposed core
+feature is genuinely general or is one language's need in disguise.
+
+Its conformance corpus is distributed as text scripts, so its roadmap will need a test-only
+ingestion path. The core's obligation is only the general rule already in section 12: test tooling
+and text parsing stay out of every product package and Native AOT closure.
+
+---
+
+## 10. Relationship to the legacy Broiler.JS component
+
+`Broiler.JS` is a **legacy component**. It keeps its own roadmap, its own status ledger, its own
+release cadence, and its current consumers, and it is not part of Broiler.VM's graph, gates, or
+evidence. Broiler.VM does not depend on it, extend it, wrap it, or replace it on any schedule
+stated here.
+
+Consequences worth stating plainly, because the alternative is discovering them later:
+
+- **Two engines coexist.** The shipping browser stack keeps using the legacy component while
+  Broiler.VM and its profiles are built. Retirement, migration, or indefinite coexistence is a
+  product decision recorded outside this roadmap; nothing here assumes any of the three.
+- **No evidence transfers.** Legacy conformance results, benchmarks, and Native AOT samples are
+  not Broiler.VM evidence, and no core gate may cite them.
+- **The legacy IL/bytecode differential is not a core oracle.** A future profile chooses its own
+  oracle; the core's oracle is the fixture profile and its own contract tests.
+- **Copying is allowed; depending is not.** Sections 9's seeding conditions govern any code taken
+  from the legacy component.
+
+---
+
+## 11. Milestones
+
+Current state lives in [the status ledger](roadmap.status.md), which is the authority for what has
+been accepted. This section states planned work and objective exit gates only; a milestone is
+never complete because its design appears here.
 
 ### VM-0 — Freeze ownership, terminology, and the build-proven graph
 
-- **Owner:** Broiler.VM architecture owner with Broiler.JS front-end/runtime and WebAssembly-profile
-  owners; release/AOT reviews the composition roots.
-- **Current evidence:** No `Broiler.VM` implementation or verified project graph exists. The
-  Broiler.JS expression-model/emitter split is landed seed evidence, while
-  [Phase 6 status](../../Broiler.JS/docs/roadmap/Phase-6.status.md) records zero production VM
-  items. Existing browser-Wasm applications do not implement a Wasm interpreter.
-- **Next action:** Write the boundary ADR and project-shell spike. Pin profile terminology,
-  dependency direction, package hypotheses, stable IDs, first Wasm feature manifest, JavaScript
-  deployment decision crosswalk, host boundary, and raw-payload/envelope rules.
-- **Dependencies:** Broiler.JS MOD-M2/MOD-M3 graph and AOT evidence; the JavaScript capability scope
-  selected by MOD-M9/Phase 6 item 6-0; named ownership for the Wasm standard manifest.
+- **Owner:** Broiler.VM architecture owner, with release/AOT review of the composition roots.
+- **Next action:** Write the boundary ADR and project-shell spike. Pin terminology, dependency
+  direction, package hypotheses, stable ID policy, the minimum lifecycle and profile-neutral
+  operation-result contracts, trusted resource-limit precedence, and immutable
+  raw-payload/envelope ownership. Assign core contract version 1 and publish its amendment
+  procedure. Decide and record the guest-initiated-load contract, the artifact-provider capability
+  shape, the external-suspension transitions, whether asynchronous instantiation is admitted, and
+  whether aggregate budgets are a core object or a host responsibility — each explicitly, even
+  where the first release ships no implementation. State the section 4 profile-facing checklist
+  and the section 8 sharing rule and extraction gate. Record the legacy boundary in section 10 as
+  an architecture-tested rule, not a convention.
+- **Dependencies:** Named ownership for the core contract and its amendments. No dependency on any
+  profile, on the legacy component, or on the legacy component's in-flight work.
 - **Objective exit gate:** An acyclic shell graph builds; architecture tests express every
-  forbidden edge; the ADR names package/composition roots, profile/version semantics, RIDs,
-  security ownership, and support terminology; no unresolved document describes a VM profile as
-  a JavaScript bootstrap or compiler profile.
+  forbidden edge, including any edge to a legacy Broiler component; the ADR names package and
+  composition roots, profile/version semantics, RIDs, security ownership, lifecycle states,
+  result/payload ownership, resource authority, verified-artifact ownership, and the supported
+  source-level profile contract; core contract version 1 is assigned and its amendment procedure
+  is published; the guest-initiated-load, asynchronous-instantiation, external-suspension, and
+  aggregate-budget questions each carry a recorded decision rather than silence.
 
-### VM-1 — Build the semantics-neutral runtime and static catalog
+### VM-1 — Build the semantics-neutral runtime, catalog, and fixture profile
 
 - **Owner:** Broiler.VM core/runtime owner.
-- **Current evidence:** Broiler.JS has explicit bootstrap and typed registry patterns, but there is
-  no VM-wide profile contract, immutable catalog, or aggregate composition.
-- **Next action:** Implement the minimal contracts, builder, descriptor validation, direct factory
-  catalog, per-runtime executor creation, result taxonomy, limits, cancellation, diagnostics, and
-  a fake profile used only for contract tests. Add direct JavaScript and WebAssembly entries as
-  shells without claiming their semantics complete.
-- **Dependencies:** VM-0 graph/ADR and package names; no dependency on production JavaScript or Wasm
-  opcode implementation.
-- **Objective exit gate:** Core/catalog tests prove deterministic registration, duplicate/alias
-  rejection, unknown-profile and version failures, catalog-order independence, per-runtime state
-  isolation, and explicit absence of reflection/name-based discovery. Trimmed and Native AOT test
-  hosts construct the fake, JavaScript-shell, and WebAssembly-shell profiles through direct roots.
+- **Next action:** Implement the contracts, bounded binary primitives, builder, descriptor
+  validation, direct factory catalog, per-runtime executor creation, profile-neutral
+  operation-result envelopes, typed profile payload boundary, limits, cancellation, diagnostics,
+  lifecycle states, and thread-affinity and reentrancy rules. Implement whichever of
+  guest-initiated-load mediation, artifact-provider registration, external-suspension transitions,
+  and aggregate budget metering VM-0 assigned to the core, including their refusal paths. Build
+  the fixture profile as the primary proof vehicle and shape its adapter after a non-trivial
+  existing runtime, so the contract is not accidentally fitted to a toy.
+- **Dependencies:** VM-0 graph and ADR.
+- **Objective exit gate:** Core and catalog tests prove deterministic registration,
+  duplicate/alias rejection, unknown-profile and unsupported-version failures, catalog-order
+  independence, per-runtime state isolation, legal and illegal lifecycle transitions,
+  cancellation and disposal behavior, declared thread affinity and reentrancy, typed
+  profile-payload preservation, and the explicit absence of reflection or name-based discovery.
+  The fixture profile exercises a guest-initiated load through a fixture provider, deterministic
+  refusal where no provider is registered, external suspension and resume, and aggregate budget
+  exhaustion across several runtimes. Trimmed and Native AOT test hosts construct the fixture
+  profile through the generic contract. The accepted contract is recorded with its version.
 
 ### VM-2 — Establish bounded artifacts, verification, and resource enforcement
 
-- **Owner:** Broiler.VM core security owner plus each profile verifier owner.
-- **Current evidence:** The portable JavaScript numeric seed validates a narrow immutable format;
-  no common artifact descriptor, Wasm verifier, shared limit contract, corruption corpus, or
-  coverage-guided fuzz result exists.
-- **Next action:** Implement descriptor/profile matching, bounded readers, verifier result
-  contracts, common envelope parsing where approved, resource-budget propagation, deterministic
-  failure classes, malformed corpora, and fuzz entry points. Build one safe vertical artifact for
-  each profile shell before expanding semantics.
-- **Dependencies:** VM-1 runtime/catalog; VM-0 artifact ADR; profile owners must define their first
-  format/feature versions and limits.
+- **Owner:** Broiler.VM core security owner.
+- **Next action:** Implement descriptor and profile matching, bounded outer-envelope parsing where
+  approved, the opaque immutable verified-artifact handle, trusted host/profile/artifact limit
+  intersection, explicit default and omission behavior, invocation-only tightening, deterministic
+  failure classes, a fixture malformed corpus, and fuzz entry points. Bound guest-initiated loads:
+  depth, fan-out, cumulative nested bytes and verifier work, charging to the requesting operation,
+  and intersection of the nested handle's ceilings with the remaining allowance.
+- **Dependencies:** VM-1 runtime and catalog; VM-0 artifact and resource ADR.
 - **Objective exit gate:** Truncated, corrupt, oversized, mismatched, unknown-version, and
-  resource-hostile artifacts fail before execution without out-of-budget allocation. Unit,
-  property, and fuzz suites retain minimized regressions. The same failure categories are stable
-  in JIT, trimmed, and Native AOT hosts.
+  resource-hostile fixture artifacts fail before execution without out-of-budget allocation.
+  Effective policy is computed before allocation and never exceeds the host ceiling. Execution
+  consumes only the verified handle; tests mutate, dispose, and concurrently overwrite the
+  caller's original buffer after verification without changing behavior. Unit, property, and fuzz
+  suites retain minimized regressions, and the same failure categories are stable in JIT, trimmed,
+  and Native AOT hosts. Omitted limits inherit materialized bounded policy, invocation overrides
+  only tighten it, and a raised ceiling requires a newly verified handle. A fixture guest-initiated
+  load cannot exceed, extend, or escape its requesting operation's budget; recursive and fan-out
+  provider requests terminate at their configured bounds; and a composition with no registered
+  provider refuses every request deterministically.
 
-### VM-3 — Deliver the JavaScript built-in profile
+### VM-3 — Prove the public profile contract and exact composition closures
 
-- **Owner:** Broiler.JS semantics/compiler owners and the Broiler.VM JavaScript-profile owner.
-- **Current evidence:** The numeric `Portable` runtime/compiler and execution-only Native AOT
-  sample are seeds only. Phase 6 records no general JavaScript interpreter, shared production
-  semantic-IR migration, accepted JavaScript-profile ABI, format, verifier, or three-way conformance result.
-- **Next action:** Follow Phase 6 ordering: scaffold the independent expected/IL/VM harness; migrate
-  the IL backend to shared production semantic IR; specify the JavaScript `ValueSlot`, frame,
-  environment, call, GC-root, completion, and suspension ABI; then grow format, verifier, lowering,
-  and interpreter in vertical semantic slices. Register the resulting executor through VM-1's
-  direct JavaScript descriptor.
-- **Dependencies:** VM-0 through VM-2; the terminal JavaScript capability/deployment ADR; the
-  applicable Broiler.JS MOD-M2/MOD-M3/MOD-M4 boundaries. Runtime compilation additionally depends
-  on an AOT-clean parser/semantic/lowering closure.
-- **Objective exit gate:** Every feature in the approved JavaScript manifest matches an independent
-  expected result on the current IL and VM arms; malformed/resource cases pass VM-2; the
-  execution-only application publishes and runs representative verified bytecode on every claimed
-  RID; every approved runtime-compiler composition separately compiles source inside its published
-  Native AOT process and executes it; precise exclusions and failure modes are public. This gate
-  makes no performance claim.
+- **Owner:** Broiler.VM architecture and developer-experience owner with release engineering.
+- **Next action:** In a separate consumer project, implement an application-local profile using
+  only the public source contract, and compose it by direct typed registration. Reserve the
+  `Broiler.*` ID namespace and require an application-owned reverse-domain namespace for consumer
+  profiles. Validate catalog and descriptor governance, direct factories, package roots, and the
+  exact closure of each named composition. Prove that adding a second profile requires no change
+  to the core runtime or execution loop.
+- **Dependencies:** VM-1 and VM-2 with stable public-candidate descriptor, verified-artifact, and
+  executor contracts. No dependency on a product profile.
+- **Objective exit gate:** A consumer profile is added without changing the core runtime, the
+  execution loop, or any Broiler-owned package, and without reflection, name-based loading, or an
+  extension directory. Single-profile and two-profile compositions each publish and run under
+  trimming and Native AOT, and each closure report contains exactly the declared profiles and no
+  fixture or test assembly. CI detects duplicate or reserved IDs, undocumented entries, missing
+  factories, forbidden edges, and catalog drift. The source-compatibility promise this exposes is
+  frozen in VM-6; no binary plug-in ABI is implied.
 
-### VM-4 — Deliver the WebAssembly built-in profile
+### VM-4 — Harden lifecycle, concurrency, diagnostics, and host integration
 
-- **Owner:** Broiler.VM WebAssembly-profile owner, with security review for validation and host
-  imports.
-- **Current evidence:** The repository contains browser-WebAssembly application/deployment work,
-  but no Broiler bytecode VM that decodes, validates, instantiates, and executes Wasm modules.
-- **Next action:** Pin the conformance-suite revision and initial proposal manifest, then implement
-  binary decoding, validation, typed frames, module instantiation, numeric/control/function slices,
-  globals, memories, tables, imports/exports, and traps vertically. Defer every unpinned proposal
-  with a deterministic validation result.
-- **Dependencies:** VM-0 through VM-2; approved Wasm feature and host-import manifests; provenance
-  and licensing review for the pinned conformance corpus.
-- **Objective exit gate:** The supported pinned WebAssembly spec-test manifest passes with no
-  unexplained failures; unsupported proposals and malformed/resource-hostile modules fail
-  deterministically; trap/import/memory/table lifecycle suites pass; WebAssembly-only and aggregate
-  applications publish and run representative modules under Native AOT on every claimed RID. The
-  manifest, not the profile name alone, defines the support claim.
+- **Owner:** Broiler.VM runtime owner with host-integration and concurrency owners.
+- **Next action:** Validate and harden the lifecycle, affinity, reentrancy, cancellation, result,
+  and disposal rules frozen in VM-0/VM-1. Test independent runtimes and multiple fixture profiles
+  under create/verify/instantiate/run/suspend/resume/cancel/dispose loops; enforce host capability
+  allowlists and typed signatures; attach stable artifact and position diagnostics; and measure
+  reclamation of frames, artifacts, interned data, and caches. Stress guest-initiated loads under
+  cancellation and disposal, external suspension and resume including a client that abandons a
+  paused operation, and aggregate budget exhaustion across concurrent runtimes.
+- **Dependencies:** VM-1 through VM-3.
+- **Objective exit gate:** Stress and soak suites show deterministic isolation, bounded
+  cancellation, correct host-exception translation, no cross-runtime state leakage, no
+  use-after-dispose, and a declared memory plateau. A guest-initiated load in flight is cancelled
+  and disposed with its requesting operation and leaves no partially verified state; an externally
+  suspended operation resumes, cancels, or disposes deterministically and never blocks disposal
+  indefinitely; and a shared aggregate budget is honored by concurrent runtimes rather than
+  multiplied by them. Diagnostics identify profile, version, and artifact locations without
+  leaking host secrets. Host imports cannot reach undeclared CLR surface.
 
-### VM-5 — Prove composition and additional built-in extensibility
+### VM-5 — Baseline the core's own overhead
 
-- **Owner:** Broiler.VM architecture/developer-experience owner with release engineering.
-- **Current evidence:** The intended direct catalog is documented, but no third profile fixture,
-  catalog drift check, or single-profile/aggregate package closure proves that it remains
-  extensible without runtime discovery.
-- **Next action:** Add a minimal test-only built-in profile using the contributor sequence, generate
-  or validate the catalog/support manifest, add architecture tests for direct factories and package
-  roots, and publish JS-only, Wasm-only, and aggregate closure reports.
-- **Dependencies:** VM-1 and VM-2; both required profile shells must expose their final descriptor
-  shape. Product JavaScript/Wasm completeness is not required to test catalog mechanics.
-- **Objective exit gate:** A fixture profile is added without changing the core execution loop or
-  using reflection; CI detects duplicate IDs, undocumented entries, missing factories, forbidden
-  edges, and catalog/manifest drift; the three supported composition roots contain exactly their
-  declared profiles and publish successfully under trimming and Native AOT.
+- **Owner:** Performance owner with the core runtime owner.
+- **Next action:** Take uninstrumented decision-grade baselines of everything the core costs a
+  profile: verification throughput per byte, catalog construction and lookup, runtime creation and
+  disposal, budget metering overhead per operation and per host call, guest-initiated-load
+  mediation, envelope read and write, diagnostics capture, startup, image and package size, and
+  resident-set plateau. Measure on JIT and Native AOT with the fixture profile.
+- **Dependencies:** VM-2 for verification, VM-4 for lifecycle. No dependency on a product profile.
+- **Objective exit gate:** Each measurement has a predeclared rule, a comparable control, an A/A
+  lane validity check, and retained repetitions. The core publishes what it costs so a profile can
+  budget against it, and states plainly that no language performance claim follows from any of it.
+  Optimization is funded only against one of these baselines.
 
-### VM-6 — Harden lifecycle, concurrency, diagnostics, and host integration
+### VM-6 — Package, publish, and continuously recertify the core
 
-- **Owner:** Broiler.VM runtime owner with JavaScript, WebAssembly, host-integration, and concurrency
-  owners.
-- **Current evidence:** Broiler.JS has a concurrency roadmap and isolated runtime mechanisms, but
-  there is no cross-profile lifecycle, reentrancy, cancellation, host-failure, or memory-plateau
-  evidence for Broiler.VM.
-- **Next action:** Test independent runtimes and profile mixtures under create/load/run/cancel/
-  dispose loops; define thread affinity and reentrancy; enforce host capability allowlists and
-  typed signatures; attach stable source/bytecode/module diagnostics; and measure reclamation of
-  frames, modules, memories, interned data, and caches.
-- **Dependencies:** Correct vertical slices from VM-3 and VM-4; any shared artifacts or mutable
-  optimizer state additionally require the ownership/publication gates in the Broiler.JS
-  modernization concurrency plan.
-- **Objective exit gate:** Stress and soak suites show deterministic isolation, bounded cancellation,
-  correct exception/trap translation, no cross-runtime state leakage, no use-after-dispose, and a
-  declared memory plateau. Diagnostics identify profile/version/artifact locations without leaking
-  host secrets. Host imports cannot reach undeclared CLR surface.
-
-### VM-7 — Take per-profile baselines and fund only measured optimization
-
-- **Owner:** Performance owner plus the affected profile owner; persistence/security owns stored
-  format changes.
-- **Current evidence:** Broiler.JS Phases 7–9 describe gates but record no accepted production VM
-  measurements. There is no Broiler.VM WebAssembly baseline. Catalogue labels and results from the
-  current IL engine are not VM-profile evidence.
-- **Next action:** Take uninstrumented decision-grade JavaScript and WebAssembly baselines on their
-  representative JIT and Native AOT workloads. Attribute decode/verify, dispatch, values/boxing,
-  calls, properties or memories/tables, host calls, allocation, GC, RSS, startup, image/package,
-  artifact size, and tail latency. Open persistence, feedback, quickening, superinstruction,
-  encoding, or PGO work only under its own measured gate.
-- **Dependencies:** VM-3 or VM-4 correctness for the profile being measured; the repository's
-  decision-grade measurement rules; VM-6 ownership for mutable/shared state. JavaScript IL tier-up
-  additionally depends on the Phase 9 dynamic-code-capable entry gate.
-- **Objective exit gate:** Each funded optimization ends accepted, retained as an owned/expiring
-  experiment, deferred, or removed under a predeclared decision rule. Candidate/control semantics
-  remain conformant; allocation, GC, memory, startup, code/image/artifact size, and tail guardrails
-  pass. No result from one profile is generalized to another without a separate population and
-  measurement.
-
-### VM-8 — Package, publish, and continuously recertify
-
-- **Owner:** Broiler.VM release owner with package, security, API, documentation, and profile
-  owners.
-- **Current evidence:** There are no Broiler.VM packages, public API baseline, feed-consumer tests,
-  release support table, Native AOT RID bundle, or rollback contract.
-- **Next action:** Finalize only the package boundaries justified by VM-0 evidence; create pristine
-  feed consumers and JS-only/Wasm-only/aggregate samples; freeze API and artifact promises; publish
-  support/exclusion tables; complete dependency, license, security, and human review; and wire
-  graph/catalog/AOT/conformance drift checks into required CI.
-- **Dependencies:** VM-3 and VM-4 release manifests, VM-5 compositions, VM-6 hardening. VM-7
-  optimization is not required unless a product threshold says the correct baseline is unshippable.
-- **Objective exit gate:** Every advertised package restores from a feed without repository project
-  references, its public API/package graph matches the baseline, all required conformance and
-  malformed-input suites pass, every claimed RID publishes and runs the declared composition with
-  warnings as errors, notices/reviews are complete, rollback is tested, and recertification triggers
-  are documented.
+- **Owner:** Broiler.VM release owner with package, security, API, and documentation owners.
+- **Next action:** Finalize only the package boundaries justified by VM-0 evidence; create
+  pristine feed consumers and samples that use public APIs only; freeze the API, the source-level
+  profile contract, the core contract version, and the artifact promises; publish support and
+  exclusion tables; complete dependency, license, security, and human review; and wire graph,
+  catalog, AOT, and contract drift checks into required CI and the status ledger.
+- **Dependencies:** VM-0 through VM-4. VM-5 is required only where a product threshold says the
+  measured core overhead is unshippable.
+- **Objective exit gate:** Every advertised package restores from a feed without repository
+  project references; the public API and package graph match the baseline; all malformed-input and
+  contract suites pass; every claimed RID publishes and runs the declared compositions with
+  warnings as errors; notices and reviews are complete; rollback is tested; and recertification
+  triggers are documented. The support table states the core contract version and states that the
+  core ships no language profile.
 
 ### Delivery order
 
 ```text
-VM-0 graph/ownership
-  └→ VM-1 core/static catalog
-       └→ VM-2 artifact/verifier/resource boundary
-            ├→ VM-3 JavaScript correctness ─┐
-            ├→ VM-4 WebAssembly correctness ├→ VM-6 hardening ─→ VM-8 release
-            └→ VM-5 future-profile proof ───┘          │
-                                                       └→ VM-7 measured branches
+VM-0 graph, ownership, core contract version 1
+  └→ VM-1 neutral runtime, catalog, fixture profile
+       └→ VM-2 immutable artifact, verification, resource boundary
+            ├→ VM-3 public profile contract and exact closures
+            │    └→ VM-4 lifecycle, concurrency, diagnostics hardening
+            │         ├→ VM-5 core overhead baselines
+            │         └→ VM-6 package, publish, recertify
+            └→ (profile roadmaps begin against the accepted contract)
 ```
 
-VM-3 and VM-4 may proceed in parallel after VM-2. VM-5 can use shells and a fixture before either
-profile is feature-complete. VM-7 is per-profile and may begin for one accepted profile while the
-other remains under correctness work. VM-8 advertises only the profiles whose gates have closed.
+A profile roadmap may begin as soon as VM-1's contract is accepted, and its own gates belong to
+its own component. Nothing in VM-0 through VM-6 waits for a profile, and no profile result closes
+a core gate.
 
 ---
 
-## 9. Test and evidence matrix
+## 12. Test and evidence matrix
 
 | Area | Required tests/evidence | Failure that blocks release |
 |---|---|---|
-| Core/catalog | duplicate/alias/unknown IDs; version mismatch; explicit selection; order independence; factory identity; fake third profile | reflection/name discovery, silent replacement, or catalog/manifest drift |
-| Dependency architecture | acyclic graph; core references no profile; profiles do not reference one another; JavaScript profile/compiler has no IL/Emit closure; composition contains only declared profiles | forbidden project/assembly edge or undeclared dynamic loading |
-| Artifact safety | truncation, invalid sizes/indexes/opcodes/sections/control flow, corrupt envelope, checksums, resource exhaustion, minimized fuzz corpus | invalid instruction executes, unbounded allocation, crash, hang, or nondeterministic failure class |
-| JavaScript correctness | pinned independent expected outcomes, current IL arm, VM arm, source/precompiled/round-trip arms, approved test262 and host manifests | unexplained expected/IL/VM delta or undocumented exclusion |
-| WebAssembly correctness | pinned spec-test/proposal manifest, validation, instantiation, traps, numeric edges, memory/table/global/import/export behavior | unexplained supported-manifest failure or acceptance of an undeclared proposal |
-| Lifecycle/concurrency | repeated load/run/cancel/dispose, independent runtimes, mixed profiles, reentrancy, memory plateau, cache eviction | shared mutable leakage, race, unbounded retention, use-after-dispose, or unbounded cancellation latency |
-| Host security | typed allowlist, signature mismatch, permission denial, thread affinity, host exception translation, secret-safe diagnostics | arbitrary CLR discovery/access or cross-runtime capability leak |
-| Native AOT | JavaScript-only, WebAssembly-only, aggregate, and each approved runtime-compiler composition; declared RID/device matrix; warnings/suppressions inventory | a claimed composition fails publish/run or reaches forbidden dynamic code |
-| Packaging | pristine feed restore/build/run, API/package baselines, dependency/license/notices, image/package sizes | repository-only success, undeclared dependency, missing notice, or unsupported surface implied by package/API |
-| Performance | uninstrumented candidate/control identity, A/A lane validity, per-profile workload, allocation/GC/RSS/startup/tail/code/image/artifact sizes | claim lacks a predeclared rule, semantic bundle, resource guardrail, or comparable control |
+| Core/catalog | duplicate, alias, unknown and reserved IDs; version and core-contract-version mismatch; explicit selection; order independence; factory identity; application-local fixture; profile-neutral outcomes and typed payload preservation | reflection or name discovery, silent replacement, core reference to a concrete profile, an undeclared or forked core contract version, or catalog drift |
+| Dependency architecture | acyclic graph; core references no profile; no profile references another; no product package references a fixture or test project; no edge to a legacy Broiler component in either direction | any forbidden project or assembly edge, or undeclared dynamic loading |
+| Artifact safety and policy | truncation, invalid sizes, indexes and framing, corrupt envelope, post-verification caller-buffer mutation, disposal and concurrent overwrite, verified-handle identity and lease lifetime, explicit default adoption, omitted-limit inheritance, host/profile/artifact intersection, invocation-only tightening, guest-initiated-load depth, fan-out and cumulative bounds, nested budget charging, missing-provider refusal, minimized fuzz corpus | invalid input executes, caller mutation changes execution, one runtime invalidates another's handle, omission becomes unbounded, policy raises a verified ceiling, a nested load enlarges or escapes its requesting operation's budget, a provider-less composition executes acquired bytes, unbounded allocation, crash, hang, or nondeterministic failure class |
+| Persistence ownership | core outer-schema compatibility, rejection and migration; header and profile dispatch; atomic corruption handling; profile payload and cache-key boundaries; content authorization separate from checksum | ambiguous migration owner, outer compatibility mistaken for payload compatibility, torn update treated as valid, or checksum treated as authenticity |
+| Lifecycle/concurrency | frozen state transitions; repeated verify, instantiate, run, suspend, resume, cancel and dispose; external suspension, resume and abandonment; guest-initiated load under cancellation and disposal; independent runtimes; multiple fixture profiles; thread affinity; reentrancy; shared aggregate budget exhaustion; memory plateau | profile-specific state leaks into the core result enum, shared mutable leakage, race, unbounded retention, use-after-dispose, an externally suspended operation that cannot be resumed, cancelled or disposed, concurrent runtimes multiplying a host ceiling, or unbounded cancellation latency |
+| Host security | typed allowlist, signature mismatch, permission denial, thread affinity, host exception translation, artifact-provider allowlist and its absence, secret-safe diagnostics | arbitrary CLR discovery or access, a provider reachable without declaration, a tool reached outside the declared closure, or cross-runtime capability leak |
+| Native AOT | every named composition, the application-local profile consumer, and each declared RID; warnings and suppressions inventory; shipped dependency-closure audit | a claimed composition fails publish or run, reaches forbidden dynamic code or test tooling, or loses a directly rooted profile or capability |
+| Packaging | pristine feed restore, build and run; API and package baselines; dependency, license and notices; image and package sizes | repository-only success, undeclared dependency, missing notice, or a language capability implied by package or API |
+| Core overhead | uninstrumented candidate and control identity, A/A lane validity, per-operation attribution, allocation, GC, RSS, startup, image and package size | a claim without a predeclared rule, a comparable control, or retained repetitions |
 
-Generated results are evidence artifacts, not substitutes for pinned manifests and durable summaries.
-Every accepted bundle records source revision, clean/dirty inputs, SDK/runtime, publish properties,
-profile and feature versions, RID/device, effective GC/JIT/AOT state, commands, and raw outputs.
-
----
-
-## 10. Release gates
-
-A Broiler.VM preview or stable release must satisfy all applicable gates:
-
-1. **Support truth:** the public table names VM profile, feature manifest, deployment/compiler
-   composition, host capabilities, RIDs, and deterministic exclusions separately.
-2. **Graph and registration:** generated/current dependency closure matches VM-0, the catalog is
-   static and documented, and no portable composition reaches dynamic loading or IL Emit.
-3. **Correctness and safety:** the profile's conformance manifest, malformed corpus, fuzz
-   regressions, resource limits, lifecycle, and host-security suites pass.
-4. **Native AOT:** each advertised composition publishes and runs representative artifacts on its
-   declared matrix with trim/AOT warnings treated as errors. Suppressions are reviewed and scoped.
-5. **Packages and consumers:** packages restore from a feed, samples use public APIs, API/package
-   baselines and notices are current, and aggregate/single-profile claims match their closures.
-6. **Operations:** diagnostics, cancellation, rollback, format-version rejection/migration,
-   vulnerability response, and recertification owners are named.
-7. **Measurement honesty:** performance is not a correctness prerequisite unless the product ADR
-   sets a threshold. Every published performance statement meets the owning measurement gate.
-
-Recertification is required when the SDK/runtime, compiler or verifier, profile format/feature
-manifest, package graph, host capability surface, Native AOT settings, RID matrix, cache identity,
-resource defaults, conformance corpus, or representative workload changes.
+Generated results are evidence artifacts, not substitutes for pinned manifests and durable
+summaries. Every accepted bundle records source revision, clean or dirty inputs, SDK and runtime,
+publish properties, core contract version, RID and device, effective GC/JIT/AOT state, commands,
+and raw outputs.
 
 ---
 
-## 11. Risks and stop conditions
+## 13. Release gates
+
+A Broiler.VM core preview or stable release must satisfy all applicable gates:
+
+1. **Support truth:** the public table names the core contract version, the compositions,
+   host capabilities, guest-initiated-load and external-control support, RIDs, and deterministic
+   exclusions separately, and states that no language profile ships with the core.
+2. **Graph and registration:** the generated dependency closure matches VM-0, the catalog is
+   static and documented, the generic runtime references no concrete profile, no product
+   composition reaches dynamic loading or IL emit, and no edge reaches a legacy Broiler component.
+   The public source-level profile contract and ID namespace pass VM-3; no binary plug-in ABI is
+   implied.
+3. **Correctness and safety:** the malformed corpus, fuzz regressions, immutable verified-artifact
+   boundary, trusted limit intersection, guest-initiated-load bounds, lifecycle, and host-security
+   suites pass against the fixture and application-local profiles.
+4. **Lifecycle and results:** the frozen ownership, state-transition, affinity, reentrancy,
+   suspension, resumption, external-control, guest-initiated-load, cancellation, and disposal
+   rules pass at the declared core contract version. Language outcomes remain typed profile
+   payloads behind profile-neutral envelopes, and a guest-initiated load adds no core result
+   category and cannot exceed its requesting operation's budget.
+5. **Native AOT:** each advertised composition publishes and runs on its declared matrix with
+   trim and AOT warnings treated as errors. Suppressions are reviewed and scoped.
+6. **Packages and consumers:** packages restore from a feed, samples use public APIs, API and
+   package baselines and notices are current, and every closure matches its claim.
+7. **Operations and persistence:** diagnostics, cancellation, rollback, format-version rejection,
+   envelope recovery, vulnerability response, and recertification owners are named.
+8. **Measurement honesty:** core overhead is published with its method, and no language
+   performance is claimed or implied.
+
+Recertification is required when the SDK or runtime, core contract version, package graph, host
+capability surface, Native AOT settings, RID matrix, cache identity, resource defaults, or
+representative workload changes.
+
+---
+
+## 14. Risks and stop conditions
 
 | Risk | Mitigation / stop condition |
 |---|---|
-| A generic core becomes a lowest-common-denominator language runtime | Keep opcodes, values, frames, verifier rules, and semantics profile-owned. Stop a proposed shared primitive when it introduces a profile-to-profile dependency or semantic conversion tax without evidence. |
-| JavaScript semantics are forked between IL and VM | Migrate IL to the shared production semantic IR first and require the independent expected/IL/VM gate. Agreement between two Broiler backends is not an oracle. |
-| The numeric portable seed freezes an unsuitable ABI | Treat it as execution/AOT seed evidence only; prove the general JavaScript ABI before accepting a persisted format. |
-| WebAssembly scope grows with every proposal | Pin a feature manifest and reject everything else deterministically. A proposal enters only with owner, tests, resources, AOT evidence, and maintenance budget. |
-| Static registration silently stops being extensible | Prove a test-only third profile, catalog/manifest drift tests, and direct composition roots. Do not replace compile-time extensibility with reflection. |
-| Trimming removes a profile or host path | Directly root factories/capabilities and publish/run JS-only, Wasm-only, aggregate, and runtime-compiler samples. A linker annotation without execution is insufficient. |
-| Aggregate package size becomes mandatory | Keep core/profile/aggregate boundaries explicit and add single-profile compositions only where measured package evidence justifies them. |
-| Malicious bytecode exhausts verifier or runtime resources | Checked/bounded readers, pre-execution verification, fuel/cancellation, memory/table/frame/import budgets, fuzzing, and stable resource failure results are release gates. |
-| Mutable feedback or caches leak across runtimes | Keep canonical artifacts immutable and mutable state owner-scoped; require disposal/plateau/concurrency tests before sharing anything. |
-| A common host registry becomes arbitrary CLR interop | Typed allowlisted capabilities only; no member enumeration or name-based CLR binding in portable profiles. |
-| One host is mistaken for JS/Wasm interoperability | Keep profiles isolated. Fund a bridge only after a separate value/lifetime/exception/security ADR and conformance plan. |
-| Internal formats become accidental public contracts | Version from the first byte, but promise persistence only after its explicit Phase 8/VM-7 gate. Reject unsupported versions deterministically. |
-| VM work is justified as an unmeasured IL speed-up | Capability/correctness comes first. On dynamic-code-capable hosts, use accepted per-profile candidate/control evidence before any performance claim. |
+| The core becomes a lowest-common-denominator language runtime | Keep opcodes, values, frames, verifier rules, and semantics profile-owned. Apply section 8's extraction gate before sharing anything, and reject a shared primitive that introduces a profile-to-profile dependency or a semantic conversion tax. |
+| A core designed with no real profile fits no real profile | Prove every gate against a fixture profile shaped after a non-trivial existing runtime, keep section 9's requirement lists current, and treat a profile that cannot be expressed through section 4 as a contract defect rather than a profile problem. |
+| An approved profile capability does not fit the frozen core contract | Amend it: mint the next core contract version, state what changed, and recertify affected evidence. Do not add a language-specific path to the core state machine, and do not maintain a second core contract per profile. |
+| The core result enum grows one case per language | Keep only profile-neutral outcome categories in the core and carry language outcomes as typed profile payloads. Reject a profile that requires the core execution loop to learn its semantics. |
+| Guest-initiated loading becomes an unverified or unbounded back door | Route every acquired byte through ordinary verification, reach the host only through a declared artifact-provider capability, charge nested work to the requesting operation, and bound depth, fan-out, and cumulative bytes. A composition with no provider refuses deterministically. |
+| A compiler or tool is reached from inside a profile | Keep it behind the artifact-provider capability so it stays inside the declared composition and Native AOT closure. A composition that declares no tool has no path to one. |
+| Concurrent runtimes multiply a host ceiling | Meter fuel, wall-clock, allocation, and live-runtime counts against a shared aggregate budget as well as each runtime, and refuse creation and resumption once the parent allowance is spent. |
+| External pause becomes an unbounded or privileged side channel | Declare who may request external suspension, keep it distinct from guest suspension and terminal cancellation, bound how long a paused operation may block disposal, and leave what a paused profile exposes to the profile. |
+| Static registration silently stops being extensible | Prove an application-local consumer profile through the public source contract, governed IDs, catalog drift tests, and direct composition roots. Do not replace compile-time extensibility with reflection or imply a binary plug-in ABI. |
+| Trimming removes a profile or host path | Root factories and capabilities directly and publish and run every named composition. A linker annotation without execution is insufficient. |
+| Legacy code is copied into a profile and quietly becomes a dependency | Enforce section 9's seeding conditions with an architecture test on the graph, record the snapshot commit, and state that fixes do not flow across the fork. |
+| The legacy component is treated as Broiler.VM evidence | No core gate may cite legacy conformance, benchmarks, or AOT samples. Section 10 is a gate, not a preference. |
+| Malicious input exhausts the verifier or runtime | Checked and bounded readers, pre-execution verification, fuel and cancellation, depth and allocation budgets, fuzzing, and stable resource failure results are release gates. |
+| An artifact weakens host policy by declaring larger limits | Treat the host ceiling as authoritative, allow the profile to tighten it, allow the artifact only to request less, compute the intersection before allocation, and record the effective policy in the verified handle. |
+| Caller-owned bytes change after verification | Snapshot or fully decode into an immutable profile-bound handle and execute only that handle. Mutation, disposal, and concurrent overwrite tests are release blockers. |
+| Internal formats become accidental public contracts | Version from the first byte and promise persistence only after its explicit gate. Reject unsupported versions deterministically. |
+| The core is justified by unmeasured performance | Capability and correctness come first. The core publishes only its own overhead and never a language claim. |
 
-Stop or re-scope a milestone when its graph is cyclic, a portable closure reaches Emit or runtime
-discovery, a verifier cannot bound work before allocation/execution, the independent conformance
-oracle cannot be maintained, the declared Native AOT composition cannot publish and run, or the
-named ownership/maintenance ceiling is absent. A difficult or slow milestone is not itself a stop
-condition; an untruthful support claim is.
+Stop or re-scope a milestone when the graph is cyclic, a product closure reaches dynamic code,
+test tooling, or a legacy component, a verifier cannot produce an immutable bounded representation
+before execution, trusted policy can be weakened by artifact input, a second core state machine is
+maintained for one language, the declared Native AOT composition cannot publish and run, or the
+named ownership or maintenance ceiling is absent. A difficult or slow milestone is not itself a
+stop condition; an untruthful support claim is.
 
 ---
 
-## 12. Platform and specification references
+## 15. Platform references
 
-VM-0 records immutable revisions for implementation and release evidence; these moving links
-are discovery entry points, not substitutes for the pinned manifests:
+VM-0 records immutable revisions for implementation and release evidence; these moving links are
+discovery entry points, not substitutes for the pinned manifests:
 
 - [.NET Native AOT deployment and limitations](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/)
 - [.NET Native AOT warning guidance](https://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/fixing-warnings)
-- [WebAssembly Core Specification](https://webassembly.github.io/spec/core/)
-- [WebAssembly specification tests](https://github.com/WebAssembly/spec/tree/main/test)
+- [.NET trimming options and analysis](https://learn.microsoft.com/en-us/dotnet/core/deploying/trimming/trimming-options)
 
-## 13. Existing Broiler.JS plan crosswalk
-
-This roadmap is the component and multi-profile owner. The linked Broiler.JS documents remain the
-detailed JavaScript-profile work plans and evidence ledgers:
-
-- [Broiler.JS roadmap index](../../Broiler.JS/docs/roadmap/README.md)
-- [Modernization program and MOD-M9 decision](../../Broiler.JS/docs/roadmap/Modernization.md)
-- [Modernization delivery DEL-9 through DEL-11](../../Broiler.JS/docs/roadmap/ModernizationDelivery.md)
-- [Assembly restructure and AOT boundary](../../Broiler.JS/docs/roadmap/Assemblies.md)
-- [Assembly dependency rules](../../Broiler.JS/docs/architecture/dependencies.md)
-- [Phase 6 plan](../../Broiler.JS/docs/roadmap/Phase-6.md) and
-  [status](../../Broiler.JS/docs/roadmap/Phase-6.status.md)
-- [Phase 7 plan](../../Broiler.JS/docs/roadmap/Phase-7.md) and
-  [status](../../Broiler.JS/docs/roadmap/Phase-7.status.md)
-- [Phase 8 plan](../../Broiler.JS/docs/roadmap/Phase-8.md) and
-  [status](../../Broiler.JS/docs/roadmap/Phase-8.status.md)
-- [Phase 9 plan](../../Broiler.JS/docs/roadmap/Phase-9.md) and
-  [status](../../Broiler.JS/docs/roadmap/Phase-9.status.md)
-- [Broiler.JS public API and profile claims](../../Broiler.JS/docs/public-api.md)
-
-Evidence is never transferred by analogy. VM core or WebAssembly progress does not close a
-Broiler.JS Phase 6 item; JavaScript conformance does not close a WebAssembly milestone; a
-WebAssembly Native AOT run does not prove a JavaScript runtime compiler closure; and Phase 9's
-optional IL adaptivity is not part of the common VM release gate.
+A profile's own specification references belong in that profile's roadmap, not here.

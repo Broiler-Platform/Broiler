@@ -20,7 +20,7 @@ lineage comes from [Yantra JS](https://github.com/yantrajs/yantra).
 | `Broiler.Graphics` | Managed bitmap/codecs/raster core plus a Windows Direct2D backend |
 | `Broiler.HTML` | Modular HTML/CSS renderer; derived in part from HTML Renderer |
 | `Broiler.JS` | JavaScript parser, compiler, runtime, built-ins, and host integration; derived in part from Yantra JS |
-| `Broiler.VM` *(planned)* | NativeAOT-compatible bytecode execution with statically composed JavaScript and WebAssembly built-in profiles |
+| `Broiler.VM` *(planned)* | NativeAOT-compatible bytecode execution core; a statically composed host for language profiles, which are separate components |
 | `Broiler.HtmlBridge` | DOM, renderer, and JavaScript integration |
 | `Broiler.App` | WPF browser application |
 | `Broiler.Browser.Windows` / `Broiler.Browser.Linux` / `Broiler.Browser.Android` | Platform-specific browser applications sharing `Broiler.Browser.Core` |
@@ -185,7 +185,7 @@ Broiler/
 ├── Broiler.Graphics/          # Git submodule
 ├── Broiler.HTML/              # Git submodule; contains a nested graphics checkout
 ├── Broiler.JS/                # Git submodule; contains DateTime, Regex, and Unicode
-├── Broiler.VM/                # planned bytecode VM component; roadmap and profile design
+├── Broiler.VM/                # planned bytecode execution core; roadmap and profile contract
 ├── eng/solutions.json         # focused-solution entry points and platform boundaries
 └── Broiler.*.slnx             # generated product/platform/test workspaces
 ```
