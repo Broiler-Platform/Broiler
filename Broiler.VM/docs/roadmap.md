@@ -567,13 +567,12 @@ any other dependency, and calls the core's ordinary verification entry point wit
 There is no command-line tool, build integration, or packaged toolchain anywhere on that path. A
 browser is the worked example in section 11.
 
-Three concerns hide behind the word *compiler*, and they do not share a home:
+Two concerns hide behind the word *compiler*, and they do not share a home:
 
 | Concern | Language-specific | Home |
 |---|---|---|
 | **Format** — opcodes, schema, encoder and decoder | yes | `Broiler.VM.Profile.<Language>.Format` |
 | **Lowering** — source to bytecode | yes, and only where Broiler compiles the language itself | `Broiler.VM.Profile.<Language>.Compiler` |
-| **Driver and artifact tooling** — command line, build integration, inspection, packaging | no | nothing yet; see below |
 
 **The format package is the pivot.** A compiler and an executor must agree on the bytecode, and
 neither may depend on the other, so the format is one authority that both reference. The compiler
@@ -699,6 +698,12 @@ Consequences worth stating plainly, because the alternative is discovering them 
 - **Two engines coexist.** The shipping browser stack keeps using the legacy component while
   Broiler.VM and its profiles are built. Retirement, migration, or indefinite coexistence is a
   product decision recorded outside this roadmap; nothing here assumes any of the three.
+- **Legacy is not frozen.** It continues to gain language features and fixes on its own schedule.
+  Two things follow. A seeding snapshot is a point-in-time fork that diverges further with every
+  legacy release, so the later it is taken the more it carries and the more it costs to adapt.
+  And the legacy component's performance characteristics are a property of that component, not an
+  argument for this one: no core gate is justified by them, and section 16 keeps an unmeasured
+  speed-up out of the case for Broiler.VM.
 - **No evidence transfers.** Legacy conformance results, benchmarks, and Native AOT samples are
   not Broiler.VM evidence, and no core gate may cite them.
 - **The legacy IL/bytecode differential is not a core oracle.** A future profile chooses its own
