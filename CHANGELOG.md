@@ -9,6 +9,28 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `document.elementFromPoint` descends into an SVG, and an SVG shape reports a
+  real `getBoundingClientRect`. Unlike the engine fixes above this is in the
+  main repository, so it is live.
+
+  An SVG child is not in the CSS box tree, so nothing below the `<svg>` root
+  had a rect: every shape measured `0,0,0,0`, and hit testing — which skips an
+  element with an empty rect — could not descend past the root, so
+  `elementFromPoint` over a `<rect>` returned the `<svg>`.
+
+  A shape's rect now comes from its own geometry attributes, composing the
+  viewport's rendered origin, the `viewBox` transform and the accumulated
+  `translate()` of the ancestor `<g>` chain. `getBoundingClientRect` and hit
+  testing go through the same resolution, so they cannot disagree about where a
+  shape is, and a group's rect is the union of its children's — which is what
+  having shape rects at all makes possible.
+
+  `rect`, `image`, `foreignObject`, `circle`, `ellipse`, `line`, `polyline` and
+  `polygon` resolve exactly. `path` and `use` report no rect, as before, rather
+  than a wrong one; a transform list containing anything but `translate()`
+  leaves its subtree untranslated; `preserveAspectRatio` is modelled at its
+  default. Each of those is pinned by its own test.
+
 - Import attributes are enforced rather than parsed and dropped. Delivered as
   `patches/0004-js-import-attribute-enforcement.patch` against `Broiler.JS`,
   so it is **not live until the patch is applied**.

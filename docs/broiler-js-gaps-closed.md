@@ -866,6 +866,38 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **SVG `elementFromPoint`.** **Fixed, and live** — this one is in the main repo, so unlike track 1's
+  and track 3's engine fixes it needs no patch and CI sees it.
+  <br>**Cause.** An SVG child is not in the CSS box tree, so nothing below the `<svg>` root had a
+  rect at all: `getBoundingClientRect` answered `0,0,0,0` for every shape, and hit testing — which
+  asks each element for a rect and skips anything empty — could never descend past the root.
+  `document.elementFromPoint` over a `<rect>` returned the `<svg>`. The group path that already
+  existed (a `<g>`'s rect is the union of its children's) could not help, because it had nothing to
+  union.
+  <br>**Fix.** A shape's client rect is resolved from its own geometry attributes, composing three
+  mappings outermost-first: the viewport's rendered origin from the box tree, the `viewBox`
+  transform, and the accumulated `translate()` of the ancestor `<g>` chain. One entry point serves
+  both `getBoundingClientRect` and hit testing, so the two cannot disagree about where a shape is —
+  wiring only the hit-test half would have left `elementFromPoint` finding a shape whose own
+  `getBoundingClientRect` still said zero.
+  <br>**Bounded on purpose.** `rect`, `image`, `foreignObject`, `circle`, `ellipse`, `line`,
+  `polyline` and `polygon` resolve exactly. `path` and `use` do not — a path needs the curve and
+  `use` needs its referent — and report no rect, which is what every shape did before, rather than a
+  confidently wrong one. Only `translate()` is accumulated; any other transform function leaves its
+  subtree untranslated rather than having some functions applied and others dropped.
+  `preserveAspectRatio` is modelled at its default. Each gap is pinned by its own test.
+  <br>**Evidence.** 17 regressions in `SvgShapeGeometryTests`, every expectation Chromium's measured
+  answer to the same markup from one probe run against both — including the two `viewBox` cases that
+  separate a plausible formula from the real one (a viewport whose aspect differs from the box's, and
+  a non-zero `min-x`/`min-y`). `GoogleSearchPolyfillTests.Document_HitTesting_Uses_Svg_Viewports_And_Rect_Geometry`
+  and its twin `Broiler.Wpt.Tests` assertion
+  `Wpt_CssomView_ElementFromPoint_Uses_Svg_Viewport_And_Rect_Geometry` both go red → green, which is
+  the two-for-one the [xUnit status](xunit-suite-status.md) predicted for this pair. Whole-suite
+  diffs against a same-container baseline show no regression in either project.
+  <br>**What it did not close,** and why: two other SVG hit-test assertions still fail, each now for
+  exactly one reason and both of them *layout* rather than scripting — `foreignObject` content is not
+  laid out, and an inline `<svg>` root is not placed in normal flow. Both are stated in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms).
 - **The `document` surface that names the document's own contents was half missing and half the
   wrong kind of object.** A probe of ~30 document properties against Chromium, run to decide whether
   `document.doctype` was a standalone item, returned one coherent cluster instead.

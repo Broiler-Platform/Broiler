@@ -519,6 +519,12 @@ public sealed partial class DomBridge
             if (isRoot)
                 return (0, 0, GetViewportReferenceLength(element, vertical: false), GetViewportReferenceLength(element, vertical: true));
 
+            // An SVG shape is not in the CSS box tree, so the layout rect below is 0×0 for it. Its
+            // geometry comes from its own attributes instead — the same resolution hit testing uses,
+            // so the two cannot disagree about where a shape is (see LayoutMetrics.SvgGeometry.cs).
+            if (TryGetSvgClientRect(element, out var svgRect))
+                return svgRect;
+
             return ComputeRenderedRect(element);
         });
 

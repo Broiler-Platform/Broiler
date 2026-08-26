@@ -231,12 +231,23 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 - **SVG lacks conforming live DOM integration** for features such as `requiredFeatures` and
   `SVGStringList`; serialized rendering prevents some script mutations and cascade changes from
   reaching paint.
-- **Three JS-visible failures remain in the current tests**: SVG `elementFromPoint`, writing-mode
-  `scrollIntoView`, and mutated iframe state. Two others once listed here no longer reproduce — a
-  `@keyframes` rule read from style text answers the same `type`/`name`/`cssRules.length` triple
-  (`7`/`spin`/`2`), and out-of-range `scrollTop`/`scrollLeft` writes clamp identically. That was a
-  spot check of one shape each rather than the failing cases the line was written from, so the
-  owning manifests are what should settle those two.
+- **Two JS-visible failures remain in the current tests**: writing-mode `scrollIntoView`, and
+  mutated iframe state. SVG `elementFromPoint`, the third, is fixed — see
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+  Two others once listed here no longer reproduce — a `@keyframes` rule read from style text answers
+  the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`), and out-of-range
+  `scrollTop`/`scrollLeft` writes clamp identically. That was a spot check of one shape each rather
+  than the failing cases the line was written from, so the owning manifests are what should settle
+  those two.
+- **Two layout gaps sit behind the remaining SVG hit-test assertions**, and they are layout rather
+  than scripting, which is why fixing SVG geometry did not close them. `foreignObject` content is
+  not laid out at all — an HTML child inside one has no box and does not even resolve a `display`,
+  so `elementFromPoint` over it reports the `foreignObject` rather than the child. And an inline
+  `<svg>` root is not placed in normal flow against its siblings: two stacked `<svg>` elements both
+  report `top: 0` instead of the second clearing the first. `GoogleSearchPolyfillTests`'s
+  `Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate` and
+  `Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow` are the two, and each now fails for
+  exactly one of these reasons and nothing else.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),
