@@ -9,6 +9,30 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `getComputedStyle` reports the user-agent stylesheet's `display`. In the main
+  repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  Every element whose display came from the UA sheet rather than an author rule
+  reported `inline`, the CSS initial value — a plain `<div>` as much as a
+  `<table>`, a `<script>` or a `<head>`. The bridge has both the table and the
+  resolution and applies them to the sparse projection its internal
+  layout/anchor/hit-test consumers read, but the JS binding's map is built by
+  the engine's `GetComputedStyle`, which backfills initial values; the seed
+  fills an *absent* `display`, and after that backfill the key is always
+  present. So nothing the UA sheet said about `display` reached script.
+
+  Rendering was never affected — the renderer reads the box tree — so this was
+  a CSSOM gap alone, which is why it survived so long. `getComputedStyle` now
+  takes `display` from the same memoised sparse projection, so the two paths
+  cannot answer differently, and the seed stays non-clobbering: an author rule,
+  an inline style, and `[hidden]`'s loss to an author rule all behave as before.
+
+  Two tags still differ from a browser, both gaps in the shared tag→display
+  table rather than in the path that now reads it, and both predating this
+  change: `<option>` is absent from the table, and `<summary>` is in it as
+  `list-item` unconditionally where HTML §15.3.9 scopes that to
+  `details > summary:first-of-type`.
+
 - The HTML content of an SVG `<foreignObject>` is laid out. In the main
   repository (`Broiler.Layout`), so it is live.
 

@@ -18,12 +18,20 @@ namespace Broiler.Cli.Tests;
 /// which re-parses it, so nothing the bridge computes about <c>display</c> reaches the renderer.
 /// </para>
 /// <para>
-/// The CSSOM is deliberately not asserted here. <c>getComputedStyle</c> reports <c>inline</c> for a
-/// <c>noscript</c> — but it reports <c>inline</c> for a <c>&lt;script&gt;</c> too, and for every
-/// other element the UA stylesheet hides, so that is one pre-existing gap on a different path
-/// (the JS binding does not consult <c>ApplyUserAgentDisplayDefaults</c>) rather than anything
-/// specific to <c>noscript</c>. Special-casing this one element there would have made it an
-/// arbitrary exception among equals; it wants its own change.
+/// The CSSOM is still not asserted here, but the reason has changed. This note used to record that
+/// <c>getComputedStyle</c> reports <c>inline</c> for a <c>noscript</c> — and for a
+/// <c>&lt;script&gt;</c>, and for every other element the UA stylesheet hides — as one pre-existing
+/// gap on a different path, the JS binding not consulting
+/// <c>ApplyUserAgentDisplayDefaults</c>. That gap is closed (see
+/// <see cref="UserAgentDisplayComputedStyleTests"/>), and a <c>&lt;script&gt;</c> now reports
+/// <c>none</c>.
+/// </para>
+/// <para>
+/// A <c>noscript</c> still reports <c>inline</c>, and that is now the right answer rather than a
+/// symptom: Chromium answers <c>inline</c> for it too. The element is not hidden by a display rule
+/// at all — with scripting enabled the parser takes its content as raw text and the element itself
+/// stays inline — which is exactly the split this class already asserts, where what decides the
+/// rendering is <see cref="HtmlPostProcessor"/> and not a computed <c>display</c>.
 /// </para>
 /// </remarks>
 public sealed class NoscriptRenderingTests

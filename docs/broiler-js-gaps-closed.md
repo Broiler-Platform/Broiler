@@ -862,6 +862,42 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **`getComputedStyle` did not apply the user-agent stylesheet's `display`.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch.
+  <br>**Cause.** Every element whose display comes from the UA sheet rather than an author rule
+  reported `inline`, the CSS initial value — a plain `<div>` as much as a `<table>`, a `<script>` or
+  a `<head>`. The bridge has both the table and the resolution (`CssUserAgentDefaults.DisplayValues`
+  and `ApplyUserAgentDisplayDefaults`) and applies them to the *sparse* projection its ~90 internal
+  layout/anchor/hit-test consumers read, but the JS binding's map is built by the engine's
+  `GetComputedStyle`, which backfills initial values. So the seed could not simply be called on it:
+  `ApplyUserAgentDisplayDefaults` fills an *absent* `display`, and after the backfill the key is
+  always present — holding `inline`. Nothing the UA sheet said about `display` reached script.
+  <br>**Not a rendering defect.** The renderer reads the box tree and the internal consumers read
+  the sparse map, both of which carried the right value; only the CSSOM answer was wrong. That is
+  why it survived so long, and why it was mis-attributed once — the `foreignObject` record below
+  blamed the missing box for the `inline` its content reported, when a plain `<div>` in the body
+  answered `inline` too.
+  <br>**Fix.** `getComputedStyle`'s map takes `display` from `GetComputedProps` — the same memoised
+  sparse projection, with the explicit-`inherit` fold and the UA seed already applied — rather than
+  recomputing it. So the two paths cannot answer differently about what an element's display is, and
+  the seed stays non-clobbering: an author rule, an inline style and `[hidden]`'s loss to an author
+  rule all behave exactly as before.
+  <br>**Evidence.** 33 regressions in `UserAgentDisplayComputedStyleTests`, every expectation
+  Chromium's measured answer to the same markup from one probe run against both; 27 of them fail
+  before the change and all 33 pass after. A 32-tag probe went from every tag answering `inline` to
+  30 of 32 matching Chromium. Whole-suite diffs against a same-container baseline show no regression:
+  `Broiler.Cli.Tests` 38 distinct failures → 38, `Broiler.Wpt.Tests` 53 → 52. Three tests differed
+  between those runs and none is this change: `ScriptCompileAheadOverlapTests`'
+  thread-budget test (whose own record says it "fails on a loaded CI box for reasons that have
+  nothing to do with the code"), the 20s `ScrollWriteGeometryTimeoutTests` render guard, and two
+  `RunnerModuleScriptTests` — each verified to pass in isolation with the change in place, the render
+  guard in 8–9s against its 20s ceiling.
+  <br>**What it did not close.** Two tags where Broiler still differs from Chromium, both gaps in the
+  shared tag→display table rather than in the path that now reads it, and both predating this change
+  — they were invisible while every element answered `inline`. They are stated in
+  [open](broiler-js-gaps-open.md#cssom-fonts-svg-and-js-visible-layout-algorithms) and pinned by
+  `TheTwoTagsWhereTheTableDivergesFromChromiumArePinned`.
+
 - **`foreignObject` content was not laid out at all.** **Fixed, and live** — entirely in the main
   repo (`Broiler.Layout`), so no patch and no submodule pointer to bump.
   <br>**Cause.** SVG internals are not CSS-visible here — the subtree is serialised back to markup

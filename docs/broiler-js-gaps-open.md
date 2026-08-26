@@ -252,19 +252,19 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
   change. Resolving it means placing the box after the viewport's used size is known rather than
   during the box fix-ups — the same "resolve against used size" shape as the nested-`<svg>` viewport
   whose own box position is not SVG-accurate either.
-- **`getComputedStyle` does not apply the UA stylesheet's `display`**, so every element whose display
-  comes from the UA sheet rather than an author rule reports the CSS initial value: a plain `<div>`
-  in the body answers `inline`, not `block`, and a `<script>` or `<noscript>` answers `inline` rather
-  than `none`. The bridge has the table and the resolution — `CssUserAgentDefaults.DisplayValues` and
-  `ApplyUserAgentDisplayDefaults` — but only the anchor resolver consults them; the JS binding's
-  computed map does not, so nothing the UA sheet says about `display` reaches script. It does reach
-  *rendering*, which is why this is a CSSOM gap and not a layout one: the elements lay out correctly.
-  <br>Recorded before now on a single element in `NoscriptRenderingTests` ("it reports `inline` for a
-  `<script>` too, and for every other element the UA stylesheet hides … it wants its own change") and
-  measured across elements while closing the `foreignObject` gap above, whose own record wrongly
-  attributed the `inline` to the missing box. Fixing it is a narrow change at one call site; what it
-  needs is a pass over the assertions written against the current answer, since it moves a value many
-  tests read.
+- **Two tags in the UA `display` table do not match a browser.** The remainder of the
+  `getComputedStyle` gap above, and a different kind of thing: the path is fixed, so what is left is
+  the content of `CssUserAgentDefaults.DisplayValues` — the table the renderer reads too, which is
+  why correcting it is a rendering change and not a CSSOM one.
+  <br>`<option>` is absent from the table, so it falls back to the CSS initial value and answers
+  `inline` where Chromium says `block`. `<summary>` is in it as `list-item` unconditionally, but HTML
+  §15.3.9 scopes that to `details > summary:first-of-type`: Chromium answers `list-item` for a
+  summary inside a `<details>` and `block` for a bare one. A flat tag→display map cannot express the
+  second, so that entry is a structural limit of the table rather than a missing row — closing it
+  means the UA sheet becoming selectors the cascade runs, not one more entry. Both are pinned by
+  `UserAgentDisplayComputedStyleTests.TheTwoTagsWhereTheTableDivergesFromChromiumArePinned`.
+  <br>The table lives in `Broiler.CSS`, a submodule this session cannot push to, so a fix there ships
+  as a patch rather than live — worth weighing against how small the two cases are.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),
