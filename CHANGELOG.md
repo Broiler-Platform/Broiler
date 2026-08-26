@@ -79,6 +79,24 @@ are versioned in lockstep during the preview.
 
 ### Added
 
+- `import.meta`, which was a SyntaxError ("import.meta not supported").
+  Delivered as `patches/0003-js-import-meta.patch` against `Broiler.JS`, so it
+  is **not live until the patch is applied**.
+
+  It carries `url` — the module's own absolute URL, so a transitively imported
+  module reports its own rather than the entry point's — and is otherwise an
+  empty, extensible, null-prototype object created once per module, so
+  `import.meta === import.meta` and a module can hang its own state off it.
+  Outside module code it stays an early SyntaxError, which is what a
+  `try { eval('import.meta') }` feature-detect expects to see.
+
+  `import.meta.resolve` is deliberately absent. The module resolver is
+  existence-based — it probes for the file and answers null when nothing is
+  there — while `resolve` is specified to hand back a URL whether or not
+  anything is at it, so building it on today's resolver would throw where a
+  browser answers. A page can feature-detect the absence; it cannot detect the
+  wrongness.
+
 - `ReadableStream` async iteration: `values()` and `@@asyncIterator`, so
   `for await (const chunk of response.body)` works. These were written with the
   stream but held back on the `for await` fix above, because an iterator over a

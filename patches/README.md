@@ -26,9 +26,10 @@ cd ..
 git add <Submodule>           # bump the pointer only after the push succeeds
 ```
 
-The numbering is an ordering hint, not a dependency: the two below touch disjoint files and each
-applies to the pinned pointer on its own, in either order. `git apply --check` both before starting
-if you are applying more than one.
+The numbering is an ordering hint, not a dependency: each patch below applies to the pinned pointer
+on its own. They were also verified as a series — `git am` of `0001`, `0002`, `0003` in that order
+against `ab5f797a` — and the engine suites were run on the resulting stack, so applying all three is
+a tested path rather than an assumed one.
 
 ---
 
@@ -114,3 +115,48 @@ repo's `JSModuleContext` subclass) overrides only `Resolve` / `GetModuleDirector
 `ReadModuleSourceAsync`, so it is unaffected either way; it was rebuilt and its
 module/subdocument/import tests run against the patched engine, 322/323, the one failure being the
 known iframe-module drain gap.
+
+---
+
+## `0003-js-import-meta.patch`
+
+- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Compiler/Expressions/FastCompiler.VisitMeta.cs`,
+  `Broiler.JavaScript.Modules/JSModule.cs`, `Broiler.JavaScript.Modules/JSModuleContext.cs`, plus the
+  new `Broiler.JavaScript.Modules.Tests/ImportMetaTests.cs`)
+- **Subject:** *Implement import.meta, with url on it and resolve deliberately absent*
+- **Based on:** `ab5f797a`, the currently pinned pointer
+
+`import.meta` was a SyntaxError — *"import.meta not supported"* — from the compiler's meta-property
+path, which handled only `new.target`. Deterministic rather than a crash, so it was carried as a
+capability decision. **The decision: `import.meta` is implemented, `url` is on it, `resolve` is not.**
+
+It compiles to a read of `meta` off the module record the body already receives as its `module`
+parameter, so the object's identity, its lazy creation and everything on it belong to the module host
+rather than to the compiler. `JSModule.Meta` creates it once and then returns the same object — a
+module is entitled to hang state off it — with a null prototype, carrying `url` and nothing else. The
+URL comes from a new `JSModuleContext.GetModuleUrl` virtual, because only the host knows what its
+keys are: an absolute URI is reported verbatim, a filesystem path becomes a `file://` URL. Returning
+null is meaningful — the object then carries no `url` rather than an invented one.
+
+**`resolve` is absent, and the reason is this context's resolver rather than the amount of code.**
+`Resolve` is existence-based: it probes the filesystem and answers null for a specifier that does not
+name a file that is there, while `import.meta.resolve` resolves a specifier to a URL whether or not
+anything is at it. Built on this resolver it would throw where a browser answers — a wrong answer to
+a resolution question rather than a missing one, and a page can feature-detect the absence but not
+the wrongness.
+
+Outside module code `import.meta` stays an early SyntaxError (ES2025 §13.3.12), which is what a
+`try { eval('import.meta') }` feature-detect expects.
+
+Eight regressions in `ImportMetaTests`; every expectation except `resolve` is Chromium's measured
+answer for a module in a page, from the same probe.
+
+**Verified as a series.** All three patches apply to the pinned pointer in numeric order with
+`git am`, and were tested together on that stack: integration 5178/5179, modules 126/126,
+module-extensions 5/5, built-ins 2215/2215, compiler 1400/1402, core/parser/runtime/ast clean — the
+three failures pre-existing and unrelated. `Broiler.Cli.Tests` against the fully patched engine has
+the **same 50 failures as the pinned pointer** (bare-container font/layout noise), with one
+additional load-sensitive worker-budget test that passes 3/3 in isolation on both.
+
+**Main-repo fallback:** none needed. Without the patch `import.meta` stays the deterministic
+SyntaxError it was.

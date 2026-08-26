@@ -62,8 +62,15 @@ below is host semantics and two decisions.
 
 ### Needs a product decision
 
-- **`import.meta`** reports "import.meta not supported" (deterministic, not a crash), and
-  `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
+- **`import defer`** (stage 3) is not parsed — a capability decision rather than a defect.
+  `import.meta`, listed here with it, is decided and implemented; see
+  [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics). What that decision left
+  open is **`import.meta.resolve`**, which is absent for a reason that is itself the next
+  decision: `JSModuleContext.Resolve` is existence-based — it probes for the file and answers null
+  when nothing is there — while `import.meta.resolve` resolves a specifier to a URL whether or not
+  anything is at it. Building it on today's resolver would throw where a browser answers. Making
+  the resolver able to answer without loading is the change that would unblock it, and it is
+  shared with anything else that needs to resolve without fetching.
 - **Import-attribute enforcement.** Import attributes now parse everywhere the grammar allows, but
   nothing acts on them: nothing reads `AstImportStatement.Attributes`, and the compiler's `import`
   call passes only the specifier, so enforcing anything means threading the attributes through to

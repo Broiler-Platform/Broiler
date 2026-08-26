@@ -453,6 +453,36 @@ The part-landed half of track 3. Live import bindings, the remaining defect of t
 family, are characterized but not fixed and stay in
 [in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
 
+- **`import.meta` is a SyntaxError.** **Decided and implemented — delivered as a submodule patch, so
+  it is not live in CI.** "import.meta not supported" came from the compiler's meta-property path,
+  which handled only `new.target`; deterministic rather than a crash, so it was carried as a
+  capability decision. **Decided: implement it, with `url` on it, and leave `resolve` out.**
+  <br>It compiles to a read of `meta` off the module record the body already receives as its
+  `module` parameter, so the object's identity, its lazy creation and everything on it belong to the
+  module host rather than to the compiler — which is what keeps `import.meta === import.meta` true
+  and lets a host with its own key form report its own URL without the compiler knowing what a
+  module key is. `JSModule.Meta` creates it once and then returns the same object (ES2025 §16.2.1.9;
+  a module is entitled to hang state off it), with a **null prototype**, carrying `url` and nothing
+  else. The URL comes from a new `JSModuleContext.GetModuleUrl` virtual: an absolute URI verbatim, a
+  filesystem path as a `file://` URL. Returning null is meaningful — the object then carries no
+  `url` rather than an invented one, so a key that cannot be a URL reads `undefined`, which a script
+  can detect.
+  <br>**`resolve` is out, and the reason is the resolver rather than the code.**
+  `JSModuleContext.Resolve` is existence-based, while `import.meta.resolve` resolves to a URL
+  whether or not anything is at it; built on today's resolver it would throw where a browser
+  answers — a wrong answer to a resolution question rather than a missing one, and a page can
+  feature-detect the absence but not the wrongness. The remainder is stated in
+  [open](broiler-js-gaps-open.md#needs-a-product-decision).
+  <br>Outside module code it stays an early SyntaxError (§13.3.12), which is what a
+  `try { eval('import.meta') }` feature-detect expects; inside module code compiled with no module
+  record it is a deterministic ReferenceError rather than a silent `undefined`.
+  <br>**Evidence.** Eight regressions in `ImportMetaTests`; every expectation except `resolve` is
+  Chromium's measured answer for a module in a page, from the same probe — identity stable,
+  prototype `null`, `Object.keys` `['url']`, and a transitively imported module reporting its own
+  URL rather than the entry point's.
+  <br>**Not live.** Ships as `patches/`'s *Implement import.meta, with url on it and resolve
+  deliberately absent*; the pointer is not bumped. No main-repo fallback is needed — without the
+  patch `import.meta` stays the deterministic SyntaxError it was.
 - **A JSON module's default import is `undefined`.** **Decided and fixed — but delivered as a
   submodule patch, so it is not live in CI.** This was listed as needing a product decision, and it
   did: the two specifications disagree about what a JSON file exports and one object cannot satisfy
