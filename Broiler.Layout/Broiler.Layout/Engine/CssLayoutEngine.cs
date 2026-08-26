@@ -2293,12 +2293,48 @@ internal static class CssLayoutEngine
             }
         }
 
+        // CSS2.1 §10.8.1: an atomic inline-block's baseline is its bottom margin edge, so two of
+        // different heights on one line stand on a shared baseline — the shorter is pushed down
+        // until their bottoms are flush. They were left where the flow put them, at the top of the
+        // line, so they came out top-aligned instead; an inline <svg> beside a taller one is the
+        // case this was found through, and a plain empty inline-block behaves identically.
+        //
+        // The shared bottom is taken from the atomic inlines themselves rather than from the
+        // line's baseline. The strut's baseline is the spec's answer, but this engine computes it
+        // without the half-leading that `line-height` contributes, so on a line whose strut is the
+        // taller of the two it sits well below the text and would push an atomic inline that far
+        // down the line — where today it is merely left at the top. Aligning them to each other
+        // fixes the case that is wrong without resting on a number that is not yet right: it can
+        // only ever move a box down onto a taller neighbour, and a line holding one atomic inline
+        // (or none) is left exactly as it was.
+        //
+        // It is the *margin* box that stands on the baseline, and the rectangle here is the border
+        // box, so the bottom margin is added on both sides of the comparison.
+        double atomicInlineBottom = double.MinValue;
+        foreach (var kvp in lineBox.Rectangles)
+        {
+            if (kvp.Key.UsesBottomMarginEdgeBaseline && !topBottomBoxes.Contains(kvp.Key))
+                atomicInlineBottom = Math.Max(atomicInlineBottom, kvp.Value.Bottom + kvp.Key.ActualMarginBottom);
+        }
+
         // --- Phase 1: Position all non-top/bottom boxes ---
         var boxes = new List<CssBox>(lineBox.Rectangles.Keys);
         foreach (CssBox box in boxes)
         {
             if (topBottomBoxes.Contains(box))
                 continue;
+
+            bool usesDefaultVerticalAlign = string.IsNullOrEmpty(box.VerticalAlign)
+                || box.VerticalAlign == CssConstants.Baseline;
+
+            if (usesDefaultVerticalAlign
+                && box.UsesBottomMarginEdgeBaseline
+                && atomicInlineBottom > double.MinValue)
+            {
+                lineBox.SetBaseLine(box,
+                    atomicInlineBottom - box.ActualMarginBottom - lineBox.Rectangles[box].Height);
+                continue;
+            }
 
             // For inline text boxes, SetBaseLine receives the desired
             // word-top position, so baseline-relative values must be

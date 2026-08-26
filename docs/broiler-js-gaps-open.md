@@ -234,21 +234,37 @@ See [the WPT shim record](wpt-rendering-gaps-fixed.md) and
 - **The three JS-visible failures this line was written for are all fixed** — SVG
   `elementFromPoint`, mutated iframe state, and writing-mode `scrollIntoView`; see
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  What is left of the line is the two layout gaps below, which are a different kind of thing.
+  What is left of the line is the layout gap below, which is a different kind of thing.
   Two others once listed here no longer reproduce — a `@keyframes` rule read from style text answers
   the same `type`/`name`/`cssRules.length` triple (`7`/`spin`/`2`), and out-of-range
   `scrollTop`/`scrollLeft` writes clamp identically. That was a spot check of one shape each rather
   than the failing cases the line was written from, so the owning manifests are what should settle
   those two.
-- **Two layout gaps sit behind the remaining SVG hit-test assertions**, and they are layout rather
-  than scripting, which is why fixing SVG geometry did not close them. `foreignObject` content is
-  not laid out at all — an HTML child inside one has no box and does not even resolve a `display`,
-  so `elementFromPoint` over it reports the `foreignObject` rather than the child. And an inline
-  `<svg>` root is not placed in normal flow against its siblings: two stacked `<svg>` elements both
-  report `top: 0` instead of the second clearing the first. `GoogleSearchPolyfillTests`'s
-  `Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate` and
-  `Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow` are the two, and each now fails for
-  exactly one of these reasons and nothing else.
+- **`foreignObject` content is not laid out at all**, which is layout rather than scripting and is
+  why fixing SVG geometry did not close it. The `<foreignObject>` element itself resolves a rect
+  from its own `x`/`y`/`width`/`height`, but the HTML subtree inside it has no box: a `<div>` in one
+  reports `0,0,0,0`, `offsetWidth`/`offsetHeight` of `0`, and a computed `display` of `inline`
+  rather than `block` — the initial value, because no box means no cascade result to read. So
+  `elementFromPoint` over the child reports the `foreignObject`. Chromium on the same markup lays
+  the child out against the `foreignObject`'s viewport rect: a `<div>` at
+  `x=20 y=30 width=100 height=40` inside a `foreignObject` at `(20,30) 150×90` reports
+  `20,30,100,40`, `display: block`, and `elementsFromPoint` returns
+  `foDiv, fo, svgRoot, BODY, HTML`.
+  <br>The parser is what suppresses it: `DomParser.CascadeApplyStyles` gives an outermost `<svg>`
+  `display: inline-block` and then sets every child box to `display: none`, because SVG internals
+  are not CSS-visible here and the subtree is serialized for `SvgRenderer` instead.
+  `<foreignObject>` is the one place SVG re-enters CSS layout, so it is the one child that must not
+  be hidden — it needs a box positioned at its viewport coordinates whose HTML children lay out
+  normally. That is a `Broiler.HTML` change.
+  <br>`GoogleSearchPolyfillTests`'s
+  `Document_HitTesting_Uses_Svg_Groups_Images_ForeignObject_And_Translate` fails for this reason and
+  nothing else. Its companion, `Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow`, was
+  listed here as a second layout gap — "an inline `<svg>` root is not placed in normal flow against
+  its siblings: two stacked `<svg>` elements both report `top: 0` instead of the second clearing the
+  first". That reading was wrong in both halves and is
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior):
+  the roots were already in normal flow, they do not stack in any browser, and the one number that
+  was wrong belonged to line-box alignment rather than to SVG.
 
 See [open WPT gaps](wpt-rendering-gaps-open.md),
 [MediaWiki computed-style evidence](mediawiki-vector-rendering.md),

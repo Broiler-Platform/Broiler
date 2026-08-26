@@ -88,7 +88,7 @@ the ones marked **fixed** carry a minimal regression in
   level, a non-async function body — stays the SyntaxError it was. Landed in the pinned
   `Broiler.JS` submodule (`98db1fc`); regressions in `Track1LanguageTests`.
 - **A method call whose argument is a method call is silently skipped inside an `async` function.**
-  **Root-caused and fixed — but delivered as a submodule patch, so it is not live in CI.**
+  **Root-caused and fixed.**
   `trace.push(items.join('+'))` did not run: no error was raised and the statement after it ran
   normally, and `console.log(list.join(', '))` is the same shape, which is what made a
   small-looking bug worth chasing.
@@ -119,12 +119,11 @@ the ones marked **fixed** carry a minimal regression in
   with the patch applied: integration 5178/5179, built-ins 2215/2215, compiler 1400/1402, modules
   104/104, core/parser/runtime/module-extensions clean — the three failures are pre-existing and
   unrelated, and reproduce with the change stashed.
-  <br>**Not live.** The push to `Broiler-Platform/Broiler.JS` returns 403, so this ships as
-  `patches/`'s *Stop a nested member call clobbering the outer call inside a generator body* and the
-  pointer is deliberately not bumped. There is no main-repo fallback and there cannot be one — the
-  defect is in how the compiler allocates temps for a member call, and nothing at a main-repo layer
-  can intercept call compilation. Until the patch is applied, every `async` function that writes
-  `a.b(c.d())` still skips that statement.
+  <br>**Live.** Upstream in `Broiler.JS` as *Stop a nested member call clobbering the outer call
+  inside a generator body* (`5b5e92f9`) and carried by the pinned pointer, so CI compiles it. It was
+  first handed over as a patch file, and a main-repo fallback was never possible — the defect is in
+  how the compiler allocates temps for a member call, and nothing at a main-repo layer can intercept
+  call compilation.
 - `for await…of` **hangs the agent** when the step result is not already settled. **Fixed.** This
   was a deadlock rather than a wrong answer, which is why it never appeared as a failing test:
   `JSIterator` unwrapped the result of `next()` with `promise.Task.GetAwaiter().GetResult()` — a
@@ -453,8 +452,8 @@ The part-landed half of track 3. Live import bindings, the remaining defect of t
 family, are characterized but not fixed and stay in
 [in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
 
-- **Import attributes parse but nothing acts on them.** **Decided and implemented — delivered as a
-  submodule patch, so it is not live in CI.** Nothing read `AstImportStatement.Attributes`, the three
+- **Import attributes parse but nothing acts on them.** **Decided and implemented.**
+  Nothing read `AstImportStatement.Attributes`, the three
   `export … from` forms discarded theirs outright, and the compiler's call to the loader passed only
   the specifier. So `with { type: 'json' }` — the portable form, and the only one a browser accepts
   on a JSON module — was accepted and ignored, and so was `with { flavour: 'nonsense' }`.
@@ -485,11 +484,11 @@ family, are characterized but not fixed and stay in
   — it was written against `with { type: 'javascript' }`, which is not a module type any platform
   defines and which enforcement now correctly rejects. Modules 160/160, parser 198/198, integration
   5178/5179, compiler 1400/1402, built-ins 2215/2215.
-  <br>**Not live.** Ships as `patches/`'s *Enforce import attributes instead of parsing and dropping
-  them*, the one patch in the backlog with a real ordering dependency — it extends a signature the
-  JSON-module patch introduces.
-- **`import.meta` is a SyntaxError.** **Decided and implemented — delivered as a submodule patch, so
-  it is not live in CI.** "import.meta not supported" came from the compiler's meta-property path,
+  <br>**Live.** Upstream in `Broiler.JS` as *Enforce import attributes instead of parsing and
+  dropping them* (`39beed96`) and carried by the pinned pointer. It extends a signature the
+  JSON-module fix introduces, so it lands after it.
+- **`import.meta` is a SyntaxError.** **Decided and implemented.**
+  "import.meta not supported" came from the compiler's meta-property path,
   which handled only `new.target`; deterministic rather than a crash, so it was carried as a
   capability decision. **Decided: implement it, with `url` on it, and leave `resolve` out.**
   <br>It compiles to a read of `meta` off the module record the body already receives as its
@@ -515,11 +514,10 @@ family, are characterized but not fixed and stay in
   Chromium's measured answer for a module in a page, from the same probe — identity stable,
   prototype `null`, `Object.keys` `['url']`, and a transitively imported module reporting its own
   URL rather than the entry point's.
-  <br>**Not live.** Ships as `patches/`'s *Implement import.meta, with url on it and resolve
-  deliberately absent*; the pointer is not bumped. No main-repo fallback is needed — without the
-  patch `import.meta` stays the deterministic SyntaxError it was.
-- **A JSON module's default import is `undefined`.** **Decided and fixed — but delivered as a
-  submodule patch, so it is not live in CI.** This was listed as needing a product decision, and it
+  <br>**Live.** Upstream in `Broiler.JS` as *Implement import.meta, with url on it and resolve
+  deliberately absent* (`33bb2b81`) and carried by the pinned pointer.
+- **A JSON module's default import is `undefined`.** **Decided and fixed.**
+  This was listed as needing a product decision, and it
   did: the two specifications disagree about what a JSON file exports and one object cannot satisfy
   both, which is why the obvious mechanical fixes all fail. ES2025 gives a JSON module exactly one
   export, `default`, holding the parsed value, and no named exports; CommonJS
@@ -542,11 +540,9 @@ family, are characterized but not fixed and stay in
   deviation, and a JavaScript module pinned as unaffected. Eleven of the fourteen fail before the
   change. Modules 118/118, module-extensions 5/5, built-ins 2215/2215, integration 5167/5168,
   compiler 1400/1402, with the three failures pre-existing and unrelated.
-  <br>**Not live.** Ships as `patches/`'s *Give a JSON module the ES namespace ESM wants and require
-  the value CommonJS wants*; the push to `Broiler-Platform/Broiler.JS` returns 403 and the pointer
-  is deliberately not bumped. No main-repo fallback is needed to keep CI honest — without the patch
-  JSON modules stay exactly as broken as they were rather than half-working, and
-  `BridgeModuleContext` overrides only the resolution/read seams, so it is unaffected either way.
+  <br>**Live.** Upstream in `Broiler.JS` as *Give a JSON module the ES namespace ESM wants and
+  require the value CommonJS wants* (`c1c295e2`) and carried by the pinned pointer.
+  `BridgeModuleContext` overrides only the resolution/read seams, so it is unaffected by the change.
 
 The two `Broiler.JS` patches carrying these three fixes were written as submodule patches because
 the push to the submodule remote returned 403 (it is outside this session's GitHub scope). They have
@@ -865,6 +861,56 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   in `WindowScreenGeometryTests`.
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
+
+- **An atomic inline-level box was left at the top of its line instead of standing on its
+  baseline.** **Fixed, and live** — `Broiler.Layout` is main-repo, so no patch.
+  <br>**The gap this was filed as does not exist.** It was recorded as the second of two SVG layout
+  gaps — "an inline `<svg>` root is not placed in normal flow against its siblings: two stacked
+  `<svg>` elements both report `top: 0` instead of the second clearing the first" — and the test
+  pinning it,
+  `GoogleSearchPolyfillTests.Document_HitTesting_Keeps_Inline_Svg_Roots_In_Normal_Flow`, expected
+  `0|98`. Measured against Chromium at Broiler's own viewport width, both halves are wrong. An
+  outermost `<svg>` is inline-level, so the two roots sit **side by side on one line** in every
+  browser — they do not stack, and the expected `98` describes a block-stacking model nothing
+  implements. Broiler already put them side by side, at the same coordinates Chromium does, and the
+  hit results already agreed. Exactly one number differed: the shorter root's `top`, `0` where
+  Chromium says `42`.
+  <br>**Cause, and it is not about SVG.** CSS2.1 §10.8.1 gives an *atomic* inline — an
+  `inline-block` with no in-flow line box, or one whose `overflow` is not `visible` — a baseline at
+  its **bottom margin edge**, so two of different heights on one line come out bottom-flush.
+  `CssLineBox.SetBaseLine` implemented that for `<img>` and returned early for an `inline-block`
+  using the initial `vertical-align: baseline`, on a premise written into the comment beside it:
+  that an inline-block's flow position is already on the baseline. It is not — the flow puts it at
+  the top of the line, exactly like an image. So every atomic inline-block was top-aligned. An
+  inline `<svg>` is one of them only because the parser gives it `display: inline-block` and
+  `overflow: hidden`; a plain empty `<span style="display:inline-block">` measured identically
+  wrong, which is what showed the gap was in line layout rather than in SVG.
+  <br>**Fix.** `CssBox.UsesBottomMarginEdgeBaseline` names the spec's two conditions, and
+  `ApplyVerticalAlignment` bottom-aligns the atomic inlines on a line to the tallest of them,
+  margin boxes included. `SetBaseLine` then moves the box with `OffsetTop` so its descendants go
+  with it. An `inline-block` that lays out its own text is deliberately untouched: its baseline
+  comes from its last line box, which this engine does not track.
+  <br>**Why the alignment target is the tallest atomic inline and not the line's baseline.** The
+  spec's answer is the line's baseline, and using it was tried first. It moves boxes *down* onto a
+  strut baseline this engine computes without the half-leading `line-height` contributes, so a
+  `font-size: 100px; line-height: 1` line put its baseline about a quarter of the font height too
+  low and dragged the box down with it — `NativeAnchorInlineCbPipelineTests` and
+  `NativeAnchorAbsInlineCbPipelineTests` both caught that, and Chromium leaves the box at the line
+  top there. Adding the half-leading term was tried too and did not reach the case (the owning
+  block's `ActualLineHeight` is `normal` on that line). Aligning the atomic inlines to each other
+  fixes what is measurably wrong without resting on a number that is not yet right: it can only
+  move a box down onto a taller neighbour, and a line with one atomic inline or none is untouched.
+  The strut half-leading is a separate defect and is not fixed here.
+  <br>**Evidence.** Nine regressions in `AtomicInlineBaselineTests`, every expectation Chromium's
+  measured answer to the same markup at the same viewport width — the two `<svg>` roots, the same
+  pair as plain inline-blocks, equal heights unmoved, three boxes all aligning to the tallest, an
+  explicit `vertical-align` still winning, and a border and a bottom margin each counted into the
+  aligned box. One pins the known limit above. The mis-stated test is retargeted to Chromium's
+  answer, `42|0|180|230|50|secondRect|secondRect|secondSvg`, with the probe moved onto the shape so
+  it still exercises hit-test descent, and it passes. `Broiler.Layout.Tests` 1317/1317; the
+  `Broiler.Cli.Tests` failure list is byte-identical to the pre-change baseline with that one test
+  moving from failing to passing; the WPT pixel suite is unchanged at 101 passed / 34 failed with
+  the same failure list.
 
 - **Writing-mode `scrollIntoView` mapped the block axis onto nothing.** **Fixed, and live** — main
   repo, so no patch.

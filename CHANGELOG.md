@@ -9,6 +9,31 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- An atomic inline-level box stands on its line's baseline instead of sitting at
+  the top of the line. In the main repository (`Broiler.Layout`), so it is live.
+
+  CSS2.1 §10.8.1 puts the baseline of an `inline-block` with no in-flow line box,
+  or one that clips its overflow, at its bottom margin edge — so two of different
+  heights on one line come out bottom-flush. Only `<img>` was aligned that way.
+  The inline-block half of `CssLineBox.SetBaseLine` returned early for the initial
+  `vertical-align: baseline`, on the premise that an inline-block's flow position
+  is already on the baseline; the flow in fact places it at the top of the line,
+  exactly like an image, so every atomic inline-block came out top-aligned. An
+  inline `<svg>` is one of them, because the parser lays it out as a replaced
+  `inline-block` with `overflow: hidden`: two `<svg>` roots of different heights
+  on one line had their tops flush where a browser has their bottoms flush.
+
+  The boxes are aligned to the tallest atomic inline on the line rather than to
+  the line's baseline, which is what the spec says. That is a deliberate limit:
+  this engine computes the strut baseline without the half-leading `line-height`
+  contributes, so on a line whose strut is the taller of the two the baseline sits
+  well below the text, and aligning to it moves boxes further from a browser than
+  leaving them alone does. Aligning them to each other can only move a box down
+  onto a taller neighbour, and a line carrying one atomic inline or none is left
+  as it was. An `inline-block` that lays out its own text is also untouched — its
+  baseline comes from its last line box, which is not tracked. The strut's missing
+  half-leading is a separate defect and is not fixed here.
+
 - `scrollIntoView` moves the block axis in a vertical writing mode. In the main
   repository, so it is live.
 
@@ -66,9 +91,9 @@ are versioned in lockstep during the preview.
   leaves its subtree untranslated; `preserveAspectRatio` is modelled at its
   default. Each of those is pinned by its own test.
 
-- Import attributes are enforced rather than parsed and dropped. Delivered as
-  `patches/0004-js-import-attribute-enforcement.patch` against `Broiler.JS`,
-  so it is **not live until the patch is applied**.
+- Import attributes are enforced rather than parsed and dropped. In `Broiler.JS`
+  as *Enforce import attributes instead of parsing and dropping them*, carried
+  by the pinned submodule pointer.
 
   `with { type: 'json' }` — the portable form, and the only one a browser
   accepts on a JSON module — was accepted and ignored, and so was
@@ -94,8 +119,8 @@ are versioned in lockstep during the preview.
   has no attributes at all.
 
 - `import d from './data.json'` is the parsed value rather than `undefined`.
-  Delivered as `patches/0002-js-json-module-default-export.patch` against
-  `Broiler.JS`, so it is **not live until the patch is applied**.
+  In `Broiler.JS` as *Give a JSON module the ES namespace ESM wants and require
+  the value CommonJS wants*, carried by the pinned submodule pointer.
 
   One wrapper served both callers — `module.exports = <json>` — which is what
   CommonJS `require` wants and exactly wrong for ESM: a default import reads
@@ -116,11 +141,9 @@ are versioned in lockstep during the preview.
   the engine does not do.
 
 - A method call whose argument is a method call is no longer silently skipped
-  inside an `async` function or a generator. Delivered as
-  `patches/0001-js-nested-member-call-clobbers-outer-call.patch` against
-  `Broiler.JS` — the push to that repository is outside this environment's
-  GitHub scope — so it is **not live until the patch is applied**, and no
-  main-repo fallback is possible for it.
+  inside an `async` function or a generator. In `Broiler.JS` as *Stop a nested
+  member call clobbering the outer call inside a generator body*, carried by the
+  pinned submodule pointer.
 
   `trace.push(items.join('+'))` did not run. No error was raised and the
   statement after it ran normally, so the failure was silent;
@@ -164,8 +187,8 @@ are versioned in lockstep during the preview.
 ### Added
 
 - `import.meta`, which was a SyntaxError ("import.meta not supported").
-  Delivered as `patches/0003-js-import-meta.patch` against `Broiler.JS`, so it
-  is **not live until the patch is applied**.
+  In `Broiler.JS` as *Implement import.meta, with url on it and resolve
+  deliberately absent*, carried by the pinned submodule pointer.
 
   It carries `url` — the module's own absolute URL, so a transitively imported
   module reports its own rather than the entry point's — and is otherwise an

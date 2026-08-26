@@ -127,11 +127,29 @@ internal sealed class CssLineBox
         {
             bool usesDefaultBaseline = string.IsNullOrEmpty(b.VerticalAlign)
                 || b.VerticalAlign == CssConstants.Baseline;
-            if (usesDefaultBaseline)
+
+            // The default `baseline` case used to return here, on the premise — written down in
+            // the <img> branch below — that an inline-block's flow position is already on the
+            // baseline. It is not: the flow puts it at the top of the line, exactly like an image.
+            // That is only harmless while the box's baseline really is at its top, so the boxes
+            // this skipped came out top-aligned; two inline-blocks of different heights on one
+            // line, and an inline <svg> beside a taller one, sat with their tops flush instead of
+            // their bottoms. Only a box whose baseline *is* its bottom margin edge is moved here
+            // (CssBox.UsesBottomMarginEdgeBaseline) — an inline-block that draws its own text
+            // keeps the position it has always had, because its baseline is not modelled.
+            if (usesDefaultBaseline && !b.UsesBottomMarginEdgeBaseline)
                 return;
 
-            if (Math.Abs(baseline - r.Top) > 0.01)
+            double inlineBlockShift = baseline - r.Top;
+            if (Math.Abs(inlineBlockShift) > 0.01)
             {
+                // Moving the box has to move what is in it. Descendant positions are absolute, so
+                // rewriting this box's own rectangle and Location alone left its content behind —
+                // which no existing case noticed only because an inline-block being aligned had
+                // nothing inside it to leave. OffsetTop walks the subtree; Location and
+                // ActualBottom are then set to the aligned position, as they were before, because
+                // the box's own placement is what the rest of the pass reads back.
+                b.OffsetTop(inlineBlockShift);
                 Rectangles[b] = new RectangleF(r.X, (float)baseline, r.Width, r.Height);
                 b.Location = new PointF(b.Location.X, (float)baseline);
                 b.ActualBottom = baseline + r.Height;
@@ -142,10 +160,10 @@ internal sealed class CssLineBox
         // CSS2.1 §10.8: an inline replaced element is an atomic box too, and aligning it means
         // moving the box — paint reads an <img>'s geometry off the box (FragmentTreeBuilder reads
         // Location/ActualBottom and only the *source* rect off the word), so moving the word alone
-        // moved nothing on screen. Unlike an inline-block, whose flow position is already on the
-        // baseline when `vertical-align` is left at its initial value, an image is placed by the
-        // flow at the line's top and always needs this: a 30px and a 90px image on one line came
-        // out top-aligned rather than standing on a shared baseline. Re-running the alignment is
+        // moved nothing on screen. An image is placed by the flow at the line's top and always
+        // needs this: a 30px and a 90px image on one line came out top-aligned rather than
+        // standing on a shared baseline. The same is true of an atomic inline-block, which the
+        // branch above now moves for the same reason. Re-running the alignment is
         // idempotent, because an atomic box that has been moved reports the same baseline it was
         // aligned to.
         if (b.IsImage)

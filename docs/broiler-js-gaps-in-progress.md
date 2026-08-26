@@ -109,11 +109,11 @@ the native backend, and all public RegExp operations consume the same conforming
 [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics) — the pinned `Broiler.JS`
 gitlink carries them, so CI sees them. One larger defect of the same family — imports are not live
 bindings — is characterized but not fixed, because it is an architectural change to how the engine
-links modules. Two of the track's three capability decisions are now taken and implemented — JSON
-modules and `import.meta`, both in
-[closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics), both shipping as patches
-rather than as a pointer bump. The rest of track 3 — the host task model, and the `import defer` /
-`import.meta.resolve` / attribute-enforcement decisions — stays in
+links modules. JSON modules, `import.meta` and attribute enforcement are now decided, implemented
+and live — all three in
+[closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics), all three carried by the
+pinned gitlink. The rest of track 3 — the host task model, and the `import defer` /
+`import.meta.resolve` decisions — stays in
 [open](broiler-js-gaps-open.md#track-3--scripts-tasks-and-modules).**
 
 ### Newly characterized — not yet fixed
