@@ -9,6 +9,32 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `document.currentScript` names the script that is running, and
+  `document.write` inserts at it, once anything ahead of them has been skipped.
+  In the main repository (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so it is
+  live.
+
+  The capture host holds two lists that look parallel and are not: the program
+  texts it will evaluate, and the document's `<script>` elements. It paired them
+  by position, rebuilding the element list from the parsed tree with the same
+  classification the extractor applies — which works only while the two readings
+  stay identical, and they cannot. The extractor drops a script for reasons no
+  reader of the parsed elements can know: a source blocked by CSP, a fetch that
+  came back empty. Each one shifted every pairing after it by one, so on a page
+  whose first external script 404s, every later script reported its
+  *predecessor* as `document.currentScript`.
+
+  The extractor already knows which `<script>` it is looking at, so it now
+  records that — the element's ordinal among all of them in document order —
+  alongside each bucket entry, and execution pairs through it. There is no
+  classification left to reproduce and nothing to drift from, and because an
+  ordinal does not care what order a bucket runs in, a host that hoists its
+  `async` scripts is no longer approximate either.
+
+  Two other hosts still reconstruct the pairing: `ScriptEngine`, which receives
+  its buckets already extracted through a public API, and `WptTestRunner`, which
+  never sets the index at all.
+
 - An element inherits its `Node` members from `Node.prototype` instead of
   carrying a copy of each. In the main repository (`Broiler.HtmlBridge.Dom`), so
   it is live.

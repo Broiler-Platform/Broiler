@@ -925,6 +925,14 @@ public class CaptureService
         var scripts = new List<string>();
         var deferredScripts = new List<string>();
         var moduleRoots = new List<string>();
+        // Which <script> each bucket entry came from, as its ordinal among all of them in document
+        // order. Recorded here rather than reconstructed later: the loop below drops a script for
+        // reasons no reader of the parsed elements can know — a CSP-blocked source, a fetch that
+        // came back empty — and a bucket paired positionally against a reconstructed list shifts by
+        // one at each of them, so every following script was attributed to its predecessor.
+        var scriptOrdinals = new List<int>();
+        var deferredScriptOrdinals = new List<int>();
+        var scriptOrdinal = -1;
         var csp = ContentSecurityPolicy.FromHtml(html);
         var scriptPrefetcher = StartScriptPrefetch(html, url, csp);
         var noscriptSpans = NoscriptSpans(html);
@@ -932,6 +940,12 @@ public class CaptureService
         {
             if (IsInsideNoscript(noscriptSpans, match.Index))
                 continue;
+
+            // Counted before any of the skips below, because the parser builds an element for a
+            // <script> whether or not this host ends up executing it — a data block, a blocked
+            // source and an unfetchable one are all elements. A <noscript> body is raw text with
+            // scripting enabled, so its contents are not, which is why this sits after that check.
+            scriptOrdinal++;
 
             var attrs = match.Groups["attrs"].Value;
 
@@ -990,11 +1004,19 @@ public class CaptureService
             // <script type="module"> is deferred by definition; route it to the engine module path
             // (run after the classic deferred scripts) rather than the classic buckets.
             if (isModule)
+            {
                 moduleRoots.Add(scriptContent);
+            }
             else if (isDefer)
+            {
                 deferredScripts.Add(scriptContent);
+                deferredScriptOrdinals.Add(scriptOrdinal);
+            }
             else
+            {
                 scripts.Add(scriptContent);
+                scriptOrdinals.Add(scriptOrdinal);
+            }
         }
 
         // Archive the program text of everything that is about to run, under the labels the error log
@@ -1078,8 +1100,16 @@ public class CaptureService
         // attributed the n-th executed script to the n-th element, which on any document carrying a
         // data block before a script — a JSON-LD block, an import map — is a different element
         // (ScriptElementMap).
-        var scriptElements = ScriptElementMap.Classic(bridge.Elements);
-        var deferredScriptElements = ScriptElementMap.Deferred(bridge.Elements);
+        var allScriptElements = ScriptElementMap.AllInDocumentOrder(bridge.Elements);
+
+        int ElementIndexFor(IReadOnlyList<int> ordinals, int bucketPosition)
+        {
+            if (bucketPosition >= ordinals.Count)
+                return -1;
+
+            var ordinal = ordinals[bucketPosition];
+            return ordinal >= 0 && ordinal < allScriptElements.Count ? allScriptElements[ordinal] : -1;
+        }
 
         static void DrainAsyncWork(DomBridge bridge, MicroTaskQueue microTasks)
         {
@@ -1117,7 +1147,7 @@ public class CaptureService
 
         for (int si = 0; si < scripts.Count; si++)
         {
-            bridge.CurrentScriptIndex = si < scriptElements.Count ? scriptElements[si] : -1;
+            bridge.CurrentScriptIndex = ElementIndexFor(scriptOrdinals, si);
             var label = ScriptLabel.Inline(si);
             try
             {
@@ -1143,7 +1173,7 @@ public class CaptureService
             // A deferred script is as much the running script as a non-deferred one; this bucket
             // never set the index, so document.currentScript was null and document.write appended
             // to <body> for the whole of it.
-            bridge.CurrentScriptIndex = di < deferredScriptElements.Count ? deferredScriptElements[di] : -1;
+            bridge.CurrentScriptIndex = ElementIndexFor(deferredScriptOrdinals, di);
             var label = ScriptLabel.Deferred(di);
             try
             {

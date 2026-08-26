@@ -372,6 +372,41 @@ empty and the directory is gone with it — a submodule fix is now checked with
 `git -C <Submodule> log --oneline --grep '<subject>'`, never by patch number.
 
 
+### Track 3 — Script attribution
+
+- **Every script was attributed to its predecessor once anything ahead of it had been skipped.**
+  **Fixed, and live** — entirely in the main repo (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so no
+  patch. Track 3 action 5.
+  <br>**Cause.** The capture host holds two lists that look parallel and are not: the program texts
+  it will evaluate, and the document's `<script>` elements. It paired them by position, rebuilding
+  the element list from the parsed tree with the same classification the extractor applies. That
+  works only while the two readings stay identical, and they cannot — the extractor drops a script
+  for reasons no reader of the parsed elements can know: a source blocked by CSP, a fetch that came
+  back empty. Each such script shifted every pairing after it by one.
+  <br>**What it looked like.** On a page whose first external script 404s, the script after it
+  reported that failed element as `document.currentScript`, the next reported *it*, and so on to the
+  end of the document. Measured: Broiler answered `missing | a | b` where Chromium answers
+  `a | b | last`. `document.write` reads the same attribution, so it inserted at the wrong element
+  too.
+  <br>**Fix.** The extractor already knows which `<script>` it is looking at, so it records that —
+  the element's ordinal among all `<script>` elements in document order — alongside each bucket
+  entry, and execution pairs through `ScriptElementMap.AllInDocumentOrder`. There is no
+  classification to reproduce and nothing to drift from: a data block, a blocked source and an
+  unfetchable one are all counted as the elements they are, and the ordinal does not care what order
+  a bucket runs in — which retires the second approximation the original investigation named, a host
+  that hoists its `async` scripts.
+  <br>**Evidence.** 6 regressions in `CurrentScriptAttributionTests`, every expectation Chromium's
+  measured answer to the same markup — an unresolved source, data blocks, a deferred script, a
+  module answering `null`, a mixed page with all of them, and the `document.write` insertion point.
+  3 of the 6 fail before the change. The tests assert which element each script names and never the
+  order they run in, because Broiler honours `defer` on an *inline* script where the specification
+  ignores it without a `src` — a separate divergence belonging to the task-model item. Whole-suite
+  diffs against a same-container baseline show no regression: `Broiler.Cli.Tests` 39 distinct
+  failures → 39 and `Broiler.Wpt.Tests` 51 → 51, byte-identical.
+  <br>**What it did not close.** Two other hosts, for two different reasons — `ScriptEngine` receives
+  its buckets already extracted through a public API, and `WptTestRunner` never sets the index at
+  all. Both are in [open](broiler-js-gaps-open.md#confirmed-host-semantic-gaps).
+
 ### Track 3 — Module syntax
 
 - The `export { … }` clause was rejected in every form, so the commonest way to export — declare

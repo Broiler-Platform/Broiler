@@ -33,11 +33,19 @@ namespace Broiler.HtmlBridge.Scripting;
 /// depart from the HTML spec's own reading of <c>defer</c>, this departs with them.
 /// </para>
 /// <para>
-/// Two cases stay approximate, and both degrade to naming a neighbouring script rather than a
+/// <b>Two cases stay approximate for a host that pairs against <see cref="Classic"/> or
+/// <see cref="Deferred"/>,</b> and both degrade to naming a neighbouring script rather than a
 /// non-script: a source the host could not resolve (blocked by CSP, or a fetch that failed) is
 /// absent from the bucket but present here, and a host that hoists its <c>async</c> scripts to the
 /// end of the classic bucket rather than leaving them in document order pairs them differently from
-/// this list. Neither is knowable from the parsed elements alone.
+/// this list. Neither is knowable from the parsed elements alone, which is the point —
+/// reconstructing the host's classification can only be as good as the two readings agreeing.
+/// </para>
+/// <para>
+/// <see cref="AllInDocumentOrder"/> is the way out, and the capture host uses it: it records which
+/// <c>&lt;script&gt;</c> each bucket entry came from as that element's ordinal, so there is no
+/// classification to reproduce and neither case arises. A host that still pairs against the two
+/// classified lists keeps both approximations.
 /// </para>
 /// </remarks>
 public static class ScriptElementMap
@@ -53,6 +61,42 @@ public static class ScriptElementMap
     /// deferred bucket executes, in document order.
     /// </summary>
     public static IReadOnlyList<int> Deferred(IReadOnlyList<DomElement> elements) => Collect(elements, deferred: true);
+
+    /// <summary>
+    /// Indices into <paramref name="elements"/> of <em>every</em> <c>&lt;script&gt;</c> element, in
+    /// document order and with no classification at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what a host should pair its buckets against, and the reason is that it needs to agree
+    /// with the host about nothing. <see cref="Classic"/> and <see cref="Deferred"/> reproduce the
+    /// extractors' classification from the parsed elements, which works only while the two readings
+    /// stay identical — and they cannot, for the two cases named above: a source the host could not
+    /// resolve is absent from its bucket and present in that list, and every later pairing shifts by
+    /// one. A host that instead records which <c>&lt;script&gt;</c> each bucket entry came from —
+    /// its ordinal among all of them, which is what this list is indexed by — has nothing to
+    /// reproduce and nothing to drift from.
+    /// </para>
+    /// <para>
+    /// The ordinal is the pairing key rather than the element itself because an extractor that scans
+    /// the source, as the capture host's does, counts <c>&lt;script&gt;</c> starts and never holds a
+    /// <see cref="DomElement"/> to hand.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<int> AllInDocumentOrder(IReadOnlyList<DomElement> elements)
+    {
+        var indices = new List<int>();
+        if (elements == null)
+            return indices;
+
+        for (var i = 0; i < elements.Count; i++)
+        {
+            if (string.Equals(elements[i].TagName, "script", StringComparison.OrdinalIgnoreCase))
+                indices.Add(i);
+        }
+
+        return indices;
+    }
 
     private static List<int> Collect(IReadOnlyList<DomElement> elements, bool deferred)
     {
