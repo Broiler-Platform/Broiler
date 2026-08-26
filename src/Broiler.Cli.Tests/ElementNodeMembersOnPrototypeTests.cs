@@ -67,6 +67,28 @@ document.getElementById('result').textContent = String({script});
             + " d.compareDocumentPosition(s) > 0].join('|')"));
 
     /// <summary>
+    /// The eighteen <c>Node</c> constants, which every wrapper kind copied onto itself while
+    /// <c>Node.prototype</c> already carried the same eighteen values. Unlike the members above they
+    /// needed no checking against the prototype's answer: they are plain numbers, and
+    /// <c>RegisterNodeConstructor</c> is where both sets come from.
+    /// </summary>
+    /// <remarks>
+    /// A sub-document's <c>document</c> object had its own copies too and now inherits them through
+    /// its <c>HTMLDocument</c> link; that one is not asserted here because this harness runs no frame.
+    /// </remarks>
+    [Fact(Timeout = 600000)]
+    public void TheNodeConstantsAreInheritedByEveryWrapperKind()
+        => Assert.Contains(">1|16|false|false|false|false|3|8|9|10|11<", Run(
+            "(function () { var f = document.createDocumentFragment(), t = document.doctype;"
+            + "return [d.ELEMENT_NODE, d.DOCUMENT_POSITION_CONTAINED_BY,"
+            + " Object.prototype.hasOwnProperty.call(d, 'ELEMENT_NODE'),"
+            + " Object.prototype.hasOwnProperty.call(document, 'ELEMENT_NODE'),"
+            + " Object.prototype.hasOwnProperty.call(f, 'ELEMENT_NODE'),"
+            + " Object.prototype.hasOwnProperty.call(t, 'ELEMENT_NODE'),"
+            + " document.TEXT_NODE, f.COMMENT_NODE, t.DOCUMENT_NODE, d.DOCUMENT_TYPE_NODE,"
+            + " f.DOCUMENT_FRAGMENT_NODE].join('|'); })()"));
+
+    /// <summary>
     /// <c>textContent</c> is deliberately <em>not</em> among them. An element's is a different
     /// operation from a character-data node's — it reads the descendants' text and writing it
     /// replaces every child with one text node — so it stays the element's own and shadows the

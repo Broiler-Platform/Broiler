@@ -269,8 +269,9 @@ public sealed partial class DomBridge
         AddElementSpecificMembers(obj, element);
 
         // Node interface constants (DOM §4.4: these exist on all Node objects) — the type values and
-        // the DOCUMENT_POSITION_* bits compareDocumentPosition returns.
-        Dom.Features.NodeConstantsBinding.Install(obj);
+        // the DOCUMENT_POSITION_* bits compareDocumentPosition returns. On Node.prototype, which this
+        // wrapper inherits; a wrapper minted before the realm carried it installs its own.
+        InstallNodeConstantsIfNotInherited(obj);
 
         return obj;
     }

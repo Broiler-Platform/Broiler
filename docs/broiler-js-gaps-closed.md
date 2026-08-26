@@ -897,6 +897,22 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **Every wrapper carried its own eighteen `Node` constants.** **Fixed, and live** — entirely in the
+  main repo (`Broiler.HtmlBridge.Dom`), so no patch.
+  <br>**Cause.** `RegisterNodeConstructor` puts the twelve `*_NODE` type values and the six
+  `DOCUMENT_POSITION_*` bits on `Node.prototype`, and `NodeConstantsBinding` put the same eighteen on
+  each element, document, document fragment, doctype and sub-document `document` object. Unlike the
+  members that moved before them these needed no checking against the prototype's answer: they are
+  plain numbers from the same source, so the copies were duplication rather than a second
+  implementation.
+  <br>**Fix.** Each wrapper installs them only when it cannot inherit — a wrapper minted before the
+  realm carried the interfaces — and the document's, which is built before the prototypes exist, are
+  dropped with the five `Node` members already removed there. An element is down from **40** own
+  properties to **22**, a document from 96 to **78**, a fragment from 52 to **34**, a doctype from 43
+  to **25**, and a sub-document's `document` from 70 to **52**.
+  <br>**Evidence.** A regression in `ElementNodeMembersOnPrototypeTests`: the values still answer for
+  an element, the document, a fragment and a doctype, and none of the four owns them.
+
 - **`HTMLElement`'s interface was copied onto every element wrapper too.** **Fixed, and live** —
   entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The sixth instalment of track 6
   action 1 and the direct sequel to the `Element` one below, whose `ElementSource` mechanism it reuses

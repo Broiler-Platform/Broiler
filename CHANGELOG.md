@@ -9,6 +9,17 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Every node wrapper stopped carrying its own copy of the eighteen `Node`
+  constants. In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  `Node.prototype` has carried the twelve `*_NODE` type values and the six
+  `DOCUMENT_POSITION_*` bits all along, and each element, document, document
+  fragment, doctype and sub-document `document` installed the same eighteen on
+  itself. They answer identically from the prototype — they are plain numbers
+  from the same source — so the copies are gone: an element is down from 40 own
+  properties to 22, a document from 96 to 78, a fragment from 52 to 34, a
+  doctype from 43 to 25, and a sub-document's `document` from 70 to 52.
+
 - `HTMLElement`'s interface lives on `HTMLElement.prototype`, and the root element
   inherits like every other. In the main repository (`Broiler.HtmlBridge.Dom`), so
   it is live.

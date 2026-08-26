@@ -58,10 +58,24 @@ internal static class NodeConstantsBinding
         ("DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC", 0x20),
     ];
 
-    /// <summary>Adds every <c>Node</c> interface constant to a node-like JS object.</summary>
+    /// <summary>
+    /// Adds every <c>Node</c> interface constant to a node-like JS object — for a wrapper that cannot
+    /// inherit them. <c>Node.prototype</c> carries all eighteen with the same values (see
+    /// <c>RegisterNodeConstructor</c>), so a wrapper whose chain reaches it needs none of its own.
+    /// </summary>
     public static void Install(JSObject obj)
     {
         foreach (var (name, value) in Constants)
             obj.FastAddValue((KeyString)name, new JSNumber(value), JSPropertyAttributes.EnumerableConfigurableValue);
+    }
+
+    /// <summary>The constant names, for dropping the copies a wrapper installed before it had a chain.</summary>
+    public static IEnumerable<string> Names
+    {
+        get
+        {
+            foreach (var (name, _) in Constants)
+                yield return name;
+        }
     }
 }

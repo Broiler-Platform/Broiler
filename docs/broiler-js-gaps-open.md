@@ -196,9 +196,9 @@ and deterministic detection behavior.
 
 - **`Node`'s tree mutations, the per-tag interfaces, and all of a document's members are still own
   properties of each wrapper.** Character data has moved whole, an element's `Node` members with it,
-  and now `Element`'s and `HTMLElement`'s interfaces — all in
+  and now `Element`'s and `HTMLElement`'s interfaces and the `Node` constants — all in
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  An element is down from **166** own properties to **40**, and a document is at **96**, where a
+  An element is down from **166** own properties to **22**, and a document is at **78**, where a
   browser gives either none.
   <br>What is left divides into four:
   <br>1. **`Node`'s five tree mutations** — `appendChild`, `insertBefore`, `removeChild`,
@@ -206,8 +206,7 @@ and deterministic detection behavior.
   them, so `document.createTextNode('x').appendChild` is `undefined` where a browser has a method
   that throws `HierarchyRequestError`. Moving them is not the mechanical case the others were: the
   bindings take a `DomElement`, while a document and a fragment carry their own separate
-  implementations that a prototype member would have to route to rather than shadow. The eighteen
-  `Node` constants beside them are pure duplicates of `Node.prototype`'s and can simply go.
+  implementations that a prototype member would have to route to rather than shadow.
   <br>2. **The per-tag interfaces.** `HTMLInputElement.value`, `HTMLTableElement.rows`,
   `HTMLFormElement.elements` and the rest are installed per tag on the instance; the globals and
   their prototype chains all exist, so each has somewhere correct to go. The form-control reflectors
