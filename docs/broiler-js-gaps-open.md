@@ -62,19 +62,22 @@ below is host semantics and two decisions.
 
 ### Needs a product decision
 
-- **A JSON module's default import is `undefined`.** `import d from './data.json'` yields
-  `undefined`, so JSON modules are effectively unusable. The module host wraps a `.json` file as
-  `module.exports = <json>`, which replaces the exports object with the parsed value, and a default
-  import then reads `.default` off that value and finds nothing. Per ES2025 a JSON module has
-  exactly one export, `default`, and no named exports — but this engine serves both `require` (which
-  wants the object itself) and `import` from the same wrapper, so making the two agree is a product
-  decision about the CommonJS/ESM boundary rather than a mechanical fix. Characterized, not guessed
-  at.
 - **`import.meta`** reports "import.meta not supported" (deterministic, not a crash), and
   `import defer` (stage 3) is not parsed. Both are capability decisions rather than defects.
 - **Import-attribute enforcement.** Import attributes now parse everywhere the grammar allows, but
-  nothing acts on them. Rejecting a module whose type does not match its attribute is a separate
+  nothing acts on them: nothing reads `AstImportStatement.Attributes`, and the compiler's `import`
+  call passes only the specifier, so enforcing anything means threading the attributes through to
+  the host first. Rejecting a module whose type does not match its attribute is a separate
   capability.
+  <br>What changed under it: JSON modules now work (see
+  [closed](broiler-js-gaps-closed.md#track-3--module-binding-semantics)), so
+  `import d from './data.json' with { type: 'json' }` — the portable form, and the only one a
+  browser accepts — is now a *correct* import whose attribute is ignored rather than a broken one.
+  That makes the decision narrower than it looks, and it has three parts: whether an attribute that
+  is present is honoured (a `type` that does not match the resolved module rejects), whether an
+  absent attribute on a JSON import is rejected the way the web does, and what an unknown key or an
+  unknown type does. The middle one is the only one that would take a working import away, and the
+  engine serves CommonJS from the same host, where no attribute is expected at all.
 
 ### Actions
 

@@ -26,6 +26,10 @@ cd ..
 git add <Submodule>           # bump the pointer only after the push succeeds
 ```
 
+The numbering is an ordering hint, not a dependency: the two below touch disjoint files and each
+applies to the pinned pointer on its own, in either order. `git apply --check` both before starting
+if you are applying more than one.
+
 ---
 
 ## `0001-js-nested-member-call-clobbers-outer-call.patch`
@@ -70,3 +74,43 @@ compiler allocates temps for a member call; nothing at a main-repo layer can int
 compilation. Until this patch is applied, every `async` function in every page that writes
 `a.b(c.d())` silently skips that statement. That is the cost of the pointer staying where it is —
 worth stating plainly rather than leaving to be rediscovered.
+
+---
+
+## `0002-js-json-module-default-export.patch`
+
+- **Targets:** `Broiler.JS` (`Broiler.JavaScript.Modules/JSModuleContext.cs`, plus the new
+  `Broiler.JavaScript.Modules.Tests/JsonModuleTests.cs`)
+- **Subject:** *Give a JSON module the ES namespace ESM wants and require the value CommonJS wants*
+- **Based on:** `ab5f797a`, the currently pinned pointer
+
+`import d from './data.json'` was `undefined`, which made JSON modules unusable. One wrapper served
+both callers — `module.exports = <json>` — which is exactly what CommonJS `require` wants and
+exactly wrong for ESM: a default import reads `.default` off the parsed value and finds nothing. A
+file whose whole content is `null` was worse than unusable: `JSModule`'s exports setter refuses
+null, so it threw on load.
+
+**The decision.** The two specifications disagree about what a JSON file exports, and one object
+cannot satisfy both. ES2025 gives a JSON module exactly one export, `default`, holding the parsed
+value, and no named exports; CommonJS hands back the parsed value itself. So the module now *stores*
+the ES namespace — `module.exports = { default: (<json>) }` — and the CommonJS view unwraps it.
+`LoadModuleAsync` takes an `esModule` flag for that, defaulting to the ES view; the two `require`
+call sites pass `false`. Storing the namespace is also what makes arrays, numbers, strings, booleans
+and `null` work — none of them can carry a `default` property, so decorating the parsed value could
+never have fixed them.
+
+**Deliberate deviation, pinned by a test:** `import { a } from './x.json'` used to read `a` off the
+parsed object and is now `undefined`. Per spec it is a link error, which needs whole-module link
+analysis this engine does not do; browsers and Node both reject the form, so nothing portable
+relied on it.
+
+Fourteen regressions in `JsonModuleTests`, eleven of which fail before the change. Engine suites
+with the patch applied: modules 118/118, module-extensions 5/5, built-ins 2215/2215, integration
+5167/5168, compiler 1400/1402 — the three failures pre-existing and unrelated.
+
+**Main-repo fallback:** none, and none is needed to keep CI honest — without the patch JSON modules
+stay exactly as broken as they were, rather than half-working. `BridgeModuleContext` (the main
+repo's `JSModuleContext` subclass) overrides only `Resolve` / `GetModuleDirectory` /
+`ReadModuleSourceAsync`, so it is unaffected either way; it was rebuilt and its
+module/subdocument/import tests run against the patched engine, 322/323, the one failure being the
+known iframe-module drain gap.

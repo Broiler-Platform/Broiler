@@ -453,6 +453,36 @@ The part-landed half of track 3. Live import bindings, the remaining defect of t
 family, are characterized but not fixed and stay in
 [in progress](broiler-js-gaps-in-progress.md#track-3--module-execution-semantics).
 
+- **A JSON module's default import is `undefined`.** **Decided and fixed — but delivered as a
+  submodule patch, so it is not live in CI.** This was listed as needing a product decision, and it
+  did: the two specifications disagree about what a JSON file exports and one object cannot satisfy
+  both, which is why the obvious mechanical fixes all fail. ES2025 gives a JSON module exactly one
+  export, `default`, holding the parsed value, and no named exports; CommonJS
+  `require('./x.json')` hands back the parsed value itself.
+  <br>**The decision: the module stores the ES namespace, and the CommonJS view unwraps it.** The
+  wrapper becomes `module.exports = { default: (<json>) }`, and `LoadModuleAsync` takes an
+  `esModule` flag — defaulting to the ES view, with the two `require` call sites passing `false` —
+  that changes nothing except the shape a JSON module is presented in. Storing the namespace rather
+  than decorating the value is what makes arrays, numbers, strings, booleans and `null` work: none
+  of them can carry a `default` property. `null` was the sharpest case — `JSModule`'s exports setter
+  refuses null, so a file whose whole content is `null` used to *throw on load* rather than import
+  as `null`.
+  <br>**Deliberate deviation, pinned by a test:** `import { a } from './x.json'` used to read `a`
+  off the parsed object and is now `undefined`. Per spec it is a link error, which needs
+  whole-module link analysis this engine does not do, so the nearer of the two available answers is
+  taken; browsers and Node both reject the form, so nothing portable relied on it.
+  <br>**Evidence.** Fourteen regressions in `JsonModuleTests` — the default import over six JSON
+  shapes, the namespace holding only `default`, a dynamic import resolving to the same namespace,
+  `require` over three shapes, both views of one file agreeing on the value, the named-import
+  deviation, and a JavaScript module pinned as unaffected. Eleven of the fourteen fail before the
+  change. Modules 118/118, module-extensions 5/5, built-ins 2215/2215, integration 5167/5168,
+  compiler 1400/1402, with the three failures pre-existing and unrelated.
+  <br>**Not live.** Ships as `patches/`'s *Give a JSON module the ES namespace ESM wants and require
+  the value CommonJS wants*; the push to `Broiler-Platform/Broiler.JS` returns 403 and the pointer
+  is deliberately not bumped. No main-repo fallback is needed to keep CI honest — without the patch
+  JSON modules stay exactly as broken as they were rather than half-working, and
+  `BridgeModuleContext` overrides only the resolution/read seams, so it is unaffected either way.
+
 The two `Broiler.JS` patches carrying these three fixes were written as submodule patches because
 the push to the submodule remote returned 403 (it is outside this session's GitHub scope). They have
 since been applied upstream and the gitlink bumped: `12839186` *Give a module's top-level lexicals their own environment* and

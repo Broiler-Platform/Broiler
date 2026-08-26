@@ -9,6 +9,28 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `import d from './data.json'` is the parsed value rather than `undefined`.
+  Delivered as `patches/0002-js-json-module-default-export.patch` against
+  `Broiler.JS`, so it is **not live until the patch is applied**.
+
+  One wrapper served both callers — `module.exports = <json>` — which is what
+  CommonJS `require` wants and exactly wrong for ESM: a default import reads
+  `.default` off the parsed value and finds nothing, so every JSON import was
+  `undefined` and JSON modules were unusable. A file whose whole content is
+  `null` threw on load instead, because the exports setter refuses null.
+
+  The two specifications disagree about what a JSON file exports and one
+  object cannot satisfy both, so the module now stores the ES namespace —
+  `{ default: value }`, the one export ES2025 gives a JSON module — and the
+  CommonJS view unwraps it. That is also what makes arrays, numbers, strings,
+  booleans and `null` work, none of which can carry a `default` property.
+
+  One behaviour is deliberately removed: `import { a } from './x.json'` used to
+  read `a` off the parsed object and is now `undefined`. A JSON module has no
+  named exports; the spec makes the form a link error, browsers and Node both
+  reject it, and raising the link error here would need whole-module analysis
+  the engine does not do.
+
 - A method call whose argument is a method call is no longer silently skipped
   inside an `async` function or a generator. Delivered as
   `patches/0001-js-nested-member-call-clobbers-outer-call.patch` against
