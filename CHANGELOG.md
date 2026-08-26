@@ -9,6 +9,33 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- Three things a `document` answered wrongly, found by checking its `Node`
+  members against the prototype's before removing them. In the main repository
+  (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  `document.ownerDocument` answered the document itself. DOM §4.4 makes it
+  null — a document *is* the node document rather than a node that has one.
+
+  `document.textContent` answered the empty string. DOM §4.4 makes it null for
+  a document and for a doctype, the two node kinds the algorithm has no text
+  for, so a page distinguishing them with `=== null` read the wrong branch.
+
+  `localName`, `prefix` and `namespaceURI` were on `Node.prototype`, where no
+  browser has them — DOM §4.9 gives them to `Element`, and to `Attr`
+  separately. A text node and the document answered `null` where a browser
+  answers `undefined`. They are on `Element.prototype` now.
+
+  With those settled, the document's five own `Node` members — `nodeType`,
+  `nodeName`, `childNodes`, `firstChild`, `lastChild` — were verified to answer
+  identically from the prototype and dropped, 101 own properties to 96. Unlike
+  every other wrapper the document's is built before the interface constructors
+  exist, so it cannot skip installing what it will inherit; the copies are
+  removed once the prototypes are up instead.
+
+  Cloning a document is still unsupported by the canonical DOM kernel, where a
+  browser succeeds. It now raises a `NotSupportedError` `DOMException` instead
+  of leaking the kernel's own exception, and an internal phrase, to the page.
+
 - `document.currentScript` names the script that is running, and
   `document.write` inserts at it, once anything ahead of them has been skipped.
   In the main repository (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so it is

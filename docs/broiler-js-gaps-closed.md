@@ -897,6 +897,44 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
 
+- **Three spec bugs a document answered wrongly, and the document's own `Node` members.**
+  **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fourth
+  instalment of track 6 action 1, and the piece the element instalment deferred: the document's
+  `Node` members are separate implementations rather than copies of the prototype's, so each was to
+  be *checked* against the prototype's answer rather than deleted. Checking them is what found the
+  three bugs.
+  <br>**`ownerDocument` answered the document itself.** DOM §4.4 makes a document's `ownerDocument`
+  null — it *is* the node document rather than a node that has one. Chromium answers `null`; the
+  walk here handed back the document.
+  <br>**`textContent` answered the empty string.** DOM §4.4 makes it null for a document *and* for a
+  doctype — the two node kinds the algorithm has no text for, rather than kinds whose text happens to
+  be empty. A page distinguishing them with `=== null` read the wrong branch.
+  <br>**`localName`, `prefix` and `namespaceURI` were on `Node.prototype`,** where no browser has
+  them: DOM §4.9 gives them to `Element` (and `Attr` separately). They arrived there in the
+  character-data instalment — that wrapper carried all three as own properties and moving its members
+  wholesale took them along — and the element instalment then removed the element's own copies, which
+  is what exposed the mistake: a text node and the document answered `null` where a browser answers
+  `undefined`. They are on `Element.prototype` now. Measured in Chromium:
+  `'localName' in Node.prototype` is `false` and `Element.prototype` owns all three.
+  <br>**And the five copies are gone.** `nodeType`, `nodeName`, `childNodes`, `firstChild` and
+  `lastChild` were verified to answer identically from the prototype for a document receiver, then
+  dropped — 101 own properties to 96. The document wrapper is built during document registration,
+  before the interface constructors exist, so unlike every other wrapper it cannot skip installing
+  what it will inherit; the copies are removed once the prototypes are up instead.
+  <br>**One obsolete assertion updated, at no cost.** `SvgDomAndCrossDocTests` asserted
+  `textNode.localName === null`, which is DOM Level 2's reading and what Acid3's test 66 still
+  checks — so that test now fails here as it does in every current browser. The Acid3 score is
+  unchanged, measured at **96 before and after**, so nothing was traded for matching the browsers.
+  <br>**Evidence.** 22 regressions in `DocumentNodeMemberTests`, every expectation Chromium's
+  measured answer to the same markup. Whole-suite diffs against a same-container baseline show no
+  regression: `Broiler.Cli.Tests` 39 distinct failures → 39 and `Broiler.Wpt.Tests` 51 → 51, the one
+  difference in each being that obsolete assertion (updated) and the 20s render guard (a load flake,
+  8s in isolation).
+  <br>**What it did not close.** Cloning a document is unsupported by the canonical DOM kernel, where
+  a browser succeeds; it now fails as a `NotSupportedError` `DOMException` rather than leaking the
+  kernel's `InvalidOperationException` and an internal phrase to the page. Stated in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+
 - **An element shadowed every `Node.prototype` member with a copy of its own.** **Fixed, and
   live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The third instalment of
   track 6 action 1; what remains is in

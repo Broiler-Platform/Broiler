@@ -207,12 +207,15 @@ and deterministic detection behavior.
   <br>2. **The per-instance *values*.** Several element members are captured values rather than
   accessors — `tagName` is a `JSString` fixed when the wrapper is built — and each has to become an
   accessor before it can move.
-  <br>3. **The document.** Its `Node` members are not copies of the prototype's but separate
-  implementations (`nodeType` is a literal `9`, `childNodes` a different binding), so unlike the
-  element's they cannot simply be deleted — each has to be checked against the prototype's answer
-  first. `textContent` is the same shape of question on the element: an element's is a different
-  operation from a character-data node's, so it stays the element's own and shadows the
-  `Node.prototype` one until there is a single implementation that serves both.
+  <br>3. **`textContent`.** An element's is a different operation from a character-data node's, so
+  it stays the element's own and shadows the `Node.prototype` one until there is a single
+  implementation that serves both. The document's `Node` members have gone — checking them against
+  the prototype's answer is what turned up three spec bugs, all now
+  [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
+- **Cloning a document throws.** `document.cloneNode(false)` answers a fresh node of type `9` in a
+  browser; here the canonical DOM kernel does not clone a document at all, so it raises a
+  `NotSupportedError` `DOMException` — explicit and detectable, but still a gap rather than a rule.
+  Closing it is a `Broiler.DOM` change, which this session cannot push, so it would ship as a patch.
 - **The window keeps its own `EventTarget` members**, the last receiver that does. The three are
   routed on `EventTarget.prototype` now and every other receiver inherits them, but `window` here
   *is* the realm's global object, whose prototype chain does not reach `EventTarget.prototype`, so

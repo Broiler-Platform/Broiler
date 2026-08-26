@@ -23,4 +23,6 @@ public sealed partial class DomBridge : Dom.Features.INodeRelationshipsHost
         => CloneDomElement(source, deep);
 
     JSObject Dom.Features.INodeRelationshipsHost.ToJSObject(DomNode node) => ToJSObject(node);
+
+    Broiler.JavaScript.Engine.JSContext? Dom.Features.INodeRelationshipsHost.JsContext => _jsContext;
 }

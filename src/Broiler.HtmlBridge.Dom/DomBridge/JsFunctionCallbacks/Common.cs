@@ -3,6 +3,7 @@ using Broiler.JavaScript.Storage;
 using Broiler.JavaScript.BuiltIns.String;
 using Broiler.JavaScript.Runtime;
 using Broiler.Dom;
+using Broiler.JavaScript.BuiltIns.Null;
 
 namespace Broiler.HtmlBridge;
 
@@ -14,6 +15,13 @@ public sealed partial class DomBridge
         // an element's textContent is the concatenation of its descendant text.
         if (node is DomCharacterData characterData)
             return new JSString(characterData.Data);
+
+        // DOM §4.4: `textContent` is *null* for a document and for a doctype — they are the two node
+        // kinds the algorithm has no text for, rather than kinds whose text happens to be empty.
+        // Both answered the empty string, so `document.textContent` was `""` where Chromium says
+        // null, and a page distinguishing the two with `=== null` read the wrong branch.
+        if (node is DomDocument or DomDocumentType)
+            return JSNull.Value;
 
         if (node is not DomElement element)
             return new JSString(string.Empty);

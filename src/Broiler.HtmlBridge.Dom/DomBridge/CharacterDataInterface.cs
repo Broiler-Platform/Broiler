@@ -90,6 +90,7 @@ public sealed partial class DomBridge
 
         InstallNodePrototypeMembers(nodeProto);
         InstallCharacterDataPrototypeMembers(characterDataProto);
+        InstallElementNamePrototypeMembers();
 
         // Text's alone: a Comment inherits CharacterData and must not answer splitText.
         AddPrototypeMethod(textProto, "splitText", 1,
@@ -97,6 +98,37 @@ public sealed partial class DomBridge
                 this, RequireNode(in a, "Text", "splitText"), in a));
 
         _nodeInterfacePrototypesReady = true;
+
+        DropDocumentNodeMemberCopies();
+    }
+
+    /// <summary>
+    /// The <c>Node</c> members the <c>document</c> wrapper installed for itself, dropped now that
+    /// <c>Node.prototype</c> carries them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every other wrapper is minted lazily and simply skips installing what it can inherit. The
+    /// document's is not: it is built during document registration, which runs before the interface
+    /// constructors this pass needs exist, so by the time there is a prototype to inherit from it has
+    /// already made its own copies. Removing them afterwards is what makes the ordering irrelevant,
+    /// short of reordering registration itself.
+    /// </para>
+    /// <para>
+    /// Only the five it actually had, and only after checking that the prototype answers the same for
+    /// a document receiver: <c>nodeType</c> is 9, <c>nodeName</c> is <c>#document</c>,
+    /// <c>childNodes</c>/<c>firstChild</c>/<c>lastChild</c> report the same nodes. They were separate
+    /// implementations rather than copies of the prototype's — a literal <c>9</c>, a different
+    /// <c>childNodes</c> binding — so agreeing was a thing to verify rather than assume.
+    /// </para>
+    /// </remarks>
+    private void DropDocumentNodeMemberCopies()
+    {
+        if (_documentJSObject is not { } document)
+            return;
+
+        foreach (var member in new[] { "nodeType", "nodeName", "childNodes", "firstChild", "lastChild" })
+            document.Delete((KeyString)member);
     }
 
     /// <summary>The prototype object of a registered interface global, if the realm has one.</summary>
@@ -116,12 +148,6 @@ public sealed partial class DomBridge
             (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetNodeType(RequireNode(in a, "Node", "nodeType"), in a));
         AddPrototypeAccessor(proto, "nodeName",
             (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetNodeName(RequireNode(in a, "Node", "nodeName"), in a));
-        AddPrototypeAccessor(proto, "localName",
-            (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetLocalName(RequireNode(in a, "Node", "localName"), in a));
-        AddPrototypeAccessor(proto, "prefix",
-            (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetPrefix(RequireNode(in a, "Node", "prefix"), in a));
-        AddPrototypeAccessor(proto, "namespaceURI",
-            (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetNamespaceURI(RequireNode(in a, "Node", "namespaceURI"), in a));
 
         AddPrototypeAccessor(proto, "nodeValue",
             (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetNodeValue(RequireNode(in a, "Node", "nodeValue"), in a),
@@ -168,6 +194,33 @@ public sealed partial class DomBridge
             (in Arguments a) => Dom.Features.NodeRelationshipsBinding.GetRootNode(this, RequireNode(in a, "Node", "getRootNode"), in a));
         AddPrototypeMethod(proto, "normalize", 0,
             (in Arguments a) => Dom.Features.NodeRelationshipsBinding.Normalize(this, RequireNode(in a, "Node", "normalize"), in a));
+    }
+
+    /// <summary>
+    /// <c>localName</c>, <c>prefix</c> and <c>namespaceURI</c> on <c>Element.prototype</c>, which is
+    /// where the DOM puts them.
+    /// </summary>
+    /// <remarks>
+    /// They are not <c>Node</c> members, though this pass first installed them there: the
+    /// character-data wrapper carried all three as own properties, and moving that wrapper's members
+    /// wholesale took them along. On <c>Node.prototype</c> they reach every node, so a text node
+    /// answered <c>null</c> and — once an element stopped shadowing them — so did the document, where
+    /// a browser answers <c>undefined</c> for both because neither interface declares them. DOM §4.9
+    /// gives them to <c>Element</c>, and <c>Attr</c> separately; measured in Chromium,
+    /// <c>'localName' in Node.prototype</c> is <see langword="false"/> and
+    /// <c>Element.prototype</c> owns all three.
+    /// </remarks>
+    private void InstallElementNamePrototypeMembers()
+    {
+        if (PrototypeOfInterface("Element") is not { } proto)
+            return;
+
+        AddPrototypeAccessor(proto, "localName",
+            (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetLocalName(RequireNode(in a, "Element", "localName"), in a));
+        AddPrototypeAccessor(proto, "prefix",
+            (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetPrefix(RequireNode(in a, "Element", "prefix"), in a));
+        AddPrototypeAccessor(proto, "namespaceURI",
+            (in Arguments a) => Dom.Features.NodeAccessorsBinding.GetNamespaceURI(RequireNode(in a, "Element", "namespaceURI"), in a));
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using System;
 using Broiler.Dom;
 using Broiler.JavaScript.Runtime;
 using Broiler.JavaScript.Storage;
@@ -106,7 +107,26 @@ internal static class NodeRelationshipsBinding
     public static JSValue CloneNode(INodeRelationshipsHost host, DomNode node, in Arguments a)
     {
         var deep = a.Length > 0 && a[0].BooleanValue;
-        var clone = host.CloneDomElement(node, deep);
+
+        DomNode clone;
+        try
+        {
+            clone = host.CloneDomElement(node, deep);
+        }
+        catch (InvalidOperationException)
+        {
+            // The canonical DOM kernel does not clone a document. A browser does — Chromium answers a
+            // fresh node of type 9 — so this is a real gap and not a rule; what this turns it into is
+            // a failure page script can read. It used to surface the kernel's own
+            // InvalidOperationException, so an internal phrase ("the Phase 1 kernel") reached the
+            // page as the message of a plain Error, and nothing could branch on it.
+            DomBridge.ThrowDOMException(
+                host.JsContext,
+                "Failed to execute 'cloneNode' on 'Node': Cloning a Document is not supported.",
+                "NotSupportedError");
+            return JSUndefined.Value;
+        }
+
         return host.ToJSObject(clone);
     }
 }

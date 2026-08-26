@@ -20,4 +20,7 @@ internal interface INodeRelationshipsHost
     JSValue ToJSRootNode(DomNode root);
     DomNode CloneDomElement(DomNode source, bool deep);
     JSObject ToJSObject(DomNode node);
+
+    /// <summary>The realm, for raising a <c>DOMException</c> that page script can branch on.</summary>
+    Broiler.JavaScript.Engine.JSContext? JsContext { get; }
 }

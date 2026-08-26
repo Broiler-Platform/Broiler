@@ -160,6 +160,12 @@ internal static class NodeAccessorsBinding
 
     public static JSValue GetOwnerDocument(INodeAccessorsHost host, DomNode node, in Arguments a)
     {
+        // DOM §4.4: a document's own `ownerDocument` is null — it is the node document, not a node
+        // that has one. The walk below would hand back the document itself, which is what
+        // `document.ownerDocument` answered; Chromium answers null.
+        if (node is Broiler.Dom.DomDocument)
+            return JSNull.Value;
+
         // Phase 4 item 1 (P4.4c): the owning document is derived from the canonical tree (connected
         // nodes) or the node's canonical OwnerDocument (detached), not a parallel OwnerDocRoot field.
         var owner = DomBridge.GetOwningDocument(node);
