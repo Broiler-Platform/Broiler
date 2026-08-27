@@ -945,6 +945,17 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   tests added, and `Broiler.Wpt.Tests` 55 → 55, byte-identical. Two tests differed between the CLI
   runs and neither is these changes — the compile-ahead worker-budget test and an idle-callback
   deadline, both verified to pass in isolation, both load-sensitive by construction.
+  <br>**And a whole-surface diff, which is what says nothing was lost in the move.** Every member
+  reachable on a node — own and inherited, with its kind and a function's `length` — was enumerated
+  on both revisions for sixteen node kinds (a `div`, `input`, `form`, `table`, `a`, `select`,
+  `textarea`, `img`, `template`, `dialog`, a namespaced `<svg>` and `<rect>`, a text node, a comment,
+  a fragment, a doctype and the document) and diffed. Across all of them: **nothing missing**, one
+  member added (`replaceChildren`), and three kinds changed — `tagName` and `classList` from values to
+  accessors, and `document.documentElement` likewise — each of which is one of the intended changes
+  above. No function's `length` moved. A namespaced SVG element is the case worth naming: its 63
+  `Element` members moved to `Element.prototype` and its 18 constants to `Node.prototype`, while
+  `HTMLElement`'s 37 stayed its own, which is the deviation pinned in
+  `HtmlElementInterfacePrototypeTests`.
 
 - **`HTMLElement`'s interface was copied onto every element wrapper too.** **Fixed, and live** —
   entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The sixth instalment of track 6
