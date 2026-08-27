@@ -22,6 +22,7 @@ public sealed partial class DomBridge : ISubDocumentHost
 
     JSObject ISubDocumentHost.ToJSObject(DomNode node) => ToJSObject(node);
     void ISubDocumentHost.LinkToInterface(JSObject wrapper, string interfaceName) => LinkToInterface(wrapper, interfaceName);
+    bool ISubDocumentHost.NodeInterfacePrototypesReady => _nodeInterfacePrototypesReady;
     DomElement? ISubDocumentHost.FindDomElementByJSObject(JSObject jsObj) => FindDomElementByJSObject(jsObj);
     DomNode? ISubDocumentHost.FindDomNodeByJSObject(JSObject jsObj) => FindDomNodeByJSObject(jsObj);
 

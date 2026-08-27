@@ -9,9 +9,11 @@ using Broiler.Dom;
 namespace Broiler.HtmlBridge.Dom.Features;
 
 /// <summary>
-/// The HTMLElement global content-attribute reflectors, co-located as an HtmlBridge feature module
+/// The global content-attribute reflectors, co-located as an HtmlBridge feature module
 /// (Phase 3): <c>id</c>, <c>className</c> (↔ <c>class</c>), <c>title</c>, <c>lang</c>, <c>accessKey</c>
-/// (↔ <c>accesskey</c>), <c>dir</c>, and the enumerated <c>draggable</c>. The selector-affecting three
+/// (↔ <c>accesskey</c>), <c>dir</c>, and the enumerated <c>draggable</c>. They are installed in two
+/// halves because Web IDL splits them in two: <c>id</c> and <c>className</c> belong to
+/// <c>Element</c> and live on its prototype, the other five to <c>HTMLElement</c>. The selector-affecting three
 /// (<c>id</c>/<c>className</c>/<c>dir</c>) invalidate the style scope on write through the one-member
 /// <see cref="IGlobalAttributeHost"/> contract; everything else is a plain reflected read/write over the
 /// bridge's neutral <c>internal static</c> <c>SetAttr</c>/<c>TryGetAttribute</c> helpers, and the canonical
@@ -22,48 +24,59 @@ namespace Broiler.HtmlBridge.Dom.Features;
 /// </summary>
 internal static class GlobalAttributeBinding
 {
-    /// <summary>Installs the HTMLElement global attribute reflectors on <paramref name="obj"/>.</summary>
-    public static void Install(IGlobalAttributeHost host, JSObject obj, DomElement element)
+    /// <summary>
+    /// <c>id</c> and <c>className</c> — the two reflectors DOM §4.9 puts on <c>Element</c> rather than
+    /// on <c>HTMLElement</c>, so they go on <c>Element.prototype</c> and an SVG element has them too.
+    /// </summary>
+    public static void InstallElementMembers(IGlobalAttributeHost host, JSObject target, ElementSource element)
     {
-        obj.FastAddProperty((KeyString)"id",
-            new DomFunction((in _) => element.Id != null ? new JSString(element.Id) : JSNull.Value, "get id"),
-            new DomFunction((in a) => SetId(host, element, in a), "set id"),
+        target.FastAddProperty((KeyString)"id",
+            new DomFunction((in a) => element(in a, "id") is { Id: { } id } ? new JSString(id) : JSNull.Value, "get id"),
+            new DomFunction((in a) => SetId(host, element(in a, "id"), in a), "set id"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // className (read/write) — reflects the 'class' content attribute
-        obj.FastAddProperty((KeyString)"className",
-            new DomFunction((in _) => GetClassName(element), "get className"),
-            new DomFunction((in a) => SetClassName(host, element, in a), "set className"),
+        target.FastAddProperty((KeyString)"className",
+            new DomFunction((in a) => GetClassName(element(in a, "className")), "get className"),
+            new DomFunction((in a) => SetClassName(host, element(in a, "className"), in a), "set className"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
+    }
 
+    /// <summary>
+    /// The reflectors <c>HTMLElement</c> owns: <c>title</c>, <c>lang</c>, <c>accessKey</c>,
+    /// <c>dir</c> and the enumerated <c>draggable</c>. Still installed on each wrapper, until
+    /// <c>HTMLElement</c>'s own interface moves.
+    /// </summary>
+    public static void InstallHtmlElementMembers(IGlobalAttributeHost host, JSObject target, ElementSource element)
+    {
         // title (read/write) — synced with attributes["title"]
-        obj.FastAddProperty((KeyString)"title",
-            new DomFunction((in _) => ReflectedGet(element, "title"), "get title"),
-            new DomFunction((in a) => ReflectedSet(element, "title", in a), "set title"),
+        target.FastAddProperty((KeyString)"title",
+            new DomFunction((in a) => ReflectedGet(element(in a, "title"), "title"), "get title"),
+            new DomFunction((in a) => ReflectedSet(element(in a, "title"), "title", in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lang (read/write) — synced with attributes["lang"]
-        obj.FastAddProperty((KeyString)"lang",
-            new DomFunction((in _) => ReflectedGet(element, "lang"), "get lang"),
-            new DomFunction((in a) => ReflectedSet(element, "lang", in a), "set lang"),
+        target.FastAddProperty((KeyString)"lang",
+            new DomFunction((in a) => ReflectedGet(element(in a, "lang"), "lang"), "get lang"),
+            new DomFunction((in a) => ReflectedSet(element(in a, "lang"), "lang", in a), "set lang"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // accessKey (read/write) — synced with attributes["accesskey"]
-        obj.FastAddProperty((KeyString)"accessKey",
-            new DomFunction((in _) => ReflectedGet(element, "accesskey"), "get accessKey"),
-            new DomFunction((in a) => ReflectedSet(element, "accesskey", in a), "set accessKey"),
+        target.FastAddProperty((KeyString)"accessKey",
+            new DomFunction((in a) => ReflectedGet(element(in a, "accessKey"), "accesskey"), "get accessKey"),
+            new DomFunction((in a) => ReflectedSet(element(in a, "accessKey"), "accesskey", in a), "set accessKey"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // dir (read/write) — synced with attributes["dir"]
-        obj.FastAddProperty((KeyString)"dir",
-            new DomFunction((in _) => ReflectedGet(element, "dir"), "get dir"),
-            new DomFunction((in a) => SetDir(host, element, in a), "set dir"),
+        target.FastAddProperty((KeyString)"dir",
+            new DomFunction((in a) => ReflectedGet(element(in a, "dir"), "dir"), "get dir"),
+            new DomFunction((in a) => SetDir(host, element(in a, "dir"), in a), "set dir"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // draggable (read/write) — reflected enumerated attribute
-        obj.FastAddProperty((KeyString)"draggable",
-            new DomFunction((in _) => GetDraggable(element), "get draggable"),
-            new DomFunction((in a) => SetDraggable(element, in a), "set draggable"),
+        target.FastAddProperty((KeyString)"draggable",
+            new DomFunction((in a) => GetDraggable(element(in a, "draggable")), "get draggable"),
+            new DomFunction((in a) => SetDraggable(element(in a, "draggable"), in a), "set draggable"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 

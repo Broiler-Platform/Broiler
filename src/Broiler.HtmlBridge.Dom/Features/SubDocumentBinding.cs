@@ -222,8 +222,11 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
             new DomFunction((in a) => Prepend(docRoot, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // Node interface constants — types and the DOCUMENT_POSITION_* bits.
-        NodeConstantsBinding.Install(doc);
+        // Node interface constants — types and the DOCUMENT_POSITION_* bits. On Node.prototype, which
+        // this document object reaches through the HTMLDocument link above; it installs its own only
+        // when the realm does not carry the interfaces.
+        if (!_host.NodeInterfacePrototypesReady)
+            NodeConstantsBinding.Install(doc);
 
         // document.implementation on sub-documents
         var subImpl = new JSObject();

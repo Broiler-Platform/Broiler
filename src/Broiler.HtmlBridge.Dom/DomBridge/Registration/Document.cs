@@ -12,8 +12,25 @@ public sealed partial class DomBridge
 {
     private void RegisterDocumentBasics(JSContext context, JSObject document)
     {
-        // document.documentElement (the <html> element)
-        document.FastAddValue((KeyString)"documentElement", ToJSObject(DocumentElement), JSPropertyAttributes.EnumerableConfigurableValue);
+        // document.documentElement (the <html> element) — a getter, like the scrollingElement below
+        // that answers with the same element, and like the accessor a browser has on
+        // Document.prototype.
+        //
+        // It was a value, and materializing it here is the one place an element wrapper is minted
+        // before the interface prototypes exist: this runs during document registration, and the
+        // constructors and their members are registered by the polyfill pass afterwards. So <html>
+        // alone took the pre-realm fallback and installed its own copy of every interface member,
+        // and the re-link sweep at the end of registration then gave it the prototype as well — it
+        // ended up with both, at 164 own properties against an ordinary element's 77, and
+        // `document.documentElement.getAttribute === Element.prototype.getAttribute` was false. A
+        // page patching Element.prototype reached every element except the root one.
+        //
+        // Deferring the mint to the first read is what makes the fallback unreachable for it rather
+        // than compensated for afterwards. It also stops a re-parse handing back the previous
+        // document's wrapper: the registry is cleared, and the value property was not.
+        document.FastAddProperty((KeyString)"documentElement",
+            new JSFunction((in _) => ToJSObject(DocumentElement), "get documentElement"),
+            null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // document.scrollingElement (getter — returns document.documentElement
         // in standards mode, or document.body in quirks mode; we always use

@@ -373,7 +373,9 @@ public sealed partial class DomBridge
         }
 
         // Node interface constants (exist on all Node objects) — types and DOCUMENT_POSITION_* bits.
-        Dom.Features.NodeConstantsBinding.Install(obj);
+        // On Node.prototype, which this wrapper inherits; one minted before the realm carried it
+        // installs its own.
+        InstallNodeConstantsIfNotInherited(obj);
     }
 
     /// <summary>
@@ -606,6 +608,8 @@ public sealed partial class DomBridge
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Node interface constants (exist on all Node objects) — types and DOCUMENT_POSITION_* bits.
-        Dom.Features.NodeConstantsBinding.Install(obj);
+        // On Node.prototype, which this wrapper inherits; one minted before the realm carried it
+        // installs its own.
+        InstallNodeConstantsIfNotInherited(obj);
     }
 }

@@ -57,22 +57,18 @@ below is host semantics and two decisions.
   buckets instead of one ordered task model. See [HtmlBridge architecture](architecture/htmlbridge.md).
 - A subdocument module can start without deadlocking but its continuation and DOM effect are not
   drained in the engine-only module path. See [xUnit status](xunit-suite-status.md).
-- `document.currentScript` is correct in the capture host and still approximate in the other two.
-  The capture host records which `<script>` each bucket entry came from and no longer reconstructs
-  it, so an unresolved or CSP-blocked source no longer shifts the scripts after it; see
-  [closed](broiler-js-gaps-closed.md#track-3--script-attribution). What is left is the other two
-  hosts, and they are two different problems.
+- `document.currentScript` is correct in the capture host and the WPT runner, and still approximate
+  in `ScriptEngine`. Both of the fixed ones record which `<script>` each bucket entry came from
+  rather than reconstructing it, so an unresolved or CSP-blocked source no longer shifts the scripts
+  after it; see [closed](broiler-js-gaps-closed.md#track-3--script-attribution).
   <br>**`ScriptEngine`** (the interactive and browser-app path) still pairs its buckets against the
   reconstructed classification, so it keeps the drift the capture host had. The ordinals cannot
   simply be recorded there: `ScriptEngine.Execute` receives the buckets already extracted, across
   four public overloads and `ITypedScriptEngine`/`IScriptEngineCapabilities`, so the fix is to carry
   the ordinal alongside each bucket entry through that API — a change to the public surface and to
   `PageContent`, not a change to the pairing.
-  <br>**`WptTestRunner`** never sets the index at all, so `document.currentScript` is always `null`
-  under the WPT runner — a different gap from a wrong answer, and one that would hide any
-  currentScript-dependent WPT test rather than fail it.
   <br>The remaining approximation named in the original investigation — a host that hoists its
-  `async` scripts to the end of the classic bucket — is gone from the capture host with the rest,
+  `async` scripts to the end of the classic bucket — is gone from the two fixed hosts with the rest,
   since an ordinal does not care what order the bucket runs in. See
   [the focused investigation](google-about-current-script.md).
 
@@ -194,20 +190,35 @@ and deterministic detection behavior.
 
 ### DOM interface and collection model
 
-- **The rest of an element's members, and all of a document's, are still own properties of each
-  wrapper.** Character data has moved whole, and an element's `Node` members with it — both are in
+- **`Node`'s tree mutations, the per-tag interfaces, and all of a document's members are still own
+  properties of each wrapper.** Character data has moved whole, an element's `Node` members with it,
+  and now `Element`'s and `HTMLElement`'s interfaces and the `Node` constants — all in
   [closed](broiler-js-gaps-closed.md#track-6--dom-cssom-svg-and-script-visible-document-behavior).
-  An element is down from **166** own properties to **140**, and a document is still at **104**,
-  where a browser gives either none.
-  <br>What is left divides into three, and only the first is mechanical:
-  <br>1. **`Element`'s own interface** — `getAttribute`, `querySelector`, `classList` and the rest,
-  spread across some forty binding modules. The receiver-resolution mechanism and the constant-time
-  wrapper→node map exist, so each moves the same way; the interface must land whole so no prototype
-  ends up with a shape no browser has.
-  <br>2. **The per-instance *values*.** Several element members are captured values rather than
-  accessors — `tagName` is a `JSString` fixed when the wrapper is built — and each has to become an
-  accessor before it can move.
-  <br>3. **`textContent`.** An element's is a different operation from a character-data node's, so
+  An element is down from **166** own properties to **22**, and a document is at **78**, where a
+  browser gives either none.
+  <br>What is left divides into four:
+  <br>1. **`Node`'s five tree mutations** — `appendChild`, `insertBefore`, `removeChild`,
+  `replaceChild` and `moveBefore` — are still the element's own, and `Node.prototype` has none of
+  them, so `document.createTextNode('x').appendChild` is `undefined` where a browser has a method
+  that throws `HierarchyRequestError`. Moving them is not the mechanical case the others were: the
+  bindings take a `DomElement`, while a document and a fragment carry their own separate
+  implementations that a prototype member would have to route to rather than shadow.
+  <br>2. **The per-tag interfaces.** `HTMLInputElement.value`, `HTMLTableElement.rows`,
+  `HTMLFormElement.elements` and the rest are installed per tag on the instance; the globals and
+  their prototype chains all exist, so each has somewhere correct to go. The form-control reflectors
+  are the odd ones: `value`, `checked`, `defaultValue`, `defaultChecked`, `type`, `name`, `disabled`,
+  `required`, `files`, `checkValidity`, `reportValidity` and `submit` are installed on *every*
+  element, where a browser gives them only to the interfaces that declare them, so moving them is
+  also a decision about dropping them from a `<div>` — as are the `data` and `length` a `<div>`
+  carries from the character-data facade, and `scrollParent`, which is the bridge's own.
+  <br>3. **An SVG element carries what an HTML one now inherits.** It does not inherit
+  `HTMLElement.prototype` — `SVGElement` derives straight from `Element` — so it installs those 37
+  members on itself, which is exactly the surface it had before. It is not a browser's: an
+  `SVGElement` shares only `style`, `dataset`, `tabIndex`, `focus`/`blur` and the `on*` handlers with
+  `HTMLElement`, and has no `title`, `innerText` or `offsetWidth`. Narrowing it is part of the per-tag
+  SVG interface decision below, since doing it needs a measured `SVGElement` shape rather than a
+  reading of the specification. Pinned as the current answer.
+  <br>4. **`textContent`.** An element's is a different operation from a character-data node's, so
   it stays the element's own and shadows the `Node.prototype` one until there is a single
   implementation that serves both. The document's `Node` members have gone — checking them against
   the prototype's answer is what turned up three spec bugs, all now

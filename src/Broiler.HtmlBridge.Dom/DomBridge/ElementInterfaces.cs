@@ -343,18 +343,15 @@ public sealed partial class DomBridge
             }
         }
 
-        // Box-model metrics (client*/offset*/scroll* dimensions, offsetParent, getBoundingClientRect/
-        // getClientRects) and the imperative scrolling API (scrollTop/scrollLeft, scroll/scrollTo/scrollBy,
-        // scrollIntoView, scrollParent) — Phase 3 P3.51: extracted into the co-located ElementGeometryBinding
-        // feature module. These read the live layout, so the module reaches the bridge through the wide
-        // IElementGeometryHost contract (DomBridge.ElementGeometryHost.cs).
-        Dom.Features.ElementGeometryBinding.Install(this, obj, element);
-
-        // Web Animations: element.animate(keyframes, options) bakes the animation's snapshot-time
-        // value so animation-driven property changes render (see DomBridge.WebAnimations).
-        obj.FastAddValue((KeyString)"animate",
-            new DomFunction((in a) => ElementAnimate(element, in a), "animate", 2),
-            JSPropertyAttributes.EnumerableConfigurableValue);
+        // The bridge's own scrollParent — Phase 3 P3.51: extracted into the co-located
+        // ElementGeometryBinding feature module. It reads the live layout, so the module reaches the
+        // bridge through the wide IElementGeometryHost contract (DomBridge.ElementGeometryHost.cs).
+        // The two interface halves of that module are on their prototypes: Element's client*/scroll*
+        // metrics, getBoundingClientRect/getClientRects and the imperative scrolling API
+        // (DomBridge.ElementInterface.cs, with animate()), and HTMLElement's offset* family
+        // (DomBridge.HtmlElementInterface.cs). scrollParent is on neither, because it is on no
+        // browser's prototype.
+        Dom.Features.ElementGeometryBinding.InstallBridgeMembers(this, obj, element);
 
         // SVG DOM interfaces — SVGAnimatedLength/Rect stubs, SVGTextContentElement text metrics, the
         // SVGSVGElement animation timeline and the SMIL animation-element no-ops (Phase 3 P3.50:

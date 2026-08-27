@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 using Broiler.Dom;
 using Broiler.JavaScript.Runtime;
 
@@ -25,13 +27,25 @@ internal sealed class JsObjectRegistry
     /// The same pairs the other way round, so a wrapper can name its node in constant time.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// A member that lives on an interface prototype has no node captured in a closure — it finds one
     /// from its receiver, on every call (see <c>DomBridge.CharacterDataInterface.cs</c>). The scan
     /// <see cref="TryGetNode"/> used to do was fine for the handful of call sites that had it, and is
     /// not fine per DOM operation: it is linear in the wrappers the document has minted, so a
     /// prototype method would have cost more the larger the page.
+    /// </para>
+    /// <para>
+    /// <b>Weakly keyed, and outliving <see cref="Remove"/> deliberately.</b> A wrapper the page still
+    /// holds must keep naming its node after the node leaves the tree, because in a browser a removed
+    /// node goes on working — <c>var gone = host.firstChild; host.innerHTML = '…'; gone.tagName</c>
+    /// still answers. This map is what an inherited member reads, so dropping the entry with the
+    /// forward one turned every such member into an illegal invocation while the members the wrapper
+    /// still owned kept working. The weak key is what keeps that from being a leak: the node is held
+    /// only for as long as script can still reach it through the wrapper, where the forward map holds
+    /// both outright and is the one <see cref="Remove"/> releases.
+    /// </para>
     /// </remarks>
-    private readonly Dictionary<JSObject, DomNode> _wrapperNodes = new(ReferenceEqualityComparer.Instance);
+    private readonly ConditionalWeakTable<JSObject, DomNode> _wrapperNodes = new();
     // Phase 4 item 1 (P4.4a): keyed by DomNode so a canonical DomDocument browsing-context root maps
     // to its document wrapper, alongside the legacy #subdoc-root element roots.
     private readonly Dictionary<DomNode, JSObject> _documentWrappers = new(ReferenceEqualityComparer.Instance);
@@ -51,17 +65,19 @@ internal sealed class JsObjectRegistry
             _wrapperNodes.Remove(previous);
 
         _nodeWrappers[node] = wrapper;
-        _wrapperNodes[wrapper] = node;
+        _wrapperNodes.AddOrUpdate(wrapper, node);
     }
 
-    /// <summary>Drops <paramref name="node"/>'s wrapper (e.g. when the node is removed/adopted away).</summary>
-    public bool Remove(DomNode node)
-    {
-        if (_nodeWrappers.TryGetValue(node, out var wrapper))
-            _wrapperNodes.Remove(wrapper);
-
-        return _nodeWrappers.Remove(node);
-    }
+    /// <summary>
+    /// Drops <paramref name="node"/>'s wrapper (e.g. when the node is removed/adopted away), so
+    /// neither is held by this registry any longer.
+    /// </summary>
+    /// <remarks>
+    /// The reverse entry is left in place on purpose: it is weakly keyed, so it holds the node only
+    /// while script can still reach the wrapper, and that is exactly the case a browser keeps working
+    /// — a node removed from the tree answers its members as before. See <see cref="_wrapperNodes"/>.
+    /// </remarks>
+    public bool Remove(DomNode node) => _nodeWrappers.Remove(node);
 
     /// <summary>The registered node→wrapper pairs, for the reverse-lookup call sites.</summary>
     public IEnumerable<KeyValuePair<DomNode, JSObject>> Entries => _nodeWrappers;

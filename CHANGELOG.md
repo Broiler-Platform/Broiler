@@ -9,6 +9,102 @@ are versioned in lockstep during the preview.
 
 ### Fixed
 
+- `document.currentScript` names the running script under the WPT runner, where
+  it was `null` for every script on every test. In the main repository
+  (`Broiler.Wpt`), so it is live.
+
+  The runner never recorded which `<script>` each collected program came from,
+  so the bridge's current-script index stayed at its default. For a conformance
+  runner that is worse than a wrong answer: a test whose script reads
+  `currentScript` took its "not supported" branch and was then scored on a page
+  that had never done its work, so the result said nothing about the feature
+  under test. The `document.write` insertion point, which resolves through the
+  same index, was equally adrift.
+
+  Each collected program now carries its ordinal among the document's
+  `<script>` elements, resolved against the parsed tree — the mechanism the
+  capture host already uses, and for the same reason: the runner skips scripts
+  that are `<script>` elements all the same (a data block, a module, a
+  testharness include it stubs), so re-deriving the classification would shift
+  every entry after each skipped one. The index is cleared as soon as a program
+  returns, so a `setTimeout` callback reads `null` as it does in a browser.
+
+- Every node wrapper stopped carrying its own copy of the eighteen `Node`
+  constants. In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  `Node.prototype` has carried the twelve `*_NODE` type values and the six
+  `DOCUMENT_POSITION_*` bits all along, and each element, document, document
+  fragment, doctype and sub-document `document` installed the same eighteen on
+  itself. They answer identically from the prototype — they are plain numbers
+  from the same source — so the copies are gone: an element is down from 40 own
+  properties to 22, a document from 96 to 78, a fragment from 52 to 34, a
+  doctype from 43 to 25, and a sub-document's `document` from 70 to 52.
+
+- `HTMLElement`'s interface lives on `HTMLElement.prototype`, and the root element
+  inherits like every other. In the main repository (`Broiler.HtmlBridge.Dom`), so
+  it is live.
+
+  The prototype owned nothing but its `constructor` while every element wrapper
+  installed the 37 members HTML gives every HTML element as own properties of
+  itself, so `HTMLElement.prototype.click` was `undefined` and
+  `el.click === otherEl.click` was `false`. Those members — the global
+  reflectors, `style`, `dataset`, `innerText`/`outerText`, `hidden`/`tabIndex`,
+  `click`/`focus`/`blur`, `attachInternals`, the seventeen `on*` handlers and the
+  `offset*` metrics — are on the prototype now, taking an element from 77 own
+  properties to 40. `el.style === el.style` and `el.dataset === el.dataset` still
+  hold: both are memoized per element rather than built with the wrapper.
+
+  `document.documentElement` was the one element wrapper minted before those
+  prototypes existed, because it was materialized as a value during document
+  registration. It carried its own copy of everything *and* the prototype — 164
+  own properties against an ordinary element's — so a page patching
+  `Element.prototype` reached every element except the root one. It is a getter
+  now, like the `scrollingElement` beside it, so its wrapper is minted on first
+  read like any other; that also stops a re-parse handing back the previous
+  document's wrapper.
+
+- `Element`'s interface lives on `Element.prototype`, where a page can reach it.
+  In the main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  The prototype carried three members and nothing else, while every element
+  wrapper installed the other 63 as own properties of itself. So
+  `Element.prototype.getAttribute` was `undefined` — and that is not only a
+  shape difference: borrowing a prototype method is what a library does when it
+  cannot trust the instance's own, and `Element.prototype.matches.call(el, sel)`
+  threw instead of answering. The polyfill idiom failed the same way round:
+  assigning to `Element.prototype` reached an object every element shadowed with
+  a copy of the same name.
+
+  The members Web IDL's `Element` declares — with the mixins it includes,
+  `ParentNode`, `ChildNode`, `NonDocumentTypeChildNode`, the CSSOM View box
+  metrics, Fullscreen and `Animatable` — are on the prototype now and find their
+  element from the receiver. An element is down from 140 own properties to 77,
+  `el.getAttribute === Element.prototype.getAttribute` holds, and a receiver that
+  is not an element — a plain object, the document, a text node — is the
+  `TypeError` a browser raises.
+
+  `Element.prototype.replaceChildren` arrived with them: it is the third member
+  of the `ParentNode` mixin beside the `append`/`prepend` that were bound, the
+  document's has been here since that mixin was bound there, and an element's —
+  which is how a page empties a node — threw on an undefined function.
+
+  What stays on each wrapper is what is not `Element`'s: `HTMLElement`'s members,
+  `Node`'s five tree mutations, and the two members no browser puts on
+  `Element.prototype` at all (`removeAttributeNodeNS`, and the bridge's own
+  `scrollParent`).
+
+- A node the page still holds keeps working after `innerHTML` drops it. In the
+  main repository (`Broiler.HtmlBridge.Dom`), so it is live.
+
+  Assigning `innerHTML` unregisters the subtree it replaces, so the registry
+  stops holding wrappers the document has discarded — and it dropped the
+  wrapper→node entry with it, which is the one a member living on an interface
+  prototype reads. A node the page had a reference to then answered its own
+  members and threw `TypeError: Illegal invocation` for every inherited one,
+  where a browser keeps a removed node entirely functional. The reverse map is
+  weakly keyed now and outlives the unregistration, so the node stays reachable
+  for exactly as long as script can still reach the wrapper.
+
 - Three things a `document` answered wrongly, found by checking its `Node`
   members against the prototype's before removing them. In the main repository
   (`Broiler.HtmlBridge.Dom`), so it is live.

@@ -103,8 +103,8 @@ public sealed partial class DomBridge
     }
 
     /// <summary>
-    /// The <c>Node</c> members the <c>document</c> wrapper installed for itself, dropped now that
-    /// <c>Node.prototype</c> carries them.
+    /// The <c>Node</c> members and constants the <c>document</c> wrapper installed for itself, dropped
+    /// now that <c>Node.prototype</c> carries them.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -115,11 +115,16 @@ public sealed partial class DomBridge
     /// short of reordering registration itself.
     /// </para>
     /// <para>
-    /// Only the five it actually had, and only after checking that the prototype answers the same for
-    /// a document receiver: <c>nodeType</c> is 9, <c>nodeName</c> is <c>#document</c>,
+    /// Only the five members it actually had, and only after checking that the prototype answers the
+    /// same for a document receiver: <c>nodeType</c> is 9, <c>nodeName</c> is <c>#document</c>,
     /// <c>childNodes</c>/<c>firstChild</c>/<c>lastChild</c> report the same nodes. They were separate
     /// implementations rather than copies of the prototype's — a literal <c>9</c>, a different
     /// <c>childNodes</c> binding — so agreeing was a thing to verify rather than assume.
+    /// </para>
+    /// <para>
+    /// The eighteen constants beside them need no such check: they are plain numbers, and
+    /// <c>RegisterNodeConstructor</c> puts the same eighteen values on <c>Node.prototype</c> — the
+    /// copies were duplication rather than a second implementation.
     /// </para>
     /// </remarks>
     private void DropDocumentNodeMemberCopies()
@@ -129,6 +134,20 @@ public sealed partial class DomBridge
 
         foreach (var member in new[] { "nodeType", "nodeName", "childNodes", "firstChild", "lastChild" })
             document.Delete((KeyString)member);
+
+        foreach (var constant in Dom.Features.NodeConstantsBinding.Names)
+            document.Delete((KeyString)constant);
+    }
+
+    /// <summary>
+    /// The <c>Node</c> constants for a wrapper that cannot inherit them — one minted before the realm
+    /// carried the interfaces. Every other wrapper's chain reaches <c>Node.prototype</c>, which has
+    /// all eighteen.
+    /// </summary>
+    private void InstallNodeConstantsIfNotInherited(JSObject obj)
+    {
+        if (!_nodeInterfacePrototypesReady)
+            Dom.Features.NodeConstantsBinding.Install(obj);
     }
 
     /// <summary>The prototype object of a registered interface global, if the realm has one.</summary>

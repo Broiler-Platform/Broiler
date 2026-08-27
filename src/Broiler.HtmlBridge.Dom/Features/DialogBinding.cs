@@ -22,6 +22,21 @@ internal sealed class DialogBinding(IDialogHost host)
     private readonly IDialogHost _host = host;
 
     /// <summary>
+    /// Fullscreen's <c>Element.requestFullscreen()</c> and its <c>webkit</c> alias — on
+    /// <c>Element.prototype</c>, since the Fullscreen API extends <c>Element</c> rather than any tag
+    /// (Chromium has both there too).
+    /// </summary>
+    internal void InstallElementMembers(JSObject target, ElementSource element)
+    {
+        target.FastAddValue((KeyString)"requestFullscreen",
+            new DomFunction((in a) => RequestFullscreen(element(in a, "requestFullscreen")), "requestFullscreen", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+        target.FastAddValue((KeyString)"webkitRequestFullscreen",
+            new DomFunction((in a) => RequestFullscreen(element(in a, "webkitRequestFullscreen")), "webkitRequestFullscreen", 0),
+            JSPropertyAttributes.EnumerableConfigurableValue);
+    }
+
+    /// <summary>
     /// Installs the dialog/details interface members and the popover methods on
     /// <paramref name="obj"/> for <paramref name="element"/> (by <paramref name="tag"/> for
     /// dialog/details; by <paramref name="hasPopover"/> for the tag-agnostic popover API).
@@ -50,14 +65,6 @@ internal sealed class DialogBinding(IDialogHost host)
                 new DomFunction((in a) => SetReturnValue(element, in a), "set returnValue"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
-
-        // Fullscreen §Element.requestFullscreen() — on every element, not tied to a tag.
-        obj.FastAddValue((KeyString)"requestFullscreen",
-            new DomFunction((in _) => RequestFullscreen(element), "requestFullscreen", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        obj.FastAddValue((KeyString)"webkitRequestFullscreen",
-            new DomFunction((in _) => RequestFullscreen(element), "webkitRequestFullscreen", 0),
-            JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Popover API (HTML §popover) — showPopover()/hidePopover() are exposed on any element
         // carrying the global `popover` attribute, not tied to a tag.

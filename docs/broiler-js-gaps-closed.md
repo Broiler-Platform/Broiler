@@ -374,6 +374,34 @@ empty and the directory is gone with it — a submodule fix is now checked with
 
 ### Track 3 — Script attribution
 
+- **`document.currentScript` was `null` for every script the WPT runner ran.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.Wpt`), so no patch. The second of the three hosts named in
+  track 3's current-script item; `ScriptEngine` is the one left, in
+  [open](broiler-js-gaps-open.md#confirmed-host-semantic-gaps).
+  <br>**Cause.** The runner never recorded which `<script>` each collected program came from, so the
+  bridge's current-script index stayed at its `-1` default. That is a different failure from a wrong
+  answer and a worse one for a conformance runner: a test whose script reads `currentScript` took its
+  "not supported" branch and was then *scored* on a page that had never done its work, so the result
+  says nothing about the feature under test. The `document.write` insertion point, which resolves
+  through the same index, was equally adrift.
+  <br>**Fix.** The scan records each collected program's ordinal among all the `<script>` elements in
+  document order, and the eval loops resolve it through `ScriptElementMap.AllInDocumentOrder` against
+  the parsed tree — the same mechanism the capture host uses, and for the same reason: the runner
+  skips scripts that are `<script>` elements all the same (a data block, a module, a testharness
+  include it stubs), so pairing the collected programs against a re-derived classification would
+  shift every entry after each one it skipped. The runner's own injected stubs came from no element
+  and run with no current script.
+  <br>**And nothing is current outside script execution.** The index is cleared as soon as a program
+  returns, before the microtask/timer drain that follows it, so a `setTimeout` callback reads `null`
+  as it does in a browser rather than naming whichever script scheduled it.
+  <br>**Evidence.** 3 regressions in `CurrentScriptUnderTheRunnerTests`, each asserting through the
+  render the suite can observe — the running script names itself, a JSON-LD data block ahead of it
+  does not shift the answer (the case that separates a recorded ordinal from a re-derived
+  classification), and a timer callback has no current script. Whole-suite diff against a
+  same-container baseline shows no regression: `Broiler.Wpt.Tests` 55 distinct failures → 55, the one
+  difference being a wall-clock budget test (`ScrollWriteGeometryTimeoutTests`, whose own name says it
+  measures "well within the runner timeout") that passes in isolation in 7s.
+
 - **Every script was attributed to its predecessor once anything ahead of it had been skipped.**
   **Fixed, and live** — entirely in the main repo (`Broiler.Cli`, `Broiler.HtmlBridge.Core`), so no
   patch. Track 3 action 5.
@@ -896,6 +924,176 @@ since been applied upstream and the gitlink bumped: `12839186` *Give a module's 
   in `WindowScreenGeometryTests`.
 
 ### Track 6 — DOM, CSSOM, SVG, and script-visible document behavior
+
+- **Every wrapper carried its own eighteen `Node` constants.** **Fixed, and live** — entirely in the
+  main repo (`Broiler.HtmlBridge.Dom`), so no patch.
+  <br>**Cause.** `RegisterNodeConstructor` puts the twelve `*_NODE` type values and the six
+  `DOCUMENT_POSITION_*` bits on `Node.prototype`, and `NodeConstantsBinding` put the same eighteen on
+  each element, document, document fragment, doctype and sub-document `document` object. Unlike the
+  members that moved before them these needed no checking against the prototype's answer: they are
+  plain numbers from the same source, so the copies were duplication rather than a second
+  implementation.
+  <br>**Fix.** Each wrapper installs them only when it cannot inherit — a wrapper minted before the
+  realm carried the interfaces — and the document's, which is built before the prototypes exist, are
+  dropped with the five `Node` members already removed there. An element is down from **40** own
+  properties to **22**, a document from 96 to **78**, a fragment from 52 to **34**, a doctype from 43
+  to **25**, and a sub-document's `document` from 70 to **52**.
+  <br>**Evidence.** A regression in `ElementNodeMembersOnPrototypeTests`: the values still answer for
+  an element, the document, a fragment and a doctype, and none of the four owns them.
+  <br>**Whole-suite evidence for this and the four instalments beside it,** measured against a
+  same-container baseline at the branch point: `Broiler.Cli.Tests` 42 distinct failures → 42 with 90
+  tests added, and `Broiler.Wpt.Tests` 55 → 55, byte-identical. Two tests differed between the CLI
+  runs and neither is these changes — the compile-ahead worker-budget test and an idle-callback
+  deadline, both verified to pass in isolation, both load-sensitive by construction.
+  <br>**And a whole-surface diff, which is what says nothing was lost in the move.** Every member
+  reachable on a node — own and inherited, with its kind and a function's `length` — was enumerated
+  on both revisions for sixteen node kinds (a `div`, `input`, `form`, `table`, `a`, `select`,
+  `textarea`, `img`, `template`, `dialog`, a namespaced `<svg>` and `<rect>`, a text node, a comment,
+  a fragment, a doctype and the document) and diffed. Across all of them: **nothing missing**, one
+  member added (`replaceChildren`), and three kinds changed — `tagName` and `classList` from values to
+  accessors, and `document.documentElement` likewise — each of which is one of the intended changes
+  above. No function's `length` moved. A namespaced SVG element is the case worth naming: its 63
+  `Element` members moved to `Element.prototype` and its 18 constants to `Node.prototype`, while
+  `HTMLElement`'s 37 stayed its own, which is the deviation pinned in
+  `HtmlElementInterfacePrototypeTests`.
+
+- **`HTMLElement`'s interface was copied onto every element wrapper too.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The sixth instalment of track 6
+  action 1 and the direct sequel to the `Element` one below, whose `ElementSource` mechanism it reuses
+  unchanged; what remains is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** `HTMLElement.prototype` owned nothing but its `constructor`, while every element
+  wrapper installed the 37 members HTML gives every HTML element as own properties of itself — so
+  `HTMLElement.prototype.click` was `undefined`, and `el.click === otherEl.click` was `false` where a
+  browser says `true`.
+  <br>**Fix.** Web IDL's `HTMLElement` and the mixins it includes — `ElementCSSInlineStyle` (`style`),
+  `HTMLOrSVGElement` (`dataset`, `tabIndex`, `focus`, `blur`), `GlobalEventHandlers` (the seventeen
+  `on*` reflectors), the global reflectors, `innerText`/`outerText`, `hidden`, `click`,
+  `attachInternals` and the CSSOM View `offset*` metrics — are on the prototype and resolve their
+  element from the receiver. An element is down from **77** own properties to **40**.
+  <br>**Two more per-instance objects.** `style` was a declaration built with the wrapper and captured
+  by the accessor; `dataset` was a self-replacing accessor that wrote its map back onto the wrapper it
+  closed over, which memoized it *and* left an own property behind. Both are weak per-element caches
+  now — the shape `classList` and `attributes` already use — so `el.style === el.style` and
+  `el.dataset === el.dataset` hold while the element carries neither.
+  <br>**What deliberately did not move.** The per-control reflectors installed beside them — `value`,
+  `checked`, `defaultValue`, `defaultChecked`, `type`, `name`, `disabled`, `required`, `files`, and
+  `checkValidity`/`reportValidity`/`submit` — are on *every* element here where a browser gives them
+  only to the interfaces that declare them, so relocating them is a decision about dropping them from
+  a `<div>` rather than a relocation. `textContent` stays each wrapper's own for the reason it always
+  has.
+  <br>**An SVG element keeps its own copies, and that is a pinned deviation rather than an
+  oversight.** `SVGElement` derives straight from `Element`, so it inherits none of these; installing
+  them on itself preserves exactly the surface it had. That surface is not a browser's — an
+  `SVGElement` shares only `style`, `dataset`, `tabIndex`, `focus`/`blur` and the `on*` handlers, and
+  has no `title` or `offsetWidth` — and narrowing it is the per-tag SVG interface decision this track
+  already holds open, which would mean minting a prototype shape from a specification reading rather
+  than from a measurement.
+  <br>**Evidence.** 30 regressions in `HtmlElementInterfacePrototypeTests` — each member inherited
+  rather than owned and owned by `HTMLElement.prototype`, one function shared across elements, the
+  inline style keeping its identity and still writing through to the `style` attribute (including
+  through the `el.style = "…"` assignment), the dataset keeping its identity and leaving no own
+  property, the reflectors, each `on*` handler answering for its own event, `click`/`focus`/`blur`
+  still dispatching, the `offset*` metrics, a non-element receiver as an illegal invocation, the SVG
+  deviation, and the members that stay each wrapper's own. Five superseded assertions updated in
+  `ElementInterfacePrototypeTests`, which pinned those five as the element's own when only `Element`
+  had moved.
+
+- **The root element inherited none of the interface the others do.** **Fixed, and live** — entirely
+  in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. Found while checking what the element
+  instalment below actually reached.
+  <br>**Cause.** `document.documentElement` was a value materialized during document registration
+  (`ToJSObject(DocumentElement)`), which is the one place an element wrapper is minted before the
+  interface constructors exist — they are registered by the polyfill pass afterwards. So `<html>`
+  alone took the pre-realm fallback and installed its own copy of every interface member, and the
+  re-link sweep at the end of registration then gave it the prototype as well. It carried both:
+  **164** own properties against an ordinary element's 77, with
+  `document.documentElement.getAttribute === Element.prototype.getAttribute` answering `false`. A page
+  patching `Element.prototype` — the idiom the element instalment exists to make work — reached every
+  element except the root one.
+  <br>**Fix.** The member is a getter, like the `scrollingElement` beside it that answers with the
+  same element and like the accessor a browser has on `Document.prototype`. Deferring the mint to the
+  first read makes the fallback unreachable for it rather than compensated for afterwards, and
+  `documentElement` now carries exactly what any other element does.
+  <br>**One other thing it fixed.** A re-parse clears the wrapper registry, and a value property is
+  not cleared — so `document.documentElement` handed back the previous document's wrapper. The getter
+  mints against the current registry.
+  <br>**Evidence.** A regression in `ElementInterfacePrototypeTests`: the root element owns no
+  `getAttribute`, shares the prototype's function, has the same own-property count as a `<div>`, and
+  still reports `HTML`.
+
+- **`Element`'s whole interface was copied onto every element wrapper.** **Fixed, and live** —
+  entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fifth instalment of track 6
+  action 1, and the one its first sub-item named; what remains is in
+  [open](broiler-js-gaps-open.md#dom-interface-and-collection-model).
+  <br>**Cause.** `Element.prototype` carried three members — `localName`, `prefix`, `namespaceURI` —
+  and nothing else, while each element wrapper installed the other 63 as own properties of itself. So
+  `Element.prototype.getAttribute` was `undefined`, which is not only a shape difference: borrowing a
+  prototype method is what a library does when it cannot trust the instance's own, and
+  `Element.prototype.matches.call(el, sel)` threw rather than answering. The polyfill idiom failed
+  the same way round — assigning to `Element.prototype` reached an object every element shadowed with
+  its own copy of the same name.
+  <br>**Fix.** The 63 members Web IDL's `Element` declares — with the mixins it includes: `ParentNode`,
+  `ChildNode`, `NonDocumentTypeChildNode`, the CSSOM View box metrics, Fullscreen and `Animatable` —
+  are installed on `Element.prototype` and found through the receiver. An element is down from **140**
+  own properties to **77**, and `el.getAttribute === Element.prototype.getAttribute` holds, as does
+  `el.matches === otherEl.matches`.
+  <br>**One installer, both places.** Each member is written once against an `ElementSource` that
+  answers either the element captured when the wrapper was built or the element the receiver names.
+  The prototype takes the receiver-resolving one; a wrapper minted before the realm exists — which
+  inherits from nothing — takes the capturing one. The earlier instalments had to establish "a
+  byte-identical copy" by reading each pair by hand; this makes it structural.
+  <br>**Two per-instance things had to change shape first.** `tagName` was a `JSString` fixed when the
+  wrapper was built — the roadmap's second sub-item — and is an accessor now, which is what a browser
+  has. `classList` was a value built with the wrapper, so its identity came for free; it is a
+  prototype accessor over a weak per-element cache now, the same shape `attributes` already used, and
+  `el.classList === el.classList` still holds.
+  <br>**One member the wrapper never had.** `Element.prototype.replaceChildren` — the third member of
+  the `ParentNode` mixin, beside the `append`/`prepend` that were bound. The document's counterpart
+  has been here since that mixin was bound there; an element's, which is how a page empties a node,
+  threw on an undefined function.
+  <br>**And one it has that no browser does.** `removeAttributeNodeNS` stays the instance's:
+  DOM §4.9 pairs `setAttributeNode` with `setAttributeNodeNS` but gives `removeAttributeNode` no
+  namespace-qualified sibling, so putting it on `Element.prototype` would give that prototype a member
+  a browser's has not got. Same for the bridge's own `scrollParent`.
+  <br>**A latent staleness went with it.** The box metrics captured "is this the viewport element?"
+  once at install; the test walks the element's ancestors, so a `<body>` whose wrapper was built
+  before it was attached under `<html>` kept the answer it had then. A prototype member has to ask per
+  call, which is also the truthful answer.
+  <br>**Evidence.** 47 regressions in `ElementInterfacePrototypeTests` — each member inherited rather
+  than owned and owned by `Element.prototype`, one function shared across elements, the borrowed call
+  answering, a non-element receiver (a plain object, the document, a text node) an illegal invocation,
+  `tagName` an accessor, `classList` and `attributes` keeping their identity, the attribute
+  operations, the tree and selector members, `replaceChildren`, a form's named getter not shadowing an
+  inherited member, an SVG element inheriting the same functions, the polyfill idiom reaching
+  instances, and the members that are *not* `Element`'s staying where they were. One superseded
+  assertion updated: `DomInterfacePrototypeTests` pinned `tagName` as the element's own, which was
+  what the prototype link was measured against before any member moved.
+
+- **An `innerHTML` assignment broke every inherited member on the nodes it replaced.** **Fixed, and
+  live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. Found while moving
+  `Element`'s interface onto its prototype, and fixed before it, because each interface that moves
+  makes it worse.
+  <br>**Cause.** Wrapper identity lives in `JsObjectRegistry`, which keeps the pairs both ways: the
+  forward map so a node finds its wrapper, and a reverse map so a wrapper can name its node, which is
+  what a member on an interface prototype reads on every call. Assigning `innerHTML` unregisters the
+  whole subtree it replaces — reasonably, to stop the registry holding wrappers the document has
+  discarded — and that dropped the reverse entry too. So a node the page still had a reference to
+  answered its *own* members (they capture the node) and threw
+  `TypeError: Illegal invocation` for every *inherited* one. A browser keeps a removed node entirely
+  functional: `var gone = host.firstChild; host.innerHTML = '…'; gone.tagName` answers.
+  <br>**Fix.** The reverse map is a `ConditionalWeakTable` keyed by the wrapper and is no longer
+  dropped on unregistration. The node then stays reachable for exactly as long as script can still
+  reach the wrapper — the case a browser keeps working — and is released with it otherwise. The
+  forward map is still dropped, so the registry stops holding the pair outright and the memory intent
+  is unchanged; the weak key is what makes keeping the other half not a leak.
+  <br>**Scope.** Only `innerHTML`/`outerHTML` and sub-document teardown unregister, so
+  `removeChild`, `remove()` and `replaceChild` never had it. Before this it cost the `Node` members
+  and the `EventTarget` trio; after the element move it would have cost most of an element's surface.
+  <br>**Evidence.** 3 regressions in `DetachedNodeWrapperTests` — the replaced node's `nodeType`,
+  `tagName`, `getAttribute`, `className`, `textContent`, `parentNode` and `isConnected`, then
+  mutating and re-attaching it, then the ordinary removal path that never regressed. Whole-suite
+  diffs for this and the four instalments beside it are recorded with the last of them.
 
 - **Three spec bugs a document answered wrongly, and the document's own `Node` members.**
   **Fixed, and live** — entirely in the main repo (`Broiler.HtmlBridge.Dom`), so no patch. The fourth

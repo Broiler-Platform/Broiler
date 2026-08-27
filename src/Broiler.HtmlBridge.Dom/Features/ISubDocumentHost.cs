@@ -33,6 +33,12 @@ internal interface ISubDocumentHost
     /// other one.</summary>
     void LinkToInterface(JSObject wrapper, string interfaceName);
 
+    /// <summary>
+    /// Whether the node interface prototypes carry their members, so a linked wrapper inherits the
+    /// <c>Node</c> constants instead of needing its own eighteen copies.
+    /// </summary>
+    bool NodeInterfacePrototypesReady { get; }
+
     /// <summary>Reverse wrapper lookup: the element whose JS wrapper is <paramref name="jsObj"/>.</summary>
     DomElement? FindDomElementByJSObject(JSObject jsObj);
 
