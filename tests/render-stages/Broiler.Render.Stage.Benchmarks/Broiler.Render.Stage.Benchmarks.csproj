@@ -35,7 +35,7 @@
     there and this condition simply stops doing anything.
   -->
   <PropertyGroup>
-    <BroilerGraphicsRasterParallelism Condition="Exists('$(MSBuildThisFileDirectory)..\..\..\Broiler.Graphics\Broiler.Graphics\Rendering\BRasterParallelism.cs')">true</BroilerGraphicsRasterParallelism>
+    <BroilerGraphicsRasterParallelism Condition="Exists('$(MSBuildThisFileDirectory)..\..\..\Broiler.Graphics\src\Broiler.Graphics\Rendering\BRasterParallelism.cs')">true</BroilerGraphicsRasterParallelism>
     <DefineConstants Condition="'$(BroilerGraphicsRasterParallelism)' == 'true'">$(DefineConstants);BROILER_GRAPHICS_RASTER_PARALLELISM</DefineConstants>
   </PropertyGroup>
 
@@ -59,17 +59,17 @@
     <ProjectReference Include="..\..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj" />
     <ProjectReference Include="..\..\..\Broiler.DOM\Broiler.Dom.Html\Broiler.Dom.Html.csproj" />
     <!-- BColor, and the image encode formats the decode benchmark builds its fixtures with. -->
-    <ProjectReference Include="..\..\..\Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" />
     <!-- For the js-context-scaling mode: whether two JSContexts on two threads actually run at
          the same time, which is the question multithreading item #18 (Web Workers) turns on. -->
     <ProjectReference Include="..\..\..\Broiler.JS\Broiler.JS\Broiler.JavaScript.All\Broiler.JavaScript.All.csproj" />
-    <ProjectReference Include="..\..\..\Broiler.Media\Broiler.Media.Image\Broiler.Media.Image.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Media\src\Broiler.Media.Image\Broiler.Media.Image.csproj" />
     <!--
       The decode-scaling mode sets `ImageDecodeParallelism.MaxDegreeOfParallelism`, which is internal
       to the managed codecs (see the InternalsVisibleTo there). Referenced explicitly rather than
       relied on transitively, because that is the assembly this project actually names in source.
     -->
-    <ProjectReference Include="..\..\..\Broiler.Media\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
   </ItemGroup>
 
 </Project>

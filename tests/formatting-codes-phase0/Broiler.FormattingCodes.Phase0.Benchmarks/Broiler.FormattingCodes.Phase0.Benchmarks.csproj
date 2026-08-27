@@ -11,7 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Broiler.Documents\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -25,7 +25,7 @@ That is what "no input is possible on google.com" was.
 ## The approach: host Broiler.UI controls over the page
 
 Rather than grow a text editor inside the renderer, the browser *hosts* the real
-thing. `HtmlFormEditor` (`src/Broiler.Browser.Core/HtmlFormEditor.cs`) keeps a
+thing. `HtmlFormEditor` (`Broiler.Browser/src/Broiler.Browser.Core/HtmlFormEditor.cs`) keeps a
 `StandardEdit` — the same Broiler.UI control the address bar uses — as a child of
 the page viewport. Clicking a text field places that control over the field's
 border box and gives it session focus, so caret, selection, clipboard, IME and

@@ -8,16 +8,17 @@
     Implements the vendoring design tracked by the release and distribution
     work in docs/ROADMAP.md. Each component is self-contained: it carries its
     own eng/Broiler.Packaging.props and eng/icon.png
-    so it builds and packs standalone -- important because the in-tree components
-    are slated to become submodules.
+    so it builds and packs standalone -- which is what let the component
+    directories become submodules of their own.
 
     The script is idempotent: re-running it refreshes the vendored files and
     leaves an already-wired Directory.Build.props untouched.
 
-    Submodule components (DOM, CSS, Graphics, HTML, JS) are NOT vendored by
-    default: editing them is a submodule change subject to the push-or-patch
-    workflow in CLAUDE.md. Pass -IncludeSubmodules to stage those working-tree
-    changes for patch generation.
+    Submodule components are NOT vendored by default: editing them is a submodule
+    change subject to the push-or-patch workflow in CLAUDE.md. Pass
+    -IncludeSubmodules to stage those working-tree changes for patch generation.
+    Broiler.Layout is the only component left in this repository, so a default run
+    now touches that one alone.
 
 .PARAMETER IncludeSubmodules
     Also vendor into the git-submodule components. Off by default.
@@ -41,20 +42,23 @@ foreach ($f in @($canonicalProps, $canonicalIcon)) {
 
 # In-tree component library roots (Writer/Browser apps and tooling excluded).
 $inTree = @(
-    'Broiler.Layout',
-    'Broiler.Documents',
-    'Broiler.Media',
-    'Broiler.Input',
-    'Broiler.UI'
+    'Broiler.Layout'
 )
 
 # Submodule component roots (push-or-patch workflow; opt in via -IncludeSubmodules).
+# Broiler.Documents, Broiler.Media, Broiler.Input and Broiler.UI moved here when the
+# component directories became submodules: vendoring into them writes into a
+# submodule working tree, which a default run must not do silently.
 $submodules = @(
     'Broiler.DOM',
     'Broiler.CSS',
     'Broiler.Graphics',
     'Broiler.HTML',
-    'Broiler.JS'
+    'Broiler.JS',
+    'Broiler.Documents',
+    'Broiler.Media',
+    'Broiler.Input',
+    'Broiler.UI'
 )
 
 $components = $inTree

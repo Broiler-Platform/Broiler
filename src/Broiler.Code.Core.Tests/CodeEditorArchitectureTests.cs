@@ -19,7 +19,7 @@ public sealed class CodeEditorArchitectureTests
 
         Assert.Equal(
         [
-            "../../../../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
+            "../../../../Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj",
             "../../../Foundation/Broiler.UI/Broiler.UI.csproj",
         ],
             references);
@@ -73,10 +73,10 @@ public sealed class CodeEditorArchitectureTests
         // puts Core on.
         Assert.Equal(
         [
-            "../../Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj",
-            "../../Broiler.Input/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
-            "../../Broiler.Input/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
-            "../../Broiler.Input/Broiler.Input.Text/Broiler.Input.Text.csproj",
+            "../../Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj",
+            "../../Broiler.Input/src/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
+            "../../Broiler.Input/src/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
+            "../../Broiler.Input/src/Broiler.Input.Text/Broiler.Input.Text.csproj",
             "../../Broiler.UI/src/Abstractions/Commands/Broiler.UI.Button/Broiler.UI.Button.csproj",
             "../../Broiler.UI/src/Abstractions/Commands/Broiler.UI.Menu/Broiler.UI.Menu.csproj",
             "../../Broiler.UI/src/Abstractions/Commands/Broiler.UI.Toolbar/Broiler.UI.Toolbar.csproj",

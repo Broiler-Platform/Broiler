@@ -245,8 +245,7 @@ internal static class RelayoutProfile
 
     private static DomDocument ParseDocument(Corpus.Page page)
     {
-        var parser = new HtmlDocumentParser();
-        return parser.ParseDocument(page.Html).Document;
+        return HtmlDocumentParser.ParseDocument(page.Html).Document;
     }
 
     /// <summary>

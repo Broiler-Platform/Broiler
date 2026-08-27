@@ -50,7 +50,7 @@ public class CascadeBenchmarks
     {
         var page = Corpus.ByName(Page);
 
-        _document = new HtmlDocumentParser().ParseDocument(page.Html).Document;
+        _document = HtmlDocumentParser.ParseDocument(page.Html).Document;
         _elements = _document.Descendants().OfType<DomElement>().ToArray();
 
         // The author sheet only. The user-agent sheet is a fixed cost shared by every page and
@@ -139,7 +139,7 @@ public class RuleScalingBenchmarks
         for (var i = 0; i < Elements; i++)
             body.Append("<div class=\"m").Append(i % 4).Append("\"><span>x</span></div>");
 
-        _document = new HtmlDocumentParser()
+        _document = HtmlDocumentParser
             .ParseDocument("<!DOCTYPE html><html><body>" + body + "</body></html>").Document;
         _elements = _document.Descendants().OfType<DomElement>().ToArray();
 

@@ -57,7 +57,7 @@ construction site, rather than a header set where the bug was noticed:
 | Loader | Where | Fetches |
 | --- | --- | --- |
 | `CaptureService.CreateHttpClient` | `src/Broiler.Cli` | the CLI's document (and any followed link) |
-| `BrowserApp.CreatePageHttpClient` | `src/Broiler.Browser.Core` | every browser-window navigation |
+| `BrowserApp.CreatePageHttpClient` | `Broiler.Browser/src/Broiler.Browser.Core` | every browser-window navigation |
 | `ScriptExtractionService.SharedHttpClient` | `src/Broiler.HtmlBridge.Core` | external `<script src>` |
 | `ResourceLoader.SharedClient` | `src/Broiler.HtmlBridge.Dom` | stylesheets, sub-resources, `fetch()`, XHR |
 | `Program.HttpClient` | `src/Broiler.Engines.Baseline` | test262 sources and dependency metadata |

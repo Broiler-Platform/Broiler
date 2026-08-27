@@ -1,87 +1,6 @@
 {
   "solutions": [
     {
-      "path": "Broiler.Windows.Browser.slnx",
-      "description": "Windows browser application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
-        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Linux.Browser.slnx",
-      "description": "Linux browser application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
-        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Android.Browser.slnx",
-      "description": "Android browser application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Browser.Android/Broiler.Browser.Android.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Windows.Writer.slnx",
-      "description": "Windows Writer application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
-        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Linux.Writer.slnx",
-      "description": "Linux Writer application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
-        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Android.Writer.slnx",
-      "description": "Android Writer application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Writer.Android/Broiler.Writer.Android.csproj"
-      ],
-      "deploy": [
-        {
-          "project": "src/Broiler.Writer.Android/Broiler.Writer.Android.csproj",
-          "solution": "Debug|*",
-          "reason": "Preserves the flag this solution has carried since the Android head landed, so Visual Studio installs the Debug APK on F5. It has no effect on `dotnet build` and nothing in CI depends on it. Broiler.Android.Browser.slnx deliberately does not declare one; that asymmetry predates this field and is left for the Android owner to settle."
-        }
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.WebAssembly.Writer.slnx",
-      "description": "WebAssembly Writer application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
-      ]
-    },
-    {
       "path": "Broiler.Windows.Code.slnx",
       "description": "Windows Broiler Code application and its transitive dependencies.",
       "roots": [
@@ -108,7 +27,7 @@
       "description": "Office server and its property-driven Writer WebAssembly client dependency.",
       "roots": [
         "Broiler.Office.Server/Broiler.Office.Server.csproj",
-        "src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj"
+        "Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
@@ -143,15 +62,13 @@
       "description": "Cross-component integration tests; component unit tests stay in component-owned solutions.",
       "roots": [
         "src/Broiler.App.Tests/Broiler.App.Tests.csproj",
-        "src/Broiler.Browser.Core.Tests/Broiler.Browser.Core.Tests.csproj",
         "src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj",
         "src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj",
         "src/Broiler.Playback.Tests/Broiler.Playback.Tests.csproj",
         "src/Broiler.Code.Core.Tests/Broiler.Code.Core.Tests.csproj",
         "src/Broiler.Code.Language.CSharp.Tests/Broiler.Code.Language.CSharp.Tests.csproj",
         "src/Broiler.Code.Workspaces.Tests/Broiler.Code.Workspaces.Tests.csproj",
-        "src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj",
-        "src/Broiler.Writer.FormatCodes.Tests/Broiler.Writer.FormatCodes.Tests.csproj"
+        "src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
@@ -161,9 +78,9 @@
       "path": "Broiler.Windows.Tests.slnx",
       "description": "Windows-only component contract and backend tests.",
       "roots": [
-        "Broiler.Graphics/Broiler.Graphics.Windows.Tests/Broiler.Graphics.Windows.Tests.csproj",
-        "Broiler.Input/Broiler.Input.Contract.Tests/Broiler.Input.Contract.Tests.csproj",
-        "Broiler.Media/Broiler.Media.Video.MediaFoundation.Tests/Broiler.Media.Video.MediaFoundation.Tests.csproj"
+        "Broiler.Graphics/src/tests/Broiler.Graphics.Windows.Tests/Broiler.Graphics.Windows.Tests.csproj",
+        "Broiler.Input/src/tests/Broiler.Input.Contract.Tests/Broiler.Input.Contract.Tests.csproj",
+        "Broiler.Media/src/tests/Broiler.Media.Video.MediaFoundation.Tests/Broiler.Media.Video.MediaFoundation.Tests.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
@@ -174,8 +91,8 @@
       "path": "Broiler.Linux.Tests.slnx",
       "description": "Linux-only component contract and backend tests.",
       "roots": [
-        "Broiler.Graphics/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj",
-        "Broiler.Input/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj"
+        "Broiler.Graphics/src/tests/Broiler.Graphics.Linux.Tests/Broiler.Graphics.Linux.Tests.csproj",
+        "Broiler.Input/src/tests/Broiler.Input.Linux.Tests/Broiler.Input.Linux.Tests.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
@@ -186,7 +103,7 @@
       "path": "Broiler.WebAssembly.Tests.slnx",
       "description": "WebAssembly backend tests and the Broiler Code payload probes.",
       "roots": [
-        "Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj",
+        "Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj",
         "tests/broiler-code-phase0/payload-probes/Probe.Wasm.Baseline/Probe.Wasm.Baseline.csproj",
         "tests/broiler-code-phase0/payload-probes/Probe.Wasm.Roslyn/Probe.Wasm.Roslyn.csproj"
       ],
@@ -198,8 +115,8 @@
       "path": "Broiler.Android.Tests.slnx",
       "description": "Host-runnable Android input and graphics backend contract tests.",
       "roots": [
-        "Broiler.Graphics/Broiler.Graphics.Android.Tests/Broiler.Graphics.Android.Tests.csproj",
-        "Broiler.Input/Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj"
+        "Broiler.Graphics/src/tests/Broiler.Graphics.Android.Tests/Broiler.Graphics.Android.Tests.csproj",
+        "Broiler.Input/src/tests/Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
@@ -207,7 +124,7 @@
     },
     {
       "path": "Broiler.Code.Phase0.slnx",
-      "description": "Broiler Code Phase 0 harnesses: the edit-to-classification prototype, the trusted build worker, and the Roslyn footprint measurement. The SampleReports fixture under tests/broiler-code-phase0/fixture is deliberately absent \u2014 it fails to compile by design and would break build verification.",
+      "description": "Broiler Code Phase 0 harnesses: the edit-to-classification prototype, the trusted build worker, and the Roslyn footprint measurement. The SampleReports fixture under tests/broiler-code-phase0/fixture is deliberately absent — it fails to compile by design and would break build verification.",
       "roots": [
         "tests/broiler-code-phase0/Broiler.Code.Phase0.Prototype/Broiler.Code.Phase0.Prototype.csproj",
         "tests/broiler-code-phase0/Broiler.Code.Phase0.Roslyn/Broiler.Code.Phase0.Roslyn.csproj",

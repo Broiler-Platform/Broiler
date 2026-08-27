@@ -8,9 +8,12 @@ name: NuGet Packages
 #                              feed) and attempt nuget.org (gated by human review).
 #   * Manual dispatch        -> choose the publish target explicitly.
 #
-# Submodule component packages (DOM/CSS/Graphics/HTML/JS) publish from their own
-# repos once patches 0011-0015 land and their pointers are bumped; this workflow
-# packs the in-tree components (Layout, Documents, Media, Input, UI) plus metas.
+# Every component except Broiler.Layout is now a submodule. This workflow still packs
+# the same set — Layout, Documents, Media, Input, UI plus their meta-packages — but it
+# reads four of them out of their submodule checkouts, which is why the checkout step
+# below needs submodules. Broiler.DOM, Broiler.CSS, Broiler.Graphics, Broiler.HTML and
+# Broiler.JS publish from their own repositories and are packed here only behind
+# scripts/pack-all.ps1 -IncludeSubmodules.
 
 on:
   push:

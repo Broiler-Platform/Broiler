@@ -4,8 +4,8 @@
 #
 # Root builds collapse each canonical kernel (Broiler.Dom, Broiler.Graphics) to the ROOT
 # submodule checkout via $(BroilerDomPath) / $(BroilerGraphicsPath) (see the root
-# Directory.Build.props). Two submodules carry a *nested* checkout of those kernels for
-# their own standalone builds:
+# Directory.Build.props). Several submodules carry a *nested* checkout of those kernels for
+# their own standalone builds, among them:
 #
 #   Broiler.CSS/Broiler.DOM        vs  root Broiler.DOM
 #   Broiler.HTML/Broiler.Graphics  vs  root Broiler.Graphics
@@ -14,9 +14,16 @@
 # submodule build would compile different sources than the canonical node used by root
 # builds. This guard fails when a nested submodule gitlink SHA drifts from the root one.
 #
+# Broiler.Graphics is deliberately NOT checked. Since the component directories became
+# submodules, the root Broiler.Graphics is on the src/ layout that Broiler.Documents,
+# Broiler.Media, Broiler.UI, Broiler.Writer and Broiler.Browser all pin, while Broiler.HTML
+# still pins the pre-src/ commit. That divergence is expected and is what the two rewrite
+# blocks in Directory.Build.targets exist for; restore the check once Broiler.HTML follows
+# Broiler.Graphics into src/ and its gitlink is bumped to the root commit.
+#
 # It reads recorded gitlink SHAs with `git ls-tree`. The root gitlinks are read from the
 # parent repo; the nested gitlinks are read from each first-level submodule's own tree, so
-# Broiler.CSS and Broiler.HTML must be checked out (their nested content is not needed).
+# Broiler.CSS must be checked out (its nested content is not needed).
 # Run from the repository root.
 set -euo pipefail
 
@@ -48,9 +55,8 @@ check "Broiler.DOM (root vs Broiler.CSS/Broiler.DOM)" \
   "$(gitlink_sha . Broiler.DOM)" \
   "$(gitlink_sha Broiler.CSS Broiler.DOM)"
 
-check "Broiler.Graphics (root vs Broiler.HTML/Broiler.Graphics)" \
-  "$(gitlink_sha . Broiler.Graphics)" \
-  "$(gitlink_sha Broiler.HTML Broiler.Graphics)"
+echo "SKIP: Broiler.Graphics (root vs Broiler.HTML/Broiler.Graphics) — the root leads Broiler.HTML's"
+echo "      pre-src/ pin on purpose; see the header comment."
 
 if [ "$status" -ne 0 ]; then
   echo

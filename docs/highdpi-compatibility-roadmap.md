@@ -30,19 +30,19 @@ work should extend this contract, not invent a parallel one.
   `NormalizeDpiScale` against non-finite or non-positive values.
 - **Windows Direct2D surfaces** apply scale through `ID2D1DeviceContext::SetDpi`
   and size their bitmaps from `DIP * scale`
-  (`Broiler.Graphics/Broiler.Graphics.Windows/Direct2DSurface.cs`,
+  (`Broiler.Graphics/src/Broiler.Graphics.Windows/Direct2DSurface.cs`,
   `Direct2DOffscreenSurface.cs`).
 - **Android** resolves `DisplayMetrics.Density`, re-resolves it on every surface
   change, feeds it to both input hit-testing and the renderer, and derives
   logical size as physical / density
   (`src/Broiler.App.Android/AndroidBroilerView.cs`,
-  `Broiler.Graphics/Broiler.Graphics.Android/AndroidSurfaceGeometry.cs`).
+  `Broiler.Graphics/src/Broiler.Graphics.Android/AndroidSurfaceGeometry.cs`).
 - **WebAssembly** reads `window.devicePixelRatio` and re-reads it through the
   `ResizeObserver`, so browser zoom and monitor moves are picked up
-  (`src/Broiler.Writer.WebAssembly/wwwroot/main.js`,
-  `Broiler.Graphics/Broiler.Graphics.WebAssembly/CanvasFramePlanner.cs`).
+  (`Broiler.Writer/Broiler.Writer/src/Broiler.Writer.WebAssembly/wwwroot/main.js`,
+  `Broiler.Graphics/src/Broiler.Graphics.WebAssembly/CanvasFramePlanner.cs`).
 - **The Windows Browser app** declares PerMonitorV2 in `app.manifest` and also
-  sets it at runtime (`src/Broiler.Browser.Windows/`).
+  sets it at runtime (`Broiler.Browser/src/Broiler.Browser.Windows/`).
 - **The UI framework** is scale-agnostic by design: it lays out in logical units
   and receives scale via `IUiHost.Scale` / `UiViewportBinding`, wired to the
   window's live `DpiScale`
@@ -76,15 +76,15 @@ is the only shipping app with no DPI story at all.
 **Next actions:**
 
 1. Add `SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2)` as the first
-   statement of `Main`, matching `src/Broiler.Writer.Windows/Program.cs`; or
+   statement of `Main`, matching `Broiler.Writer/src/Broiler.Writer.Windows/Program.cs`; or
 2. Preferably, give the project the same PerMonitorV2 `app.manifest` as
-   `src/Broiler.Browser.Windows` and reference it via `<ApplicationManifest>`.
+   `Broiler.Browser/src/Broiler.Browser.Windows` and reference it via `<ApplicationManifest>`.
 3. Verify on a 150%/200% monitor that `window.DpiScale` reports the real scale
    and text is rendered, not resampled.
 
 ### HDPI-2 — Linux X11 window never sources the display scale (High)
 
-**Owner:** `Broiler.Graphics.Linux.OpenGL` + `src/Broiler.Browser.Linux`
+**Owner:** `Broiler.Graphics.Linux.OpenGL` + `Broiler.Browser/src/Broiler.Browser.Linux`
 
 `LinuxBrowserRunner.cs` builds the surface with `BSurfaceDescriptor.Default(...)`,
 whose scale is hardcoded to `1.0` (`BRenderOptions.cs`).

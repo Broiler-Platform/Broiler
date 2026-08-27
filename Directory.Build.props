@@ -127,19 +127,25 @@
     HtmlBridge complexity-reduction Phase 1 (project-graph repair), item 4: canonical
     single-source paths for the Broiler.Dom and Broiler.Graphics kernels.
 
-    Two submodules carry a nested checkout of these kernels for their own standalone builds
-    (Broiler.CSS/Broiler.DOM and Broiler.HTML/Broiler.Graphics). Left unmanaged, in-tree
-    solution graphs could build two nodes with the same assembly name for each kernel. Each
-    submodule's Directory.Build.props defaults $(BroilerDomPath)/$(BroilerGraphicsPath) to
-    its nested copy (used only when built standalone). In root builds those submodule props
-    chain up to THIS file, so the unconditional values below win and every consumer resolves
-    to the single ROOT checkout — one Broiler.Dom node and one Graphics node per build graph.
+    Several submodules carry a nested checkout of these kernels for their own standalone
+    builds (Broiler.CSS/Broiler.DOM, Broiler.HTML/Broiler.Graphics, and — since the component
+    directories became submodules — Broiler.Documents/, Broiler.Media/ and Broiler.UI/ under
+    their own Broiler.Graphics). Left unmanaged, in-tree solution graphs could build two nodes
+    with the same assembly name for each kernel. Each submodule's Directory.Build.props
+    defaults $(BroilerDomPath)/$(BroilerGraphicsPath) to its nested copy (used only when built
+    standalone). In root builds those submodule props chain up to THIS file, so the
+    unconditional values below win and every consumer resolves to the single ROOT checkout —
+    one Broiler.Dom node and one Graphics node per build graph.
 
-    scripts/check-submodule-sha-drift.sh fails CI if a nested submodule SHA drifts from the
-    root, so the collapsed single node is always assembly-identical to the nested copy.
+    scripts/check-submodule-sha-drift.sh fails CI if the Broiler.CSS nested Broiler.DOM SHA
+    drifts from the root, so that collapsed node stays assembly-identical to the nested copy.
+    Broiler.Graphics is deliberately exempt: the root checkout leads Broiler.HTML's gitlink
+    (the root is on the src/ layout, Broiler.HTML still pins the pre-src/ commit), which is
+    also why Directory.Build.targets has to rewrite Broiler.HTML's two literal-path
+    references. Both drop out once Broiler.HTML follows the components into src/.
   -->
   <PropertyGroup>
     <BroilerDomPath>$(MSBuildThisFileDirectory)Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj</BroilerDomPath>
-    <BroilerGraphicsPath>$(MSBuildThisFileDirectory)Broiler.Graphics\Broiler.Graphics\Broiler.Graphics.csproj</BroilerGraphicsPath>
+    <BroilerGraphicsPath>$(MSBuildThisFileDirectory)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj</BroilerGraphicsPath>
   </PropertyGroup>
 </Project>

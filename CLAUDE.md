@@ -32,16 +32,30 @@ origin/main` before touching files.
 
 ## Submodules: modify them; push if allowed, otherwise deliver as a PATCH
 
-`Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS`, and
-`Broiler.Graphics` are git submodules (see `.gitmodules`), each with its own
-remote under the `MaiRat/` org. The renderer, CSS engine, DOM, JS engine, and
-graphics core live there — **a fix often belongs in a submodule, not the main
-repo.** Do not contort a change into the main repo just to avoid touching a
-submodule; write the fix at its correct layer.
+`Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS`, `Broiler.Graphics`,
+`Broiler.Input`, `Broiler.Media`, `Broiler.Documents`, `Broiler.UI`,
+`Broiler.Writer` and `Broiler.Browser` are git submodules (see `.gitmodules`),
+each with its own remote under the `Broiler-Platform/` org. The renderer, CSS
+engine, DOM, JS engine, graphics core, input and media stacks, document codecs,
+UI toolkit, and both applications live there — **a fix often belongs in a
+submodule, not the main repo.** What is left in this repository is
+`Broiler.Layout`, the HtmlBridge, and the tools and tests under `src/` and
+`tests/`.
+
+The component repositories publish their projects under `src/` (with tests in
+`src/tests/`), and each carries nested checkouts of the components it depends on
+so that it still builds standalone. `Broiler.HTML` is the exception: it still
+uses the pre-`src/` layout and pins an older `Broiler.Graphics`, which is why the
+root `Directory.Build.targets` rewrites two of its references and
+`scripts/update-solutions.ps1` carries a `$staleLayoutMappings` table. Both drop
+out once `Broiler.HTML` follows the components into `src/`.
+
+Do not contort a change into the main repo just to avoid touching a submodule;
+write the fix at its correct layer.
 
 **Rule: try to push the submodule change to its remote and bump the pointer; if
 the push is denied, fall back to a patch file.** First push the submodule commit
-to its `MaiRat/` remote and — *only if that push succeeds* — bump the submodule
+to its `Broiler-Platform/` remote and — *only if that push succeeds* — bump the submodule
 pointer (gitlink) in the parent. If the push is **denied** (403 — the submodule
 remote is outside the session's GitHub scope; see the caveat below), do NOT bump
 the pointer: instead capture the change as a patch file under `patches/` and
@@ -119,10 +133,10 @@ re-apply the edit rather than shipping it.
 ### Egress-scope caveat
 
 Pushes go through the session's git proxy, which only authorizes repos in the
-session's GitHub scope. If a submodule remote (e.g. `MaiRat/Broiler.HTML`) is
+session's GitHub scope. If a submodule remote (e.g. `Broiler-Platform/Broiler.HTML`) is
 outside that scope the push returns **403**; that 403 is the signal to fall back
 to the patch workflow above — not to retry or route around it (per
-`/root/.ccr/README.md`). Granting push access means adding `MaiRat/Broiler.*` to
+`/root/.ccr/README.md`). Granting push access means adding `Broiler-Platform/Broiler.*` to
 the environment's GitHub access scope — an environment-config change, not
 something to attempt from inside the container.
 

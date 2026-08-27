@@ -8,10 +8,62 @@ $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $manifestPath = Join-Path $repositoryRoot 'eng/solutions.json'
 $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
 
+# Every component repository carries nested checkouts of the components it depends on so that
+# it still builds standalone. Composed here, those nested copies duplicate a top-level
+# checkout, so a solution generated straight from the reference graph would list the same
+# assembly under several paths. Each entry folds one <parent>/<nested> spelling onto the
+# checkout it duplicates.
+#
+# The table is applied REPEATEDLY rather than once, so a path nested more than one level deep
+# (Broiler.Writer/Broiler.UI/Broiler.Graphics/... is three) collapses through the same
+# single-hop entries instead of needing an entry per deep path. Every value is shorter than
+# its key, so the rewrite strictly shortens the path and the loop always terminates.
+#
+# A prefix match is used rather than "the last segment that names a component" because
+# component repositories contain directories that repeat their own name and are NOT separate
+# checkouts - Broiler.JS/Broiler.JS/ and Broiler.Graphics/src/Broiler.Graphics/ among them.
 $duplicateCheckoutMappings = [ordered]@{
-    'Broiler.CSS/Broiler.DOM/' = 'Broiler.DOM/'
-    'Broiler.HTML/Broiler.Graphics/' = 'Broiler.Graphics/'
     'Broiler.JS/Broiler.Regex/Broiler.Unicode/' = 'Broiler.JS/Broiler.Unicode/'
+    'Broiler.Browser/Broiler.CSS/' = 'Broiler.CSS/'
+    'Broiler.Browser/Broiler.DOM/' = 'Broiler.DOM/'
+    'Broiler.Browser/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.Browser/Broiler.HTML/' = 'Broiler.HTML/'
+    'Broiler.Browser/Broiler.Input/' = 'Broiler.Input/'
+    'Broiler.Browser/Broiler.JS/' = 'Broiler.JS/'
+    'Broiler.Browser/Broiler.Media/' = 'Broiler.Media/'
+    'Broiler.Browser/Broiler.UI/' = 'Broiler.UI/'
+    'Broiler.CSS/Broiler.DOM/' = 'Broiler.DOM/'
+    'Broiler.Documents/Broiler.DOM/' = 'Broiler.DOM/'
+    'Broiler.Documents/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.Graphics/Broiler.Input/' = 'Broiler.Input/'
+    'Broiler.Graphics/Broiler.Media/' = 'Broiler.Media/'
+    'Broiler.HTML/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.Media/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.UI/Broiler.Documents/' = 'Broiler.Documents/'
+    'Broiler.UI/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.UI/Broiler.Input/' = 'Broiler.Input/'
+    'Broiler.Writer/Broiler.DOM/' = 'Broiler.DOM/'
+    'Broiler.Writer/Broiler.Documents/' = 'Broiler.Documents/'
+    'Broiler.Writer/Broiler.Graphics/' = 'Broiler.Graphics/'
+    'Broiler.Writer/Broiler.Input/' = 'Broiler.Input/'
+    'Broiler.Writer/Broiler.Media/' = 'Broiler.Media/'
+    'Broiler.Writer/Broiler.UI/' = 'Broiler.UI/'
+}
+
+# Broiler.HTML still spells its top-level Broiler.Media and Broiler.Graphics references in the
+# pre-src/ layout those components used while this repository vendored them as plain
+# directories. Both now publish their projects under src/, so the reference as written
+# resolves nowhere. Directory.Build.targets rewrites these two references for the build; the
+# same rewrite has to happen here or the generated solutions would disagree with what MSBuild
+# actually compiles. Both tables drop out together once Broiler.HTML follows the components
+# into src/.
+#
+# The trailing '.' is load-bearing: it matches the sibling projects
+# (Broiler.Graphics/Broiler.Graphics.Windows/, Broiler.Media/Broiler.Media.Image.Managed/) and
+# deliberately does not match the already-correct Broiler.Graphics/src/Broiler.Graphics/.
+$staleLayoutMappings = [ordered]@{
+    'Broiler.Media/Broiler.Media.' = 'Broiler.Media/src/Broiler.Media.'
+    'Broiler.Graphics/Broiler.Graphics.' = 'Broiler.Graphics/src/Broiler.Graphics.'
 }
 
 $referenceCache = @{}
@@ -29,7 +81,22 @@ function Convert-ToRepositoryPath {
     }
     $relativePath = $normalizedFullPath.Substring($rootPrefix.Length).Replace('\', '/')
 
-    foreach ($mapping in $duplicateCheckoutMappings.GetEnumerator()) {
+    # Fold to a fixed point: one pass only strips the outermost nesting level.
+    for ($pass = 0; $pass -lt 16; $pass++) {
+        $foldedThisPass = $false
+        foreach ($mapping in $duplicateCheckoutMappings.GetEnumerator()) {
+            if ($relativePath.StartsWith($mapping.Key, [StringComparison]::OrdinalIgnoreCase)) {
+                $relativePath = $mapping.Value + $relativePath.Substring($mapping.Key.Length)
+                $foldedThisPass = $true
+                break
+            }
+        }
+        if (-not $foldedThisPass) {
+            break
+        }
+    }
+
+    foreach ($mapping in $staleLayoutMappings.GetEnumerator()) {
         if ($relativePath.StartsWith($mapping.Key, [StringComparison]::OrdinalIgnoreCase)) {
             $relativePath = $mapping.Value + $relativePath.Substring($mapping.Key.Length)
             break
@@ -65,7 +132,14 @@ function Resolve-ProjectReference {
         (Join-Path $repositoryRoot 'Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj'))
     $resolvedInclude = $resolvedInclude.Replace(
         '$(BroilerGraphicsPath)',
-        (Join-Path $repositoryRoot 'Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj'))
+        (Join-Path $repositoryRoot 'Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj'))
+
+    # Broiler.Regex prefers a Broiler.Unicode checkout nested beside it and falls back to the
+    # one Broiler.JS owns. Both gitlinks point at the same commit, and the mapping table folds
+    # the nested spelling onto Broiler.JS/Broiler.Unicode anyway, so resolve to the fallback.
+    $resolvedInclude = $resolvedInclude.Replace(
+        '$(BroilerUnicodeRoot)',
+        (Join-Path $repositoryRoot 'Broiler.JS/Broiler.Unicode/'))
 
     if ($resolvedInclude.Contains('$(')) {
         throw "Unsupported property in ProjectReference '$Include' from '$ProjectPath'."

@@ -43,22 +43,26 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $outDir = if ([IO.Path]::IsPathRooted($Output)) { $Output } else { Join-Path $repoRoot $Output }
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
-# In-tree component pack targets (solutions + meta-packages).
+# Default component pack targets (solutions + meta-packages). Broiler.Layout is the only
+# one still in this repository; Broiler.Documents, Broiler.Media, Broiler.Input and
+# Broiler.UI are now submodules but stay in the default set so the packages this script
+# produces do not change. Each path is the solution or bundle the component publishes,
+# read out of its own checkout.
 $targets = @(
     'Broiler.Layout/Broiler.Layout.slnx',
     'Broiler.Documents/Broiler.Documents.slnx',
     'Broiler.Media/Broiler.Media.slnx',
     'Broiler.Input/Broiler.Input.slnx',
     'Broiler.UI/Broiler.UI.slnx',
-    'Broiler.Media/Broiler.Media.All/Broiler.Media.All.csproj',
-    'Broiler.Input/Broiler.Input.All/Broiler.Input.All.csproj',
+    'Broiler.Media/src/Broiler.Media.All/Broiler.Media.All.csproj',
+    'Broiler.Input/src/Broiler.Input.All/Broiler.Input.All.csproj',
     'Broiler.UI/src/Bundles/Broiler.UI.All/Broiler.UI.All.csproj'
 )
 if ($IncludeSubmodules) {
     $targets += @(
         'Broiler.DOM/Broiler.Dom.slnx',
         'Broiler.CSS/Broiler.CSS.slnx',
-        'Broiler.Graphics/Broiler.Graphics/Broiler.Graphics.csproj'
+        'Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj'
         # Broiler.HTML and Broiler.JS: add their specific pack targets here once
         # their patches land; they publish from their own repos by default.
     )

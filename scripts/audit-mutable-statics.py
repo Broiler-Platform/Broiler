@@ -49,9 +49,9 @@ RENDER_PATH_ROOTS = [
     ("Broiler.CSS/Broiler.CSS", "CSS"),
     ("Broiler.CSS/Broiler.CSS.Dom", "CSS"),
     ("Broiler.Layout/Broiler.Layout", "Layout"),
-    ("Broiler.Graphics/Broiler.Graphics", "Graphics"),
-    ("Broiler.Media/Broiler.Media.Image", "Media"),
-    ("Broiler.Media/Broiler.Media.Image.Managed", "Media"),
+    ("Broiler.Graphics/src/Broiler.Graphics", "Graphics"),
+    ("Broiler.Media/src/Broiler.Media.Image", "Media"),
+    ("Broiler.Media/src/Broiler.Media.Image.Managed", "Media"),
     ("Broiler.HTML/Source", "HTML"),
 ]
 

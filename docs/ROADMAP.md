@@ -406,7 +406,7 @@ names a `dotnet`/`git`/`grep` command that does run locally.
      runtime identifier. They were not. That project's browser-RID build compiles
      a single empty marker class, and no workflow ever built it with that RID —
      `Broiler.WebAssembly.Tests.slnx` is not built by CI at all. The real, live
-     closure check is `src/Broiler.Writer.WebAssembly`, which the
+     closure check is `Broiler.Writer/src/Broiler.Writer.WebAssembly`, which the
      preview-package workflow publishes for `browser-wasm` over a comparably
      wide Broiler.UI graph. Nothing enforced was lost.
    - What *was* lost is smaller and worth rebuilding deliberately rather than
@@ -821,8 +821,9 @@ every later Android phase cites it instead of re-deciding.
 **Historical evidence, corrected 2026-08-22:** this was formerly pending as
 `patches/0040-graphics-android-opengles-backend.patch`; it has landed in
 `Broiler.Graphics` as `d051d57` (`android: EGL / OpenGL ES presentation backend`). The
-former 403/patch-handoff state is superseded; release use still depends on the aggregate
-repository pinning a component commit that contains it.
+former 403/patch-handoff state is superseded, and as of the component-submodule
+conversion this repository pins `Broiler.Graphics` at `b95c859`, which contains
+`d051d57` — so the aggregate-pin condition is met.
 
 The landed commit adds `Broiler.Graphics.Android` — EGL/GLES3 context, off-screen pbuffer
 surface, on-screen `ANativeWindow` surface, the CPU-frame upload-and-blit present,
@@ -844,8 +845,10 @@ arriving while detached are retained on the CPU rather than throwing, and
 
 **Next actions:**
 
-1. Apply the patch, push the `Broiler.Graphics` commit, and bump the submodule
-   pointer. Until then nothing in this phase is on CI.
+1. ~~Apply the patch, push the `Broiler.Graphics` commit, and bump the submodule
+   pointer.~~ Done — the root pointer now contains the backend. What is still true
+   is that no CI job builds it: the Android leg of the packaging workflow publishes
+   the application heads, not `Broiler.Graphics.Android`.
 2. Record the presentation contract: surface format, colour handling, and the
    scaling rule when the surface size and the logical viewport disagree.
 3. Run the native path on a device — context creation, upload, blit, swap, and
