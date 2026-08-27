@@ -35,14 +35,14 @@ public sealed partial class DomBridge
     private JSObject CreateDomRectObject((double Left, double Top, double Width, double Height) rectData)
     {
         var rect = new JSObject();
-        rect.FastAddValue((KeyString)"x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("x", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("y", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("top", new JSNumber(rectData.Top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("left", new JSNumber(rectData.Left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("right", new JSNumber(rectData.Left + rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("bottom", new JSNumber(rectData.Top + rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("width", new JSNumber(rectData.Width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("height", new JSNumber(rectData.Height), JSPropertyAttributes.EnumerableConfigurableValue);
         return rect;
     }
 

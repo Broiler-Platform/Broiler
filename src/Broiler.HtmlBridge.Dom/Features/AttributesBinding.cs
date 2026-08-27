@@ -123,9 +123,9 @@ internal sealed class AttributesBinding(IAttributesHost host)
 
         byName.Remove(name);
         DomBridge.TryGetAttribute(element, name, out var lastValue);
-        attr.FastAddValue((KeyString)"ownerElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"value", new JSString(lastValue ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"nodeValue", new JSString(lastValue ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("ownerElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("value", new JSString(lastValue ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("nodeValue", new JSString(lastValue ?? string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     /// <summary>
@@ -317,31 +317,31 @@ internal sealed class AttributesBinding(IAttributesHost host)
         var localName = explicitLocalName ?? (colonIdx >= 0 ? name[(colonIdx + 1)..] : name);
         var prefix = colonIdx >= 0 ? name[..colonIdx] : null;
 
-        attr.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
         if (accessor is { } live)
         {
-            attr.FastAddProperty((KeyString)"value",
+            attr.FastAddProperty("value",
                 new DomFunction((in _) => live.Read(), "get value"),
                 new DomFunction(live.Write, "set value"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
-            attr.FastAddProperty((KeyString)"nodeValue",
+            attr.FastAddProperty("nodeValue",
                 new DomFunction((in _) => live.Read(), "get nodeValue"),
                 new DomFunction(live.Write, "set nodeValue"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
         else
         {
-            attr.FastAddValue((KeyString)"value", liveValue ?? new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-            attr.FastAddValue((KeyString)"nodeValue", liveValue ?? new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+            attr.FastAddValue("value", liveValue ?? new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+            attr.FastAddValue("nodeValue", liveValue ?? new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
-        attr.FastAddValue((KeyString)"specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"ownerElement", ownerElement, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"localName", new JSString(localName), JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"prefix", prefix != null ? new JSString(prefix) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        attr.FastAddValue((KeyString)"namespaceURI", namespaceUri != null ? new JSString(namespaceUri) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("specified", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("ownerElement", ownerElement, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("nodeType", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("nodeName", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("localName", new JSString(localName), JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("prefix", prefix != null ? new JSString(prefix) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        attr.FastAddValue("namespaceURI", namespaceUri != null ? new JSString(namespaceUri) : JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
 
         return attr;
     }

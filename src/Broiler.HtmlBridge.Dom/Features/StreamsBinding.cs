@@ -92,7 +92,7 @@ internal sealed class StreamsBinding
             return;
 
         blobPrototype.FastAddValue(
-            (KeyString)"stream",
+            "stream",
             new DomFunction(
                 (in a) => a.This is JSObject receiver && blobs.BytesOf(receiver) is { } bytes
                     ? StreamOverBytes(context, bytes)

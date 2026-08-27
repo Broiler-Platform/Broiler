@@ -30,32 +30,32 @@ internal static class IframeElementBinding
         if (!string.Equals(element.TagName, "iframe", StringComparison.OrdinalIgnoreCase))
             return;
 
-        obj.FastAddProperty((KeyString)"contentDocument",
+        obj.FastAddProperty("contentDocument",
             new DomFunction((in _) => GetContentDocument(host, element), "get contentDocument"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"contentWindow",
+        obj.FastAddProperty("contentWindow",
             new DomFunction((in _) => GetContentWindow(host, element), "get contentWindow"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getSVGDocument() — returns contentDocument (same as contentDocument for same-origin)
-        obj.FastAddValue((KeyString)"getSVGDocument",
+        obj.FastAddValue("getSVGDocument",
             new DomFunction((in _) => GetContentDocument(host, element), "getSVGDocument", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // src property (read/write) — for iframe elements
-        obj.FastAddProperty((KeyString)"src",
+        obj.FastAddProperty("src",
             new DomFunction((in _) => DomBridge.TryGetAttribute(element, "src", out var s) ? new JSString(s) : new JSString(string.Empty), "get src"),
             new DomFunction((in a) => SetFrameAttribute(host, element, "src", in a), "set src"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        obj.FastAddProperty((KeyString)"srcdoc",
+        obj.FastAddProperty("srcdoc",
             new DomFunction((in _) => DomBridge.TryGetAttribute(element, "srcdoc", out var s) ? new JSString(s) : new JSString(string.Empty), "get srcdoc"),
             new DomFunction((in a) => SetFrameAttribute(host, element, "srcdoc", in a), "set srcdoc"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // sandbox attribute access
-        obj.FastAddProperty((KeyString)"sandbox",
+        obj.FastAddProperty("sandbox",
             new DomFunction((in _) => DomBridge.TryGetAttribute(element, "sandbox", out var sandbox) ? new JSString(sandbox) : new JSString(string.Empty), "get sandbox"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
     }

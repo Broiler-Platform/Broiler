@@ -39,15 +39,15 @@ internal static class StorageQuotaBinding
     /// </summary>
     public static void Install(JSObject navigator)
     {
-        navigator.FastAddValue((KeyString)"webkitTemporaryStorage", BuildStorageQuota(), JSPropertyAttributes.EnumerableConfigurableValue);
-        navigator.FastAddValue((KeyString)"webkitPersistentStorage", BuildStorageQuota(), JSPropertyAttributes.EnumerableConfigurableValue);
+        navigator.FastAddValue("webkitTemporaryStorage", BuildStorageQuota(), JSPropertyAttributes.EnumerableConfigurableValue);
+        navigator.FastAddValue("webkitPersistentStorage", BuildStorageQuota(), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     private static JSObject BuildStorageQuota()
     {
         var quota = new JSObject();
 
-        quota.FastAddValue((KeyString)"queryUsageAndQuota",
+        quota.FastAddValue("queryUsageAndQuota",
             new DomFunction(QueryUsageAndQuota, "queryUsageAndQuota", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

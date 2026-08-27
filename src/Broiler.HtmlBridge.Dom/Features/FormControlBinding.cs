@@ -29,7 +29,7 @@ internal sealed class FormControlBinding(IFormControlHost host)
     {
         // value (read/write) — for input, textarea, select elements.
         // The IDL 'value' property is NOT reflected as a content attribute for inputs.
-        obj.FastAddProperty((KeyString)"value",
+        obj.FastAddProperty("value",
             new DomFunction((in _) => GetValue(element), "get value"),
             new DomFunction((in a) => SetValue(element, in a), "set value"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -37,7 +37,7 @@ internal sealed class FormControlBinding(IFormControlHost host)
         // checked (read/write) — for checkbox and radio inputs. Uses the typed checked-state slot as the
         // "dirty" IDL state that tracks programmatic changes; setAttribute("checked") only sets the
         // content attribute and does NOT affect this IDL state.
-        obj.FastAddProperty((KeyString)"checked",
+        obj.FastAddProperty("checked",
             new DomFunction((in _) => GetChecked(element), "get checked"),
             new DomFunction((in a) => SetChecked(element, in a), "set checked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -47,38 +47,38 @@ internal sealed class FormControlBinding(IFormControlHost host)
         // comparing the current value against the original to decide whether a field is unsaved
         // compared against `undefined` and concluded "changed" for every field, including the ones
         // it had just reset.
-        obj.FastAddProperty((KeyString)"defaultValue",
+        obj.FastAddProperty("defaultValue",
             new DomFunction((in _) => GetDefaultValue(element), "get defaultValue"),
             new DomFunction((in a) => SetDefaultValue(element, in a), "set defaultValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // defaultChecked (read/write) — reflects the `checked` content attribute, which is exactly
         // the state `checked` falls back to when no dirty checkedness has been set.
-        obj.FastAddProperty((KeyString)"defaultChecked",
+        obj.FastAddProperty("defaultChecked",
             new DomFunction((in _) => DomBridge.HasAttr(element, "checked") ? JSBoolean.True : JSBoolean.False, "get defaultChecked"),
             new DomFunction((in a) => SetDefaultChecked(element, in a), "set defaultChecked"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // type (read/write) — for input/button elements; getter returns lowercase.
-        obj.FastAddProperty((KeyString)"type",
+        obj.FastAddProperty("type",
             new DomFunction((in _) => GetType(element), "get type"),
             new DomFunction((in a) => SetType(element, in a), "set type"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // name (read/write) — for form elements; syncs with content attribute.
-        obj.FastAddProperty((KeyString)"name",
+        obj.FastAddProperty("name",
             new DomFunction((in _) => GetName(element), "get name"),
             new DomFunction((in a) => SetName(element, in a), "set name"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // disabled (read/write) — for form controls.
-        obj.FastAddProperty((KeyString)"disabled",
+        obj.FastAddProperty("disabled",
             new DomFunction((in _) => DomBridge.HasAttr(element, "disabled") ? JSBoolean.True : JSBoolean.False, "get disabled"),
             new DomFunction((in a) => SetDisabled(element, in a), "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // required (read/write) — form validation.
-        obj.FastAddProperty((KeyString)"required",
+        obj.FastAddProperty("required",
             new DomFunction((in _) => DomBridge.HasAttr(element, "required") ? JSBoolean.True : JSBoolean.False, "get required"),
             new DomFunction((in a) => SetRequired(element, in a), "set required"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -88,7 +88,7 @@ internal sealed class FormControlBinding(IFormControlHost host)
         // `if (input.files && input.files.length)` was a TypeError on the input it was written for.
         // The list is empty because this engine has no file selection, which is also what a browser
         // reports for an input nobody has touched.
-        obj.FastAddProperty((KeyString)"files",
+        obj.FastAddProperty("files",
             new DomFunction((in _) => GetFiles(element), "get files"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -103,13 +103,13 @@ internal sealed class FormControlBinding(IFormControlHost host)
     internal void InstallHtmlElementMembers(JSObject target, ElementSource element)
     {
         // hidden (read/write) — global reflected boolean attribute.
-        target.FastAddProperty((KeyString)"hidden",
+        target.FastAddProperty("hidden",
             new DomFunction((in a) => DomBridge.HasAttr(element(in a, "hidden"), "hidden") ? JSBoolean.True : JSBoolean.False, "get hidden"),
             new DomFunction((in a) => SetHidden(element(in a, "hidden"), in a), "set hidden"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // tabIndex (read/write) — global reflected numeric attribute.
-        target.FastAddProperty((KeyString)"tabIndex",
+        target.FastAddProperty("tabIndex",
             new DomFunction((in a) => GetTabIndex(element(in a, "tabIndex")), "get tabIndex"),
             new DomFunction((in a) => SetTabIndex(element(in a, "tabIndex"), in a), "set tabIndex"),
             JSPropertyAttributes.EnumerableConfigurableProperty);

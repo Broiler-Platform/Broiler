@@ -118,7 +118,7 @@ public sealed partial class DomBridge
         var sheet = new JSObject();
 
         // ownerNode
-        sheet.FastAddProperty((KeyString)"ownerNode", new DomFunction((in _) => ToJSObject(styleElement), "get ownerNode"),
+        sheet.FastAddProperty("ownerNode", new DomFunction((in _) => ToJSObject(styleElement), "get ownerNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // href — CSSOM §2.1 StyleSheet.href: the location of the sheet, null for an inline
@@ -126,14 +126,14 @@ public sealed partial class DomBridge
         // document.styleSheets as an inline sheet that happened to have no rules. A live getter
         // rather than a captured value: the sheet object is cached per element for identity, and a
         // script can re-point the link at another href afterwards.
-        sheet.FastAddProperty((KeyString)"href",
+        sheet.FastAddProperty("href",
             new DomFunction((in _) => StyleSheetHrefValue(styleElement), "get href"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // disabled — CSSOM StyleSheet.disabled. A true value prevents the sheet from
         // applying (CSSOM §2.3). Getting reads the effective state (script flag, else the
         // <link disabled> content attribute); setting stores the script flag and re-cascades.
-        sheet.FastAddProperty((KeyString)"disabled",
+        sheet.FastAddProperty("disabled",
             new DomFunction((in _) => IsStyleSheetDisabled(styleElement) ? JSBoolean.True : JSBoolean.False, "get disabled"),
             new DomFunction((in a) => { SetStyleSheetDisabledFlag(styleElement, a.Length > 0 && a[0].BooleanValue); return JSUndefined.Value; }, "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -150,11 +150,11 @@ public sealed partial class DomBridge
         var liveCssRules = new JSObject();
         var lastSyncedRuleCount = 0;
         // length is a live getter that always reflects the current rule count
-        liveCssRules.FastAddProperty((KeyString)"length",
+        liveCssRules.FastAddProperty("length",
             new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        liveCssRules.FastAddValue((KeyString)"item",
+        liveCssRules.FastAddValue("item",
             new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -175,18 +175,18 @@ public sealed partial class DomBridge
         }
 
         // cssRules — returns the live collection, syncing indices on access
-        sheet.FastAddProperty((KeyString)"cssRules",
+        sheet.FastAddProperty("cssRules",
             new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // insertRule(rule, index) — mutates the shared model (marking it mutated so
         // the renderer/engine serialize from it) and resyncs the live collection
-        sheet.FastAddValue((KeyString)"insertRule",
+        sheet.FastAddValue("insertRule",
             new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // deleteRule(index) — removes a rule from the shared model
-        sheet.FastAddValue((KeyString)"deleteRule",
+        sheet.FastAddValue("deleteRule",
             new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

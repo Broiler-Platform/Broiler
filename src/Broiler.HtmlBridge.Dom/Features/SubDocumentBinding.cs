@@ -52,26 +52,26 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         // collections are the main document's, over this root's sub-tree.
         var collections = new SubDocumentCollectionHost(_host, docRoot);
 
-        doc.FastAddProperty((KeyString)"documentElement",
+        doc.FastAddProperty("documentElement",
             new DomFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } de ? _host.ToJSObject(de) : JSNull.Value, "get documentElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        doc.FastAddProperty((KeyString)"scrollingElement",
+        doc.FastAddProperty("scrollingElement",
             new DomFunction((in _) => DomBridge.GetDocumentElement(docRoot) is { } se ? _host.ToJSObject(se) : JSNull.Value, "get scrollingElement"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // body
-        doc.FastAddProperty((KeyString)"body",
+        doc.FastAddProperty("body",
             new DomFunction((in _) => GetBody(docRoot), "get body"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // head
-        doc.FastAddProperty((KeyString)"head",
+        doc.FastAddProperty("head",
             new DomFunction((in _) => GetHead(docRoot), "get head"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // title (dynamic getter from <title> element in <head>)
-        doc.FastAddProperty((KeyString)"title",
+        doc.FastAddProperty("title",
             new DomFunction((in _) => GetTitle(docRoot), "get title"),
             new DomFunction((in a) => SetTitle(docRoot, in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -84,47 +84,47 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         RegisterMetadata(doc, docRoot);
 
         // childNodes
-        doc.FastAddProperty((KeyString)"childNodes",
+        doc.FastAddProperty("childNodes",
             new DomFunction((in _) => GetChildNodes(docRoot), "get childNodes"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // firstChild
-        doc.FastAddProperty((KeyString)"firstChild",
+        doc.FastAddProperty("firstChild",
             new DomFunction((in _) => docRoot.ChildNodes.Count > 0 ? _host.ToJSObject(DomBridge.ChildAt(docRoot, 0)) : JSNull.Value, "get firstChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lastChild
-        doc.FastAddProperty((KeyString)"lastChild",
+        doc.FastAddProperty("lastChild",
             new DomFunction((in _) => docRoot.ChildNodes.Count > 0 ? _host.ToJSObject(DomBridge.ChildAt(docRoot, ^1)) : JSNull.Value, "get lastChild"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // hasChildNodes()
-        doc.FastAddValue((KeyString)"hasChildNodes",
+        doc.FastAddValue("hasChildNodes",
             new DomFunction((in _) => docRoot.ChildNodes.Count > 0 ? JSBoolean.True : JSBoolean.False, "hasChildNodes", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // nodeType = DOCUMENT_NODE (9)
-        doc.FastAddProperty((KeyString)"nodeType",
+        doc.FastAddProperty("nodeType",
             new DomFunction((in _) => new JSNumber(9), "get nodeType"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // nodeName = "#document"
-        doc.FastAddProperty((KeyString)"nodeName",
+        doc.FastAddProperty("nodeName",
             new DomFunction((in _) => new JSString("#document"), "get nodeName"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // localName = null for document
-        doc.FastAddProperty((KeyString)"localName",
+        doc.FastAddProperty("localName",
             DomBridge.NullFunction("get localName"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getElementById(id)
-        doc.FastAddValue((KeyString)"getElementById",
+        doc.FastAddValue("getElementById",
             new DomFunction((in a) => GetElementById(docRoot, in a), "getElementById", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getElementsByTagName(tag)
-        doc.FastAddValue((KeyString)"getElementsByTagName",
+        doc.FastAddValue("getElementsByTagName",
             new DomFunction((in a) => GetElementsByTagName(docRoot, in a), "getElementsByTagName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -132,93 +132,93 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         // frame's document was missing while the main document had them. A script in a frame is a
         // script like any other: absent, these read as undefined rather than as missing methods, so
         // calling one threw and took the frame's whole <script> with it.
-        doc.FastAddValue((KeyString)"getElementsByClassName",
+        doc.FastAddValue("getElementsByClassName",
             new DomFunction((in a) => GetElementsByClassName(docRoot, in a), "getElementsByClassName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue((KeyString)"getElementsByName",
+        doc.FastAddValue("getElementsByName",
             new DomFunction((in a) => GetElementsByName(docRoot, in a), "getElementsByName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createElement(tag)
-        doc.FastAddValue((KeyString)"createElement",
+        doc.FastAddValue("createElement",
             new DomFunction((in a) => CreateElement(docRoot, in a), "createElement", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createTextNode(text)
-        doc.FastAddValue((KeyString)"createTextNode",
+        doc.FastAddValue("createTextNode",
             new DomFunction((in a) => CreateTextNode(docRoot, in a), "createTextNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createComment(data)
-        doc.FastAddValue((KeyString)"createComment",
+        doc.FastAddValue("createComment",
             new DomFunction((in a) => CreateComment(docRoot, in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createElementNS(ns, localName)
-        doc.FastAddValue((KeyString)"createElementNS",
+        doc.FastAddValue("createElementNS",
             new DomFunction((in a) => CreateElementNS(docRoot, in a), "createElementNS", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // adoptNode(node) — the one document method that moves a node between documents rather than
         // copying it. A frame's document needs it as much as the page's: the interesting direction is
         // adopting *into* this document, which is exactly what the page's own adoptNode cannot do.
-        doc.FastAddValue((KeyString)"adoptNode",
+        doc.FastAddValue("adoptNode",
             new DomFunction((in a) => AdoptNode(docRoot, in a), "adoptNode", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createEvent(type)
-        doc.FastAddValue((KeyString)"createEvent",
+        doc.FastAddValue("createEvent",
             new DomFunction((in a) => CreateEvent(in a), "createEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // querySelector / querySelectorAll
-        doc.FastAddValue((KeyString)"querySelector",
+        doc.FastAddValue("querySelector",
             new DomFunction((in a) => QuerySelector(docRoot, in a), "querySelector", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue((KeyString)"querySelectorAll",
+        doc.FastAddValue("querySelectorAll",
             new DomFunction((in a) => QuerySelectorAll(docRoot, in a), "querySelectorAll", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue((KeyString)"elementFromPoint",
+        doc.FastAddValue("elementFromPoint",
             new DomFunction((in a) => ElementFromPoint(docRoot, in a), "elementFromPoint", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue((KeyString)"elementsFromPoint",
+        doc.FastAddValue("elementsFromPoint",
             new DomFunction((in a) => ElementsFromPoint(docRoot, in a), "elementsFromPoint", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.open()
-        doc.FastAddValue((KeyString)"open",
+        doc.FastAddValue("open",
             new DomFunction((in _) => Open(doc, docRoot), "open", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.close()
-        doc.FastAddValue((KeyString)"close",
+        doc.FastAddValue("close",
             DomBridge.UndefinedFunction("close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // document.write(html)
-        doc.FastAddValue((KeyString)"write",
+        doc.FastAddValue("write",
             new DomFunction((in a) => Write(docRoot, in a), "write", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // removeChild on document
-        doc.FastAddValue((KeyString)"removeChild",
+        doc.FastAddValue("removeChild",
             new DomFunction((in a) => RemoveChild(docRoot, in a), "removeChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // appendChild on document
-        doc.FastAddValue((KeyString)"appendChild",
+        doc.FastAddValue("appendChild",
             new DomFunction((in a) => AppendChild(docRoot, in a), "appendChild", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue((KeyString)"append",
+        doc.FastAddValue("append",
             new DomFunction((in a) => Append(docRoot, in a), "append", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        doc.FastAddValue((KeyString)"prepend",
+        doc.FastAddValue("prepend",
             new DomFunction((in a) => Prepend(docRoot, in a), "prepend", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -230,35 +230,35 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
 
         // document.implementation on sub-documents
         var subImpl = new JSObject();
-        subImpl.FastAddValue((KeyString)"hasFeature",
+        subImpl.FastAddValue("hasFeature",
             DomBridge.TrueFunction("hasFeature", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        subImpl.FastAddValue((KeyString)"createDocumentType",
+        subImpl.FastAddValue("createDocumentType",
             new DomFunction((in a) => CreateDocumentType(in a), "createDocumentType", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        subImpl.FastAddValue((KeyString)"createDocument",
+        subImpl.FastAddValue("createDocument",
             new DomFunction((in a) => CreateDocument(in a), "createDocument", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        subImpl.FastAddValue((KeyString)"createHTMLDocument",
+        subImpl.FastAddValue("createHTMLDocument",
             new DomFunction((in a) => CreateHTMLDocument(in a), "createHTMLDocument", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        doc.FastAddValue((KeyString)"implementation",
+        doc.FastAddValue("implementation",
             subImpl, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // defaultView — return the main window object so getComputedStyle is accessible
         if (_host.WindowJSObject != null)
         {
-            doc.FastAddValue((KeyString)"defaultView",
+            doc.FastAddValue("defaultView",
                 _host.WindowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // createTreeWalker(root, whatToShow, filter)
-        doc.FastAddValue((KeyString)"createTreeWalker",
+        doc.FastAddValue("createTreeWalker",
             new DomFunction((in a) => CreateTreeWalker(in a), "createTreeWalker", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createNodeIterator(root, whatToShow, filter)
-        doc.FastAddValue((KeyString)"createNodeIterator",
+        doc.FastAddValue("createNodeIterator",
             new DomFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -266,19 +266,19 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         // Absent here, a page driving a transition inside its <iframe> through contentDocument hit a
         // TypeError that aborted the rest of its script, so the main frame's own transition never ran
         // either (WPT css-view-transitions/iframe-and-main-frame-transition-*).
-        doc.FastAddValue((KeyString)"startViewTransition",
+        doc.FastAddValue("startViewTransition",
             new DomFunction((in a) => _host.StartViewTransition(docRoot, in a), "startViewTransition", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // createRange()
-        doc.FastAddValue((KeyString)"createRange",
+        doc.FastAddValue("createRange",
             new DomFunction((in _) => _host.BuildRange(docRoot), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getSelection() — this document's own selection, distinct from the containing page's. The
         // method exists on every document, but only one being displayed has a selection to report, so
         // a createDocument/createHTMLDocument result answers null; the host draws that line.
-        doc.FastAddValue((KeyString)"getSelection",
+        doc.FastAddValue("getSelection",
             new DomFunction((in _) => _host.GetSelection(docRoot), "getSelection", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -325,7 +325,7 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
 
         void Getter(string name, Func<JSValue> read) =>
             doc.FastAddProperty(
-                (KeyString)name, new DomFunction((in _) => read(), $"get {name}"), null,
+                name, new DomFunction((in _) => read(), $"get {name}"), null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 
@@ -344,14 +344,14 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
     private void RegisterMetadata(JSObject doc, DomNode docRoot)
     {
         doc.FastAddProperty(
-            (KeyString)"doctype",
+            "doctype",
             new DomFunction((in _) => DocumentTypeNode(docRoot) is { } doctype ? _host.ToJSObject(doctype) : JSNull.Value, "get doctype"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // HTML §3.2.6: the getter is limited to only known values — the canonical lower-case keyword
         // or the empty string — while the setter writes the assigned text through unchanged.
         doc.FastAddProperty(
-            (KeyString)"dir",
+            "dir",
             new DomFunction((in _) => new JSString(DocumentDirection(docRoot)), "get dir"),
             new DomFunction((in a) =>
             {
@@ -365,7 +365,7 @@ internal sealed partial class SubDocumentBinding(ISubDocumentHost host)
         // (ASCII case-insensitively) is ignored rather than stored.
         var designMode = "off";
         doc.FastAddProperty(
-            (KeyString)"designMode",
+            "designMode",
             new DomFunction((in _) => new JSString(designMode), "get designMode"),
             new DomFunction((in a) =>
             {

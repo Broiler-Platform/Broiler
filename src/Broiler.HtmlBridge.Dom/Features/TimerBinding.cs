@@ -185,10 +185,10 @@ internal static class TimerBinding
         var enteredAt = Stopwatch.GetTimestamp();
 
         var deadline = new JSObject();
-        deadline.FastAddValue((KeyString)"didTimeout",
+        deadline.FastAddValue("didTimeout",
             didTimeout ? JSBoolean.True : JSBoolean.False,
             JSPropertyAttributes.EnumerableConfigurableValue);
-        deadline.FastAddValue((KeyString)"timeRemaining",
+        deadline.FastAddValue("timeRemaining",
             new DomFunction((in _) => new JSNumber(
                 Math.Max(0, IdleBudgetMs - Stopwatch.GetElapsedTime(enteredAt).TotalMilliseconds)),
                 "timeRemaining", 0),

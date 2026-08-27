@@ -139,28 +139,28 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 return values.TryGetValue(name, out var currentValue) ? new JSString(currentValue) : JSNull.Value;
             }
 
-            headersObject.FastAddValue((KeyString)"get", new JSFunction(JsRegistrationGet078, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue("get", new JSFunction(JsRegistrationGet078, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationHas079(in Arguments a)
             {
                 if (a.Length == 0)
                     return JSBoolean.False;
                 return values.ContainsKey(a[0].ToString()) ? JSBoolean.True : JSBoolean.False;
             }
-            headersObject.FastAddValue((KeyString)"has", new JSFunction(JsRegistrationHas079, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue("has", new JSFunction(JsRegistrationHas079, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationSet080(in Arguments a)
             {
                 if (a.Length >= 2)
                     SetHeader(a[0].ToString(), a[1].ToString());
                 return JSUndefined.Value;
             }
-            headersObject.FastAddValue((KeyString)"set", new JSFunction(JsRegistrationSet080, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue("set", new JSFunction(JsRegistrationSet080, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationAppend081(in Arguments a)
             {
                 if (a.Length >= 2)
                     AppendHeader(a[0].ToString(), a[1].ToString());
                 return JSUndefined.Value;
             }
-            headersObject.FastAddValue((KeyString)"append", new JSFunction(JsRegistrationAppend081, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue("append", new JSFunction(JsRegistrationAppend081, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationDelete082(in Arguments a)
             {
                 if (a.Length > 0)
@@ -174,7 +174,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
                 return JSUndefined.Value;
             }
-            headersObject.FastAddValue((KeyString)"delete", new JSFunction(JsRegistrationDelete082, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue("delete", new JSFunction(JsRegistrationDelete082, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationForEach083(in Arguments a)
             {
                 if (a.Length > 0 && a[0] is JSFunction cb)
@@ -188,7 +188,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
                 return JSUndefined.Value;
             }
-            headersObject.FastAddValue((KeyString)"forEach", new JSFunction(JsRegistrationForEach083, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            headersObject.FastAddValue("forEach", new JSFunction(JsRegistrationForEach083, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return headersObject;
         }
@@ -308,7 +308,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 return JSUndefined.Value;
             }
 
-            formDataObject.FastAddValue((KeyString)"append", new JSFunction(JsRegistrationAppend084, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("append", new JSFunction(JsRegistrationAppend084, "append", 2), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationDelete085(in Arguments a)
             {
                 if (a.Length > 0)
@@ -319,7 +319,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
                 return JSUndefined.Value;
             }
-            formDataObject.FastAddValue((KeyString)"delete", new JSFunction(JsRegistrationDelete085, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("delete", new JSFunction(JsRegistrationDelete085, "delete", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationForEach086(in Arguments a)
             {
                 if (a.Length > 0 && a[0] is JSFunction cb)
@@ -330,7 +330,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
                 return JSUndefined.Value;
             }
-            formDataObject.FastAddValue((KeyString)"forEach", new JSFunction(JsRegistrationForEach086, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("forEach", new JSFunction(JsRegistrationForEach086, "forEach", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationGet087(in Arguments a)
             {
                 if (a.Length == 0)
@@ -344,7 +344,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
                 return JSNull.Value;
             }
-            formDataObject.FastAddValue((KeyString)"get", new JSFunction(JsRegistrationGet087, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("get", new JSFunction(JsRegistrationGet087, "get", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationGetAll088(in Arguments a)
             {
                 var result = new JSArray();
@@ -359,7 +359,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
 
                 return result;
             }
-            formDataObject.FastAddValue((KeyString)"getAll", new JSFunction(JsRegistrationGetAll088, "getAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("getAll", new JSFunction(JsRegistrationGetAll088, "getAll", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationHas089(in Arguments a)
             {
                 if (a.Length == 0)
@@ -367,15 +367,15 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 var name = a[0].ToString();
                 return entries.Any(entry => string.Equals(entry.Key, name, StringComparison.Ordinal)) ? JSBoolean.True : JSBoolean.False;
             }
-            formDataObject.FastAddValue((KeyString)"has", new JSFunction(JsRegistrationHas089, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("has", new JSFunction(JsRegistrationHas089, "has", 1), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationSet090(in Arguments a)
             {
                 if (a.Length >= 2)
                     SetEntry(a[0].ToString(), a[1].ToString());
                 return JSUndefined.Value;
             }
-            formDataObject.FastAddValue((KeyString)"set", new JSFunction(JsRegistrationSet090, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-            formDataObject.FastAddValue((KeyString)"toString", new JSFunction((in _) => new JSString(string.Join("&", entries.Select(static entry => $"{EncodeFormComponent(entry.Key)}={EncodeFormComponent(entry.Value)}"))),
+            formDataObject.FastAddValue("set", new JSFunction(JsRegistrationSet090, "set", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+            formDataObject.FastAddValue("toString", new JSFunction((in _) => new JSString(string.Join("&", entries.Select(static entry => $"{EncodeFormComponent(entry.Key)}={EncodeFormComponent(entry.Value)}"))),
                 "toString", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return formDataObject;
@@ -481,7 +481,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                     throw new JSException("Failed to execute 'clone' on 'Request': body is already used.");
                 return CreateRequestObject(requestObject);
             }
-            requestObject.FastAddValue((KeyString)"clone", new JSFunction(JsRegistrationClone098, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue("clone", new JSFunction(JsRegistrationClone098, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationText099(in Arguments _)
             {
                 if (IsBodyUnavailable(requestObject))
@@ -489,7 +489,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => body == null ? new JSString(string.Empty) : new JSString(body));
             }
-            requestObject.FastAddValue((KeyString)"text", new JSFunction(JsRegistrationText099, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue("text", new JSFunction(JsRegistrationText099, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationJson100(in Arguments _)
             {
                 if (IsBodyUnavailable(requestObject))
@@ -497,7 +497,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => ParseJsonText(body ?? string.Empty));
             }
-            requestObject.FastAddValue((KeyString)"json", new JSFunction(JsRegistrationJson100, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue("json", new JSFunction(JsRegistrationJson100, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationArrayBuffer101(in Arguments _)
             {
                 if (IsBodyUnavailable(requestObject))
@@ -505,7 +505,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(body ?? string.Empty)));
             }
-            requestObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction(JsRegistrationArrayBuffer101, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue("arrayBuffer", new JSFunction(JsRegistrationArrayBuffer101, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationBlob102(in Arguments _)
             {
                 if (IsBodyUnavailable(requestObject))
@@ -513,7 +513,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => CreateBlobBody(body ?? string.Empty, headersObject));
             }
-            requestObject.FastAddValue((KeyString)"blob", new JSFunction(JsRegistrationBlob102, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue("blob", new JSFunction(JsRegistrationBlob102, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationFormData103(in Arguments _)
             {
                 if (IsBodyUnavailable(requestObject))
@@ -521,7 +521,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 requestObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => CreateFormDataObject(new JSString(body ?? string.Empty)));
             }
-            requestObject.FastAddValue((KeyString)"formData", new JSFunction(JsRegistrationFormData103, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            requestObject.FastAddValue("formData", new JSFunction(JsRegistrationFormData103, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return requestObject;
         }
@@ -550,7 +550,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => new JSString(body));
             }
-            responseObject.FastAddValue((KeyString)"text", new JSFunction(JsRegistrationText104, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue("text", new JSFunction(JsRegistrationText104, "text", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationJson105(in Arguments _)
             {
                 if (IsBodyUnavailable(responseObject))
@@ -558,7 +558,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => ParseResponseJsonText(body));
             }
-            responseObject.FastAddValue((KeyString)"json", new JSFunction(JsRegistrationJson105, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue("json", new JSFunction(JsRegistrationJson105, "json", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationArrayBuffer106(in Arguments _)
             {
                 if (IsBodyUnavailable(responseObject))
@@ -566,7 +566,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => new JSArrayBuffer(Encoding.UTF8.GetBytes(body)));
             }
-            responseObject.FastAddValue((KeyString)"arrayBuffer", new JSFunction(JsRegistrationArrayBuffer106, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue("arrayBuffer", new JSFunction(JsRegistrationArrayBuffer106, "arrayBuffer", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationBlob107(in Arguments _)
             {
                 if (IsBodyUnavailable(responseObject))
@@ -574,7 +574,7 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => CreateBlobBody(body, headersObject));
             }
-            responseObject.FastAddValue((KeyString)"blob", new JSFunction(JsRegistrationBlob107, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue("blob", new JSFunction(JsRegistrationBlob107, "blob", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationFormData108(in Arguments _)
             {
                 if (IsBodyUnavailable(responseObject))
@@ -582,14 +582,14 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
                 responseObject[(KeyString)"bodyUsed"] = JSBoolean.True;
                 return CreateThenable(() => CreateFormDataObject(new JSString(body)));
             }
-            responseObject.FastAddValue((KeyString)"formData", new JSFunction(JsRegistrationFormData108, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue("formData", new JSFunction(JsRegistrationFormData108, "formData", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue JsRegistrationClone109(in Arguments _)
             {
                 if (IsBodyUnavailable(responseObject))
                     throw new JSException("Failed to execute 'clone' on 'Response': body is already used.");
                 return CreateResponse(body, statusCode, statusText, responseUrl, type, redirected, new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase));
             }
-            responseObject.FastAddValue((KeyString)"clone", new JSFunction(JsRegistrationClone109, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            responseObject.FastAddValue("clone", new JSFunction(JsRegistrationClone109, "clone", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
             return responseObject;
         }
@@ -649,21 +649,21 @@ internal sealed partial class FetchBinding(IFetchHost host, ResourceLoader resou
         var headersCtor = new JSFunction((in a) => CreateHeadersObject(a.Length > 0 ? a[0] : null), "Headers", 1);
         var requestCtor = new JSFunction((in a) => CreateRequestObject(a.Length > 0 ? a[0] : JSUndefined.Value, a.Length > 1 ? a[1] : null), "Request", 2);
         var responseCtor = new JSFunction((in a) => JsRegistrationResponse113Core(ParseResponseInit, CreateResponse, in a), "Response", 2);
-        responseCtor.FastAddValue((KeyString)"json", new JSFunction((in a) => JsRegistrationJson114Core(ParseResponseInit, CreateResponse, in a), "json", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        responseCtor.FastAddValue((KeyString)"error", new JSFunction((in _) => CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
+        responseCtor.FastAddValue("json", new JSFunction((in a) => JsRegistrationJson114Core(ParseResponseInit, CreateResponse, in a), "json", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue("error", new JSFunction((in _) => CreateResponse(string.Empty, 0, string.Empty, string.Empty, "error", false, new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)),
             "error", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-        responseCtor.FastAddValue((KeyString)"redirect", new JSFunction((in a) => JsRegistrationRedirect116Core(ResolveResponseRedirectUrl, CreateResponse, in a), "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue((KeyString)"Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        responseCtor.FastAddValue("redirect", new JSFunction((in a) => JsRegistrationRedirect116Core(ResolveResponseRedirectUrl, CreateResponse, in a), "redirect", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("FormData", formDataCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("Headers", headersCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("Request", requestCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("Response", responseCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["FormData"] = formDataCtor;
         context["Headers"] = headersCtor;
         context["Request"] = requestCtor;
         context["Response"] = responseCtor;
         // fetch(url, options) — polyfill backed by the injected ResourceLoader
         var fetchFn = new JSFunction((in a) => JsRegistrationFetch120Core(TryGetJsPropertyString, EnumerateObjectStringEntries, CreateAbortErrorValue, CreateResponse, in a), "fetch", 1);
-        window.FastAddValue((KeyString)"fetch", fetchFn, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("fetch", fetchFn, JSPropertyAttributes.EnumerableConfigurableValue);
         // XMLHttpRequest — basic polyfill backed by fetch/the ResourceLoader
         RegisterXMLHttpRequest(context);
         return fetchFn;

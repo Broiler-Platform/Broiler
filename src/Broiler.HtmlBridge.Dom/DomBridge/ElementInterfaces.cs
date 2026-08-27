@@ -114,14 +114,14 @@ public sealed partial class DomBridge
         // HTMLLabelElement — htmlFor property (maps to 'for' content attribute)
         if (tag == "label")
         {
-            obj.FastAddProperty((KeyString)"htmlFor", new DomFunction((in _) => TryGetAttribute(element, "for", out var f) ? new JSString(f) : new JSString(string.Empty), "get htmlFor"),
+            obj.FastAddProperty("htmlFor", new DomFunction((in _) => TryGetAttribute(element, "for", out var f) ? new JSString(f) : new JSString(string.Empty), "get htmlFor"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetHtmlFor(element, in a), "set htmlFor"), JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         // HTMLMetaElement — httpEquiv property (maps to 'http-equiv' content attribute)
         if (tag == "meta")
         {
-            obj.FastAddProperty((KeyString)"httpEquiv", new DomFunction((in _) => TryGetAttribute(element, "http-equiv", out var he) ? new JSString(he) : new JSString(string.Empty), "get httpEquiv"),
+            obj.FastAddProperty("httpEquiv", new DomFunction((in _) => TryGetAttribute(element, "http-equiv", out var he) ? new JSString(he) : new JSString(string.Empty), "get httpEquiv"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetHttpEquiv(element, in a), "set httpEquiv"), JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
@@ -131,13 +131,13 @@ public sealed partial class DomBridge
             // data get (reflected URL) + type get/set are in ElementReflectionBinding (P3.49); the data
             // setter, contentDocument getter and getSVGDocument() are sub-document-coupled and live in the
             // ObjectElementBinding feature module (Phase 3 P3.52).
-            obj.FastAddProperty((KeyString)"data",
+            obj.FastAddProperty("data",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetData(this, element, in _), "get data"),
                 new DomFunction((in a) => Dom.Features.ObjectElementBinding.SetData(this, element, in a), "set data"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // type property (MIME type of the resource)
-            obj.FastAddProperty((KeyString)"type",
+            obj.FastAddProperty("type",
                 new DomFunction((in _) => TryGetAttribute(element, "type", out var t) ? new JSString(t) : new JSString(string.Empty), "get type"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetType(element, in a), "set type"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -145,12 +145,12 @@ public sealed partial class DomBridge
             // contentDocument for <object> element (with same-origin check)
             // Returns null when the resource fails to load (HTTP 404, file not found, etc.)
             // which signals that the fallback content (child nodes) should be visible.
-            obj.FastAddProperty((KeyString)"contentDocument",
+            obj.FastAddProperty("contentDocument",
                 new DomFunction((in _) => Dom.Features.ObjectElementBinding.GetContentDocument(this, element, in _), "get contentDocument"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // getSVGDocument() for <object> element
-            obj.FastAddValue((KeyString)"getSVGDocument",
+            obj.FastAddValue("getSVGDocument",
                 new DomFunction((in _) => Dom.Features.ObjectElementBinding.GetSvgDocument(this, element, in _), "getSVGDocument", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
@@ -158,7 +158,7 @@ public sealed partial class DomBridge
         // HTMLAnchorElement — href property with URI resolution
         if (tag == "a")
         {
-            obj.FastAddProperty((KeyString)"href",
+            obj.FastAddProperty("href",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -171,14 +171,14 @@ public sealed partial class DomBridge
             foreach (var attrName in new[] { "shape", "coords", "alt", "target" })
             {
                 var captured = attrName; // capture for closure
-                obj.FastAddProperty((KeyString)captured,
+                obj.FastAddProperty(captured,
                     new DomFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + captured),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + captured),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
             }
 
             // href — with URI resolution like <a>
-            obj.FastAddProperty((KeyString)"href",
+            obj.FastAddProperty("href",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetHref(element, in a), "set href"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -194,7 +194,7 @@ public sealed partial class DomBridge
             // Writing a live <link>'s href points it at a new sheet, which is a fresh fetch and so a
             // fresh load event (HTML §4.2.4) — the shape UIEvent.load.stylesheet waits on.
             var isLink = tag == "link";
-            obj.FastAddProperty((KeyString)"href",
+            obj.FastAddProperty("href",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetHref(this, element, in _), "get href"),
                 new DomFunction((in a) =>
                 {
@@ -215,7 +215,7 @@ public sealed partial class DomBridge
             {
                 var captured = attrName; // capture for closure
                 var firesLoad = captured == "rel";
-                obj.FastAddProperty((KeyString)idlName,
+                obj.FastAddProperty(idlName,
                     new DomFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
                     new DomFunction((in a) =>
                     {
@@ -237,7 +237,7 @@ public sealed partial class DomBridge
         // waitForWhichBrowser poll). Exactly the shape of the <link>.href gap fixed above.
         if (tag == "script")
         {
-            obj.FastAddProperty((KeyString)"src",
+            obj.FastAddProperty("src",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetSrc(this, element, in _), "get src"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetSrc(element, in a), "set src"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -245,7 +245,7 @@ public sealed partial class DomBridge
             foreach (var (idlName, attrName) in ScriptReflectedAttributes)
             {
                 var captured = attrName; // capture for closure
-                obj.FastAddProperty((KeyString)idlName,
+                obj.FastAddProperty(idlName,
                     new DomFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + idlName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -254,7 +254,7 @@ public sealed partial class DomBridge
             foreach (var (idlName, attrName) in ScriptReflectedBooleans)
             {
                 var captured = attrName; // capture for closure
-                obj.FastAddProperty((KeyString)idlName,
+                obj.FastAddProperty(idlName,
                     new DomFunction((in _) => HasAttr(element, captured) ? JSBoolean.True : JSBoolean.False, "get " + idlName),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedBoolean(captured, element, in a), "set " + idlName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -264,7 +264,7 @@ public sealed partial class DomBridge
             // loader idiom, for an inline script built in JS rather than fetched. textContent is
             // already installed on every element and does the same thing; this aliases it so
             // `s.text = code` is not silently a plain JS property either.
-            obj.FastAddProperty((KeyString)"text",
+            obj.FastAddProperty("text",
                 new DomFunction((in _) => GetNodeTextValue(element), "get text"),
                 new DomFunction((in a) => { SetElementTextContent(element, a.Length > 0 ? a[0].ToString() : string.Empty); return JSUndefined.Value; }, "set text"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -278,7 +278,7 @@ public sealed partial class DomBridge
             foreach (var dim in new[] { "height", "width" })
             {
                 var dimName = dim;
-                obj.FastAddProperty((KeyString)dimName,
+                obj.FastAddProperty(dimName,
                     new DomFunction((in _) => Dom.Features.ComputedStyleBinding.GetUsedDimension(this, dimName, element, in _), "get " + dimName),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedDimension(dimName, element, in a), "set " + dimName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -291,7 +291,7 @@ public sealed partial class DomBridge
             // mw.util.parseImageUrl(), whose first act is url.match(...) — "Cannot get property match
             // of undefined". That throw took MultimediaViewerBootstrap.processThumbs down and, with
             // it, the rest of the single load.php bundle queued behind it.
-            obj.FastAddProperty((KeyString)"src",
+            obj.FastAddProperty("src",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetSrc(this, element, in _), "get src"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetSrc(element, in a), "set src"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -301,12 +301,12 @@ public sealed partial class DomBridge
             // the resolved src, and the empty string when there is no src at all. That is the pair of
             // answers the `img.currentSrc || img.src` idiom is written against (mmv.bootstrap's
             // processThumb reads exactly that, then calls .includes() on the result).
-            obj.FastAddProperty((KeyString)"currentSrc",
+            obj.FastAddProperty("currentSrc",
                 new DomFunction((in _) => Dom.Features.ElementReflectionBinding.GetCurrentSrc(this, element, in _), "get currentSrc"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
             // .isMap — the one boolean in the interface: present or absent, never the string "false".
-            obj.FastAddProperty((KeyString)"isMap",
+            obj.FastAddProperty("isMap",
                 new DomFunction((in _) => HasAttr(element, "ismap") ? JSBoolean.True : JSBoolean.False, "get isMap"),
                 new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedBoolean("ismap", element, in a), "set isMap"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -318,7 +318,7 @@ public sealed partial class DomBridge
             foreach (var (idlName, attrName) in ImageReflectedAttributes)
             {
                 var captured = attrName; // capture for closure
-                obj.FastAddProperty((KeyString)idlName,
+                obj.FastAddProperty(idlName,
                     new DomFunction((in _) => TryGetAttribute(element, captured, out var v) ? new JSString(v) : new JSString(string.Empty), "get " + idlName),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedAttribute(captured, element, in a), "set " + idlName),
                     JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -335,7 +335,7 @@ public sealed partial class DomBridge
             foreach (var dim in new[] { "height", "width" })
             {
                 var dimName = dim;
-                obj.FastAddProperty((KeyString)dimName,
+                obj.FastAddProperty(dimName,
                     new DomFunction((in _) => new JSString(
                         TryGetAttribute(element, dimName, out var v) ? v : string.Empty), "get " + dimName),
                     new DomFunction((in a) => Dom.Features.ElementReflectionBinding.SetReflectedDimension(dimName, element, in a), "set " + dimName),

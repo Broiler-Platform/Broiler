@@ -55,14 +55,14 @@ internal static partial class StyleSheetBinding
             return BuildCssRuleObject(CssSerializer.Serialize(rule), parentStyleSheet, parentRule);
 
         var ruleObj = new JSObject();
-        ruleObj.FastAddProperty((KeyString)"parentStyleSheet",
+        ruleObj.FastAddProperty("parentStyleSheet",
             new DomFunction((in _) => parentStyleSheet, "get parentStyleSheet"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        ruleObj.FastAddProperty((KeyString)"parentRule",
+        ruleObj.FastAddProperty("parentRule",
             new DomFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        ruleObj.FastAddValue((KeyString)"type", new JSNumber((int)kind), JSPropertyAttributes.EnumerableConfigurableValue);
+        ruleObj.FastAddValue("type", new JSNumber((int)kind), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Builds the JS CSSStyleDeclaration for a declaration-bodied rule from the
         // model's declaration block — identical to the legacy substring path because
@@ -80,8 +80,8 @@ internal static partial class StyleSheetBinding
             case CssomRuleType.Charset:
                 {
                     var encoding = CssomRuleMetadata.GetCharsetEncoding((CssAtRule)rule);
-                    ruleObj.FastAddValue((KeyString)"encoding", new JSString(encoding), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("encoding", new JSString(encoding), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => new JSString($"@charset \"{encoding}\";"), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -90,9 +90,9 @@ internal static partial class StyleSheetBinding
             case CssomRuleType.Import:
                 {
                     var import = CssomRuleMetadata.GetImport((CssAtRule)rule);
-                    ruleObj.FastAddValue((KeyString)"href", new JSString(import.Href), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"media", new JSString(import.Media), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("href", new JSString(import.Href), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("media", new JSString(import.Media), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText017Core(import.Href, import.Media, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -107,9 +107,9 @@ internal static partial class StyleSheetBinding
                         nestedRuleObjects,
                         text => BuildCssRuleObject(text, parentStyleSheet, ruleObj));
 
-                    ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText018Core(mediaText, nestedRuleObjects, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -118,10 +118,10 @@ internal static partial class StyleSheetBinding
             case CssomRuleType.FontFace:
                 {
                     var styleObj = StyleFromBlock(((CssAtRule)rule).Declarations);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText019Core(styleObj, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
-                    ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                     break;
                 }
 
@@ -133,9 +133,9 @@ internal static partial class StyleSheetBinding
                     var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects,
                         text => BuildCssKeyframeRuleObject(text, parentStyleSheet, ruleObj));
 
-                    ruleObj.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText020Core(name, nestedRuleObjects, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -152,13 +152,13 @@ internal static partial class StyleSheetBinding
                         || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
                     var initialValue = descriptors.GetValueOrDefault("initial-value");
 
-                    ruleObj.FastAddValue((KeyString)"name", new JSString(propertyName), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"syntax", new JSString(syntax), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"inherits", inherits ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"initialValue",
+                    ruleObj.FastAddValue("name", new JSString(propertyName), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("syntax", new JSString(syntax), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("inherits", inherits ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("initialValue",
                         string.IsNullOrEmpty(initialValue) ? JSNull.Value : new JSString(initialValue),
                         JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText021Core(inherits, initialValue, propertyName, syntax, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -170,7 +170,7 @@ internal static partial class StyleSheetBinding
                     var ruleName = atRule.Prelude;
                     var descriptors = DomBridge.ParseStyle(CssSerializer.Serialize(atRule.Declarations ?? new CssDeclarationBlock([])));
 
-                    ruleObj.FastAddValue((KeyString)"name", new JSString(ruleName), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("name", new JSString(ruleName), JSPropertyAttributes.EnumerableConfigurableValue);
 
                     var descriptorMap = new (string CssName, string JsName)[]
                     {
@@ -188,12 +188,12 @@ internal static partial class StyleSheetBinding
 
                     foreach (var (cssName, jsName) in descriptorMap)
                     {
-                        ruleObj.FastAddValue((KeyString)jsName,
+                        ruleObj.FastAddValue(jsName,
                             descriptors.TryGetValue(cssName, out var value) ? new JSString(value) : JSUndefined.Value,
                             JSPropertyAttributes.EnumerableConfigurableValue);
                     }
 
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText022Core(descriptorMap, ruleName, ruleObj, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -208,9 +208,9 @@ internal static partial class StyleSheetBinding
                         nestedRuleObjects,
                         text => BuildCssRuleObject(text, parentStyleSheet, ruleObj));
 
-                    ruleObj.FastAddValue((KeyString)"conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText023Core(conditionText, nestedRuleObjects, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -226,22 +226,22 @@ internal static partial class StyleSheetBinding
                         var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects,
                             text => BuildCssRuleObject(text, parentStyleSheet, ruleObj));
 
-                        ruleObj.FastAddValue((KeyString)"name",
+                        ruleObj.FastAddValue("name",
                             string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
                             JSPropertyAttributes.EnumerableConfigurableValue);
-                        ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                        ruleObj.FastAddProperty((KeyString)"cssText",
+                        ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                        ruleObj.FastAddProperty("cssText",
                             new DomFunction((in _) => JsStyleSheetsGetCssText024Core(nameText, nestedRuleObjects, in _), "get cssText"),
                             null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     }
                     else
                     {
                         // Statement form: `@layer a, b;` — no block, empty cssRules.
-                        ruleObj.FastAddValue((KeyString)"name",
+                        ruleObj.FastAddValue("name",
                             string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
                             JSPropertyAttributes.EnumerableConfigurableValue);
-                        ruleObj.FastAddValue((KeyString)"cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
-                        ruleObj.FastAddProperty((KeyString)"cssText",
+                        ruleObj.FastAddValue("cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
+                        ruleObj.FastAddProperty("cssText",
                             new DomFunction((in _) => JsStyleSheetsGetCssText025Core(nameText, in _), "get cssText"),
                             null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     }
@@ -251,11 +251,11 @@ internal static partial class StyleSheetBinding
             case CssomRuleType.Namespace:
                 {
                     var ns = CssomRuleMetadata.GetNamespace((CssAtRule)rule);
-                    ruleObj.FastAddValue((KeyString)"namespaceURI", new JSString(ns.Uri), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"prefix",
+                    ruleObj.FastAddValue("namespaceURI", new JSString(ns.Uri), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("prefix",
                         string.IsNullOrEmpty(ns.Prefix) ? JSUndefined.Value : new JSString(ns.Prefix),
                         JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText026Core(ns.Uri, ns.Prefix, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -266,9 +266,9 @@ internal static partial class StyleSheetBinding
                     var atRule = (CssAtRule)rule;
                     var selectorText = atRule.Prelude;
                     var styleObj = StyleFromBlock(atRule.Declarations);
-                    ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText027Core(selectorText, styleObj, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     break;
@@ -279,12 +279,12 @@ internal static partial class StyleSheetBinding
                     // CSSStyleRule — type 1
                     var styleRule = (CssStyleRule)rule;
                     var selectorText = CssomRuleMetadata.GetSelectorText(styleRule);
-                    ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
-                    ruleObj.FastAddProperty((KeyString)"cssText",
+                    ruleObj.FastAddValue("selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddProperty("cssText",
                         new DomFunction((in _) => JsStyleSheetsGetCssText028Core(ruleObj, selectorText, in _), "get cssText"),
                         null, JSPropertyAttributes.EnumerableConfigurableProperty);
                     var styleObj = StyleFromBlock(styleRule.Declarations);
-                    ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                     break;
                 }
         }
@@ -296,10 +296,10 @@ internal static partial class StyleSheetBinding
     {
         var ruleObj = new JSObject();
         ruleObj.FastAddProperty(
-            (KeyString)"parentStyleSheet",
+            "parentStyleSheet",
             new DomFunction((in _) => parentStyleSheet, "get parentStyleSheet"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        ruleObj.FastAddProperty((KeyString)"parentRule",
+        ruleObj.FastAddProperty("parentRule",
             new DomFunction((in _) => parentRule ?? JSNull.Value, "get parentRule"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -308,19 +308,19 @@ internal static partial class StyleSheetBinding
         if (trimmedRuleText.StartsWith("@charset", StringComparison.OrdinalIgnoreCase))
         {
             // CSSCharsetRule — type 2
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var charsetBody = trimmedRuleText[8..].Trim().TrimEnd(';').Trim();
             var encoding = charsetBody.Trim('"', '\'');
 
-            ruleObj.FastAddValue((KeyString)"encoding", new JSString(encoding), JSPropertyAttributes.EnumerableConfigurableValue);
-            ruleObj.FastAddProperty((KeyString)"cssText",
+            ruleObj.FastAddValue("encoding", new JSString(encoding), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddProperty("cssText",
                 new DomFunction((in _) => new JSString($"@charset \"{encoding}\";"), "get cssText"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
         else if (trimmedRuleText.StartsWith("@import", StringComparison.OrdinalIgnoreCase))
         {
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var importBody = trimmedRuleText[7..].Trim().TrimEnd(';').Trim();
             var href = string.Empty;
@@ -347,15 +347,15 @@ internal static partial class StyleSheetBinding
                 }
             }
 
-            ruleObj.FastAddValue((KeyString)"href", new JSString(href), JSPropertyAttributes.EnumerableConfigurableValue);
-            ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
-            ruleObj.FastAddProperty((KeyString)"cssText",
+            ruleObj.FastAddValue("href", new JSString(href), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddProperty("cssText",
                 new DomFunction((in _) => JsStyleSheetsGetCssText017Core(href, mediaText, in _), "get cssText"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
         else if (trimmedRuleText.StartsWith("@media", StringComparison.OrdinalIgnoreCase))
         {
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
 
             int braceOpen = ruleText.IndexOf('{');
             int braceClose = ruleText.LastIndexOf('}');
@@ -368,9 +368,9 @@ internal static partial class StyleSheetBinding
                     nestedRuleObjects,
                     rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
 
-                ruleObj.FastAddValue((KeyString)"media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("media", new JSString(mediaText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText018Core(mediaText, nestedRuleObjects, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -378,7 +378,7 @@ internal static partial class StyleSheetBinding
         else if (trimmedRuleText.StartsWith("@font-face", StringComparison.OrdinalIgnoreCase))
         {
             // CSSFontFaceRule — type 5
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
 
             // Extract declarations from @font-face { ... }
             int braceOpen = ruleText.IndexOf('{');
@@ -388,16 +388,16 @@ internal static partial class StyleSheetBinding
                 var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var styleMap = DomBridge.ParseStyle(declarations);
                 var styleObj = StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText019Core(styleObj, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
-                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
             }
         }
         else if (trimmedRuleText.StartsWith("@keyframes", StringComparison.OrdinalIgnoreCase))
         {
             // CSSKeyframesRule — type 7
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
 
             int braceOpen = ruleText.IndexOf('{');
             int braceClose = ruleText.LastIndexOf('}');
@@ -410,9 +410,9 @@ internal static partial class StyleSheetBinding
                     nestedRuleObjects,
                     rule => BuildCssKeyframeRuleObject(rule, parentStyleSheet, ruleObj));
 
-                ruleObj.FastAddValue((KeyString)"name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("name", new JSString(name), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText020Core(name, nestedRuleObjects, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -420,7 +420,7 @@ internal static partial class StyleSheetBinding
         else if (trimmedRuleText.StartsWith("@property", StringComparison.OrdinalIgnoreCase))
         {
             // CSSPropertyRule — type 25
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(25), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(25), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var braceOpen = trimmedRuleText.IndexOf('{');
             var braceClose = trimmedRuleText.LastIndexOf('}');
@@ -436,13 +436,13 @@ internal static partial class StyleSheetBinding
                     || !string.Equals(inheritsValue, "false", StringComparison.OrdinalIgnoreCase);
                 var initialValue = descriptors.GetValueOrDefault("initial-value");
 
-                ruleObj.FastAddValue((KeyString)"name", new JSString(propertyName), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"syntax", new JSString(syntax), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"inherits", inherits ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"initialValue",
+                ruleObj.FastAddValue("name", new JSString(propertyName), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("syntax", new JSString(syntax), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("inherits", inherits ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("initialValue",
                     string.IsNullOrEmpty(initialValue) ? JSNull.Value : new JSString(initialValue),
                     JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText021Core(inherits, initialValue, propertyName, syntax, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -450,7 +450,7 @@ internal static partial class StyleSheetBinding
         else if (trimmedRuleText.StartsWith("@counter-style", StringComparison.OrdinalIgnoreCase))
         {
             // CSSCounterStyleRule — type 10
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var braceOpen = trimmedRuleText.IndexOf('{');
             var braceClose = trimmedRuleText.LastIndexOf('}');
@@ -460,7 +460,7 @@ internal static partial class StyleSheetBinding
                 var descriptorsText = trimmedRuleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                 var descriptors = DomBridge.ParseStyle(descriptorsText);
 
-                ruleObj.FastAddValue((KeyString)"name", new JSString(ruleName), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("name", new JSString(ruleName), JSPropertyAttributes.EnumerableConfigurableValue);
 
                 var descriptorMap = new (string CssName, string JsName)[]
                 {
@@ -478,12 +478,12 @@ internal static partial class StyleSheetBinding
 
                 foreach (var (cssName, jsName) in descriptorMap)
                 {
-                    ruleObj.FastAddValue((KeyString)jsName,
+                    ruleObj.FastAddValue(jsName,
                         descriptors.TryGetValue(cssName, out var value) ? new JSString(value) : JSUndefined.Value,
                         JSPropertyAttributes.EnumerableConfigurableValue);
                 }
 
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText022Core(descriptorMap, ruleName, ruleObj, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -491,7 +491,7 @@ internal static partial class StyleSheetBinding
         else if (trimmedRuleText.StartsWith("@supports", StringComparison.OrdinalIgnoreCase))
         {
             // CSSSupportsRule — type 11
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(11), JSPropertyAttributes.EnumerableConfigurableValue);
 
             int braceOpen = ruleText.IndexOf('{');
             int braceClose = ruleText.LastIndexOf('}');
@@ -503,9 +503,9 @@ internal static partial class StyleSheetBinding
                 var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects,
                     rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
 
-                ruleObj.FastAddValue((KeyString)"conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("conditionText", new JSString(conditionText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText023Core(conditionText, nestedRuleObjects, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -513,7 +513,7 @@ internal static partial class StyleSheetBinding
         else if (trimmedRuleText.StartsWith("@layer", StringComparison.OrdinalIgnoreCase))
         {
             // CSSLayerRule — type 12
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(12), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(12), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var layerBody = ruleText[6..].Trim();
             var braceOpen = ruleText.IndexOf('{');
@@ -526,22 +526,22 @@ internal static partial class StyleSheetBinding
                 var nestedCssRules = BuildCssRuleListObject(nestedRuleObjects,
                     rule => BuildCssRuleObject(rule, parentStyleSheet, ruleObj));
 
-                ruleObj.FastAddValue((KeyString)"name",
+                ruleObj.FastAddValue("name",
                     string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
                     JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("cssRules", nestedCssRules, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText024Core(nameText, nestedRuleObjects, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
             else
             {
                 var nameText = layerBody.TrimEnd(';').Trim();
-                ruleObj.FastAddValue((KeyString)"name",
+                ruleObj.FastAddValue("name",
                     string.IsNullOrEmpty(nameText) ? JSNull.Value : new JSString(nameText),
                     JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("cssRules", BuildCssRuleListObject([]), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText025Core(nameText, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -549,7 +549,7 @@ internal static partial class StyleSheetBinding
         else if (trimmedRuleText.StartsWith("@namespace", StringComparison.OrdinalIgnoreCase))
         {
             // CSSNamespaceRule — type 9
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var namespaceBody = trimmedRuleText[10..].Trim().TrimEnd(';').Trim();
             string? prefix = null;
@@ -566,18 +566,18 @@ internal static partial class StyleSheetBinding
                 namespaceUri = CssomRuleMetadata.ExtractNamespaceUri(parts[0]);
             }
 
-            ruleObj.FastAddValue((KeyString)"namespaceURI", new JSString(namespaceUri), JSPropertyAttributes.EnumerableConfigurableValue);
-            ruleObj.FastAddValue((KeyString)"prefix",
+            ruleObj.FastAddValue("namespaceURI", new JSString(namespaceUri), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("prefix",
                 string.IsNullOrEmpty(prefix) ? JSUndefined.Value : new JSString(prefix),
                 JSPropertyAttributes.EnumerableConfigurableValue);
-            ruleObj.FastAddProperty((KeyString)"cssText",
+            ruleObj.FastAddProperty("cssText",
                 new DomFunction((in _) => JsStyleSheetsGetCssText026Core(namespaceUri, prefix, in _), "get cssText"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
         else if (trimmedRuleText.StartsWith("@page", StringComparison.OrdinalIgnoreCase))
         {
             // CSSPageRule — type 6
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
 
             var braceOpen = ruleText.IndexOf('{');
             var braceClose = ruleText.LastIndexOf('}');
@@ -588,9 +588,9 @@ internal static partial class StyleSheetBinding
                 var styleMap = DomBridge.ParseStyle(declarations);
                 var styleObj = StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
 
-                ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddValue("style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText027Core(selectorText, styleObj, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
             }
@@ -598,15 +598,15 @@ internal static partial class StyleSheetBinding
         else
         {
             // CSSStyleRule — type 1
-            ruleObj.FastAddValue((KeyString)"type", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+            ruleObj.FastAddValue("type", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
 
             // Extract selector text
             int braceOpen = ruleText.IndexOf('{');
             if (braceOpen >= 0)
             {
                 var selectorText = ruleText[..braceOpen].Trim();
-                ruleObj.FastAddValue((KeyString)"selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
-                ruleObj.FastAddProperty((KeyString)"cssText",
+                ruleObj.FastAddValue("selectorText", new JSString(selectorText), JSPropertyAttributes.EnumerableConfigurableValue);
+                ruleObj.FastAddProperty("cssText",
                     new DomFunction((in _) => JsStyleSheetsGetCssText028Core(ruleObj, selectorText, in _), "get cssText"),
                     null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -616,7 +616,7 @@ internal static partial class StyleSheetBinding
                     var declarations = ruleText.Substring(braceOpen + 1, braceClose - braceOpen - 1).Trim();
                     var styleMap = DomBridge.ParseStyle(declarations);
                     var styleObj = StyleDeclarationBinding.BuildRuleDeclaration(styleMap, ruleObj);
-                    ruleObj.FastAddValue((KeyString)"style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
+                    ruleObj.FastAddValue("style", styleObj, JSPropertyAttributes.EnumerableConfigurableValue);
                 }
             }
         }

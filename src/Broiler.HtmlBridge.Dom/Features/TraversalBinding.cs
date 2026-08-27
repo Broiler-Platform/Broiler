@@ -38,42 +38,42 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
     {
         // NodeFilter constants
         var nodeFilter = new JSObject();
-        nodeFilter.FastAddValue((KeyString)"FILTER_ACCEPT", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"FILTER_REJECT", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"FILTER_SKIP", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_ALL", new JSNumber(0xFFFFFFFF), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_ELEMENT", new JSNumber(0x1), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_ATTRIBUTE", new JSNumber(0x2), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_TEXT", new JSNumber(0x4), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_CDATA_SECTION", new JSNumber(0x8), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_ENTITY_REFERENCE", new JSNumber(0x10), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_ENTITY", new JSNumber(0x20), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_PROCESSING_INSTRUCTION", new JSNumber(0x40), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_COMMENT", new JSNumber(0x80), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_DOCUMENT", new JSNumber(0x100), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_DOCUMENT_TYPE", new JSNumber(0x200), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_DOCUMENT_FRAGMENT", new JSNumber(0x400), JSPropertyAttributes.EnumerableConfigurableValue);
-        nodeFilter.FastAddValue((KeyString)"SHOW_NOTATION", new JSNumber(0x800), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("FILTER_ACCEPT", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("FILTER_REJECT", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("FILTER_SKIP", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_ALL", new JSNumber(0xFFFFFFFF), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_ELEMENT", new JSNumber(0x1), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_ATTRIBUTE", new JSNumber(0x2), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_TEXT", new JSNumber(0x4), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_CDATA_SECTION", new JSNumber(0x8), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_ENTITY_REFERENCE", new JSNumber(0x10), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_ENTITY", new JSNumber(0x20), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_PROCESSING_INSTRUCTION", new JSNumber(0x40), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_COMMENT", new JSNumber(0x80), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_DOCUMENT", new JSNumber(0x100), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_DOCUMENT_TYPE", new JSNumber(0x200), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_DOCUMENT_FRAGMENT", new JSNumber(0x400), JSPropertyAttributes.EnumerableConfigurableValue);
+        nodeFilter.FastAddValue("SHOW_NOTATION", new JSNumber(0x800), JSPropertyAttributes.EnumerableConfigurableValue);
         context["NodeFilter"] = nodeFilter;
 
         // document.createTreeWalker(root, whatToShow, filter)
         document.FastAddValue(
-            (KeyString)"createTreeWalker",
+            "createTreeWalker",
             new DomFunction((in a) => CreateTreeWalker(in a), "createTreeWalker", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createNodeIterator(root, whatToShow, filter)
         document.FastAddValue(
-            (KeyString)"createNodeIterator",
+            "createNodeIterator",
             new DomFunction((in a) => CreateNodeIterator(in a), "createNodeIterator", 3),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createRange()
         document.FastAddValue(
-            (KeyString)"createRange",
+            "createRange",
             new DomFunction((in _) => BuildRange(), "createRange", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // document.createComment(data)
         document.FastAddValue(
-            (KeyString)"createComment",
+            "createComment",
             new DomFunction((in a) => CreateComment(in a), "createComment", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -83,7 +83,7 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
         // this is only reachable from page script, which runs after that.
         var getSelection = new DomFunction((in _) => GetSelection(), "getSelection", 0);
         document.FastAddValue(
-            (KeyString)"getSelection", getSelection, JSPropertyAttributes.EnumerableConfigurableValue);
+            "getSelection", getSelection, JSPropertyAttributes.EnumerableConfigurableValue);
         context["getSelection"] = getSelection;
     }
 
@@ -163,11 +163,11 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             (DomWhatToShow)(uint)whatToShow,
             node => (DomFilterResult)ApplyFilter(node, whatToShow, filterFn));
 
-        tw.FastAddValue((KeyString)"root",
+        tw.FastAddValue("root",
             _host.ToJSObject(root),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        tw.FastAddProperty((KeyString)"currentNode",
+        tw.FastAddProperty("currentNode",
             new DomFunction((in a) => _host.ToJSObject(walker.CurrentNode), "get currentNode"),
             new DomFunction((in a) =>
             {
@@ -180,31 +180,31 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             }, "set currentNode"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        tw.FastAddValue((KeyString)"whatToShow",
+        tw.FastAddValue("whatToShow",
             new JSNumber(whatToShow),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        tw.FastAddValue((KeyString)"parentNode",
+        tw.FastAddValue("parentNode",
             new DomFunction((in a) => ToTraversalJsValue(walker.ParentNode()), "parentNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        tw.FastAddValue((KeyString)"firstChild",
+        tw.FastAddValue("firstChild",
             new DomFunction((in a) => ToTraversalJsValue(walker.FirstChild()), "firstChild", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        tw.FastAddValue((KeyString)"lastChild",
+        tw.FastAddValue("lastChild",
             new DomFunction((in a) => ToTraversalJsValue(walker.LastChild()), "lastChild", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        tw.FastAddValue((KeyString)"nextSibling",
+        tw.FastAddValue("nextSibling",
             new DomFunction((in a) => ToTraversalJsValue(walker.NextSibling()), "nextSibling", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        tw.FastAddValue((KeyString)"previousSibling",
+        tw.FastAddValue("previousSibling",
             new DomFunction((in a) => ToTraversalJsValue(walker.PreviousSibling()), "previousSibling", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // nextNode() — depth-first pre-order traversal forward
-        tw.FastAddValue((KeyString)"nextNode",
+        tw.FastAddValue("nextNode",
             new DomFunction((in a) => ToTraversalJsValue(walker.NextNode()), "nextNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         // previousNode() — depth-first pre-order traversal backward
-        tw.FastAddValue((KeyString)"previousNode",
+        tw.FastAddValue("previousNode",
             new DomFunction((in a) => ToTraversalJsValue(walker.PreviousNode()), "previousNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -226,29 +226,29 @@ internal sealed partial class TraversalBinding(ITraversalHost host)
             (DomWhatToShow)(uint)whatToShow,
             node => (DomFilterResult)ApplyFilter(node, whatToShow, filterFn));
 
-        iter.FastAddValue((KeyString)"root",
+        iter.FastAddValue("root",
             _host.ToJSObject(root),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        iter.FastAddValue((KeyString)"whatToShow",
+        iter.FastAddValue("whatToShow",
             new JSNumber(whatToShow),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        iter.FastAddProperty((KeyString)"referenceNode",
+        iter.FastAddProperty("referenceNode",
             new DomFunction((in a) => ToTraversalJsValue(iterator.ReferenceNode), "get referenceNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        iter.FastAddProperty((KeyString)"pointerBeforeReferenceNode",
+        iter.FastAddProperty("pointerBeforeReferenceNode",
             new DomFunction((in a) => iterator.PointerBeforeReferenceNode ? JSBoolean.True : JSBoolean.False, "get pointerBeforeReferenceNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        iter.FastAddValue((KeyString)"nextNode",
+        iter.FastAddValue("nextNode",
             new DomFunction((in a) => ToTraversalJsValue(iterator.NextNode()), "nextNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        iter.FastAddValue((KeyString)"previousNode",
+        iter.FastAddValue("previousNode",
             new DomFunction((in a) => ToTraversalJsValue(iterator.PreviousNode()), "previousNode", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        iter.FastAddValue((KeyString)"detach",
+        iter.FastAddValue("detach",
             new DomFunction((in a) =>
             {
                 iterator.Dispose();

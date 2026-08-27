@@ -1387,7 +1387,7 @@ public class CaptureService
         var classes = new List<string>();
 
         classList.FastAddValue(
-            (KeyString)"add",
+            "add",
             new JSFunction((in Arguments a) =>
             {
                 for (var i = 0; i < a.Length; i++)
@@ -1400,7 +1400,7 @@ public class CaptureService
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         classList.FastAddValue(
-            (KeyString)"remove",
+            "remove",
             new JSFunction((in Arguments a) =>
             {
                 for (var i = 0; i < a.Length; i++)
@@ -1410,7 +1410,7 @@ public class CaptureService
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         classList.FastAddValue(
-            (KeyString)"contains",
+            "contains",
             new JSFunction((in Arguments a) =>
             {
                 if (a.Length == 0) return JSBoolean.False;
@@ -1419,12 +1419,12 @@ public class CaptureService
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         docElement.FastAddValue(
-            (KeyString)"classList",
+            "classList",
             classList,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         document.FastAddValue(
-            (KeyString)"documentElement",
+            "documentElement",
             docElement,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -1433,7 +1433,7 @@ public class CaptureService
         // window stub with localStorage and matchMedia
         var window = new JSObject();
         window.FastAddValue(
-            (KeyString)"document",
+            "document",
             document,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -1446,11 +1446,11 @@ public class CaptureService
         var sessionStorage = Broiler.HtmlBridge.Dom.Features.WebStorageBinding.BuildStorage();
 
         window.FastAddValue(
-            (KeyString)"localStorage",
+            "localStorage",
             localStorage,
             JSPropertyAttributes.EnumerableConfigurableValue);
         window.FastAddValue(
-            (KeyString)"sessionStorage",
+            "sessionStorage",
             sessionStorage,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -1459,16 +1459,16 @@ public class CaptureService
 
         // window.matchMedia(query) — stub returning { matches: false }
         window.FastAddValue(
-            (KeyString)"matchMedia",
+            "matchMedia",
             new JSFunction((in Arguments a) =>
             {
                 var result = new JSObject();
                 result.FastAddValue(
-                    (KeyString)"matches",
+                    "matches",
                     JSBoolean.False,
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 result.FastAddValue(
-                    (KeyString)"media",
+                    "media",
                     a.Length > 0 ? new JSString(a[0]?.ToString() ?? string.Empty) : new JSString(string.Empty),
                     JSPropertyAttributes.EnumerableConfigurableValue);
                 return result;
@@ -1543,7 +1543,7 @@ public class CaptureService
             var weakRef = new WeakReference<JSValue>(target);
 
             var instance = new JSObject();
-            instance.FastAddValue((KeyString)"deref", new JSFunction((in Arguments _) =>
+            instance.FastAddValue("deref", new JSFunction((in Arguments _) =>
             {
                 return weakRef.TryGetTarget(out var t) ? t : JSUndefined.Value;
             }, "deref", 0), JSPropertyAttributes.EnumerableConfigurableValue);
@@ -1571,12 +1571,12 @@ public class CaptureService
         {
             var instance = new JSObject();
 
-            instance.FastAddValue((KeyString)"register", new JSFunction((in Arguments _) =>
+            instance.FastAddValue("register", new JSFunction((in Arguments _) =>
             {
                 return JSUndefined.Value;
             }, "register", 3), JSPropertyAttributes.EnumerableConfigurableValue);
 
-            instance.FastAddValue((KeyString)"unregister", new JSFunction((in Arguments _) =>
+            instance.FastAddValue("unregister", new JSFunction((in Arguments _) =>
             {
                 return JSBoolean.False;
             }, "unregister", 1), JSPropertyAttributes.EnumerableConfigurableValue);

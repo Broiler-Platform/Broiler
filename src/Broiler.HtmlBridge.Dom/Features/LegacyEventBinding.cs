@@ -24,41 +24,41 @@ internal static class LegacyEventBinding
         var evt = new JSObject();
         var legacyCancelBubble = false;
 
-        evt.FastAddValue((KeyString)"type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"screenX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"screenY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"clientX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"clientY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"ctrlKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"altKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"shiftKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"metaKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"key", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"location", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"repeat", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"keyCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"charCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"which", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"deltaX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"deltaY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"deltaZ", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("view", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("screenX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("screenY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("clientX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("clientY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("x", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("y", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("ctrlKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("altKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("shiftKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("metaKey", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("key", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("location", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("repeat", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("keyCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("charCode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("which", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("button", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("buttons", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("deltaX", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("deltaY", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("deltaZ", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("deltaMode", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
 
         JSValue JsRegistrationStopPropagation018(in Arguments _)
         {
@@ -66,14 +66,14 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"stopPropagation", new DomFunction(JsRegistrationStopPropagation018, "stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("stopPropagation", new DomFunction(JsRegistrationStopPropagation018, "stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationStopImmediatePropagation019(in Arguments _)
         {
             legacyCancelBubble = true;
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"stopImmediatePropagation", new DomFunction(JsRegistrationStopImmediatePropagation019, "stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("stopImmediatePropagation", new DomFunction(JsRegistrationStopImmediatePropagation019, "stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationPreventDefault020(in Arguments _)
         {
             var cancelable = evt[(KeyString)"cancelable"];
@@ -82,7 +82,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"preventDefault", new DomFunction(JsRegistrationPreventDefault020, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("preventDefault", new DomFunction(JsRegistrationPreventDefault020, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationGetCancelBubble021(in Arguments _)
         {
             return legacyCancelBubble ? JSBoolean.True : JSBoolean.False;
@@ -95,7 +95,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddProperty((KeyString)"cancelBubble", new DomFunction(JsRegistrationGetCancelBubble021, "get cancelBubble"), new DomFunction(JsRegistrationSetCancelBubble022, "set cancelBubble"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty("cancelBubble", new DomFunction(JsRegistrationGetCancelBubble021, "get cancelBubble"), new DomFunction(JsRegistrationSetCancelBubble022, "set cancelBubble"), JSPropertyAttributes.EnumerableConfigurableProperty);
         JSValue JsRegistrationGetReturnValue023(in Arguments _)
         {
             return evt[(KeyString)"defaultPrevented"].BooleanValue ? JSBoolean.False : JSBoolean.True;
@@ -109,7 +109,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddProperty((KeyString)"returnValue", new DomFunction(JsRegistrationGetReturnValue023, "get returnValue"), new DomFunction(JsRegistrationSetReturnValue024, "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
+        evt.FastAddProperty("returnValue", new DomFunction(JsRegistrationGetReturnValue023, "get returnValue"), new DomFunction(JsRegistrationSetReturnValue024, "set returnValue"), JSPropertyAttributes.EnumerableConfigurableProperty);
         JSValue JsRegistrationInitEvent025(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -121,7 +121,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initEvent", new DomFunction(JsRegistrationInitEvent025, "initEvent", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initEvent", new DomFunction(JsRegistrationInitEvent025, "initEvent", 3), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitUIEvent026(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -137,7 +137,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initUIEvent", new DomFunction(JsRegistrationInitUIEvent026, "initUIEvent", 5), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initUIEvent", new DomFunction(JsRegistrationInitUIEvent026, "initUIEvent", 5), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitInputEvent027(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -157,7 +157,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initInputEvent", new DomFunction(JsRegistrationInitInputEvent027, "initInputEvent", 7), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initInputEvent", new DomFunction(JsRegistrationInitInputEvent027, "initInputEvent", 7), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitCustomEvent028(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -170,7 +170,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initCustomEvent", new DomFunction(JsRegistrationInitCustomEvent028, "initCustomEvent", 4), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initCustomEvent", new DomFunction(JsRegistrationInitCustomEvent028, "initCustomEvent", 4), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitFocusEvent029(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -188,7 +188,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initFocusEvent", new DomFunction(JsRegistrationInitFocusEvent029, "initFocusEvent", 6), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initFocusEvent", new DomFunction(JsRegistrationInitFocusEvent029, "initFocusEvent", 6), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitKeyboardEvent030(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -231,7 +231,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initKeyboardEvent", new DomFunction(JsRegistrationInitKeyboardEvent030, "initKeyboardEvent", 13), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initKeyboardEvent", new DomFunction(JsRegistrationInitKeyboardEvent030, "initKeyboardEvent", 13), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitMouseEvent031(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -286,7 +286,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initMouseEvent", new DomFunction(JsRegistrationInitMouseEvent031, "initMouseEvent", 15), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initMouseEvent", new DomFunction(JsRegistrationInitMouseEvent031, "initMouseEvent", 15), JSPropertyAttributes.EnumerableConfigurableValue);
         JSValue JsRegistrationInitWheelEvent032(in Arguments initArgs)
         {
             if (initArgs.Length > 0)
@@ -339,7 +339,7 @@ internal static class LegacyEventBinding
             return JSUndefined.Value;
         }
 
-        evt.FastAddValue((KeyString)"initWheelEvent", new DomFunction(JsRegistrationInitWheelEvent032, "initWheelEvent", 16), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("initWheelEvent", new DomFunction(JsRegistrationInitWheelEvent032, "initWheelEvent", 16), JSPropertyAttributes.EnumerableConfigurableValue);
         return evt;
     }
 }

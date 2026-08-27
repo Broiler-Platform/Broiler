@@ -38,63 +38,63 @@ internal static class ElementGeometryBinding
         // -- TODO-G4 / TODO-G19: Box model properties for all elements --
         // clientWidth/clientHeight, scrollWidth/scrollHeight, scrollTop/scrollLeft, and
         // getBoundingClientRect()
-        target.FastAddProperty((KeyString)"clientTop",
+        target.FastAddProperty("clientTop",
             new DomFunction((in a) => new JSNumber(host.GetClientTopForDomElement(element(in a, "clientTop"))), "get clientTop"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"clientLeft",
+        target.FastAddProperty("clientLeft",
             new DomFunction((in a) => new JSNumber(host.GetClientLeftForDomElement(element(in a, "clientLeft"))), "get clientLeft"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"clientWidth",
+        target.FastAddProperty("clientWidth",
             new DomFunction((in a) => Metric(host, element(in a, "clientWidth"), host.GetClientWidthForDomElement), "get clientWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"clientHeight",
+        target.FastAddProperty("clientHeight",
             new DomFunction((in a) => Metric(host, element(in a, "clientHeight"), host.GetClientHeightForDomElement), "get clientHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"scrollWidth",
+        target.FastAddProperty("scrollWidth",
             new DomFunction((in a) => Metric(host, element(in a, "scrollWidth"), host.GetScrollWidthForDomElement), "get scrollWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"scrollHeight",
+        target.FastAddProperty("scrollHeight",
             new DomFunction((in a) => Metric(host, element(in a, "scrollHeight"), host.GetScrollHeightForDomElement), "get scrollHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"scrollTop",
+        target.FastAddProperty("scrollTop",
             new DomFunction((in a) => GetScrollTop(host, element(in a, "scrollTop")), "get scrollTop"),
             new DomFunction((in a) => SetScrollTop(host, element(in a, "scrollTop"), in a), "set scrollTop"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"scrollLeft",
+        target.FastAddProperty("scrollLeft",
             new DomFunction((in a) => GetScrollLeft(host, element(in a, "scrollLeft")), "get scrollLeft"),
             new DomFunction((in a) => SetScrollLeft(host, element(in a, "scrollLeft"), in a), "set scrollLeft"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // getBoundingClientRect() — returns DOMRect-like object
-        target.FastAddValue((KeyString)"getBoundingClientRect",
+        target.FastAddValue("getBoundingClientRect",
             new DomFunction((in a) => Rect(host, element(in a, "getBoundingClientRect"), GetBoundingClientRect), "getBoundingClientRect", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // getClientRects() — returns array with one DOMRect for root elements
-        target.FastAddValue((KeyString)"getClientRects",
+        target.FastAddValue("getClientRects",
             new DomFunction((in a) => Rect(host, element(in a, "getClientRects"), GetClientRects), "getClientRects", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        target.FastAddValue((KeyString)"scrollIntoView",
+        target.FastAddValue("scrollIntoView",
             new DomFunction((in a) => ScrollIntoView(host, element(in a, "scrollIntoView"), in a), "scrollIntoView", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        target.FastAddValue((KeyString)"scroll",
+        target.FastAddValue("scroll",
             new DomFunction((in a) => Scroll(host, element(in a, "scroll"), in a), "scroll", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        target.FastAddValue((KeyString)"scrollTo",
+        target.FastAddValue("scrollTo",
             new DomFunction((in a) => Scroll(host, element(in a, "scrollTo"), in a), "scrollTo", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        target.FastAddValue((KeyString)"scrollBy",
+        target.FastAddValue("scrollBy",
             new DomFunction((in a) => ScrollBy(host, element(in a, "scrollBy"), in a), "scrollBy", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -106,23 +106,23 @@ internal static class ElementGeometryBinding
     /// </summary>
     public static void InstallHtmlElementMembers(IElementGeometryHost host, JSObject target, ElementSource element)
     {
-        target.FastAddProperty((KeyString)"offsetWidth",
+        target.FastAddProperty("offsetWidth",
             new DomFunction((in a) => Metric(host, element(in a, "offsetWidth"), host.GetOffsetWidthForDomElement), "get offsetWidth"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"offsetHeight",
+        target.FastAddProperty("offsetHeight",
             new DomFunction((in a) => Metric(host, element(in a, "offsetHeight"), host.GetOffsetHeightForDomElement), "get offsetHeight"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"offsetTop",
+        target.FastAddProperty("offsetTop",
             new DomFunction((in a) => new JSNumber(host.GetOffsetTopForDomElement(element(in a, "offsetTop"))), "get offsetTop"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"offsetLeft",
+        target.FastAddProperty("offsetLeft",
             new DomFunction((in a) => new JSNumber(host.GetOffsetLeftForDomElement(element(in a, "offsetLeft"))), "get offsetLeft"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        target.FastAddProperty((KeyString)"offsetParent",
+        target.FastAddProperty("offsetParent",
             new DomFunction((in a) => GetOffsetParent(host, element(in a, "offsetParent")), "get offsetParent"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
     }
@@ -133,7 +133,7 @@ internal static class ElementGeometryBinding
     /// </summary>
     public static void InstallBridgeMembers(IElementGeometryHost host, JSObject obj, DomElement element)
     {
-        obj.FastAddValue((KeyString)"scrollParent",
+        obj.FastAddValue("scrollParent",
             new DomFunction((in _) => GetScrollParent(host, element), "scrollParent", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -199,14 +199,14 @@ internal static class ElementGeometryBinding
     private static JSObject BuildRect(double left, double top, double width, double height)
     {
         var rect = new JSObject();
-        rect.FastAddValue((KeyString)"x", new JSNumber(left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"y", new JSNumber(top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"top", new JSNumber(top), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"left", new JSNumber(left), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"right", new JSNumber(left + width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"bottom", new JSNumber(top + height), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"width", new JSNumber(width), JSPropertyAttributes.EnumerableConfigurableValue);
-        rect.FastAddValue((KeyString)"height", new JSNumber(height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("x", new JSNumber(left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("y", new JSNumber(top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("top", new JSNumber(top), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("left", new JSNumber(left), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("right", new JSNumber(left + width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("bottom", new JSNumber(top + height), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("width", new JSNumber(width), JSPropertyAttributes.EnumerableConfigurableValue);
+        rect.FastAddValue("height", new JSNumber(height), JSPropertyAttributes.EnumerableConfigurableValue);
         return rect;
     }
 

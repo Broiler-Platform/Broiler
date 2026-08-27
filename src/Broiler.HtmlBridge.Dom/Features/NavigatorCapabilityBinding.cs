@@ -50,7 +50,7 @@ internal static class NavigatorCapabilityBinding
     {
         // navigator.javaEnabled() (HTML §8.9) — specified to return false. Not "false because
         // Broiler has no Java": the method is a vestige whose only conforming answer is false.
-        navigator.FastAddValue((KeyString)"javaEnabled",
+        navigator.FastAddValue("javaEnabled",
             new DomFunction((in _) => JSBoolean.False, "javaEnabled", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -59,24 +59,24 @@ internal static class NavigatorCapabilityBinding
         // entries a Chromium reports are its bundled viewer, not a plugin system. `pdfViewerEnabled`
         // is the flag that decides between the two branches, so it is registered beside them rather
         // than left for a page to infer from the empty lists.
-        navigator.FastAddValue((KeyString)"plugins", BuildEmptyPluginArray("PluginArray"), JSPropertyAttributes.EnumerableConfigurableValue);
-        navigator.FastAddValue((KeyString)"mimeTypes", BuildEmptyPluginArray("MimeTypeArray"), JSPropertyAttributes.EnumerableConfigurableValue);
-        navigator.FastAddValue((KeyString)"pdfViewerEnabled", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        navigator.FastAddValue("plugins", BuildEmptyPluginArray("PluginArray"), JSPropertyAttributes.EnumerableConfigurableValue);
+        navigator.FastAddValue("mimeTypes", BuildEmptyPluginArray("MimeTypeArray"), JSPropertyAttributes.EnumerableConfigurableValue);
+        navigator.FastAddValue("pdfViewerEnabled", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // navigator.getGamepads() (Gamepad §2.2) — the gamepads currently connected. Broiler has no
         // gamepad input path, so none ever are, and an empty list is what the specification asks
         // for in that case.
-        navigator.FastAddValue((KeyString)"getGamepads",
+        navigator.FastAddValue("getGamepads",
             new DomFunction((in _) => new JSArray(), "getGamepads", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // navigator.getBattery() (Battery Status §4).
-        navigator.FastAddValue((KeyString)"getBattery",
+        navigator.FastAddValue("getBattery",
             new DomFunction((in _) => GetBattery(), "getBattery", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // navigator.requestMediaKeySystemAccess() (EME §5).
-        navigator.FastAddValue((KeyString)"requestMediaKeySystemAccess",
+        navigator.FastAddValue("requestMediaKeySystemAccess",
             new DomFunction((in a) => RequestMediaKeySystemAccess(context, in a), "requestMediaKeySystemAccess", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -90,14 +90,14 @@ internal static class NavigatorCapabilityBinding
     {
         var collection = new JSObject();
 
-        collection.FastAddValue((KeyString)"length", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        collection.FastAddValue((KeyString)"item", DomBridge.NullFunction("item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        collection.FastAddValue((KeyString)"namedItem", DomBridge.NullFunction("namedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        collection.FastAddValue("length", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        collection.FastAddValue("item", DomBridge.NullFunction("item", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        collection.FastAddValue("namedItem", DomBridge.NullFunction("namedItem", 1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // refresh() exists only on PluginArray, and re-checks for newly installed plugins. There are
         // none to find, but a page that calls it before iterating must not lose the iteration.
         if (name == "PluginArray")
-            collection.FastAddValue((KeyString)"refresh", DomBridge.UndefinedFunction("refresh", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            collection.FastAddValue("refresh", DomBridge.UndefinedFunction("refresh", 0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return collection;
     }
@@ -113,17 +113,17 @@ internal static class NavigatorCapabilityBinding
     {
         var battery = new JSObject();
 
-        battery.FastAddValue((KeyString)"charging", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        battery.FastAddValue((KeyString)"chargingTime", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        battery.FastAddValue((KeyString)"dischargingTime", new JSNumber(double.PositiveInfinity), JSPropertyAttributes.EnumerableConfigurableValue);
-        battery.FastAddValue((KeyString)"level", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        battery.FastAddValue("charging", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        battery.FastAddValue("chargingTime", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        battery.FastAddValue("dischargingTime", new JSNumber(double.PositiveInfinity), JSPropertyAttributes.EnumerableConfigurableValue);
+        battery.FastAddValue("level", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // The four event-handler attributes, settable and never fired: none of the four values above
         // can change, so there is no change to deliver. A page assigns to them unconditionally.
         foreach (var handler in BatteryEventHandlers)
         {
             JSValue stored = JSNull.Value;
-            battery.FastAddProperty((KeyString)handler,
+            battery.FastAddProperty(handler,
                 new DomFunction((in _) => stored, "get " + handler),
                 new DomFunction((in a) => stored = a.Length > 0 ? a[0] : JSNull.Value, "set " + handler),
                 JSPropertyAttributes.EnumerableConfigurableProperty);

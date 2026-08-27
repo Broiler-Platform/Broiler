@@ -47,8 +47,8 @@ public sealed partial class DomBridge
         try
         {
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type", new JSString("readystatechange"), JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("type", new JSString("readystatechange"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
             DispatchEventOnElement(_document, evt);
         }
         catch (Exception ex)
@@ -117,8 +117,8 @@ public sealed partial class DomBridge
         try
         {
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type", new JSString("load"), JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("type", new JSString("load"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
             DispatchEventOnElement(element, evt);
         }
         catch (Exception ex)
@@ -269,8 +269,8 @@ public sealed partial class DomBridge
         try
         {
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type", new JSString("DOMContentLoaded"), JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("type", new JSString("DOMContentLoaded"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
             DispatchEventOnElement(_document, evt);
         }
         catch (Exception ex)
@@ -293,8 +293,8 @@ public sealed partial class DomBridge
     private JSBoolean DispatchWindowEvent(string eventType, bool bubbles = false)
     {
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", bubbles ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("bubbles", bubbles ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
         return DispatchWindowEvent(evt);
     }
 
@@ -304,10 +304,10 @@ public sealed partial class DomBridge
             return JSBoolean.True;
 
         var eventType = evt[(KeyString)"type"]?.ToString() ?? "unknown";
-        evt.FastAddValue((KeyString)"target", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("target", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
         evt[(KeyString)"srcElement"] = _windowJSObject;
-        evt.FastAddValue((KeyString)"currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("currentTarget", _windowJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("eventPhase", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
 
         var immediateStopped = false;
         var prevented = evt[(KeyString)"defaultPrevented"] is JSValue defaultPreventedValue &&
@@ -315,26 +315,26 @@ public sealed partial class DomBridge
         var currentListenerPassive = false;
         var legacyCancelBubble = false;
         evt[(KeyString)"defaultPrevented"] = prevented ? JSBoolean.True : JSBoolean.False;
-        evt.FastAddValue((KeyString)"stopPropagation",
+        evt.FastAddValue("stopPropagation",
             new DomFunction((in _) => JsCallbackStopPropagation001Core(ref legacyCancelBubble, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"stopImmediatePropagation",
+        evt.FastAddValue("stopImmediatePropagation",
             new DomFunction((in _) => JsCallbackStopImmediatePropagation002Core(ref immediateStopped, ref legacyCancelBubble, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"preventDefault",
+        evt.FastAddValue("preventDefault",
             new DomFunction((in _) => JsCallbackPreventDefault003Core(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
         evt.FastAddProperty(
-            (KeyString)"cancelBubble",
+            "cancelBubble",
             new DomFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
             new DomFunction((in setArgs) => JsCallbackSetCancelBubble005Core(ref legacyCancelBubble, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         evt.FastAddProperty(
-            (KeyString)"returnValue",
+            "returnValue",
             new DomFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
             new DomFunction((in setArgs) => JsCallbackSetReturnValue007Core(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
-        evt.FastAddValue((KeyString)"composedPath",
+        evt.FastAddValue("composedPath",
             new DomFunction((in _) => new JSArray(_windowJSObject), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

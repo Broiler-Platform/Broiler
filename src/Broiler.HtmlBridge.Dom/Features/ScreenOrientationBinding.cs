@@ -45,13 +45,13 @@ internal static class ScreenOrientationBinding
     {
         var orientation = new JSObject();
 
-        orientation.FastAddProperty((KeyString)"type",
+        orientation.FastAddProperty("type",
             new DomFunction((in _) => new JSString(TypeOf(width, height)), "get type"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // The angle between the current orientation and the device's natural one. Broiler's output
         // surface is its natural orientation, so the two never differ.
-        orientation.FastAddProperty((KeyString)"angle",
+        orientation.FastAddProperty("angle",
             new DomFunction((in _) => new JSNumber(0), "get angle"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -59,14 +59,14 @@ internal static class ScreenOrientationBinding
         // orientation cannot change. It is present because a page assigns to it unconditionally,
         // and null is the value the attribute has before anything is assigned.
         JSValue onChange = JSNull.Value;
-        orientation.FastAddProperty((KeyString)"onchange",
+        orientation.FastAddProperty("onchange",
             new DomFunction((in _) => onChange, "get onchange"),
             new DomFunction((in a) => onChange = a.Length > 0 ? a[0] : JSNull.Value, "set onchange"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // unlock() releases a lock; with no way to take one there is never a lock to release, which
         // makes doing nothing the specified behaviour rather than a stub.
-        orientation.FastAddValue((KeyString)"unlock",
+        orientation.FastAddValue("unlock",
             DomBridge.UndefinedFunction("unlock", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

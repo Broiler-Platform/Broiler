@@ -59,21 +59,21 @@ internal static class FormAssociationBinding
     {
         if (FormAssociatedTags.Contains(tag))
         {
-            obj.FastAddProperty((KeyString)"form",
+            obj.FastAddProperty("form",
                 new DomFunction((in _) => FormOwnerValue(host, element), "get form"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         if (LabelableTags.Contains(tag))
         {
-            obj.FastAddProperty((KeyString)"labels",
+            obj.FastAddProperty("labels",
                 new DomFunction((in _) => LabelsValue(host, element), "get labels"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         if (string.Equals(tag, "label", StringComparison.OrdinalIgnoreCase))
         {
-            obj.FastAddProperty((KeyString)"control",
+            obj.FastAddProperty("control",
                 new DomFunction((in _) => LabeledControl(host, element) is { } control
                     ? host.ToJSObject(control)
                     : JSNull.Value, "get control"),

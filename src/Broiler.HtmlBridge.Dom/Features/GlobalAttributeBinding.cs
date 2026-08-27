@@ -30,13 +30,13 @@ internal static class GlobalAttributeBinding
     /// </summary>
     public static void InstallElementMembers(IGlobalAttributeHost host, JSObject target, ElementSource element)
     {
-        target.FastAddProperty((KeyString)"id",
+        target.FastAddProperty("id",
             new DomFunction((in a) => element(in a, "id") is { Id: { } id } ? new JSString(id) : JSNull.Value, "get id"),
             new DomFunction((in a) => SetId(host, element(in a, "id"), in a), "set id"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // className (read/write) — reflects the 'class' content attribute
-        target.FastAddProperty((KeyString)"className",
+        target.FastAddProperty("className",
             new DomFunction((in a) => GetClassName(element(in a, "className")), "get className"),
             new DomFunction((in a) => SetClassName(host, element(in a, "className"), in a), "set className"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -50,31 +50,31 @@ internal static class GlobalAttributeBinding
     public static void InstallHtmlElementMembers(IGlobalAttributeHost host, JSObject target, ElementSource element)
     {
         // title (read/write) — synced with attributes["title"]
-        target.FastAddProperty((KeyString)"title",
+        target.FastAddProperty("title",
             new DomFunction((in a) => ReflectedGet(element(in a, "title"), "title"), "get title"),
             new DomFunction((in a) => ReflectedSet(element(in a, "title"), "title", in a), "set title"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // lang (read/write) — synced with attributes["lang"]
-        target.FastAddProperty((KeyString)"lang",
+        target.FastAddProperty("lang",
             new DomFunction((in a) => ReflectedGet(element(in a, "lang"), "lang"), "get lang"),
             new DomFunction((in a) => ReflectedSet(element(in a, "lang"), "lang", in a), "set lang"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // accessKey (read/write) — synced with attributes["accesskey"]
-        target.FastAddProperty((KeyString)"accessKey",
+        target.FastAddProperty("accessKey",
             new DomFunction((in a) => ReflectedGet(element(in a, "accessKey"), "accesskey"), "get accessKey"),
             new DomFunction((in a) => ReflectedSet(element(in a, "accessKey"), "accesskey", in a), "set accessKey"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // dir (read/write) — synced with attributes["dir"]
-        target.FastAddProperty((KeyString)"dir",
+        target.FastAddProperty("dir",
             new DomFunction((in a) => ReflectedGet(element(in a, "dir"), "dir"), "get dir"),
             new DomFunction((in a) => SetDir(host, element(in a, "dir"), in a), "set dir"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // draggable (read/write) — reflected enumerated attribute
-        target.FastAddProperty((KeyString)"draggable",
+        target.FastAddProperty("draggable",
             new DomFunction((in a) => GetDraggable(element(in a, "draggable")), "get draggable"),
             new DomFunction((in a) => SetDraggable(element(in a, "draggable"), in a), "set draggable"),
             JSPropertyAttributes.EnumerableConfigurableProperty);

@@ -29,17 +29,17 @@ internal sealed class SelectBinding(ISelectHost host)
     {
         if (tag == "select")
         {
-            obj.FastAddValue((KeyString)"add",
+            obj.FastAddValue("add",
                 new DomFunction((in a) => Add(element, in a), "add", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
-            obj.FastAddProperty((KeyString)"options",
+            obj.FastAddProperty("options",
                 new DomFunction((in _) => GetOptions(element), "get options"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"selectedIndex",
+            obj.FastAddProperty("selectedIndex",
                 new DomFunction((in _) => new JSNumber(GetSelectedIndex(element)), "get selectedIndex"),
                 new DomFunction((in a) => SetSelectedIndexCallback(element, in a), "set selectedIndex"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
-            obj.FastAddProperty((KeyString)"size",
+            obj.FastAddProperty("size",
                 new DomFunction((in _) => GetSize(element), "get size"),
                 new DomFunction((in a) => SetSize(element, in a), "set size"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -47,7 +47,7 @@ internal sealed class SelectBinding(ISelectHost host)
 
         if (tag == "option")
         {
-            obj.FastAddProperty((KeyString)"defaultSelected",
+            obj.FastAddProperty("defaultSelected",
                 new DomFunction((in _) => _host.GetOptionDefaultSelected(element) ? JSBoolean.True : JSBoolean.False, "get defaultSelected"),
                 new DomFunction((in a) => SetDefaultSelected(element, in a), "set defaultSelected"),
                 JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -91,7 +91,7 @@ internal sealed class SelectBinding(ISelectHost host)
             if (string.Equals(c.TagName, "option", StringComparison.OrdinalIgnoreCase))
                 opts.Add(_host.ToJSObject(c));
         var arr = new JSArray(opts);
-        arr.FastAddProperty((KeyString)"length",
+        arr.FastAddProperty("length",
             new DomFunction((in _) => new JSNumber(opts.Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         return arr;

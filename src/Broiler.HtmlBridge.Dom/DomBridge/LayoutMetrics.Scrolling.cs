@@ -340,8 +340,8 @@ public sealed partial class DomBridge
     private void DispatchElementEvent(DomElement element, string eventType)
     {
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString(eventType), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
         DispatchEventOnElement(element, evt);
     }
 
@@ -467,9 +467,9 @@ public sealed partial class DomBridge
             return;
 
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString("scroll"), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"target", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"currentTarget", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString("scroll"), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("target", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("currentTarget", _visualViewportJSObject, JSPropertyAttributes.EnumerableConfigurableValue);
 
         foreach (var listener in _eventTargets.VisualViewportScrollListeners.ToList())
         {

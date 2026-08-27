@@ -199,14 +199,14 @@ internal sealed class ElementInternalsBinding(IElementInternalsHost host)
         {
             var name = flag;
             validityPrototype.FastAddProperty(
-                (KeyString)name,
+                name,
                 new DomFunction((in a) => Bool(StateForValidity(in a, name).Flags.Contains(name)), $"get {name}"),
                 null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
         }
 
         validityPrototype.FastAddProperty(
-            (KeyString)"valid",
+            "valid",
             new DomFunction((in a) => Bool(StateForValidity(in a, "valid").Flags.Count == 0), "get valid"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -391,13 +391,13 @@ internal sealed class ElementInternalsBinding(IElementInternalsHost host)
 
     private void Method(JSObject prototype, string name, int length, InternalsOperation body) =>
         prototype.FastAddValue(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => body(StateFor(in a, name, execute: true), in a), name, length),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
     private void Getter(JSObject prototype, string name, Func<InternalsState, JSValue> read, bool formOnly = true) =>
         prototype.FastAddProperty(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => read(StateFor(in a, name, execute: false, formOnly: formOnly)), $"get {name}"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

@@ -772,9 +772,9 @@ public sealed partial class DomBridge
         try
         {
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type",
+            evt.FastAddValue("type",
                 new JSString(loaded ? "load" : "error"), JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
             DispatchEventOnElement(element, evt);
         }
         catch (Exception ex)

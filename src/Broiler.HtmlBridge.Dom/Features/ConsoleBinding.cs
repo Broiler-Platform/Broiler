@@ -25,22 +25,22 @@ internal static class ConsoleBinding
         var console = new JSObject();
 
         console.FastAddValue(
-            (KeyString)"log",
+            "log",
             new DomFunction(Log, "log"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         console.FastAddValue(
-            (KeyString)"warn",
+            "warn",
             new DomFunction(Warn, "warn"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         console.FastAddValue(
-            (KeyString)"error",
+            "error",
             new DomFunction(Error, "error"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         console.FastAddValue(
-            (KeyString)"info",
+            "info",
             new DomFunction(Info, "info"),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

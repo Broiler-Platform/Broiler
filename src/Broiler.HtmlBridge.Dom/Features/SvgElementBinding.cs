@@ -51,7 +51,7 @@ internal static class SvgElementBinding
         foreach (var dimAttr in new[] { "width", "height", "x", "y", "cx", "cy", "r", "rx", "ry" })
         {
             var attrName = dimAttr; // capture for closure
-            obj.FastAddProperty((KeyString)attrName,
+            obj.FastAddProperty(attrName,
                 new DomFunction((in _) => BuildAnimatedLength(attrName, element), $"get {attrName}"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
@@ -59,7 +59,7 @@ internal static class SvgElementBinding
         // SVG viewBox attribute — returns SVGAnimatedRect with baseVal {x,y,width,height}
         if (tag == "svg" || tag == "svg:svg")
         {
-            obj.FastAddProperty((KeyString)"viewBox",
+            obj.FastAddProperty("viewBox",
                 new DomFunction((in _) => GetViewBox(element), "get viewBox"),
                 null, JSPropertyAttributes.EnumerableConfigurableProperty);
         }
@@ -68,32 +68,32 @@ internal static class SvgElementBinding
         if (tag == "text" || tag == "svg:text" || tag == "tspan" || tag == "svg:tspan" ||
             tag == "textpath" || tag == "svg:textpath")
         {
-            obj.FastAddValue((KeyString)"getNumberOfChars",
+            obj.FastAddValue("getNumberOfChars",
                 new DomFunction((in _) => GetNumberOfChars(element), "getNumberOfChars", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getComputedTextLength() — returns estimated total advance width
-            obj.FastAddValue((KeyString)"getComputedTextLength",
+            obj.FastAddValue("getComputedTextLength",
                 new DomFunction((in _) => GetComputedTextLength(element), "getComputedTextLength", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getSubStringLength(charnum, nchars) — returns advance width of substring
-            obj.FastAddValue((KeyString)"getSubStringLength",
+            obj.FastAddValue("getSubStringLength",
                 new DomFunction((in a) => GetSubStringLength(element, in a), "getSubStringLength", 2),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getStartPositionOfChar(charnum) — returns SVGPoint {x, y}
-            obj.FastAddValue((KeyString)"getStartPositionOfChar",
+            obj.FastAddValue("getStartPositionOfChar",
                 new DomFunction((in a) => GetStartPositionOfChar(element, in a), "getStartPositionOfChar", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getEndPositionOfChar(charnum) — returns SVGPoint {x, y}
-            obj.FastAddValue((KeyString)"getEndPositionOfChar",
+            obj.FastAddValue("getEndPositionOfChar",
                 new DomFunction((in a) => GetEndPositionOfChar(element, in a), "getEndPositionOfChar", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
             // getRotationOfChar(charnum) — returns rotation angle in degrees
-            obj.FastAddValue((KeyString)"getRotationOfChar",
+            obj.FastAddValue("getRotationOfChar",
                 new DomFunction((in a) => GetRotationOfChar(element, in a), "getRotationOfChar", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
@@ -103,11 +103,11 @@ internal static class SvgElementBinding
         {
             double currentTime = 0;
 
-            obj.FastAddValue((KeyString)"getCurrentTime",
+            obj.FastAddValue("getCurrentTime",
                 new DomFunction((in _) => new JSNumber(currentTime), "getCurrentTime", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
-            obj.FastAddValue((KeyString)"setCurrentTime",
+            obj.FastAddValue("setCurrentTime",
                 new DomFunction((in a) => SetCurrentTime(ref currentTime, in a), "setCurrentTime", 1),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
@@ -118,15 +118,15 @@ internal static class SvgElementBinding
             tag == "animatetransform" || tag == "svg:animatetransform" ||
             tag == "animatemotion" || tag == "svg:animatemotion")
         {
-            obj.FastAddValue((KeyString)"beginElement",
+            obj.FastAddValue("beginElement",
                 DomBridge.UndefinedFunction("beginElement", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
-            obj.FastAddValue((KeyString)"endElement",
+            obj.FastAddValue("endElement",
                 DomBridge.UndefinedFunction("endElement", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
-            obj.FastAddValue((KeyString)"getStartTime",
+            obj.FastAddValue("getStartTime",
                 DomBridge.ZeroFunction("getStartTime", 0),
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
@@ -140,8 +140,8 @@ internal static class SvgElementBinding
         double.TryParse(valueStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var numVal);
         var baseVal = CreateSvgLengthValue(numVal);
         var animVal = CreateSvgLengthValue(numVal);
-        animLength.FastAddValue((KeyString)"baseVal", baseVal, JSPropertyAttributes.EnumerableConfigurableValue);
-        animLength.FastAddValue((KeyString)"animVal", animVal, JSPropertyAttributes.EnumerableConfigurableValue);
+        animLength.FastAddValue("baseVal", baseVal, JSPropertyAttributes.EnumerableConfigurableValue);
+        animLength.FastAddValue("animVal", animVal, JSPropertyAttributes.EnumerableConfigurableValue);
         return animLength;
     }
 
@@ -163,12 +163,12 @@ internal static class SvgElementBinding
             }
         }
 
-        baseRect.FastAddValue((KeyString)"x", new JSNumber(vbX), JSPropertyAttributes.EnumerableConfigurableValue);
-        baseRect.FastAddValue((KeyString)"y", new JSNumber(vbY), JSPropertyAttributes.EnumerableConfigurableValue);
-        baseRect.FastAddValue((KeyString)"width", new JSNumber(vbW), JSPropertyAttributes.EnumerableConfigurableValue);
-        baseRect.FastAddValue((KeyString)"height", new JSNumber(vbH), JSPropertyAttributes.EnumerableConfigurableValue);
-        animRect.FastAddValue((KeyString)"baseVal", baseRect, JSPropertyAttributes.EnumerableConfigurableValue);
-        animRect.FastAddValue((KeyString)"animVal", baseRect, JSPropertyAttributes.EnumerableConfigurableValue);
+        baseRect.FastAddValue("x", new JSNumber(vbX), JSPropertyAttributes.EnumerableConfigurableValue);
+        baseRect.FastAddValue("y", new JSNumber(vbY), JSPropertyAttributes.EnumerableConfigurableValue);
+        baseRect.FastAddValue("width", new JSNumber(vbW), JSPropertyAttributes.EnumerableConfigurableValue);
+        baseRect.FastAddValue("height", new JSNumber(vbH), JSPropertyAttributes.EnumerableConfigurableValue);
+        animRect.FastAddValue("baseVal", baseRect, JSPropertyAttributes.EnumerableConfigurableValue);
+        animRect.FastAddValue("animVal", baseRect, JSPropertyAttributes.EnumerableConfigurableValue);
         return animRect;
     }
 
@@ -212,8 +212,8 @@ internal static class SvgElementBinding
         var fontSize = ReadFontSize(element);
 
         var pt = new JSObject();
-        pt.FastAddValue((KeyString)"x", new JSNumber(charnum * fontSize * 0.6), JSPropertyAttributes.EnumerableConfigurableValue);
-        pt.FastAddValue((KeyString)"y", new JSNumber(fontSize), JSPropertyAttributes.EnumerableConfigurableValue);
+        pt.FastAddValue("x", new JSNumber(charnum * fontSize * 0.6), JSPropertyAttributes.EnumerableConfigurableValue);
+        pt.FastAddValue("y", new JSNumber(fontSize), JSPropertyAttributes.EnumerableConfigurableValue);
         return pt;
     }
 
@@ -227,8 +227,8 @@ internal static class SvgElementBinding
         var fontSize = ReadFontSize(element);
 
         var pt = new JSObject();
-        pt.FastAddValue((KeyString)"x", new JSNumber((charnum + 1) * fontSize * 0.6), JSPropertyAttributes.EnumerableConfigurableValue);
-        pt.FastAddValue((KeyString)"y", new JSNumber(fontSize), JSPropertyAttributes.EnumerableConfigurableValue);
+        pt.FastAddValue("x", new JSNumber((charnum + 1) * fontSize * 0.6), JSPropertyAttributes.EnumerableConfigurableValue);
+        pt.FastAddValue("y", new JSNumber(fontSize), JSPropertyAttributes.EnumerableConfigurableValue);
         return pt;
     }
 
@@ -267,20 +267,20 @@ internal static class SvgElementBinding
     private static JSObject CreateSvgLengthValue(double numericValue)
     {
         var svgLength = new JSObject();
-        svgLength.FastAddValue((KeyString)"value", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"valueInSpecifiedUnits", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_UNKNOWN", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_NUMBER", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PERCENTAGE", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_EMS", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_EXS", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PX", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_CM", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_MM", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_IN", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PT", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
-        svgLength.FastAddValue((KeyString)"SVG_LENGTHTYPE_PC", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("value", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("valueInSpecifiedUnits", new JSNumber(numericValue), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("unitType", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_UNKNOWN", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_NUMBER", new JSNumber(1), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_PERCENTAGE", new JSNumber(2), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_EMS", new JSNumber(3), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_EXS", new JSNumber(4), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_PX", new JSNumber(5), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_CM", new JSNumber(6), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_MM", new JSNumber(7), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_IN", new JSNumber(8), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_PT", new JSNumber(9), JSPropertyAttributes.EnumerableConfigurableValue);
+        svgLength.FastAddValue("SVG_LENGTHTYPE_PC", new JSNumber(10), JSPropertyAttributes.EnumerableConfigurableValue);
         return svgLength;
     }
 }

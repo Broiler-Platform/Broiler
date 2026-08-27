@@ -197,23 +197,23 @@ public sealed partial class DomBridge
     private JSObject BuildViewTransitionObject(ViewTransitionState state)
     {
         var transition = new JSObject();
-        transition.FastAddValue((KeyString)"ready", ReadyThenable(state), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("ready", ReadyThenable(state), JSPropertyAttributes.EnumerableConfigurableValue);
         // `finished` resolving means the transition is over: the ::view-transition tree has been
         // removed and the DOM is back to its plain final state. A reftest that screenshots from
         // finished (rather than ready) therefore expects the final DOM, not the pseudo tree — so
         // realizing this thenable clears the active transition, and the serialize-time bake becomes
         // a no-op (WPT element-stops-grouping-after-animation).
-        transition.FastAddValue((KeyString)"finished", FinishedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"updateCallbackDone", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("finished", FinishedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("updateCallbackDone", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
 
         var typesArray = new JavaScript.BuiltIns.Array.JSArray();
         foreach (var type in state.Types)
             typesArray.Add(new JavaScript.BuiltIns.String.JSString(type));
-        transition.FastAddValue((KeyString)"types", typesArray, JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("types", typesArray, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // skipTransition() ends the transition without animating; the still is already the final
         // state here, so it is a no-op beyond clearing the active state.
-        transition.FastAddValue((KeyString)"skipTransition",
+        transition.FastAddValue("skipTransition",
             new DomFunction((in _) => { _activeViewTransition = null; return JSUndefined.Value; }, "skipTransition", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -240,9 +240,9 @@ public sealed partial class DomBridge
             }
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"finally",
+        thenable.FastAddValue("then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("finally",
             new DomFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
@@ -293,9 +293,9 @@ public sealed partial class DomBridge
             Run(args.Length > 0 ? args[0] as JSFunction : null);
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"finally",
+        thenable.FastAddValue("then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("finally",
             new DomFunction((in a) => { Run(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;
@@ -364,9 +364,9 @@ public sealed partial class DomBridge
             RunAndMaybeFinish(args.Length > 0 ? args[0] as JSFunction : null);
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"finally",
+        thenable.FastAddValue("then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("finally",
             new DomFunction((in a) => { RunAndMaybeFinish(a.Length > 0 ? a[0] as JSFunction : null); return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;

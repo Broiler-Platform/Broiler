@@ -89,7 +89,7 @@ internal static class NavigatorIdentityBinding
     }
 
     private static void Add(JSObject navigator, string name, JSValue value)
-        => navigator.FastAddValue((KeyString)name, value, JSPropertyAttributes.EnumerableConfigurableValue);
+        => navigator.FastAddValue(name, value, JSPropertyAttributes.EnumerableConfigurableValue);
 
     /// <summary>
     /// The machine's memory in GiB, rounded down to the nearest power of two and clamped to

@@ -95,7 +95,7 @@ public sealed partial class DomBridge
     private void RouteEventTargetMethod(JSObject proto, string name, int length, JSFunction? engineMethod,
         NodeEventTargetOperation onNode, WindowEventTargetOperation onWindow)
     {
-        proto.FastAddValue((KeyString)name, new DomFunction((in Arguments a) =>
+        proto.FastAddValue(name, new DomFunction((in Arguments a) =>
         {
             if (a.This is JSObject receiver)
             {

@@ -58,7 +58,7 @@ public sealed partial class DomBridge
 
         void Getter(string name, Func<JSValue> read) =>
             document.FastAddProperty(
-                (KeyString)name, new DomFunction((in _) => read(), $"get {name}"), null,
+                name, new DomFunction((in _) => read(), $"get {name}"), null,
                 JSPropertyAttributes.EnumerableConfigurableProperty);
     }
 
@@ -77,7 +77,7 @@ public sealed partial class DomBridge
     private void RegisterDocumentMetadata(JSObject document)
     {
         document.FastAddProperty(
-            (KeyString)"doctype",
+            "doctype",
             new DomFunction((in _) => DocumentTypeNode() is { } doctype ? ToJSObject(doctype) : JSNull.Value, "get doctype"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -87,7 +87,7 @@ public sealed partial class DomBridge
         // the attribute still spelled "LTR", and an unknown value reads back as "" with the
         // attribute set to whatever was assigned.
         document.FastAddProperty(
-            (KeyString)"dir",
+            "dir",
             new DomFunction((in _) => new JSString(DocumentDirection()), "get dir"),
             new DomFunction((in a) =>
             {
@@ -100,7 +100,7 @@ public sealed partial class DomBridge
         // Assigning anything but "on"/"off" (ASCII case-insensitively) is ignored rather than
         // stored — `document.designMode = 'zzz'` leaves the previous value in place.
         document.FastAddProperty(
-            (KeyString)"designMode",
+            "designMode",
             new DomFunction((in _) => new JSString(_designMode), "get designMode"),
             new DomFunction((in a) =>
             {

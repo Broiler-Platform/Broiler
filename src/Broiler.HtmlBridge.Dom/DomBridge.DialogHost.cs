@@ -71,9 +71,9 @@ public sealed partial class DomBridge : IDialogHost
         try
         {
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type", new JSString("fullscreenchange"),
+            evt.FastAddValue("type", new JSString("fullscreenchange"),
                 JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"bubbles", JSBoolean.True,
+            evt.FastAddValue("bubbles", JSBoolean.True,
                 JSPropertyAttributes.EnumerableConfigurableValue);
             DispatchEventOnElement(target, evt);
         }

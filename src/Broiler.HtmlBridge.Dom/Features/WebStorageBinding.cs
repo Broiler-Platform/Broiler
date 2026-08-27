@@ -54,27 +54,27 @@ internal static class WebStorageBinding
         // `Object.keys(storage)` yield keys alone. Bridge objects carry their members directly
         // (see RegisterDomInterfaceConstructors), so hiding them from enumeration is what keeps a
         // page that iterates a storage area from finding four methods among its keys.
-        storage.FastAddValue((KeyString)"getItem",
+        storage.FastAddValue("getItem",
             new DomFunction((in a) => GetItem(storage, in a), "getItem", 1),
             JSPropertyAttributes.ConfigurableValue);
 
-        storage.FastAddValue((KeyString)"setItem",
+        storage.FastAddValue("setItem",
             new DomFunction((in a) => SetItem(storage, in a), "setItem", 2),
             JSPropertyAttributes.ConfigurableValue);
 
-        storage.FastAddValue((KeyString)"removeItem",
+        storage.FastAddValue("removeItem",
             new DomFunction((in a) => RemoveItem(storage, in a), "removeItem", 1),
             JSPropertyAttributes.ConfigurableValue);
 
-        storage.FastAddValue((KeyString)"clear",
+        storage.FastAddValue("clear",
             new DomFunction((in a) => Clear(storage, in a), "clear", 0),
             JSPropertyAttributes.ConfigurableValue);
 
-        storage.FastAddValue((KeyString)"key",
+        storage.FastAddValue("key",
             new DomFunction((in a) => Key(storage, in a), "key", 1),
             JSPropertyAttributes.ConfigurableValue);
 
-        storage.FastAddProperty((KeyString)"length",
+        storage.FastAddProperty("length",
             new DomFunction((in _) => new JSNumber(storage.Count), "get length"),
             null,
             JSPropertyAttributes.ConfigurableProperty);

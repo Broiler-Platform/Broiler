@@ -60,7 +60,7 @@ internal static class MediaCapabilityBinding
         if (tag is not ("video" or "audio"))
             return;
 
-        obj.FastAddValue((KeyString)"canPlayType",
+        obj.FastAddValue("canPlayType",
             new DomFunction((in _) => NotSupported, "canPlayType", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -81,7 +81,7 @@ internal static class MediaCapabilityBinding
     {
         var constructor = new JSFunction((in _) => NewMediaSource(context), "MediaSource", 0);
 
-        constructor.FastAddValue((KeyString)"isTypeSupported",
+        constructor.FastAddValue("isTypeSupported",
             new DomFunction((in _) => JSBoolean.False, "isTypeSupported", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -94,14 +94,14 @@ internal static class MediaCapabilityBinding
 
         // "closed" is the state a MediaSource is in until it is attached to a media element. It is
         // the one this never leaves, because there is no element for it to be attached to.
-        source.FastAddValue((KeyString)"readyState", new JSString("closed"), JSPropertyAttributes.EnumerableConfigurableValue);
+        source.FastAddValue("readyState", new JSString("closed"), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // The buffer lists are empty and stay empty: addSourceBuffer refuses every type, which is
         // what the specification requires of a type isTypeSupported rejects.
-        source.FastAddValue((KeyString)"sourceBuffers", new JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
-        source.FastAddValue((KeyString)"activeSourceBuffers", new JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
+        source.FastAddValue("sourceBuffers", new JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
+        source.FastAddValue("activeSourceBuffers", new JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        source.FastAddValue((KeyString)"addSourceBuffer",
+        source.FastAddValue("addSourceBuffer",
             new DomFunction((in a) => AddSourceBuffer(context, in a), "addSourceBuffer", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

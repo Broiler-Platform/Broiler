@@ -104,22 +104,22 @@ public sealed partial class DomBridge
         // resolve it once here (stable CWT identity for this element/bridge) and hand it to the callbacks.
         var animationState = AnimationStateFor(element);
         animation.FastAddProperty(
-            (KeyString)"currentTime",
+            "currentTime",
             new DomFunction((in _) => Dom.Features.AnimationObjectBinding.GetCurrentTime(animationState, in _), "get currentTime"),
             new DomFunction((in a) => Dom.Features.AnimationObjectBinding.SetCurrentTime(animationState, in a), "set currentTime"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var ready = new JSObject();
         ready.FastAddValue(
-            (KeyString)"then",
+            "then",
             new DomFunction((in a) => Dom.Features.AnimationObjectBinding.Then(ready, in a), "then", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         ready.FastAddValue(
-            (KeyString)"catch",
+            "catch",
             new DomFunction((in _) => ready, "catch", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        animation.FastAddValue((KeyString)"ready", ready, JSPropertyAttributes.EnumerableConfigurableValue);
+        animation.FastAddValue("ready", ready, JSPropertyAttributes.EnumerableConfigurableValue);
         return animation;
     }
 

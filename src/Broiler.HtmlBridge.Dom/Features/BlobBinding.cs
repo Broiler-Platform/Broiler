@@ -174,11 +174,11 @@ internal sealed class BlobBinding
             return;
 
         url.FastAddValue(
-            (KeyString)"createObjectURL",
+            "createObjectURL",
             new DomFunction((in a) => CreateObjectUrl(in a), "createObjectURL", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         url.FastAddValue(
-            (KeyString)"revokeObjectURL",
+            "revokeObjectURL",
             new DomFunction((in a) => RevokeObjectUrl(in a), "revokeObjectURL", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -383,13 +383,13 @@ internal sealed class BlobBinding
 
     private void Method(JSObject prototype, string name, int length, BlobOperation body) =>
         prototype.FastAddValue(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => body(DataFor(in a, name), in a), name, length),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
     private void Getter(JSObject prototype, string name, Func<BlobData, JSValue> read) =>
         prototype.FastAddProperty(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => read(DataFor(in a, name)), $"get {name}"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

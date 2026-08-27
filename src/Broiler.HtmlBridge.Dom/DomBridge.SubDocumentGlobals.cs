@@ -93,7 +93,7 @@ public sealed partial class DomBridge
                 if (value is null || value.IsUndefined)
                     continue;
 
-                subWindow.FastAddValue((KeyString)name,
+                subWindow.FastAddValue(name,
                     value is JSFunction declared ? BindToFrameContext(declared, subWindow, name) : value,
                     JSPropertyAttributes.EnumerableConfigurableValue);
             }

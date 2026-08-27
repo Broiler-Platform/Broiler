@@ -179,13 +179,13 @@ internal sealed partial class TraversalBinding
 
     private void SelectionMethod(JSObject prototype, string name, int length, SelectionOperation body) =>
         prototype.FastAddValue(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => body(SelectionFor(in a, name), in a), name, length),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
     private void SelectionGetter(JSObject prototype, string name, Func<SelectionState, ITraversalHost, JSValue> read) =>
         prototype.FastAddProperty(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => read(SelectionFor(in a, name), _host), $"get {name}"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
