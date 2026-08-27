@@ -27,12 +27,12 @@ internal static class FormSubmitBinding
         {
             // Fire submit event
             var submitEvt = new JSObject();
-            submitEvt.FastAddValue((KeyString)"type", new JSString("submit"), JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"target", obj, JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("type", new JSString("submit"), JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("target", obj, JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
             var prevented = false;
-            submitEvt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
             JSValue PreventDefault(in Arguments _)
             {
                 prevented = true;
@@ -40,8 +40,8 @@ internal static class FormSubmitBinding
                 return JSUndefined.Value;
             }
 
-            submitEvt.FastAddValue((KeyString)"preventDefault", new DomFunction(PreventDefault, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-            submitEvt.FastAddValue((KeyString)"stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("preventDefault", new DomFunction(PreventDefault, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+            submitEvt.FastAddValue("stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
             if (host.GetEventListeners(element).TryGetValue("submit", out var submitListeners))
             {
                 foreach (var registration in submitListeners.ToList())

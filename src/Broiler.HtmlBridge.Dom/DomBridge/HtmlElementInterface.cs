@@ -147,7 +147,7 @@ public sealed partial class DomBridge
             var eventName = name;
             var member = "on" + eventName;
 
-            target.FastAddProperty((KeyString)member,
+            target.FastAddProperty(member,
                 new DomFunction((in Arguments a) =>
                     Dom.Features.EventHandlerReflectorBinding.GetOn(this, element(in a, member), eventName, in a), "get " + member),
                 new DomFunction((in Arguments a) =>

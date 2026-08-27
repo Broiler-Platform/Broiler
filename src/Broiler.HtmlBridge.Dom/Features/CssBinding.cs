@@ -24,12 +24,12 @@ internal static class CssBinding
         var css = new JSObject();
 
         css.FastAddValue(
-            (KeyString)"supports",
+            "supports",
             new DomFunction(Supports, "supports", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         css.FastAddValue(
-            (KeyString)"escape",
+            "escape",
             new DomFunction(Escape, "escape", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

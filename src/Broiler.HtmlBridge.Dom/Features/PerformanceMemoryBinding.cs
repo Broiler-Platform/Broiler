@@ -44,15 +44,15 @@ internal static class PerformanceMemoryBinding
     {
         var memory = new JSObject();
 
-        memory.FastAddProperty((KeyString)"jsHeapSizeLimit",
+        memory.FastAddProperty("jsHeapSizeLimit",
             new DomFunction((in _) => new JSNumber(Sample().Limit), "get jsHeapSizeLimit"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        memory.FastAddProperty((KeyString)"totalJSHeapSize",
+        memory.FastAddProperty("totalJSHeapSize",
             new DomFunction((in _) => new JSNumber(Sample().Total), "get totalJSHeapSize"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        memory.FastAddProperty((KeyString)"usedJSHeapSize",
+        memory.FastAddProperty("usedJSHeapSize",
             new DomFunction((in _) => new JSNumber(Sample().Used), "get usedJSHeapSize"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 

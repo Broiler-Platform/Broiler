@@ -72,15 +72,15 @@ internal static class NavigationTimingBinding
     {
         var navigation = BuildNavigationEntry(pageUrl, pageProtocol, timing, fetchTiming);
 
-        performance.FastAddValue((KeyString)"getEntries",
+        performance.FastAddValue("getEntries",
             new DomFunction((in _) => new JSArray([navigation]), "getEntries", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        performance.FastAddValue((KeyString)"getEntriesByType",
+        performance.FastAddValue("getEntriesByType",
             new DomFunction((in a) => EntriesByType(navigation, in a), "getEntriesByType", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        performance.FastAddValue((KeyString)"getEntriesByName",
+        performance.FastAddValue("getEntriesByName",
             new DomFunction((in a) => EntriesByName(navigation, pageUrl, in a), "getEntriesByName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -104,9 +104,9 @@ internal static class NavigationTimingBinding
         // PerformanceEntry (Performance Timeline §3.1). A navigation entry is named by the
         // document's URL and its startTime is 0 by definition — the time origin *is* this
         // navigation's start.
-        entry.FastAddValue((KeyString)"name", new JSString(pageUrl), JSPropertyAttributes.EnumerableConfigurableValue);
-        entry.FastAddValue((KeyString)"entryType", new JSString("navigation"), JSPropertyAttributes.EnumerableConfigurableValue);
-        entry.FastAddValue((KeyString)"startTime", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("name", new JSString(pageUrl), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("entryType", new JSString("navigation"), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("startTime", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // duration is loadEventEnd - startTime (Navigation Timing §4), and startTime is 0 for a
         // navigation entry, so it *is* loadEventEnd. It was a hardcoded 0, which is right only until
@@ -120,17 +120,17 @@ internal static class NavigationTimingBinding
         // PerformanceResourceTiming (Resource Timing §4.1), of which a navigation entry is a
         // subtype. `initiatorType` is fixed at "navigation" for one, and the protocol is the engine's
         // own — see BroilerHttpProtocol, which pins the request version this names.
-        entry.FastAddValue((KeyString)"initiatorType", new JSString("navigation"), JSPropertyAttributes.EnumerableConfigurableValue);
-        entry.FastAddValue((KeyString)"nextHopProtocol", new JSString(NextHopProtocol(pageProtocol)), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("initiatorType", new JSString("navigation"), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("nextHopProtocol", new JSString(NextHopProtocol(pageProtocol)), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // PerformanceNavigationTiming (Navigation Timing §4). "navigate" is the plain case — the
         // alternatives ("reload", "back_forward", "prerender") describe entries into a session
         // history Broiler does not keep, so none of them can arise here.
-        entry.FastAddValue((KeyString)"type", new JSString("navigate"), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("type", new JSString("navigate"), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Redirects are followed inside the HTTP client, which does not report how many it took, so
         // this is the count Broiler can vouch for rather than a measurement.
-        entry.FastAddValue((KeyString)"redirectCount", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("redirectCount", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // --- Timing attributes (Navigation Timing §4). ---
         //
@@ -192,7 +192,7 @@ internal static class NavigationTimingBinding
         AddTimingConstant(entry, "encodedBodySize", fetchTiming?.EncodedBodySize ?? 0);
         AddTimingConstant(entry, "decodedBodySize", fetchTiming?.DecodedBodySize ?? 0);
 
-        entry.FastAddValue((KeyString)"toJSON",
+        entry.FastAddValue("toJSON",
             new DomFunction((in _) => entry, "toJSON", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -224,11 +224,11 @@ internal static class NavigationTimingBinding
 
     /// <summary>A live timing mark: an accessor so the entry reports the value at read time.</summary>
     private static void AddTimingAccessor(JSObject entry, string name, Func<double> read)
-        => entry.FastAddProperty((KeyString)name,
+        => entry.FastAddProperty(name,
             new DomFunction((in _) => new JSNumber(read()), $"get {name}"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
     /// <summary>A mark whose value cannot change for this document.</summary>
     private static void AddTimingConstant(JSObject entry, string name, double value)
-        => entry.FastAddValue((KeyString)name, new JSNumber(value), JSPropertyAttributes.EnumerableConfigurableValue);
+        => entry.FastAddValue(name, new JSNumber(value), JSPropertyAttributes.EnumerableConfigurableValue);
 }

@@ -31,22 +31,22 @@ internal sealed class FormBinding(IFormHost host)
             return;
 
         // elements — the form controls collection (numeric + named access)
-        obj.FastAddProperty((KeyString)"elements",
+        obj.FastAddProperty("elements",
             new DomFunction((in _) => BuildElementsCollection(element), "get elements"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // length — alias for elements.length
-        obj.FastAddProperty((KeyString)"length",
+        obj.FastAddProperty("length",
             new DomFunction((in _) => new JSNumber(_host.CollectFormControls(element).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
         // action (read/write)
-        obj.FastAddProperty((KeyString)"action",
+        obj.FastAddProperty("action",
             new DomFunction((in _) => DomBridge.TryGetAttribute(element, "action", out var act) ? new JSString(act) : new JSString(string.Empty), "get action"),
             new DomFunction((in a) => SetAction(element, in a), "set action"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
         // reset() — HTML §4.10.21.4. It did not exist, so `form.reset()` was a TypeError on
         // undefined: the call that a "clear this form" control is written as aborted the handler
         // rather than clearing anything, and every edited control kept its edited state.
-        obj.FastAddValue((KeyString)"reset",
+        obj.FastAddValue("reset",
             new DomFunction((in _) => { _host.ResetForm(element); return JSUndefined.Value; }, "reset", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -62,7 +62,7 @@ internal sealed class FormBinding(IFormHost host)
             collection.FastAddValue((uint)i, _host.ToJSObject(controls[i]),
                 JSPropertyAttributes.EnumerableConfigurableValue);
 
-        collection.FastAddProperty((KeyString)"length",
+        collection.FastAddProperty("length",
             new DomFunction((in _) => new JSNumber(_host.CollectFormControls(form).Count), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 

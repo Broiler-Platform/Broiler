@@ -129,8 +129,8 @@ internal static class NavigatorSurfacesBinding
         Method(prototype, "estimate", 0, static (in Arguments _) =>
         {
             var estimate = new JSObject();
-            estimate.FastAddValue((KeyString)"usage", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-            estimate.FastAddValue((KeyString)"quota", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+            estimate.FastAddValue("usage", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+            estimate.FastAddValue("quota", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
             return Resolved(estimate);
         });
 
@@ -177,7 +177,7 @@ internal static class NavigatorSurfacesBinding
 
         // The state never changes, so this handler is never called — which is the correct behaviour
         // rather than a missing one. It is present because a page assigns to it unconditionally.
-        statusPrototype.FastAddValue((KeyString)"onchange",
+        statusPrototype.FastAddValue("onchange",
             JavaScript.BuiltIns.Null.JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
@@ -219,22 +219,22 @@ internal static class NavigatorSurfacesBinding
             // A hint that is not asked for is absent, which is the interface's own shape: the
             // caller names what it wants and gets exactly that.
             if (hints.Contains("architecture"))
-                result.FastAddValue((KeyString)"architecture", new JSString("x86"), JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("architecture", new JSString("x86"), JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("bitness"))
-                result.FastAddValue((KeyString)"bitness", new JSString(is64Bit ? "64" : "32"), JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("bitness", new JSString(is64Bit ? "64" : "32"), JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("model"))
-                result.FastAddValue((KeyString)"model", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("model", new JSString(string.Empty), JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("platformVersion"))
-                result.FastAddValue((KeyString)"platformVersion", new JSString(platformVersion), JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("platformVersion", new JSString(platformVersion), JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("uaFullVersion"))
-                result.FastAddValue((KeyString)"uaFullVersion", new JSString(version), JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("uaFullVersion", new JSString(version), JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("fullVersionList"))
-                result.FastAddValue((KeyString)"fullVersionList", BrandList(brand, version), JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("fullVersionList", BrandList(brand, version), JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("wow64"))
-                result.FastAddValue((KeyString)"wow64", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                result.FastAddValue("wow64", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
             if (hints.Contains("formFactors"))
             {
-                result.FastAddValue((KeyString)"formFactors",
+                result.FastAddValue("formFactors",
                     new JSArray([new JSString("Desktop")]), JSPropertyAttributes.EnumerableConfigurableValue);
             }
 
@@ -245,17 +245,17 @@ internal static class NavigatorSurfacesBinding
     private static JSObject LowEntropyObject(string brand, string majorVersion, string platform)
     {
         var result = new JSObject();
-        result.FastAddValue((KeyString)"brands", BrandList(brand, majorVersion), JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"mobile", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"platform", new JSString(platform), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("brands", BrandList(brand, majorVersion), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("mobile", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("platform", new JSString(platform), JSPropertyAttributes.EnumerableConfigurableValue);
         return result;
     }
 
     private static JSArray BrandList(string brand, string version)
     {
         var entry = new JSObject();
-        entry.FastAddValue((KeyString)"brand", new JSString(brand), JSPropertyAttributes.EnumerableConfigurableValue);
-        entry.FastAddValue((KeyString)"version", new JSString(version), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("brand", new JSString(brand), JSPropertyAttributes.EnumerableConfigurableValue);
+        entry.FastAddValue("version", new JSString(version), JSPropertyAttributes.EnumerableConfigurableValue);
         return new JSArray([entry]);
     }
 
@@ -335,12 +335,12 @@ internal static class NavigatorSurfacesBinding
     }
 
     private static void Method(JSObject prototype, string name, int length, JSFunctionDelegate body) =>
-        prototype.FastAddValue((KeyString)name, new DomFunction(body, name, length),
+        prototype.FastAddValue(name, new DomFunction(body, name, length),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
     private static void Getter(JSObject prototype, string name, Func<JSObject, JSValue> read) =>
         prototype.FastAddProperty(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => a.This is JSObject receiver ? read(receiver) : JSUndefined.Value, $"get {name}"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -357,5 +357,5 @@ internal static class NavigatorSurfacesBinding
     }
 
     private static void Add(JSObject navigator, string name, JSValue value) =>
-        navigator.FastAddValue((KeyString)name, value, JSPropertyAttributes.EnumerableConfigurableValue);
+        navigator.FastAddValue(name, value, JSPropertyAttributes.EnumerableConfigurableValue);
 }

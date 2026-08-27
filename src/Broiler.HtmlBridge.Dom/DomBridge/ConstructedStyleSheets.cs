@@ -55,24 +55,24 @@ public sealed partial class DomBridge
         static void MarkRulesMutated() => BridgeRuntimeStateEpoch.Bump();
 
         // ownerNode is null for a constructed sheet; href is null (no source URL).
-        sheet.FastAddProperty((KeyString)"ownerNode", NullFunction("get ownerNode"),
+        sheet.FastAddProperty("ownerNode", NullFunction("get ownerNode"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        sheet.FastAddProperty((KeyString)"href", NullFunction("get href"),
+        sheet.FastAddProperty("href", NullFunction("get href"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
         // disabled — a script flag on the sheet; a disabled adopted sheet does not apply.
         var disabled = false;
-        sheet.FastAddProperty((KeyString)"disabled",
+        sheet.FastAddProperty("disabled",
             new DomFunction((in _) => disabled ? JSBoolean.True : JSBoolean.False, "get disabled"),
             new DomFunction((in a) => { disabled = a.Length > 0 && a[0].BooleanValue; return JSUndefined.Value; }, "set disabled"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         var liveCssRules = new JSObject();
         var lastSyncedRuleCount = 0;
-        liveCssRules.FastAddProperty((KeyString)"length",
+        liveCssRules.FastAddProperty("length",
             new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetLength002Core(CurrentRules, in _), "get length"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        liveCssRules.FastAddValue((KeyString)"item",
+        liveCssRules.FastAddValue("item",
             new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsItem003Core(SyncLiveCssRulesIndices, liveCssRules, CurrentRules, in a), "item", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -88,13 +88,13 @@ public sealed partial class DomBridge
             lastSyncedRuleCount = current.Count;
         }
 
-        sheet.FastAddProperty((KeyString)"cssRules",
+        sheet.FastAddProperty("cssRules",
             new DomFunction((in _) => Dom.Features.StyleSheetBinding.JsStyleSheetsGetCssRules004Core(SyncLiveCssRulesIndices, liveCssRules, in _), "get cssRules"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        sheet.FastAddValue((KeyString)"insertRule",
+        sheet.FastAddValue("insertRule",
             new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsInsertRule005Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "insertRule", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        sheet.FastAddValue((KeyString)"deleteRule",
+        sheet.FastAddValue("deleteRule",
             new DomFunction((in a) => Dom.Features.StyleSheetBinding.JsStyleSheetsDeleteRule006Core(CurrentRules, MarkRulesMutated, SyncLiveCssRulesIndices, in a), "deleteRule", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -112,10 +112,10 @@ public sealed partial class DomBridge
             SyncLiveCssRulesIndices();
         }
 
-        sheet.FastAddValue((KeyString)"replaceSync",
+        sheet.FastAddValue("replaceSync",
             new DomFunction((in a) => { ReplaceFromText(a.Length > 0 ? a[0].ToString() : string.Empty); return JSUndefined.Value; }, "replaceSync", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        sheet.FastAddValue((KeyString)"replace",
+        sheet.FastAddValue("replace",
             new DomFunction((in a) => { ReplaceFromText(a.Length > 0 ? a[0].ToString() : string.Empty); return ResolvedThenableWith(sheet); }, "replace", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -136,9 +136,9 @@ public sealed partial class DomBridge
             }
             return thenable;
         }
-        thenable.FastAddValue((KeyString)"then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
-        thenable.FastAddValue((KeyString)"finally",
+        thenable.FastAddValue("then", new DomFunction(Then, "then", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("catch", new DomFunction((in _) => thenable, "catch", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+        thenable.FastAddValue("finally",
             new DomFunction((in a) => { if (a.Length > 0 && a[0] is JSFunction cb) { try { cb.InvokeFunction(new Arguments(cb)); } catch { } } return thenable; }, "finally", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         return thenable;

@@ -86,17 +86,17 @@ internal static class EventTargetBinding
         }
 
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString("click"), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"stopImmediatePropagation", DomBridge.UndefinedFunction("stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"preventDefault", DomBridge.UndefinedFunction("preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString("click"), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("stopImmediatePropagation", DomBridge.UndefinedFunction("stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("preventDefault", DomBridge.UndefinedFunction("preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
         host.DispatchEventOnElement(element, evt);
         // Per HTML spec: clicking a submit button triggers form submission
         if (string.Equals(element.TagName, "input", StringComparison.OrdinalIgnoreCase) || string.Equals(element.TagName, "button", StringComparison.OrdinalIgnoreCase))
@@ -116,22 +116,22 @@ internal static class EventTargetBinding
                 {
                     // Dispatch a submit event on the form
                     var submitEvt = new JSObject();
-                    submitEvt.FastAddValue((KeyString)"type", new JSString("submit"), JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("type", new JSString("submit"), JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("bubbles", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
                     JSValue JsJsObjectsPreventDefault100(in Arguments __)
                     {
                         submitEvt[(KeyString)"defaultPrevented"] = JSBoolean.True;
                         return JSUndefined.Value;
                     }
 
-                    submitEvt.FastAddValue((KeyString)"preventDefault", new DomFunction(JsJsObjectsPreventDefault100, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
-                    submitEvt.FastAddValue((KeyString)"stopImmediatePropagation", DomBridge.UndefinedFunction("stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("preventDefault", new DomFunction(JsJsObjectsPreventDefault100, "preventDefault", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("stopPropagation", DomBridge.UndefinedFunction("stopPropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                    submitEvt.FastAddValue("stopImmediatePropagation", DomBridge.UndefinedFunction("stopImmediatePropagation", 0), JSPropertyAttributes.EnumerableConfigurableValue);
                     host.DispatchEventOnElement(form, submitEvt);
                 }
             }
@@ -149,19 +149,19 @@ internal static class EventTargetBinding
     private static JSValue DispatchSyntheticFocusEvent(IEventTargetHost host, DomElement element, string type)
     {
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString(type), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"view", host.WindowJSObject ?? JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString(type), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("cancelable", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("defaultPrevented", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("target", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("currentTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("srcElement", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("eventPhase", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("isTrusted", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("timeStamp", new JSNumber(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("detail", new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("view", host.WindowJSObject ?? JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("relatedTarget", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
         host.DispatchEventOnElement(element, evt);
         return JSUndefined.Value;
     }

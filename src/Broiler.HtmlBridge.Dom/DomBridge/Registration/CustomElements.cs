@@ -42,19 +42,19 @@ public sealed partial class DomBridge
     private void RegisterCustomElements(JSContext context, JSObject window)
     {
         var registry = new JSObject();
-        registry.FastAddValue((KeyString)"define",
+        registry.FastAddValue("define",
             new DomFunction((in a) => CustomElements.Define(in a), "define", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        registry.FastAddValue((KeyString)"get",
+        registry.FastAddValue("get",
             new DomFunction((in a) => CustomElements.Get(in a), "get", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        registry.FastAddValue((KeyString)"getName",
+        registry.FastAddValue("getName",
             new DomFunction((in a) => CustomElements.GetName(in a), "getName", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        registry.FastAddValue((KeyString)"whenDefined",
+        registry.FastAddValue("whenDefined",
             new DomFunction((in a) => CustomElements.WhenDefined(in a), "whenDefined", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        registry.FastAddValue((KeyString)"upgrade",
+        registry.FastAddValue("upgrade",
             new DomFunction((in a) => CustomElements.Upgrade(in a), "upgrade", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -119,7 +119,7 @@ public sealed partial class DomBridge
             })();
             """);
 
-        window.FastAddValue((KeyString)"customElements", registry, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("customElements", registry, JSPropertyAttributes.EnumerableConfigurableValue);
         SubscribeCustomElementReactions();
     }
 

@@ -44,8 +44,8 @@ public sealed partial class DomBridge : Dom.Runtime.IScriptInsertionHost
             // addEventListener registration — all three land on the one dispatch path.
             ToJSObject(target);
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type", new JSString(type), JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("type", new JSString(type), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
             DispatchEventOnElement(target, evt);
         }
         catch (Exception ex)

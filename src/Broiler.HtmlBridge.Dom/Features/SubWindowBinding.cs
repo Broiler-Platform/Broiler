@@ -143,7 +143,7 @@ internal sealed class SubWindowBinding(
         _messaging.InstallEventTargetApi(subWindow, "DomBridge.subWindow.dispatchEvent");
         _messaging.RegisterWindowMessaging(subWindow);
 
-        subWindow.FastAddProperty((KeyString)"document",
+        subWindow.FastAddProperty("document",
             new DomFunction((in _) => _host.GetOrCreateSubDocument(containerElement), "get document"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
@@ -152,37 +152,37 @@ internal sealed class SubWindowBinding(
         // as a top-level one and a missing method is a TypeError that takes its caller with it.
         var locationHref = GetSubWindowLocationHref(containerElement);
         var iframeLocation = LocationBinding.Build(locationHref);
-        subWindow.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subWindow.FastAddProperty((KeyString)"scrollX", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"scrollY", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageXOffset", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
-        subWindow.FastAddProperty((KeyString)"pageYOffset", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty("scrollX", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get scrollX"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty("scrollY", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get scrollY"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty("pageXOffset", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: false)), "get pageXOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
+        subWindow.FastAddProperty("pageYOffset", new DomFunction((in _) => new JSNumber(GetSubWindowScrollOffset(containerElement, vertical: true)), "get pageYOffset"), null, JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        subWindow.FastAddValue((KeyString)"scroll", new DomFunction((in a) => Scroll(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollTo", new DomFunction((in a) => ScrollTo(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"scrollBy", new DomFunction((in a) => ScrollBy(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("scroll", new DomFunction((in a) => Scroll(containerElement, in a), "scroll", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("scrollTo", new DomFunction((in a) => ScrollTo(containerElement, in a), "scrollTo", 2), JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("scrollBy", new DomFunction((in a) => ScrollBy(containerElement, in a), "scrollBy", 2), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subWindow.FastAddValue((KeyString)"self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
-        subWindow.FastAddValue((KeyString)"window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("self", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("window", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subWindow.FastAddValue((KeyString)"globalThis", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("globalThis", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
         foreach (var ctorName in MirroredGlobals)
         {
             if (_host.GetGlobal(ctorName) is { } ctor)
-                subWindow.FastAddValue((KeyString)ctorName, ctor, JSPropertyAttributes.EnumerableConfigurableValue);
+                subWindow.FastAddValue(ctorName, ctor, JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         var parentWindow = GetParentWindowForSubDocument(containerElement);
         if (parentWindow != null)
         {
-            subWindow.FastAddValue((KeyString)"parent", parentWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+            subWindow.FastAddValue("parent", parentWindow, JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
-        subWindow.FastAddValue((KeyString)"top", _host.WindowJSObject ?? subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+        subWindow.FastAddValue("top", _host.WindowJSObject ?? subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
-        subDocument.FastAddValue((KeyString)"defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
+        subDocument.FastAddValue("defaultView", subWindow, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.getSelection — the frame's own selection, distinct from the containing page's. It is
         // literally the document's function rather than a second one over the same root, so
@@ -190,18 +190,18 @@ internal sealed class SubWindowBinding(
         if (subDocument[(KeyString)"getSelection"] is { } documentGetSelection)
         {
             subWindow.FastAddValue(
-                (KeyString)"getSelection", documentGetSelection, JSPropertyAttributes.EnumerableConfigurableValue);
+                "getSelection", documentGetSelection, JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         // The frame's document shares its window's Location, as the main document shares the main
         // window's. A framed page reads `document.location` for its origin exactly as a top-level
         // one does, and undefined there throws rather than reading as absent.
-        subDocument.FastAddValue((KeyString)"location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
+        subDocument.FastAddValue("location", iframeLocation, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // window.getComputedStyle — sub-window needs its own copy so that
         // doc.defaultView.getComputedStyle(node, "") resolves CSS rules from
         // the sub-document's <style> elements rather than the main document.
-        subWindow.FastAddValue((KeyString)"getComputedStyle", new DomFunction((in a) => GetComputedStyle(in a), "getComputedStyle", 2),
+        subWindow.FastAddValue("getComputedStyle", new DomFunction((in a) => GetComputedStyle(in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // Last, so the bridge's own members are already in place and win over a same-named

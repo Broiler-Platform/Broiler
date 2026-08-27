@@ -57,9 +57,9 @@ public sealed partial class DomBridge : IElementInternalsHost
     void IElementInternalsHost.DispatchInvalidEvent(DomElement element)
     {
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString("invalid"), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString("invalid"), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("bubbles", JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("cancelable", JSBoolean.True, JSPropertyAttributes.EnumerableConfigurableValue);
         DispatchEventOnElement(element, evt);
     }
 }

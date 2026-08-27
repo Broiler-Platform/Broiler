@@ -76,7 +76,7 @@ internal sealed class WorkerBinding : IDisposable
     public void Register(JSContext context, JSObject window)
     {
         var ctor = new JSFunction((in a) => CreateWorker(in a), "Worker", 1);
-        window.FastAddValue((KeyString)"Worker", ctor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("Worker", ctor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["Worker"] = ctor;
     }
 
@@ -143,7 +143,7 @@ internal sealed class WorkerBinding : IDisposable
     private void InstallWorkerHandle(JSObject handle, JSWorker? worker)
     {
         handle.FastAddValue(
-            (KeyString)"postMessage",
+            "postMessage",
             new JSFunction((in a) =>
             {
                 if (worker is null)
@@ -167,18 +167,18 @@ internal sealed class WorkerBinding : IDisposable
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         handle.FastAddValue(
-            (KeyString)"terminate",
+            "terminate",
             new JSFunction((in _) => { worker?.Terminate(); return JSUndefined.Value; }, "terminate", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        handle.FastAddValue((KeyString)"onmessage", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
-        handle.FastAddValue((KeyString)"onerror", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        handle.FastAddValue("onmessage", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        handle.FastAddValue("onerror", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // addEventListener is accepted for the two event types this slice fires, so page code
         // written the idiomatic way works rather than silently registering nothing.
         var listeners = new List<(string Type, JSFunction Fn)>();
         handle.FastAddValue(
-            (KeyString)"addEventListener",
+            "addEventListener",
             new JSFunction((in a) =>
             {
                 if (a.Length >= 2 && a[1] is JSFunction fn)
@@ -235,8 +235,8 @@ internal sealed class WorkerBinding : IDisposable
         }
 
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString("message"), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"data", materialized, JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString("message"), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("data", materialized, JSPropertyAttributes.EnumerableConfigurableValue);
 
         Invoke(handle, "onmessage", "message", evt);
     }
@@ -244,8 +244,8 @@ internal sealed class WorkerBinding : IDisposable
     internal void FireErrorEvent(JSObject handle, string message)
     {
         var evt = new JSObject();
-        evt.FastAddValue((KeyString)"type", new JSString("error"), JSPropertyAttributes.EnumerableConfigurableValue);
-        evt.FastAddValue((KeyString)"message", new JSString(message), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("type", new JSString("error"), JSPropertyAttributes.EnumerableConfigurableValue);
+        evt.FastAddValue("message", new JSString(message), JSPropertyAttributes.EnumerableConfigurableValue);
         Invoke(handle, "onerror", "error", evt);
     }
 

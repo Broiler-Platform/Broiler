@@ -77,11 +77,11 @@ public sealed partial class DomBridge
         }
 
         var transition = new JSObject();
-        transition.FastAddValue((KeyString)"ready", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"finished", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"updateCallbackDone", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"types", new JavaScript.BuiltIns.Array.JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
-        transition.FastAddValue((KeyString)"skipTransition",
+        transition.FastAddValue("ready", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("finished", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("updateCallbackDone", ResolvedThenable(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("types", new JavaScript.BuiltIns.Array.JSArray(), JSPropertyAttributes.EnumerableConfigurableValue);
+        transition.FastAddValue("skipTransition",
             new DomFunction((in _) =>
             {
                 _subDocumentViewTransitionOldMarkup.Remove(docRoot);

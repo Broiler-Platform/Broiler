@@ -145,15 +145,15 @@ public sealed partial class DomBridge
         // registration; they are registered here alongside the other window globals now that the fetch
         // networking surface is an isolated feature module.
         var messageChannelCtor = new JSFunction((in _) => _messaging.CreateMessageChannel(), "MessageChannel", 0);
-        window.FastAddValue((KeyString)"MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("MessageChannel", messageChannelCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["MessageChannel"] = messageChannelCtor;
         // CSSStyleSheet constructor (constructable stylesheets / adoptedStyleSheets — CSSOM).
         var cssStyleSheetCtor = new JSFunction((in a) => CreateConstructedStyleSheet(in a), "CSSStyleSheet", 0);
-        window.FastAddValue((KeyString)"CSSStyleSheet", cssStyleSheetCtor, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("CSSStyleSheet", cssStyleSheetCtor, JSPropertyAttributes.EnumerableConfigurableValue);
         context["CSSStyleSheet"] = cssStyleSheetCtor;
         // getComputedStyle (CSSOM), co-located in the ComputedStyleBinding feature module (Phase 3).
         window.FastAddValue(
-            (KeyString)"getComputedStyle",
+            "getComputedStyle",
             new JSFunction((in a) => Dom.Features.ComputedStyleBinding.GetComputedStyle(this, in a), "getComputedStyle", 2),
             JSPropertyAttributes.EnumerableConfigurableValue);
         windowBasicsScope.Dispose();

@@ -188,8 +188,8 @@ internal sealed class JSWorker
             var data = JSGlobalStatic.StructuredClone(new Arguments(JSUndefined.Value, detached));
 
             var evt = new JSObject();
-            evt.FastAddValue((KeyString)"type", new JSString("message"), JSPropertyAttributes.EnumerableConfigurableValue);
-            evt.FastAddValue((KeyString)"data", data, JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("type", new JSString("message"), JSPropertyAttributes.EnumerableConfigurableValue);
+            evt.FastAddValue("data", data, JSPropertyAttributes.EnumerableConfigurableValue);
 
             if (context["onmessage"] is JSFunction handler)
                 handler.InvokeFunction(new Arguments(JSUndefined.Value, evt));
@@ -333,7 +333,7 @@ internal sealed class JSWorker
         {
             var captured = level;
             console.FastAddValue(
-                (KeyString)captured,
+                captured,
                 new JSFunction((in a) =>
                 {
                     var text = a.Length > 0 ? a[0]?.ToString() ?? string.Empty : string.Empty;

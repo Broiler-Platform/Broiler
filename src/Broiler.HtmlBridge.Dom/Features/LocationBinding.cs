@@ -82,21 +82,21 @@ internal static class LocationBinding
         // had been asked, and the URL then disagreed with the document still in hand. As an
         // accessor it answers the document's own URL and routes the write where assign() goes.
         location.FastAddProperty(
-            (KeyString)"href",
+            "href",
             new DomFunction((in _) => new JSString(href), "get href"),
             new DomFunction((in a) => Navigate(href, "href", in a), "set href"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
         location.FastAddValue(
-            (KeyString)"assign",
+            "assign",
             new DomFunction((in a) => Navigate(href, "assign", in a), "assign", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue(
-            (KeyString)"replace",
+            "replace",
             new DomFunction((in a) => Navigate(href, "replace", in a), "replace", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
         location.FastAddValue(
-            (KeyString)"reload",
+            "reload",
             new DomFunction((in _) =>
             {
                 RenderLogger.LogDebug(LogCategory.JavaScript, LogContext, $"location.reload() requested; the capture renders the document it was given and does not reload {href}");
@@ -107,7 +107,7 @@ internal static class LocationBinding
         // Location stringifies to its href, not to "[object Object]". Pages build URLs with
         // `"" + location` and log it, and the default Object.prototype.toString made both useless.
         location.FastAddValue(
-            (KeyString)"toString",
+            "toString",
             new DomFunction((in _) => new JSString(href), "toString", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
     }
@@ -131,5 +131,5 @@ internal static class LocationBinding
     }
 
     private static void Add(JSObject location, string name, string value)
-        => location.FastAddValue((KeyString)name, new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
+        => location.FastAddValue(name, new JSString(value), JSPropertyAttributes.EnumerableConfigurableValue);
 }

@@ -93,7 +93,7 @@ internal static class WorkerTransfer
             return JSUndefined.Value;
 
         var cloneOptions = new JSObject();
-        cloneOptions.FastAddValue((KeyString)"transfer", new JSArray(buffers), JSPropertyAttributes.EnumerableConfigurableValue);
+        cloneOptions.FastAddValue("transfer", new JSArray(buffers), JSPropertyAttributes.EnumerableConfigurableValue);
         return cloneOptions;
     }
 }

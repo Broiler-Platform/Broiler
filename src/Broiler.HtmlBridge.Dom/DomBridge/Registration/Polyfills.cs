@@ -20,7 +20,7 @@ public sealed partial class DomBridge
         // here rather than in the JS asset. Order-independent of the pure-JS polyfills above.
         var cookieStore = "";
         document.FastAddProperty(
-            (KeyString)"cookie",
+            "cookie",
             new DomFunction((in _) => new JSString(cookieStore), "get cookie"),
             new DomFunction((in a) => Dom.Features.WindowDocumentMiscBinding.SetCookie(ref cookieStore, in a), "set cookie"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
@@ -30,7 +30,7 @@ public sealed partial class DomBridge
     {
         // window.crypto — the getRandomValues/randomUUID subset (Phase 3: co-located CryptoBinding module)
         var cryptoObj = Dom.Features.CryptoBinding.Build();
-        window.FastAddValue((KeyString)"crypto", cryptoObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("crypto", cryptoObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["crypto"] = cryptoObj;
 
         // window.CSS — the CSSOM namespace object (supports/escape). Host-driven rather than a
@@ -38,7 +38,7 @@ public sealed partial class DomBridge
         // evaluator; answering from the CSSOM instead would claim support for everything, since
         // Broiler's CSSOM stores declarations without validating them.
         var cssObj = Dom.Features.CssBinding.Build();
-        window.FastAddValue((KeyString)"CSS", cssObj, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("CSS", cssObj, JSPropertyAttributes.EnumerableConfigurableValue);
         context["CSS"] = cssObj;
 
         // DOMException constructor
@@ -96,13 +96,13 @@ public sealed partial class DomBridge
         // Notification — the interface, with its permission already settled at "denied" because
         // there is no surface to show one on (NotificationBinding).
         var notification = Dom.Features.NotificationBinding.Build();
-        window.FastAddValue((KeyString)"Notification", notification, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("Notification", notification, JSPropertyAttributes.EnumerableConfigurableValue);
 
         // MediaSource — the Media Source Extensions entry point, whose isTypeSupported answers for
         // the playback pipeline the HTML layer does not yet have (MediaCapabilityBinding, which also
         // installs canPlayType on the media elements themselves).
         var mediaSource = Dom.Features.MediaCapabilityBinding.BuildMediaSource(context);
-        window.FastAddValue((KeyString)"MediaSource", mediaSource, JSPropertyAttributes.EnumerableConfigurableValue);
+        window.FastAddValue("MediaSource", mediaSource, JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     /// <summary>

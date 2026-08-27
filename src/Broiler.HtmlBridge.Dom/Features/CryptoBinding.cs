@@ -26,12 +26,12 @@ internal static class CryptoBinding
         var crypto = new JSObject();
 
         crypto.FastAddValue(
-            (KeyString)"getRandomValues",
+            "getRandomValues",
             new DomFunction(GetRandomValues, "getRandomValues", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         crypto.FastAddValue(
-            (KeyString)"randomUUID",
+            "randomUUID",
             new DomFunction(RandomUuid, "randomUUID", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

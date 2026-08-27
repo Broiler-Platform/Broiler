@@ -49,7 +49,7 @@ internal static class WindowBarPropBinding
     public static void Install(JSObject window)
     {
         foreach (var name in BarNames)
-            window.FastAddValue((KeyString)name, Build(), JSPropertyAttributes.EnumerableConfigurableValue);
+            window.FastAddValue(name, Build(), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     /// <summary>One <c>BarProp</c>. Each member gets its own object, as in a browser.</summary>
@@ -57,7 +57,7 @@ internal static class WindowBarPropBinding
     {
         var bar = new JSObject();
 
-        bar.FastAddProperty((KeyString)"visible",
+        bar.FastAddProperty("visible",
             new DomFunction((in _) => JSBoolean.False, "get visible"),
             null, JSPropertyAttributes.EnumerableConfigurableProperty);
 

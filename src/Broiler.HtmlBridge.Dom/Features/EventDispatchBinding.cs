@@ -63,30 +63,30 @@ internal sealed class EventDispatchBinding(IEventDispatchHost host)
         evt[(KeyString)"srcElement"] = evt[(KeyString)"target"];
         evt[(KeyString)"eventPhase"] = new JSNumber(0);
 
-        evt.FastAddValue((KeyString)"stopPropagation",
+        evt.FastAddValue("stopPropagation",
             new DomFunction((in _) => EventStopPropagation(ref legacyCancelBubble, ref stopped, in _), "stopPropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        evt.FastAddValue((KeyString)"stopImmediatePropagation",
+        evt.FastAddValue("stopImmediatePropagation",
             new DomFunction((in _) => EventStopImmediatePropagation(ref immediateStopped, ref legacyCancelBubble, ref stopped, in _), "stopImmediatePropagation", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        evt.FastAddValue((KeyString)"preventDefault",
+        evt.FastAddValue("preventDefault",
             new DomFunction((in _) => EventPreventDefault(currentListenerPassive, evt, ref prevented, in _), "preventDefault", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         evt.FastAddProperty(
-            (KeyString)"cancelBubble",
+            "cancelBubble",
             new DomFunction((in _) => legacyCancelBubble ? JSBoolean.True : JSBoolean.False, "get cancelBubble"),
             new DomFunction((in setArgs) => EventSetCancelBubble(ref legacyCancelBubble, ref stopped, in setArgs), "set cancelBubble"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        evt.FastAddProperty((KeyString)"returnValue",
+        evt.FastAddProperty("returnValue",
             new DomFunction((in _) => prevented ? JSBoolean.False : JSBoolean.True, "get returnValue"),
             new DomFunction((in setArgs) => EventSetReturnValue(currentListenerPassive, evt, ref prevented, in setArgs), "set returnValue"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        evt.FastAddValue((KeyString)"composedPath",
+        evt.FastAddValue("composedPath",
             new DomFunction((in _) => BuildComposedPathValue(target, path), "composedPath", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

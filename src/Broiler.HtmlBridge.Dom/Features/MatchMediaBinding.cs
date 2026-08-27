@@ -31,11 +31,11 @@ internal static class MatchMediaBinding
             new CssEnvironment(host.ViewportWidth, host.ViewportHeight));
 
         var result = new JSObject();
-        result.FastAddValue((KeyString)"matches", matches ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"media", new JSString(query), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("matches", matches ? JSBoolean.True : JSBoolean.False, JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("media", new JSString(query), JSPropertyAttributes.EnumerableConfigurableValue);
         // addListener / removeListener stubs (the legacy MediaQueryList API) — no-ops.
-        result.FastAddValue((KeyString)"addListener", NoOp("addListener"), JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"removeListener", NoOp("removeListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("addListener", NoOp("addListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("removeListener", NoOp("removeListener"), JSPropertyAttributes.EnumerableConfigurableValue);
 
         // CSSOM View §4.2 made MediaQueryList an EventTarget, and that is the pair current code
         // registers with — the two above are the deprecated spelling kept for old callers. Having
@@ -49,13 +49,13 @@ internal static class MatchMediaBinding
         // A capture renders one frame at a fixed viewport, so no `change` event can ever fire and
         // the listener is genuinely never called; what matters is that registering one is not an
         // error. `dispatchEvent` reports false — nothing was dispatched — for the same reason.
-        result.FastAddValue((KeyString)"addEventListener", NoOp("addEventListener"), JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"removeEventListener", NoOp("removeEventListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("addEventListener", NoOp("addEventListener"), JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("removeEventListener", NoOp("removeEventListener"), JSPropertyAttributes.EnumerableConfigurableValue);
         result.FastAddValue(
-            (KeyString)"dispatchEvent",
+            "dispatchEvent",
             new JSFunction((in _) => JSBoolean.False, "dispatchEvent", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
-        result.FastAddValue((KeyString)"onchange", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
+        result.FastAddValue("onchange", JSNull.Value, JSPropertyAttributes.EnumerableConfigurableValue);
 
         return result;
     }

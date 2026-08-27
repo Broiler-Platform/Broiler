@@ -252,7 +252,7 @@ internal sealed partial class TraversalBinding
         // Range's own attribute rather than AbstractRange's, so it reads the live range — a
         // StaticRange has no common ancestor to report and is not asked for one.
         prototype.FastAddProperty(
-            (KeyString)"commonAncestorContainer",
+            "commonAncestorContainer",
             new DomFunction(
                 (in a) => RangeGetCommonAncestorContainer(StateFor(in a, "commonAncestorContainer")),
                 "get commonAncestorContainer"),
@@ -290,7 +290,7 @@ internal sealed partial class TraversalBinding
 
     private void Method(JSObject prototype, string name, int length, RangeOperation body) =>
         prototype.FastAddValue(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => body(StateFor(in a, name), in a), name, length),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -300,7 +300,7 @@ internal sealed partial class TraversalBinding
     /// </summary>
     private void Getter(JSObject prototype, string name, Func<IRangeBoundaries, ITraversalHost, JSValue> read) =>
         prototype.FastAddProperty(
-            (KeyString)name,
+            name,
             new DomFunction((in a) => read(BoundariesFor(in a, name), _host), $"get {name}"),
             null,
             JSPropertyAttributes.EnumerableConfigurableProperty);

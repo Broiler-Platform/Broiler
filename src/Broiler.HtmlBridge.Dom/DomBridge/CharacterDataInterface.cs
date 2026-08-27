@@ -297,13 +297,13 @@ public sealed partial class DomBridge
     /// the member changes.
     /// </remarks>
     private static void AddPrototypeMethod(JSObject proto, string name, int length, JSFunctionDelegate body) =>
-        proto.FastAddValue((KeyString)name, new DomFunction(body, name, length),
+        proto.FastAddValue(name, new DomFunction(body, name, length),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
     /// <summary>Adds a WebIDL attribute to an interface prototype, read-only unless a setter is given.</summary>
     private static void AddPrototypeAccessor(JSObject proto, string name,
         JSFunctionDelegate getter, JSFunctionDelegate? setter = null) =>
-        proto.FastAddProperty((KeyString)name,
+        proto.FastAddProperty(name,
             new DomFunction(getter, "get " + name),
             setter is null ? null : new DomFunction(setter, "set " + name),
             JSPropertyAttributes.EnumerableConfigurableProperty);

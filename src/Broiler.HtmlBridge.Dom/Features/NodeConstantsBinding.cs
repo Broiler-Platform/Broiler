@@ -66,7 +66,7 @@ internal static class NodeConstantsBinding
     public static void Install(JSObject obj)
     {
         foreach (var (name, value) in Constants)
-            obj.FastAddValue((KeyString)name, new JSNumber(value), JSPropertyAttributes.EnumerableConfigurableValue);
+            obj.FastAddValue(name, new JSNumber(value), JSPropertyAttributes.EnumerableConfigurableValue);
     }
 
     /// <summary>The constant names, for dropping the copies a wrapper installed before it had a chain.</summary>

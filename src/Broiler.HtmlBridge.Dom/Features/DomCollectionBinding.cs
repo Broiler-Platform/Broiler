@@ -279,7 +279,7 @@ internal static class DomCollectionBinding
 
         void Install(string name, int length, Func<NamedNodeMapOperations, Func<Arguments, JSValue>> pick) =>
             prototype.FastAddValue(
-                (KeyString)name,
+                name,
                 new DomFunction(
                     (in Arguments a) =>
                     {

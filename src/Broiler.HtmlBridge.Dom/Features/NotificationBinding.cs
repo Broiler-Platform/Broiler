@@ -45,17 +45,17 @@ internal static class NotificationBinding
     {
         var constructor = new JSFunction(NewNotification, "Notification", 2);
 
-        constructor.FastAddValue((KeyString)"permission",
+        constructor.FastAddValue("permission",
             new JSString(Permission), JSPropertyAttributes.EnumerableConfigurableValue);
 
-        constructor.FastAddValue((KeyString)"requestPermission",
+        constructor.FastAddValue("requestPermission",
             new DomFunction(RequestPermission, "requestPermission", 1),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         // The maximum number of actions a notification may carry. Zero is the honest count for a
         // notification that is never displayed, and it is a value the specification expects to vary
         // by user agent, so a page reading it is already prepared for zero.
-        constructor.FastAddValue((KeyString)"maxActions",
+        constructor.FastAddValue("maxActions",
             new JSNumber(0), JSPropertyAttributes.EnumerableConfigurableValue);
 
         return constructor;
@@ -81,7 +81,7 @@ internal static class NotificationBinding
     {
         var notification = new JSObject();
 
-        notification.FastAddValue((KeyString)"title",
+        notification.FastAddValue("title",
             a.Length > 0 ? new JSString(a[0].ToString()) : new JSString(string.Empty),
             JSPropertyAttributes.EnumerableConfigurableValue);
 
@@ -91,18 +91,18 @@ internal static class NotificationBinding
         foreach (var (name, fallback) in ReflectedOptions)
         {
             var value = options[(KeyString)name];
-            notification.FastAddValue((KeyString)name,
+            notification.FastAddValue(name,
                 value is JSUndefined ? fallback : value,
                 JSPropertyAttributes.EnumerableConfigurableValue);
         }
 
         JSValue onError = JSNull.Value;
-        notification.FastAddProperty((KeyString)"onerror",
+        notification.FastAddProperty("onerror",
             new DomFunction((in _) => onError, "get onerror"),
             new DomFunction((in b) => onError = b.Length > 0 ? b[0] : JSNull.Value, "set onerror"),
             JSPropertyAttributes.EnumerableConfigurableProperty);
 
-        notification.FastAddValue((KeyString)"close",
+        notification.FastAddValue("close",
             DomBridge.UndefinedFunction("close", 0),
             JSPropertyAttributes.EnumerableConfigurableValue);
 

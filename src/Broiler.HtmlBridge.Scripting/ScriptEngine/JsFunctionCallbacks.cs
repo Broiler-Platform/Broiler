@@ -44,7 +44,7 @@ public sealed partial class ScriptEngine
                     return weakRef.TryGetTarget(out var t) ? t : JSUndefined.Value;
                 }
 
-                instance.FastAddValue((KeyString)"deref", new JSFunction(JsScriptEngineDeref003, "deref", 0), JSPropertyAttributes.EnumerableConfigurableValue);
+                instance.FastAddValue("deref", new JSFunction(JsScriptEngineDeref003, "deref", 0), JSPropertyAttributes.EnumerableConfigurableValue);
                 return instance;
             }
 
@@ -60,14 +60,14 @@ public sealed partial class ScriptEngine
                 }
 
                 // register(target, heldValue [, unregisterToken])
-                instance.FastAddValue((KeyString)"register", new JSFunction(JsScriptEngineRegister005, "register", 3), JSPropertyAttributes.EnumerableConfigurableValue);
+                instance.FastAddValue("register", new JSFunction(JsScriptEngineRegister005, "register", 3), JSPropertyAttributes.EnumerableConfigurableValue);
                 JSValue JsScriptEngineUnregister006(in Arguments unregArgs)
                 {
                     return JSBoolean.False;
                 }
 
                 // unregister(unregisterToken)
-                instance.FastAddValue((KeyString)"unregister", new JSFunction(JsScriptEngineUnregister006, "unregister", 1), JSPropertyAttributes.EnumerableConfigurableValue);
+                instance.FastAddValue("unregister", new JSFunction(JsScriptEngineUnregister006, "unregister", 1), JSPropertyAttributes.EnumerableConfigurableValue);
                 return instance;
             }
 
