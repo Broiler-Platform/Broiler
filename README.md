@@ -79,6 +79,8 @@ commit named by a human reviewer; **PENDING is not an approval**.
 | Broiler.CSS | [Review](Broiler.CSS/HUMAN_REVIEW.md) |
 | Broiler.Layout | [Review](Broiler.Layout/HUMAN_REVIEW.md) |
 | Broiler.Graphics | [Review](Broiler.Graphics/HUMAN_REVIEW.md) |
+| Broiler.UI | [Review](Broiler.UI/HUMAN_REVIEW.md) |
+| Broiler.Browser | [Review](Broiler.Browser/HUMAN_REVIEW.md) |
 | Broiler.HTML | [Review](Broiler.HTML/HUMAN_REVIEW.md) |
 | Broiler.JS | [Review](Broiler.JS/HUMAN_REVIEW.md) |
 | Broiler.DateTime | [Review](Broiler.JS/Broiler.DateTime/HUMAN_REVIEW.md) |
@@ -117,19 +119,23 @@ Requirements:
 Choose the solution for the product, platform, or validation slice you are working on:
 
 ```bash
-dotnet build Broiler.Windows.Browser.slnx
-dotnet build Broiler.Linux.Writer.slnx
-dotnet build Broiler.Android.Writer.slnx -p:AndroidSdkDirectory="C:\Program Files (x86)\Android\android-sdk"
+dotnet build Broiler.Browser/Broiler.Windows.Browser.slnx
+dotnet build Broiler.Writer/Broiler.Linux.Writer.slnx
+dotnet build Broiler.Writer/Broiler.Android.Writer.slnx -p:AndroidSdkDirectory="C:\Program Files (x86)\Android\android-sdk"
 dotnet test Broiler.Tests.slnx
 ```
+
+The Browser and Writer applications live in their own repositories and are composed
+here as submodules, so their solutions are read out of those checkouts rather than
+from the repository root.
 
 The root workspaces are deliberately split so an IDE does not load unrelated applications,
 platform backends, tests, samples, generators, and benchmarks:
 
 | Scope | Solution |
 |---|---|
-| Browser applications | `Broiler.Windows.Browser.slnx`, `Broiler.Linux.Browser.slnx`, `Broiler.Android.Browser.slnx` |
-| Writer applications | `Broiler.Windows.Writer.slnx`, `Broiler.Linux.Writer.slnx`, `Broiler.WebAssembly.Writer.slnx`, `Broiler.Android.Writer.slnx` |
+| Browser applications | `Broiler.Browser/Broiler.Windows.Browser.slnx`, `Broiler.Browser/Broiler.Linux.Browser.slnx`, `Broiler.Browser/Broiler.Android.Browser.slnx` |
+| Writer applications | `Broiler.Writer/Broiler.Windows.Writer.slnx`, `Broiler.Writer/Broiler.Linux.Writer.slnx`, `Broiler.Writer/Broiler.WebAssembly.Writer.slnx`, `Broiler.Writer/Broiler.Android.Writer.slnx` |
 | Hosted Writer | `Broiler.Office.Server.slnx` |
 | Rendering and WPT tools | `Broiler.Cli.slnx`, `Broiler.Wpt.slnx` |
 | Developer tooling | `Broiler.Tooling.slnx` |
@@ -138,9 +144,11 @@ platform backends, tests, samples, generators, and benchmarks:
 | Performance harnesses | `Broiler.Benchmarks.slnx` |
 
 Each root solution contains only its declared entry points and their transitive
-`ProjectReference` closure. Component-owned unit tests remain in the existing component
-solutions such as `Broiler.Documents/Broiler.Documents.slnx` and
-`Broiler.UI/Broiler.UI.slnx`.
+`ProjectReference` closure. Component-owned unit tests live in the component's own
+solution, inside its submodule — `Broiler.Documents/Broiler.Documents.slnx` and
+`Broiler.UI/Broiler.UI.slnx` among them — and the application suites live with the
+applications, in `Broiler.Browser/Broiler.Browser.Tests.slnx` and
+`Broiler.Writer/Broiler.Writer.Tests.slnx`.
 
 Solution entry points are declared in `eng/solutions.json`. Regenerate and verify the
 dependency closures after changing project references:
@@ -153,7 +161,7 @@ dependency closures after changing project references:
 Run the Win32/Direct2D application on Windows:
 
 ```bash
-dotnet run --project src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj --configuration Debug-Windows
+dotnet run --project Broiler.Browser/src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj --configuration Debug-Windows
 ```
 
 Android is currently an emulator-verified preview; physical-device validation is
@@ -182,9 +190,15 @@ Broiler/
 ├── Broiler.DOM/               # Git submodule
 ├── Broiler.CSS/               # Git submodule; contains a nested DOM checkout
 ├── Broiler.Layout/            # in-tree layout component
-├── Broiler.Graphics/          # Git submodule
+├── Broiler.Graphics/          # Git submodule; nested Input and Media checkouts
 ├── Broiler.HTML/              # Git submodule; contains a nested graphics checkout
 ├── Broiler.JS/                # Git submodule; contains DateTime, Regex, and Unicode
+├── Broiler.Input/             # Git submodule
+├── Broiler.Media/             # Git submodule; nested graphics checkout
+├── Broiler.Documents/         # Git submodule; nested DOM and graphics checkouts
+├── Broiler.UI/                # Git submodule; nested component checkouts
+├── Broiler.Browser/           # Git submodule; browser application and its solutions
+├── Broiler.Writer/            # Git submodule; Writer application and its solutions
 ├── Broiler.VM/                # planned bytecode execution core; roadmap and profile contract
 ├── eng/solutions.json         # focused-solution entry points and platform boundaries
 └── Broiler.*.slnx             # generated product/platform/test workspaces

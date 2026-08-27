@@ -94,9 +94,10 @@ it at 362: that scene is thirteen enormous fills and enters the fill path too fe
 leave OSR-compiled code, and the small fills ahead of it are what promote it. **A figure from
 this command is comparable to another figure from this command and to nothing else.**
 
-It needs `patches/0127-graphics-raster-band-parallelism.patch` applied to the
-`Broiler.Graphics` submodule; without it the mode compiles itself out and says so, so the
-project still builds on a clean checkout.
+It needs `BRasterParallelism` in the pinned `Broiler.Graphics`, which the component now
+carries at `src/Broiler.Graphics/Rendering/BRasterParallelism.cs`; the project probes for
+that file and, when it is absent, compiles the mode out and says so, so a checkout pinning
+an older component still builds.
 
 `--tile-scaling` renders the corpus at 1, 2, 4 and *cores* tiles (item #5) and reports the
 `PerformPaint` stage as well as the whole render — tiling changes one stage, and on a page

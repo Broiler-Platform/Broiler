@@ -39,7 +39,7 @@
          RID-named folders match the default `dotnet publish -r <rid>` output when no -o is given. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;publish\**;linux-*\**;win-*\**;osx-*\**</DefaultItemExcludes>
 
-    <WriterClientProject>..\src\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
+    <WriterClientProject>..\Broiler.Writer\src\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
     <!-- Absolute: this PublishDir is handed to the client's build, where a relative path would resolve
          against the client project directory rather than this one. BaseIntermediateOutputPath (obj\)
          is set early and reliably; IntermediateOutputPath is not yet populated at this point. -->

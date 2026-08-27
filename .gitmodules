@@ -18,3 +18,27 @@
 	path = Broiler.DOM
 	url = https://github.com/Broiler-Platform/Broiler.DOM.git
 	branch = main
+[submodule "Broiler.UI"]
+	path = Broiler.UI
+	url = https://github.com/Broiler-Platform/Broiler.UI.git
+	branch = main
+[submodule "Broiler.Input"]
+	path = Broiler.Input
+	url = https://github.com/Broiler-Platform/Broiler.Input.git
+	branch = main
+[submodule "Broiler.Media"]
+	path = Broiler.Media
+	url = https://github.com/Broiler-Platform/Broiler.Media.git
+	branch = main
+[submodule "Broiler.Documents"]
+	path = Broiler.Documents
+	url = https://github.com/Broiler-Platform/Broiler.Documents.git
+	branch = main
+[submodule "Broiler.Writer"]
+	path = Broiler.Writer
+	url = https://github.com/Broiler-Platform/Broiler.Writer.git
+	branch = main
+[submodule "Broiler.Browser"]
+	path = Broiler.Browser
+	url = https://github.com/Broiler-Platform/Broiler.Browser.git
+	branch = main

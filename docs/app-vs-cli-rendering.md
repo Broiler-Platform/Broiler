@@ -58,7 +58,7 @@ after the display list exists:
 
 `src/Broiler.Cli/CaptureService.cs` → `Broiler.HTML/Source/Broiler.HTML.Image/HtmlRender.cs:299-301`
 (`PerformLayout` then `PerformPaint` on one bitmap), versus
-`src/Broiler.Browser.Core/BrowserApp.cs:1487-1494`
+`Broiler.Browser/src/Broiler.Browser.Core/BrowserApp.cs:1487-1494`
 (`CreateDisplayList` then `HtmlGraphicsRenderListBuilder.Build`).
 
 The browser app is the *only* consumer of `HtmlGraphicsRenderListBuilder`; no
@@ -136,7 +136,7 @@ for the pipeline: the style layer normalises font sizes to points
 `CssMetrics.PtToPx = 96/72`).
 
 `BFontStyle`'s second parameter is `double SizeInPixels`
-(`Broiler.Graphics/Broiler.Graphics/Text/BFontStyle.cs:28-32`), and both
+(`Broiler.Graphics/src/Broiler.Graphics/Text/BFontStyle.cs:28-32`), and both
 Direct2D and the CPU renderer honour it as pixels — so a point count is drawn
 as that many pixels.
 
@@ -192,7 +192,7 @@ throws away.
 
 **Watch out for one misleading comment while fixing this:**
 `ILayoutFont.Size` is documented as "The font size, in CSS pixels"
-(`Broiler.Graphics/Broiler.Graphics/Text/ILayoutFont.cs`), which is wrong —
+(`Broiler.Graphics/src/Broiler.Graphics/Text/ILayoutFont.cs`), which is wrong —
 `FontAdapter.Size => size` is the pt value, and `CssBoxProperties.GetEmHeight()`
 multiplies it by `PtToPx` to get pixels. The doc comment should be corrected in
 the same change.
@@ -213,14 +213,14 @@ fontSize = (float)(ParseFontSize(style.FontSize) * (96.0 / 72.0));
 `"Verdana, sans-serif"` (acid1) or `"Verdana, Arial, Helvetica"` (7-zip.org).
 The measuring side splits and resolves it:
 `FontsHandler.EnumerateFamilyCandidates`
-(`Broiler.Graphics/Broiler.Graphics/Text/FontsHandler.cs:154`) splits on `,`,
+(`Broiler.Graphics/src/Broiler.Graphics/Text/FontsHandler.cs:154`) splits on `,`,
 strips quotes, and `TryResolveAvailableFamily` (line 132) returns the first
 candidate actually installed.
 
 The app's translator passes the whole string through as a family name. On
 Windows it reaches
 `DirectWriteText.ResolveFontFamily`
-(`Broiler.Graphics/Broiler.Graphics.Windows/DirectWriteTextMetricsProvider.cs:144-158`),
+(`Broiler.Graphics/src/Broiler.Graphics.Windows/DirectWriteTextMetricsProvider.cs:144-158`),
 which maps the three generic keywords and otherwise returns the string
 unchanged:
 
@@ -320,7 +320,7 @@ lossy in other ways the CLI is not. Comparing the two switches
 
 `BRenderList`'s vocabulary is the deeper constraint: its whole command set is
 `FillRect`, `StrokeRect`, `FillRoundedRect`, `StrokeRoundedRect`, `DrawText`,
-`DrawImage`, clip and transform (`Broiler.Graphics/Broiler.Graphics/RenderList/BRenderCommand.cs`).
+`DrawImage`, clip and transform (`Broiler.Graphics/src/Broiler.Graphics/RenderList/BRenderCommand.cs`).
 There is no gradient, no path, no layer and — decisively — no positioned glyph
 run: `BTextRun` is a *string* plus a `BFontStyle`, so any backend consuming it
 must re-resolve and re-shape the text. Defects 1-4 are symptoms of that.
@@ -373,14 +373,14 @@ across a boundary whose measurement contract it does not participate in.
 This does not cause the word gaps, but it is real, it is in the main repo, and
 it explains why the app screenshots are both larger *and* softer than the CLI's.
 
-`src/Broiler.Browser.Windows/Program.cs:32` asks for per-monitor awareness and
+`Broiler.Browser/src/Broiler.Browser.Windows/Program.cs:32` asks for per-monitor awareness and
 discards the answer:
 
 ```csharp
 _ = SetProcessDpiAwarenessContext(new IntPtr(-4)); // PER_MONITOR_AWARE_V2, best effort.
 ```
 
-But `src/Broiler.Browser.Windows/app.manifest:56` — live, not inside the
+But `Broiler.Browser/src/Broiler.Browser.Windows/app.manifest:56` — live, not inside the
 surrounding comment, and wired in by
 `Broiler.Browser.Windows.csproj:13` (`<ApplicationManifest>`) — declares the
 opposite:
@@ -484,7 +484,7 @@ above, because nothing pointed at them until the text was right:
 
 ### Verification
 
-- `src/Broiler.Browser.Core.Tests/RenderListTextFidelityTests.cs` — six tests
+- `Broiler.Browser/src/Broiler.Browser.Core.Tests/RenderListTextFidelityTests.cs` — six tests
   over the app's real path: lay out, `CreateDisplayList`, translate, then assert
   each emitted `BFontStyle` against the `RFont` that measured the run. Covers
   `medium`, `pt`, `%`, `em`, `rem`, `px`, `smaller`/`larger` and absolute units,

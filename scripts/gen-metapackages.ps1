@@ -38,12 +38,12 @@ $metas = @{
     'Broiler.Media' = @{
         Desc = 'Meta-package that pulls in the full cross-platform Broiler.Media stack (core, audio, image, and video plus their managed implementations). Platform-native backends (e.g. MediaFoundation) are separate packages.'
         Tags = 'broiler;media;audio;image;video;meta'
-        Dir  = 'Broiler.Media.All'
+        Dir  = 'src\Broiler.Media.All'
     }
     'Broiler.Input' = @{
         Desc = 'Meta-package that pulls in the cross-platform Broiler.Input device contracts (keyboard, mouse, pen, touch, text, camera, microphone). Platform backends (*.Windows, *.Linux, *.Android) are separate packages.'
         Tags = 'broiler;input;devices;meta'
-        Dir  = 'Broiler.Input.All'
+        Dir  = 'src\Broiler.Input.All'
     }
     'Broiler.UI' = @{
         Desc = 'Meta-package that pulls in the complete Broiler retained-mode UI toolkit: every control contract and its Standard implementation.'
@@ -100,12 +100,17 @@ function Get-RelativePath {
 
 foreach ($component in $metas.Keys | Sort-Object) {
     $componentDir = Join-Path $repoRoot $component
+    # Each component is a submodule that carries nested checkouts of the components it
+    # depends on (Broiler.UI/Broiler.Graphics/, Broiler.Media/Broiler.Graphics/, ...).
+    # Those sit beside src/, never inside it, so scanning src/ alone is what keeps a
+    # foreign component's projects out of this component's meta-package.
+    $sourceDir = Join-Path $componentDir 'src'
     $metaId   = "$component.All"
     $metaDir  = Join-Path $componentDir $metas[$component].Dir
     $metaProj = Join-Path $metaDir "$metaId.csproj"
 
     # Discover member projects.
-    $members = Get-ChildItem -Path $componentDir -Recurse -Filter '*.csproj' |
+    $members = Get-ChildItem -Path $sourceDir -Recurse -Filter '*.csproj' |
         Where-Object { $_.FullName -notmatch '[\\/](obj|bin)[\\/]' } |
         Where-Object { [IO.Path]::GetFileNameWithoutExtension($_.Name) -notmatch $excludeSuffix } |
         Sort-Object FullName

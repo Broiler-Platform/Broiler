@@ -22,7 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Playback\Broiler.Playback.csproj" />
     <!-- Composition root for tests: real WAVE audio codec + the media catalog. -->
-    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Audio.Managed\Broiler.Media.Audio.Managed.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\src\Broiler.Media.Audio.Managed\Broiler.Media.Audio.Managed.csproj" />
   </ItemGroup>
 
 </Project>

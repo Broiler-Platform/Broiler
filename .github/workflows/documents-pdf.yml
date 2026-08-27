@@ -26,8 +26,12 @@ name: Documents And PDF
 #     that would trigger them. The Windows and Linux Writer heads now register
 #     the codec for opening (roadmap §10.1), and the shape of that registration
 #     is enforced by Broiler.Documents.Tests/PdfDeliveryGuardTests.cs, which runs
-#     in this workflow — hence the src/Broiler.Writer*/** trigger paths below. The
-#     Writer's own behavioural cover lives with the Writer tests.
+#     in this workflow. That guard now SKIPS here: it looks for an aggregate
+#     checkout holding both src/Broiler.Writer.Windows and src/Broiler.Cli, and
+#     since the Writer heads moved into the Broiler-Platform/Broiler.Writer
+#     submodule no directory carries both. The registration is guarded in that
+#     repository instead, which is also where the Writer's behavioural cover
+#     lives, so this workflow no longer triggers on the Writer.
 #
 # Scope: the Documents solution and its dependency closure, which today is
 # Broiler.Graphics and nothing else — Broiler.Documents.Model references it for
@@ -50,13 +54,13 @@ on:
   # out twice because the workflow parser does not support YAML anchors.
   pull_request:
     paths:
+      # Both are submodules, so a pointer bump changes the gitlink path itself
+      # ('Broiler.Documents') and never anything under it — both spellings are
+      # needed for the trigger to fire on a bump as well as on a local edit.
+      - 'Broiler.Documents'
       - 'Broiler.Documents/**'
+      - 'Broiler.Graphics'
       - 'Broiler.Graphics/**'
-      # The Writer heads, because PdfDeliveryGuardTests polices them: it reads
-      # every composition root under src/ to prove PDF is registered only where a
-      # head asks for it. A guard whose subject can change without running the
-      # guard is not a guard.
-      - 'src/Broiler.Writer*/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
@@ -64,13 +68,13 @@ on:
     branches:
       - main
     paths:
+      # Both are submodules, so a pointer bump changes the gitlink path itself
+      # ('Broiler.Documents') and never anything under it — both spellings are
+      # needed for the trigger to fire on a bump as well as on a local edit.
+      - 'Broiler.Documents'
       - 'Broiler.Documents/**'
+      - 'Broiler.Graphics'
       - 'Broiler.Graphics/**'
-      # The Writer heads, because PdfDeliveryGuardTests polices them: it reads
-      # every composition root under src/ to prove PDF is registered only where a
-      # head asks for it. A guard whose subject can change without running the
-      # guard is not a guard.
-      - 'src/Broiler.Writer*/**'
       - 'Directory.Build.props'
       - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
@@ -112,10 +116,12 @@ jobs:
       - name: Initialize the submodules this solution needs
         shell: bash
         run: |
-          # Broiler.Documents.Model references Broiler.Graphics; the HTML codec
-          # references Broiler.DOM. Broiler.Media is in-repo, and neither
-          # submodule has nested submodules of its own.
-          git submodule update --init Broiler.Graphics Broiler.DOM
+          # Broiler.Documents is a submodule and owns this solution. It is
+          # self-contained: Broiler.Documents.Model references Broiler.Graphics
+          # and the HTML codec references Broiler.DOM, both through its own
+          # nested checkouts rather than the top-level ones — hence --recursive,
+          # and hence no need to initialize the root Broiler.Graphics/Broiler.DOM.
+          git submodule update --init --recursive Broiler.Documents
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -164,9 +170,11 @@ jobs:
 
       # A console runner, not an xunit project: its Main returns the failure
       # count, so a non-zero exit fails the step. It runs because
-      # Broiler.Documents.Model builds against Broiler.Graphics.
+      # Broiler.Documents.Model builds against Broiler.Graphics — and against
+      # the checkout nested inside Broiler.Documents, which is the one exercised
+      # here rather than the top-level one.
       - name: Run the Graphics test runner
-        run: dotnet run --project Broiler.Graphics/Broiler.Graphics.Tests/Broiler.Graphics.Tests.csproj -c Release
+        run: dotnet run --project Broiler.Documents/Broiler.Graphics/src/tests/Broiler.Graphics.Tests/Broiler.Graphics.Tests.csproj -c Release
 
       - name: Upload test results
         if: always()

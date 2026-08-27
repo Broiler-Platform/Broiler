@@ -134,7 +134,7 @@ references were thought to be the only thing compiling the Broiler.UI closure
 against the `browser-wasm` runtime identifier; in fact its browser-RID build
 compiles a single empty marker class, no workflow ever built it with that RID,
 and no workflow builds that solution at all. The live closure check is
-`src/Broiler.Writer.WebAssembly`, published for `browser-wasm` by the
+`Broiler.Writer/src/Broiler.Writer.WebAssembly`, published for `browser-wasm` by the
 preview-package workflow over a comparably wide Broiler.UI graph.
 
 Genuinely lost: the normalized input-trace baseline over the `UiInputEvent`

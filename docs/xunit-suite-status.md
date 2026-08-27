@@ -21,14 +21,22 @@ most of what is listed below, and it is worth fixing before the list is.
 
 ## Where it stands
 
-29 xUnit projects, ~4 800 `[Fact]`s plus theory cases. 27 are green:
+Nine xUnit projects are still owned by this repository. The
+`Broiler.Documents.*.Tests` (7) and `Broiler.UI.*.Tests` (11) suites this file used
+to inventory moved out with their components and are now run by
+`Broiler.Documents/Broiler.Documents.slnx` and `Broiler.UI/Broiler.UI.slnx` inside
+those submodules; the application suites live in
+`Broiler.Browser/Broiler.Browser.Tests.slnx` and
+`Broiler.Writer/Broiler.Writer.Tests.slnx`. This file no longer answers "is this
+failure mine?" for any of them — ask the owning repository instead.
+
+The result column below is the last measurement taken while those suites were
+in-tree; it has not been re-measured since the split.
 
 | Project group | Projects | Result |
 | --- | --- | --- |
-| `Broiler.Documents.*.Tests` | 7 | green |
-| `Broiler.UI.*.Tests` | 11 | green |
 | `Broiler.Layout.Tests` | 1 | green — 1 317 tests |
-| `src/*.Tests` except the two below | 8 | green |
+| `src/*.Tests` except the two below | 6 | green |
 | `src/Broiler.Wpt.Tests` | 1 | **84 failing** of 1 194 |
 | `src/Broiler.Cli.Tests` | 1 | **45 failing** of 4 190 (42 distinct tests) |
 

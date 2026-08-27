@@ -12,9 +12,9 @@
     <!-- Abstractions only. Concrete codecs (managed audio, MediaFoundation video) and the
          Graphics.Windows HWND target are supplied by the composition root via IMediaOutputProvider
          and the MediaCodecCatalog handed to MediaPlayer. -->
-    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media\Broiler.Media.csproj" />
-    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Audio\Broiler.Media.Audio.csproj" />
-    <ProjectReference Include="..\..\Broiler.Media\Broiler.Media.Video\Broiler.Media.Video.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\src\Broiler.Media\Broiler.Media.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\src\Broiler.Media.Audio\Broiler.Media.Audio.csproj" />
+    <ProjectReference Include="..\..\Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" />
   </ItemGroup>
 
 </Project>

@@ -93,10 +93,10 @@ jobs:
     timeout-minutes: 120
     env:
       BPP_BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
-      BROWSER_PROJECT_PATH: src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj
-      WRITER_PROJECT_PATH: src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj
+      BROWSER_PROJECT_PATH: Broiler.Browser/src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj
+      WRITER_PROJECT_PATH: Broiler.Writer/src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj
       BOSS_PROJECT_PATH: Broiler.Office.Server/Broiler.Office.Server.csproj
-      WRITER_CLIENT_PROJECT_PATH: src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj
+      WRITER_CLIENT_PROJECT_PATH: Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj
 
     steps:
       - name: Checkout selected branch
@@ -370,10 +370,10 @@ jobs:
     timeout-minutes: 120
     env:
       BPP_BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
-      BROWSER_PROJECT_PATH: src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj
-      WRITER_PROJECT_PATH: src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj
+      BROWSER_PROJECT_PATH: Broiler.Browser/src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj
+      WRITER_PROJECT_PATH: Broiler.Writer/src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj
       BOSS_PROJECT_PATH: Broiler.Office.Server/Broiler.Office.Server.csproj
-      WRITER_CLIENT_PROJECT_PATH: src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj
+      WRITER_CLIENT_PROJECT_PATH: Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj
 
     steps:
       - name: Checkout selected branch
@@ -667,8 +667,8 @@ jobs:
       signing-certificate-sha256: ${{ steps.sign-android-packages.outputs.certificate-sha256 }}
     env:
       BPP_BUILD_TAG: ${{ needs.resolve-preview-package-tag.outputs.build-tag }}
-      BROWSER_PROJECT_PATH: src/Broiler.Browser.Android/Broiler.Browser.Android.csproj
-      WRITER_PROJECT_PATH: src/Broiler.Writer.Android/Broiler.Writer.Android.csproj
+      BROWSER_PROJECT_PATH: Broiler.Browser/src/Broiler.Browser.Android/Broiler.Browser.Android.csproj
+      WRITER_PROJECT_PATH: Broiler.Writer/src/Broiler.Writer.Android/Broiler.Writer.Android.csproj
       # The compile API and the build-tools track the android workload's Microsoft.Android.Sdk
       # major; bump them together with scripts/install-android-sdk.sh.
       ANDROID_API_LEVEL: '36'

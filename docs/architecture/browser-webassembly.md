@@ -35,13 +35,13 @@ contracts.
 
 ## Repository topology
 
-- [`Broiler.Graphics.WebAssembly`](../../Broiler.Graphics/Broiler.Graphics.WebAssembly/)
+- [`Broiler.Graphics.WebAssembly`](../../Broiler.Graphics/src/Broiler.Graphics.WebAssembly/)
   replays supported render commands directly to Canvas 2D.
-- [`Broiler.UI.WebAssembly.Demo`](../../Broiler.UI/samples/WebAssembly/Broiler.UI.WebAssembly.Demo/)
+- [`Broiler.UI.WebAssembly.Demo`](../../Broiler.UI/src/samples/WebAssembly/Broiler.UI.WebAssembly.Demo/)
   is the reusable control/host proof.
-- [`Broiler.Writer.WebAssembly`](../../src/Broiler.Writer.WebAssembly/) is the
+- [`Broiler.Writer.WebAssembly`](../../Broiler.Writer/src/Broiler.Writer.WebAssembly/) is the
   application port.
-- [`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/)
+- [`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/)
   and the [Broiler Code payload probes](../../tests/broiler-code-phase0/payload-probes/)
   are the supported WebAssembly test entry points, registered in
   `Broiler.WebAssembly.Tests.slnx`.
@@ -122,7 +122,7 @@ root registered no `Broiler.Graphics` image-codec catalog, so the blobs were
 never checked against anything. Render-command semantics that the fixture was
 meant to pin (clip and transform stacks unwinding independently, run
 interleaving) are covered by
-[`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/Broiler.Graphics.WebAssembly.Tests/).
+[`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/).
 
 What remains uncovered, and worth rebuilding deliberately rather than restoring,
 is a normalized input-trace baseline over the `UiInputEvent` projection —
