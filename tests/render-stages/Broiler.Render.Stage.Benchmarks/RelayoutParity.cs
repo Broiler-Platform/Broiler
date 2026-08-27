@@ -121,8 +121,7 @@ internal static class RelayoutParity
     private static byte[] Render(Corpus.Page page, RelayoutProfile.MutationCase mutation, out bool skipped)
     {
         var clip = new RectangleF(0, 0, Width, Height);
-        var parser = new HtmlDocumentParser();
-        var document = parser.ParseDocument(page.Html).Document;
+        var document = HtmlDocumentParser.ParseDocument(page.Html).Document;
 
         using var bitmap = new BBitmap(Width, Height);
         using var container = new HtmlContainer();
