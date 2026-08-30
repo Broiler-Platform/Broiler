@@ -23,20 +23,26 @@
     components that have no top-level checkout, are deliberately left alone; see the
     generator for the list and the reasons.
 
-    200 reference(s) across 78 project(s).
+    203 reference(s) across 79 project(s).
   -->
 
   <!--
     Deliberately NOT redirected:
-         8 reference(s)  Broiler.Browser/Broiler.DOM: pin differs (mirror 8f13a228b3, canonical 433ec9254a) and the trees cannot be compared
          2 reference(s)  Broiler.Browser/Broiler.HTML: pin differs and 1 build input(s) differ: Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
-        51 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
-         1 reference(s)  Broiler.HTML/Broiler.Graphics: pin differs and 177 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.sln (+175 more)
+        14 reference(s)  Broiler.Browser/Broiler.UI: pin differs and 28 build input(s) differ: Broiler.UI.slnx, src/Abstractions/Shell/Broiler.UI.Dialog/UiDialog.cs (+26 more)
+        45 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
+         1 reference(s)  Broiler.HTML/Broiler.Graphics: pin differs and 182 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs (+180 more)
          1 reference(s)  Broiler.JS/Broiler.DateTime: no canonical top-level checkout
          1 reference(s)  Broiler.JS/Broiler.Regex: no canonical top-level checkout
          3 reference(s)  Broiler.JS/Broiler.Unicode: no canonical top-level checkout
-         2 reference(s)  Broiler.Media/Broiler.Graphics: pin differs and 177 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.sln (+175 more)
   -->
+
+  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Cli\Broiler.Documents.Cli.csproj'">
+    <ProjectReference Remove="..\..\Broiler.Graphics\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
+    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
+    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
+    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
+  </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Html\Broiler.Documents.Html.csproj'">
     <ProjectReference Remove="..\..\Broiler.DOM\Broiler.Dom.Html\Broiler.Dom.Html.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.DOM\Broiler.Dom.Html\Broiler.Dom.Html.csproj')" />
@@ -51,6 +57,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj'">
+    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
+    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj')" />
   </ItemGroup>
