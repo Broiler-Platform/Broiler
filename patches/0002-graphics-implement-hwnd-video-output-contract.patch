@@ -1,0 +1,298 @@
+From 171443242a0f6a651582bd7bfbe944f14eace7ba Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 30 Aug 2026 08:30:38 +0000
+Subject: [PATCH] Implement the Media borrowed-HWND contract instead of being
+ referenced by it
+
+HwndVideoOutput is the HWND-backed video presentation target this component
+owns and a Windows video backend borrows. Until now the backend named this
+concrete class, so Broiler.Media referenced Broiler.Graphics while Graphics
+referenced Broiler.Media.Image and Broiler.Media.Video -- a component-level
+dependency cycle that forced each repository to carry a submodule checkout
+of the other and made one aggregate build compile Broiler.Media.Image twice
+from two source trees.
+
+Broiler.Media now declares the borrower's view of the target as
+IHwndVideoOutput in Broiler.Media.Video.Windows. Implement it here, so the
+dependency runs one way only: this component references a Media contract,
+and Media references nothing here. Window creation, resize, visibility and
+destruction stay owned here, unchanged -- IHwndVideoOutput deliberately
+carries no owner-only operation, so Resize, SetVisible and NotifyDestroyed
+are reachable only by the window's owner. Keep them off the interface.
+
+HwndVideoTargetChangeKind and HwndVideoTargetChangedEventArgs move to the
+contracts assembly with the interface; they are re-exposed from there, so
+external consumers of those two type names need a using change.
+
+Take over the tests for the concrete target. They lived in Broiler.Media's
+Media Foundation suite, which could reach this type only because of the
+reference that closed the cycle; the type is declared here, so its coverage
+belongs here. Media keeps testing its side of the contract against its own
+double.
+
+Requires the matching Broiler.Media change (its ADR 0006). Bump this
+component's Broiler.Media gitlink to a commit containing
+Broiler.Media.Video.Windows when applying.
+---
+ .../Broiler.Graphics.Direct2D.csproj          |  10 +-
+ .../HwndVideoOutput.cs                        |  26 +++--
+ .../HwndVideoTargetChangeKind.cs              |  12 ---
+ .../HwndVideoTargetChangedEventArgs.cs        |  36 -------
+ .../HwndVideoOutputTests.cs                   | 101 ++++++++++++++++++
+ .../Broiler.Graphics.Windows.Tests/Program.cs |   1 +
+ 6 files changed, 125 insertions(+), 61 deletions(-)
+ delete mode 100644 src/Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs
+ delete mode 100644 src/Broiler.Graphics.Windows/HwndVideoTargetChangedEventArgs.cs
+ create mode 100644 src/tests/Broiler.Graphics.Windows.Tests/HwndVideoOutputTests.cs
+
+diff --git a/src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj b/src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj
+index 45f49c6..02833b2 100644
+--- a/src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj
++++ b/src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj
+@@ -26,11 +26,13 @@
+ 
+   <ItemGroup>
+     <ProjectReference Include="..\Broiler.Graphics\Broiler.Graphics.csproj" />
+-    <!-- Graphics.Windows declares the HWND-backed video presentation target
+-         (HwndVideoOutput) implementing the Broiler.Media.Video output lifecycle, per the
+-         media roadmap §6.6/§7.5. It references only the Video ABSTRACTION, never a codec
+-         implementation. -->
++    <!-- Graphics.Windows owns the HWND-backed video presentation target (HwndVideoOutput),
++         which implements Broiler.Media.Video.Windows' IHwndVideoOutput contract per the media
++         roadmap §6.6/§7.5. It references only the Video ABSTRACTIONS, never a codec
++         implementation — and the dependency runs this way only: Media references nothing
++         here (Broiler.Media ADR 0006). -->
+     <ProjectReference Include="..\..\Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" />
++    <ProjectReference Include="..\..\Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" />
+   </ItemGroup>
+ 
+ </Project>
+diff --git a/src/Broiler.Graphics.Windows/HwndVideoOutput.cs b/src/Broiler.Graphics.Windows/HwndVideoOutput.cs
+index 8522d80..0c41514 100644
+--- a/src/Broiler.Graphics.Windows/HwndVideoOutput.cs
++++ b/src/Broiler.Graphics.Windows/HwndVideoOutput.cs
+@@ -4,25 +4,33 @@ using System.Runtime.Versioning;
+ using System.Threading;
+ using System.Threading.Tasks;
+ using Broiler.Media;
+-using Broiler.Media.Video;
++using Broiler.Media.Video.Windows;
+ 
+ namespace Broiler.Graphics.Windows;
+ 
+ /// <summary>
+-/// A Windows HWND-backed video presentation target, declared and owned by
+-/// <c>Broiler.Graphics.Windows</c> (which owns the window lifetime). It implements the
+-/// platform-neutral <see cref="IVideoOutput"/> lifecycle so a video backend such as
++/// A Windows HWND-backed video presentation target, created and owned by
++/// <c>Broiler.Graphics.Windows</c> (which owns the window lifetime). It implements
++/// <see cref="IHwndVideoOutput"/> so a video backend such as
+ /// <c>Broiler.Media.Video.MediaFoundation</c> can <em>borrow</em> it and drive
+ /// <c>IMFMediaEngine</c> against its HWND without ever creating or destroying the window.
+ /// </summary>
+ /// <remarks>
+-/// This type is the presentation-target contract required by the Broiler.Media roadmap
+-/// (§6.6 / §7.5): the HWND is declared and owned here in Graphics.Windows; the Media
+-/// Foundation implementation references this assembly and treats the handle's lifetime and
+-/// thread affinity as external constraints.
++/// <para>
++/// This type is the presentation target required by the Broiler.Media roadmap (§6.6 / §7.5):
++/// the HWND is created and owned here in Graphics.Windows, and a borrowing backend treats the
++/// handle's lifetime and thread affinity as external constraints.
++/// </para>
++/// <para>
++/// The dependency runs one way: this assembly references the Media contract, and Media
++/// references nothing here. The borrower sees only <see cref="IHwndVideoOutput"/>, which
++/// carries no owner-only operation — so <see cref="Resize"/>, <see cref="SetVisible"/> and
++/// <see cref="NotifyDestroyed"/> below are reachable only by the window's owner. Keep them off
++/// the interface (Broiler.Media ADR 0006).
++/// </para>
+ /// </remarks>
+ [SupportedOSPlatform("windows")]
+-public sealed class HwndVideoOutput : IVideoOutput
++public sealed class HwndVideoOutput : IHwndVideoOutput
+ {
+     private readonly object _gate = new();
+ 
+diff --git a/src/Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs b/src/Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs
+deleted file mode 100644
+index 419e88d..0000000
+--- a/src/Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs
++++ /dev/null
+@@ -1,12 +0,0 @@
+-namespace Broiler.Graphics.Windows;
+-
+-/// <summary>
+-/// The kind of change reported by an <see cref="HwndVideoOutput"/> when the window it
+-/// presents into is resized, shown/hidden, or destroyed by its owner.
+-/// </summary>
+-public enum HwndVideoTargetChangeKind
+-{
+-    Resized,
+-    VisibilityChanged,
+-    Destroyed,
+-}
+diff --git a/src/Broiler.Graphics.Windows/HwndVideoTargetChangedEventArgs.cs b/src/Broiler.Graphics.Windows/HwndVideoTargetChangedEventArgs.cs
+deleted file mode 100644
+index 4c4e84e..0000000
+--- a/src/Broiler.Graphics.Windows/HwndVideoTargetChangedEventArgs.cs
++++ /dev/null
+@@ -1,36 +0,0 @@
+-using System;
+-
+-namespace Broiler.Graphics.Windows;
+-
+-/// <summary>
+-/// Notifies a borrower (e.g. a Media Foundation video session) that the HWND-backed
+-/// presentation target owned by <see cref="HwndVideoOutput"/> changed size, visibility,
+-/// or was destroyed.
+-/// </summary>
+-public sealed class HwndVideoTargetChangedEventArgs : EventArgs
+-{
+-    public HwndVideoTargetChangedEventArgs(
+-        HwndVideoTargetChangeKind kind,
+-        int width,
+-        int height,
+-        bool isVisible)
+-    {
+-        if (width < 0)
+-            throw new ArgumentOutOfRangeException(nameof(width));
+-        if (height < 0)
+-            throw new ArgumentOutOfRangeException(nameof(height));
+-
+-        Kind = kind;
+-        Width = width;
+-        Height = height;
+-        IsVisible = isVisible;
+-    }
+-
+-    public HwndVideoTargetChangeKind Kind { get; }
+-
+-    public int Width { get; }
+-
+-    public int Height { get; }
+-
+-    public bool IsVisible { get; }
+-}
+diff --git a/src/tests/Broiler.Graphics.Windows.Tests/HwndVideoOutputTests.cs b/src/tests/Broiler.Graphics.Windows.Tests/HwndVideoOutputTests.cs
+new file mode 100644
+index 0000000..537b5ae
+--- /dev/null
++++ b/src/tests/Broiler.Graphics.Windows.Tests/HwndVideoOutputTests.cs
+@@ -0,0 +1,101 @@
++using System;
++using System.Collections.Generic;
++using Broiler.Media;
++using Broiler.Media.Video;
++using Broiler.Media.Video.Windows;
++
++namespace Broiler.Graphics.Windows.Tests;
++
++/// <summary>
++/// Coverage for the HWND-backed video presentation target this assembly owns.
++/// </summary>
++/// <remarks>
++/// These assertions used to live in Broiler.Media's Media Foundation suite, which could reach
++/// the concrete type because Media referenced this assembly. That reference closed a
++/// component-level dependency cycle and was removed (Broiler.Media ADR 0006); the type is
++/// declared here, so its tests belong here too. Broiler.Media now tests only its side of the
++/// <see cref="IHwndVideoOutput"/> contract, against its own double.
++/// </remarks>
++internal static class HwndVideoOutputTests
++{
++    public static void Register(ICollection<(string Name, Action Body)> tests)
++    {
++        tests.Add(("HwndVideoOutput rejects a zero window handle", RejectsZeroHandle));
++        tests.Add(("HwndVideoOutput reports resize, visibility and destruction to its borrower", ReportsLifecycle));
++        tests.Add(("HwndVideoOutput refuses use after its owner destroys the window", RefusesUseAfterDestroy));
++        tests.Add(("HwndVideoOutput records media output completion and failure", RecordsOutputState));
++        tests.Add(("HwndVideoOutput satisfies the borrowed-target contract", SatisfiesContract));
++    }
++
++    private static void RejectsZeroHandle() =>
++        Assert.Throws<ArgumentException>(() => _ = new HwndVideoOutput(0, "zero", 1, 1, validateNativeWindow: false));
++
++    private static void ReportsLifecycle()
++    {
++        HwndVideoOutput target = CreateTarget();
++        var changes = new List<HwndVideoTargetChangeKind>();
++        target.TargetChanged += (_, e) => changes.Add(e.Kind);
++
++        target.Resize(800, 450);
++        target.SetVisible(false);
++        target.NotifyDestroyed();
++
++        Assert.AreEqual(800, target.Width);
++        Assert.AreEqual(450, target.Height);
++        Assert.True(!target.IsVisible, "Expected the target to report itself hidden.");
++        Assert.True(target.IsDestroyed, "Expected the target to report itself destroyed.");
++
++        HwndVideoTargetChangeKind[] expected =
++        [
++            HwndVideoTargetChangeKind.Resized,
++            HwndVideoTargetChangeKind.VisibilityChanged,
++            HwndVideoTargetChangeKind.Destroyed,
++        ];
++
++        Assert.AreEqual(expected.Length, changes.Count, "Unexpected number of target-change notifications.");
++        for (int i = 0; i < expected.Length; i++)
++            Assert.AreEqual(expected[i], changes[i], $"Target-change notification {i} differs.");
++    }
++
++    private static void RefusesUseAfterDestroy()
++    {
++        HwndVideoOutput target = CreateTarget();
++        target.NotifyDestroyed();
++
++        Assert.Throws<ObjectDisposedException>(() => target.Resize(1, 1));
++        Assert.Throws<ObjectDisposedException>(target.ThrowIfUsableTargetRequired);
++    }
++
++    private static void RecordsOutputState()
++    {
++        HwndVideoOutput completed = CreateTarget();
++        completed.CompleteAsync().AsTask().GetAwaiter().GetResult();
++        Assert.True(completed.Completed, "Expected the target to record completion.");
++
++        HwndVideoOutput failed = CreateTarget();
++        var error = new MediaError(MediaErrorCode.OutputFailed, "target failed");
++        failed.FailAsync(error).AsTask().GetAwaiter().GetResult();
++        Assert.AreEqual(error, failed.Failure);
++    }
++
++    private static void SatisfiesContract()
++    {
++        // The borrowed-HWND split of ADR 0005 only holds if a borrower reaches this type
++        // through the contract; handing one the concrete class is what rebuilt the cycle
++        // before. Assert the target is usable purely as IHwndVideoOutput.
++        IHwndVideoOutput target = CreateTarget();
++
++        Assert.AreEqual((nint)1234, target.Hwnd);
++        Assert.AreEqual(640, target.Width);
++        Assert.AreEqual(360, target.Height);
++        Assert.True(target.IsVisible, "Expected a freshly created target to be visible.");
++        Assert.True(!target.IsDestroyed, "Expected a freshly created target to be live.");
++        Assert.AreEqual("test hwnd", target.DisplayName);
++        Assert.True(target is IVideoOutput, "The borrowed target must remain a platform-neutral video output.");
++
++        target.ThrowIfUsableTargetRequired();
++    }
++
++    private static HwndVideoOutput CreateTarget() =>
++        new((nint)1234, "test hwnd", 640, 360, validateNativeWindow: false);
++}
+diff --git a/src/tests/Broiler.Graphics.Windows.Tests/Program.cs b/src/tests/Broiler.Graphics.Windows.Tests/Program.cs
+index 9f3addf..604c91e 100644
+--- a/src/tests/Broiler.Graphics.Windows.Tests/Program.cs
++++ b/src/tests/Broiler.Graphics.Windows.Tests/Program.cs
+@@ -18,6 +18,7 @@ internal static class Program
+ 
+         var tests = new List<(string Name, Action Body)>();
+         WindowsImageTests.Register(tests);
++        HwndVideoOutputTests.Register(tests);
+ 
+         int passed = 0;
+         var failures = new List<string>();
+-- 
+2.43.0
+
