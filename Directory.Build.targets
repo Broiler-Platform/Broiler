@@ -27,4 +27,52 @@
     <ProjectReference Include="$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
   </ItemGroup>
 
+  <!--
+    Broiler.Graphics carries its own Broiler.Media submodule so it builds standalone, and its
+    project references are relative, so they resolve into that NESTED checkout. In the aggregate
+    workspace that means one build compiles Broiler.Media twice: once from Broiler.Media\src\ for
+    everything else, once from Broiler.Graphics\Broiler.Media\src\ for Graphics — two assemblies
+    with the same name, one of which wins the copy into any output directory that sees both.
+    `dotnet build src\Broiler.HtmlBridge.Dom` did exactly that, since it references Broiler.Graphics
+    and Broiler.Media.Image side by side. Broiler.Media ADR 0001 forbids it: during aggregate
+    development every local project reference to Media must point at the single root checkout.
+
+    So point Graphics' Media references back at the canonical checkout. Harmless while the two
+    pins agree — which is the normal case, and is why the duplicate went unnoticed — and correct
+    when they do not.
+
+    Unlike the two Broiler.HTML blocks above, this is not a migration workaround with a deletion
+    trigger: a component that must build standalone will always carry a checkout of what it
+    depends on, so the aggregate workspace will always have a mirror to redirect. Add a line here
+    when Graphics gains a Media reference.
+  -->
+  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj'">
+    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Image\Broiler.Media.Image.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Image\Broiler.Media.Image.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj'">
+    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" />
+
+    <!--
+      Broiler.Media.Video.Windows arrives with the borrowed-HWND contract patches under patches\
+      (Broiler.Media ADR 0006), which Direct2D references once applied. Redirecting it is what
+      lets the two submodules land in either order: without this, applying the Graphics patch
+      before bumping that component's own Broiler.Media gitlink leaves Direct2D pointing at a
+      project its mirror does not have, and the build fails outright. The Exists guard keeps this
+      inert until the Media patch lands; between the two patches it adds a reference Direct2D does
+      not yet declare, which is unused and harmless.
+    -->
+    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj"
+                      Condition="Exists('$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
+  </ItemGroup>
+
+  <!-- The Graphics test projects are the composition roots that supply the concrete codecs. -->
+  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.Graphics\src\tests\Broiler.Graphics.Tests\Broiler.Graphics.Tests.csproj' Or '$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.Graphics\src\tests\Broiler.Graphics.Linux.Tests\Broiler.Graphics.Linux.Tests.csproj' Or '$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.Graphics\src\tests\Broiler.Graphics.Windows.Tests\Broiler.Graphics.Windows.Tests.csproj'">
+    <ProjectReference Remove="..\..\..\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" />
+  </ItemGroup>
+
 </Project>

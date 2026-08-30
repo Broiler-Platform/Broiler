@@ -51,13 +51,18 @@ submodule is dropped. The reasoning is recorded as Broiler.Media ADR 0006, added
 ### Applying
 
 1. `git am` 0001 in `Broiler.Media`, push, bump this repository's `Broiler.Media` gitlink.
-2. `git am` 0002 in `Broiler.Graphics`, and **in the same commit bump that component's own
-   `Broiler.Media` gitlink** to a commit containing `Broiler.Media.Video.Windows`. Its
-   relative project references resolve to its nested `Broiler.Media` mirror, so without the
-   bump `Broiler.Graphics.Direct2D` references a project that mirror does not have. Push,
-   then bump this repository's `Broiler.Graphics` gitlink.
+2. `git am` 0002 in `Broiler.Graphics`, push, bump this repository's `Broiler.Graphics` gitlink.
+   Bump that component's own `Broiler.Media` gitlink too, to a commit containing
+   `Broiler.Media.Video.Windows` — its relative project references resolve to its nested
+   `Broiler.Media` mirror, so a standalone `Broiler.Graphics` build needs it.
 
 Order matters only in that step 2's gitlink bump needs step 1's commit to exist upstream.
+**Root builds tolerate either order**, including step 2 without that inner gitlink bump: the
+`Directory.Build.targets` redirect described below points Graphics' Media references at the
+canonical top-level checkout. Verified — with both patches applied and the inner gitlink left
+un-bumped, `Broiler.Graphics.Direct2D` builds clean with the redirect and fails with
+`CS0234: The type or namespace name 'Windows' does not exist in the namespace
+'Broiler.Media.Video'` without it.
 
 ### Breaking change
 
@@ -82,13 +87,23 @@ submodule pointer changes here, so the parent builds unchanged with the patches 
 | `Broiler.Graphics.Windows.Tests` | 5/5 new; 6 pre-existing failures are `DllNotFoundException: d3d11.dll` (Windows natives absent on Linux) |
 | `Broiler.HtmlBridge.Dom`, `Broiler.Layout`, `Broiler.Playback`, `Broiler.Wpt` | build clean |
 
-### Known issue this does *not* fix
+### The nested-mirror duplicate, fixed alongside
 
-`Broiler.Graphics` still carries a `Broiler.Media` submodule (it must, to build standalone),
-and its relative project references still resolve to that nested mirror, so an aggregate-
-workspace build still compiles `Broiler.Media.Image` twice. That is benign only while the two
-pins match — which is not enforced. The durable fix is a `Directory.Build.targets` redirect in
-this repository, like the two blocks already there for `Broiler.HTML`, pointing
-`Broiler.Graphics`' Media references at the canonical top-level checkout. It is deliberately
-left out of this change: it touches the build of every `Broiler.Graphics` project and is
-independent of the cycle.
+`Broiler.Graphics` still carries a `Broiler.Media` submodule — it must, to build standalone —
+and its relative project references resolve into that nested mirror. So an aggregate build
+used to compile `Broiler.Media` twice, from two source trees, emitting same-named assemblies.
+
+`Directory.Build.targets` now redirects all five of those references to the canonical
+top-level checkout, in the same explicit style as the two `Broiler.HTML` blocks already there.
+Verified by rebuilding `src/Broiler.HtmlBridge.Dom` from clean: the nested mirror is left with
+no `obj/` at all, and every `Broiler.Media.Image.dll` in the workspace now derives from the one
+canonical compilation.
+
+This is orthogonal to the patches — it holds with them applied or not — but it is what makes
+the apply order above forgiving.
+
+Still open, and out of scope here: the same nested-mirror pattern appears **331 times**
+workspace-wide (`Broiler.Browser`, `Broiler.Writer`, `Broiler.UI` and others each carry their
+own mirrors and reference them the same way). Only the `Broiler.Graphics` → `Broiler.Media`
+edge was measured to duplicate a compile in a root build, so only it is redirected. Whether the
+rest are reached by root solutions has not been established.
