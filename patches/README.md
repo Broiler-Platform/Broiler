@@ -1,21 +1,25 @@
 # Submodule patches awaiting upstream
 
-Changes that belong in a `Broiler-Platform/Broiler.*` submodule but could not be pushed
-from the session that wrote them: those remotes are outside the session's GitHub scope, so
-`git push` returns 403. Each patch is captured here for a maintainer to apply upstream; the
-submodule pointers in this repository are deliberately **not** bumped, because CI clones each
-submodule by pointer and a pointer whose commit does not exist upstream would break it.
+Changes that belong in a `Broiler-Platform/Broiler.*` submodule. A session can only push to
+the repositories in its GitHub scope, so these are captured here as patches when that push is
+denied; the submodule pointers in this repository stay **unbumped** meanwhile, because CI clones
+each submodule by pointer and a pointer whose commit does not exist upstream would break it.
 
 Apply with `git am` inside the target submodule, push, then bump the gitlink here.
+
+**Both patches below are now pushed upstream as branches with open pull requests** — see the
+table. They are kept here until those merge, as the record of what is proposed and as the
+fallback if either branch is dropped. Delete them once the pull requests land and this
+repository's gitlinks are bumped.
 
 This directory is a backlog, not an archive: delete a patch once its fix is upstream, and
 renumber from `0001` against whatever is left. A `patches/NNNN` reference in an older commit
 message or document is therefore almost always dangling — name the **commit subject** instead.
 
-| Patch | Target submodule | Commit subject |
+| Patch | Target submodule | Pull request |
 |---|---|---|
-| `0001-media-break-graphics-dependency-cycle.patch` | `Broiler.Media` | Break the Media/Graphics dependency cycle: Media depends on nothing |
-| `0002-graphics-implement-hwnd-video-output-contract.patch` | `Broiler.Graphics` | Implement the Media borrowed-HWND contract instead of being referenced by it |
+| `0001-media-break-graphics-dependency-cycle.patch` | `Broiler.Media` | Broiler-Platform/Broiler.Media#3 |
+| `0002-graphics-implement-hwnd-video-output-contract.patch` | `Broiler.Graphics` | Broiler-Platform/Broiler.Graphics#18 |
 
 ## 0001 + 0002 — breaking the Broiler.Media ↔ Broiler.Graphics cycle
 
@@ -104,7 +108,7 @@ the apply order above forgiving.
 
 The redirect has since been generalised to the whole workspace — see
 `scripts/generate-aggregate-reference-redirects.py` and the generated
-`eng/aggregate-workspace-references.targets`, which cover 194 references across 77 projects.
+`eng/aggregate-workspace-references.targets`, which cover 198 references across 77 projects.
 A full root build now compiles nothing inside a mirror except the deliberate exclusions below.
 
 One of those exclusions is `Broiler.Media/Broiler.Graphics`: its pin (`cb83c76`, the pre-`src/`
