@@ -23,27 +23,29 @@
     components that have no top-level checkout, are deliberately left alone; see the
     generator for the list and the reasons.
 
-    198 reference(s) across 77 project(s).
+    127 reference(s) across 30 project(s).
   -->
 
   <!--
     Deliberately NOT redirected:
+         7 reference(s)  Broiler.Browser/Broiler.Graphics: pin differs and 12 build input(s) differ: src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj, src/Broiler.Graphics.Windows/Direct2DWindow.cs (+10 more)
          2 reference(s)  Broiler.Browser/Broiler.HTML: pin differs and 1 build input(s) differ: Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
-        59 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
+         3 reference(s)  Broiler.Browser/Broiler.Media: pin differs and 13 build input(s) differ: Broiler.Media.slnx, src/Broiler.Media.Video.MediaFoundation/Broiler.Media.Video.MediaFoundation.csproj (+11 more)
+        49 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
          2 reference(s)  Broiler.Documents/Broiler.DOM: pin differs and 2 build input(s) differ: Directory.Build.props, eng/Broiler.Packaging.props
-         1 reference(s)  Broiler.HTML/Broiler.Graphics: pin differs and 177 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.sln (+175 more)
+         1 reference(s)  Broiler.Documents/Broiler.Graphics: pin differs and 12 build input(s) differ: src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj, src/Broiler.Graphics.Windows/Direct2DWindow.cs (+10 more)
+         1 reference(s)  Broiler.HTML/Broiler.Graphics: pin differs and 182 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs (+180 more)
          1 reference(s)  Broiler.JS/Broiler.DateTime: no canonical top-level checkout
          1 reference(s)  Broiler.JS/Broiler.Regex: no canonical top-level checkout
          3 reference(s)  Broiler.JS/Broiler.Unicode: no canonical top-level checkout
-         2 reference(s)  Broiler.Media/Broiler.Graphics: pin differs and 177 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.sln (+175 more)
+        61 reference(s)  Broiler.UI/Broiler.Graphics: pin differs and 12 build input(s) differ: src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj, src/Broiler.Graphics.Windows/Direct2DWindow.cs (+10 more)
+         7 reference(s)  Broiler.Writer/Broiler.Graphics: pin differs and 12 build input(s) differ: src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj, src/Broiler.Graphics.Windows/Direct2DWindow.cs (+10 more)
+         3 reference(s)  Broiler.Writer/Broiler.Media: pin differs and 13 build input(s) differ: Broiler.Media.slnx, src/Broiler.Media.Video.MediaFoundation/Broiler.Media.Video.MediaFoundation.csproj (+11 more)
   -->
 
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj'">
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj'">
+    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
+    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Video\Broiler.Media.Video.csproj')" />
   </ItemGroup>
@@ -83,133 +85,17 @@
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Commands\Broiler.UI.Button\Broiler.UI.Button.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Commands\Broiler.UI.Menu\Broiler.UI.Menu.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Commands\Broiler.UI.Toolbar\Broiler.UI.Toolbar.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Content\Broiler.UI.ImageView\Broiler.UI.ImageView.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Content\Broiler.UI.Label\Broiler.UI.Label.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Content\Broiler.UI.ProgressBar\Broiler.UI.ProgressBar.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Layout\Broiler.UI.ScrollView\Broiler.UI.ScrollView.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Layout\Broiler.UI.Splitter\Broiler.UI.Splitter.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Layout\Broiler.UI.TabView\Broiler.UI.TabView.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Shell\Broiler.UI.Dialog\Broiler.UI.Dialog.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Shell\Broiler.UI.FileDialog\Broiler.UI.FileDialog.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Shell\Broiler.UI.FontDialog\Broiler.UI.FontDialog.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Shell\Broiler.UI.Tooltip\Broiler.UI.Tooltip.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Shell\Broiler.UI.Window\Broiler.UI.Window.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Text\Broiler.UI.CodeEditor\Broiler.UI.CodeEditor.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Text\Broiler.UI.Edit\Broiler.UI.Edit.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Text\Broiler.UI.FormatCodeView\Broiler.UI.FormatCodeView.csproj'">
     <ProjectReference Remove="..\..\..\..\Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\Text\Broiler.UI.RichEdit\Broiler.UI.RichEdit.csproj'">
     <ProjectReference Remove="..\..\..\..\Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.CheckBox\Broiler.UI.CheckBox.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.ComboBox\Broiler.UI.ComboBox.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.ListView\Broiler.UI.ListView.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.RadioButton\Broiler.UI.RadioButton.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.Slider\Broiler.UI.Slider.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.TreeView\Broiler.UI.TreeView.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Foundation\Broiler.UI.Standard\Broiler.UI.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Remove="..\..\..\Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj')" />
@@ -223,8 +109,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Foundation\Broiler.UI\Broiler.UI.csproj'">
-    <ProjectReference Remove="..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Remove="..\..\..\Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj')" />
@@ -239,138 +123,14 @@
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input\Broiler.Input.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input\Broiler.Input.csproj')" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Commands\Broiler.UI.Button.Standard\Broiler.UI.Button.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Commands\Broiler.UI.Menu.Standard\Broiler.UI.Menu.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Commands\Broiler.UI.ToggleButton.Standard\Broiler.UI.ToggleButton.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Commands\Broiler.UI.Toolbar.Standard\Broiler.UI.Toolbar.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Content\Broiler.UI.ImageView.Standard\Broiler.UI.ImageView.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Content\Broiler.UI.Label.Standard\Broiler.UI.Label.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Content\Broiler.UI.ProgressBar.Standard\Broiler.UI.ProgressBar.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Layout\Broiler.UI.Panel.Standard\Broiler.UI.Panel.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Layout\Broiler.UI.ScrollView.Standard\Broiler.UI.ScrollView.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Layout\Broiler.UI.Splitter.Standard\Broiler.UI.Splitter.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Layout\Broiler.UI.TabView.Standard\Broiler.UI.TabView.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Shell\Broiler.UI.Dialog.Standard\Broiler.UI.Dialog.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Shell\Broiler.UI.FileDialog.Standard\Broiler.UI.FileDialog.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Shell\Broiler.UI.FontDialog.Standard\Broiler.UI.FontDialog.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Shell\Broiler.UI.Tooltip.Standard\Broiler.UI.Tooltip.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Shell\Broiler.UI.Window.Standard\Broiler.UI.Window.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.CodeEditor.Standard\Broiler.UI.CodeEditor.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.Edit.Standard\Broiler.UI.Edit.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.FormatCodeView.Standard\Broiler.UI.FormatCodeView.Standard.csproj'">
     <ProjectReference Remove="..\..\..\..\..\Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.FormatCodes\Broiler.Documents.FormatCodes.csproj')" />
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj'">
     <ProjectReference Remove="..\..\..\..\..\Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\ValueAndSelection\Broiler.UI.CheckBox.Standard\Broiler.UI.CheckBox.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\ValueAndSelection\Broiler.UI.ComboBox.Standard\Broiler.UI.ComboBox.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\ValueAndSelection\Broiler.UI.ListView.Standard\Broiler.UI.ListView.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\ValueAndSelection\Broiler.UI.RadioButton.Standard\Broiler.UI.RadioButton.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\ValueAndSelection\Broiler.UI.Slider.Standard\Broiler.UI.Slider.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\ValueAndSelection\Broiler.UI.TreeView.Standard\Broiler.UI.TreeView.Standard.csproj'">
-    <ProjectReference Remove="..\..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\Integrations\RichEdit\Broiler.UI.RichEdit.Rtf\Broiler.UI.RichEdit.Rtf.csproj'">
@@ -383,12 +143,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\samples\Linux\Broiler.UI.Linux.Demo\Broiler.UI.Linux.Demo.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
@@ -406,8 +160,6 @@
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\samples\RichEdit.Win32\Broiler.UI.RichEdit.Win32.Demo\Broiler.UI.RichEdit.Win32.Demo.csproj'">
     <ProjectReference Remove="..\..\..\..\Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj')" />
@@ -419,10 +171,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\samples\WebAssembly\Broiler.UI.WebAssembly.Demo\Broiler.UI.WebAssembly.Demo.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj')" />
@@ -434,8 +182,6 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\samples\Win32\Broiler.UI.Win32.Demo\Broiler.UI.Win32.Demo.csproj'">
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Camera.Windows\Broiler.Input.Camera.Windows.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Camera.Windows\Broiler.Input.Camera.Windows.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Camera.Windows\Broiler.Input.Camera.Windows.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Camera.Windows\Broiler.Input.Camera.Windows.csproj')" />
     <ProjectReference Remove="..\..\..\..\Broiler.Input\src\Broiler.Input.Camera\Broiler.Input.Camera.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Camera\Broiler.Input.Camera.csproj')" />
@@ -474,8 +220,6 @@
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\tests\Text\Broiler.UI.RichEdit.Rtf.Tests\Broiler.UI.RichEdit.Rtf.Tests.csproj'">
     <ProjectReference Remove="..\..\..\..\Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\tests\Text\Broiler.UI.RichEdit.Standard.Tests\Broiler.UI.RichEdit.Standard.Tests.csproj'">
@@ -486,13 +230,9 @@
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.UI\src\tests\Text\Broiler.UI.RichEdit.Tests\Broiler.UI.RichEdit.Tests.csproj'">
     <ProjectReference Remove="..\..\..\..\Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Model\Broiler.Documents.Model.csproj')" />
-    <ProjectReference Remove="..\..\..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Writer\src\Broiler.App.Android\Broiler.App.Android.csproj'">
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Android\Broiler.Input.Android.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Android\Broiler.Input.Android.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Android\Broiler.Input.Android.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Android\Broiler.Input.Android.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Keyboard.Android\Broiler.Input.Keyboard.Android.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Android\Broiler.Input.Keyboard.Android.csproj')" />
@@ -510,8 +250,6 @@
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Writer\src\Broiler.Writer.FormatCodes.Tests\Broiler.Writer.FormatCodes.Tests.csproj'">
     <ProjectReference Remove="..\..\Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
     <ProjectReference Remove="..\..\Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.UI\src\Implementations\Standard\Text\Broiler.UI.RichEdit.Standard\Broiler.UI.RichEdit.Standard.csproj')" />
   </ItemGroup>
@@ -528,18 +266,12 @@
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Writer\src\Broiler.Writer.Linux\Broiler.Writer.Linux.csproj'">
     <ProjectReference Remove="..\..\Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux.OpenGL\Broiler.Graphics.Linux.OpenGL.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Linux\Broiler.Graphics.Linux.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard.Linux\Broiler.Input.Keyboard.Linux.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Linux\Broiler.Input.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Linux\Broiler.Input.Linux.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Linux\Broiler.Input.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Linux\Broiler.Input.Linux.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse.Linux\Broiler.Input.Mouse.Linux.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Writer\src\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj'">
@@ -555,10 +287,6 @@
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.WebAssembly\Broiler.Graphics.WebAssembly.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj')" />
@@ -604,10 +332,6 @@
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Writer\src\Broiler.Writer.Windows\Broiler.Writer.Windows.csproj'">
     <ProjectReference Remove="..\..\Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Pdf\Broiler.Documents.Pdf.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Media\src\Broiler.Media.Image.Managed\Broiler.Media.Image.Managed.csproj')" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot)Broiler.Writer\src\Broiler.Writer\Broiler.Writer.Core.csproj'">
@@ -623,8 +347,6 @@
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents.Rtf\Broiler.Documents.Rtf.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Documents\src\Broiler.Documents\Broiler.Documents.csproj')" />
-    <ProjectReference Remove="..\..\Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
-    <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Include="$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Keyboard\Broiler.Input.Keyboard.csproj')" />
     <ProjectReference Remove="..\..\Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj" Condition="Exists('$(BroilerWorkspaceRoot)Broiler.Input\src\Broiler.Input.Mouse\Broiler.Input.Mouse.csproj')" />
