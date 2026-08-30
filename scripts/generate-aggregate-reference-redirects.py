@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""Regenerate eng/aggregate-workspace-references.targets.
+
+Every component submodule carries nested checkouts ("mirrors") of the components it
+depends on, so that it still builds standalone. Its project references are relative, so
+in the aggregate workspace they resolve into those mirrors rather than into the canonical
+top-level checkout. One root build then compiles the same component several times from
+several source trees, emitting assemblies that share a name -- `Broiler.Media` was built
+from nine different project paths, `Broiler.Graphics` from eight. Broiler.Media ADR 0001
+forbids it: during aggregate development every local project reference must point at the
+single root checkout.
+
+The root Directory.Build.props already collapses two kernels this way, via
+$(BroilerDomPath)/$(BroilerGraphicsPath): each submodule defaults the property to its own
+nested copy for standalone builds, and the root value wins in root builds. That mechanism
+is the better one, but it only works for references written as $(BroilerXPath), and the
+component submodules never adopted it -- their references are literal relative paths. This
+script covers those from the root instead, needing no submodule change.
+
+SAFETY -- a mirror is redirected only when its pinned commit matches the canonical
+checkout's, so the redirect cannot change which source compiles. Mirrors pinned to a
+different commit are left alone and reported; collapsing one would silently swap the
+sources that go into a shipping assembly, which is a decision for a human. Mirrors with no
+canonical top-level checkout at all (Broiler.JS vendors Broiler.Unicode, Broiler.Regex and
+Broiler.DateTime, which are not top-level submodules) cannot be redirected either.
+
+References carrying metadata (ReferenceOutputAssembly, OutputItemType,
+GlobalPropertiesToRemove) are skipped: the Remove/Include rewrite below would drop it.
+Today those are all inside Broiler.JS, which is excluded anyway.
+
+Usage:  python3 scripts/generate-aggregate-reference-redirects.py [--check]
+        --check exits non-zero if the generated file is stale.
+"""
+
+from __future__ import annotations
+
+import argparse
+import collections
+import os
+import re
+import subprocess
+import sys
+
+ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
+OUTPUT = os.path.join(ROOT, "eng", "aggregate-workspace-references.targets")
+
+REFERENCE_RE = re.compile(
+    r"<ProjectReference\b([^>]*?)/>|<ProjectReference\b([^>]*?)>(.*?)</ProjectReference>", re.S
+)
+INCLUDE_RE = re.compile(r'Include="([^"]+)"')
+
+
+def git_sha(path: str) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", path, "rev-parse", "HEAD"], capture_output=True, text=True
+    )
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def components() -> list[str]:
+    return sorted(
+        d
+        for d in os.listdir(ROOT)
+        if d.startswith("Broiler.") and os.path.isdir(os.path.join(ROOT, d))
+    )
+
+
+def discover_mirrors() -> dict[str, dict]:
+    """Nested directories that are their own git checkout of another component."""
+    canonical = {c: git_sha(os.path.join(ROOT, c)) for c in components()}
+    mirrors: dict[str, dict] = {}
+    for owner in components():
+        owner_dir = os.path.join(ROOT, owner)
+        for entry in sorted(os.listdir(owner_dir)):
+            nested = os.path.join(owner_dir, entry)
+            if not entry.startswith("Broiler."):
+                continue
+            if not os.path.isdir(nested) or not os.path.exists(os.path.join(nested, ".git")):
+                continue
+            mirror_sha = git_sha(nested)
+            canonical_sha = canonical.get(entry)
+            if canonical_sha is None:
+                reason = "no canonical top-level checkout"
+            elif mirror_sha != canonical_sha:
+                reason = f"pin differs (mirror {mirror_sha[:10]}, canonical {canonical_sha[:10]})"
+            else:
+                reason = None
+            mirrors[f"{owner}/{entry}"] = {
+                "owner": owner,
+                "component": entry,
+                "skip_reason": reason,
+            }
+    return mirrors
+
+
+def owning_mirror(relative_path: str, mirrors: dict) -> str | None:
+    parts = relative_path.split(os.sep)
+    for i in range(len(parts) - 1):
+        key = f"{parts[i]}/{parts[i + 1]}"
+        if key in mirrors:
+            return key
+    return None
+
+
+def nearest_build_targets(project: str) -> str | None:
+    """Directory owning the Directory.Build.targets MSBuild will import for this project.
+
+    Returns None when that is the workspace root (the file this generator feeds), or the
+    repo-relative directory of the shadowing file otherwise.
+    """
+    directory = os.path.dirname(project)
+    while True:
+        if os.path.exists(os.path.join(directory, "Directory.Build.targets")):
+            return None if directory == ROOT else os.path.relpath(directory, ROOT)
+        if directory == ROOT or os.path.dirname(directory) == directory:
+            return None
+        directory = os.path.dirname(directory)
+
+
+def project_files() -> list[str]:
+    found = []
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in ("bin", "obj", ".git")]
+        found.extend(
+            os.path.join(dirpath, f) for f in filenames if f.endswith(".csproj")
+        )
+    return sorted(found)
+
+
+def collect(mirrors: dict):
+    """Return (redirects, skipped) for references that resolve into a mirror."""
+    redirects = collections.defaultdict(list)
+    skipped = collections.Counter()
+    for project in project_files():
+        relative_project = os.path.relpath(project, ROOT)
+        # A project that itself lives inside a mirror is a copy; the canonical one is
+        # visited separately, so rewriting the copy would be pointless churn.
+        if owning_mirror(relative_project, mirrors):
+            continue
+        # MSBuild imports only the NEAREST Directory.Build.targets above a project. A
+        # component that ships its own (and does not chain upward) never sees the root one,
+        # so a redirect emitted for its projects would silently do nothing -- worse than not
+        # emitting it, because the file would claim coverage it does not have. Note this is
+        # decided below, once we know the project actually has references worth redirecting.
+        shadowed_by = nearest_build_targets(project)
+        try:
+            text = open(project, encoding="utf-8-sig").read()
+        except OSError:
+            continue
+        for match in REFERENCE_RE.finditer(text):
+            attributes = match.group(1) or match.group(2) or ""
+            body = (match.group(3) or "").strip()
+            include = INCLUDE_RE.search(attributes)
+            if not include:
+                continue
+            spec = include.group(1)
+            resolved = os.path.realpath(
+                os.path.join(os.path.dirname(project), spec.replace("\\", "/"))
+            )
+            key = owning_mirror(os.path.relpath(resolved, ROOT), mirrors)
+            if not key:
+                continue
+            mirror = mirrors[key]
+            if mirror["skip_reason"]:
+                skipped[f'{key}: {mirror["skip_reason"]}'] += 1
+                continue
+            extra = [
+                a
+                for a in re.findall(r"(\w+)=", attributes)
+                if a not in ("Include", "Remove", "Update", "Condition")
+            ]
+            if body or extra:
+                skipped[f"{key}: reference carries metadata, cannot rewrite safely"] += 1
+                continue
+            # Re-root at the canonical checkout: strip everything before the component
+            # segment that starts the mirror, however deeply nested it is.
+            if shadowed_by is not None:
+                skipped[
+                    f"{shadowed_by}: ships its own Directory.Build.targets, so the root one is "
+                    f"never imported for its projects. Redirect these there, or make that file "
+                    f"chain upward with GetPathOfFileAbove"
+                ] += 1
+                continue
+            tail = os.path.relpath(resolved, os.path.join(ROOT, mirror["owner"], mirror["component"]))
+            canonical = os.path.join(mirror["component"], tail)
+            redirects[relative_project].append((spec, canonical.replace("/", "\\")))
+    return redirects, skipped
+
+
+def render(redirects: dict, skipped: collections.Counter) -> str:
+    total = sum(len(v) for v in redirects.values())
+    lines = [
+        "<Project>",
+        "",
+        "  <!--",
+        "    GENERATED FILE \u2014 do not edit by hand.",
+        "    Regenerate with: python3 scripts/generate-aggregate-reference-redirects.py",
+        "",
+        "    Paths are anchored on $(BroilerWorkspaceRoot), set by Directory.Build.targets before it",
+        "    imports this file. It must be an already-normalised absolute path: MSBuild compares",
+        "    condition strings literally, so a '..' segment in either operand never matches and every",
+        "    redirect below would silently do nothing.",
+        "",
+        "    Each component submodule carries nested checkouts of the components it depends on so",
+        "    that it still builds standalone, and its project references are relative, so in the",
+        "    aggregate workspace they resolve into those mirrors instead of the canonical top-level",
+        "    checkout. One root build then compiled the same component several times over: nine",
+        "    copies of Broiler.Media, eight of Broiler.Graphics, and 53 duplicated assemblies in",
+        "    total across the root solutions. Broiler.Media ADR 0001 forbids it: during aggregate",
+        "    development every local project reference to a component must point at the single root",
+        "    checkout.",
+        "",
+        "    A mirror is redirected only when its pinned commit matches the canonical checkout's, so",
+        "    this can never change which source compiles. Mirrors on a different pin, and mirrors of",
+        "    components that have no top-level checkout, are deliberately left alone; see the",
+        "    generator for the list and the reasons.",
+        "",
+        f"    {total} reference(s) across {len(redirects)} project(s).",
+        "  -->",
+        "",
+    ]
+    if skipped:
+        lines.append("  <!--")
+        lines.append("    Deliberately NOT redirected:")
+        for reason, count in sorted(skipped.items()):
+            lines.append(f"      {count:4} reference(s)  {reason}")
+        lines.append("  -->")
+        lines.append("")
+    for project in sorted(redirects):
+        msbuild_project = project.replace("/", "\\")
+        lines.append(
+            f"  <ItemGroup Condition=\"'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot){msbuild_project}'\">"
+        )
+        for spec, canonical in sorted(redirects[project]):
+            lines.append(f'    <ProjectReference Remove="{spec}" />')
+            lines.append(
+                f'    <ProjectReference Include="$(BroilerWorkspaceRoot){canonical}" />'
+            )
+        lines.append("  </ItemGroup>")
+        lines.append("")
+    lines.append("</Project>")
+    rendered = "\n".join(lines) + "\n"
+
+    # An XML comment may not contain '--'. MSBuild rejects the whole file if one slips in,
+    # and because the import is Exists()-guarded the failure surfaces as every redirect
+    # silently not applying rather than as an obvious error. Catch it here instead.
+    for comment in re.findall(r"<!--(.*?)-->", rendered, re.S):
+        if "--" in comment:
+            raise SystemExit(
+                "generated XML comment contains '--', which MSBuild rejects:\n"
+                + comment.strip()[:200]
+            )
+    return rendered
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true", help="fail if the generated file is stale")
+    args = parser.parse_args()
+
+    mirrors = discover_mirrors()
+    redirects, skipped = collect(mirrors)
+    rendered = render(redirects, skipped)
+
+    if args.check:
+        current = open(OUTPUT, encoding="utf-8").read() if os.path.exists(OUTPUT) else ""
+        if current != rendered:
+            print(f"STALE: {os.path.relpath(OUTPUT, ROOT)} does not match the workspace.")
+            print("Regenerate with: python3 scripts/generate-aggregate-reference-redirects.py")
+            return 1
+        print(f"up to date: {sum(len(v) for v in redirects.values())} redirect(s)")
+        return 0
+
+    os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
+    with open(OUTPUT, "w", encoding="utf-8") as handle:
+        handle.write(rendered)
+    print(
+        f"wrote {os.path.relpath(OUTPUT, ROOT)}: "
+        f"{sum(len(v) for v in redirects.values())} redirect(s) across {len(redirects)} project(s)"
+    )
+    for reason, count in sorted(skipped.items()):
+        print(f"  skipped {count:4}  {reason}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

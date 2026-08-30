@@ -102,8 +102,12 @@ canonical compilation.
 This is orthogonal to the patches — it holds with them applied or not — but it is what makes
 the apply order above forgiving.
 
-Still open, and out of scope here: the same nested-mirror pattern appears **331 times**
-workspace-wide (`Broiler.Browser`, `Broiler.Writer`, `Broiler.UI` and others each carry their
-own mirrors and reference them the same way). Only the `Broiler.Graphics` → `Broiler.Media`
-edge was measured to duplicate a compile in a root build, so only it is redirected. Whether the
-rest are reached by root solutions has not been established.
+The redirect has since been generalised to the whole workspace — see
+`scripts/generate-aggregate-reference-redirects.py` and the generated
+`eng/aggregate-workspace-references.targets`, which cover 194 references across 77 projects.
+A full root build now compiles nothing inside a mirror except the deliberate exclusions below.
+
+One of those exclusions is `Broiler.Media/Broiler.Graphics`: its pin (`cb83c76`, the pre-`src/`
+layout) differs from the canonical checkout, so it is not redirected and `Broiler.Graphics`
+still compiles twice. **Patch 0001 removes that mirror outright**, which closes the last
+pin-drift duplicate in the workspace.
