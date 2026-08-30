@@ -74,6 +74,44 @@ def git_sha(path: str) -> str | None:
     return result.stdout.strip() if result.returncode == 0 else None
 
 
+# Extensions a build actually consumes. A difference outside this set (a CI workflow, a
+# README, a .gitignore) cannot change the assembly the compiler produces.
+BUILD_INPUT_SUFFIXES = (
+    ".cs", ".csproj", ".props", ".targets", ".sln", ".slnx", ".resx", ".json",
+    ".xaml", ".vb", ".fs", ".fsproj", ".editorconfig", ".ruleset", ".snk",
+)
+
+
+def build_relevant_diff(component: str, mirror_sha: str, canonical_sha: str) -> list[str] | None:
+    """Build inputs that differ between two commits of a component.
+
+    Returns [] when the two commits are build-identical, the differing paths when they are
+    not, and None when the comparison cannot be made (the canonical checkout does not have
+    the mirror's commit), which callers must treat as unsafe rather than as "no difference".
+    """
+    path = os.path.join(ROOT, component)
+    for sha in (mirror_sha, canonical_sha):
+        probe = subprocess.run(
+            ["git", "-C", path, "cat-file", "-e", f"{sha}^{{commit}}"],
+            capture_output=True,
+            text=True,
+        )
+        if probe.returncode != 0:
+            return None
+    result = subprocess.run(
+        ["git", "-C", path, "diff", "--name-only", mirror_sha, canonical_sha],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return [
+        line
+        for line in result.stdout.splitlines()
+        if line.strip().endswith(BUILD_INPUT_SUFFIXES)
+    ]
+
+
 def components() -> list[str]:
     return sorted(
         d
@@ -98,10 +136,28 @@ def discover_mirrors() -> dict[str, dict]:
             canonical_sha = canonical.get(entry)
             if canonical_sha is None:
                 reason = "no canonical top-level checkout"
-            elif mirror_sha != canonical_sha:
-                reason = f"pin differs (mirror {mirror_sha[:10]}, canonical {canonical_sha[:10]})"
-            else:
+            elif mirror_sha == canonical_sha:
                 reason = None
+            else:
+                # A differing pin does not by itself make a redirect unsafe: what matters is
+                # whether the SOURCE the compiler sees differs. Pins routinely drift by a
+                # release-workflow or docs commit that no build reads, and blocking on SHA
+                # equality would leave those duplicates in place for no reason. Compare the
+                # trees instead, restricted to files a build actually consumes.
+                differing = build_relevant_diff(entry, mirror_sha, canonical_sha)
+                if differing is None:
+                    reason = (
+                        f"pin differs (mirror {mirror_sha[:10]}, canonical "
+                        f"{canonical_sha[:10]}) and the trees cannot be compared"
+                    )
+                elif differing:
+                    shown = ", ".join(differing[:2])
+                    more = f" (+{len(differing) - 2} more)" if len(differing) > 2 else ""
+                    reason = (
+                        f"pin differs and {len(differing)} build input(s) differ: {shown}{more}"
+                    )
+                else:
+                    reason = None
             mirrors[f"{owner}/{entry}"] = {
                 "owner": owner,
                 "component": entry,
