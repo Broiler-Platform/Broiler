@@ -28,6 +28,23 @@ References carrying metadata (ReferenceOutputAssembly, OutputItemType,
 GlobalPropertiesToRemove) are skipped: the Remove/Include rewrite below would drop it.
 Today those are all inside Broiler.JS, which is excluded anyway.
 
+A component that ships its own Directory.Build.targets is skipped too, because MSBuild
+imports only the nearest such file and the root one therefore never reaches its projects.
+
+DO NOT "fix" that by chaining the component's file upward with GetPathOfFileAbove. It was
+tried on Broiler.Browser and it makes things strictly worse. Broiler.Browser's four
+solutions enumerate 80 projects that live in its own mirrors, and they have to: those
+relative paths are what let the component build standalone in its own CI. Redirecting only
+its ProjectReferences leaves the solutions still building the mirror copies, so a build
+compiles the canonical AND the mirror copy of Broiler.UI, Broiler.Graphics, Broiler.Input
+and Broiler.Media -- inventing the very duplicate this script exists to remove, in a
+component that had none. Collapsing such a component needs its solutions rewritten as well,
+which cannot be done without breaking its standalone build; it is a real piece of design
+work, not a one-line import.
+
+None of this costs anything today: no root solution references Broiler.Browser, so its
+projects are never built from the root, only from its own solutions.
+
 Usage:  python3 scripts/generate-aggregate-reference-redirects.py [--check]
         --check exits non-zero if the generated file is stale.
 """
@@ -103,15 +120,26 @@ def owning_mirror(relative_path: str, mirrors: dict) -> str | None:
 
 
 def nearest_build_targets(project: str) -> str | None:
-    """Directory owning the Directory.Build.targets MSBuild will import for this project.
+    """Directory of a Directory.Build.targets that hides the root one from this project.
 
-    Returns None when that is the workspace root (the file this generator feeds), or the
-    repo-relative directory of the shadowing file otherwise.
+    MSBuild imports only the nearest such file above a project. Returns None when the root
+    file is reached (or when every file between chains upward with GetPathOfFileAbove, since
+    the root one is then still imported); otherwise the repo-relative directory of the file
+    that breaks the chain.
     """
     directory = os.path.dirname(project)
     while True:
-        if os.path.exists(os.path.join(directory, "Directory.Build.targets")):
-            return None if directory == ROOT else os.path.relpath(directory, ROOT)
+        candidate = os.path.join(directory, "Directory.Build.targets")
+        if os.path.exists(candidate):
+            if directory == ROOT:
+                return None
+            try:
+                chains = "GetPathOfFileAbove" in open(candidate, encoding="utf-8-sig").read()
+            except OSError:
+                chains = False
+            if not chains:
+                return os.path.relpath(directory, ROOT)
+            # It chains, so keep walking: an ancestor could still break the chain.
         if directory == ROOT or os.path.dirname(directory) == directory:
             return None
         directory = os.path.dirname(directory)
@@ -177,8 +205,8 @@ def collect(mirrors: dict):
             if shadowed_by is not None:
                 skipped[
                     f"{shadowed_by}: ships its own Directory.Build.targets, so the root one is "
-                    f"never imported for its projects. Redirect these there, or make that file "
-                    f"chain upward with GetPathOfFileAbove"
+                    f"never imported for its projects. Chaining it upward does NOT fix this; "
+                    f"see the note at the top of the generator script"
                 ] += 1
                 continue
             tail = os.path.relpath(resolved, os.path.join(ROOT, mirror["owner"], mirror["component"]))

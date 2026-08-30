@@ -30,7 +30,7 @@
     Deliberately NOT redirected:
          8 reference(s)  Broiler.Browser/Broiler.DOM: pin differs (mirror 8f13a228b3, canonical 433ec9254a)
          2 reference(s)  Broiler.Browser/Broiler.HTML: pin differs (mirror fb907b63af, canonical 34474d9bf9)
-        51 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Redirect these there, or make that file chain upward with GetPathOfFileAbove
+        51 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
          6 reference(s)  Broiler.Graphics/Broiler.Input: pin differs (mirror 0d58269977, canonical 25a38e92f6)
          1 reference(s)  Broiler.HTML/Broiler.Graphics: pin differs (mirror 2a05826f9f, canonical b95c8593fd)
          1 reference(s)  Broiler.JS/Broiler.DateTime: no canonical top-level checkout
