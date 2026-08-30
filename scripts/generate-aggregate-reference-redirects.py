@@ -232,9 +232,16 @@ def render(redirects: dict, skipped: collections.Counter) -> str:
             f"  <ItemGroup Condition=\"'$(MSBuildProjectFullPath)' == '$(BroilerWorkspaceRoot){msbuild_project}'\">"
         )
         for spec, canonical in sorted(redirects[project]):
-            lines.append(f'    <ProjectReference Remove="{spec}" />')
+            # Both halves are guarded on the canonical project being present. A component's
+            # own CI checks out only that submodule (recursively), deliberately relying on
+            # its nested mirrors -- the top-level checkouts do not exist there. Unguarded,
+            # the Remove would strip a reference that resolves fine and the Include would
+            # add one that does not, breaking a build the redirect has no business touching.
+            guard = f"Exists('$(BroilerWorkspaceRoot){canonical}')"
+            lines.append(f'    <ProjectReference Remove="{spec}" Condition="{guard}" />')
             lines.append(
-                f'    <ProjectReference Include="$(BroilerWorkspaceRoot){canonical}" />'
+                f'    <ProjectReference Include="$(BroilerWorkspaceRoot){canonical}"'
+                f' Condition="{guard}" />'
             )
         lines.append("  </ItemGroup>")
         lines.append("")

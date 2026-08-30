@@ -76,7 +76,8 @@
     the generator picks the reference up on its own.
   -->
   <ItemGroup Condition="'$(MSBuildProjectFullPath)' == '$(MSBuildThisFileDirectory)Broiler.Graphics\src\Broiler.Graphics.Windows\Broiler.Graphics.Direct2D.csproj'">
-    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj" />
+    <ProjectReference Remove="..\..\Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj"
+                      Condition="Exists('$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
     <ProjectReference Include="$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj"
                       Condition="Exists('$(MSBuildThisFileDirectory)Broiler.Media\src\Broiler.Media.Video.Windows\Broiler.Media.Video.Windows.csproj')" />
   </ItemGroup>
