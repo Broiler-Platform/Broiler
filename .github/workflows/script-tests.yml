@@ -1,0 +1,66 @@
+name: Script tests
+
+# The unit tests under scripts/tests/ that had no runner.
+#
+# Two of the five Python suites were already invoked — test_run_privacy_test_pages from
+# privacy-test-pages.yml and test_real_world_render_tests from real-world-render-tests.yml —
+# but both of those workflows are workflow_dispatch and schedule only. A change to a script
+# could therefore break its tests and merge green, with the breakage surfacing days later
+# inside an expensive run that exists to measure something else entirely. The other three
+# suites had no runner at all.
+#
+# So this job is deliberately small and fast: no submodules, no .NET, no browsers, no
+# package installs. The suites it runs need none of that — every one of them drives its
+# script inside a temporary directory. It finishes in well under a minute, which is what
+# makes it reasonable to run on every pull request that touches scripts/.
+#
+# The two workflows above keep their own steps. Running a suite twice costs seconds and
+# means a dispatched run still checks its own harness before spending an hour on it.
+
+on:
+  pull_request:
+    paths:
+      # The scripts and their tests, and this file. Not '**' — these suites test scripts/
+      # and nothing else, so a renderer or WPT change cannot affect their result.
+      - 'scripts/**'
+      - '.github/workflows/script-tests.yml'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: script-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python script tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+        # No submodules. Nothing under scripts/tests/ reads a component checkout; the
+        # suites build their own fixtures in temporary directories.
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      # Discovery rather than a list of module names: a new scripts/tests/test_*.py is then
+      # picked up by existing, not by also remembering to name it here. A runner you have
+      # to update by hand reintroduces the very gap this job closes, one file at a time.
+      #
+      # --start-directory rather than `discover -t .`: scripts/tests has no __init__.py, so
+      # unittest will not accept the repository root as the top-level directory — it
+      # refuses with "Start directory is not importable".
+      - name: Run the Python script tests
+        run: >
+          python -m unittest discover
+          --start-directory scripts/tests
+          --pattern 'test_*.py'
+          --verbose
