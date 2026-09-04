@@ -9,6 +9,7 @@
     <Project Path="src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj" />
     <Project Path="src/Broiler.Code.Core.Tests/Broiler.Code.Core.Tests.csproj" />
     <Project Path="src/Broiler.Code.Language.CSharp.Tests/Broiler.Code.Language.CSharp.Tests.csproj" />
+    <Project Path="src/Broiler.Code.Review.Tests/Broiler.Code.Review.Tests.csproj" />
     <Project Path="src/Broiler.Code.Workspaces.Tests/Broiler.Code.Workspaces.Tests.csproj" />
     <Project Path="src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj" />
     <Project Path="src/Broiler.Playback.Tests/Broiler.Playback.Tests.csproj" />
@@ -94,6 +95,7 @@
     <Project Path="Broiler.UI/src/Abstractions/Layout/Broiler.UI.Splitter/Broiler.UI.Splitter.csproj" />
     <Project Path="Broiler.UI/src/Abstractions/Layout/Broiler.UI.TabView/Broiler.UI.TabView.csproj" />
     <Project Path="Broiler.UI/src/Abstractions/Text/Broiler.UI.CodeEditor/Broiler.UI.CodeEditor.csproj" />
+    <Project Path="Broiler.UI/src/Abstractions/Text/Broiler.UI.Edit/Broiler.UI.Edit.csproj" />
     <Project Path="Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.TreeView/Broiler.UI.TreeView.csproj" />
     <Project Path="Broiler.UI/src/Foundation/Broiler.UI.Standard/Broiler.UI.Standard.csproj" />
     <Project Path="Broiler.UI/src/Foundation/Broiler.UI/Broiler.UI.csproj" />
@@ -105,6 +107,7 @@
     <Project Path="Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.Splitter.Standard/Broiler.UI.Splitter.Standard.csproj" />
     <Project Path="Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.TabView.Standard/Broiler.UI.TabView.Standard.csproj" />
     <Project Path="Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.CodeEditor.Standard/Broiler.UI.CodeEditor.Standard.csproj" />
+    <Project Path="Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.Edit.Standard/Broiler.UI.Edit.Standard.csproj" />
     <Project Path="Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.TreeView.Standard/Broiler.UI.TreeView.Standard.csproj" />
   </Folder>
   <Folder Name="/Dependencies/src/">
@@ -112,6 +115,8 @@
     <Project Path="src/Broiler.Code.Core/Broiler.Code.Core.csproj" />
     <Project Path="src/Broiler.Code.Language.CSharp.Roslyn/Broiler.Code.Language.CSharp.Roslyn.csproj" />
     <Project Path="src/Broiler.Code.Language.CSharp.Syntax/Broiler.Code.Language.CSharp.Syntax.csproj" />
+    <Project Path="src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj" />
+    <Project Path="src/Broiler.Code.Review/Broiler.Code.Review.csproj" />
     <Project Path="src/Broiler.Code.Workspaces/Broiler.Code.Workspaces.csproj" />
     <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj" />

@@ -85,7 +85,13 @@ public sealed class CodeEditorArchitectureTests
             "../../Broiler.UI/src/Abstractions/Layout/Broiler.UI.Splitter/Broiler.UI.Splitter.csproj",
             "../../Broiler.UI/src/Abstractions/Layout/Broiler.UI.TabView/Broiler.UI.TabView.csproj",
             "../../Broiler.UI/src/Abstractions/Text/Broiler.UI.CodeEditor/Broiler.UI.CodeEditor.csproj",
+            "../../Broiler.UI/src/Abstractions/Text/Broiler.UI.Edit/Broiler.UI.Edit.csproj",
             "../../Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.TreeView/Broiler.UI.TreeView.csproj",
+
+            // The review model sits below Core on the same side of the seam as
+            // the workspace: no UI, no Roslyn, no platform. Its own rule is
+            // asserted by The_Review_Model_Depends_Only_On_The_Workspace below.
+            "../Broiler.Code.Review/Broiler.Code.Review.csproj",
             "../Broiler.Code.Workspaces/Broiler.Code.Workspaces.csproj",
         ],
             references);
@@ -95,6 +101,27 @@ public sealed class CodeEditorArchitectureTests
             reference.Contains("Windows", StringComparison.OrdinalIgnoreCase) ||
             reference.Contains("Linux", StringComparison.OrdinalIgnoreCase) ||
             reference.Contains("Android", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The review model is evidence about the source, so it is held to the same
+    /// rule as the text layer: it may know about a workspace and nothing else.
+    ///
+    /// Asserted rather than described because the two things most likely to be
+    /// added to it are the two that would break it — a UI reference, so a pane
+    /// can render a status directly, and a git package, so staleness can be
+    /// decided from a commit. The first would stop CI computing coverage with no
+    /// display; the second would make a review expire on a rebase.
+    /// </summary>
+    [Fact(Timeout = 600000)]
+    public void The_Review_Model_Depends_Only_On_The_Workspace()
+    {
+        XDocument project = Load("src", "Broiler.Code.Review", "Broiler.Code.Review.csproj");
+
+        Assert.Empty(project.Descendants("PackageReference"));
+        Assert.Equal(
+            ["../Broiler.Code.Workspaces/Broiler.Code.Workspaces.csproj"],
+            References(project));
     }
 
     private static string[] References(params string[] parts) => References(Load(parts));

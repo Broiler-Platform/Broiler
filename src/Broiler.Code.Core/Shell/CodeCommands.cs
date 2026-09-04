@@ -21,6 +21,19 @@ public static class CodeCommandNames
     public const string Build = "code.build";
     public const string Rebuild = "code.rebuild";
     public const string Cancel = "code.cancel";
+
+    // Human Review. Named commands like every other action, so the menu, a
+    // keyboard shortcut, and a later toolbar button all drive one path and
+    // report one enabled state — which for these matters more than usual,
+    // because "why is Mark Reviewed greyed out?" has a specific answer the
+    // command set is what produces.
+    public const string MarkReviewed = "code.review.reviewed";
+    public const string MarkInReview = "code.review.inReview";
+    public const string MarkQuestion = "code.review.question";
+    public const string MarkNeedsChange = "code.review.needsChange";
+    public const string ClearReview = "code.review.clear";
+    public const string AddNote = "code.review.addNote";
+    public const string ReviewCoverage = "code.review.coverage";
 }
 
 public enum CommandAvailability
@@ -82,12 +95,32 @@ public sealed class CodeCommandSet
     /// </summary>
     public bool HasFileDialogs { get; set; }
 
+    /// <summary>
+    /// Set when the head composed a review pane. Without it the review commands
+    /// report Unavailable with a reason, in keeping with the rest of this set:
+    /// a menu entry that silently does nothing is worse than one that says the
+    /// host does not carry the feature.
+    /// </summary>
+    public bool HasReview { get; set; }
+
+    /// <summary>Set once the host knows who is reviewing. An approval with no name is not evidence.</summary>
+    public bool HasReviewer { get; set; }
+
     public IReadOnlyList<CodeCommand> GetCommands()
     {
         Workspaces.CodeWorkspace? workspace = _workspace();
         bool hasWorkspace = workspace is not null;
-        bool hasDocument = !_activeDocument().IsNone;
+        Workspaces.Model.WorkspaceItemId active = _activeDocument();
+        bool hasDocument = !active.IsNone;
         bool dirty = workspace?.HasUnsavedChanges ?? false;
+
+        // Asked of the buffer here rather than cached in a property the shell
+        // refreshes. A keystroke makes a document dirty without going anywhere
+        // near the command set, so a flag would say "clean" until something else
+        // happened to refresh it — and the four commands that must never run on
+        // a dirty document would be enabled exactly when it matters.
+        bool activeIsDirty =
+            hasDocument && workspace?.FindOpenDocument(active) is { IsDirty: true };
 
         return
         [
@@ -128,6 +161,45 @@ public sealed class CodeCommandSet
                 CodeCommandNames.Cancel, "Cancel Build",
                 IsBuildRunning ? CommandAvailability.Enabled : CommandAvailability.Disabled,
                 AccessKey: 'X'),
+
+            Review(CodeCommandNames.MarkReviewed, "Mark Reviewed", hasDocument, activeIsDirty, 'R'),
+            Review(CodeCommandNames.MarkInReview, "Mark In Review", hasDocument, activeIsDirty, 'I'),
+            Review(CodeCommandNames.MarkQuestion, "Mark Open Question", hasDocument, activeIsDirty, 'Q'),
+            Review(CodeCommandNames.MarkNeedsChange, "Mark Needs Change", hasDocument, activeIsDirty, 'N'),
+
+            // Clearing is allowed on a dirty document, and is the only review
+            // command that is. It records nothing about content, so there is no
+            // content for it to be wrong about — and a reviewer who marked the
+            // wrong file should not have to save it to undo that.
+            HasReview
+                ? new CodeCommand(
+                    CodeCommandNames.ClearReview, "Clear Review",
+                    hasDocument ? CommandAvailability.Enabled : CommandAvailability.Disabled,
+                    AccessKey: 'C')
+                : NoReview(CodeCommandNames.ClearReview, "Clear Review", 'C'),
+
+            // A note is a question, not an attestation, so unlike the four
+            // decisions it is allowed on a document with unsaved changes: a
+            // reviewer who has to save before writing down what confuses them
+            // stops writing it down. It still needs a name and a file.
+            HasReview
+                ? new CodeCommand(
+                    CodeCommandNames.AddNote, "Add Note",
+                    hasDocument && HasReviewer
+                        ? CommandAvailability.Enabled
+                        : CommandAvailability.Disabled,
+                    hasDocument
+                        ? HasReviewer ? null : "Set a reviewer name first — a note has to say who is asking."
+                        : "Open a file to write a note about it.",
+                    'T')
+                : NoReview(CodeCommandNames.AddNote, "Add Note", 'T'),
+
+            HasReview
+                ? new CodeCommand(
+                    CodeCommandNames.ReviewCoverage, "Review Coverage",
+                    hasWorkspace ? CommandAvailability.Enabled : CommandAvailability.Disabled,
+                    AccessKey: 'V')
+                : NoReview(CodeCommandNames.ReviewCoverage, "Review Coverage", 'V'),
         ];
     }
 
@@ -139,6 +211,44 @@ public sealed class CodeCommandSet
         : new CodeCommand(
             name, text, CommandAvailability.Unavailable,
             "This host has no way to ask for a file.", accessKey);
+
+    /// <summary>
+    /// A command that records a review decision.
+    ///
+    /// Every refusal carries the reason, because each one is a different problem
+    /// with a different fix: compose a review pane, name a reviewer, open a file,
+    /// or save it. A single greyed-out entry saying none of that is how a feature
+    /// meant to be used daily stops being used.
+    /// </summary>
+    private CodeCommand Review(
+        string name, string text, bool hasDocument, bool activeIsDirty, char accessKey)
+    {
+        if (!HasReview)
+            return NoReview(name, text, accessKey);
+
+        if (!HasReviewer)
+        {
+            return new CodeCommand(
+                name, text, CommandAvailability.Disabled,
+                "Set a reviewer name first — a review record has to say who made it.", accessKey);
+        }
+
+        if (!hasDocument)
+            return new CodeCommand(name, text, CommandAvailability.Disabled, "Open a file to review it.", accessKey);
+
+        if (activeIsDirty)
+        {
+            return new CodeCommand(
+                name, text, CommandAvailability.Disabled,
+                "Save the file first — a review records the content on disk.", accessKey);
+        }
+
+        return new CodeCommand(name, text, CommandAvailability.Enabled, AccessKey: accessKey);
+    }
+
+    private static CodeCommand NoReview(string name, string text, char accessKey) =>
+        new(name, text, CommandAvailability.Unavailable,
+            "This host does not compose the Human Review pane.", accessKey);
 
     private CodeCommand Build(string name, string text, bool hasWorkspace, char accessKey)
     {

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.Code.Review</RootNamespace>
+    <AssemblyName>Broiler.Code.Review</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    The review record is evidence, so this assembly is deliberately the least
+    capable one in Broiler Code. It reaches storage only through
+    IWorkspaceStorage, which is why the same store works over a desktop
+    filesystem, Android's Storage Access Framework, and a browser directory
+    handle without a second implementation, and why a review can never read or
+    write outside the roots the user granted.
+
+    It has no Broiler.UI reference, so review state can be computed by a CI tool
+    that has no display; no Roslyn reference, so a host running the portable
+    classifier alone still has the full review model; and no git dependency,
+    because staleness is decided by content, not by a revision graph. The
+    revision an unreviewed file was reviewed at is recorded as provenance and
+    supplied by whoever knows it — see IRevisionProvider.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Code.Workspaces\Broiler.Code.Workspaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Code.Review.Tests" />
+  </ItemGroup>
+
+</Project>

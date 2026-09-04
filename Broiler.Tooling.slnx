@@ -5,6 +5,7 @@
     <BuildType Name="Release" />
   </Configurations>
   <Folder Name="/Entry points/">
+    <Project Path="src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj" />
     <Project Path="src/Broiler.DevConsole/Broiler.DevConsole.csproj" />
     <Project Path="src/Broiler.DevSite/Broiler.DevSite.csproj" />
     <Project Path="src/Broiler.Engines.Baseline/Broiler.Engines.Baseline.csproj" />
@@ -65,6 +66,8 @@
     <Project Path="Broiler.Media/src/Broiler.Media/Broiler.Media.csproj" />
   </Folder>
   <Folder Name="/Dependencies/src/">
+    <Project Path="src/Broiler.Code.Review/Broiler.Code.Review.csproj" />
+    <Project Path="src/Broiler.Code.Workspaces/Broiler.Code.Workspaces.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj" />
     <Project Path="src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj" />
   </Folder>

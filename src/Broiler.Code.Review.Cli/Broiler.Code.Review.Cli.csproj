@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Broiler.Code.Review.Cli</RootNamespace>
+    <AssemblyName>Broiler.Code.Review.Cli</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    The half of the review workspace that runs where there is no display. It
+    shares the model with the editor rather than reimplementing it, which is the
+    point of Broiler.Code.Review having no UI dependency: the number CI publishes
+    and the badge the editor draws are computed by the same code, so they cannot
+    disagree.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Broiler.Code.Review\Broiler.Code.Review.csproj" />
+    <ProjectReference Include="..\Broiler.Code.Workspaces\Broiler.Code.Workspaces.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Broiler.Code.Review.Tests" />
+  </ItemGroup>
+
+</Project>

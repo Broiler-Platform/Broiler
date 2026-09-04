@@ -1,12 +1,12 @@
 # Broiler Code roadmap
 
-- **Status:** Phases 0-3 delivered. The composed shell runs on Windows and
-  Linux; the Linux head reports its IME as unavailable, and its
-  window has not yet been exercised on a Linux display
+- **Status:** MVP-0 (Human Review workspace) and Phases 0-3 delivered. The
+  composed shell runs on Windows and Linux; the Linux head reports its IME as
+  unavailable, and its window has not yet been exercised on a Linux display
 - **Scope:** A C#/.NET IDE that reuses the Broiler Writer application stack and
   supports multi-project workspaces, live diagnostics, and builds for ordinary
   .NET, Android, and browser WebAssembly
-- **Last reconciled:** 2026-08-05
+- **Last reconciled:** 2026-09-04
 
 ## Product goal
 
@@ -29,6 +29,36 @@ editor, workspace, diagnostic, and build contracts must remain language-neutral,
 but a plug-in language marketplace and general-purpose multi-language IDE are
 not part of the first release. Standard `.slnx`/`.sln` and `.csproj` files remain
 canonical; Broiler Code must not invent a second project format.
+
+## MVP-0 - The Human Review workspace
+
+**Delivered.** Broiler Code's first useful release is not an IDE feature; it is
+the tool that makes the platform's own claim about itself checkable.
+
+The claim *"AI-generated code is human reviewed"* is today a sentence in a README
+backed by twelve component `HUMAN_REVIEW.md` files, each attesting to a whole
+component at one commit and going quietly out of date as the code moves. MVP-0
+replaces it with something falsifiable: **every source file has a known review
+state relative to a concrete revision of its content.**
+
+What shipped:
+
+| Outcome | Where |
+| --- | --- |
+| A review record per source file — status, reviewer, date, reviewed content hash, provenance revision, and notes — committed beside the source in `.broiler-review/` | `Broiler.Code.Review` |
+| Staleness decided by content, so a rebase does not expire a review and a revert restores one | `ReviewContentHash`, `ReviewStateEvaluator` |
+| Notes anchored to the code they were written against, following it through edits and admitting when they cannot | `NoteAnchoring` |
+| A third pane beside the editor, a review badge on every explorer row, and a Review menu | `Broiler.Code.Core/Review`, `CodeShell` |
+| A coverage number that excludes stale approvals, published beside the test262 and WPT rates | `ReviewCoverage`, `Broiler.Code.Review.Cli` |
+| A pull-request check that annotates the reviews a change invalidated | `.github/workflows/human-review.yml` |
+
+The decisions behind it, and the list of what MVP-0 deliberately does not do,
+are in [the architecture record](architecture/broiler-code-review.md).
+
+Exit gates, all met: the review model depends on nothing but the workspace
+(asserted by `CodeEditorArchitectureTests.The_Review_Model_Depends_Only_On_The_Workspace`);
+a dirty document cannot be marked reviewed; a review cannot be recorded without a
+reviewer; and the editor and CI compute the same state from the same code.
 
 ## Current baseline
 
@@ -989,6 +1019,7 @@ production-signable artifacts.
 
 | Milestone | Included phases | User-visible outcome |
 | --- | --- | --- |
+| MVP-0 - Human Review workspace | MVP-0 | Per-file human-review records, a review pane, and a measurable review-coverage number for the platform |
 | M0 - Editor prototype | 0-1 | Shared, classification-capable CodeEditor driven by a deterministic fixture classifier |
 | M1 - Project editor | 2-3 | Multi-project C# editing, dirty/recovery behavior, and live cross-file errors |
 | M2 - Desktop compiler | 4 | Responsive Windows/Linux IDE with authoritative local .NET builds |
