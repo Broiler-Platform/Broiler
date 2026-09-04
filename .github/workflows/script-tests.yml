@@ -9,10 +9,11 @@ name: Script tests
 # inside an expensive run that exists to measure something else entirely. The other three
 # suites had no runner at all.
 #
-# So this job is deliberately small and fast: no submodules, no .NET, no browsers, no
-# package installs. The suites it runs need none of that — every one of them drives its
-# script inside a temporary directory. It finishes in well under a minute, which is what
-# makes it reasonable to run on every pull request that touches scripts/.
+# So this job is deliberately small and fast: no submodules, no .NET, no browsers, and a
+# three-package pip install that only one suite needs. Every suite drives its script inside
+# a temporary directory, so none of the heavy setup its owning workflow performs is
+# required here. It finishes in well under a minute, which is what makes it reasonable to
+# run on every pull request that touches scripts/.
 #
 # The two workflows above keep their own steps. Running a suite twice costs seconds and
 # means a dispatched run still checks its own harness before spending an hour on it.
@@ -24,6 +25,9 @@ on:
       # and nothing else, so a renderer or WPT change cannot affect their result.
       - 'scripts/**'
       - '.github/workflows/script-tests.yml'
+      # The pinned requirements installed below. Not a script, but this job fails
+      # without them, so a change to them has to re-run it.
+      - 'tests/real-world-sites/requirements.txt'
   push:
     branches:
       - main
@@ -50,6 +54,16 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tests/real-world-sites/requirements.txt
+
+      # One suite imports numpy: test_real_world_render_tests drives the render harness's
+      # image comparison, which is numpy the whole way down. The rest need nothing, so this
+      # installs the render harness's own pinned requirements rather than a list invented
+      # here — the same file real-world-render-tests.yml installs, so the two cannot drift.
+      # It is a wheel install of three packages, cached above.
+      - name: Install the render harness requirements
+        run: python -m pip install --requirement tests/real-world-sites/requirements.txt
 
       # Discovery rather than a list of module names: a new scripts/tests/test_*.py is then
       # picked up by existing, not by also remembering to name it here. A runner you have
