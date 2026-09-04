@@ -31,6 +31,7 @@
          2 reference(s)  Broiler.Browser/Broiler.HTML: pin differs and 1 build input(s) differ: Source/Broiler.HTML.Orchestration/HtmlContainerInt.cs
         14 reference(s)  Broiler.Browser/Broiler.UI: pin differs and 28 build input(s) differ: Broiler.UI.slnx, src/Abstractions/Shell/Broiler.UI.Dialog/UiDialog.cs (+26 more)
         45 reference(s)  Broiler.Browser: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
+        55 reference(s)  Broiler.Code: ships its own Directory.Build.targets, so the root one is never imported for its projects. Chaining it upward does NOT fix this; see the note at the top of the generator script
          1 reference(s)  Broiler.HTML/Broiler.Graphics: pin differs and 182 build input(s) differ: Broiler.Graphics.Linux.Demo/Broiler.Graphics.Linux.Demo.csproj, Broiler.Graphics.Windows/HwndVideoTargetChangeKind.cs (+180 more)
          1 reference(s)  Broiler.JS/Broiler.DateTime: no canonical top-level checkout
          1 reference(s)  Broiler.JS/Broiler.Regex: no canonical top-level checkout
