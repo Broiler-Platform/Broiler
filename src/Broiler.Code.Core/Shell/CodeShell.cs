@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Broiler.Code.Core.Diagnostics;
+using Broiler.Code.Core.Review;
+using Broiler.Code.Review;
 using Broiler.Code.Core.Templates;
 using Broiler.Code.Workspaces;
 using Broiler.Code.Workspaces.Model;
@@ -12,6 +14,7 @@ using Broiler.Graphics;
 using Broiler.UI;
 using Broiler.UI.Button;
 using Broiler.UI.CodeEditor;
+using Broiler.UI.Edit;
 using Broiler.UI.Label;
 using Broiler.UI.Menu;
 using Broiler.UI.Panel;
@@ -48,6 +51,38 @@ public sealed record CodeShellControls
     public required UiCodeEditor Editor { get; init; }
 
     public required UiTreeView Problems { get; init; }
+
+    /// <summary>
+    /// The Human Review pane, and the splitter that sizes it.
+    ///
+    /// Optional, unlike everything above it. A head that supplies neither gets
+    /// the shell it had before the review workspace existed, which is what lets
+    /// the Android and browser heads adopt it when they are ready rather than
+    /// when this file changed. Supplying one and not the other composes the
+    /// pane without a splitter, which is a poor experience but not a broken one.
+    /// </summary>
+    public UiTreeView? Review { get; init; }
+
+    public UiSplitter? ReviewSplitter { get; init; }
+
+    /// <summary>
+    /// Holds the review tree and the note field. Supplied separately because a
+    /// tree is not a container: without it the review tree is docked on its own
+    /// and there is nowhere to type a note.
+    /// </summary>
+    public UiPanel? ReviewPane { get; init; }
+
+    /// <summary>
+    /// Where a new review note is typed.
+    ///
+    /// A single-line field, which is the honest shape of what Broiler.UI has
+    /// today: <c>UiEdit</c> is single-line and <c>UiRichEdit</c> is a formatted
+    /// document, not a plain-text box. A note is one or two sentences far more
+    /// often than it is a paragraph, so this is a real constraint rather than a
+    /// crippling one — and the record format already carries multi-line text, so
+    /// a multi-line control later needs no migration.
+    /// </summary>
+    public UiEdit? ReviewNoteInput { get; init; }
 
     public required UiLabel Status { get; init; }
 
@@ -93,6 +128,9 @@ public sealed class CodeShell : IDisposable
     private readonly Dictionary<string, UiButton> _toolbarButtons = [];
     private readonly ProblemsModel _problems = new();
     private readonly ProblemsTreeSource _problemsSource;
+    private ReviewController? _review;
+    private ReviewPaneSource? _reviewSource;
+    private CancellationTokenSource? _reviewLoad;
     private CodeWorkspace? _workspace;
     private SolutionExplorerSource? _explorerSource;
     private DocumentCoordinator? _coordinator;
@@ -110,6 +148,12 @@ public sealed class CodeShell : IDisposable
         _controls.Menu.ItemInvoked += OnMenuItemInvoked;
         _controls.Explorer.NodeActivated += OnExplorerNodeActivated;
         _controls.Problems.NodeActivated += OnProblemActivated;
+
+        // The review pane follows whatever the editor is showing. Subscribed
+        // here rather than through DocumentCoordinator because the coordinator
+        // raises no active-document event, and the tab strip's selection is the
+        // same fact seen one level lower.
+        _controls.Tabs.SelectionChanged += OnActiveDocumentChanged;
         RefreshCommands();
         SetStatus("No workspace open. File ▸ Open…");
     }
@@ -126,6 +170,12 @@ public sealed class CodeShell : IDisposable
     public CodeWorkspace? Workspace => _workspace;
 
     public DocumentCoordinator? Coordinator => _coordinator;
+
+    /// <summary>
+    /// The Human Review state for the open workspace, or null when the head
+    /// composed no review pane.
+    /// </summary>
+    public ReviewController? Review => _review;
 
     /// <summary>
     /// Binds a workspace. The explorer, the tabs, and the commands all follow
@@ -147,6 +197,8 @@ public sealed class CodeShell : IDisposable
         {
             HasFileDialogs = _fileDialogs is not null,
             HasBuildService = _commands.HasBuildService,
+            HasReview = _controls.Review is not null,
+            HasReviewer = !string.IsNullOrWhiteSpace(Reviewer),
         };
 
         // Expand to the projects so the tree opens showing something, rather
@@ -154,9 +206,71 @@ public sealed class CodeShell : IDisposable
         foreach (TreeRow row in _controls.Explorer.Rows.ToArray())
             _controls.Explorer.Expand(row.Id);
 
+        AttachReview(workspace);
         RefreshCommands();
         SetStatus($"{workspace.Projects.Count} projects, {workspace.Items.Count} items");
         ShowWorkspaceDiagnostics();
+    }
+
+    /// <summary>
+    /// Binds the review workspace to the open workspace.
+    ///
+    /// The records are read once, in the background, rather than on the way in.
+    /// A repository the size of this one has thousands of them, and blocking the
+    /// window on that read would make opening a workspace feel like the tool had
+    /// hung. Until it completes the explorer simply shows no badges, which is the
+    /// same thing it shows for a file nobody has reviewed.
+    /// </summary>
+    private void AttachReview(CodeWorkspace workspace)
+    {
+        if (_controls.Review is null)
+            return;
+
+        _review = new ReviewController(workspace, RevisionProvider, Reviewer, Dispatcher);
+        _reviewSource = new ReviewPaneSource(_review);
+        _controls.Review.DataSource = _reviewSource;
+
+        if (_explorerSource is { } explorer)
+            explorer.ReviewStateOf = _review.StateFor;
+
+        _review.Changed += OnReviewChanged;
+
+        // Cancelled by DetachWorkspace, so closing a workspace stops a load that
+        // is still reading rather than leaving it to finish filling a controller
+        // nobody is showing.
+        _reviewLoad = new CancellationTokenSource();
+        _ = LoadReviewAsync(_review, _reviewLoad.Token);
+    }
+
+    private async Task LoadReviewAsync(ReviewController controller, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Task.Run, despite LoadAsync being async, because the desktop
+            // storage provider is synchronous underneath its async signatures —
+            // FileSystemWorkspaceStorage reads with File.ReadAllBytes and returns
+            // ValueTask.FromResult, so nothing ever yields. Awaiting it directly
+            // would read every record in the repository, and every file those
+            // records describe, on the UI thread — exactly the freeze the
+            // background load exists to avoid.
+            //
+            // The result is not applied here. LoadAsync posts it through the
+            // dispatcher, so the maps are mutated on the UI thread even though
+            // the reads finished on a pool thread.
+            await Task.Run(
+                () => controller.LoadAsync(cancellationToken).AsTask(), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // The workspace closed while the records were being read. Nothing to
+            // report: the controller it was filling has already been discarded.
+        }
+        catch (ObjectDisposedException)
+        {
+            // The same race seen from the other side — the cancellation source
+            // was disposed between the check and the throw.
+        }
     }
 
     /// <summary>
@@ -164,6 +278,40 @@ public sealed class CodeShell : IDisposable
     /// Cancel, because losing someone's work is not a default.
     /// </summary>
     public DirtyClosePrompt? DirtyClosePrompt { get; set; }
+
+    /// <summary>
+    /// Who is recording reviews. Until a head sets it the review commands stay
+    /// disabled with that as the reason: a record saying a file was approved,
+    /// with no name on it, is not evidence of a human review.
+    /// </summary>
+    public string Reviewer
+    {
+        get;
+        set
+        {
+            field = value ?? string.Empty;
+            if (_review is not null)
+                _review.Reviewer = field;
+            RefreshCommands();
+        }
+    } = string.Empty;
+
+    /// <summary>
+    /// Supplies the revision a review is recorded at, when the head has one.
+    /// Provenance only — see <see cref="IRevisionProvider"/>.
+    /// </summary>
+    public IRevisionProvider? RevisionProvider { get; set; }
+
+    /// <summary>
+    /// Marshals background work onto the UI thread.
+    ///
+    /// Set by a head before the workspace attaches. Without it the review load
+    /// applies its result on whichever thread finished the last read, which
+    /// races every repaint — the reason
+    /// <see cref="Hosting.UiThreadDispatcher"/> exists rather than the Standard
+    /// immediate dispatcher.
+    /// </summary>
+    public UI.IUiDispatcher? Dispatcher { get; set; }
 
     /// <summary>Runs a named command. The single path the menu, toolbar, and keys share.</summary>
     public async ValueTask<bool> InvokeAsync(string name, CancellationToken cancellationToken = default)
@@ -189,6 +337,18 @@ public sealed class CodeShell : IDisposable
             CodeCommandNames.SaveAll => await SaveAllAsync(cancellationToken).ConfigureAwait(false),
             CodeCommandNames.Close => _coordinator is not null &&
                 await _coordinator.CloseAsync(_coordinator.ActiveDocument, cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.MarkReviewed =>
+                await RecordReviewAsync(ReviewStatus.Reviewed, cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.MarkInReview =>
+                await RecordReviewAsync(ReviewStatus.InReview, cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.MarkQuestion =>
+                await RecordReviewAsync(ReviewStatus.Question, cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.MarkNeedsChange =>
+                await RecordReviewAsync(ReviewStatus.NeedsChange, cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.ClearReview =>
+                await RecordReviewAsync(ReviewStatus.Unreviewed, cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.AddNote => await AddNoteFromInputAsync(cancellationToken).ConfigureAwait(false),
+            CodeCommandNames.ReviewCoverage => ShowReviewCoverage(),
             _ => false,
         };
 
@@ -563,6 +723,11 @@ public sealed class CodeShell : IDisposable
         _controls.Menu.ItemInvoked -= OnMenuItemInvoked;
         _controls.Explorer.NodeActivated -= OnExplorerNodeActivated;
         _controls.Problems.NodeActivated -= OnProblemActivated;
+        if (_controls.Review is { } review)
+            review.NodeActivated -= OnReviewNodeActivated;
+        if (_controls.ReviewNoteInput is { } noteInput)
+            noteInput.Submitted -= OnReviewNoteSubmitted;
+        _controls.Tabs.SelectionChanged -= OnActiveDocumentChanged;
         foreach (UiButton button in _toolbarButtons.Values)
             button.Clicked -= OnToolbarButtonClicked;
         _toolbarButtons.Clear();
@@ -605,6 +770,11 @@ public sealed class CodeShell : IDisposable
         documents.AddChild(_controls.Editor);
         documents.SetDock(_controls.Editor, UiDock.Fill);
 
+        ComposeReview(body);
+
+        // Added last so it takes what the docked panes left, which is what Fill
+        // means here. Adding it before the review pane would give the editor the
+        // whole remainder and leave the review pane nothing to dock into.
         body.AddChild(documents);
         body.SetDock(documents, UiDock.Fill);
         root.AddChild(body);
@@ -615,8 +785,62 @@ public sealed class CodeShell : IDisposable
         ComposeToolbar();
     }
 
+    /// <summary>
+    /// Docks the Human Review pane to the right of the editor, giving the shell
+    /// the three columns the review workspace is built around: what to review on
+    /// the left, the code in the middle, and what is known about it on the right.
+    ///
+    /// Does nothing when the head supplied no review tree, so a host that has
+    /// not adopted the review workspace composes exactly the shell it did before.
+    /// </summary>
+    private void ComposeReview(UiPanel body)
+    {
+        if (_controls.Review is not { } review)
+            return;
+
+        // The pane goes to the far right and the splitter to its left, mirroring
+        // the explorer's arrangement on the other side. The splitter is a grip
+        // and nothing more today: UiSplitter.Value is read by no one here, and
+        // the explorer's has been inert the same way since it was composed —
+        // pane width comes from the PreferredSize the head sets. Applying Value
+        // to pane layout is one change for both splitters, not something to
+        // solve for this pane alone.
+        if (_controls.ReviewPane is { } pane)
+        {
+            pane.LayoutMode = UiPanelLayoutMode.Dock;
+
+            if (_controls.ReviewNoteInput is { } input)
+            {
+                input.PlaceholderText = "Add a review note…";
+                input.Submitted += OnReviewNoteSubmitted;
+                pane.AddChild(input);
+                pane.SetDock(input, UiDock.Bottom);
+            }
+
+            pane.AddChild(review);
+            pane.SetDock(review, UiDock.Fill);
+            body.AddChild(pane);
+            body.SetDock(pane, UiDock.Right);
+        }
+        else
+        {
+            body.AddChild(review);
+            body.SetDock(review, UiDock.Right);
+        }
+
+        if (_controls.ReviewSplitter is { } splitter)
+        {
+            splitter.Orientation = UiSplitterOrientation.Vertical;
+            body.AddChild(splitter);
+            body.SetDock(splitter, UiDock.Right);
+        }
+
+        review.NodeActivated += OnReviewNodeActivated;
+    }
+
     private void RefreshCommands()
     {
+        SyncReviewState();
         var items = new List<UiMenuItem>();
 
         // Mnemonics go in AccessKey, never in the text. UiMenu renders Text
@@ -639,6 +863,20 @@ public sealed class CodeShell : IDisposable
         AddItem(build, CodeCommandNames.Cancel);
         items.Add(build);
 
+        // A menu of its own rather than entries under File. Human review is not
+        // a file operation: it is the thing this shell exists to make routine,
+        // and burying it three items deep would say the opposite.
+        var review = new UiMenuItem("review", "Review") { AccessKey = 'R' };
+        AddItem(review, CodeCommandNames.MarkReviewed);
+        AddItem(review, CodeCommandNames.MarkInReview);
+        AddItem(review, CodeCommandNames.MarkQuestion);
+        AddItem(review, CodeCommandNames.MarkNeedsChange);
+        review.Children.Add(new UiMenuItem("review.sep", string.Empty) { IsSeparator = true });
+        AddItem(review, CodeCommandNames.AddNote);
+        AddItem(review, CodeCommandNames.ClearReview);
+        AddItem(review, CodeCommandNames.ReviewCoverage);
+        items.Add(review);
+
         _controls.Menu.SetItems(items);
         RefreshToolbar();
 
@@ -655,6 +893,25 @@ public sealed class CodeShell : IDisposable
                 AccessKey = command.AccessKey,
             });
         }
+    }
+
+    /// <summary>
+    /// Points the review pane at the active document and refreshes the state the
+    /// review commands are enabled from.
+    ///
+    /// Driven from the command refresh because every path that can change either
+    /// — a tab switch, a save, an edit, a recorded decision — already ends
+    /// there. A second notification path would be one more thing to forget.
+    /// </summary>
+    private void SyncReviewState()
+    {
+        WorkspaceItemId active = _coordinator?.ActiveDocument ?? WorkspaceItemId.None;
+
+        if (_review is not null && _review.CurrentDocument != active)
+            _review.SetCurrentDocument(active);
+
+        _commands.HasReview = _controls.Review is not null;
+        _commands.HasReviewer = !string.IsNullOrWhiteSpace(Reviewer);
     }
 
     /// <summary>
@@ -743,6 +1000,145 @@ public sealed class CodeShell : IDisposable
             return;
 
         _ = NavigateAsync(item.Id, entry);
+    }
+
+    private void OnActiveDocumentChanged(object? sender, UiTabSelectionChangedEventArgs e) =>
+        RefreshCommands();
+
+    private void OnReviewChanged(object? sender, EventArgs e)
+    {
+        // An unreadable record makes its file look unreviewed, so it is said out
+        // loud rather than left for the reviewer to notice a badge that quietly
+        // went missing.
+        if (_review is { Unreadable.Count: > 0 } review)
+        {
+            SetStatus(review.Unreadable.Count == 1
+                ? review.Unreadable[0].Message
+                : $"{review.Unreadable.Count} review records could not be read; those files show as unreviewed.");
+        }
+
+        // The explorer badges come from the same controller, so a recorded
+        // decision has to redraw the tree as well as the pane. Refresh() rather
+        // than a targeted change: a single decision can move one row, and a
+        // completed background load moves thousands.
+        _explorerSource?.Refresh();
+        RefreshCommands();
+    }
+
+    /// <summary>
+    /// Activating a note in the review pane puts the caret on the code it is
+    /// about. The note's placed line is used, not its recorded one, so this lands
+    /// correctly on a file that has been edited since the note was written.
+    /// </summary>
+    private void OnReviewNodeActivated(object? sender, TreeNodeEventArgs e)
+    {
+        if (_reviewSource?.NoteFor(e.Node) is not { } note ||
+            note.Status is ReviewAnchorStatus.FileLevel or ReviewAnchorStatus.Orphaned)
+        {
+            return;
+        }
+
+        ICodeTextSnapshot snapshot = _controls.Editor.Snapshot;
+        if (note.StartLine >= 0 && note.StartLine < snapshot.LineCount)
+        {
+            _controls.Editor.Selection = CodeSelection.Caret(snapshot.GetLineStart(note.StartLine));
+            _controls.Editor.EnsureCaretVisible();
+        }
+    }
+
+    /// <summary>
+    /// Adds a note from the pane's input field, anchored to the line the caret
+    /// is on.
+    ///
+    /// The caret rather than a separate "pick a line" gesture: the reviewer is
+    /// already reading the line they are asking about, and a note-taking step
+    /// that first asks where is a note-taking step people skip.
+    /// </summary>
+    private void OnReviewNoteSubmitted(object? sender, UiEditSubmittedEventArgs e) =>
+        _ = InvokeAsync(CodeCommandNames.AddNote);
+
+    /// <summary>
+    /// Writes the note in the pane's input field, anchored to the line the caret
+    /// is on.
+    ///
+    /// The caret rather than a separate "pick a line" gesture: the reviewer is
+    /// already reading the line they are asking about, and a note-taking step
+    /// that first asks where is a note-taking step people skip.
+    ///
+    /// Every note is a Question. The other three kinds exist in the record
+    /// format and are unreachable from the product until the pane can offer a
+    /// choice — see the limitations in
+    /// <c>docs/architecture/broiler-code-review.md</c>.
+    /// </summary>
+    private async ValueTask<bool> AddNoteFromInputAsync(CancellationToken cancellationToken)
+    {
+        if (_review is null || _controls.ReviewNoteInput is not { } input)
+        {
+            SetStatus("This host has no way to write a review note.");
+            return false;
+        }
+
+        string text = input.Text;
+        if (text.Trim().Length == 0)
+        {
+            SetStatus("Type the note first.");
+            return false;
+        }
+
+        ICodeTextSnapshot snapshot = _controls.Editor.Snapshot;
+        int line = snapshot.GetLineFromPosition(
+            Math.Clamp(_controls.Editor.Selection.Focus, 0, snapshot.Length));
+
+        ReviewActionResult result = await _review
+            .AddNoteAsync(ReviewNoteKind.Question, text, line, line, cancellationToken: cancellationToken)
+            .ConfigureAwait(true);
+
+        if (result.Succeeded && !input.IsDisposed)
+            input.Text = string.Empty;
+
+        SetStatus(result.Message);
+        return result.Succeeded;
+    }
+
+    private async ValueTask<bool> RecordReviewAsync(ReviewStatus status, CancellationToken cancellationToken)
+    {
+        if (_review is null)
+        {
+            SetStatus("This host does not compose the Human Review pane.");
+            return false;
+        }
+
+        ReviewActionResult result = await _review
+            .RecordDecisionAsync(status, cancellationToken).ConfigureAwait(true);
+
+        SetStatus(result.Message);
+        return result.Succeeded;
+    }
+
+    /// <summary>
+    /// Writes the coverage summary to the Output line.
+    ///
+    /// The counterpart to the Test262 and WPT numbers, computed over the open
+    /// workspace rather than the whole platform: this is the shell's answer, and
+    /// the CI tool's is the one that covers every component.
+    /// </summary>
+    private bool ShowReviewCoverage()
+    {
+        if (_review is null)
+        {
+            SetStatus("This host does not compose the Human Review pane.");
+            return false;
+        }
+
+        ReviewCoverageTotals totals = ReviewCoverage.Overall(_review.Snapshot());
+        _controls.Output.Text =
+            $"Human review: {totals.Verified}/{totals.Total} files verified " +
+            $"({totals.FormatPercent(totals.VerifiedPercent)}), " +
+            $"{totals.StaleApprovals} modified since review, " +
+            $"{totals.Unreviewed} never reviewed, {totals.OpenNotes} open notes.";
+
+        SetStatus("Review coverage written to the Output pane.");
+        return true;
     }
 
     private async ValueTask NavigateAsync(WorkspaceItemId id, ProblemEntry entry)
@@ -855,6 +1251,23 @@ public sealed class CodeShell : IDisposable
         _coordinator = null;
         _explorerSource?.Dispose();
         _explorerSource = null;
+
+        // Cancelled before the controller is disposed, so an in-flight load stops
+        // at its next read instead of running to completion against a workspace
+        // that has gone.
+        _reviewLoad?.Cancel();
+        _reviewLoad?.Dispose();
+        _reviewLoad = null;
+
+        if (_review is not null)
+            _review.Changed -= OnReviewChanged;
+        _reviewSource?.Dispose();
+        _reviewSource = null;
+        _review?.Dispose();
+        _review = null;
+
+        if (_controls.Review is { IsDisposed: false } review)
+            review.DataSource = null;
 
         // A host may dispose its session — and with it the whole element tree —
         // before the shell. Detaching then has nothing left to detach from, and

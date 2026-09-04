@@ -143,6 +143,11 @@ internal static class CodeHost
         session.AddRoot(shell.RootElement);
         window.Attach(session, shell);
 
+        // The same dispatcher the session uses. The review load reads every
+        // record and every file it describes on a pool thread; without this it
+        // would apply the result there too, racing the paint that reads it.
+        shell.Dispatcher = window.Dispatcher;
+
         // Null when no helper is installed, which is what makes Open and Save
         // As report Unavailable with a reason instead of doing nothing.
         shell.FileDialogs = dialogs.IsAvailable ? dialogs : null;

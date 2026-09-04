@@ -21,6 +21,7 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\Broiler.Code.Workspaces\Broiler.Code.Workspaces.csproj" />
+    <ProjectReference Include="..\Broiler.Code.Review\Broiler.Code.Review.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Text\Broiler.UI.CodeEditor\Broiler.UI.CodeEditor.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\ValueAndSelection\Broiler.UI.TreeView\Broiler.UI.TreeView.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Layout\Broiler.UI.TabView\Broiler.UI.TabView.csproj" />
@@ -34,6 +35,8 @@
     <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Commands\Broiler.UI.Menu\Broiler.UI.Menu.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Commands\Broiler.UI.Toolbar\Broiler.UI.Toolbar.csproj" />
     <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Content\Broiler.UI.Label\Broiler.UI.Label.csproj" />
+    <!-- The review pane's note field. Single-line; see CodeShellControls.ReviewNoteInput. -->
+    <ProjectReference Include="..\..\Broiler.UI\src\Abstractions\Text\Broiler.UI.Edit\Broiler.UI.Edit.csproj" />
     <!--
       Input and Graphics for the shared desktop input routing. Both are
       platform-neutral contract assemblies, not backends: a platform backend

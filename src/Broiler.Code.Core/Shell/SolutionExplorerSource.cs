@@ -37,6 +37,18 @@ public sealed class SolutionExplorerSource : IObservableTreeDataSource, IDisposa
 
     public TreeNodeId Root => new("root");
 
+    /// <summary>
+    /// The review state to badge a file row with, when the host composed the
+    /// review workspace.
+    ///
+    /// A delegate rather than a reference to the controller, so this stays
+    /// testable with no review store and so the explorer keeps working
+    /// unchanged on a host that does not compose one. It is called once per
+    /// visible row per repaint, so the implementation behind it must be a
+    /// lookup — see <see cref="Review.ReviewController.StateFor"/>.
+    /// </summary>
+    public Func<string, Broiler.Code.Review.ReviewState>? ReviewStateOf { get; set; }
+
     /// <summary>The workspace item a node stands for, or None for a grouping node.</summary>
     public WorkspaceItemId ItemFor(TreeNodeId node)
     {
@@ -103,7 +115,28 @@ public sealed class SolutionExplorerSource : IObservableTreeDataSource, IDisposa
         if (!found.Item.IsNone && _workspace.FindOpenDocument(found.Item) is { IsDirty: true })
             decoration = TreeNodeDecoration.Dirty;
 
-        return new TreeNodePresentation(node, found.Label, found.Secondary, found.IconKey, decoration);
+        string? secondary = found.Secondary;
+
+        // Unsaved work outranks a review badge on the same row. There is one
+        // decoration per row, and a file being edited right now is the more
+        // urgent of the two things to say about it — its review state is about
+        // to change anyway.
+        if (ReviewStateOf is { } review && found.IconKey == "source" &&
+            !found.Item.IsNone && _workspace.FindItem(found.Item) is { } item)
+        {
+            Broiler.Code.Review.ReviewState state = review(item.RelativePath);
+            if (state.IsAttested || state.OpenNotes > 0)
+            {
+                secondary = found.Secondary is { Length: > 0 } existing
+                    ? $"{existing} · {state.ToDisplayString()}"
+                    : state.ToDisplayString();
+
+                if (decoration == TreeNodeDecoration.None)
+                    decoration = Review.ReviewPaneSource.DecorationFor(state);
+            }
+        }
+
+        return new TreeNodePresentation(node, found.Label, secondary, found.IconKey, decoration);
     }
 
     public void Dispose()

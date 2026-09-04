@@ -51,6 +51,7 @@
       "path": "Broiler.Tooling.slnx",
       "description": "Developer diagnostics, playback, and baseline tooling.",
       "roots": [
+        "src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj",
         "src/Broiler.DevConsole/Broiler.DevConsole.csproj",
         "src/Broiler.DevSite/Broiler.DevSite.csproj",
         "src/Broiler.Engines.Baseline/Broiler.Engines.Baseline.csproj",
@@ -66,6 +67,7 @@
         "src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj",
         "src/Broiler.Playback.Tests/Broiler.Playback.Tests.csproj",
         "src/Broiler.Code.Core.Tests/Broiler.Code.Core.Tests.csproj",
+        "src/Broiler.Code.Review.Tests/Broiler.Code.Review.Tests.csproj",
         "src/Broiler.Code.Language.CSharp.Tests/Broiler.Code.Language.CSharp.Tests.csproj",
         "src/Broiler.Code.Workspaces.Tests/Broiler.Code.Workspaces.Tests.csproj",
         "src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj"

@@ -1,0 +1,140 @@
+name: Human Review
+
+# The CI half of the Broiler Code Human Review workspace.
+#
+# It exists so the review record is checkable by somebody other than the person
+# who wrote it. A record only a local editor can read proves nothing; run here,
+# the same evaluation the editor does produces a number the project can publish
+# beside its Test262 and WPT rates, and a warning when a pull request changes a
+# file somebody had already approved.
+#
+# Two things this workflow deliberately does NOT do:
+#
+#   * It does not fail on unreviewed files. A repository adopting this starts
+#     with all of them unreviewed, and a gate that goes red on the first run is a
+#     gate that gets deleted on the first run. Unreviewed files are reported by
+#     the coverage number; this job's `check` step reports only reviews that a
+#     change has *invalidated* — an approval whose content moved out from under
+#     it, or a file a reviewer explicitly marked as needing work.
+#
+#   * It does not fail on those either, by default. `check` annotates the diff
+#     and exits zero. Turning that into a merge gate is one flag
+#     (`--fail-on-stale`) and a deliberate decision to make once the backlog is
+#     small enough to hold; see docs/architecture/broiler-code-review.md.
+#
+# Staleness is decided by content, not by commit, which is why this workflow
+# needs no history: a rebase does not invalidate a review and a revert restores
+# one, so a shallow checkout of the merge result answers the question exactly.
+# `fetch-depth: 0` is set on pull requests for one reason only — to diff against
+# the base and find out which files the pull request touched, so the annotations
+# land on those rather than on every stale review in the repository.
+
+on:
+  pull_request:
+    paths:
+      # The review records themselves, the source they describe, and the tool
+      # that evaluates them. Not '**' — a change to a shell script or a WPT
+      # fixture cannot invalidate a review of a .cs file.
+      - '.broiler-review/**'
+      - '**.cs'
+      - 'src/Broiler.Code.Review/**'
+      - 'src/Broiler.Code.Review.Cli/**'
+      - '.github/workflows/human-review.yml'
+      # Each submodule named without a trailing slash, because a pointer bump
+      # changes the gitlink path itself and nothing under it. '**.cs' does not
+      # match a gitlink, so without these a pull request that moves a component
+      # forward — bringing in every source change inside it — would not run this
+      # job at all.
+      - 'Broiler.Browser'
+      - 'Broiler.CSS'
+      - 'Broiler.DOM'
+      - 'Broiler.Documents'
+      - 'Broiler.Graphics'
+      - 'Broiler.HTML'
+      - 'Broiler.Input'
+      - 'Broiler.JS'
+      - 'Broiler.Media'
+      - 'Broiler.UI'
+      - 'Broiler.Writer'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: human-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Human review coverage
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Submodules are where most of the platform's source lives, so a
+          # coverage number computed without them would describe the main
+          # repository and claim to describe Broiler. Recursive, because the
+          # components carry their own nested checkouts — the tool folds the
+          # duplicates back together by identity rather than counting them
+          # (docs/architecture/broiler-code-review.md, "The denominator").
+          submodules: recursive
+
+          # Full history on a pull request, only to diff against the base below;
+          # the evaluation itself needs no history at all.
+          #
+          # Written the long way round because 0 is FALSY in a workflow
+          # expression, so the natural spelling — `X && 0 || 1` — returns 1 in
+          # both branches and silently gives a pull request a shallow clone,
+          # where the diff below then fails to find a merge base. Testing for
+          # the other case and yielding 1 keeps the truthy value on the left of
+          # each operator, which is the only arrangement that works.
+          fetch-depth: ${{ github.event_name != 'pull_request' && 1 || 0 }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build the review tool
+        # Its own project rather than a solution: this job needs the evaluator,
+        # not the IDE, and building the shell here would make a review report
+        # depend on a UI compile.
+        run: dotnet build src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj -c Release
+
+      - name: List the files this pull request changes
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          # Written to a file rather than passed as arguments: a pull request can
+          # touch more paths than a command line will hold.
+          git diff --name-only \
+            "origin/${{ github.base_ref }}...HEAD" > changed-files.txt
+          echo "$(wc -l < changed-files.txt) files changed"
+
+      - name: Report reviews this change invalidates
+        if: github.event_name == 'pull_request'
+        run: >
+          dotnet run --project src/Broiler.Code.Review.Cli -c Release --no-build --
+          check --root . --changed changed-files.txt
+
+      - name: Measure review coverage
+        run: >
+          dotnet run --project src/Broiler.Code.Review.Cli -c Release --no-build --
+          coverage --root .
+          --markdown artifacts/human-review/coverage.md
+          --json artifacts/human-review/coverage.json
+
+      - name: Publish the coverage report to the run summary
+        shell: bash
+        run: cat artifacts/human-review/coverage.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: human-review-coverage
+          path: artifacts/human-review/
+          if-no-files-found: error

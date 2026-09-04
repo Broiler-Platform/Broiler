@@ -71,6 +71,11 @@ internal static class CodeHost
         window.AttachShell(shell);
         host.Attach(window.Clipboard);
 
+        // The same dispatcher the session uses. The review load reads every
+        // record and every file it describes on a pool thread; without this it
+        // would apply the result there too, racing the paint that reads it.
+        shell.Dispatcher = window.Dispatcher;
+
         // The dialogs are what make Open and Save As real commands rather than
         // menu entries that raise an intent nobody handles.
         shell.FileDialogs = new WindowsFileDialogs(window.NativeHandle);

@@ -91,6 +91,28 @@ The review files deliberately require a real developer to provide an identity, e
 commit, test and analysis evidence, findings, intended-use scope, decision, and
 attestation. AI tools must not select or sign the decision.
 
+### Per-file review records
+
+A component record attests to a whole component at one commit, and goes out of date as
+the code moves. Broiler Code's **Human Review workspace** records the same kind of
+attestation per source file, against a hash of the exact content reviewed, so the state
+of every file is known at every revision:
+
+```bash
+dotnet run --project src/Broiler.Code.Review.Cli -- coverage --root .
+```
+
+Records live in `.broiler-review/` beside the source and are committed, so human review
+becomes part of the project's history and a pull request can be told which reviews it
+invalidated. Staleness is decided by content rather than by commit — a rebase does not
+expire a review and a revert restores one. The resulting coverage number is the
+counterpart to the machine-checked ones: test262 and WPT measure what a machine can
+prove, and review coverage measures what a human has actually read. It counts only files
+approved *and* unchanged since; a stale approval is reported separately and never counts.
+
+The workspace itself is the three-pane review view in Broiler Code. See
+[the architecture record](docs/architecture/broiler-code-review.md).
+
 ## Get the source
 
 Broiler uses recursive Git submodules:
