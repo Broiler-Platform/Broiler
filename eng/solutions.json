@@ -1,28 +1,6 @@
 {
   "solutions": [
     {
-      "path": "Broiler.Windows.Code.slnx",
-      "description": "Windows Broiler Code application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Code.Windows/Broiler.Code.Windows.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*Linux[^/]*\\.csproj$",
-        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Linux.Code.slnx",
-      "description": "Linux Broiler Code application and its transitive dependencies.",
-      "roots": [
-        "src/Broiler.Code.Linux/Broiler.Code.Linux.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation)[^/]*\\.csproj$",
-        "(?i)(^|[./])[^/]*WebAssembly[^/]*\\.csproj$"
-      ]
-    },
-    {
       "path": "Broiler.Office.Server.slnx",
       "description": "Office server and its property-driven Writer WebAssembly client dependency.",
       "roots": [
@@ -51,7 +29,6 @@
       "path": "Broiler.Tooling.slnx",
       "description": "Developer diagnostics, playback, and baseline tooling.",
       "roots": [
-        "src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj",
         "src/Broiler.DevConsole/Broiler.DevConsole.csproj",
         "src/Broiler.DevSite/Broiler.DevSite.csproj",
         "src/Broiler.Engines.Baseline/Broiler.Engines.Baseline.csproj",
@@ -66,10 +43,6 @@
         "src/Broiler.Cli.Tests/Broiler.Cli.Tests.csproj",
         "src/Broiler.DevConsole.Tests/Broiler.DevConsole.Tests.csproj",
         "src/Broiler.Playback.Tests/Broiler.Playback.Tests.csproj",
-        "src/Broiler.Code.Core.Tests/Broiler.Code.Core.Tests.csproj",
-        "src/Broiler.Code.Review.Tests/Broiler.Code.Review.Tests.csproj",
-        "src/Broiler.Code.Language.CSharp.Tests/Broiler.Code.Language.CSharp.Tests.csproj",
-        "src/Broiler.Code.Workspaces.Tests/Broiler.Code.Workspaces.Tests.csproj",
         "src/Broiler.Wpt.Tests/Broiler.Wpt.Tests.csproj"
       ],
       "forbiddenProjectPatterns": [
@@ -103,11 +76,9 @@
     },
     {
       "path": "Broiler.WebAssembly.Tests.slnx",
-      "description": "WebAssembly backend tests and the Broiler Code payload probes.",
+      "description": "WebAssembly backend tests. The Broiler Code payload probes moved with that component; Broiler.WebAssembly.Code.slnx in the Broiler.Code submodule builds them now.",
       "roots": [
-        "Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj",
-        "tests/broiler-code-phase0/payload-probes/Probe.Wasm.Baseline/Probe.Wasm.Baseline.csproj",
-        "tests/broiler-code-phase0/payload-probes/Probe.Wasm.Roslyn/Probe.Wasm.Roslyn.csproj"
+        "Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"
@@ -119,18 +90,6 @@
       "roots": [
         "Broiler.Graphics/src/tests/Broiler.Graphics.Android.Tests/Broiler.Graphics.Android.Tests.csproj",
         "Broiler.Input/src/tests/Broiler.Input.Android.Tests/Broiler.Input.Android.Tests.csproj"
-      ],
-      "forbiddenProjectPatterns": [
-        "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"
-      ]
-    },
-    {
-      "path": "Broiler.Code.Phase0.slnx",
-      "description": "Broiler Code Phase 0 harnesses: the edit-to-classification prototype, the trusted build worker, and the Roslyn footprint measurement. The SampleReports fixture under tests/broiler-code-phase0/fixture is deliberately absent — it fails to compile by design and would break build verification.",
-      "roots": [
-        "tests/broiler-code-phase0/Broiler.Code.Phase0.Prototype/Broiler.Code.Phase0.Prototype.csproj",
-        "tests/broiler-code-phase0/Broiler.Code.Phase0.Roslyn/Broiler.Code.Phase0.Roslyn.csproj",
-        "tests/broiler-code-phase0/Broiler.Code.Phase0.Worker/Broiler.Code.Phase0.Worker.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux|WebAssembly)[^/]*\\.csproj$"

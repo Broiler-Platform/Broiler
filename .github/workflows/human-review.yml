@@ -20,7 +20,8 @@ name: Human Review
 #   * It does not fail on those either, by default. `check` annotates the diff
 #     and exits zero. Turning that into a merge gate is one flag
 #     (`--fail-on-stale`) and a deliberate decision to make once the backlog is
-#     small enough to hold; see docs/architecture/broiler-code-review.md.
+#     small enough to hold; see
+#     Broiler.Code/docs/architecture/broiler-code-review.md.
 #
 # Staleness is decided by content, not by commit, which is why this workflow
 # needs no history: a rebase does not invalidate a review and a revert restores
@@ -32,13 +33,12 @@ name: Human Review
 on:
   pull_request:
     paths:
-      # The review records themselves, the source they describe, and the tool
-      # that evaluates them. Not '**' — a change to a shell script or a WPT
-      # fixture cannot invalidate a review of a .cs file.
+      # The review records themselves and the source they describe. Not '**' — a
+      # change to a shell script or a WPT fixture cannot invalidate a review of a
+      # .cs file. The tool that evaluates them lives in the Broiler.Code
+      # submodule, so it is watched as a gitlink below rather than as a path.
       - '.broiler-review/**'
       - '**.cs'
-      - 'src/Broiler.Code.Review/**'
-      - 'src/Broiler.Code.Review.Cli/**'
       - '.github/workflows/human-review.yml'
       # Each submodule named without a trailing slash, because a pointer bump
       # changes the gitlink path itself and nothing under it. '**.cs' does not
@@ -47,6 +47,7 @@ on:
       # job at all.
       - 'Broiler.Browser'
       - 'Broiler.CSS'
+      - 'Broiler.Code'
       - 'Broiler.DOM'
       - 'Broiler.Documents'
       - 'Broiler.Graphics'
@@ -81,7 +82,8 @@ jobs:
           # repository and claim to describe Broiler. Recursive, because the
           # components carry their own nested checkouts — the tool folds the
           # duplicates back together by identity rather than counting them
-          # (docs/architecture/broiler-code-review.md, "The denominator").
+          # (Broiler.Code/docs/architecture/broiler-code-review.md, "The
+          # denominator").
           submodules: recursive
 
           # Full history on a pull request, only to diff against the base below;
@@ -104,7 +106,9 @@ jobs:
         # Its own project rather than a solution: this job needs the evaluator,
         # not the IDE, and building the shell here would make a review report
         # depend on a UI compile.
-        run: dotnet build src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj -c Release
+        run: >
+          dotnet build
+          Broiler.Code/src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj -c Release
 
       - name: List the files this pull request changes
         if: github.event_name == 'pull_request'
@@ -119,12 +123,12 @@ jobs:
       - name: Report reviews this change invalidates
         if: github.event_name == 'pull_request'
         run: >
-          dotnet run --project src/Broiler.Code.Review.Cli -c Release --no-build --
+          dotnet run --project Broiler.Code/src/Broiler.Code.Review.Cli -c Release --no-build --
           check --root . --changed changed-files.txt
 
       - name: Measure review coverage
         run: >
-          dotnet run --project src/Broiler.Code.Review.Cli -c Release --no-build --
+          dotnet run --project Broiler.Code/src/Broiler.Code.Review.Cli -c Release --no-build --
           coverage --root .
           --markdown artifacts/human-review/coverage.md
           --json artifacts/human-review/coverage.json

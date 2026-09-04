@@ -64,7 +64,7 @@ An item closes only when:
 
 ### HDPI-1 — Broiler Code for Windows runs DPI-unaware (High)
 
-**Owner:** `src/Broiler.Code.Windows`
+**Owner:** `Broiler.Code/src/Broiler.Code.Windows`
 
 `Program.cs` declares neither an `app.manifest` nor a runtime
 `SetProcessDpiAwarenessContext` call, yet `CodeWindow : Direct2DWindow` sizes in

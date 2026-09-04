@@ -42,7 +42,7 @@ contracts.
 - [`Broiler.Writer.WebAssembly`](../../Broiler.Writer/src/Broiler.Writer.WebAssembly/) is the
   application port.
 - [`Broiler.Graphics.WebAssembly.Tests`](../../Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/)
-  and the [Broiler Code payload probes](../../tests/broiler-code-phase0/payload-probes/)
+  and the [Broiler Code payload probes](../../Broiler.Code/tests/broiler-code-phase0/payload-probes/)
   are the supported WebAssembly test entry points, registered in
   `Broiler.WebAssembly.Tests.slnx`.
 
