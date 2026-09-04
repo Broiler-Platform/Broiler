@@ -1,21 +1,25 @@
 name: Script tests
 
-# The unit tests under scripts/tests/ that had no runner.
+# The unit tests under scripts/tests/ — six Python suites and four Node ones — that had no
+# runner on a pull request.
 #
-# Two of the five Python suites were already invoked — test_run_privacy_test_pages from
-# privacy-test-pages.yml and test_real_world_render_tests from real-world-render-tests.yml —
-# but both of those workflows are workflow_dispatch and schedule only. A change to a script
-# could therefore break its tests and merge green, with the breakage surfacing days later
-# inside an expensive run that exists to measure something else entirely. The other three
-# suites had no runner at all.
+# Four of the ten were invoked somewhere: test_run_privacy_test_pages,
+# capture-privacy-reference and github-issue from privacy-test-pages.yml, and
+# test_real_world_render_tests with generate-real-world-references from
+# real-world-render-tests.yml. But both of those workflows are workflow_dispatch and
+# schedule only, so none of them gates a change. A script could break its tests and merge
+# green, with the breakage surfacing days later inside an expensive run that exists to
+# measure something else entirely. The other six — generate-wpt-references among them — ran
+# nowhere at all.
 #
-# So this job is deliberately small and fast: no submodules, no .NET, no browsers, and a
-# three-package pip install that only one suite needs. Every suite drives its script inside
-# a temporary directory, so none of the heavy setup its owning workflow performs is
-# required here. It finishes in well under a minute, which is what makes it reasonable to
-# run on every pull request that touches scripts/.
+# So these jobs are deliberately small and fast: no submodules, no .NET, no browsers, no npm
+# install, and a three-package pip install that one Python suite needs. Every suite drives
+# its script inside a temporary directory, and every script under Node test here imports
+# only node: builtins, so none of the heavy setup the owning workflows perform is required.
+# Both jobs finish in well under a minute, which is what makes them reasonable on every pull
+# request that touches scripts/.
 #
-# The two workflows above keep their own steps. Running a suite twice costs seconds and
+# The two dispatch workflows keep their own steps. Running a suite twice costs seconds and
 # means a dispatched run still checks its own harness before spending an hour on it.
 
 on:
@@ -72,9 +76,58 @@ jobs:
       # --start-directory rather than `discover -t .`: scripts/tests has no __init__.py, so
       # unittest will not accept the repository root as the top-level directory — it
       # refuses with "Start directory is not importable".
+      #
+      # The count is checked first for the same reason the Node job checks it: unittest
+      # exits zero when discovery matches nothing, so a change that stopped matching would
+      # leave this job green while testing nothing at all. A file that matches but cannot
+      # be imported already fails the run — that is how the missing numpy was caught — so
+      # the empty case is the only silent one, and this closes it.
       - name: Run the Python script tests
-        run: >
-          python -m unittest discover
-          --start-directory scripts/tests
-          --pattern 'test_*.py'
-          --verbose
+        shell: bash
+        run: |
+          shopt -s nullglob
+          suites=(scripts/tests/test_*.py)
+          if [ ${#suites[@]} -eq 0 ]; then
+            echo "::error::No Python suites matched scripts/tests/test_*.py"
+            exit 1
+          fi
+          echo "Discovering ${#suites[@]} suite(s): ${suites[*]}"
+          python -m unittest discover \
+            --start-directory scripts/tests \
+            --pattern 'test_*.py' \
+            --verbose
+
+  node:
+    name: Node script tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+        # No submodules, and no npm install: every script these suites exercise imports
+        # only node: builtins at load time. Playwright is reached at run time, by code
+        # paths the tests stub rather than execute.
+
+      - uses: actions/setup-node@v5
+        with:
+          # The version the two dispatch workflows already pin, so a suite cannot pass
+          # here and fail there on a runtime difference.
+          node-version: '20'
+
+      # The shell expands the suites rather than `node --test scripts/tests/`, for one
+      # reason: the empty case. Node's runner exits zero when it finds nothing, so a
+      # discovery change that stopped matching would turn this job green while testing
+      # nothing at all — the exact failure it exists to prevent, wearing a passing badge.
+      # The guard makes that loud. `nullglob` is what lets the count reach zero instead of
+      # handing node an unexpanded pattern.
+      - name: Run the Node script tests
+        shell: bash
+        run: |
+          shopt -s nullglob
+          suites=(scripts/tests/*.test.js)
+          if [ ${#suites[@]} -eq 0 ]; then
+            echo "::error::No Node suites matched scripts/tests/*.test.js"
+            exit 1
+          fi
+          echo "Running ${#suites[@]} suite(s): ${suites[*]}"
+          node --test "${suites[@]}"
