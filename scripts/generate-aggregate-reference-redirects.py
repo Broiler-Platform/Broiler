@@ -31,6 +31,10 @@ Today those are all inside Broiler.JS, which is excluded anyway.
 A component that ships its own Directory.Build.targets is skipped too, because MSBuild
 imports only the nearest such file and the root one therefore never reaches its projects.
 
+Whether a component's file chains upward is decided by looking for that call outside XML
+comments; a file that only names it, such as one warning a reader not to chain, is correctly
+read as breaking the chain.
+
 DO NOT "fix" that by chaining the component's file upward with GetPathOfFileAbove. It was
 tried on Broiler.Browser and it makes things strictly worse. Broiler.Browser's four
 solutions enumerate 80 projects that live in its own mirrors, and they have to: those
@@ -65,6 +69,10 @@ REFERENCE_RE = re.compile(
     r"<ProjectReference\b([^>]*?)/>|<ProjectReference\b([^>]*?)>(.*?)</ProjectReference>", re.S
 )
 INCLUDE_RE = re.compile(r'Include="([^"]+)"')
+
+# XML comments cannot nest and cannot contain '--', so a non-greedy match is exact here
+# rather than merely close enough.
+XML_COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 
 
 def git_sha(path: str) -> str | None:
@@ -182,6 +190,19 @@ def nearest_build_targets(project: str) -> str | None:
     file is reached (or when every file between chains upward with GetPathOfFileAbove, since
     the root one is then still imported); otherwise the repo-relative directory of the file
     that breaks the chain.
+
+    Comments are stripped before the test. A file that only MENTIONS the function -- in a
+    comment warning against chaining, say -- does not chain, and reading it as though it did
+    is the worst failure this script has: the component looks covered, so redirects are
+    emitted for its projects, and they then compete with the nested checkouts its own
+    solutions enumerate. Broiler.Code hit exactly that, and the symptom was 55 redirects
+    that would have double-built four components.
+
+    The test stays a substring one on the rest of the file rather than looking only at
+    Import/@Project, because the chaining idiom is routinely split in two: a property holds
+    the GetPathOfFileAbove call and the Import consumes the property (Broiler.UI's
+    Directory.Build.props is written that way). Matching only the Import element would miss
+    that form and wrongly report a chaining file as breaking the chain.
     """
     directory = os.path.dirname(project)
     while True:
@@ -190,7 +211,9 @@ def nearest_build_targets(project: str) -> str | None:
             if directory == ROOT:
                 return None
             try:
-                chains = "GetPathOfFileAbove" in open(candidate, encoding="utf-8-sig").read()
+                with open(candidate, encoding="utf-8-sig") as handle:
+                    text = handle.read()
+                chains = "GetPathOfFileAbove" in XML_COMMENT_RE.sub("", text)
             except OSError:
                 chains = False
             if not chains:
