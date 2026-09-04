@@ -45,3 +45,4 @@
 [submodule "Broiler.Code"]
 	path = Broiler.Code
 	url = https://github.com/Broiler-Platform/Broiler.Code.git
+	branch = main

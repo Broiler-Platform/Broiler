@@ -6,8 +6,6 @@
   </Configurations>
   <Folder Name="/Entry points/">
     <Project Path="Broiler.Graphics/src/tests/Broiler.Graphics.WebAssembly.Tests/Broiler.Graphics.WebAssembly.Tests.csproj" />
-    <Project Path="tests/broiler-code-phase0/payload-probes/Probe.Wasm.Baseline/Probe.Wasm.Baseline.csproj" />
-    <Project Path="tests/broiler-code-phase0/payload-probes/Probe.Wasm.Roslyn/Probe.Wasm.Roslyn.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.Graphics/">
     <Project Path="Broiler.Graphics/src/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj" />

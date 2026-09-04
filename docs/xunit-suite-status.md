@@ -141,12 +141,12 @@ failed in one full run and passed in the next and in isolation.
 ## Running it
 
 * **The Phase 0 fixture pins an SDK feature band.**
-  `tests/broiler-code-phase0/fixture/global.json` asks for 10.0.302 with
+  `Broiler.Code/tests/broiler-code-phase0/fixture/global.json` asks for 10.0.302 with
   `rollForward: latestFeature`, which will not roll *down* a band — so the
   Ubuntu archive's 10.0.1xx does not satisfy it and
   `Broiler.Code.Language.CSharp.Tests` reports "A compatible .NET SDK was not
   found" for two tests. `.claude/hooks/session-start.sh` installs a satisfying
-  SDK beside whatever is on PATH; `cd tests/broiler-code-phase0/fixture &&
+  SDK beside whatever is on PATH; `cd Broiler.Code/tests/broiler-code-phase0/fixture &&
   dotnet --version` is the check.
 * **`Broiler.Cli.Tests` used to hang, and it was one test.**
   `SubDocumentEngineModuleTests.Iframe_Module_Runs_Through_Engine_Path_When_Parent_Is_ModuleContext`

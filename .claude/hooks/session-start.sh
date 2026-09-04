@@ -54,18 +54,22 @@ else
 fi
 
 # --- 1b. The SDK the Phase 0 fixture pins ---------------------------------------
-# tests/broiler-code-phase0/fixture/global.json pins an SDK *feature band*, and the
-# design-time evaluator honours it rather than substituting the SDK it is running
-# under — that is the behaviour Broiler.Code.Language.CSharp.Tests exercises. So "a
-# .NET 10 SDK" is not enough: the Ubuntu archive ships 10.0.1xx, the fixture asks
-# for 10.0.3xx, and `rollForward: latestFeature` will not go *down* a band. Without
-# a satisfying SDK those tests fail with "A compatible .NET SDK was not found",
-# which reads like a product bug and is not one.
+# Broiler.Code/tests/broiler-code-phase0/fixture/global.json pins an SDK *feature
+# band*, and the design-time evaluator honours it rather than substituting the SDK it
+# is running under — that is the behaviour Broiler.Code.Language.CSharp.Tests
+# exercises. So "a .NET 10 SDK" is not enough: the Ubuntu archive ships 10.0.1xx,
+# the fixture asks for 10.0.3xx, and `rollForward: latestFeature` will not go *down*
+# a band. Without a satisfying SDK those tests fail with "A compatible .NET SDK was
+# not found", which reads like a product bug and is not one.
+#
+# Both the fixture and the tests live in the Broiler.Code submodule now, so the
+# guard below is a no-op until that submodule is checked out — which is what the
+# `[ -f "$fixture/global.json" ]` test already covers.
 #
 # `dotnet --version` run inside the fixture is the resolver's own answer, so it is
 # the check: non-zero means nothing installed satisfies the pin.
 ensure_fixture_sdk() {
-  local fixture="$REPO_DIR/tests/broiler-code-phase0/fixture"
+  local fixture="$REPO_DIR/Broiler.Code/tests/broiler-code-phase0/fixture"
   [ -f "$fixture/global.json" ] || return 0
   command -v dotnet >/dev/null 2>&1 || return 0
 

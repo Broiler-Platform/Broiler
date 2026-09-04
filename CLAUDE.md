@@ -34,13 +34,18 @@ origin/main` before touching files.
 
 `Broiler.HTML`, `Broiler.CSS`, `Broiler.DOM`, `Broiler.JS`, `Broiler.Graphics`,
 `Broiler.Input`, `Broiler.Media`, `Broiler.Documents`, `Broiler.UI`,
-`Broiler.Writer` and `Broiler.Browser` are git submodules (see `.gitmodules`),
-each with its own remote under the `Broiler-Platform/` org. The renderer, CSS
-engine, DOM, JS engine, graphics core, input and media stacks, document codecs,
-UI toolkit, and both applications live there — **a fix often belongs in a
-submodule, not the main repo.** What is left in this repository is
-`Broiler.Layout`, the HtmlBridge, and the tools and tests under `src/` and
-`tests/`.
+`Broiler.Writer`, `Broiler.Browser` and `Broiler.Code` are git submodules (see
+`.gitmodules`), each with its own remote under the `Broiler-Platform/` org. The
+renderer, CSS engine, DOM, JS engine, graphics core, input and media stacks,
+document codecs, UI toolkit, and all three applications live there — **a fix
+often belongs in a submodule, not the main repo.** What is left in this
+repository is `Broiler.Layout`, the HtmlBridge, and the tools and tests under
+`src/` and `tests/`.
+
+`Broiler.Code` owns the editor *and* the human review workspace, so the review
+tool the root `human-review.yml` runs is built out of that submodule
+(`Broiler.Code/src/Broiler.Code.Review.Cli`); the `.broiler-review/` records it
+evaluates still live in each repository beside the source they describe.
 
 The component repositories publish their projects under `src/` (with tests in
 `src/tests/`), and each carries nested checkouts of the components it depends on

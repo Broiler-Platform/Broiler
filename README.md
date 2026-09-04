@@ -25,6 +25,7 @@ lineage comes from [Yantra JS](https://github.com/yantrajs/yantra).
 | `Broiler.App` | WPF browser application |
 | `Broiler.Browser.Windows` / `Broiler.Browser.Linux` / `Broiler.Browser.Android` | Platform-specific browser applications sharing `Broiler.Browser.Core` |
 | `Broiler.Writer.Windows` / `Broiler.Writer.Linux` / `Broiler.Writer.WebAssembly` / `Broiler.Writer.Android` | Platform-specific Writer applications sharing `Broiler.Writer.Core` |
+| `Broiler.Code.Windows` / `Broiler.Code.Linux` | Platform-specific Broiler Code applications sharing `Broiler.Code.Core`, plus the workspace, language services and human review model |
 | `Broiler.Cli`, `Broiler.Wpt` | Rendering and web-platform-test tooling |
 | `Broiler.DevConsole`, `Broiler.DevSite` | Development and diagnostics tools |
 
@@ -99,7 +100,7 @@ attestation per source file, against a hash of the exact content reviewed, so th
 of every file is known at every revision:
 
 ```bash
-dotnet run --project src/Broiler.Code.Review.Cli -- coverage --root .
+dotnet run --project Broiler.Code/src/Broiler.Code.Review.Cli -- coverage --root .
 ```
 
 Records live in `.broiler-review/` beside the source and are committed, so human review
@@ -111,7 +112,8 @@ prove, and review coverage measures what a human has actually read. It counts on
 approved *and* unchanged since; a stale approval is reported separately and never counts.
 
 The workspace itself is the three-pane review view in Broiler Code. See
-[the architecture record](docs/architecture/broiler-code-review.md).
+[the architecture record](Broiler.Code/docs/architecture/broiler-code-review.md), in the
+`Broiler.Code` submodule that owns the workspace and the tool.
 
 ## Get the source
 
@@ -144,12 +146,13 @@ Choose the solution for the product, platform, or validation slice you are worki
 dotnet build Broiler.Browser/Broiler.Windows.Browser.slnx
 dotnet build Broiler.Writer/Broiler.Linux.Writer.slnx
 dotnet build Broiler.Writer/Broiler.Android.Writer.slnx -p:AndroidSdkDirectory="C:\Program Files (x86)\Android\android-sdk"
+dotnet build Broiler.Code/Broiler.Windows.Code.slnx
 dotnet test Broiler.Tests.slnx
 ```
 
-The Browser and Writer applications live in their own repositories and are composed
-here as submodules, so their solutions are read out of those checkouts rather than
-from the repository root.
+The Browser, Writer and Broiler Code applications live in their own repositories and
+are composed here as submodules, so their solutions are read out of those checkouts
+rather than from the repository root.
 
 The root workspaces are deliberately split so an IDE does not load unrelated applications,
 platform backends, tests, samples, generators, and benchmarks:
@@ -158,6 +161,7 @@ platform backends, tests, samples, generators, and benchmarks:
 |---|---|
 | Browser applications | `Broiler.Browser/Broiler.Windows.Browser.slnx`, `Broiler.Browser/Broiler.Linux.Browser.slnx`, `Broiler.Browser/Broiler.Android.Browser.slnx` |
 | Writer applications | `Broiler.Writer/Broiler.Windows.Writer.slnx`, `Broiler.Writer/Broiler.Linux.Writer.slnx`, `Broiler.Writer/Broiler.WebAssembly.Writer.slnx`, `Broiler.Writer/Broiler.Android.Writer.slnx` |
+| Broiler Code | `Broiler.Code/Broiler.Windows.Code.slnx`, `Broiler.Code/Broiler.Linux.Code.slnx` |
 | Hosted Writer | `Broiler.Office.Server.slnx` |
 | Rendering and WPT tools | `Broiler.Cli.slnx`, `Broiler.Wpt.slnx` |
 | Developer tooling | `Broiler.Tooling.slnx` |
@@ -169,8 +173,8 @@ Each root solution contains only its declared entry points and their transitive
 `ProjectReference` closure. Component-owned unit tests live in the component's own
 solution, inside its submodule — `Broiler.Documents/Broiler.Documents.slnx` and
 `Broiler.UI/Broiler.UI.slnx` among them — and the application suites live with the
-applications, in `Broiler.Browser/Broiler.Browser.Tests.slnx` and
-`Broiler.Writer/Broiler.Writer.Tests.slnx`.
+applications, in `Broiler.Browser/Broiler.Browser.Tests.slnx`,
+`Broiler.Writer/Broiler.Writer.Tests.slnx` and `Broiler.Code/Broiler.Code.Tests.slnx`.
 
 Solution entry points are declared in `eng/solutions.json`. Regenerate and verify the
 dependency closures after changing project references:
@@ -221,6 +225,8 @@ Broiler/
 ├── Broiler.UI/                # Git submodule; nested component checkouts
 ├── Broiler.Browser/           # Git submodule; browser application and its solutions
 ├── Broiler.Writer/            # Git submodule; Writer application and its solutions
+├── Broiler.Code/              # Git submodule; Broiler Code application, its solutions,
+│                              #   Phase 0 harnesses and the human review tool
 ├── Broiler.VM/                # planned bytecode execution core; roadmap and profile contract
 ├── eng/solutions.json         # focused-solution entry points and platform boundaries
 └── Broiler.*.slnx             # generated product/platform/test workspaces
