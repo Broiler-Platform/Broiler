@@ -46,3 +46,42 @@
 	path = Broiler.Code
 	url = https://github.com/Broiler-Platform/Broiler.Code.git
 	branch = main
+[submodule "Broiler.VM"]
+	path = Broiler.VM
+	url = https://github.com/Broiler-Platform/Broiler.VM.git
+[submodule "Broiler.Layout"]
+	path = Broiler.Layout
+	url = https://github.com/Broiler-Platform/Broiler.Layout.git
+[submodule "Broiler.Mail"]
+	path = Broiler.Mail
+	url = https://github.com/Broiler-Platform/Broiler.Mail.git
+[submodule "Broiler.HtmlBridge"]
+	path = Broiler.HtmlBridge
+	url = https://github.com/Broiler-Platform/Broiler.HtmlBridge.git
+[submodule "Broiler.JSeal"]
+	path = Broiler.JSeal
+	url = https://github.com/Broiler-Platform/Broiler.JSeal.git
+[submodule "Broiler.Native"]
+	path = Broiler.Native
+	url = https://github.com/Broiler-Platform/Broiler.Native.git
+[submodule "Broiler.Net"]
+	path = Broiler.Net
+	url = https://github.com/Broiler-Platform/Broiler.Net.git
+[submodule "Broiler.RegEx"]
+	path = Broiler.RegEx
+	url = https://github.com/Broiler-Platform/Broiler.RegEx.git
+[submodule "Broiler.DateTime"]
+	path = Broiler.DateTime
+	url = https://github.com/Broiler-Platform/Broiler.DateTime.git
+[submodule "Broiler.Unicode"]
+	path = Broiler.Unicode
+	url = https://github.com/Broiler-Platform/Broiler.Unicode.git
+[submodule "Broiler.Plate"]
+	path = Broiler.Plate
+	url = https://github.com/Broiler-Platform/Broiler.Plate.git
+[submodule "Broiler.Fond"]
+	path = Broiler.Fond
+	url = https://github.com/Broiler-Platform/Broiler.Fond.git
+[submodule "Broiler.Terminal"]
+	path = Broiler.Terminal
+	url = https://github.com/Broiler-Platform/Broiler.Terminal.git
