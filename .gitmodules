@@ -101,3 +101,4 @@
 [submodule "Broiler.Hosting"]
 	path = Broiler.Hosting
 	url = https://github.com/Broiler-Platform/Broiler.Hosting.git
+	branch = main
