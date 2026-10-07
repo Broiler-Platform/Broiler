@@ -4,7 +4,7 @@
     Pack every shippable Broiler component into a folder of .nupkg/.snupkg files.
 
 .DESCRIPTION
-    Shared by CI (.github/workflows/nuget-packages.yml) and developers. Packs the
+    Shared by CI (.github/workflows/nuget-pack.yml and nuget-packages.yml) and developers. Packs the
     in-tree component solutions plus the three meta-packages. Submodule components
     (DOM/CSS/Graphics/HTML/JS) publish from their own repos once patches 0011-0015
     land and their pointers are bumped; pass -IncludeSubmodules to also pack them

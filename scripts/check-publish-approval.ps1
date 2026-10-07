@@ -14,8 +14,8 @@
 
     This gate reads that status line and classifies APPROVED (incl. "approved with
     conditions") as a pass; PENDING / NOT APPROVED / SUMMARY-ONLY as a block. The
-    CI workflow runs it before pushing to nuget.org. GitHub Packages (internal
-    preview feed) does not require it. As of writing Broiler.DOM and Broiler.JS are
+    CI workflow runs it before pushing to nuget.org, the only feed Broiler publishes
+    to. As of writing Broiler.DOM and Broiler.JS are
     PENDING, so this correctly blocks the public feed.
 
     Override for emergencies only: BROILER_PUBLISH_FORCE=1 (logged).
@@ -76,5 +76,5 @@ if ($env:BROILER_PUBLISH_FORCE -eq '1') {
     exit 0
 }
 
-Write-Error "`nPublic NuGet publish is blocked: $($blocked.Count) component(s) not approved. Publish to the GitHub Packages preview feed instead, or sign off the records."
+Write-Error "`nPublic NuGet publish is blocked: $($blocked.Count) component(s) not approved. Sign off the records, then re-run the release."
 exit 1
