@@ -1,0 +1,21 @@
+<Project>
+  <!--
+    Central Package Management for the projects this repository owns (src/, tests/).
+
+    MSBuild uses the NEAREST Directory.Packages.props walking up from a project, so every
+    submodule that carries its own file keeps managing its own versions; this file only
+    reaches root-tracked projects and submodules that have not adopted CPM yet.
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="xunit" Version="2.5.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.3" />
+    <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageVersion Include="Jint" Version="4.15.3" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+  </ItemGroup>
+</Project>

@@ -13,7 +13,9 @@ extractions, phase logs, or per-test investigation journals.
 ### Publish a reproducible first preview
 
 **Current evidence:** the repository has component package metadata, the
-[`nuget-packages`](../.github/workflows/nuget-packages.yml) workflow, a
+[`nuget-packages`](../.github/workflows/nuget-packages.yml) workflow (tag or
+dispatch publishes to NuGet.org only; the pack-only check runs in CI as
+[`NuGet pack (dry run)`](../.github/workflows/nuget-pack.yml)), a
 lockstep preview version, SourceLink/symbol-package configuration, and
 commit-scoped human-review records.
 
@@ -31,7 +33,7 @@ commit-scoped human-review records.
    supported hosts.
 
 **Exit gate:** the exact reviewed commit produces deterministic packages and
-symbols, installs from the advertised feeds on supported platforms, passes the
+symbols, installs from NuGet.org on supported platforms, passes the
 published smoke suite, and can be reproduced without uncommitted submodule
 changes.
 

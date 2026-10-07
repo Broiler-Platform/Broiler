@@ -76,10 +76,10 @@ provisioning path. Runtime checks use an API 36 `sdk_gphone64_x86_64` emulator.
 
 | Concern | Owner |
 | --- | --- |
-| Shared Activity view, lifecycle, vsync, clipboard, and IME glue | `Broiler.App.Android` |
+| Shared Activity view, lifecycle, vsync, clipboard, and IME glue | `Broiler.Hosting.Android` |
 | Product Activity and capability policy | `Broiler.Browser.Android` / `Broiler.Writer.Android` |
 | Shared application behavior | `Broiler.Browser.Core` / `Broiler.Writer.Core` |
-| On-screen hardware Canvas presentation and native image cache | `Broiler.App.Android` |
+| On-screen hardware Canvas presentation and native image cache | `Broiler.Hosting.Android` |
 | Portable off-screen rasterization and image ownership | `Broiler.Graphics` |
 | Standalone EGL/OpenGL ES backend and host-runnable tests | `Broiler.Graphics.Android` |
 | Neutral device and text contracts | `Broiler.Input` |

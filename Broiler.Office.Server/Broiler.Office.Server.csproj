@@ -50,8 +50,8 @@
     <!-- Service-manager integration for the prepared unit files under packaging/: systemd
          readiness/stop notification (Type=notify) and the Windows service control protocol.
          Both are inert when the server is started from a console. -->
-    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" Version="10.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
   </ItemGroup>
 
   <!-- Publish the Writer WASM client (trimmed — untrimmed crashes mono at boot) into an intermediate

@@ -1,0 +1,57 @@
+name: NuGet pack (dry run)
+
+# Pack-only validation of the NuGet package set that nuget-packages.yml publishes. It runs
+# the same scripts/pack-all.ps1 on every push to main and every pull request and uploads the
+# packages as an artifact, so a packaging break shows up before a nuget-v* tag is cut.
+# Nothing is published from here: publishing is nuget-packages.yml, to NuGet.org only.
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-pack-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  NUGET_DIR: ${{ github.workspace }}/artifacts/nupkg
+
+jobs:
+  pack:
+    name: NuGet pack (dry run)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Pack
+        shell: pwsh
+        run: ./scripts/pack-all.ps1 -Output $env:NUGET_DIR
+
+      - name: Upload packages artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: nuget-packages-dry-run
+          path: |
+            ${{ env.NUGET_DIR }}/*.nupkg
+            ${{ env.NUGET_DIR }}/*.snupkg
+          if-no-files-found: error
+          retention-days: 7

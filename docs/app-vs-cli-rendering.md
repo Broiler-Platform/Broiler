@@ -247,7 +247,8 @@ every run, family ignored (`BImageRenderer.cs:238-253`). Android is a third
 text stack again: `AndroidCanvasRenderer.DrawText` sets
 `_paint.TextSize = run.Font.SizeInPixels`, resolves its own typeface, and puts
 the baseline at `Origin.Y + SizeInPixels * 0.8`
-(`src/Broiler.App.Android/AndroidCanvasRenderer.cs:187-198`).
+(`AndroidCanvasRenderer.DrawText` in
+`Broiler.Hosting/src/Broiler.Hosting.Android/Platform/AndroidCanvasRenderer.cs`).
 
 So the same render list is drawn by three different text engines with three
 different family-resolution rules and three different baseline conventions —

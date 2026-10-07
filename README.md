@@ -244,7 +244,7 @@ Component READMEs disclose AI assistance and link to commit-scoped human review 
 
 ## NuGet packages
 
-The reusable component libraries are published as NuGet packages (the
+The reusable component libraries are published to NuGet.org (the
 `Broiler.Writer` and browser applications are not). Packages are versioned in
 lockstep during the preview (currently `0.1.0-preview.1`, a prerelease) and are
 licensed under Apache-2.0.

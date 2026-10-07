@@ -1,12 +1,13 @@
 name: NuGet Packages
 
-# Packs the Broiler component libraries into NuGet packages and (on a release
-# tag) publishes them. See docs/ROADMAP.md#release-and-distribution.
+# Packs the Broiler component libraries and publishes them to NuGet.org. NuGet.org is the
+# only feed: nothing is pushed to GitHub Packages, and there is no dry-run mode here — the
+# pack-only validation runs in CI on every push to main and every pull request
+# (.github/workflows/nuget-pack.yml, "NuGet pack (dry run)").
+# See docs/ROADMAP.md#release-and-distribution.
 #
-#   * Any push / manual run  -> pack + upload artifact (no publish).
-#   * Tag  nuget-v*          -> pack, then publish to GitHub Packages (preview
-#                              feed) and attempt nuget.org (gated by human review).
-#   * Manual dispatch        -> choose the publish target explicitly.
+#   * Tag  nuget-v*   -> pack, then publish to NuGet.org (gated by human review).
+#   * Manual dispatch -> the same, for re-running a release.
 #
 # Every component except Broiler.Layout is now a submodule. This workflow still packs
 # the same set — Layout, Documents, Media, Input, UI plus their meta-packages — but it
@@ -20,17 +21,9 @@ on:
     tags:
       - 'nuget-v*'
   workflow_dispatch:
-    inputs:
-      publish:
-        description: 'Publish target'
-        required: true
-        default: 'none'
-        type: choice
-        options: [none, github, nuget]
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: nuget-packages-${{ github.ref }}
@@ -72,36 +65,10 @@ jobs:
             ${{ env.NUGET_DIR }}/*.snupkg
           if-no-files-found: error
 
-  publish-github:
-    name: Publish to GitHub Packages (preview)
-    runs-on: ubuntu-24.04
-    needs: pack
-    if: startsWith(github.ref, 'refs/tags/nuget-v') || github.event.inputs.publish == 'github'
-    timeout-minutes: 30
-    steps:
-      - uses: actions/download-artifact@v7
-        with:
-          name: nuget-packages
-          path: nupkg
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Push to GitHub Packages
-        shell: pwsh
-        run: |
-          dotnet nuget push "nupkg/*.nupkg" `
-            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
-            --api-key "${{ secrets.GITHUB_TOKEN }}" `
-            --skip-duplicate
-
   publish-nuget:
     name: Publish to NuGet.org (gated)
     runs-on: ubuntu-24.04
     needs: pack
-    if: startsWith(github.ref, 'refs/tags/nuget-v') || github.event.inputs.publish == 'nuget'
     environment: nuget-release
     timeout-minutes: 30
     steps:
