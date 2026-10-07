@@ -35,7 +35,7 @@ work should extend this contract, not invent a parallel one.
 - **Android** resolves `DisplayMetrics.Density`, re-resolves it on every surface
   change, feeds it to both input hit-testing and the renderer, and derives
   logical size as physical / density
-  (`src/Broiler.App.Android/AndroidBroilerView.cs`,
+  (`Broiler.Hosting/src/Broiler.Hosting.Android/Platform/AndroidBroilerView.cs`,
   `Broiler.Graphics/src/Broiler.Graphics.Android/AndroidSurfaceGeometry.cs`).
 - **WebAssembly** reads `window.devicePixelRatio` and re-reads it through the
   `ResizeObserver`, so browser zoom and monitor moves are picked up
