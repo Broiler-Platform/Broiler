@@ -98,3 +98,6 @@
 	path = Broiler.Terminal
 	url = https://github.com/Broiler-Platform/Broiler.Terminal.git
 	branch = main
+[submodule "Broiler.Hosting"]
+	path = Broiler.Hosting
+	url = https://github.com/Broiler-Platform/Broiler.Hosting.git
