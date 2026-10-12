@@ -26,7 +26,7 @@ public sealed class VisualViewportNativeReadModelTests
                    Body + "</body></html>";
         using var ctx = new JSContext();
         // No explicit flag — this also guards that NativeVisualViewport defaults ON (patch 0006 pinned).
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///vv.html");
         ctx.Eval("window.visualViewport.scale = 2;");
         var offset = ctx.Eval(

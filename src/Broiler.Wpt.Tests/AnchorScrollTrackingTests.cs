@@ -106,8 +106,7 @@ public class AnchorScrollTrackingTests : IDisposable
     {
         string dir = Path.Combine(Path.GetTempPath(), "broiler-anchor-slg-" + System.Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
-        bool previous = DomBridge.UseSharedLayoutGeometry;
-        DomBridge.UseSharedLayoutGeometry = true;
+        // Shared layout geometry is the bridge's default, and no longer a switch a host can set.
         try
         {
             string file = Path.Combine(dir, "scroll-track-slg.html");
@@ -124,7 +123,6 @@ public class AnchorScrollTrackingTests : IDisposable
         }
         finally
         {
-            DomBridge.UseSharedLayoutGeometry = previous;
             try { Directory.Delete(dir, true); } catch { }
         }
     }

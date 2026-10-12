@@ -38,7 +38,7 @@ public sealed class SelectorsBindingModuleTests
                             "<span>three</span></section></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""

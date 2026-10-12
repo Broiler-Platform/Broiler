@@ -163,7 +163,7 @@ public sealed class DomRenderFidelityTests : IDisposable
         return false;
     }
 
-    private static bool IsGreen(Broiler.Graphics.BColor p) => p.G > 80 && p.R < 80 && p.B < 80;
+    private static bool IsGreen(Broiler.Graphics.Color.BColor p) => p.G > 80 && p.R < 80 && p.B < 80;
 
-    private static bool IsWhite(Broiler.Graphics.BColor p) => p.R > 250 && p.G > 250 && p.B > 250;
+    private static bool IsWhite(Broiler.Graphics.Color.BColor p) => p.R > 250 && p.G > 250 && p.B > 250;
 }

@@ -29,7 +29,7 @@ public sealed class GridIntrinsicWidthTests
             + $"<div id=\"g\" style=\"{style}\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-width=\"0\" data-expected-height=\"0\"></div>"
             + "</body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///giw.html");
         var m = bridge.EvaluateCheckLayoutAssertions()
             .Where(a => a.Element.Contains("#g")).ToDictionary(a => a.Property, a => a.Actual);

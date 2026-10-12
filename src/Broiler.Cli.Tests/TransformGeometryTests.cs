@@ -13,7 +13,7 @@ public class TransformGeometryTests
     private static string Rect(string bodyHtml, string id)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><body style=\"margin:0\">" + bodyHtml, "file:///t.html");
         return context.Eval(
             $"var b=document.getElementById('{id}').getBoundingClientRect();" +
@@ -103,7 +103,7 @@ public class TransformGeometryTests
     {
         // Only getBoundingClientRect is transformed; offsetWidth/offsetHeight remain the layout box.
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context,
             "<!DOCTYPE html><body style=\"margin:0\"><div id=i style='width:100px;height:100px;transform:scale(0.5)'></div>",
             "file:///t.html");

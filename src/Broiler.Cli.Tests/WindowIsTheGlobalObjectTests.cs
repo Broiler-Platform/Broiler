@@ -27,7 +27,7 @@ public sealed class WindowIsTheGlobalObjectTests
     private static (JSContext Context, DomBridge Bridge) Attach(string url = "https://www.google.com/")
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!doctype html><html><body></body></html>", url);
         return (context, bridge);
     }
@@ -124,7 +124,7 @@ public sealed class WindowIsTheGlobalObjectTests
 """;
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();

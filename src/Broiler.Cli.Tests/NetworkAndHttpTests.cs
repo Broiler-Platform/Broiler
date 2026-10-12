@@ -997,7 +997,7 @@ firstRead.then(function(text) {
     public void Fetch_Response_Json_InvalidJson_Rejects_With_A_Clear_Error()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
 
         context.Eval(@"

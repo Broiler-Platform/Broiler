@@ -1,5 +1,5 @@
 using System.IO;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Wpt.Tests;
 

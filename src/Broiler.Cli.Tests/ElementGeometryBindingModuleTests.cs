@@ -24,7 +24,7 @@ public sealed class ElementGeometryBindingModuleTests
         var html = "<!DOCTYPE html><html><head><style>html,body{margin:0;padding:0}</style></head><body>" +
                    bodyHtml + "</body></html>";
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///geometry.html");
         return ctx.Eval(expr).ToString();
     }

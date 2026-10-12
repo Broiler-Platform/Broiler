@@ -32,7 +32,6 @@
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Orchestration/Broiler.HTML.Orchestration.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.JS/">
-    <Project Path="Broiler.JS/Broiler.DateTime/src/Broiler.DateTime/Broiler.DateTime.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
@@ -51,13 +50,6 @@
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
-    <Project Path="Broiler.JS/Broiler.Regex/Broiler.Regex/Broiler.Regex.csproj" />
-    <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeCldr.LocaleData/UnicodeCldr.LocaleData.csproj" />
-    <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeEmoji.StringProperties/UnicodeEmoji.StringProperties.csproj" />
-    <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeProperties/UnicodeProperties.csproj" />
-  </Folder>
-  <Folder Name="/Dependencies/Broiler.Layout/">
-    <Project Path="Broiler.Layout/Broiler.Layout/Broiler.Layout.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.Media/">
     <Project Path="Broiler.Media/src/Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj" />

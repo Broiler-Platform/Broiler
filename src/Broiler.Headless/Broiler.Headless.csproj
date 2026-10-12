@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Broiler.Headless</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>The hosts' ILayoutView: answers the script bridge's element-geometry queries by laying the document out with the Broiler.HTML renderer, without a graphics backend.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Broiler.Layout owns the ILayoutView contract and ships no implementation of it; a
+         consumer implements one and injects it through DomBridge.LayoutViewFactory. This is
+         that implementation for the hosts in this repository. -->
+    <ProjectReference Include="..\..\Broiler.HTML\Source\Broiler.HTML.Image\Broiler.HTML.Image.csproj" />
+    <ProjectReference Include="..\..\Broiler.Layout\Broiler.Layout\Broiler.Layout.csproj" />
+  </ItemGroup>
+
+</Project>

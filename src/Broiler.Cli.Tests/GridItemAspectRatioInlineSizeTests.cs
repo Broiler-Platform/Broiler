@@ -41,7 +41,7 @@ public sealed class GridItemAspectRatioInlineSizeTests
             + "</div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///grid-item-aspect-ratio.html");
 
         var byProperty = bridge.EvaluateCheckLayoutAssertions()

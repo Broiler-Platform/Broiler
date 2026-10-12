@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.IO;
 using Broiler.HTML.Image;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Wpt.Tests;
 
@@ -108,8 +108,8 @@ public class WptTestRunnerTests : IDisposable
             executed = method!.Invoke(
                 null,
                 [testHtml, new Uri(Path.GetFullPath(testFile)).AbsoluteUri, _tempDir, false,
-                 Broiler.HtmlBridge.DomBridge.DefaultViewportWidth,
-                 Broiler.HtmlBridge.DomBridge.DefaultViewportHeight]);
+                 Broiler.HtmlBridge.DomBridgeUtils.DefaultViewportWidth,
+                 Broiler.HtmlBridge.DomBridgeUtils.DefaultViewportHeight]);
         }
         finally
         {

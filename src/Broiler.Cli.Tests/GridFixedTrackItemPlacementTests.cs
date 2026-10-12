@@ -25,7 +25,7 @@ public sealed class GridFixedTrackItemPlacementTests
     private static Dictionary<string, Dictionary<string, double>> Measure(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///grid-fixed-track-placement.html");
 
         return bridge.EvaluateCheckLayoutAssertions()

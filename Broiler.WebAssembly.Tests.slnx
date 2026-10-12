@@ -11,8 +11,4 @@
     <Project Path="Broiler.Graphics/src/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj" />
     <Project Path="Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj" />
   </Folder>
-  <Folder Name="/Dependencies/Broiler.Media/">
-    <Project Path="Broiler.Media/src/Broiler.Media.Image/Broiler.Media.Image.csproj" />
-    <Project Path="Broiler.Media/src/Broiler.Media/Broiler.Media.csproj" />
-  </Folder>
 </Solution>

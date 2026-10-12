@@ -32,7 +32,7 @@ public sealed class NativeAnchorScrollContainerModeTests
     private static string ResolveAndSerialize(bool nativeMode)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeAnchorPlacement = nativeMode };
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions) { NativeAnchorPlacement = nativeMode };
         bridge.Attach(context, Html, Url);
         bridge.ResolveAnchorPositions();
         return bridge.SerializeToHtml();

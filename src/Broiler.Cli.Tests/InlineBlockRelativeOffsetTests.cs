@@ -1,7 +1,7 @@
 using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using Broiler.JavaScript.Engine;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Cli.Tests;
 
@@ -61,7 +61,7 @@ public sealed class InlineBlockRelativeOffsetTests
             + "</style></head><body><div id=t>x</div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///t.html");
         var rect = context.Eval(
             "var r=document.getElementById('t').getBoundingClientRect(); r.top+','+r.left").ToString();

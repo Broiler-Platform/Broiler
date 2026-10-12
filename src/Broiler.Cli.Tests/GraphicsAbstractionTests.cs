@@ -1,4 +1,4 @@
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 using BBitmap = Broiler.HTML.Image.BBitmap;
 using BCanvas = Broiler.HTML.Image.BCanvas;
 using Broiler.HTML.Adapters;
@@ -431,20 +431,15 @@ public class GraphicsAbstractionTests
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(brush.HasMaterializedPaint);
-        Assert.False(pen.HasMaterializedPaint);
 
         graphics.DrawRectangle(brush, 0, 0, 6, 6);
         graphics.DrawLine(pen, 0, 0, 5, 5);
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(brush.HasMaterializedPaint);
-        Assert.False(pen.HasMaterializedPaint);
 
         graphics.Dispose();
 
-        Assert.Equal(0, bitmap.CompatSyncInvocationCount);
         Assert.False(bitmap.HasMaterializedCompatBitmap);
     }
 
@@ -464,13 +459,11 @@ public class GraphicsAbstractionTests
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(brush.HasMaterializedPaint);
 
         graphics.DrawRectangle(brush, 0, 0, 4, 4);
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(brush.HasMaterializedPaint);
         Assert.Equal(new BColor(0, 255, 0, 255), bitmap.GetPixel(2, 2));
     }
 
@@ -487,7 +480,6 @@ public class GraphicsAbstractionTests
 
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
-        Assert.False(brush.HasMaterializedPaint);
     }
 
     [Fact(Timeout = 600000)]
@@ -501,22 +493,12 @@ public class GraphicsAbstractionTests
             compatTypefaceFactory: () => new object(),
             fontCompatFactory: compatFactory);
 
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
         var height = font.Height;
         var underlineOffset = font.UnderlineOffset;
 
         Assert.Equal(18d, height);
         Assert.Equal(7d, underlineOffset);
-        Assert.True(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
         Assert.Equal(["CreateFont:12", "GetMetrics"], compatFactory.Calls);
-
-        _ = font.RenderFont;
-
-        Assert.True(font.HasMaterializedRenderFont);
-        Assert.Equal(["CreateFont:12", "GetMetrics", $"CreateFont:{12 * (96f / 72f):0.####}"], compatFactory.Calls);
     }
 
     [Fact(Timeout = 600000)]
@@ -550,32 +532,6 @@ public class GraphicsAbstractionTests
         Assert.Equal(
             ["MeasureString", "MeasureStringMaxWidth", "DrawString", "DrawGradientString"],
             textShaper.Calls);
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-    }
-
-    [Fact(Timeout = 600000)]
-    public void BBitmap_Compatibility_Surface_Operations_Delegate_Through_Bitmap_Compat_Seam()
-    {
-        using var compatSurface = new RecordingBitmapCompatSurface(4, 4);
-        using var bitmap = new BBitmap(4, 4, new byte[4 * 4 * 4], compatSurface);
-
-        bitmap.SetPixel(1, 1, new BColor(10, 20, 30, 255));
-        bitmap.Clear(new BColor(40, 50, 60, 255));
-
-        using var canvas = Assert.IsType<SKCanvas>(bitmap.OpenCanvas());
-        using var bitmapCopy = Assert.IsType<SKBitmap>(bitmap.ToCompatBitmapCopy());
-        using var compatBitmap = Assert.IsType<SKBitmap>(bitmap.AsCompatBitmap());
-        using var recorder = new SKPictureRecorder();
-        recorder.BeginRecording(new SKRect(0, 0, 4, 4)).DrawRect(new SKRect(0, 0, 4, 4), new SKPaint { Color = SKColors.Red });
-        using var picture = recorder.EndRecording();
-
-        bitmap.DrawPictureToFit(picture);
-
-        Assert.Equal(1, bitmap.CompatSyncInvocationCount);
-        Assert.Equal(
-            ["SetPixel", "Clear", "OpenCanvas", "ToBitmapCopy", "AsBitmap", "DrawPictureToFit", "SyncToPrimaryBuffer"],
-            compatSurface.Calls);
     }
 
     [Fact(Timeout = 600000)]
@@ -600,44 +556,6 @@ public class GraphicsAbstractionTests
     }
 
     [Fact(Timeout = 600000)]
-    public void BBitmap_Default_Compat_Surface_Comes_From_Skia_Compat_Provider()
-    {
-        var provider = new RecordingCompatProvider(() => new RecordingBitmapCompatSurface(4, 4));
-        using var overrideScope = CompatProvider.OverrideForCurrentThread(provider);
-        using var bitmap = new BBitmap(4, 4);
-
-        bitmap.SetPixel(1, 1, new BColor(0, 0, 0, 255));
-        bitmap.Clear(BColor.White);
-
-        Assert.Equal(1, provider.BitmapCompatSurfaceFactoryCallCount);
-        Assert.Equal(["SetPixel", "Clear"], provider.BitmapCompatSurface!.Calls);
-    }
-
-    [Fact(Timeout = 600000)]
-    public void StubImageAdapter_Default_Resolver_And_Paint_Factory_Come_From_Skia_Compat_Provider()
-    {
-        var provider = new RecordingCompatProvider();
-        using var overrideScope = CompatProvider.OverrideForCurrentThread(provider);
-        var adapter = new StubImageAdapter();
-
-        var family = adapter.LoadFontFromFile("/tmp/fake-font.ttf", "AliasFont");
-        var font = Assert.IsType<FontAdapter>(adapter.GetFont("AliasFont", 12, FontStyle.Regular));
-        var pen = Assert.IsType<PenAdapter>(adapter.GetPen(BColor.Blue));
-        var solidBrush = Assert.IsType<BrushAdapter>(adapter.GetSolidBrush(BColor.Red));
-        var gradientBrush = Assert.IsType<BrushAdapter>(adapter.GetLinearGradientBrush(new RectangleF(0, 0, 10, 10), BColor.Red, BColor.Blue, 45));
-
-        Assert.Equal("AliasFont", family);
-        _ = font.Typeface;
-        _ = pen.Paint;
-        _ = solidBrush.Paint;
-        _ = gradientBrush.Paint;
-
-        Assert.Equal(1, provider.FontTypefaceResolverFactoryCallCount);
-        Assert.Equal(["RegisterFontFile", "ResolveTypeface"], provider.FontTypefaceResolver.Calls);
-        Assert.Equal(["CreatePenPaint", "CreateSolidBrushPaint", "CreateLinearGradientBrushPaint"], provider.PaintCompatFactory.Calls);
-    }
-
-    [Fact(Timeout = 600000)]
     public void StubImageAdapter_Font_Operations_Delegate_Through_Typeface_Resolver_Seam()
     {
         var resolver = new RecordingFontTypefaceResolver();
@@ -648,21 +566,14 @@ public class GraphicsAbstractionTests
         var family = adapter.LoadFontFromFile("/tmp/fonts/SeamSans.ttf", "SeamSans");
 
         Assert.Equal("SeamSans", family);
-        Assert.True(adapter.HasDeferredLoadedTypefacePath("SeamSans"));
-        Assert.False(adapter.HasMaterializedLoadedTypeface("SeamSans"));
 
         var font = Assert.IsType<FontAdapter>(adapter.GetFont("SeamSans", 12, FontStyle.Bold | FontStyle.Italic));
-
-        Assert.False(adapter.HasMaterializedLoadedTypeface("SeamSans"));
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
 
         using var bitmap = new BBitmap(32, 32);
         using var graphics = bitmap.OpenGraphics(new RectangleF(0, 0, 32, 32));
         var size = graphics.MeasureString("abc", font);
 
         Assert.True(size.Width > 0);
-        Assert.True(adapter.HasMaterializedLoadedTypeface("SeamSans"));
         Assert.Equal(
             [
                 "RegisterFontFile",
@@ -673,60 +584,6 @@ public class GraphicsAbstractionTests
                 "HasMaterializedLoadedTypeface",
             ],
             resolver.Calls);
-    }
-
-    [Fact(Timeout = 600000)]
-    public void SkiaTextShaper_NonAhem_Measurement_Delegates_Through_Text_Metrics_Compat_Seam()
-    {
-        var textMetricsCompat = new RecordingTextMetricsCompat();
-        var textShaper = new SkiaTextShaper(textMetricsCompat);
-        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
-
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        var size = textShaper.MeasureString(font, "measure");
-        textShaper.MeasureString(font, "measure", 13, out var charFit, out var charFitWidth);
-
-        Assert.Equal(new SizeF(17, (float)font.Height), size);
-        Assert.Equal(2, charFit);
-        Assert.Equal(11d, charFitWidth);
-        Assert.Equal(
-            [
-                "MeasureTextWidth",
-                "MeasureTextWidthMaxWidth",
-            ],
-            textMetricsCompat.Calls);
-        Assert.True(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-    }
-
-    [Fact(Timeout = 600000)]
-    public void SkiaTextShaper_Fallback_Draw_Operations_Delegate_Through_Text_Canvas_Compat_Seam()
-    {
-        using var surface = SKSurface.Create(new SKImageInfo(32, 32));
-        var textCanvasCompat = new RecordingTextCanvasCompat();
-        var textShaper = new SkiaTextShaper(textCanvasCompat: textCanvasCompat);
-        var font = new FontAdapter("SystemUi", 12, FontStyle.Regular, () => new object());
-
-        Assert.False(font.HasMaterializedLayoutFont);
-        Assert.False(font.HasMaterializedRenderFont);
-
-        textShaper.DrawString(surface.Canvas, font, "draw", BColor.Black, new PointF(1, 2));
-        textShaper.DrawGradientString(
-            surface.Canvas,
-            font,
-            "gradient",
-            new RectangleF(0, 0, 8, 9),
-            new PointF(5, 6),
-            new SizeF(7, 8),
-            [BColor.Red, BColor.Blue],
-            [0f, 1f],
-            45f);
-
-        Assert.Equal(["DrawString", "DrawGradientString"], textCanvasCompat.Calls);
-        Assert.True(font.HasMaterializedRenderFont);
-        Assert.False(font.HasMaterializedLayoutFont);
     }
 
     [Fact(Timeout = 600000)]
@@ -750,19 +607,12 @@ public class GraphicsAbstractionTests
             45));
         var pen = Assert.IsType<PenAdapter>(adapter.GetPen(BColor.Green));
 
-        Assert.False(solidBrush.HasMaterializedPaint);
-        Assert.False(gradientBrush.HasMaterializedPaint);
-        Assert.False(pen.HasMaterializedPaint);
-
         _ = solidBrush.Paint;
         _ = gradientBrush.Paint;
         _ = pen.Paint;
         pen.Width = 3;
         pen.DashStyle = DashStyle.Dash;
 
-        Assert.True(solidBrush.HasMaterializedPaint);
-        Assert.True(gradientBrush.HasMaterializedPaint);
-        Assert.True(pen.HasMaterializedPaint);
         Assert.Equal(expectedCalls, paintCompat.Calls);
         Assert.Equal(
             [(3f, DashStyle.Solid), (3f, DashStyle.Dash)],
@@ -777,14 +627,12 @@ public class GraphicsAbstractionTests
 
         path.Start(1, 2);
         path.LineTo(3, 4);
-        path.ArcTo(5, 6, 2, Graphics.Corner.TopRight);
+        path.ArcTo(5, 6, 2, Graphics.Geometry.Corner.TopRight);
 
-        Assert.False(path.HasMaterializedPath);
         Assert.Empty(pathCompat.Calls);
 
         _ = path.Path;
 
-        Assert.True(path.HasMaterializedPath);
         Assert.Equal(["CreatePath", "MoveTo", "LineTo", "ArcTo"], pathCompat.Calls);
 
         path.Start(7, 8);
@@ -804,13 +652,11 @@ public class GraphicsAbstractionTests
         path.LineTo(3, 1);
         path.LineTo(5, 5);
 
-        Assert.False(path.HasMaterializedPath);
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
 
         graphics.DrawPath(brush, path);
 
-        Assert.False(path.HasMaterializedPath);
         Assert.False(bitmap.HasMaterializedCompatBitmap);
         Assert.False(graphics.HasMaterializedCanvas);
     }
@@ -1122,7 +968,6 @@ public class GraphicsAbstractionTests
     [Fact(Timeout = 600000)]
     public void HtmlContainer_PerformPaint_With_BBitmap_Surface_Renders_Solid_Border_And_Fill()
     {
-        using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.BroilerRasterId);
         using var container = new HtmlContainer();
         container.AvoidAsyncImagesLoading = true;
         container.AvoidImagesLateLoading = true;
@@ -1378,7 +1223,7 @@ public class GraphicsAbstractionTests
         pen.Width = 1;
         using var path = graphics.GetGraphicsPath();
         path.Start(1, 4);
-        path.ArcTo(4, 1, 3, Graphics.Corner.TopLeft);
+        path.ArcTo(4, 1, 3, Graphics.Geometry.Corner.TopLeft);
         path.LineTo(5, 1);
 
         graphics.DrawPath(pen, path);
@@ -1812,44 +1657,6 @@ public class GraphicsAbstractionTests
         public float Size { get; } = size;
     }
 
-    private sealed class SkiaTextShaper(
-        ITextMetricsCompat? textMetricsCompat = null,
-        ITextCanvasCompat? textCanvasCompat = null) : ITextShaper
-    {
-        public SizeF MeasureString(FontAdapter font, string text)
-        {
-            var width = textMetricsCompat?.MeasureTextWidth(font, text) ?? 0f;
-            return new SizeF(width, (float)font.Height);
-        }
-
-        public void MeasureString(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
-        {
-            if (textMetricsCompat is not null)
-            {
-                textMetricsCompat.MeasureTextWidth(font, text, maxWidth, out charFit, out charFitWidth);
-                return;
-            }
-
-            charFit = text?.Length ?? 0;
-            charFitWidth = 0;
-        }
-
-        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, BColor color, PointF point) => false;
-
-        public bool TryDrawGradientString(BCanvas canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle) => false;
-
-        public void DrawString(object canvas, FontAdapter font, string text, BColor color, PointF point) =>
-            textCanvasCompat?.DrawString(canvas, font, font.RenderFont, text, color, point);
-
-        public void DrawGradientString(object canvas, FontAdapter font, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle) =>
-            textCanvasCompat?.DrawGradientString(canvas, font, font.RenderFont, text, rect, point, size, colors, positions, angle);
-
-        public bool TryDrawString(BCanvas canvas, FontAdapter font, string text, BColor color, PointF point, float glyphRotationDeg = 0)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
     private sealed class RecordingTextShaper : ITextShaper
     {
         public List<string> Calls { get; } = [];
@@ -1932,42 +1739,11 @@ public class GraphicsAbstractionTests
             _materializedFamilies.Add(family);
             return new object();
         }
-    }
 
-    private sealed class RecordingTextMetricsCompat : ITextMetricsCompat
-    {
-        public List<string> Calls { get; } = [];
-
-        public float MeasureTextWidth(FontAdapter font, string text)
+        public Broiler.Graphics.Text.BFontFace? GetRegisteredFace(object typeface)
         {
-            Calls.Add("MeasureTextWidth");
-            return 17f;
-        }
-
-        public void MeasureTextWidth(FontAdapter font, string text, double maxWidth, out int charFit, out double charFitWidth)
-        {
-            Calls.Add("MeasureTextWidthMaxWidth");
-            charFit = 2;
-            charFitWidth = 11d;
-        }
-    }
-
-    private sealed class RecordingTextCanvasCompat : ITextCanvasCompat
-    {
-        public List<string> Calls { get; } = [];
-
-        public void DrawString(object canvas, FontAdapter font, object renderFont, string text, BColor color, PointF point)
-        {
-            Calls.Add("DrawString");
-            Assert.IsType<SKCanvas>(canvas);
-            Assert.Same(font.RenderFont, renderFont);
-        }
-
-        public void DrawGradientString(object canvas, FontAdapter font, object renderFont, string text, RectangleF rect, PointF point, SizeF size, BColor[] colors, float[] positions, float angle)
-        {
-            Calls.Add("DrawGradientString");
-            Assert.IsType<SKCanvas>(canvas);
-            Assert.Same(font.RenderFont, renderFont);
+            Calls.Add("GetRegisteredFace");
+            return null;
         }
     }
 

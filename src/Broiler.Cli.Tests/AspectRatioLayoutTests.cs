@@ -18,7 +18,7 @@ public sealed class AspectRatioLayoutTests
     private static void AssertCheckLayout(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///aspect-ratio.html");
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();

@@ -15,7 +15,7 @@ public class ShadowRootInnerHtmlTests
     public void ShadowRoot_InnerHtml_ParsesWithoutMarkerNodes()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><html><body><host-1>L</host-1></body></html>", "file:///t.html");
 
         var result = context.Eval("""

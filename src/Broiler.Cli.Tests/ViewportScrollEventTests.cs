@@ -28,7 +28,7 @@ public class ViewportScrollEventTests
     private static string Run(string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Page, "file:///test.html");
         context.Eval(script);
         return bridge.SerializeToHtml();
@@ -87,7 +87,7 @@ public class ViewportScrollEventTests
         // Only the viewport propagates to the window; a scroller's own event stays on the element,
         // which is what it did before and what CSSOM View asks for.
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, """
 <!DOCTYPE html>
 <html>

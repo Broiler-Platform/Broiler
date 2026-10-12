@@ -4,6 +4,7 @@ using System.Drawing;
 using Broiler.Dom;
 using Broiler.Dom.Html;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 using Broiler.Layout.Engine;
 using BBitmap = Broiler.HTML.Image.BBitmap;

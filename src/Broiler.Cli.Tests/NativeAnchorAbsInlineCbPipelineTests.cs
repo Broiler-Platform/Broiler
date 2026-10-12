@@ -53,7 +53,7 @@ public sealed class NativeAnchorAbsInlineCbPipelineTests
     private static IReadOnlyDictionary<DomElement, BoxGeometry> Layout(bool nativeAnchor, out DomDocument document)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         if (nativeAnchor) bridge.NativeAnchorPlacement = true;
         bridge.Attach(context, Html, Url);
         document = bridge.GetRenderDocument();

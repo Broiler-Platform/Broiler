@@ -3,6 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using Broiler.Graphics;
+using Broiler.Graphics.Geometry;
+using Broiler.Graphics.Imaging;
+using Broiler.Graphics.Color;
+using Broiler.Graphics.RenderList;
+using Broiler.Graphics.Rendering;
 
 namespace Broiler.Render.Stage.Benchmarks;
 

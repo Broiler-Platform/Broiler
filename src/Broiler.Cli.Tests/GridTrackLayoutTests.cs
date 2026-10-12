@@ -150,7 +150,7 @@ public sealed class GridTrackLayoutTests
     public void GridAutoFlowSparse_MatchesExpectedGeometry()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, BuildHtml(), "file:///grid-auto-flow-sparse-001.html");
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();
@@ -188,7 +188,7 @@ public sealed class GridTrackLayoutTests
             + "</div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///grid-repeat-gap.html");
 
         var byKey = bridge.EvaluateCheckLayoutAssertions()
@@ -209,7 +209,7 @@ public sealed class GridTrackLayoutTests
     private static void AssertCheckLayout(string html, string url)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, url);
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();

@@ -34,7 +34,7 @@ public sealed class NestedGridItemBlockSizeTests
             + "<ul class=\"container\"><li id=\"li\">" + wrappedImg + "</li></ul></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///nested-grid-item-block-size.html");
         var byProp = bridge.EvaluateCheckLayoutAssertions()
             .Where(a => a.Element.Contains("img"))

@@ -15,7 +15,7 @@ public sealed class GridRtlTests
     private static System.Collections.Generic.Dictionary<string, (double x, double y, double w, double h)> Eval(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///rtl.html");
         return bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

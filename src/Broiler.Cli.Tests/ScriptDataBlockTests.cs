@@ -95,7 +95,7 @@ public sealed class ScriptDataBlockTests
 
         // Fewer than two *script* URLs means no prefetcher at all; before the fix these two data
         // blocks counted and one was created.
-        Assert.Null(ScriptExtractionService.CreateScriptPrefetcher(html, pageUrl: null, csp: null));
+        Assert.Null(ScriptExtractionService.CreateScriptPrefetcher(html, pageUrl: null, csp: default));
     }
 
     [Theory]

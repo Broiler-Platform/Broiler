@@ -35,7 +35,7 @@ public sealed class ElementGetElementsByClassNameTests
     private static (JSContext Context, DomBridge Bridge) Attach()
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Page, "https://www.google.com/");
         return (context, bridge);
     }

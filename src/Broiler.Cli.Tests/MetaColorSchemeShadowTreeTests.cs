@@ -17,7 +17,7 @@ public class MetaColorSchemeShadowTreeTests
     {
         const string html = "<!DOCTYPE html><html><head></head><body></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval(script);
         var serialized = bridge.SerializeToHtml();

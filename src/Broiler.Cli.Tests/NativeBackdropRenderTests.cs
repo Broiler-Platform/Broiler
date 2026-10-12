@@ -39,7 +39,7 @@ public class NativeBackdropRenderTests
 <body><div id="pop" popover></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval("document.getElementById('pop').showPopover();");
         bridge.ResolveAnchorPositions();
@@ -98,7 +98,7 @@ public class NativeBackdropRenderTests
 <body><dialog id="dialog"></dialog></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval("document.getElementById('dialog').showModal();");
         bridge.ResolveAnchorPositions();
@@ -136,7 +136,7 @@ public class NativeBackdropRenderTests
 <body><div id="container"><dialog id="dialog"></dialog></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval("document.getElementById('dialog').showModal(); document.getElementById('container').style.width = '100px';");
         bridge.ResolveAnchorPositions();

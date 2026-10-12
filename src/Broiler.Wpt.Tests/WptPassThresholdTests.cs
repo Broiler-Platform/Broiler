@@ -112,7 +112,7 @@ public sealed class WptPassThresholdTests : IDisposable
         using (var reference = rendered.Copy())
         {
             for (int i = 0; i < differingPixels; i++)
-                reference.SetPixel(i % width, i / width, new Graphics.BColor(255, 0, 255, 255));
+                reference.SetPixel(i % width, i / width, new Graphics.Color.BColor(255, 0, 255, 255));
 
             reference.Save(Path.Combine(referenceDir, "pass-threshold.png"));
         }

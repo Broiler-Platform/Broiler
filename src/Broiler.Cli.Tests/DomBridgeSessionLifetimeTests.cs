@@ -37,7 +37,7 @@ public sealed class DomBridgeSessionLifetimeTests
     [Fact(Timeout = 600000)]
     public void ReAttach_Clears_Prior_Document_Nodes()
     {
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         using (var ctx1 = new JSContext())
         {
             bridge.Attach(ctx1, "<!DOCTYPE html><html><body><p id='one'>1</p></body></html>", "file:///1.html");
@@ -53,7 +53,7 @@ public sealed class DomBridgeSessionLifetimeTests
     [Fact(Timeout = 600000)]
     public void ReAttach_Clears_Pending_Timers()
     {
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         using (var ctx1 = new JSContext())
         {
             bridge.Attach(ctx1, BodyHtml, "file:///1.html");
@@ -71,7 +71,7 @@ public sealed class DomBridgeSessionLifetimeTests
     public void ReAttach_Clears_Window_Listeners()
     {
         using var ctx = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
 
         bridge.Attach(ctx, BodyHtml, "file:///1.html");
         ctx.Eval("var __hits = 0; window.addEventListener('load', function(){ __hits++; });");
@@ -91,13 +91,13 @@ public sealed class DomBridgeSessionLifetimeTests
     [Fact(Timeout = 600000)]
     public void Two_Simultaneous_Sessions_Do_Not_See_Each_Others_State()
     {
-        using var bridgeA = new DomBridge();
+        using var bridgeA = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         using var ctxA = new JSContext();
         bridgeA.Attach(ctxA, "<!DOCTYPE html><html><body><p id='a'>A</p></body></html>", "file:///a.html");
 
         // A second live session created AFTER the first — its JSContext ctor makes it the "last-created"
         // current context — with both remaining attached and live at the same time.
-        using var bridgeB = new DomBridge();
+        using var bridgeB = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         using var ctxB = new JSContext();
         bridgeB.Attach(ctxB, "<!DOCTYPE html><html><body><p id='b'>B</p></body></html>", "file:///b.html");
 
@@ -178,7 +178,7 @@ public sealed class DomBridgeSessionLifetimeTests
     public void Dispose_Drops_Pending_Timers_Without_Running_Them()
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, BodyHtml, "file:///d.html");
         // Use a global `var` (this engine's global object and `window` are distinct, so a bare
         // read sees the global binding, not a `window.` property).
@@ -195,7 +195,7 @@ public sealed class DomBridgeSessionLifetimeTests
     public void Dispose_Does_Not_Dispose_The_Borrowed_JsContext()
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, BodyHtml, "file:///d.html");
 
         bridge.Dispose();
@@ -212,7 +212,7 @@ public sealed class DomBridgeSessionLifetimeTests
     public void Attach_After_Dispose_Throws()
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, BodyHtml, "file:///d.html");
         bridge.Dispose();
 
@@ -223,7 +223,7 @@ public sealed class DomBridgeSessionLifetimeTests
     public void Timer_Entry_Points_After_Dispose_Throw()
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, BodyHtml, "file:///d.html");
         bridge.Dispose();
 

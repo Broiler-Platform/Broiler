@@ -4,6 +4,7 @@ using System.Linq;
 using Broiler.CSS;
 using Broiler.Dom;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Core.Entities;
 using Broiler.HTML.Image;
 using Broiler.Layout.IR;

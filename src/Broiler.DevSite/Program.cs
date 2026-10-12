@@ -1,7 +1,7 @@
 using Broiler.DevSite.Services;
 
 // Composition root: register the concrete image codecs Broiler.Graphics decodes/encodes with.
-Broiler.Graphics.BImageCodecs.Use(
+Broiler.Graphics.Imaging.BImageCodecs.Use(
     new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
 
 var builder = WebApplication.CreateBuilder(args);

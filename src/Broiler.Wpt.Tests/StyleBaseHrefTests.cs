@@ -1,6 +1,6 @@
 using System.IO;
 using Broiler.HTML.Image;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Wpt.Tests;
 

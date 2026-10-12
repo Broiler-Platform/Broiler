@@ -19,7 +19,7 @@ public sealed class RenderProjectionIsolationTests
     public void GetRenderDocument_Reflects_Runtime_State_Without_Mutating_Live_Dom()
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, "file:///projection.html");
         context.Eval("document.getElementById('field').value = 'runtime';");
 
@@ -48,7 +48,7 @@ public sealed class RenderProjectionIsolationTests
     public void Serialization_And_Repeated_Projections_Are_Isolated()
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, "file:///projection.html");
         context.Eval("document.getElementById('field').value = 'runtime';");
 

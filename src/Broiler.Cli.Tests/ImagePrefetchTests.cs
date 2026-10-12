@@ -6,12 +6,13 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Core.Entities;
 using Broiler.HTML.Image;
 using Broiler.Layout;
 using Xunit;
 using BBitmap = Broiler.HTML.Image.BBitmap;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Cli.Tests;
 

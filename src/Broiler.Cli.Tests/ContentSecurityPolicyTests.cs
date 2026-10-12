@@ -404,7 +404,7 @@ public class ContentSecurityPolicyTests
             """;
 
         using var ctx = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Csp = ContentSecurityPolicy.FromHtml(html);
         bridge.Attach(ctx, html, "file:///t.html");
 
@@ -419,7 +419,7 @@ public class ContentSecurityPolicyTests
             """;
 
         using var ctx = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///t.html"); // no policy configured → nothing stripped
 
         Assert.Contains("background: green", bridge.SerializeToHtml());

@@ -17,7 +17,7 @@ public sealed class StyleScopeMediaTests
     private static string ComputedColor(string html, string id)
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///media.html");
         return ctx.Eval($"window.getComputedStyle(document.getElementById('{id}')).color").ToString();
     }

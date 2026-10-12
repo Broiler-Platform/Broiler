@@ -8,7 +8,9 @@ using Broiler.JavaScript.Runtime;
 using Broiler.HTML.Core.Entities;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge;
+using Broiler.Headless;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HtmlBridge.Scripting;
 using Broiler.HtmlBridge.Dom;
 
@@ -3320,8 +3322,8 @@ internal sealed partial class WptTestRunner
         string url,
         string? wptRoot = null,
         bool batchStyleInvalidations = false,
-        int viewportWidth = DomBridge.DefaultViewportWidth,
-        int viewportHeight = DomBridge.DefaultViewportHeight)
+        int viewportWidth = DomBridgeUtils.DefaultViewportWidth,
+        int viewportHeight = DomBridgeUtils.DefaultViewportHeight)
     {
         // This method is what drives the bridge's headless geometry pass, and that pass builds a
         // container of its own — out of reach of the handlers the render is handed afterwards. Tell
@@ -3505,7 +3507,7 @@ internal sealed partial class WptTestRunner
             // positioning, animation snapshots, etc. via the DomBridge.
             using var microTaskContext2 = MicroTaskSynchronizationContext.Install(microTasks);
             using var context2 = new JSContext();
-            using var bridge2 = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop, ViewportWidth = viewportWidth, ViewportHeight = viewportHeight };
+            using var bridge2 = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions) { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop, ViewportWidth = viewportWidth, ViewportHeight = viewportHeight };
             bridge2.Attach(context2, html, url);
             // Inject browser API stubs so onload handlers etc. can reference them.
             try { context2.Eval(BrowserApiStubs); } catch { /* best-effort */ }
@@ -3535,7 +3537,7 @@ internal sealed partial class WptTestRunner
         // view and its HtmlContainer (hence the whole box tree and every sub-resource its image
         // load handlers hold), timer/animation queues, listener stores and observers. Leaving it
         // to the GC kept one of those sessions alive per rendered document.
-        using var bridge = new DomBridge { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop, ViewportWidth = viewportWidth, ViewportHeight = viewportHeight };
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions) { NativeAnchorPlacement = NativeAnchorPlacement, NativeTopLayer = NativeAnchorPlacement, NativeBackdrop = NativeBackdrop, ViewportWidth = viewportWidth, ViewportHeight = viewportHeight };
         bridge.TaskCheckpointCallback = () => microTasks.Drain();
         context["queueMicrotask"] = new JSFunction((in Arguments a) =>
         {
@@ -3567,7 +3569,7 @@ internal sealed partial class WptTestRunner
         try { context.Eval("window.queueMicrotask = queueMicrotask;"); } catch { /* best-effort */ }
 
         // Register DOM elements with IDs as globals (HTML5 named access).
-        bridge.RegisterNamedElementGlobals(context);
+        NamedElementGlobals.Register(bridge, context);
         attachScope.Dispose();
 
         // The parsed document's <script> elements, in document order and with no classification —
@@ -3588,7 +3590,7 @@ internal sealed partial class WptTestRunner
         {
             // Match the broader DomBridge timer drain cap so promise/timer chains
             // used by WPT can settle without risking an infinite loop.
-            for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
+            for (var iteration = 0; iteration < DomBridgeRuntimeLimits.AsyncDrainIterationLimit; iteration++)
             {
                 bool hadWork = false;
 
@@ -3611,7 +3613,7 @@ internal sealed partial class WptTestRunner
             // Phase 8 item 3: the drain budget is exhausted while work is still queued (a runaway
             // microtask/timer loop). Surface it explicitly instead of stopping silently.
             RenderLogger.LogWarning(LogCategory.JavaScript, "WptTestRunner.DrainAsyncWork",
-                $"Async work did not settle within {DomBridge.AsyncDrainIterationLimit} drain iterations; " +
+                $"Async work did not settle within {DomBridgeRuntimeLimits.AsyncDrainIterationLimit} drain iterations; " +
                 $"stopping with pending microtasks={microTasks.Count}, pendingTimers={bridge.HasPendingTimers}. " +
                 "This usually indicates a runaway microtask/timer loop.");
         }

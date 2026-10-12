@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 // Both rasterizers now carry a partitioner of this name — item #4's copy here and item
 // #3's in Broiler.Graphics — so the reference has to say which. This file measures the

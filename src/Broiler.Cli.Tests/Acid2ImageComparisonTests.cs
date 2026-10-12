@@ -1,7 +1,8 @@
 using Broiler.HtmlBridge;
 using Broiler.HTML.Image;
 using System.Drawing;
-using BColor = Broiler.Graphics.BColor;
+using Broiler.Headless;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Cli.Tests;
 

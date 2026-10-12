@@ -23,7 +23,7 @@ public sealed class NodeConstructionRoundTripTests
         const string html = "<!DOCTYPE html><html><body><div id=\"host\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -47,7 +47,7 @@ public sealed class NodeConstructionRoundTripTests
         const string html = "<!DOCTYPE html><html><body><ul id=\"list\"><li class=\"row\">a</li></ul></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -83,7 +83,7 @@ public sealed class NodeConstructionRoundTripTests
         const string html = "<!DOCTYPE html><html><body><div id=\"box\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""

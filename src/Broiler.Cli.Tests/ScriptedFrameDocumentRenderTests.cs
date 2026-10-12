@@ -52,7 +52,7 @@ public class ScriptedFrameDocumentRenderTests : IDisposable
 </body>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, pageUrl);
         if (!string.IsNullOrEmpty(script))
             context.Eval(script);

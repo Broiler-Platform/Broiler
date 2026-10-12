@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using Broiler.Dom;
 using Broiler.Dom.Html;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 using Broiler.Layout.Diagnostics;
 using Broiler.Layout.Engine;

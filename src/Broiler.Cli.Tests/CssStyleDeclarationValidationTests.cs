@@ -18,7 +18,7 @@ public sealed class CssStyleDeclarationValidationTests
     private static string Eval(string script)
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx,
             "<!DOCTYPE html><html><body><div id=\"t\"></div></body></html>", "file:///v.html");
         return ctx.Eval("(function(){var s=document.getElementById('t').style;" + script + "})()").ToString();

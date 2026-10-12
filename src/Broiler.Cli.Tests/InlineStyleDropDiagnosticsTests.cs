@@ -60,7 +60,7 @@ public sealed class InlineStyleDropDiagnosticsTests
         // End-to-end: the dropped declaration must be absent from the serialized
         // HTML (the gap #1b closes), while the valid one survives.
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, "file:///inline-drop.html");
         context.Eval(
             "document.getElementById('t').setAttribute('style', 'position: wobble; color: red');");
@@ -90,7 +90,7 @@ public sealed class InlineStyleDropDiagnosticsTests
     public void Modern_WhiteSpace_Value_Survives_Serialization()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, "file:///inline-drop.html");
         context.Eval(
             "document.getElementById('t').setAttribute('style', 'white-space: preserve-breaks');");
@@ -103,7 +103,7 @@ public sealed class InlineStyleDropDiagnosticsTests
     private static List<(string Property, string Value)> RunWithDiagnostics(string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, "file:///inline-drop.html");
 
         var rejected = new List<(string Property, string Value)>();

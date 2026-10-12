@@ -27,7 +27,7 @@ public class ViewTransitionRootCaptureTests
     private static BBitmap Render(string html, string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval(script);
         return HtmlRender.RenderToImageWithStyleSet(bridge.SerializeToHtml(), 200, 200);

@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Broiler.Graphics;
+using Broiler.Graphics.Imaging;
 using Broiler.Media;
 using Broiler.Media.Image.Managed;
 

@@ -26,7 +26,7 @@ public sealed class TemplateContentAndImportNodeTests
     private static string Eval(string html, string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         return context.Eval(script).ToString();
     }

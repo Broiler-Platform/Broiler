@@ -1,16 +1,17 @@
 using System.Drawing;
 using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Dom;
-using Broiler.HTML.Headless;
+using Broiler.Headless;
 using Broiler.JavaScript.Engine;
 
 namespace Broiler.Cli.Tests;
 
 /// <summary>
 /// RF-BRIDGE-1b increment ②: the renderer-backed <see cref="HeadlessLayoutView"/>
-/// (Broiler.HTML.Headless, the Phase-1 <c>ILayoutView</c> implementation) drives the
-/// renderer's headless layout for the canonical document and caches the per-element
-/// geometry map by document version + viewport + base URL. These tests cover the view in
+/// (Broiler.Headless, the hosts' <c>ILayoutView</c> implementation) drives the renderer's
+/// headless layout for the canonical document. It keeps no cache of its own: the bridge caches
+/// the snapshot under a key that also carries zoom and the visual-viewport scale, which this view
+/// cannot see. These tests cover the view in
 /// isolation; the live <c>LayoutMetrics</c> routing (behind <c>UseSharedLayoutGeometry</c>)
 /// lands in increment ③.
 /// </summary>
@@ -21,7 +22,7 @@ public sealed class SharedLayoutGeometryProviderTests
     public void Provider_Returns_Real_Geometry_Keyed_By_Element()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(
             context,
             "<!DOCTYPE html><html><body style='margin:0'>" +
@@ -37,27 +38,5 @@ public sealed class SharedLayoutGeometryProviderTests
         Assert.True(map.TryGetValue(target!, out var geometry));
         Assert.Equal(120f, geometry.BorderBox.Width, 1);
         Assert.Equal(60f, geometry.BorderBox.Height, 1);
-    }
-
-    [Fact(Timeout = 600000)]
-    public void Provider_Caches_Snapshot_For_Same_Version_And_Viewport()
-    {
-        using var context = new JSContext();
-        var bridge = new DomBridge();
-        bridge.Attach(
-            context,
-            "<!DOCTYPE html><html><body><div id='t' style='width:10px;height:10px'></div></body></html>",
-            "file:///p.html");
-        var document = bridge.GetRenderDocument();
-        using var provider = new HeadlessLayoutView();
-
-        var first = provider.GetGeometry(document, new SizeF(800, 600), "file:///p.html");
-        var second = provider.GetGeometry(document, new SizeF(800, 600), "file:///p.html");
-        // No relayout when the document version and viewport are unchanged.
-        Assert.Same(first, second);
-
-        // A viewport change invalidates the snapshot.
-        var resized = provider.GetGeometry(document, new SizeF(400, 300), "file:///p.html");
-        Assert.NotSame(first, resized);
     }
 }

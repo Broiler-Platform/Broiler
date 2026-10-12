@@ -24,7 +24,7 @@ public sealed class FetchRequestHeadersTests
     private static void Run(RecordingOrigin origin, string script)
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!doctype html><html><body></body></html>", origin.PageUrl);
         context.Eval(script);
     }

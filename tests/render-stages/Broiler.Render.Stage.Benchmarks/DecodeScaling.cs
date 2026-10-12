@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.Media.Image;
 using Broiler.Media.Image.Managed;
 using BBitmap = Broiler.HTML.Image.BBitmap;

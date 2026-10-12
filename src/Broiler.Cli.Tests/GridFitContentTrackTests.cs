@@ -41,7 +41,7 @@ public sealed class GridFitContentTrackTests
         string html = "<!DOCTYPE html><html><head><style>" + style + "</style></head>"
             + "<body style=\"margin:0\"><div class=\"g\">" + body + "</div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///grid-fit-content.html");
 
         var failures = bridge.EvaluateCheckLayoutAssertions()

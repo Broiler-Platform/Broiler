@@ -19,7 +19,7 @@ public sealed class PercentChildShrinkToFitTests
     private static void AssertCheckLayout(string html, string url)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, url);
         var assertions = bridge.EvaluateCheckLayoutAssertions();
         var failures = assertions

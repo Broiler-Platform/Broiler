@@ -59,7 +59,7 @@ function run() {
 </body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         // Execute inline script (defines run())
@@ -86,7 +86,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         context.Eval("""
@@ -110,7 +110,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         context.Eval("""
@@ -139,7 +139,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -163,7 +163,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -191,7 +191,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -229,7 +229,7 @@ function run() {
 </body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -258,7 +258,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -297,7 +297,7 @@ function run() {
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -339,7 +339,7 @@ function run() {
 </body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         context.Eval(@"
@@ -375,7 +375,7 @@ setTimeout(step, 10);");
 </body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         context.Eval(@"
@@ -420,7 +420,7 @@ function update() {
 </body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/page.html");
 
         context.Eval(@"
@@ -443,7 +443,7 @@ document.getElementById('out').appendChild(p);");
 </body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html);
 
         context.Eval(@"
@@ -848,7 +848,7 @@ document.getElementById('out').appendChild(p);
     public void DomBridge_HasPendingTimers_False_When_No_Timers()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>");
         Assert.False(bridge.HasPendingTimers);
     }
@@ -857,7 +857,7 @@ document.getElementById('out').appendChild(p);
     public void DomBridge_HasPendingTimers_True_After_SetTimeout()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>");
         context.Eval("setTimeout(function() {}, 0);");
         Assert.True(bridge.HasPendingTimers);
@@ -868,7 +868,7 @@ document.getElementById('out').appendChild(p);
     {
         var html = "<html><body><div id='out'></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html);
 
         // Queue two chained timeouts:
@@ -903,7 +903,7 @@ document.getElementById('out').appendChild(p);
     public void DomBridge_FlushTimerStep_Returns_False_When_Empty()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>");
         Assert.False(bridge.FlushTimerStep());
     }
@@ -958,7 +958,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         var result = bridge.SerializeToHtml();
@@ -997,7 +997,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         var result = bridge.SerializeToHtml();
@@ -1056,7 +1056,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         var result = bridge.SerializeToHtml();
@@ -1103,7 +1103,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         var result = bridge.SerializeToHtml();
@@ -1131,7 +1131,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -1169,7 +1169,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
         bridge.ResolveAnchorPositions();
@@ -1210,7 +1210,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval("document.getElementById('dialog').showModal();");
         bridge.ResolveAnchorPositions();
@@ -1242,7 +1242,7 @@ document.getElementById('out').appendChild(p);
 <body><div id="pop" popover></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval("document.getElementById('pop').showPopover();");
         bridge.ResolveAnchorPositions();
@@ -1267,7 +1267,7 @@ document.getElementById('out').appendChild(p);
 <body><div id="pop" popover></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         // Shown then hidden with no overlay transition → leaves the top layer.
         context.Eval("var p = document.getElementById('pop'); p.showPopover(); p.hidePopover();");
@@ -1301,7 +1301,7 @@ document.getElementById('out').appendChild(p);
 <body><div id="pop" popover></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval("var p = document.getElementById('pop'); p.showPopover(); p.hidePopover();");
         bridge.ResolveAnchorPositions();
@@ -1349,7 +1349,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         bridge.FireWindowLoadEvent();
 
@@ -1369,7 +1369,7 @@ document.getElementById('out').appendChild(p);
 
         // ...and it is the same form the top level produces for the same markup and mutation.
         using var topContext = new JSContext();
-        var topBridge = new DomBridge();
+        var topBridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         topBridge.Attach(topContext, $"<!DOCTYPE html><html><body>{frameBody}</body></html>", "file:///top.html");
         topBridge.FireWindowLoadEvent();
         topContext.Eval("document.getElementById('target').scrollIntoView();");
@@ -1410,7 +1410,7 @@ document.getElementById('out').appendChild(p);
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
 
         context.Eval("""

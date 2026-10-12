@@ -29,15 +29,14 @@ internal static class Program
             File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "fixtures.json")),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
             ?? throw new InvalidOperationException("Fixture manifest is empty.");
-        var projector = new FormatCodeProjector();
         var results = new List<FixtureResult>(fixtures.Count);
 
         foreach (FixtureSpec fixture in fixtures)
         {
             RichTextDocument document = BuildFixture(fixture);
-            FormatCodeProjection projection = projector.Project(document);
+            FormatCodeProjection projection = FormatCodeProjector.Project(document);
             Measurement measurement = Measure(
-                () => GC.KeepAlive(projector.Project(document)),
+                () => GC.KeepAlive(FormatCodeProjector.Project(document)),
                 iterations);
             results.Add(new FixtureResult(
                 fixture.Id,

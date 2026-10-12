@@ -32,7 +32,7 @@ public class ViewTransitionRenderTests
     private static BBitmap Render(string html, string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval(script);
         var serialized = bridge.SerializeToHtml();
@@ -43,7 +43,7 @@ public class ViewTransitionRenderTests
     public void StartViewTransition_Is_Defined()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><body>", "file:///test.html");
         var typeofResult = context.Eval("typeof document.startViewTransition").ToString();
 
@@ -153,7 +153,7 @@ public class ViewTransitionRenderTests
     public void Ready_Promise_Resolves_So_The_Screenshot_Fires()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><body><div id=r></div>", "file:///test.html");
         context.Eval(
             "document.startViewTransition(() => {}).ready.then(() => " +
@@ -167,7 +167,7 @@ public class ViewTransitionRenderTests
     public void UpdateCallback_Runs_And_Mutates_The_Dom()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><body><div id=r></div>", "file:///test.html");
         context.Eval(
             "document.startViewTransition(() => " +

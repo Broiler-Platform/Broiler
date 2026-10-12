@@ -91,7 +91,7 @@ function put(v) {{ document.getElementById('result').textContent = String(v); }}
     {
         const string html = "<!DOCTYPE html><html><head></head><body><p id=\"x\">hi</p></body></html>";
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///test.html");
 
         // Canonical document reports nodeType Document (9) and carries the doctype + <html> tree.

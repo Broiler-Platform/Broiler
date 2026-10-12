@@ -91,7 +91,7 @@ public class HtmlBridgeArchitectureGuardTests
     {
         Assert.Equal("Broiler.Layout", typeof(Broiler.Layout.ILayoutView).Assembly.GetName().Name);
         Assert.True(typeof(Broiler.Layout.ILayoutView).IsAssignableFrom(
-            typeof(Broiler.HTML.Headless.HeadlessLayoutView)));
+            typeof(Broiler.Headless.HeadlessLayoutView)));
     }
 
     // roadmap Phase 1 (project-graph repair), exit criterion: "One Broiler.Dom assembly node

@@ -18,7 +18,7 @@ public sealed class StyleSheetBindingModuleTests
     private static DomBridge Attach(out JSContext context, string html)
     {
         context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         return bridge;
     }

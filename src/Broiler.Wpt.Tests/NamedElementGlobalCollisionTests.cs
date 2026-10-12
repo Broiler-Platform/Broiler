@@ -2,7 +2,7 @@ using Broiler.HtmlBridge;
 using Broiler.HtmlBridge.Dom;
 using Broiler.JavaScript.Engine;
 
-namespace Broiler.Cli.Tests;
+namespace Broiler.Wpt.Tests;
 
 /// <summary>
 /// Regression guards for the crash that gated several WPT tests (issue #1302,
@@ -11,7 +11,8 @@ namespace Broiler.Cli.Tests;
 /// with the same name as an element's <c>id</c> (e.g. the WPT
 /// <c>&lt;img id="img"&gt;</c> + <c>const img = …</c> and
 /// <c>&lt;iframe id="current"&gt;</c> + <c>const current = …</c> helpers) crashed
-/// the whole render. <see cref="DomBridge.RegisterNamedElementGlobals"/> assigned
+/// the whole render. <see cref="NamedElementGlobals.Register"/> (then
+/// <c>DomBridge.RegisterNamedElementGlobals</c>, now the WPT runner's own) assigned
 /// the element to the same-named global via the context indexer, which wrote
 /// through the read-only lexical binding and threw. The "skip if already defined"
 /// guard compared the engine's <c>JSBoolean</c> against C#'s "True" and so never
@@ -30,7 +31,7 @@ public sealed class NamedElementGlobalCollisionTests
 
         // Registering the same-named element must not crash (previously threw
         // "Cannot assign to read only variable").
-        var ex = Record.Exception(() => bridge.RegisterNamedElementGlobals(ctx));
+        var ex = Record.Exception(() => NamedElementGlobals.Register(bridge, ctx));
         Assert.Null(ex);
 
         // The user's const binding wins over named-element access.
@@ -45,7 +46,7 @@ public sealed class NamedElementGlobalCollisionTests
         bridge.Attach(ctx, "<!doctype html><body><div id=Widget></div></body>", "file:///c.html");
         ctx.Eval("class Widget {}");
 
-        var ex = Record.Exception(() => bridge.RegisterNamedElementGlobals(ctx));
+        var ex = Record.Exception(() => NamedElementGlobals.Register(bridge, ctx));
         Assert.Null(ex);
         Assert.Equal("function", ctx.Eval("typeof Widget").ToString());
     }
@@ -58,7 +59,7 @@ public sealed class NamedElementGlobalCollisionTests
         bridge.Attach(ctx, "<!doctype html><body><div id=host></div></body>", "file:///c.html");
 
         // No user binding named `host` — named access on the window must still work.
-        bridge.RegisterNamedElementGlobals(ctx);
+        NamedElementGlobals.Register(bridge, ctx);
         Assert.Equal("object", ctx.Eval("typeof host").ToString());
     }
 }

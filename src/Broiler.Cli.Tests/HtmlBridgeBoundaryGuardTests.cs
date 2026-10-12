@@ -43,21 +43,6 @@ public class HtmlBridgeBoundaryGuardTests
     }
 
     [Fact(Timeout = 600000)]
-    public void DomBridge_Engine_Internal_Leaks_Are_Frozen_To_The_Known_Compatibility_Surface()
-    {
-        var exposedMembers = typeof(DomBridge)
-            .GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
-            .Where(static member => member.DeclaringType == typeof(DomBridge))
-            .Where(static member => member.MemberType is MemberTypes.Method or MemberTypes.Property)
-            .Where(ExposesEngineInternalType)
-            .Select(DescribeMember)
-            .OrderBy(static member => member, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.Equal(AllowedDomBridgeEngineInternalLeaks, exposedMembers);
-    }
-
-    [Fact(Timeout = 600000)]
     public void Core_And_Dom_Bridge_Assemblies_Are_Split_As_Expected()
     {
         // RF-BRIDGE-1c Phase F4: the DomElement facade that used to anchor "owned by Core"

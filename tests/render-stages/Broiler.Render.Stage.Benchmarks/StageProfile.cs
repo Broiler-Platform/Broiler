@@ -7,6 +7,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 using Broiler.Layout.Diagnostics;
 using Broiler.Layout.IR;

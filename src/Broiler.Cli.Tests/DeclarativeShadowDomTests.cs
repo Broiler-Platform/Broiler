@@ -22,7 +22,7 @@ public class DeclarativeShadowDomTests
     private static BBitmap Render(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         return HtmlRender.RenderToImageWithStyleSet(bridge.SerializeToHtml(), 300, 300);
     }
@@ -30,7 +30,7 @@ public class DeclarativeShadowDomTests
     private static string Eval(string html, string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval(script);
         return bridge.SerializeToHtml();

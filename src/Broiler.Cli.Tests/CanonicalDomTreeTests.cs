@@ -27,7 +27,7 @@ public sealed class CanonicalDomTreeTests
             typeof(DomBridge).GetProperty(nameof(DomBridge.DocumentElement))!.PropertyType);
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<main id='host'><span id='child'></span></main>");
 
         Assert.IsType<Broiler.Dom.DomElement>(bridge.DocumentElement);
@@ -41,7 +41,7 @@ public sealed class CanonicalDomTreeTests
         // via the shared HtmlDocumentParser and exposes the same implicit html/head/body
         // structure through its public canonical seams.
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<title>Phase Zero</title><main id='host'><span>one</span><span>two</span></main>");
 
         var documentElement = bridge.DocumentElement;
@@ -61,7 +61,7 @@ public sealed class CanonicalDomTreeTests
     [Fact(Timeout = 600000)]
     public void DomBridge_Owns_The_Canonical_Document_And_Exposes_Tree_Derived_Elements()
     {
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         using var context = new JSContext();
         bridge.Attach(context, "<main id='host'><span id='child'></span></main>");
 
@@ -84,7 +84,7 @@ public sealed class CanonicalDomTreeTests
             """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.test/phase-zero");
 
         var first = bridge.SerializeToHtml();
@@ -105,7 +105,7 @@ public sealed class CanonicalDomTreeTests
             """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.test/phase-zero");
 
         context.Eval("""

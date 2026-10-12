@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 
 namespace Broiler.Render.Stage.Benchmarks;
