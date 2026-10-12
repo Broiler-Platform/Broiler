@@ -50,22 +50,6 @@ $duplicateCheckoutMappings = [ordered]@{
     'Broiler.Writer/Broiler.UI/' = 'Broiler.UI/'
 }
 
-# Broiler.HTML still spells its top-level Broiler.Media and Broiler.Graphics references in the
-# pre-src/ layout those components used while this repository vendored them as plain
-# directories. Both now publish their projects under src/, so the reference as written
-# resolves nowhere. Directory.Build.targets rewrites these two references for the build; the
-# same rewrite has to happen here or the generated solutions would disagree with what MSBuild
-# actually compiles. Both tables drop out together once Broiler.HTML follows the components
-# into src/.
-#
-# The trailing '.' is load-bearing: it matches the sibling projects
-# (Broiler.Graphics/Broiler.Graphics.Windows/, Broiler.Media/Broiler.Media.Image.Managed/) and
-# deliberately does not match the already-correct Broiler.Graphics/src/Broiler.Graphics/.
-$staleLayoutMappings = [ordered]@{
-    'Broiler.Media/Broiler.Media.' = 'Broiler.Media/src/Broiler.Media.'
-    'Broiler.Graphics/Broiler.Graphics.' = 'Broiler.Graphics/src/Broiler.Graphics.'
-}
-
 $referenceCache = @{}
 
 function Convert-ToRepositoryPath {
@@ -96,13 +80,6 @@ function Convert-ToRepositoryPath {
         }
     }
 
-    foreach ($mapping in $staleLayoutMappings.GetEnumerator()) {
-        if ($relativePath.StartsWith($mapping.Key, [StringComparison]::OrdinalIgnoreCase)) {
-            $relativePath = $mapping.Value + $relativePath.Substring($mapping.Key.Length)
-            break
-        }
-    }
-
     $canonicalFullPath = Join-Path $repositoryRoot $relativePath
     if (-not (Test-Path -LiteralPath $canonicalFullPath -PathType Leaf)) {
         throw "Project does not exist: $relativePath"
@@ -127,12 +104,6 @@ function Resolve-ProjectReference {
     $resolvedInclude = $resolvedInclude.Replace(
         '$(MSBuildThisFileDirectory)',
         $projectDirectory + [IO.Path]::DirectorySeparatorChar)
-    $resolvedInclude = $resolvedInclude.Replace(
-        '$(BroilerDomPath)',
-        (Join-Path $repositoryRoot 'Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj'))
-    $resolvedInclude = $resolvedInclude.Replace(
-        '$(BroilerGraphicsPath)',
-        (Join-Path $repositoryRoot 'Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj'))
 
     # Broiler.Regex prefers a Broiler.Unicode checkout nested beside it and falls back to the
     # one Broiler.JS owns. Both gitlinks point at the same commit, and the mapping table folds

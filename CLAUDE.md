@@ -48,12 +48,13 @@ tool the root `human-review.yml` runs is built out of that submodule
 evaluates still live in each repository beside the source they describe.
 
 The component repositories publish their projects under `src/` (with tests in
-`src/tests/`), and each carries nested checkouts of the components it depends on
-so that it still builds standalone. `Broiler.HTML` is the exception: it still
-uses the pre-`src/` layout and pins an older `Broiler.Graphics`, which is why the
-root `Directory.Build.targets` rewrites two of its references and
-`scripts/update-solutions.ps1` carries a `$staleLayoutMappings` table. Both drop
-out once `Broiler.HTML` follows the components into `src/`.
+`src/tests/`; `Broiler.HTML` still uses its older `Source/` layout) and consume
+each other only as NuGet packages, pinned in each component's
+`Directory.Packages.props` — none carries nested checkouts any more. So a
+component builds the same inside this checkout as standalone, and the root no
+longer rewrites any component's references: there is no root
+`Directory.Build.targets`. A change spanning components is verified by packing
+the upstream one locally and building the downstream one against that pack.
 
 Do not contort a change into the main repo just to avoid touching a submodule;
 write the fix at its correct layer.

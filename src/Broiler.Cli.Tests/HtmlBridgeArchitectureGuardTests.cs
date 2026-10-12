@@ -95,9 +95,7 @@ public class HtmlBridgeArchitectureGuardTests
     }
 
     // roadmap Phase 1 (project-graph repair), exit criterion: "One Broiler.Dom assembly node
-    // and one Graphics implementation in a solution build." Submodules carry nested checkouts
-    // of both kernels for standalone builds; in-tree every consumer resolves the single ROOT
-    // checkout via $(BroilerDomPath)/$(BroilerGraphicsPath). A specialized solution may omit a
+    // and one Graphics implementation in a solution build." A specialized solution may omit a
     // kernel it does not consume, but it must never list the same canonical kernel more than once.
     [Theory]
     [InlineData("Broiler.Dom.csproj")]
@@ -123,9 +121,7 @@ public class HtmlBridgeArchitectureGuardTests
 
     // Set of Broiler assembly names reachable through the csproj <ProjectReference> graph
     // rooted at the given project. Literal relative Includes are resolved; MSBuild
-    // property-based Includes (e.g. $(BroilerDomPath), introduced by the Phase 1 path
-    // dedup) resolve only to the canonical Dom/Graphics kernels and never toward the image
-    // stack, so they are skipped rather than MSBuild-evaluated.
+    // property-based Includes are skipped rather than MSBuild-evaluated.
     private static HashSet<string> TransitiveProjectReferences(string rootProjectName)
     {
         var repositoryRoot = FindRepositoryRoot();

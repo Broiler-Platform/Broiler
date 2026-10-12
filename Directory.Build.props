@@ -122,30 +122,4 @@
     -->
     <NoWarn>$(NoWarn);CS8600;CS8601;CS8602;CS8603;CS8604;CS8618;CS8619;CS8620;CS8622;CS8625;CS8631;CS8632;CS8765;CS8767;CS0109;CS0628;CS9113;CA1416;CA2255;SYSLIB0013;RS1038;RS1041</NoWarn>
   </PropertyGroup>
-
-  <!--
-    HtmlBridge complexity-reduction Phase 1 (project-graph repair), item 4: canonical
-    single-source paths for the Broiler.Dom and Broiler.Graphics kernels.
-
-    Several submodules carry a nested checkout of these kernels for their own standalone
-    builds (Broiler.CSS/Broiler.DOM, Broiler.HTML/Broiler.Graphics, and — since the component
-    directories became submodules — Broiler.Documents/, Broiler.Media/ and Broiler.UI/ under
-    their own Broiler.Graphics). Left unmanaged, in-tree solution graphs could build two nodes
-    with the same assembly name for each kernel. Each submodule's Directory.Build.props
-    defaults $(BroilerDomPath)/$(BroilerGraphicsPath) to its nested copy (used only when built
-    standalone). In root builds those submodule props chain up to THIS file, so the
-    unconditional values below win and every consumer resolves to the single ROOT checkout —
-    one Broiler.Dom node and one Graphics node per build graph.
-
-    scripts/check-submodule-sha-drift.sh fails CI if the Broiler.CSS nested Broiler.DOM SHA
-    drifts from the root, so that collapsed node stays assembly-identical to the nested copy.
-    Broiler.Graphics is deliberately exempt: the root checkout leads Broiler.HTML's gitlink
-    (the root is on the src/ layout, Broiler.HTML still pins the pre-src/ commit), which is
-    also why Directory.Build.targets has to rewrite Broiler.HTML's two literal-path
-    references. Both drop out once Broiler.HTML follows the components into src/.
-  -->
-  <PropertyGroup>
-    <BroilerDomPath>$(MSBuildThisFileDirectory)Broiler.DOM\Broiler.Dom\Broiler.Dom.csproj</BroilerDomPath>
-    <BroilerGraphicsPath>$(MSBuildThisFileDirectory)Broiler.Graphics\src\Broiler.Graphics\Broiler.Graphics.csproj</BroilerGraphicsPath>
-  </PropertyGroup>
 </Project>
