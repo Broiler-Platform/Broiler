@@ -78,10 +78,11 @@ order before their consumers' branches build in CI:
 6. Broiler.Hosting 0.1.0-preview.10 (needs UI .21, Graphics .13, Native .9)
 7. Broiler.Writer, Broiler.Plate, Broiler.Browser
 
-Broiler.Browser's `main` already fails to build against the published Broiler.HtmlBridge
-0.1.0-preview.28, which lacks `DocumentFetchTiming.RecordResponseVersion`; an HtmlBridge release
-from current source is needed for the Browser regardless of printing. The printing work was
-verified against a local pack of that source.
+No Broiler.HtmlBridge release is needed: the Browser prints against the published 0.1.0-preview.28.
+Its `main` needs the Broiler.Browser commit "Restore HtmlBridge from the published preview.28"
+first, which repins `Broiler.HtmlBridge.Scripting.Vm` from a local `-http2.6` build that was never
+published; the printing branch then rebases onto it and drops its own HtmlBridge property for the
+family's `$(BroilerHtmlBridgeVersion)`.
 
 Then this repository bumps the submodule pointers.
 
