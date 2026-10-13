@@ -72,11 +72,16 @@ order before their consumers' branches build in CI:
 
 1. Broiler.Graphics 0.1.0-preview.13
 2. Broiler.Native 0.1.0-preview.9
-3. Broiler.Documents 0.1.0-preview.23 (needs Graphics .13)
-4. Broiler.UI 0.1.0-preview.21 (needs Graphics .13)
+3. Broiler.Documents 0.1.0-preview.25 (needs Graphics .13)
+4. Broiler.UI 0.1.0-preview.22 (needs Graphics .13)
 5. Broiler.HTML 0.1.0-preview.29 (independent of the above)
-6. Broiler.Hosting 0.1.0-preview.10 (needs UI .21, Graphics .13, Native .9)
+6. Broiler.Hosting 0.1.0-preview.10 (needs UI .22, Graphics .13, Native .9)
 7. Broiler.Writer, Broiler.Plate, Broiler.Browser
+
+Each number is the next preview after what nuget.org already has, and the consumers pin it before
+it exists. A release of the component that ships without printing in the meantime takes the number:
+UI 0.1.0-preview.21 and Documents 0.1.0-preview.23 and .24 did, which is why the list now reads .22
+and .25. When that happens again, move the consumers' pins with it.
 
 No Broiler.HtmlBridge release is needed: the Browser prints against the published 0.1.0-preview.28.
 Its `main` needs the Broiler.Browser commit "Restore HtmlBridge from the published preview.28"
