@@ -62,7 +62,6 @@ on:
       - 'Broiler.Graphics'
       - 'Broiler.Graphics/**'
       - 'Directory.Build.props'
-      - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
   push:
     branches:
@@ -76,7 +75,6 @@ on:
       - 'Broiler.Graphics'
       - 'Broiler.Graphics/**'
       - 'Directory.Build.props'
-      - 'Directory.Build.targets'
       - '.github/workflows/documents-pdf.yml'
   workflow_dispatch:
 
