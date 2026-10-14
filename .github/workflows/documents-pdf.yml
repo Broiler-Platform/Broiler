@@ -33,47 +33,41 @@ name: Documents And PDF
 #     repository instead, which is also where the Writer's behavioural cover
 #     lives, so this workflow no longer triggers on the Writer.
 #
-# Scope: the Documents solution and its dependency closure, which today is
-# Broiler.Graphics and nothing else — Broiler.Documents.Model references it for
-# value types such as BColor. Broiler.Media is deliberately *not* gated here.
+# Scope: the Documents solution alone. Broiler.Documents takes Broiler.Graphics
+# and Broiler.DOM as NuGet packages, and their suites run in their own
+# repositories' CI. Broiler.Media is deliberately *not* gated here.
 # Nothing in the solution references it, so a Media failure would say nothing
 # about Documents, and its Windows leg turns on whether the runner image happens
 # to carry the Store-shipped WIC WebP codec, which is not a property of this
 # repository. Images reach the PDF codec at a later roadmap phase; the Media
 # paths and suites belong in this workflow then, not before.
 #
-# The no-op guard below matters more than it looks. The Graphics suite this
-# workflow runs is a console runner rather than an xunit project: `dotnet test`
-# against it exits 0 having run nothing at all. It is invoked with `dotnet run`
-# so its exit code is the failure count. The Documents solution is xunit and is
-# checked for a plausible executed-test count, because the roadmap is explicit
-# that a skipped, empty, or no-op job can never satisfy a later phase gate.
+# The no-op guard below matters more than it looks. The Documents solution is
+# xunit and is checked for a plausible executed-test count, because the roadmap
+# is explicit that a skipped, empty, or no-op job can never satisfy a later
+# phase gate.
 
 on:
   # The two path lists are identical and must stay that way. They are written
   # out twice because the workflow parser does not support YAML anchors.
   pull_request:
     paths:
-      # Both are submodules, so a pointer bump changes the gitlink path itself
-      # ('Broiler.Documents') and never anything under it — both spellings are
-      # needed for the trigger to fire on a bump as well as on a local edit.
+      # Broiler.Documents is a submodule, so a pointer bump changes the gitlink
+      # path itself and never anything under it — both spellings are needed for
+      # the trigger to fire on a bump as well as on a local edit.
       - 'Broiler.Documents'
       - 'Broiler.Documents/**'
-      - 'Broiler.Graphics'
-      - 'Broiler.Graphics/**'
       - 'Directory.Build.props'
       - '.github/workflows/documents-pdf.yml'
   push:
     branches:
       - main
     paths:
-      # Both are submodules, so a pointer bump changes the gitlink path itself
-      # ('Broiler.Documents') and never anything under it — both spellings are
-      # needed for the trigger to fire on a bump as well as on a local edit.
+      # Broiler.Documents is a submodule, so a pointer bump changes the gitlink
+      # path itself and never anything under it — both spellings are needed for
+      # the trigger to fire on a bump as well as on a local edit.
       - 'Broiler.Documents'
       - 'Broiler.Documents/**'
-      - 'Broiler.Graphics'
-      - 'Broiler.Graphics/**'
       - 'Directory.Build.props'
       - '.github/workflows/documents-pdf.yml'
   workflow_dispatch:
@@ -114,12 +108,10 @@ jobs:
       - name: Initialize the submodules this solution needs
         shell: bash
         run: |
-          # Broiler.Documents is a submodule and owns this solution. It is
-          # self-contained: Broiler.Documents.Model references Broiler.Graphics
-          # and the HTML codec references Broiler.DOM, both through its own
-          # nested checkouts rather than the top-level ones — hence --recursive,
-          # and hence no need to initialize the root Broiler.Graphics/Broiler.DOM.
-          git submodule update --init --recursive Broiler.Documents
+          # Broiler.Documents is a submodule and owns this solution. It has no
+          # submodules of its own: Broiler.Graphics and Broiler.DOM come as
+          # NuGet packages, so no other checkout is needed.
+          git submodule update --init Broiler.Documents
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
@@ -165,14 +157,6 @@ jobs:
           if ($executed -lt [int]$env:MINIMUM_EXECUTED_TESTS) {
               throw "Only $executed tests executed, below the floor of $env:MINIMUM_EXECUTED_TESTS. A run this small means a project was skipped, not that the suite shrank."
           }
-
-      # A console runner, not an xunit project: its Main returns the failure
-      # count, so a non-zero exit fails the step. It runs because
-      # Broiler.Documents.Model builds against Broiler.Graphics — and against
-      # the checkout nested inside Broiler.Documents, which is the one exercised
-      # here rather than the top-level one.
-      - name: Run the Graphics test runner
-        run: dotnet run --project Broiler.Documents/Broiler.Graphics/src/tests/Broiler.Graphics.Tests/Broiler.Graphics.Tests.csproj -c Release
 
       - name: Upload test results
         if: always()
