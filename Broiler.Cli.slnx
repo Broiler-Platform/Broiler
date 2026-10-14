@@ -32,6 +32,7 @@
     <Project Path="Broiler.HtmlBridge/src/Broiler.HtmlBridge.Scripting/Broiler.HtmlBridge.Scripting.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.JS/">
+    <Project Path="Broiler.JS/Broiler.ECMAScript/Broiler.ECMAScript.Algorithms/Broiler.ECMAScript.Algorithms.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
