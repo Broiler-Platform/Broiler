@@ -24,7 +24,7 @@ public sealed class NativeModalCenteringTests
 <body><dialog id="d">{{dialogContent}}</dialog></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///t.html");
         context.Eval("document.getElementById('d').showModal();");
         bridge.ResolveAnchorPositions();

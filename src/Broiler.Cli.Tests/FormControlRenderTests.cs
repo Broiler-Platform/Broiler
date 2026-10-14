@@ -1,5 +1,6 @@
 using Broiler.HTML.Image;
 using Broiler.HtmlBridge;
+using Broiler.Headless;
 
 namespace Broiler.Cli.Tests;
 

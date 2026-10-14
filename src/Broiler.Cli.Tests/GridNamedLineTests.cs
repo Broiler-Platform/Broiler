@@ -32,7 +32,7 @@ public sealed class GridNamedLineTests
             + "column-gap:23px;row-gap:12px;}"
             + "</style></head><body style=\"margin:0\">" + body + "</body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///nl.html");
         return bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

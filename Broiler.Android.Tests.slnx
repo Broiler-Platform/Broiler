@@ -24,8 +24,4 @@
     <Project Path="Broiler.Input/src/Broiler.Input.Touch/Broiler.Input.Touch.csproj" />
     <Project Path="Broiler.Input/src/Broiler.Input/Broiler.Input.csproj" />
   </Folder>
-  <Folder Name="/Dependencies/Broiler.Media/">
-    <Project Path="Broiler.Media/src/Broiler.Media.Image/Broiler.Media.Image.csproj" />
-    <Project Path="Broiler.Media/src/Broiler.Media/Broiler.Media.csproj" />
-  </Folder>
 </Solution>

@@ -157,7 +157,7 @@ public sealed class DocumentStyleContextTests
         const string html = "<!DOCTYPE html><html><head><style>.h{display:none}</style></head>" +
                             "<body><p id='t'>x</p></body></html>";
         using var ctx = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///style.html");
 
         // Before the class is added, no `.h` rule matches, so display is not none.

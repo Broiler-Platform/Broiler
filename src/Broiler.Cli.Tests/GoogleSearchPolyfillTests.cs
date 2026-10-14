@@ -2554,7 +2554,7 @@ document.getElementById('result').textContent =
     public void SmoothScroll_On_OverflowHidden_Element_Can_Be_Interrupted_By_Scroll_Handler()
     {
         using var ctx = new Broiler.JavaScript.Engine.JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, "<!DOCTYPE html><html><body></body></html>", "file:///test.html");
 
         var result = ctx.Eval("""

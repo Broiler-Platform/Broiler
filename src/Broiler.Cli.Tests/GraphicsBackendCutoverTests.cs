@@ -21,7 +21,7 @@ public class GraphicsBackendCutoverTests
 
         try
         {
-            Environment.SetEnvironmentVariable(legacyVariable, BGraphicsBackend.StubFallbackId);
+            Environment.SetEnvironmentVariable(legacyVariable, "stub");
 
             Assert.Equal(BGraphicsBackend.BroilerRasterId, BGraphicsBackend.CurrentId);
             Assert.Equal("Broiler raster", BGraphicsBackend.CurrentDisplayName);
@@ -33,28 +33,13 @@ public class GraphicsBackendCutoverTests
         }
     }
 
-    [Theory]
-    [InlineData(BGraphicsBackend.BroilerRasterId, "Broiler raster", true)]
-    [InlineData(BGraphicsBackend.StubFallbackId, "Stub compatibility fallback (no OS backend)", false)]
-    public void BGraphicsBackend_OverrideForCurrentThread_Selects_Requested_Mode(
-        string backendId,
-        string expectedDisplayName,
-        bool expectedRasterPipeline)
-    {
-        using var _ = BGraphicsBackend.OverrideForCurrentThread(backendId);
-
-        Assert.Equal(backendId, BGraphicsBackend.CurrentId);
-        Assert.Equal(expectedDisplayName, BGraphicsBackend.CurrentDisplayName);
-        Assert.Equal($"{backendId} ({expectedDisplayName})", BGraphicsBackend.CurrentLabel);
-        Assert.Equal(expectedRasterPipeline, BGraphicsBackend.UseBroilerRasterPipeline);
-    }
-
     // Two pixel-parity facts used to sit here, rendering each fixture twice — once through
     // the Broiler raster pipeline and once through what was then a real second backend — and
     // asserting the results were identical. The stub is no longer a second implementation, so
     // the comparison measured the raster pipeline against a placeholder and had stopped
     // meaning anything. Pixel fidelity is the WPT suites' job; what is left here is the
-    // backend selection surface itself.
+    // backend selection surface itself. The per-thread override that selected the stub went with it
+    // (Broiler.HTML "Remove dead code"), so the raster pipeline is the only backend left to report.
 
     /// <summary>
     /// The capture sidecar records which backend produced the image. This is the only
@@ -70,9 +55,8 @@ public class GraphicsBackendCutoverTests
 
         try
         {
-            await File.WriteAllTextAsync(htmlPath, "<html><body style='margin:0'>fallback metadata</body></html>");
+            await File.WriteAllTextAsync(htmlPath, "<html><body style='margin:0'>backend metadata</body></html>");
 
-            using var _ = BGraphicsBackend.OverrideForCurrentThread(BGraphicsBackend.StubFallbackId);
             var exitCode = await Program.Main([
                 "--capture-image", htmlPath,
                 "--output", outputPath,
@@ -84,8 +68,8 @@ public class GraphicsBackendCutoverTests
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(metadataPath));
             var renderBackend = document.RootElement.GetProperty("renderBackend");
 
-            Assert.Equal(BGraphicsBackend.StubFallbackId, renderBackend.GetProperty("id").GetString());
-            Assert.Equal("Stub compatibility fallback (no OS backend)", renderBackend.GetProperty("displayName").GetString());
+            Assert.Equal(BGraphicsBackend.BroilerRasterId, renderBackend.GetProperty("id").GetString());
+            Assert.Equal("Broiler raster", renderBackend.GetProperty("displayName").GetString());
             Assert.Equal(BGraphicsBackend.CurrentLabel, renderBackend.GetProperty("label").GetString());
         }
         finally

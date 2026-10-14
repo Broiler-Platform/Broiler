@@ -42,7 +42,7 @@ public class FrameViewportTests
 </body>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///frame-viewport.html");
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();

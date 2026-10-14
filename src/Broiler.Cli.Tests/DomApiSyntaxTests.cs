@@ -27,7 +27,7 @@ public sealed class DomApiSyntaxTests
     private static DomBridge Attach(out JSContext context)
     {
         context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(
             context,
             "<!DOCTYPE html><html><body><div id=a class=c><p>one</p><p>two</p></div></body></html>",
@@ -302,7 +302,7 @@ public sealed class DomApiSyntaxTests
     public void Every_Selector_Entry_Point_Throws_The_Same_SyntaxError(string call)
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(
             context,
             """
@@ -454,7 +454,7 @@ public sealed class DomApiSyntaxTests
     public void A_Pseudo_Element_Rule_Still_Applies_In_The_Cascade()
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(
             context,
             """
@@ -482,7 +482,7 @@ public sealed class DomApiSyntaxTests
     public void An_Invalid_Selector_In_A_Stylesheet_Does_Not_Throw_And_Does_Not_Stop_The_Cascade()
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(
             context,
             """

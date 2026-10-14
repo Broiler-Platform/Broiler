@@ -29,7 +29,7 @@ public sealed class HtmlEntityDecodingTests
     private static string TextContent(string bodyHtml, string id)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, $"<!DOCTYPE html><html><body>{bodyHtml}</body></html>", Url);
         return context.Eval($"document.getElementById('{id}').textContent")?.ToString() ?? "";
     }
@@ -52,7 +52,7 @@ public sealed class HtmlEntityDecodingTests
     public void NbspSurvivesSerializeRoundTrip_NotDoubleEncoded()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!DOCTYPE html><html><body><div id='t'>&nbsp;&nbsp;X</div></body></html>", Url);
         var serialized = bridge.SerializeToHtml();
 
@@ -62,7 +62,7 @@ public sealed class HtmlEntityDecodingTests
 
         // Re-parsing the serialized HTML must still yield the two non-breaking spaces.
         using var context2 = new JSContext();
-        var bridge2 = new DomBridge();
+        var bridge2 = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge2.Attach(context2, serialized, Url);
         var text = context2.Eval("document.getElementById('t').textContent")?.ToString() ?? "";
         Assert.Equal("  X", text);
@@ -73,7 +73,7 @@ public sealed class HtmlEntityDecodingTests
     {
         // Raw-text element content must stay verbatim: a "&amp;&amp;" in JS must not become "&&".
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context,
             "<!DOCTYPE html><html><body><script id='s' type='text/plain'>a &amp;&amp; b</script></body></html>", Url);
         var text = context.Eval("document.getElementById('s').textContent")?.ToString() ?? "";
@@ -85,7 +85,7 @@ public sealed class HtmlEntityDecodingTests
     private static string Evaluate(string bodyHtml, string expression)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, $"<!DOCTYPE html><html><body>{bodyHtml}</body></html>", Url);
         return context.Eval(expression)?.ToString() ?? "";
     }

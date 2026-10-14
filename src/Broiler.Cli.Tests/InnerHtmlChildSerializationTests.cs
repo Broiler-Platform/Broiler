@@ -27,7 +27,7 @@ public sealed class InnerHtmlChildSerializationTests
     private static DomBridge Attach(out JSContext context, string body)
     {
         context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, $"<!DOCTYPE html><html><body>{body}</body></html>", "https://example.com/i.html");
         return bridge;
     }

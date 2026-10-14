@@ -63,7 +63,7 @@ div {
 </html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///view-transition-finished.html");
         // takeScreenshot mirrors /common/reftest-wait.js exactly — it drops the class through
         // classList, which is what the bridge's "is a screenshot still pending?" check reads. It is

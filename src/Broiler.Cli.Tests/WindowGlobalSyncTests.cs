@@ -30,7 +30,7 @@ public sealed class WindowGlobalSyncTests
     private static (JSContext Context, DomBridge Bridge) Attach()
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!doctype html><html><body></body></html>", "file:///window-global-sync.html");
         return (context, bridge);
     }

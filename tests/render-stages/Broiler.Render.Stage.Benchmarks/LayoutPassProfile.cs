@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Globalization;
 using System.Linq;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 using Broiler.Layout.Diagnostics;
 using BBitmap = Broiler.HTML.Image.BBitmap;

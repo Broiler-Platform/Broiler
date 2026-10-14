@@ -36,7 +36,7 @@ public sealed class EventTargetBindingModuleTests
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -66,7 +66,7 @@ public sealed class EventTargetBindingModuleTests
                             "<div id=\"f\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""

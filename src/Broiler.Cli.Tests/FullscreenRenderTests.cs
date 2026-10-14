@@ -53,7 +53,7 @@ public class FullscreenRenderTests
 <body><div id="target"></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///fullscreen.html");
         context.Eval("document.getElementById('target').requestFullscreen();");
         bridge.ResolveAnchorPositions();
@@ -87,7 +87,7 @@ public class FullscreenRenderTests
 <body><div id="target"></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///fullscreen-default.html");
         context.Eval("document.getElementById('target').requestFullscreen();");
         bridge.ResolveAnchorPositions();
@@ -114,7 +114,7 @@ public class FullscreenRenderTests
 <body><div id="target"></div></body></html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///fullscreen-exit.html");
         context.Eval("document.getElementById('target').requestFullscreen();");
         context.Eval("document.exitFullscreen();");
@@ -135,7 +135,7 @@ public class FullscreenRenderTests
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"target\"></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///fullscreen-element.html");
 
         Assert.Equal("null", context.Eval("String(document.fullscreenElement)").ToString());
@@ -156,7 +156,7 @@ public class FullscreenRenderTests
     {
         const string html = "<!DOCTYPE html><html><body><div id=\"target\"></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///fullscreen-event.html");
 
         context.Eval("window.seen = 0; document.addEventListener('fullscreenchange', () => { window.seen++; });");

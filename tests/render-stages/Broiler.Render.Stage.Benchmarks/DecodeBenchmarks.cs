@@ -1,6 +1,7 @@
 using System;
 using BenchmarkDotNet.Attributes;
 using Broiler.Graphics;
+using Broiler.Graphics.Color;
 using Broiler.HTML.Image;
 using Broiler.Media.Image;
 using BBitmap = Broiler.HTML.Image.BBitmap;

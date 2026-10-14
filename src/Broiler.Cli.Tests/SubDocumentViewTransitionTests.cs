@@ -57,7 +57,7 @@ public class SubDocumentViewTransitionTests
 </html>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///sub-document-view-transition.html");
         context.Eval(script);
         bridge.FireWindowLoadEvent();
@@ -87,7 +87,7 @@ public class SubDocumentViewTransitionTests
 
         // Asserted through a second render so the attribute survives serialization.
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context,
             """<!DOCTYPE html><html><iframe srcdoc="<body></body>"></iframe></html>""",
             "file:///probe.html");
@@ -210,7 +210,7 @@ public class SubDocumentViewTransitionTests
     public void TransitionObject_ResolvesItsPromises()
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context,
             """<!DOCTYPE html><html><iframe srcdoc="<body></body>"></iframe></html>""",
             "file:///promises.html");

@@ -217,7 +217,7 @@ internal sealed record WptPageDecoration(string BackgroundCss, string BoxCss, bo
         return HtmlRender.RenderToImageWithStyleSet(
             markup, sheetWidth, sheetHeight,
             styleSet: null,
-            backgroundColor: Broiler.Graphics.BColor.White,
+            backgroundColor: Broiler.Graphics.Color.BColor.White,
             stylesheetLoad: stylesheetLoad,
             imageLoad: imageLoad,
             baseUrl: baseUrl);
@@ -262,7 +262,7 @@ internal sealed record WptPageDecoration(string BackgroundCss, string BoxCss, bo
         using var probe = HtmlRender.RenderToImageWithStyleSet(
             markup, width, height,
             styleSet: null,
-            backgroundColor: Broiler.Graphics.BColor.White,
+            backgroundColor: Broiler.Graphics.Color.BColor.White,
             stylesheetLoad: stylesheetLoad,
             imageLoad: imageLoad,
             baseUrl: baseUrl);

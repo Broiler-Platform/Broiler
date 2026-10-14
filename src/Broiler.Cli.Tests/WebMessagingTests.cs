@@ -17,7 +17,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -59,7 +59,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         context.Eval("""
             window.addEventListener('message', function(event) {
@@ -89,7 +89,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -147,7 +147,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -202,7 +202,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com:8443/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -239,7 +239,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -275,7 +275,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -312,7 +312,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -343,7 +343,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         context.Eval("""
@@ -386,7 +386,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         context.Eval("""
@@ -425,7 +425,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         context.Eval("""
@@ -463,7 +463,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         context.Eval("""
@@ -516,7 +516,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         context.Eval("""
@@ -569,7 +569,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -602,7 +602,7 @@ public class WebMessagingTests
 """;
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""

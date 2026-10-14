@@ -29,7 +29,7 @@ public sealed class DocumentLocationTests
     private static (JSContext Context, DomBridge Bridge) Attach(string url = PageUrl)
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!doctype html><html><body></body></html>", url);
         return (context, bridge);
     }
@@ -97,7 +97,7 @@ public sealed class DocumentLocationTests
     public void SubDocumentLocation_IsTheFramesOwnLocation()
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         using var _ = context;
         using var __ = bridge;
         bridge.Attach(

@@ -22,7 +22,7 @@ public class WmAbsPosGeometryTests
             $"<div style='position:relative;width:300px;height:200px;{cbWritingMode}'>" +
             $"<span id=x style='position:absolute;{absStyle}'><div style='width:50px;height:30px'></div></span></div>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///t.html");
         return context.Eval(
             "var b=document.getElementById('x').getBoundingClientRect();" +

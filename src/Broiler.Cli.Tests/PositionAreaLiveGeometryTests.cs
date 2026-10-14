@@ -47,7 +47,7 @@ public sealed class PositionAreaLiveGeometryTests
         string area, int left, int top, int width, int height)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, BorderedCbHtml, "file:///pa-live.html");
 
         var (l, t, w, h) = LiveOffsets(context, area);
@@ -72,7 +72,7 @@ public sealed class PositionAreaLiveGeometryTests
   #t { position: absolute; position-anchor: --a; position-area: bottom right; width: 40px; height: 30px; }
 </style></head><body><div id='cb'><div id='a'></div><div id='t'></div></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///pa-nonstretch.html");
 
         int Read(string prop) => (int)double.Parse(
@@ -97,7 +97,7 @@ public sealed class PositionAreaLiveGeometryTests
   #t { position: absolute; align-self: stretch; justify-self: stretch; position-anchor: --a; position-area: bottom right; }
 </style></head><body><div id='cb'><div id='a'></div><div id='t'></div></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///pa-borderless.html");
 
         int L() => (int)double.Parse(context.Eval("document.getElementById('t').offsetLeft").ToString()!, System.Globalization.CultureInfo.InvariantCulture);
@@ -138,7 +138,7 @@ public sealed class PositionAreaLiveGeometryTests
   <div class='cb'><div class='anchor'></div><div id='h' class='anchored'></div></div>
 </body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///pa-wm.html");
         bridge.ResolveAnchorPositions();
         var serialized = bridge.SerializeToHtml();
@@ -177,7 +177,7 @@ public sealed class PositionAreaLiveGeometryTests
   #t { position: absolute; position-anchor: --a; position-area: bottom right; width: 40px; height: 30px; }
 </style></head><body><div id='cb'><div id='a'></div><div id='t'></div></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///pa-gbcr.html");
 
         double D(string expr) => double.Parse(

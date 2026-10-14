@@ -7,10 +7,6 @@
   <Folder Name="/Entry points/">
     <Project Path="src/Broiler.Cli/Broiler.Cli.csproj" />
   </Folder>
-  <Folder Name="/Dependencies/Broiler.CSS/">
-    <Project Path="Broiler.CSS/Broiler.CSS.Dom/Broiler.CSS.Dom.csproj" />
-    <Project Path="Broiler.CSS/Broiler.CSS/Broiler.CSS.csproj" />
-  </Folder>
   <Folder Name="/Dependencies/Broiler.Documents/">
     <Project Path="Broiler.Documents/src/Broiler.Documents.Docx/Broiler.Documents.Docx.csproj" />
     <Project Path="Broiler.Documents/src/Broiler.Documents.Html/Broiler.Documents.Html.csproj" />
@@ -20,22 +16,22 @@
     <Project Path="Broiler.Documents/src/Broiler.Documents/Broiler.Documents.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.DOM/">
-    <Project Path="Broiler.DOM/Broiler.Dom.Html/Broiler.Dom.Html.csproj" />
     <Project Path="Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj" />
-  </Folder>
-  <Folder Name="/Dependencies/Broiler.Graphics/">
-    <Project Path="Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.HTML/">
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Core/Broiler.HTML.Core.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Dom/Broiler.HTML.Dom.csproj" />
-    <Project Path="Broiler.HTML/Source/Broiler.HTML.Headless/Broiler.HTML.Headless.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Image.Compat/Broiler.HTML.Image.Compat.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Image/Broiler.HTML.Image.csproj" />
     <Project Path="Broiler.HTML/Source/Broiler.HTML.Orchestration/Broiler.HTML.Orchestration.csproj" />
   </Folder>
+  <Folder Name="/Dependencies/Broiler.HtmlBridge/">
+    <Project Path="Broiler.HtmlBridge/src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj" />
+    <Project Path="Broiler.HtmlBridge/src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj" />
+    <Project Path="Broiler.HtmlBridge/src/Broiler.HtmlBridge.DomBridgeUtils/Broiler.HtmlBridge.DomBridgeUtils.csproj" />
+    <Project Path="Broiler.HtmlBridge/src/Broiler.HtmlBridge.Scripting/Broiler.HtmlBridge.Scripting.csproj" />
+  </Folder>
   <Folder Name="/Dependencies/Broiler.JS/">
-    <Project Path="Broiler.JS/Broiler.DateTime/src/Broiler.DateTime/Broiler.DateTime.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj" />
@@ -54,21 +50,11 @@
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj" />
     <Project Path="Broiler.JS/Broiler.JS/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj" />
-    <Project Path="Broiler.JS/Broiler.Regex/Broiler.Regex/Broiler.Regex.csproj" />
-    <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeCldr.LocaleData/UnicodeCldr.LocaleData.csproj" />
-    <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeEmoji.StringProperties/UnicodeEmoji.StringProperties.csproj" />
-    <Project Path="Broiler.JS/Broiler.Unicode/src/UnicodeProperties/UnicodeProperties.csproj" />
   </Folder>
   <Folder Name="/Dependencies/Broiler.Layout/">
     <Project Path="Broiler.Layout/Broiler.Layout/Broiler.Layout.csproj" />
   </Folder>
-  <Folder Name="/Dependencies/Broiler.Media/">
-    <Project Path="Broiler.Media/src/Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj" />
-    <Project Path="Broiler.Media/src/Broiler.Media.Image/Broiler.Media.Image.csproj" />
-    <Project Path="Broiler.Media/src/Broiler.Media/Broiler.Media.csproj" />
-  </Folder>
   <Folder Name="/Dependencies/src/">
-    <Project Path="src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj" />
-    <Project Path="src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj" />
+    <Project Path="src/Broiler.Headless/Broiler.Headless.csproj" />
   </Folder>
 </Solution>

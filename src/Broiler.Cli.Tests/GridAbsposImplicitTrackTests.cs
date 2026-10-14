@@ -63,7 +63,7 @@ public sealed class GridAbsposImplicitTrackTests
         string html = "<!DOCTYPE html><html><head><style>" + Style + "</style></head><body style=\"margin:0\">"
             + body + "</body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///grid-positioned-items-within-grid-implicit-track-001.html");
 
         var assertions = bridge.EvaluateCheckLayoutAssertions().ToList();

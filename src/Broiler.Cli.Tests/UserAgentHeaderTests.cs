@@ -79,7 +79,7 @@ public sealed class UserAgentHeaderTests : IDisposable
             .ToString();
 
         using var context = new JSContext();
-        new DomBridge().Attach(context, html, _origin.Url("page.html"));
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(context, html, _origin.Url("page.html"));
         CaptureService.ExecuteScriptsWithDom(html, _origin.Url("page.html"));
 
         AssertEveryRequestIdentified("/sheet.css");
@@ -114,7 +114,7 @@ public sealed class UserAgentHeaderTests : IDisposable
         const string Html = """<!DOCTYPE html><html><body><div id="out"></div></body></html>""";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, _origin.Url("page.html"));
 
         var reported = context.Eval("String(navigator.userAgent)").ToString();

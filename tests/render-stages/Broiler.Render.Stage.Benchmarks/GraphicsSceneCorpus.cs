@@ -1,6 +1,11 @@
 using System;
 using System.Collections.Generic;
 using Broiler.Graphics;
+using Broiler.Graphics.Geometry;
+using Broiler.Graphics.Color;
+using Broiler.Graphics.RenderList;
+using Broiler.Graphics.Rendering;
+using Broiler.Graphics.Text;
 
 namespace Broiler.Render.Stage.Benchmarks;
 

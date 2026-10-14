@@ -43,7 +43,7 @@ public sealed class NativeAnchorWillChangeCbPipelineTests
     private static BoxGeometry LayoutTarget(bool nativeAnchor)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, Url);
         DomDocument document = bridge.GetRenderDocument();
 

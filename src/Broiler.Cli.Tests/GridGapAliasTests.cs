@@ -33,7 +33,7 @@ public sealed class GridGapAliasTests
             + "<div id=\"d\" style=\"grid-row:2;grid-column:2\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-width=\"0\" data-expected-height=\"0\"></div>"
             + "</div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///gap.html");
         var by = bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

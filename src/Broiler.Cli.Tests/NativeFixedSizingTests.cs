@@ -33,7 +33,7 @@ public sealed class NativeFixedSizingTests
     private static BoxGeometry EngineLayout(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, Url);
         DomDocument document = bridge.GetRenderDocument();
         using var container = new HtmlContainer
@@ -72,7 +72,7 @@ public sealed class NativeFixedSizingTests
         static string ResolveAndSerialize()
         {
             using var context = new JSContext();
-            var bridge = new DomBridge();
+            var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
             bridge.Attach(context, OpposingInsetHtml, Url);
             bridge.ResolveAnchorPositions();
             return bridge.SerializeToHtml();

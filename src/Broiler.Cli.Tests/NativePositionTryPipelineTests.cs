@@ -55,7 +55,7 @@ public sealed class NativePositionTryPipelineTests
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? rules)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, Url);
         DomDocument document = bridge.GetRenderDocument();
 
@@ -147,7 +147,7 @@ public sealed class NativePositionTryPipelineTests
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>? rules)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, Url);
         DomDocument document = bridge.GetRenderDocument();
 

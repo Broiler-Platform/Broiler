@@ -69,7 +69,7 @@ public class InlineReplacedBaselineTests
         var html = Page($"""
 <img src="{LimePixel}" width="40" height="80"><img src="{LimePixel}" width="40" height="40"><img src="{LimePixel}" width="40" height="20">
 """);
-        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, Width, Height, backgroundColor: Broiler.Graphics.BColor.White);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, Width, Height, backgroundColor: Broiler.Graphics.Color.BColor.White);
 
         var tall = ColumnExtent(bitmap, 20);
         var medium = ColumnExtent(bitmap, 60);
@@ -98,7 +98,7 @@ public class InlineReplacedBaselineTests
         var html = Page($"""
 <img src="{LimePixel}" width="40" height="80"><br><img src="{LimePixel}" width="40" height="20">
 """);
-        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, Width, Height, backgroundColor: Broiler.Graphics.BColor.White);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, Width, Height, backgroundColor: Broiler.Graphics.Color.BColor.White);
 
         var first = ColumnExtent(bitmap, 20);
 
@@ -130,7 +130,7 @@ public class InlineReplacedBaselineTests
         var html = Page($"""
 <img src="{LimePixel}" width="40" height="80">Ay
 """);
-        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, Width, Height, backgroundColor: Broiler.Graphics.BColor.White);
+        using var bitmap = HtmlRender.RenderToImageWithStyleSet(html, Width, Height, backgroundColor: Broiler.Graphics.Color.BColor.White);
 
         var image = ColumnExtent(bitmap, 20);
         Assert.InRange(image.Bottom - image.Top, 79, 81);

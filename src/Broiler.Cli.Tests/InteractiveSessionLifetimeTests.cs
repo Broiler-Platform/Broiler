@@ -29,6 +29,7 @@ public class InteractiveSessionLifetimeTests
         public int CurrentScriptIndex { get; set; }
         public bool HasPendingTimers => false;
         public bool HasPendingTimersDueBy(double virtualHorizonMs) => false;
+        public NavigationRequest? TakePendingNavigation() => null;
 
         public void Attach(JSContext context, string html)
         {

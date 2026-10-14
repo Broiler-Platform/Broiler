@@ -35,7 +35,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
     {
         var pageUrl = new Uri(Path.Combine(_directory, "page.html")).AbsoluteUri;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, """<!DOCTYPE html><body><iframe src="child.html"></iframe></body>""", pageUrl);
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();
@@ -110,7 +110,7 @@ public class SubDocumentGlobalPublishingTests : IDisposable
 
         var pageUrl = new Uri(Path.Combine(_directory, "page.html")).AbsoluteUri;
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context,
             """<!DOCTYPE html><body><div id="marker"></div><iframe src="child.html"></iframe></body>""",
             pageUrl);

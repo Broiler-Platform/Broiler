@@ -32,7 +32,7 @@ public sealed class GridVerticalWritingModeTests
             + "<div id=\"c2r2\" class=\"i\" style=\"grid-column:2;grid-row:2\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-width=\"0\" data-expected-height=\"0\"></div>"
             + "</div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///vwm.html");
         return bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

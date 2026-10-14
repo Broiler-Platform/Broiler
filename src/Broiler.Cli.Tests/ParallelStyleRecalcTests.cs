@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using Broiler.HTML.Image;
 using Broiler.Layout.Engine;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.Cli.Tests;
 

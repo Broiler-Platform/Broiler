@@ -23,7 +23,7 @@ public sealed class MarginCollapseBfcTests
     private static int OffsetTop(string html, string id)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, Url);
         DomDocument document = bridge.GetRenderDocument();
         using var container = new HtmlContainer

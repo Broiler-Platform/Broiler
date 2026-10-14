@@ -32,7 +32,7 @@ public sealed class GridWhitespaceItemTests
             + bodyInner
             + "</div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///ws.html");
         var by = bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

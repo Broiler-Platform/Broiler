@@ -17,7 +17,7 @@ public class OverlayTransitionRenderTests
     private static BBitmap Render(string html, string script)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         context.Eval(script);
         bridge.ResolveAnchorPositions();

@@ -25,9 +25,8 @@ public sealed class TableGridItemTests
     public void BareOnloadAssignment_FiresOnWindowLoad()
     {
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, "<!doctype html><body><div id=d></div>", "file:///o.html");
-        bridge.RegisterNamedElementGlobals(ctx);
         // Bare assignment (no `window.` / `var`), exactly as the WPT test writes it.
         ctx.Eval("onload = function(){ document.getElementById('d').setAttribute('data-loaded','yes'); };");
         bridge.FireWindowLoadEvent();
@@ -47,7 +46,7 @@ public sealed class TableGridItemTests
             + "<thead><tr><th id=\"cell\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-width=\"0\" data-expected-height=\"0\">Header text here</th></tr></thead>"
             + "</table></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///t.html");
         var by = bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

@@ -42,7 +42,7 @@ public sealed class SubDocumentEngineModuleTests
             "engine module path expected active on the pinned engine (98b07636)");
 
         using var context = new BridgeModuleContext(csp: null, pageUrl: "file:///host.html");
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, FrameHost, "file:///host.html");
 
         context.Eval(SetSrcdocWithModule);
@@ -58,7 +58,7 @@ public sealed class SubDocumentEngineModuleTests
         // parent. Under a plain JSContext parent the module is not executed, so its DOM effect is absent.
         // (This is the documented limitation of the engine-only module path.)
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, FrameHost, "file:///host.html");
 
         context.Eval(SetSrcdocWithModule);

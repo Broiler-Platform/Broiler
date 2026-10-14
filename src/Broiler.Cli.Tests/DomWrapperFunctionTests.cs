@@ -92,48 +92,6 @@ public class DomWrapperFunctionTests
         Assert.Contains("formData:object", result);
     }
 
-    /// <summary>
-    /// Source guard: wrapper members must be minted through <c>DomFunction</c>. Only the files that
-    /// register interface objects (which JS constructs with <c>new</c>) may use <c>JSFunction</c>
-    /// directly. Without this, a new binding added the obvious way silently reintroduces a
-    /// per-member prototype allocation on every node.
-    /// </summary>
-    [Fact(Timeout = 600000)]
-    public void Bridge_Mints_Wrapper_Members_Through_DomFunction()
-    {
-        // These register interface objects — URL, Response, Request, Headers, FormData,
-        // MessageChannel, CSSStyleSheet, Notification, MediaSource — which must stay constructable.
-        var interfaceObjectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "Document.cs",
-            "Registration.cs",
-            "FetchBinding.cs",
-            "NotificationBinding.cs",
-            "MediaCapabilityBinding.cs",
-        };
-
-        var bridgeRoot = Path.Combine(FindRepositoryRoot(), "src", "Broiler.HtmlBridge.Dom");
-        Assert.True(Directory.Exists(bridgeRoot), $"Bridge source not found at {bridgeRoot}");
-
-        var offenders = Directory
-            .EnumerateFiles(bridgeRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(path => !path.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Where(path => !interfaceObjectFiles.Contains(Path.GetFileName(path)))
-            .Where(path => File.ReadAllText(path).Contains("new JSFunction(", StringComparison.Ordinal))
-            .Select(path => Path.GetRelativePath(bridgeRoot, path))
-            .OrderBy(static name => name, StringComparer.Ordinal)
-            .ToArray();
-
-        Assert.True(
-            offenders.Length == 0,
-            "These bridge files mint wrapper members with `new JSFunction(`, which allocates a " +
-            "throwaway prototype object per member per node. Use `new DomFunction(` instead — or, " +
-            "if the file genuinely registers a constructable interface object, add it to " +
-            $"interfaceObjectFiles above:{Environment.NewLine}  " +
-            string.Join($"{Environment.NewLine}  ", offenders));
-    }
-
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

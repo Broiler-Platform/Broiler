@@ -53,7 +53,7 @@ public sealed class PreloadScanOverlapTests : IDisposable
         try
         {
             using var context = new JSContext();
-            var bridge = new DomBridge();
+            var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
             WithScan(true, () => bridge.Attach(context, html, _origin.PageUrl));
 
             // Deterministic: the requests will arrive, because the worker has been handed them and
@@ -77,7 +77,7 @@ public sealed class PreloadScanOverlapTests : IDisposable
         try
         {
             using var context = new JSContext();
-            var bridge = new DomBridge();
+            var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
             WithScan(false, () => bridge.Attach(context, html, _origin.PageUrl));
 
             // No wait and no window to race against: with the scan off, the only code that could

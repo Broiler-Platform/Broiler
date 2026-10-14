@@ -34,7 +34,7 @@ public sealed class ZoomBakeVsEngineEquivalenceTests
         try
         {
             using var ctx = new JSContext();
-            var bridge = new DomBridge();
+            var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
             bridge.Attach(ctx, html, "file:///zoom-ab.html");
             return ctx.Eval(expr).ToString();
         }

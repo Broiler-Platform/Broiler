@@ -23,7 +23,7 @@ public sealed class SharedLayoutGeometryTests
         string html, out DomDocument document)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///geom.html");
         document = bridge.GetRenderDocument();
 

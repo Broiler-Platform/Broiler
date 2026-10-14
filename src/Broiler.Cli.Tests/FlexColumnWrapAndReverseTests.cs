@@ -222,7 +222,7 @@ public sealed class FlexColumnWrapAndReverseTests
             "<body>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, head + body + "</body></html>", "file:///flex.html");
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();

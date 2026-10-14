@@ -25,7 +25,7 @@ public sealed class NestedInsetAbsoluteSizingTests
             + "</body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///t.html");
         return context.Eval(
             "var r=document.getElementById('t').getBoundingClientRect(); r.width+'x'+r.height").ToString();
@@ -56,7 +56,7 @@ public sealed class NestedInsetAbsoluteSizingTests
             + "</div></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///t.html");
         var height = context.Eval(
             "document.getElementById('t').getBoundingClientRect().height").ToString();

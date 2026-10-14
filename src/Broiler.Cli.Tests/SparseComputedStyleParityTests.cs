@@ -102,7 +102,7 @@ public sealed class SparseComputedStyleParityTests
         foreach (var html in Corpus)
         {
             using var ctx = new JSContext();
-            var bridge = new DomBridge();
+            var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
             bridge.Attach(ctx, html, "file:///parity.html");
 
             foreach (var element in bridge.Elements)

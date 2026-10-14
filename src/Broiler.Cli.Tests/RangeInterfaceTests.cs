@@ -35,7 +35,7 @@ public sealed class RangeInterfaceTests
     private static DomBridge Attach(out JSContext context)
     {
         context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Markup, "https://example.com/index.html");
         return bridge;
     }

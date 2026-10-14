@@ -20,7 +20,7 @@ public class ShadowPartSelectorTests
     private static BBitmap Render(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         return HtmlRender.RenderToImageWithStyleSet(bridge.SerializeToHtml(), 300, 300);
     }

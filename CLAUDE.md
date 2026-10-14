@@ -38,9 +38,12 @@ origin/main` before touching files.
 `.gitmodules`), each with its own remote under the `Broiler-Platform/` org. The
 renderer, CSS engine, DOM, JS engine, graphics core, input and media stacks,
 document codecs, UI toolkit, and all three applications live there — **a fix
-often belongs in a submodule, not the main repo.** What is left in this
-repository is `Broiler.Layout`, the HtmlBridge, and the tools and tests under
-`src/` and `tests/`.
+often belongs in a submodule, not the main repo.** `Broiler.Layout` and
+`Broiler.HtmlBridge` are submodules too; what is left in this repository is the
+tools and tests under `src/` and `tests/`, which build those components from
+source. One of them, `src/Broiler.Headless`, is the hosts' `ILayoutView`: the
+bridge takes it per session (`DomBridgeSessionOptions.LayoutViewFactory`), so a
+`new DomBridge()` built without those options answers geometry queries empty.
 
 `Broiler.Code` owns the editor *and* the human review workspace, so the review
 tool the root `human-review.yml` runs is built out of that submodule

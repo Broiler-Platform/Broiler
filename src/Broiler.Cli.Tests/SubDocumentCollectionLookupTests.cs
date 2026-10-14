@@ -31,7 +31,7 @@ public sealed class SubDocumentCollectionLookupTests
     private static (JSContext Context, DomBridge Bridge) AttachWithFrame()
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(
             context,
             $"<!doctype html><html><body><iframe id='f' srcdoc=\"{Frame}\"></iframe></body></html>",

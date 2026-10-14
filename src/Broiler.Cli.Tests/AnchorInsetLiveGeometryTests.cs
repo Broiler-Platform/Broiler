@@ -34,7 +34,7 @@ public sealed class AnchorInsetLiveGeometryTests
     public void StartInsets_LiveOffsetsAndRect_ResolveToAnchorEdge()
     {
         using var context = new JSContext();
-        new DomBridge().Attach(context, Html, "file:///anchor-inset-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(context, Html, "file:///anchor-inset-live.html");
 
         // left: anchor(--a right) → 150; top: anchor(--a bottom) → 170.
         Assert.Equal(150, Read(context, "document.getElementById('t').offsetLeft"), 3);
@@ -55,7 +55,7 @@ public sealed class AnchorInsetLiveGeometryTests
     public void EndInsets_ResolveAgainstContainingBlockMinusBox()
     {
         using var context = new JSContext();
-        new DomBridge().Attach(context, Html, "file:///anchor-inset-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(context, Html, "file:///anchor-inset-live.html");
 
         // #r: right: anchor(--a left) → the box's right edge sits at the anchor's left (100),
         // so offsetLeft = 100 − 30 (box width) = 70; bottom: anchor(--a top) → 100 − 20 = 80.
@@ -80,7 +80,7 @@ public sealed class AnchorInsetLiveGeometryTests
     public void AnchorSize_LiveDimensions_ResolveToAnchorSize()
     {
         using var context = new JSContext();
-        new DomBridge().Attach(context, SizeHtml, "file:///anchor-size-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(context, SizeHtml, "file:///anchor-size-live.html");
 
         // #s: content-box, no padding/border → offset size == the anchor's 50×70.
         Assert.Equal(50, Read(context, "document.getElementById('s').offsetWidth"), 3);
@@ -94,7 +94,7 @@ public sealed class AnchorInsetLiveGeometryTests
     public void AnchorSize_ContentBox_AddsPaddingAndBorderToBorderBox()
     {
         using var context = new JSContext();
-        new DomBridge().Attach(context, SizeHtml, "file:///anchor-size-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(context, SizeHtml, "file:///anchor-size-live.html");
 
         // #p: content-box 50×70 + padding 10 each side (20) + border 5 each side (10) = 80×100.
         Assert.Equal(80, Read(context, "document.getElementById('p').offsetWidth"), 3);
@@ -116,7 +116,7 @@ public sealed class AnchorInsetLiveGeometryTests
     public void OpposingInsets_AutoSize_SpanBetweenResolvedInsets()
     {
         using var context = new JSContext();
-        new DomBridge().Attach(context, OpposingHtml, "file:///opposing-inset-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(context, OpposingHtml, "file:///opposing-inset-live.html");
 
         Assert.Equal(150, Read(context, "document.getElementById('o').offsetLeft"), 3);
         Assert.Equal(170, Read(context, "document.getElementById('o').offsetTop"), 3);

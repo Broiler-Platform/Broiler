@@ -43,7 +43,7 @@ public class StylesheetBaseHrefTests
 </html>
 """;
             using var context = new JSContext();
-            var bridge = new DomBridge();
+            var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
             bridge.Attach(context, html, pageUrl);
             var serialized = bridge.SerializeToHtml();
             using var bmp = HtmlRender.RenderToImageWithStyleSet(serialized, 200, 200);

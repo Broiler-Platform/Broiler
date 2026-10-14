@@ -48,7 +48,7 @@ public sealed class AttributesBindingModuleTests
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -70,7 +70,7 @@ public sealed class AttributesBindingModuleTests
         const string html = "<!DOCTYPE html><html><body><div id=\"d\" class=\"a\" data-y=\"z\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -91,7 +91,7 @@ public sealed class AttributesBindingModuleTests
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         // Writing the style attribute must flow through IAttributesHost.ApplyStyleAttribute so the
@@ -113,7 +113,7 @@ public sealed class AttributesBindingModuleTests
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
 
@@ -147,7 +147,7 @@ public sealed class AttributesBindingModuleTests
         const string html = "<!DOCTYPE html><html><body><div id=\"d\"></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""

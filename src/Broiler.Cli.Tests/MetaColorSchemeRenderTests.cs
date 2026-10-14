@@ -17,7 +17,7 @@ public class MetaColorSchemeRenderTests
     private static bool IsDarkCanvas(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///test.html");
         var serialized = bridge.SerializeToHtml();
         using var bitmap = HtmlRender.RenderToImageWithStyleSet(serialized, 200, 200);

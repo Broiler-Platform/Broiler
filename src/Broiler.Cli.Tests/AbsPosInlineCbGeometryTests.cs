@@ -38,7 +38,7 @@ public sealed class AbsPosInlineCbGeometryTests
                    "<a id='t' style='position:absolute;top:10px;left:20px;width:5px;height:5px'></a></span>" +
                    "</body></html>";
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///abspos-inline-cb.html");
 
         // The inline CB `rel` is at (0, 50); the abspos target's border box must be at

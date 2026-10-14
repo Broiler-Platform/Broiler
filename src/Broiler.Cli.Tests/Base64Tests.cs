@@ -18,7 +18,7 @@ public sealed class Base64Tests
     private static (JSContext Context, DomBridge Bridge) Attach()
     {
         var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<!doctype html><html><body></body></html>", "https://example.com/");
         return (context, bridge);
     }

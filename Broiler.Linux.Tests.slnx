@@ -22,9 +22,4 @@
     <Project Path="Broiler.Input/src/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj" />
     <Project Path="Broiler.Input/src/Broiler.Input/Broiler.Input.csproj" />
   </Folder>
-  <Folder Name="/Dependencies/Broiler.Media/">
-    <Project Path="Broiler.Media/src/Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj" />
-    <Project Path="Broiler.Media/src/Broiler.Media.Image/Broiler.Media.Image.csproj" />
-    <Project Path="Broiler.Media/src/Broiler.Media/Broiler.Media.csproj" />
-  </Folder>
 </Solution>

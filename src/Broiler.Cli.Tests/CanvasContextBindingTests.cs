@@ -25,7 +25,7 @@ public sealed class CanvasContextBindingTests
     {
         const string html = "<!DOCTYPE html><html><body><canvas id='c' width='120' height='80'></canvas></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///canvas.html");
         return context.Eval(script).ToString();
     }

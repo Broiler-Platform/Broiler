@@ -42,7 +42,7 @@ public sealed class ShrinkToFitInlineBlockRunTests
             + "</body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///shrink-to-fit-inline-block-run.html");
 
         var failures = bridge.EvaluateCheckLayoutAssertions()

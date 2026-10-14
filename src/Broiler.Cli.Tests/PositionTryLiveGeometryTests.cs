@@ -41,7 +41,7 @@ public sealed class PositionTryLiveGeometryTests
     public void OverflowingBase_SelectsFallback_LiveOffsets()
     {
         using var c = new JSContext();
-        new DomBridge().Attach(c, Html, "file:///pt-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(c, Html, "file:///pt-live.html");
 
         // Base (left:0; right:anchor(--a left)) gives a 100px IMCB but min-content is 200 → overflows.
         // Fallback --f1 (left:anchor(--a right)=200; right:0) fits: the box lands at x=200, width 200.
@@ -74,7 +74,7 @@ public sealed class PositionTryLiveGeometryTests
     public void FixedSizeOverflowingBase_SelectsFallback_LiveOffsets()
     {
         using var c = new JSContext();
-        new DomBridge().Attach(c, FixedHtml, "file:///pt-fixed-live.html");
+        new DomBridge(HeadlessLayoutViewRegistration.SessionOptions).Attach(c, FixedHtml, "file:///pt-fixed-live.html");
 
         // Base left/top = anchor(--a right/bottom) = 90 → 30px box overflows the 100 CB.
         // Fallback --flip (right:anchor(--a left)=70; bottom:anchor(--a top)=70) → border box at (40,40).

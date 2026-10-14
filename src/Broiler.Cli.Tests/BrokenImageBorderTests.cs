@@ -101,7 +101,7 @@ public sealed class BrokenImageBorderTests
             "<body>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, head + body + "</body></html>", "file:///broken-image.html");
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();

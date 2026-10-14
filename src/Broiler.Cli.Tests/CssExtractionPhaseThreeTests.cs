@@ -22,33 +22,6 @@ public sealed class CssExtractionPhaseThreeTests
         Assert.Contains(@"..\..\Broiler.CSS\Broiler.CSS.Dom\Broiler.CSS.Dom.csproj", references);
     }
 
-    [Fact(Timeout = 600000)]
-    public void Bridge_Selector_Surface_Is_A_Compatibility_Wrapper()
-    {
-        var root = FindRepositoryRoot();
-        var selectorSource = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Broiler.HtmlBridge.Dom",
-            "DomBridge.Selectors.cs"));
-        var cssSource = File.ReadAllText(Path.Combine(
-            root,
-            "src",
-            "Broiler.HtmlBridge.Dom",
-            "DomBridge",
-            "Css.cs"));
-
-        Assert.Contains("Broiler.CSS.Dom.CssSelectorMatcher", selectorSource, StringComparison.Ordinal);
-        Assert.Contains("SharedSelectorMatcher.Matches", selectorSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("SplitSelectorParts", selectorSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("ProcessPseudoClasses", selectorSource, StringComparison.Ordinal);
-        Assert.Contains(
-            "Broiler.CSS.CssSelectorParser.CalculateSpecificity(selector).Encoded",
-            cssSource,
-            StringComparison.Ordinal);
-        Assert.DoesNotContain("CalculateSpecificityComponents", cssSource, StringComparison.Ordinal);
-    }
-
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

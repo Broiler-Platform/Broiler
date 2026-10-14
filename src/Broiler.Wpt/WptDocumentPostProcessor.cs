@@ -1,5 +1,6 @@
 using Broiler.Dom;
 using Broiler.HtmlBridge;
+using Broiler.Headless;
 
 namespace Broiler.Wpt;
 

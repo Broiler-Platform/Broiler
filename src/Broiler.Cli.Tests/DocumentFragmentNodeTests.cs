@@ -17,7 +17,7 @@ public sealed class DocumentFragmentNodeTests
     private static DomBridge Attach(string html, out JSContext context)
     {
         context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         return bridge;
     }

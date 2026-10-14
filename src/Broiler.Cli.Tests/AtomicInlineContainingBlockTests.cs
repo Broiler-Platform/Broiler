@@ -53,7 +53,7 @@ public sealed class AtomicInlineContainingBlockTests
             + "</div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///atomic-inline-containing-block.html");
 
         var byProperty = bridge.EvaluateCheckLayoutAssertions()

@@ -70,7 +70,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function (e) { postMessage({ echoed: e.data.value, from: 'worker' }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -107,7 +107,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -148,7 +148,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -188,7 +188,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -215,7 +215,7 @@ public sealed class WorkerBindingTests : IDisposable
     public void Missing_worker_script_fires_error_without_throwing()
     {
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, @"
@@ -239,7 +239,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function (e) { postMessage({ n: e.data.n }); };");
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -278,7 +278,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -307,7 +307,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -335,7 +335,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -363,7 +363,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ answered: true, ticks: ticks }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -395,7 +395,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -421,7 +421,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ up: true }); };");
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -454,7 +454,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ trail: afterImport, call: fromA() }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -490,7 +490,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ marker: marker }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
         bridge.SetLocalBasePath(_dir);   // the page's base path points at the decoy
 
@@ -520,7 +520,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ threw: threw, loadedAfter: loadedAfter }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -547,7 +547,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ caught: caught }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -572,7 +572,7 @@ public sealed class WorkerBindingTests : IDisposable
             onmessage = function () { postMessage({ depth: depth }); };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -603,7 +603,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -641,7 +641,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -673,7 +673,7 @@ public sealed class WorkerBindingTests : IDisposable
             };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         var ok = RunAndDrain(bridge, context, $@"
@@ -701,7 +701,7 @@ public sealed class WorkerBindingTests : IDisposable
         var script = WriteWorker("idle.js", "onmessage = function () { };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         context.Eval($"var w = new Worker({Quote(script)}); var name = '';");
@@ -720,7 +720,7 @@ public sealed class WorkerBindingTests : IDisposable
         var script = WriteWorker("idle2.js", "onmessage = function () { };");
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, "<html><body></body></html>", "file:///page.html");
 
         context.Eval($@"

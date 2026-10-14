@@ -33,7 +33,7 @@ public sealed class FrameDeferredCallbackRealmTests
             "</body></html>";
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();
@@ -151,7 +151,7 @@ public sealed class FrameDeferredCallbackRealmTests
             "</body></html>";
 
         using var context = new JSContext();
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         // The main document's own timer, registered from the main context (Attach does not run this

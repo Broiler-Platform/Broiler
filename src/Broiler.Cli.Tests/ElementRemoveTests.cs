@@ -20,7 +20,7 @@ public sealed class ElementRemoveTests
     {
         const string html = "<!DOCTYPE html><html><head></head><body></body></html>";
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///remove.html");
         return ctx.Eval(script).ToString();
     }

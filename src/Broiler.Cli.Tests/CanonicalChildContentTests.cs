@@ -44,7 +44,7 @@ public sealed class CanonicalChildContentTests
 </head><body><div id=""box""></div></body></html>";
 
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///test.html");
 
         var sheet = FindById(bridge.DocumentElement, "sheet");
@@ -71,7 +71,7 @@ public sealed class CanonicalChildContentTests
 </body></html>";
 
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///test.html");
 
         bridge.ResolveAnchorPositions();
@@ -92,7 +92,7 @@ public sealed class CanonicalChildContentTests
 </head><body></body></html>";
 
         using var ctx = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(ctx, html, "file:///test.html");
 
         var s = FindById(bridge.DocumentElement, "s");

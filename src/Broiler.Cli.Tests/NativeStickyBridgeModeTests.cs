@@ -29,7 +29,7 @@ public sealed class NativeStickyBridgeModeTests
     private static string ResolveAndSerialize(bool nativeMode)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeAnchorPlacement = nativeMode };
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions) { NativeAnchorPlacement = nativeMode };
         bridge.Attach(context, Html, Url);
         bridge.ResolveAnchorPositions();
         return bridge.SerializeToHtml();
@@ -74,7 +74,7 @@ public sealed class NativeStickyBridgeModeTests
     private static string ResolveAndSerializeAnchorPage(bool nativeMode)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeAnchorPlacement = nativeMode };
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions) { NativeAnchorPlacement = nativeMode };
         bridge.Attach(context, AnchorPageHtml, Url);
         bridge.ResolveAnchorPositions();
         return bridge.SerializeToHtml();

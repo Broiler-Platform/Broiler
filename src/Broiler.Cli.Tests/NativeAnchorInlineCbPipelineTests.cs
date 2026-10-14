@@ -43,7 +43,7 @@ public sealed class NativeAnchorInlineCbPipelineTests
     private static (BoxGeometry anchor, BoxGeometry br) LayoutBoxes(bool nativeAnchor)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, Html, Url);
         DomDocument document = bridge.GetRenderDocument();
 

@@ -21,7 +21,7 @@ public sealed class CheckLayoutAssertionTests
             "</body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///check-layout.html");
 
         var assertions = bridge.EvaluateCheckLayoutAssertions();
@@ -53,7 +53,7 @@ public sealed class CheckLayoutAssertionTests
             "</body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///check-layout-size.html");
 
         var byProperty = bridge.EvaluateCheckLayoutAssertions().ToDictionary(a => a.Property);
@@ -70,7 +70,7 @@ public sealed class CheckLayoutAssertionTests
         const string html = "<!DOCTYPE html><html><body><div>plain</div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///plain.html");
 
         Assert.Empty(bridge.EvaluateCheckLayoutAssertions());

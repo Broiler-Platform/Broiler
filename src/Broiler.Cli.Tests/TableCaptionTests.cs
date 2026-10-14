@@ -46,7 +46,7 @@ public sealed class TableCaptionTests
             + "<tr><td id=\"cell\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-height=\"0\">RowCellContent</td></tr>"
             + "</table></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///caption.html");
         return bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

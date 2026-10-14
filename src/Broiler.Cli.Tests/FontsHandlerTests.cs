@@ -1,5 +1,7 @@
 
 using Broiler.Graphics;
+using Broiler.Graphics.Adapters;
+using Broiler.Graphics.Text;
 
 namespace Broiler.Cli.Tests;
 
@@ -52,25 +54,25 @@ public class FontsHandlerTests
     {
         public List<string> CreatedFamilies { get; } = [];
 
-        public RFont CreateFont(string family, double size, FontStyle style)
+        public BFont CreateFont(string family, double size, FontStyle style)
         {
             CreatedFamilies.Add(family);
             return new TestFont(family, size);
         }
 
-        public RFont CreateFont(RFontFamily family, double size, FontStyle style)
+        public BFont CreateFont(BFontFamily family, double size, FontStyle style)
         {
             CreatedFamilies.Add(family.Name);
             return new TestFont(family.Name, size);
         }
     }
 
-    private sealed class TestFontFamily(string name) : RFontFamily
+    private sealed class TestFontFamily(string name) : BFontFamily
     {
         public override string Name => name;
     }
 
-    private sealed class TestFont : RFont
+    private sealed class TestFont : BFont
     {
         public TestFont(string familyName, double size)
         {
@@ -83,6 +85,6 @@ public class FontsHandlerTests
         public override double Height => Size;
         public override double UnderlineOffset => 0;
         public override double LeftPadding => 0;
-        public override double GetWhitespaceWidth(RGraphics graphics) => 0;
+        public override double GetWhitespaceWidth(BGraphics graphics) => 0;
     }
 }

@@ -1,4 +1,5 @@
 using Broiler.Graphics;
+using Broiler.Graphics.Adapters;
 
 namespace Broiler.Cli.Tests;
 

@@ -1,6 +1,6 @@
 using Broiler.HTML.Image;
 using Broiler.Media.Image;
-using BColor = Broiler.Graphics.BColor;
+using BColor = Broiler.Graphics.Color.BColor;
 
 namespace Broiler.DevSite.Services;
 

@@ -20,7 +20,7 @@ public class Program
     public static async Task<int> Main(string[] args)
     {
         // Composition root: register the concrete image codecs Broiler.Graphics decodes/encodes with.
-        Broiler.Graphics.BImageCodecs.Use(
+        Broiler.Graphics.Imaging.BImageCodecs.Use(
             new Broiler.Media.MediaCodecCatalog(Broiler.Media.Image.Managed.ManagedImageCodecs.CreateCodecs()));
 
         // Repeatable inputs: one is the single-input path this CLI has always had, more than

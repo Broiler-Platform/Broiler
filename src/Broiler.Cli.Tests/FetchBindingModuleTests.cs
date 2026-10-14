@@ -52,7 +52,7 @@ public sealed class FetchBindingModuleTests
         const string html = "<!DOCTYPE html><html><body></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -72,7 +72,7 @@ public sealed class FetchBindingModuleTests
         const string html = "<!DOCTYPE html><html><body></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("""
@@ -95,7 +95,7 @@ public sealed class FetchBindingModuleTests
         const string html = "<!DOCTYPE html><html><body></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         var result = context.Eval("(typeof XMLHttpRequest) + '|' + (new XMLHttpRequest().readyState)");
@@ -108,7 +108,7 @@ public sealed class FetchBindingModuleTests
         const string html = "<!DOCTYPE html><html><body></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "https://example.com/index.html");
 
         // These two globals historically lived inside the fetch registration and were relocated to the

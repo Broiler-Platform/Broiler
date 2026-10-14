@@ -78,7 +78,7 @@ public sealed class GridAutoRepeatMinSizeTests
         string html = "<!DOCTYPE html><html><head><style>" + Style + "</style></head><body style=\"margin:0\">"
             + body + "</body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///grid-auto-repeat-min-size-001.html");
 
         var failures = bridge.EvaluateCheckLayoutAssertions()

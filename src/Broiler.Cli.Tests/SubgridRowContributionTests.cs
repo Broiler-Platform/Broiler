@@ -38,7 +38,7 @@ public sealed class SubgridRowContributionTests
             + "<div id=\"c\" style=\"height:30px;grid-row:3\" data-offset-x=\"0\" data-offset-y=\"0\" data-expected-height=\"30\"></div>"
             + "</div></div></body></html>";
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///sub.html");
         var by = bridge.EvaluateCheckLayoutAssertions()
             .GroupBy(a => a.Element)

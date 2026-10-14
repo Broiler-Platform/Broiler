@@ -20,6 +20,7 @@ using Broiler.JavaScript.BuiltIns.Promise;
 #endif
 using Broiler.CSS;
 using Broiler.HtmlBridge;
+using Broiler.Headless;
 using Broiler.HtmlBridge.Logging;
 using Broiler.HtmlBridge.Scripting;
 using Broiler.HtmlBridge.Internal.Scripting;
@@ -986,7 +987,7 @@ public class CaptureService
                     // Consume side of item #2's split. Identical resolution and identical result;
                     // the difference is that the preload scan has had this request in flight since
                     // before the loop started, instead of it beginning here, one script at a time.
-                    var fetched = ScriptExtractionService.FetchExternalScript(srcUri, url, scriptPrefetcher);
+                    var fetched = FetchExternalScript(srcUri, url, scriptPrefetcher);
                     if (!string.IsNullOrEmpty(fetched))
                         scriptContent = fetched;
                 }
@@ -1054,30 +1055,12 @@ public class CaptureService
         using var microTaskContext = MicroTaskSynchronizationContext.Install(microTasks);
         using JSContext context = useEngineModules ? new BridgeModuleContext(csp, url) : new JSContext();
         RegisterRuntimeExtensions(context, microTasks, csp);
-        // Multithreading roadmap item #16, and the earliest point it can start: the last of these
-        // sources was unknown until the external fetches above returned, so there is no version of
-        // this that precedes the context. What it overlaps with is everything between here and the
-        // eval loop — the parse and DOM build in Attach — and then, once the loop is running, the
-        // execution of each script overlaps the compile of the ones behind it. Ordering is
-        // untouched: the loop below still evaluates the same sources in the same order on this
-        // thread, and finds the compile already done instead of doing it inline. Disposed (joined)
-        // before the context, so no compile outlives the cache it writes into.
-        // Each unit carries the label the eval below will pass, because the location is part of the
-        // code-cache key: compiling under one shared location while evaluating under per-script ones
-        // would file every entry where the eval does not look, and the overlap would be lost with no
-        // symptom other than being slower.
-        using var compileAhead = ScriptCompileAhead.Start(
-            context,
-            [
-                .. scripts.Select((s, i) => new ScriptCompileUnit(s, ScriptLabel.Inline(i))),
-                .. deferredScripts.Select((s, i) => new ScriptCompileUnit(s, ScriptLabel.Deferred(i))),
-            ]);
         // Disposed with this call, and declared after the context so it is torn down first: the
         // bridge owns a per-document session — the headless layout view and its HtmlContainer
         // (hence the whole box tree and every sub-resource its image load handlers hold), timer
         // and animation queues, listener stores, observers and message ports. Only the serialized
         // HTML string outlives this scope, so there is nothing to keep the session alive for.
-        using var bridge = new DomBridge();
+        using var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Csp = csp;
         // Before Attach: the window registration reads this once, to take the navigation's start as
         // the document's time origin and to give the PerformanceNavigationTiming entry its network
@@ -1113,7 +1096,7 @@ public class CaptureService
 
         static void DrainAsyncWork(DomBridge bridge, MicroTaskQueue microTasks)
         {
-            for (var iteration = 0; iteration < DomBridge.AsyncDrainIterationLimit; iteration++)
+            for (var iteration = 0; iteration < DomBridgeRuntimeLimits.AsyncDrainIterationLimit; iteration++)
             {
                 var hadWork = false;
 
@@ -1123,7 +1106,7 @@ public class CaptureService
                     hadWork = true;
                 }
 
-                if (bridge.HasPendingTimersDueBy(DomBridge.AsyncDrainVirtualTimeBudgetMs))
+                if (bridge.HasPendingTimersDueBy(DomBridgeRuntimeLimits.AsyncDrainVirtualTimeBudgetMs))
                 {
                     bridge.FlushTimerStep();
                     hadWork = true;
@@ -1140,7 +1123,7 @@ public class CaptureService
             // rescheduling itself with no delay, or a microtask queueing another. That is worth a
             // warning; an interval is not, and used to get one.
             RenderLogger.LogWarning(LogCategory.JavaScript, "CaptureService.DrainAsyncWork",
-                $"Async work still due after {DomBridge.AsyncDrainIterationLimit} drain iterations; " +
+                $"Async work still due after {DomBridgeRuntimeLimits.AsyncDrainIterationLimit} drain iterations; " +
                 $"stopping with pending microtasks={microTasks.Count}. " +
                 "A callback is rescheduling itself with no delay, so the virtual clock cannot advance.");
         }
@@ -1322,6 +1305,31 @@ public class CaptureService
         ScriptExtractionService.FetchExternalScript(scriptUrl, pageUrl) ?? string.Empty;
 
     /// <summary>
+    /// The same fetch, consuming <paramref name="prefetcher"/> when one is supplied. The URL is resolved
+    /// exactly as <see cref="ScriptExtractionService.FetchExternalScript(string, string?)"/> resolves it,
+    /// because that is the key <see cref="StartScriptPrefetch"/> files each prefetch under; the bridge's
+    /// own consuming overload now takes its request-aware prefetcher instead, so the consume is here.
+    /// </summary>
+    private static string? FetchExternalScript(string scriptUrl, string pageUrl, SubResourcePrefetcher? prefetcher)
+    {
+        if (prefetcher is null)
+            return ScriptExtractionService.FetchExternalScript(scriptUrl, pageUrl);
+
+        try
+        {
+            return UrlResolver.Resolve(scriptUrl, pageUrl) is { } resolved
+                ? prefetcher.Consume(resolved.AbsoluteUri)
+                : null;
+        }
+        catch (Exception ex)
+        {
+            RenderLogger.LogError(LogCategory.JavaScript, "CaptureService.FetchExternalScript",
+                $"Failed to fetch external script '{scriptUrl}': {ex.Message}", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Removes all <c>&lt;script&gt;</c> tags from the HTML.
     /// Delegates to <see cref="HtmlPostProcessor.StripScriptTags"/>.
     /// </summary>
@@ -1437,26 +1445,6 @@ public class CaptureService
             document,
             JSPropertyAttributes.EnumerableConfigurableValue);
 
-        // window.localStorage / window.sessionStorage — the same in-memory Storage areas the DOM
-        // path builds, rather than a second, thinner copy of the same code that drifts from it: the
-        // hand-rolled stub here had no `sessionStorage`, no `length` and no `key()`.
-        // Registered on the global as well, because the unqualified spelling is the one page
-        // scripts use and an unqualified miss is a ReferenceError that aborts the whole script.
-        var localStorage = Broiler.HtmlBridge.Dom.Features.WebStorageBinding.BuildStorage();
-        var sessionStorage = Broiler.HtmlBridge.Dom.Features.WebStorageBinding.BuildStorage();
-
-        window.FastAddValue(
-            "localStorage",
-            localStorage,
-            JSPropertyAttributes.EnumerableConfigurableValue);
-        window.FastAddValue(
-            "sessionStorage",
-            sessionStorage,
-            JSPropertyAttributes.EnumerableConfigurableValue);
-
-        context["localStorage"] = localStorage;
-        context["sessionStorage"] = sessionStorage;
-
         // window.matchMedia(query) — stub returning { matches: false }
         window.FastAddValue(
             "matchMedia",
@@ -1476,6 +1464,24 @@ public class CaptureService
             JSPropertyAttributes.EnumerableConfigurableValue);
 
         context["window"] = window;
+
+        // window.localStorage / window.sessionStorage — the same in-memory Storage areas the DOM
+        // path builds, rather than a second, thinner copy of the same code that drifts from it: the
+        // hand-rolled stub here had no `sessionStorage`, no `length` and no `key()`.
+        // Registered on the global as well, because the unqualified spelling is the one page
+        // scripts use and an unqualified miss is a ReferenceError that aborts the whole script.
+        // The binding mints them through a JSEAL realm, so the context is adopted the way the
+        // bridge and ScriptEngine's document-free paths adopt theirs; there is no page policy here,
+        // so evaluation is allowed. The realm wraps the context and must outlive the storage
+        // methods it minted, so it is not disposed, as ScriptEngine does not dispose its own.
+        var realm = DomBridgeHostUtils.AdoptRealm(context, new Broiler.JSeal.JsRealmOptions { AllowGuestEval = true });
+        var windowValue = realm.GetProperty(realm.Global, "window");
+        foreach (var name in (string[])["localStorage", "sessionStorage"])
+        {
+            var storage = Broiler.HtmlBridge.Dom.Features.WebStorageBinding.BuildStorage(realm);
+            realm.DefineValue(windowValue, name, storage);
+            realm.DefineValue(realm.Global, name, storage);
+        }
     }
 
     /// <summary>

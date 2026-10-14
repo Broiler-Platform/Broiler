@@ -22,16 +22,6 @@ public sealed class SharedLayoutGeometryParityTests
 
     private const double TolerancePx = 1.0; // matches WptTestRunner.LayoutAssertionTolerancePx
 
-    [Fact(Timeout = 600000)]
-    public void UseSharedLayoutGeometry_Is_Enabled_By_Default()
-    {
-        // Increments 1-3 landed and the parity gate below confirms the shared
-        // renderer-layout path matches or improves on the estimators, so the geometry
-        // cutover is on by default. Guards against an accidental revert of the default.
-        Assert.True(DomBridge.UseSharedLayoutGeometry,
-            "UseSharedLayoutGeometry must default to true now that the parity gate passes.");
-    }
-
     private static (int Matched, int Total, int Files) MeasureCorpus()
     {
         int matched = 0, total = 0, files = 0;
@@ -45,7 +35,7 @@ public sealed class SharedLayoutGeometryParityTests
             try
             {
                 using var context = new JSContext();
-                var bridge = new DomBridge();
+                var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
                 bridge.Attach(context, html, "file:///" + Path.GetFileName(path));
                 assertions = bridge.EvaluateCheckLayoutAssertions();
             }
@@ -78,7 +68,7 @@ public sealed class SharedLayoutGeometryParityTests
                               "<body style='margin:0'><div id='x'></div></body></html>";
 
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, styled, "file:///s.html");
         var doc = bridge.GetRenderDocument();
         using var container = new Broiler.HTML.Image.HtmlContainer
@@ -231,7 +221,7 @@ public sealed class SharedLayoutGeometryParityTests
     private static IReadOnlyList<DomBridge.CheckLayoutAssertion> EvaluateCheckLayout(string html)
     {
         using var context = new JSContext();
-        var bridge = new DomBridge();
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions);
         bridge.Attach(context, html, "file:///check-layout.html");
         return bridge.EvaluateCheckLayoutAssertions();
     }

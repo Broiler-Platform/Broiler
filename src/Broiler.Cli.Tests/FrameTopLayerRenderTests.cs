@@ -47,7 +47,7 @@ public class FrameTopLayerRenderTests
 </body>
 """;
         using var context = new JSContext();
-        var bridge = new DomBridge { NativeBackdrop = nativeBackdrop };
+        var bridge = new DomBridge(HeadlessLayoutViewRegistration.SessionOptions) { NativeBackdrop = nativeBackdrop };
         bridge.Attach(context, html, "file:///frame-top-layer.html");
         bridge.FireWindowLoadEvent();
         bridge.FlushTimers();
