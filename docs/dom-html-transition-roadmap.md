@@ -13,7 +13,7 @@ The [architecture investigation](architecture/dom-html-layout-investigation.md) 
 Before implementing a wave:
 
 1. Record the source revisions, consumed package versions, test totals, and relevant rendering baseline. Avoid fixed claims such as “82+ renderer tests.”
-2. Verify the actual dependency closure. [HTML package pins](../Broiler.HTML/Directory.Packages.props) currently select `Broiler.Dom.Html` `0.1.0-preview.14`, `Broiler.Layout` `0.1.0-preview.23`, and CSS packages `0.1.0-preview.17`. Changes to sibling component source must be packed and consumed through the downstream package configuration before an HTML test run can verify them.
+2. Verify the actual dependency closure. [HTML package pins](../Broiler.HTML/Directory.Packages.props) currently select `Broiler.Dom.Html` `0.1.0-preview.14`, `Broiler.Layout` `0.1.0-preview.23`, and CSS packages `0.1.0-preview.17`. Changes to sibling component source must be packed and consumed through the downstream package configuration before an HTML test run can verify them. Check the `source` in each restored package's `.nupkg.metadata`: a locally packed build carrying a published version number shadows the published package in the global NuGet cache, along with its dependency ranges.
 3. Add focused regression cases for each behavior being changed, including intentional differences from the old renderer. Keep renderer defaults and selection policy separate from DOM attribute queries.
 4. Treat base-URL and serialization conformance gaps as prerequisites to those migrations, not as already-solved properties of the shared APIs.
 
@@ -34,23 +34,25 @@ Every wave includes focused verification. Wave 5 is the final integration check,
 
 ### Void-element classification
 
-- Replace the duplicated `HtmlUtils.IsSingleTag` list with the shared `HtmlSerializer.VoidElements` classification at an appropriate dependency boundary. `HTML.Dom` already directly references `Broiler.Dom.Html`; `HTML.Core`, where `HtmlUtils` lives, does not. Choose relocation or an explicit package reference rather than assuming the import is free.
+- Replace the duplicated `HtmlUtils.IsSingleTag` list with the shared `HtmlSerializer.VoidElements` classification. `HTML.Core`, where the internal `HtmlUtils` lives, has no `Broiler.Dom.Html` reference. However, the helper's only caller is `HtmlParser.AppendCanonicalNode` in `HTML.Dom`, which does. Switch that call site and delete the helper; this needs no new package reference and changes no public API.
+- The result becomes `HtmlTag.IsSingle`, which `DomUtils` export, `HtmlParserDump`, and `Broiler.Layout`'s inline-SVG serialization (`FragmentTreeBuilder.SerializeSvgBox`) all read. Cover those consumers, not just the parser.
 - Cover case sensitivity and the different treatment of legacy names, including `basefont` and `isindex`. The shared set also omits `basefont`, `bgsound`, and `keygen` from the standard's serialization-void list; resolve shared-set gaps before claiming conformance. Preserve or deliberately change compatibility behavior; do not describe the sets as identical or claim a benchmarked speedup. See [WHATWG fragment serialization](https://html.spec.whatwg.org/multipage/parsing.html#serialising-html-fragments).
 
 ### Progress / meter
 
 - Delegate source-backed ratio calculations to `HtmlElementQueries.ResolveProgressLikeValueRatio`, passing the normalized `meter` or `progress` tag; define behavior for synthetic boxes without `SourceElement`.
-- Keep renderer geometry, fill-box creation, and styling in HTML. Test missing/invalid values, nonfinite numbers, clamping, and unusual min/max ranges against the intended behavior.
-- `ReadNumericAttribute` is also used by multiple-select sizing. Remove it only after that caller is migrated in Wave 2, not as a Wave 1 exit condition.
+- Keep renderer geometry, fill-box creation, and styling in HTML. Test missing/invalid values, nonfinite numbers (`value="NaN"` currently yields a NaN ratio in both copies), clamping, and unusual min/max ranges against the intended behavior.
+- `ReadNumericAttribute` is also used by multiple-select sizing. Remove it only after that caller is migrated in Wave 2, not as a Wave 1 exit condition. The public `HtmlElementQueries.ReadNumericAttribute` applies the same parsing rule to source-backed elements.
 
 ### Document base URL
 
 - Consolidate base-element selection on the canonical document for **both** string and `DomDocument` entry points, before resource-dependent work. Prefer resolving once before box projection, with the resolved value explicitly carried into later orchestration.
 - First address the shared query's contract: `GetEffectiveBaseHref` returns a nonblank trimmed string, not a `Uri`, and currently skips empty `href` values. Specify and test first-element semantics, including empty, whitespace-only, invalid, and fallback-equal candidates followed by another base. A later base must not be selected merely because the first resolves to the fallback. Reference: [WHATWG document base URLs](https://html.spec.whatwg.org/multipage/urls-and-fetching.html#document-base-url).
 - Retain URI resolution/fallback policy and propagation to `CssBox.BaseUrl`, `HtmlContainerInt.DocumentBaseUrl`, linked stylesheets, images, and inline CSS URLs. Update `HtmlParserDump.DumpResourceLogAsJson` as well as `DomParser.PrepareCssTree` before retiring the box scanner.
-- Preserve the established exclusion of parsed template contents. Add coverage for bridge-supplied DOM, bound-document rebuilds, and nested documents so one document's base cannot accidentally become another's.
+- Preserve the established exclusion of parsed template contents. Add coverage for bridge-supplied DOM and bound-document rebuilds.
+- Fix the nested-document boundary rather than only guarding it. The current box scanner walks into projected nested-browsing-context subtrees, so a sub-document's `<base>` can become the outer document's base. Decide where a nested document's own base comes from, and make sure the replacement query stops at the same boundary.
 
-**Exit gate:** shared classification and ratio use are verified; first-base behavior and resource resolution are covered on both renderer inputs and resource logs; affected renderer tests pass against the intended packages. Template exclusion is a regression guard, not a newly proven renderer fix.
+**Exit gate:** shared classification and ratio use are verified; first-base behavior and resource resolution are covered on both renderer inputs and resource logs; a nested document's `<base>` no longer reaches its parent; affected renderer tests pass against the intended packages. Template exclusion is a regression guard, not a newly proven renderer fix.
 
 ## 3. Wave 2: Table and Form Queries
 
@@ -70,7 +72,10 @@ Every wave includes focused verification. Wave 5 is the final integration check,
 
 ### Multiple-select fallback
 
-- Use `HtmlSelectQueries.GetSize` with an explicit renderer fallback (`4`) before the 2–8 track clamp. Its result `0` conflates missing, malformed, zero, and negative attributes; the old numeric reader does not treat all those alike. Preserving those distinctions needs additional attribute information, or an intentional behavior change. Decide and test fractional, negative, zero, malformed, and oversized values before removing the old reader.
+- Choose between keeping the behavior and changing it.
+  - **Keep it:** `HtmlElementQueries.ReadNumericAttribute(select, "size", 4)` uses the same parsing rule as the local reader, so the result is unchanged before the 2–8 track clamp.
+  - **Change it:** `HtmlSelectQueries.GetSize` with an explicit renderer fallback (`4`). Its result `0` conflates missing, malformed, zero, negative, and fractional attributes, so `size="0"` and `size="2.5"` would render four tracks instead of today's two.
+- Decide and test fractional, negative, zero, malformed, and oversized values before removing the old reader.
 - Use `GetOptions` for option semantics where needed, but retain box-level hiding and fallback construction. The current implementation hides all immediate children, including optgroups/text, and paints generic rows; option enumeration alone does not implement selected-option labels or native widget behavior.
 - Remove the local numeric reader once no callers remain.
 
@@ -86,7 +91,8 @@ Every wave includes focused verification. Wave 5 is the final integration check,
 
 - `HtmlGenerationStyle.None`, `Inline`, and `InHeader`, including authored inline declarations and header stylesheet injection.
 - Selected-word slicing, rendered whitespace, ancestor/element filtering, and `<!--StartFragment-->` / `<!--EndFragment-->` placement.
-- Anonymous wrappers, elements with both words and child boxes, void tags, raw-text elements, and escaping in text and attributes.
+- Anonymous wrappers, elements with both words and child boxes, void tags (the renderer writes `/>`, the shared serializer `>`), raw-text elements, and escaping in text and attributes.
+- `InHeader`'s extra `<head>`, inserted after `<html>` ahead of the document's own head.
 - Null roots, special `link` filtering, existing doctype omission, and the limits of box export: original comments and template contents are already absent. Full DOM serialization is a separate contract.
 
 ### Design a serialization view
@@ -105,7 +111,7 @@ The actual `HtmlSerializationAdapter<TNode>` constructor requires:
 | `GetText` | Supply correctly sliced/rendered text or comment contents. |
 | `GetRawInnerHtml` | Prefer null; raw markup bypasses escaping and is not a substitute for constructing export nodes. |
 
-Call `HtmlSerializer.Serialize` only after that view preserves the chosen export contract. Keep text encoding enabled. Test raw-text and namespace behavior explicitly: the generic API has no namespace or scripting-mode callback, so tag-name matching alone cannot justify a promise of complete standard conformance. Reference: [WHATWG fragment serialization](https://html.spec.whatwg.org/multipage/parsing.html#serialising-html-fragments).
+Call `HtmlSerializer.Serialize` only after that view preserves the chosen export contract. Keep text encoding enabled. Test raw-text and namespace behavior explicitly. The generic API has no namespace or scripting-mode callback, and it lowercases every element name, which affects inline-SVG names such as `foreignObject`. So tag-name matching alone cannot justify a promise of complete standard conformance. Reference: [WHATWG fragment serialization](https://html.spec.whatwg.org/multipage/parsing.html#serialising-html-fragments).
 
 The shared serializer uses an explicit stack and `MaximumDepth`. Convert recursive selection/preparation walks too before describing the entire path as stack-safe. `HtmlParserDump`'s JSON diagnostics are outside this writer migration.
 
@@ -117,7 +123,8 @@ The shared serializer uses an explicit stack and `MaximumDepth`. Convert recursi
 
 - Rename the internal class/file and both `GenerateCssTree` overloads to `BuildLayoutTree`, preserving HTML-string and `DomDocument` inputs.
 - Update both construction/call sites in `HtmlContainerInt`, including the bound-document rebuild path.
-- Update references in `IStylesheetLoader`, `SharedRendererCascade`, `PaintWalker.Text`, and `CssDefaults`. Search the whole repository for code, XML documentation, and explanatory references; historical references may remain when clearly marked.
+- Update references in `IStylesheetLoader`, `SharedRendererCascade` (a `<see cref="DomParser"/>` the compiler resolves), `PaintWalker.Text`, and `CssDefaults`. Search the whole repository for code, XML documentation, and explanatory references; historical references may remain when clearly marked.
+- Comment-only mentions also exist in other components: `Broiler.Layout` engine sources and tests, `Broiler.DOM`'s `HtmlDocumentParser`, and this repository's `src/` (`Broiler.Headless`, `Broiler.Wpt`, `Broiler.Cli.Tests`). There are also historical mentions under `docs/`. None of them is a code or reflection reference, so they can follow in each component's own change.
 - A namespace/directory move from `Parse` to `LayoutTree` is optional and should be scoped separately from the mechanical rename. Other types still live in `Parse`.
 - Describe the class as coordinating DOM-to-box projection, cascade projection, presentational hints, and renderer box normalization before core layout. Do not imply that it only accepts an already-built DOM or performs all layout itself.
 
