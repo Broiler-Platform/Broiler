@@ -12,7 +12,7 @@ namespace Broiler.Cli.Tests;
 /// <c>DomBridge</c> stamps the native markers
 /// (<c>data-broiler-top-layer</c> / <c>data-broiler-backdrop</c>) on the
 /// element rather than emulating a scrim, and the renderer
-/// (<c>Broiler.HTML DomParser.GenerateNativeBackdrops</c> +
+/// (<c>Broiler.HTML LayoutTreeBuilder.GenerateNativeBackdrops</c> +
 /// <c>PaintWalker</c> top-layer paint, pinned in the submodule) turns those
 /// markers into an actually-painted <c>::backdrop</c> box. This proves the
 /// markers are honoured on real pixels, not just present in the serialized DOM.

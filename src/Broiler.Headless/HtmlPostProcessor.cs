@@ -114,7 +114,7 @@ public static class HtmlPostProcessor
     /// <para>
     /// <c>&lt;video&gt;</c>, <c>&lt;progress&gt;</c>/<c>&lt;meter&gt;</c> and <c>&lt;select multiple&gt;</c>
     /// are now rendered natively as replaced boxes by the renderer's post-cascade
-    /// <c>DomParser</c> passes (<c>CorrectVideoBoxes</c>/<c>CorrectProgressBoxes</c>/
+    /// <c>LayoutTreeBuilder</c> passes (<c>CorrectVideoBoxes</c>/<c>CorrectProgressBoxes</c>/
     /// <c>CorrectSelectMultipleBoxes</c>), so the former string-rewrite fallbacks were dropped.
     /// </para>
     /// <para>

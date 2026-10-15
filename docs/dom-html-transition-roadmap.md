@@ -1,8 +1,8 @@
 # Transition Roadmap: Modernizing Broiler.HTML with Broiler.DOM
 
 **Date / source recheck:** 2026-10-15  
-**Status:** Proposed implementation plan, corrected against the current checkout.  
-**Scope:** Consolidate duplicated HTML queries and serialization mechanics, then clarify the role of `DomParser`. This documentation update does not implement the waves below.
+**Status:** Waves 1, 2 and 4 and the Wave 5 guards are implemented on the `claude/dom-html-transition` branch of `Broiler.HTML`, with the shared-semantics prerequisites on `claude/dom-html-transition-wave1` in `Broiler.DOM`. Wave 3 is not started: it first needs a shared serializer change (see §4). The [implementation record](#7-implementation-record) lists what changed, the decisions taken, and what was verified.  
+**Scope:** Consolidate duplicated HTML queries and serialization mechanics, then clarify the role of `DomParser` (now `LayoutTreeBuilder`).
 
 The [architecture investigation](architecture/dom-html-layout-investigation.md) records source evidence, API limitations, and the focused test result. It supersedes earlier claims that parsed template bases currently leak into the renderer, that row-alignment inheritance misses `th`, and that a direct `CssBox` serializer adapter preserves HTML export behavior.
 
@@ -54,6 +54,8 @@ Every wave includes focused verification. Wave 5 is the final integration check,
 
 **Exit gate:** shared classification and ratio use are verified; first-base behavior and resource resolution are covered on both renderer inputs and resource logs; a nested document's `<base>` no longer reaches its parent; affected renderer tests pass against the intended packages. Template exclusion is a regression guard, not a newly proven renderer fix.
 
+**Status:** implemented; the exit gate is met against both `Broiler.Dom.Html` `0.1.0-preview.14` and a local pack of the DOM prerequisites. See [§7](#wave-1-outcome).
+
 ## 3. Wave 2: Table and Form Queries
 
 **Owners:** `Broiler.HTML.Dom`, `Broiler.HTML.Orchestration`.
@@ -80,6 +82,8 @@ Every wave includes focused verification. Wave 5 is the final integration check,
 - Remove the local numeric reader once no callers remain.
 
 **Exit gate:** table hints reach the intended cells without crossing nested-table boundaries; form labels and select geometry retain documented defaults; any intentional behavior change has focused renderer coverage; affected suites pass without new warnings attributable to the change.
+
+**Status:** implemented, keeping today's select sizing. See [§7](#wave-2-outcome).
 
 ## 4. Wave 3: HTML Export Through the Shared Serializer
 
@@ -117,6 +121,8 @@ The shared serializer uses an explicit stack and `MaximumDepth`. Convert recursi
 
 **Exit gate:** full and selected HTML pass behavioral comparisons for every style mode; intentional escaping/raw-text corrections are separately asserted; deep-tree coverage includes export preparation as well as serialization; no promise of reconstructing source markup is made.
 
+**Status:** not started. Adopting `HtmlSerializer.Serialize<TNode>` today would regress inline-SVG export, because the serializer lowercases every element name, and void and raw-text handling also depend on the missing namespace input. That needs a `Broiler.Dom.Html` change, published before this wave can consume it. See [§7](#wave-3-prerequisites).
+
 ## 5. Wave 4: Rename `DomParser` to `LayoutTreeBuilder`
 
 **Owner:** `Broiler.HTML.Orchestration`.
@@ -139,6 +145,8 @@ Suggested class summary:
 ```
 
 **Exit gate:** no active implementation type or call site retains the old name; both input paths and rebuilds compile and pass their tests; no public API change is claimed merely from renaming this internal type.
+
+**Status:** implemented in `Broiler.HTML` and in this repository's `src/` comments. The comment-only mentions in `Broiler.Layout`, `Broiler.HtmlBridge` and `Broiler.DOM` are left for those components' own changes.
 
 ## 6. Wave 5: Integration Verification and Architecture Guards
 
@@ -164,6 +172,43 @@ Add narrowly scoped architecture guards after each migration lands, building on 
 - Detect reintroduction of the retired box-based base selector or ratio parser at their former implementation points, supported by behavioral regression tests.
 - Assert the absence of the old `DomParser` implementation type after the rename. Historical documentation is not an architectural violation.
 
-An `ArchitectureBoundaryTests` class in HTML is proposed work, not an existing safeguard. Avoid relying solely on a private field name such as `_list` to prove absence of duplication.
+`Broiler.HTML`'s `ArchitectureBoundaryTests` now carries the guards for the waves that have landed (void list, box-tree base selector, ratio/numeric reader, and the rename); the quirks-classification guard and the Wave 3 guards are still to come. Avoid relying solely on a private field name such as `_list` to prove absence of duplication.
 
 **Final exit gate:** affected functional tests and architecture guards pass, intended package versions are verified, visual baselines show no unexplained regressions, and supported CI jobs complete. The [investigation's verification record](architecture/dom-html-layout-investigation.md#6-verification-record) records the narrower checks actually performed during this documentation recheck.
+
+## 7. Implementation Record
+
+**Branches:** `claude/dom-html-transition` in `Broiler.HTML` (one commit per wave, plus the guards) and `claude/dom-html-transition-wave1` in `Broiler.DOM` (the shared-semantics prerequisites, commit "Parse and serialize basefont, bgsound and keygen as void, and read only finite numbers"). `Broiler.HTML` still pins `Broiler.Dom.Html` `0.1.0-preview.14`, so its waves work on the published package. The DOM prerequisites reach the renderer only after a DOM release that contains them, followed by a pin bump in `Broiler.HTML`.
+
+### Wave 1 outcome
+
+- **Void classification.** `HtmlParser.AppendCanonicalNode` takes `HtmlTag.IsSingle` from `HtmlSerializer.VoidElements`, and `HtmlUtils` is deleted. The renderer therefore classifies elements as the tree builder that built them did. Under `preview.14`, `basefont`, `bgsound` and `keygen` are not single, and that parser does not close them either. The DOM prerequisite adds all three to the shared set: the tree builder now inserts and immediately pops them, `basefont` and `bgsound` stay in the head, and the serializer writes no end tag for them. `isindex` is an ordinary element in both. The `/>` versus `>` difference in the renderer's export is Wave 3's.
+- **Progress / meter.** `ResolveProgressValueRatio` delegates to `HtmlElementQueries.ResolveProgressLikeValueRatio`. A box without a `SourceElement` (the projection gives every element box one, so only a synthesised box) draws an empty bar. The DOM prerequisite makes `ReadNumericAttribute` reject `NaN`, `Infinity` and overflowing literals, and makes the ratio 0 when extreme finite bounds overflow. Until that release is consumed, `value="Infinity"` still fills a progress bar under `preview.14`, and `value="NaN"` still yields a NaN ratio, which lays out as an empty fill. The full HTML floating-point parsing rules (for example, accepting trailing garbage such as `5px`) are not implemented by either copy.
+- **Document base URL.** `DocumentBaseUrl.Resolve(DomNode, Uri)` reads the canonical DOM before any box exists. It selects the first HTML `<base>` with an `href`, whatever the value is. It freezes an empty, whitespace-only, unparsable, `data:` or `javascript:` value to the fallback, and that frozen value still hides any later base. It does not descend into a nested document root. `HtmlParser.ParseDocument(..., out documentBaseUrl)` resolves the document's base and builds every box against it. A nested sub-document gets its own base, resolved with its parent's base as the fallback; this covers an in-tree `#subdoc-root` and a resolver-supplied content document alike. `LayoutTreeBuilder` carries the value instead of rebasing the tree, and `HtmlParserDump.DumpResourceLogAsJson` reads each box's own base. The leak of a sub-document's base into its parent is now reproduced by a test that fails on the old code.
+  - The renderer does not call `HtmlDocumentQueries.GetEffectiveBaseHref`, for two reasons: it skips a blank `href`, which §4.2.3 does not, and it cannot stop at the renderer's nested-document boundary. Aligning that shared query with the standard would also change `Broiler.HtmlBridge`'s callers, so it is a separate DOM change.
+  - Still open: a nested document's `<link rel=stylesheet>` resolves at the container level, against the outer document's base, as it did before.
+
+### Wave 2 outcome
+
+- **Table hints.** `SetForAllCells` asks `CollectTableRows` / `GetRowCells` for the table's cells. It maps them to boxes in one walk over the table's own three levels, before the box fix-ups. A `th` in a direct row is now padded itself, not its children. Caption content and the text between cells are no longer styled as cells, and a nested table's cells stay its own. `InheritRowAlignment` is unchanged.
+- **Toggles.** `IsNativelyDrawnToggle` uses `IsCheckboxInput` / `IsRadioInput`. `type=" checkbox "` is now a text field here too, as it already was for the user-agent sheet.
+- **Multiple select.** Kept: `HtmlElementQueries.ReadNumericAttribute(select, "size", 4)`, clamped to 2–8. The renderer's own numeric reader is deleted. After the DOM prerequisite, `size="Infinity"` gives four tracks instead of eight.
+- **Input text.** Unchanged. `GetDefaultValue` cannot distinguish a missing `value` from `value=""`, and no shared query supplies the Submit/Reset labels or the text-type allowlist, so tests now pin that policy instead.
+
+### Wave 3 prerequisites
+
+Before the renderer export can move to `HtmlSerializer.Serialize<TNode>`, `Broiler.Dom.Html` needs to:
+
+1. Stop lowercasing foreign element names, through a namespace input on `HtmlSerializationAdapter<TNode>` or an equivalent, and keep the existing constructor binary-compatible. `foreignObject` and `linearGradient` must survive the export.
+2. Apply the void and raw-text rules to HTML-namespace elements only.
+3. Then publish a release, with `Broiler.HtmlBridge`'s serializer tests run against it, because its `innerHTML` and `outerHTML` go through the same code.
+
+On the renderer side, the export contract in §4 still has to be characterized first. Selected-HTML tests need a way to set a selection that the test project can reach, since `Broiler.Layout` grants it no internals.
+
+### Verification
+
+- `Broiler.DOM` (`dotnet test Broiler.Dom.slnx -c Release`): 186 + 636 passed, 0 failed. The 636 include 28 new tests.
+- `Broiler.HTML` (`dotnet test tests/Broiler.HTML.Tests -c Release`): 210 passed, 0 failed, against the published `Broiler.Dom.Html` `0.1.0-preview.14`. The suite also passes, 210 of 210, against a local `0.1.0-preview.15-local.1` pack of the DOM branch. The baseline before these changes was 140. The new tests that catch the old base-URL, table and toggle behavior were each checked to fail on the code they replace.
+- This repository's `src/Broiler.Cli.Tests` builds both branches from submodule source, so it exercises the renderer changes and the DOM prerequisites together. It ran 4,230 tests: 4,045 passed and 185 failed. The same suite at the original submodule commits had 4,043 passed and 187 failed. No test fails only with the changes; the two that failed only at baseline (a fetch-promise test and a graphics-path test) are unrelated to this work. The remaining failures are pre-existing.
+- `Broiler.CSS` and `Broiler.Layout` have no source changes here; their suites were not re-run.
+- Not run: the WPT pixel and reftest suites, and Windows/Linux CI.

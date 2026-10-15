@@ -10,7 +10,7 @@ namespace Broiler.Wpt.Tests;
 /// (<c>&lt;![CDATA[ … ]]&gt;</c>). The HTML tree builder leaves the markers as
 /// literal text in the style element; the CSS parser cannot tokenize them and
 /// dropped the whole stylesheet, so every CDATA-wrapped CSS2 reftest rendered
-/// unstyled. <see cref="DomParser.StripCdataSection"/> now removes them.</item>
+/// unstyled. <c>LayoutTreeBuilder.StripCdataSection</c> now removes them.</item>
 /// <item>A non-standard UA rule <c>td, th { border-color:#dfdfdf }</c> was a
 /// longhand the post-cascade <c>border</c>-shorthand expansion could not
 /// override, so an author <c>td { border: …green }</c> rendered grey. The rule

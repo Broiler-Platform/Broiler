@@ -447,7 +447,7 @@ document.getElementById('result').textContent = [
 
     /// <summary>
     /// The renderer paints <c>&lt;meter&gt;</c> natively as a replaced track with a proportional
-    /// fill (renderer <c>DomParser.CorrectProgressBoxes</c>), honouring writing-mode and direction.
+    /// fill (renderer <c>LayoutTreeBuilder.CorrectProgressBoxes</c>), honouring writing-mode and direction.
     /// This exercises the native path end-to-end — the former <c>HtmlPostProcessor</c> string-rewrite
     /// fallback was dropped once the renderer handled it.
     /// </summary>
