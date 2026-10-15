@@ -7,7 +7,7 @@ namespace Broiler.Wpt.Tests;
 /// Regression tests for the <c>&lt;br&gt;</c>-after-inline-block line-advance fix.
 ///
 /// <para>A <c>&lt;br&gt;</c> is modelled as a block whose empty-line height is
-/// <c>.95em</c> when it "follows a block" (Broiler.HTML <c>DomParser</c>).  An
+/// <c>.95em</c> when it "follows a block" (Broiler.HTML <c>LayoutTreeBuilder</c>).  An
 /// atomic inline-block carries no text words, so it was misclassified as
 /// block-level: a <c>&lt;br&gt;</c> after one inserted a spurious full empty
 /// line and the anonymous block wrapping the inline-block dropped the

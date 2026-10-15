@@ -4,6 +4,8 @@
 **Status:** Source-verified investigation; proposed changes are not implemented by this document.  
 **Scope:** The local checkout of `Broiler.DOM`, `Broiler.HTML`, `Broiler.Layout`, and `Broiler.CSS`. This is not a certification of standards compliance or a full renderer/CI test result. See the [transition roadmap](../dom-html-transition-roadmap.md) for implementation gates.
 
+> **Later status (2026-10-15):** the roadmap's Waves 1, 2 and 4 have since been implemented on branches (see its [implementation record](../dom-html-transition-roadmap.md#7-implementation-record)), and `DomParser` is now `LayoutTreeBuilder`. The sections below describe the code as this recheck found it, before those changes.
+
 ## 1. Findings
 
 The main architectural conclusion holds: `Broiler.HTML.Orchestration.Parse.DomParser` coordinates construction and styling of the layout box tree. It delegates HTML parsing to `Broiler.Dom.Html.HtmlDocumentParser` through `Broiler.HTML.Dom.Parse.HtmlParser`; it is not an independent HTML tokenizer or DOM tree builder. `LayoutTreeBuilder` would describe its role more clearly.
@@ -112,7 +114,7 @@ The shared ratio helper reflects the existing approximation, including acceptanc
 
 The earlier assertion that parsed `<base>` elements inside `<template>` affect this renderer is unsupported: [DomElement.TemplateContents](../../Broiler.DOM/Broiler.Dom/DomElement.cs) holds them outside `ChildNodes`, and `HtmlParser.AppendCanonicalNode` walks `ChildNodes`. The canonical DOM query relies on the same separation. Bridge/custom DOM representations require their own coverage.
 
-Nested browsing contexts are a different matter. `Resolve` and `Rebase` walk every box, including the sub-viewport subtrees that `HtmlParser` projects under an `<iframe>`/`<object>`/`<frame>` (`CssBox.IsNestedBrowsingContextRoot`). As written, a `<base>` inside a projected sub-document can become the outer document's base when the outer document declares none earlier in tree order, and the outer base is stamped onto the nested boxes. This finding comes from reading the source; it has not been reproduced in a test. A resolver-supplied content document is not part of the canonical tree, so `GetEffectiveBaseHref` would not see it. A legacy in-tree `#subdoc-root` subtree is part of that tree, so the shared query needs the same boundary decision.
+Nested browsing contexts are a different matter. `Resolve` and `Rebase` walk every box, including the sub-viewport subtrees that `HtmlParser` projects under an `<iframe>`/`<object>`/`<frame>` (`CssBox.IsNestedBrowsingContextRoot`). As written, a `<base>` inside a projected sub-document can become the outer document's base when the outer document declares none earlier in tree order, and the outer base is stamped onto the nested boxes. This finding came from reading the source; the Wave 1 implementation later reproduced it with a resolver-supplied sub-document, in a test that fails on this code. A resolver-supplied content document is not part of the canonical tree, so `GetEffectiveBaseHref` would not see it. A legacy in-tree `#subdoc-root` subtree is part of that tree, so the shared query needs the same boundary decision.
 
 A migration must retain URI resolution, `CssBox.BaseUrl` propagation, `HtmlContainerInt.DocumentBaseUrl` behavior, and the resource-log path in [HtmlParserDump](../../Broiler.HTML/Source/Broiler.HTML.Dom/Parse/HtmlParserDump.cs). Both string and bound-document inputs, rebuilds, and nested browsing contexts matter.
 

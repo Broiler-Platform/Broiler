@@ -20,7 +20,7 @@ namespace Broiler.Cli.Tests;
 /// This is the case the previous inline-CB expansion deliberately left on the bridge
 /// bake path (the roadmap assumed the engine blockified the abspos inline element and
 /// disagreed on the CB extent). It does not: the cascade's §9.7 display adjustment fires
-/// only for <c>float</c> (<c>DomParser.CascadeApplyStyles</c>), so the engine treats the
+/// only for <c>float</c> (<c>LayoutTreeBuilder.CascadeApplyStyles</c>), so the engine treats the
 /// abspos <c>&lt;span&gt;</c> as inline and reads its inline bounding box — which, for a
 /// simple content run, equals the block shrink-to-fit extent, i.e. the correct containing
 /// block. So the anchored boxes place identically to a relatively-positioned inline CB.

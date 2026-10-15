@@ -380,7 +380,7 @@ internal sealed partial class WptTestRunner
 
     /// <summary>
     /// Native <c>::backdrop</c> lever (Phase 5 native dialog/backdrop track). The native
-    /// <c>::backdrop</c> box generation (<c>Broiler.HTML DomParser.GenerateNativeBackdrops</c> +
+    /// <c>::backdrop</c> box generation (<c>Broiler.HTML LayoutTreeBuilder.GenerateNativeBackdrops</c> +
     /// <c>PaintWalker</c> top-layer paint) is <em>pinned</em> in the submodule, so the engine
     /// honours the <c>data-broiler-backdrop</c> / <c>data-broiler-top-layer</c> markers — the
     /// default <see cref="DomBridge"/> now stamps them (native) rather than emulating a scrim, and
