@@ -1,7 +1,7 @@
 # Transition Roadmap: Modernizing Broiler.HTML with Broiler.DOM
 
 **Date / source recheck:** 2026-10-15  
-**Status:** Waves 1, 2 and 4 and the Wave 5 guards are implemented on the `claude/dom-html-transition` branch of `Broiler.HTML`, with the shared-semantics prerequisites on `claude/dom-html-transition-wave1` in `Broiler.DOM`. Wave 3 is not started: it first needs a shared serializer change (see §4). The [implementation record](#7-implementation-record) lists what changed, the decisions taken, and what was verified.  
+**Status:** Waves 1, 2 and 4 and the Wave 5 guards are merged (`Broiler.HTML` #252, `Broiler.DOM` #32, and the cleanup in #253). Wave 3 is implemented on `Broiler.HTML` branch `claude/dom-html-wave3`. It waits for a `Broiler.Dom.Html` release (`0.1.0-preview.16`) that carries `Broiler.DOM` #33 and #34. The [implementation record](#7-implementation-record) lists what changed, the decisions taken, and what was verified.  
 **Scope:** Consolidate duplicated HTML queries and serialization mechanics, then clarify the role of `DomParser` (now `LayoutTreeBuilder`).
 
 The [architecture investigation](architecture/dom-html-layout-investigation.md) records source evidence, API limitations, and the focused test result. It supersedes earlier claims that parsed template bases currently leak into the renderer, that row-alignment inheritance misses `th`, and that a direct `CssBox` serializer adapter preserves HTML export behavior.
@@ -122,7 +122,7 @@ The shared serializer uses an explicit stack and `MaximumDepth`. Convert recursi
 
 **Exit gate:** full and selected HTML pass behavioral comparisons for every style mode; intentional escaping/raw-text corrections are separately asserted; deep-tree coverage includes export preparation as well as serialization; no promise of reconstructing source markup is made.
 
-**Status:** not started. The `Broiler.Dom.Html` side is implemented but not released: the serializer now takes an optional namespace input, so adopting it no longer has to lowercase script-built SVG names or treat SVG elements as void or raw text. This wave can consume it once a DOM release carries it. See [§7](#wave-3-prerequisites).
+**Status:** implemented on `Broiler.HTML` branch `claude/dom-html-wave3`, verified against a local pack of the DOM release it needs. It merges after `Broiler.Dom.Html` `0.1.0-preview.16` is published and its pin is bumped. See [§7](#wave-3-outcome).
 
 ## 5. Wave 4: Rename `DomParser` to `LayoutTreeBuilder`
 
@@ -173,7 +173,7 @@ Add narrowly scoped architecture guards after each migration lands, building on 
 - Detect reintroduction of the retired box-based base selector or ratio parser at their former implementation points, supported by behavioral regression tests.
 - Assert the absence of the old `DomParser` implementation type after the rename. Historical documentation is not an architectural violation.
 
-`Broiler.HTML`'s `ArchitectureBoundaryTests` now carries the guards for the waves that have landed (void list, box-tree base selector, ratio/numeric reader, and the rename); the quirks-classification guard and the Wave 3 guards are still to come. Avoid relying solely on a private field name such as `_list` to prove absence of duplication.
+`Broiler.HTML`'s `ArchitectureBoundaryTests` carries the guards for the void list, the box-tree base selector, the ratio/numeric reader and the rename. On the Wave 3 branch it also guards the export writer and the single `BuildLayoutTree(DomDocument)` input, which reflects the single parse. A guard on quirks classification is still to come. Avoid relying solely on a private field name such as `_list` to prove absence of duplication.
 
 **Final exit gate:** affected functional tests and architecture guards pass, intended package versions are verified, visual baselines show no unexplained regressions, and supported CI jobs complete. The [investigation's verification record](architecture/dom-html-layout-investigation.md#6-verification-record) records the narrower checks actually performed during this documentation recheck.
 
@@ -211,13 +211,47 @@ Verification:
 - `Broiler.HTML`: 229 passed, 0 failed, on `preview.14`. The 19 new tests are in `NestedDocumentStyleTests`, `ElementRectangleIdTests` and `FormSubmitTargetTests`; 14 of them fail on the code they replace, and the other 5 pin plain submit cases.
 - This repository's `src/Broiler.Cli.Tests`: 4,045 passed / 185 failed, against 4,043 / 187 without the fixes. No test fails only with them; the two that failed only without them are a fetch-promise test and an idle-callback timing test.
 
-Still open from the same sweep:
-- Typed input values are written into the `value` attribute (`SetEditableInputValue`), where `HtmlFormState` models a dirty value.
-- The input-type allowlists are kept in three places, with no shared input-type query.
-- The source is tokenized a second time to read the document mode, which the parse result could carry.
-- `rel` tokens are split on spaces only.
-- Layout's `colspan` / `rowspan` parsing has no HTML clamps.
-- The per-box attribute copy (`HtmlTag`) is still kept.
+The rest of the sweep is handled in the next section.
+
+### Follow-ups to the sweep
+
+- **Typed values** (`Broiler.HTML` `claude/dom-html-followups`). Typing sets the control's dirty value (HTML §4.10.5.4, §4.10.11) in the container's new `FormState`, an `HtmlFormState` a host can share. The element's `value` attribute and a textarea's text are its default value, and typing no longer rewrites them. The projection shows the dirty value, so it survives `RestyleDocument`. The renderer's own export still writes the typed value, because the box's attribute copy carries it.
+- **`rel` tokens** (same branch) are split on ASCII whitespace (`HtmlLinkTypes`), for the stylesheet collection and the resource log.
+- **`Broiler.Dom.Html` `0.1.0-preview.15`** (same branch) is now the pin. It carries Wave 1's void and numeric fixes.
+- **Input types and the document mode** (`Broiler.DOM` #34; `Broiler.HTML` `claude/dom-html-wave3`).
+  - `HtmlFormQueries.GetInputType` maps a `type` attribute to its state keyword, and `"text"` for a missing or invalid value. The renderer's three type lists read it, so `type="foo"` is a text field.
+  - `HtmlDocumentParseResult.IsQuirksMode` reports the tree builder's mode decision. `SetHtmlWithStyleSet` now parses once, publishes that mode, and hands the parsed document to `LayoutTreeBuilder`, whose HTML-string overload is gone. Before, it tokenized the source a second time through `IsQuirksMode(string)`.
+  - `SharedRendererCascade.FindCanonicalDocument` was looked at and left as it is: it returns at the first element box, so it is not a tree walk worth removing.
+- **Spans** (`Broiler.Layout` `claude/html-span-attributes`). `colspan` and `rowspan` are read as HTML's non-negative integers and clamped to 1–1000 and 1–65534 (`HtmlTableSpans`). One cell with `colspan="3000000"` used to make the layout allocate 137 MiB. `rowspan="0"` is still a single row, where HTML spans it to the end of the row group.
+- **The per-box attribute copy is kept, on purpose.** `HtmlTag`'s dictionary is the render tree's snapshot of the element's attributes. Layout and paint can run on other threads while a script mutates the DOM, and reading attributes live would bring back the cross-thread races the DOM's child-list snapshots were added for. The drift the copy showed came from writes into the DOM (typed values), and those are gone. Reading through `SourceElement` instead would need an immutable attribute snapshot in `Broiler.DOM` first.
+
+### Wave 3 outcome
+
+Implemented on `Broiler.HTML` branch `claude/dom-html-wave3`, against a local pack of `Broiler.DOM` #34 (which carries #33).
+
+- `DomUtils.GenerateHtml` delegates to `RendererHtmlExport`, which builds a view of the rendered boxes as element, text and comment nodes and serializes it with `HtmlSerializer.Serialize<TNode>`. The view sets `GetNamespace` from each box's `SourceElement`.
+- The export's own policy stays in the view:
+  - rendered words, not source text;
+  - selection slicing and the fragment comments;
+  - the `Inline` style attribute and the `InHeader` head;
+  - the omitted `property:` and `method:` links.
+
+  Anonymous boxes are transparent, so a `<style>`'s or `<xmp>`'s text is that element's own raw text.
+- Corrections, asserted by `HtmlExportContractTests` (seven of whose twelve cases fail on the old writer):
+  - void elements end with `>` and keep no children, so an input's generated label is no longer stray text after it;
+  - raw-text elements' text is not escaped;
+  - the inline `style` attribute has no trailing `;`;
+  - the table layout's spacing boxes (`<none colspan="1">`) and nested documents' sub-viewports (`<#subdoc-root>`) are left out.
+- The view, the selection collection and the serializer use explicit stacks. The box projection, cascade and layout before them still recurse: 2,000 nested elements overflow the stack in `HtmlParser.AppendCanonicalNode`, before anything is exported.
+- `ArchitectureBoundaryTests` guards against the old writer coming back.
+
+Verification of the follow-ups and Wave 3:
+- `Broiler.DOM` #34: 191 + 838 passed, 0 failed (45 new).
+- `Broiler.Layout` `claude/html-span-attributes`: 3,053 passed, 0 failed (32 new). Both layout-level cases fail on the old span reading, which allocates 137 MiB for `colspan="3000000"`.
+- `Broiler.HTML` `claude/dom-html-followups`: 243 passed on the published `preview.15`. `claude/dom-html-wave3`: 265 passed against the local `0.1.0-preview.16-local.1` pack of #34 (feed `D:\local-packages\dom-html-followups-2026-10-15`).
+- This repository's `src/Broiler.Cli.Tests`, with all three branches built from source: 4,044 passed / 186 failed, against 4,042 / 188 with the submodules at `main`.
+  - Two tests failed only with the branches. The graphics-path test passes when re-run and failed only on the baseline in an earlier comparison. The XHR header test failed in every earlier run, baseline included, and passed only in this run's baseline.
+  - No failure is attributable to the changes.
 
 ### Wave 3 prerequisites
 
