@@ -31,6 +31,8 @@ conformance, and implementation work belongs with that component.
 | [Broiler Code budgets and support matrix](../Broiler.Code/docs/architecture/broiler-code-budgets.md) | **Moved into the `Broiler.Code` submodule on 2026-09-04.** The frozen performance budgets, the traces they are measured against, the recorded baselines, and what is still unmeasured |
 | [SDK-project mutation matrix](../Broiler.Code/docs/architecture/broiler-code-project-mutations.md) | **Moved into the `Broiler.Code` submodule on 2026-09-04.** Which project constructs Broiler Code may edit, read losslessly, or only evaluate |
 | [HtmlBridge architecture](architecture/htmlbridge.md) | Current bridge assemblies, ownership boundaries, and public seams |
+| [DOM/HTML/Layout architecture investigation](architecture/dom-html-layout-investigation.md) | Component boundaries between Broiler.DOM, Broiler.HTML, Broiler.Layout and Broiler.CSS, explaining DomParser.cs and CssBox ownership |
+| [DOM/HTML transition roadmap](dom-html-transition-roadmap.md) | Phased transition plan to retire duplicated logic in Broiler.HTML, reuse canonical Broiler.DOM queries, and rename DomParser to LayoutTreeBuilder |
 | [Browser WebAssembly architecture](architecture/browser-webassembly.md) | Current browser-host, rendering, input, and support decisions |
 | [Android application architecture](architecture/android.md) | Proposed Android host topology, platform baseline, and ownership boundaries |
 | [Multithreading analysis and roadmap](architecture/multithreading.md) | Cross-component integration and historical host measurements. JavaScript-local implementation and acceptance are delegated to the component concurrency plan above |
