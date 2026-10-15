@@ -196,6 +196,29 @@ Add narrowly scoped architecture guards after each migration lands, building on 
 - **Multiple select.** Kept: `HtmlElementQueries.ReadNumericAttribute(select, "size", 4)`, clamped to 2–8. The renderer's own numeric reader is deleted. After the DOM prerequisite, `size="Infinity"` gives four tracks instead of eight.
 - **Input text.** Unchanged. `GetDefaultValue` cannot distinguish a missing `value` from `value=""`, and no shared query supplies the Submit/Reset labels or the text-type allowlist, so tests now pin that policy instead.
 
+### Cleanup after Waves 1, 2 and 4
+
+A later sweep of `Broiler.HTML` for DOM semantics it still computes itself found three defects, fixed on `Broiler.HTML` branch `claude/dom-html-cleanup`:
+
+- **A nested document's style sheets stayed in the parent.** `LayoutTreeBuilder.CascadeParseStyles` walked every box, including the sub-viewports projected under an `<iframe>`, into one style set, and both documents were cascaded with it. An iframe's `p { color: red }` turned the parent page's paragraphs red, and the parent's sheets styled the iframe. This is the same nested-boundary leak the base URL had. The walk now stops at a nested document root. `ApplyNestedDocumentStyles` cascades each sub-document with its own style set: the document-independent sheets (user-agent and embedder CSS) plus the sub-document's own, through engines built for its document. Limitations kept:
+  - The sub-document's media queries still see the container's viewport, not the frame's box.
+  - Its `<link rel=stylesheet>` still resolves against the outer document's base (see Wave 1).
+  - `@position-try` rules (`HtmlContainerInt.CollectPositionTryRules`) are still collected across documents.
+- **`GetElementRectangle(id)` matched ids case-insensitively.** It lowercased the id and compared without case, so `"box"` found `id="Box"`. In-page fragment navigation and the browser's form-control host go through it. It now asks the canonical document's `GetElementById` and maps the element to its box. An id the document does not hold is still looked up, now case-sensitively, in the boxes of its nested sub-documents.
+- **Every button submitted, and only to an enclosing form.** The click fallback treated every `<button>` and `<input type=button|reset>` as a submit button. It found the form by walking up the box tree, ignored `formaction`, and reported the base URL for an empty action. It now recognizes a submit button by its type state (HTML §4.10.6): a missing or invalid `type` is a submit button, and `button` and `reset` are not. The form owner comes from `HtmlFormQueries.GetFormOwner`, so `form="id"` is honored. The URL is the button's `formaction`, else the form's `action`, else the document's URL (§4.10.21.3). `<input type=image>` is classified as a submit button, but `Broiler.Layout`'s `CssBox.IsClickable` does not yet let a click on one reach this path.
+
+Verification:
+- `Broiler.HTML`: 229 passed, 0 failed, on `preview.14`. The 19 new tests are in `NestedDocumentStyleTests`, `ElementRectangleIdTests` and `FormSubmitTargetTests`; 14 of them fail on the code they replace, and the other 5 pin plain submit cases.
+- This repository's `src/Broiler.Cli.Tests`: 4,045 passed / 185 failed, against 4,043 / 187 without the fixes. No test fails only with them; the two that failed only without them are a fetch-promise test and an idle-callback timing test.
+
+Still open from the same sweep:
+- Typed input values are written into the `value` attribute (`SetEditableInputValue`), where `HtmlFormState` models a dirty value.
+- The input-type allowlists are kept in three places, with no shared input-type query.
+- The source is tokenized a second time to read the document mode, which the parse result could carry.
+- `rel` tokens are split on spaces only.
+- Layout's `colspan` / `rowspan` parsing has no HTML clamps.
+- The per-box attribute copy (`HtmlTag`) is still kept.
+
 ### Wave 3 prerequisites
 
 Before the renderer export can move to `HtmlSerializer.Serialize<TNode>`, `Broiler.Dom.Html` needs the four changes below. The first two are on `Broiler.DOM` branch `claude/namespace-aware-serializer`, commit "Serialize elements by their namespace, not their name alone". That branch is cut from `claude/dom-html-transition-wave1`, so one DOM release can carry both. The third is on `claude/foreign-content-parsing`, commit "Parse inline SVG and MathML as foreign content", which is cut from the serializer branch, and its fragment half on `claude/foreign-fragment-context`, commit "Parse a fragment in an SVG or MathML context as foreign content", cut from the parser branch. A fix for the title placement those fragments exposed is on `claude/fragment-title-in-place`, commit "Insert an HTML title at the current node once the body has started", cut from the fragment branch.
