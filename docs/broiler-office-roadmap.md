@@ -2,7 +2,11 @@
 
 Date: 2026-10-28. Status: proposed implementation plan, grounded in the current checkout.
 
-This roadmap turns `Broiler.Launcher` into the entry point for a distributable **Broiler Office** suite. It covers the requested P0 review, P1 product installation and release workflow, and P2 BOSS startup, update notification/application, and settings. The source review and local test baseline below are complete; implementation work remains planned.
+Delivery records: [P0 Windows acceptance](../Broiler.Launcher/docs/p0-status.md)
+and [M1 split-button/package handoff](../Broiler.Launcher/docs/m1-status.md).
+Linux runtime support is deferred by the user for this delivery sequence.
+
+This roadmap turns `Broiler.Launcher` into the entry point for a distributable **Broiler Office** suite. It covers the requested P0 review, P1 product installation and release workflow, and P2 BOSS startup, update notification/application, and settings. Implementation progress and validation are tracked in the delivery records above; downstream milestones remain planned.
 
 ## 1. Intended experience and scope
 
