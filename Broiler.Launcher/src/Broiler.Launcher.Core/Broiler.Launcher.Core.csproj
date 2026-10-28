@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Broiler.Launcher</RootNamespace>
+    <AssemblyName>Broiler.Launcher.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Broiler.UI" />
+    <PackageReference Include="Broiler.UI.Standard" />
+    <PackageReference Include="Broiler.UI.Button.Standard" />
+    <PackageReference Include="Broiler.UI.Label.Standard" />
+    <PackageReference Include="Broiler.UI.Panel.Standard" />
+    <PackageReference Include="Broiler.UI.Menu.Standard" />
+    <PackageReference Include="Broiler.UI.Window.Standard" />
+    <PackageReference Include="Broiler.UI.Dialog.Standard" />
+    <PackageReference Include="Broiler.UI.AboutDialog.Standard" />
+    <PackageReference Include="Broiler.UI.Edit.Standard" />
+    <PackageReference Include="Broiler.UI.FileDialog.Standard" />
+    <PackageReference Include="Broiler.Graphics" />
+  </ItemGroup>
+</Project>

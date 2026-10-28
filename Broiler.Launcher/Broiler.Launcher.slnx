@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Broiler.Launcher.Core/Broiler.Launcher.Core.csproj" />
+    <Project Path="src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj" />
+    <Project Path="src/Broiler.Launcher.Linux/Broiler.Launcher.Linux.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Broiler.Launcher.Tests/Broiler.Launcher.Tests.csproj" />
+  </Folder>
+</Solution>

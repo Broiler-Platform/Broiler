@@ -1,0 +1,42 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <BroilerUiVersion>0.1.0-preview.22</BroilerUiVersion>
+    <BroilerHostingVersion>0.1.0-preview.10</BroilerHostingVersion>
+    <BroilerGraphicsVersion>0.1.0-preview.12</BroilerGraphicsVersion>
+    <BroilerGraphicsCoreVersion>0.1.0-preview.13</BroilerGraphicsCoreVersion>
+    <BroilerInputVersion>0.1.0-preview.6</BroilerInputVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Broiler.UI" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Button.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Label.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Panel.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Menu.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Window.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Dialog.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.AboutDialog.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Edit" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.Edit.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.FileDialog" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.FileDialog.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.Graphics" Version="$(BroilerGraphicsCoreVersion)" />
+    <PackageVersion Include="Broiler.Graphics.Windows" Version="$(BroilerGraphicsVersion)" />
+    <PackageVersion Include="Broiler.Graphics.Linux" Version="$(BroilerGraphicsVersion)" />
+    <PackageVersion Include="Broiler.Graphics.Linux.OpenGL" Version="$(BroilerGraphicsVersion)" />
+    <PackageVersion Include="Broiler.Hosting.Windows" Version="$(BroilerHostingVersion)" />
+    <PackageVersion Include="Broiler.Hosting.Linux" Version="$(BroilerHostingVersion)" />
+    <PackageVersion Include="Broiler.Input" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Keyboard" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Mouse" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Keyboard.Windows" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Mouse.Windows" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Linux" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Keyboard.Linux" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Broiler.Input.Mouse.Linux" Version="$(BroilerInputVersion)" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="xunit" Version="2.5.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.3" />
+  </ItemGroup>
+</Project>

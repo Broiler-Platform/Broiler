@@ -1,0 +1,15 @@
+<Solution>
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="Debug-Windows" />
+    <BuildType Name="Release-Windows" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Broiler.Launcher.Core/Broiler.Launcher.Core.csproj" />
+    <Project Path="src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Broiler.Launcher.Tests/Broiler.Launcher.Tests.csproj" />
+  </Folder>
+</Solution>

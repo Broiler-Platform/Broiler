@@ -10,6 +10,7 @@ conformance, and implementation work belongs with that component.
 | Document | Purpose |
 | --- | --- |
 | [Root roadmap](ROADMAP.md) | The unfinished cross-repository work and its exit gates |
+| [Broiler Office package roadmap](broiler-office-roadmap.md) | Launcher review, installation actions, Office release packaging, BOSS startup, updates, and settings across Windows and Linux |
 | [WebRTC implementation roadmap](webrtc-roadmap.md) | The cross-component architecture, security boundary, native-backend decision, phased delivery, conformance, interoperability, platform, and release gates for peer connections, data channels, and real-time media |
 | [Printing roadmap](printing-roadmap.md) | The page model, print dialog, platform print hosts and application printing: what the first slice implements on the component branches, the release order it needs, and the vector, PDF-export and web-platform phases after it |
 | [Broiler Code roadmap](../Broiler.Code/docs/broiler-code-roadmap.md) | **Moved into the `Broiler.Code` submodule on 2026-09-04.** The phased plan for a shared C#/.NET IDE, multi-project editing, diagnostics, and .NET/Android/WebAssembly builds |
