@@ -12,6 +12,8 @@ public static class LauncherCliHandler
 {
     public static bool TryHandleCli(string[] args, out int exitCode, IAppLauncherService? launcherService = null)
     {
+        if (Broiler.Launcher.Services.Boss.BossCli.TryHandle(args, out exitCode, launcherService)) return true;
+        if (Broiler.Launcher.Installation.OfficeInstallCli.TryHandle(args, out exitCode)) return true;
         launcherService ??= new AppLauncherService();
 
         for (int i = 0; i < args.Length; i++)
@@ -101,6 +103,12 @@ public static class LauncherCliHandler
         Console.WriteLine("  --list, -l         List all supported applications and their resolved binary paths");
         Console.WriteLine("  --config, -c       Display persistent configuration file location and custom settings");
         Console.WriteLine("  --help, -h         Display this help text");
+        Console.WriteLine("  --office-install <product> [--package-directory <absolute-directory>]  Install for user");
+        Console.WriteLine("  --office-repair <product> [--package-directory <absolute-directory>]   Repair for user");
+        Console.WriteLine("  --office-rollback <product>     Activate the previous user installation");
+        Console.WriteLine("  --office-unregister <product>   Remove user registration; retain data and version files");
+        Console.WriteLine("  --boss-start      Start or reuse BOSS (default: keep it running after launcher exit)");
+        Console.WriteLine("  --boss-status     Check BOSS identity, web assets, and availability");
         Console.WriteLine();
         Console.WriteLine("Applications:");
         foreach (BroilerAppInfo app in launcherService.Apps)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using Broiler.Launcher.Models;
+using Broiler.Launcher.Installation;
 
 namespace Broiler.Launcher.Services;
 
@@ -19,6 +20,7 @@ public sealed class AppLauncherService : IAppLauncherService
     private readonly Func<string, string?> _environment;
     private readonly string _currentDirectory;
     private readonly Func<ProcessStartInfo, int?> _startProcess;
+    private readonly IInstallationInventory _inventory;
 
     public AppLauncherService(
         IReadOnlyList<BroilerAppInfo>? apps = null,
@@ -26,9 +28,11 @@ public sealed class AppLauncherService : IAppLauncherService
         bool? isWindows = null,
         Func<string, string?>? environment = null,
         string? currentDirectory = null,
-        Func<ProcessStartInfo, int?>? startProcess = null)
+        Func<ProcessStartInfo, int?>? startProcess = null,
+        IInstallationInventory? inventory = null)
     {
         _isWindows = isWindows ?? OperatingSystem.IsWindows();
+        _inventory = inventory ?? new InstallationInventory(OfficeInstallPaths.CreateDefault());
         _environment = environment ?? Environment.GetEnvironmentVariable;
         _currentDirectory = currentDirectory ?? Environment.CurrentDirectory;
         _startProcess = startProcess ?? (info => { using var process = Process.Start(info); return process?.Id; });
@@ -46,6 +50,7 @@ public sealed class AppLauncherService : IAppLauncherService
     public void UpdateSettings(LauncherSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        LauncherSettingsValidation.Validate(settings);
         _settingsStore.Save(settings);
         _settings = settings;
     }
@@ -59,8 +64,9 @@ public sealed class AppLauncherService : IAppLauncherService
         AppCustomSettings appSetting = _settings.GetOrCreate(app.Id);
 
         // If custom path is enabled and not in pure auto-detect mode
-        if (!appSetting.UseAutoDetect && !string.IsNullOrWhiteSpace(appSetting.ExecutablePath))
+        if (!appSetting.UseAutoDetect)
         {
+            if (string.IsNullOrWhiteSpace(appSetting.ExecutablePath)) return AppResolution.NotFound("Custom path is empty; choose a path or select Auto-detect in Settings.");
             string expandedPath = Environment.ExpandEnvironmentVariables(appSetting.ExecutablePath);
             if (File.Exists(expandedPath))
             {
@@ -88,6 +94,17 @@ public sealed class AppLauncherService : IAppLauncherService
         var platform = app.GetPlatform(isWindows);
         if (platform is null) return AppResolution.NotFound("Unsupported on this platform");
 
+        // Managed scope identity comes from receipts, independently of portable/workspace discovery.
+        var preferredScope = _settings.GetOrCreate(app.Id).PreferredInstalledScope;
+        foreach (var scope in new[] { preferredScope, preferredScope == InstallScope.User ? InstallScope.Machine : InstallScope.User })
+        {
+            var installed = _inventory.Find(app.Id.ToString().ToLowerInvariant(), scope);
+            if (_isWindows && installed.State == InstallationState.Installed && installed.Receipt?.Rid == "win-x64")
+                return AppResolution.Available(installed.ExecutablePath!, installed.Receipt!.Invocation == "dotnet",
+                    $"Installed for {(scope == InstallScope.User ? "user" : "all users")} ({installed.Receipt.Version})") with
+                { InstallScope = scope, InstalledVersion = installed.Receipt.Version };
+        }
+
         // 1. Direct local lookup in application directory
         string directExe = Path.Combine(searchBase, platform.BinaryName);
         if (File.Exists(directExe))
@@ -99,6 +116,16 @@ public sealed class AppLauncherService : IAppLauncherService
         if (File.Exists(directDll))
         {
             return AppResolution.Available(Path.GetFullPath(directDll), launchWithDotnet: true, statusText: "Ready (Local)");
+        }
+
+        // Isolated Office portable payloads live alongside the launcher directory.
+        string bundleRoot = Path.GetFileName(Path.TrimEndingDirectorySeparator(searchBase)).Equals("launcher", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetDirectoryName(Path.TrimEndingDirectorySeparator(searchBase))! : searchBase;
+        string portable = Path.Combine(bundleRoot, "products", app.Id.ToString().ToLowerInvariant());
+        foreach (string name in new[] { platform.BinaryName, platform.DllName })
+        {
+            string candidate = Path.Combine(portable, name);
+            if (File.Exists(candidate)) return AppResolution.Available(Path.GetFullPath(candidate), name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase), "Ready (Portable)");
         }
 
         // 2. Probing workspace tree upward from base directory and current directory

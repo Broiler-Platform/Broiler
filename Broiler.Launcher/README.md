@@ -128,14 +128,31 @@ To open Settings:
 
 Product launch buttons have a separate down-arrow menu. Launch is disabled when
 the product cannot be found; the menu remains available. Settings opens the
-existing settings page. Install for user, Install for all, and Start BOSS are
-shown disabled until their service milestones are delivered. Card background
-clicks no longer launch products. See [M1 delivery and package handoff](docs/m1-status.md).
+existing settings page. Install for user/all are enabled by a compatible signed
+Office package (or a complete local demo bundle in an explicit demo build) and update inventory without restarting the launcher. Installation
+shows phase/progress and cancellation in the selected product's menu. Start BOSS
+starts or reuses the shared web server; Open BOSS and lifecycle controls are
+available in Tools → BOSS. Card background clicks no longer launch products.
+See [M1 delivery](docs/m1-status.md) and [M2 installation/signing/recovery](docs/m2-status.md).
+
+The [M3 demo package and workflow](docs/m3-status.md) can be built without signing
+keys. Its launcher is visibly marked as an unsigned demo. Production signing is
+deferred to the final release gate, allowing M4–M6 to continue for demonstration.
+
+See [M4 BOSS lifecycle and demo](docs/m4-status.md) for server start, readiness,
+ownership, shutdown, logs and current JSON/CLI options.
+See [M5 release checks and updates](docs/m5-status.md) for cached GitHub release
+discovery, user/machine update actions, local demo bundle upgrades and BOSS
+restart/rollback. No additional NuGet publication is required for M5.
+The [M6 settings delivery](docs/m6-status.md) adds explicit product modes,
+installation preferences, BOSS and update controls, schema migration and draft
+Save/Cancel behavior. It consumes existing Broiler.UI preview.24 controls.
 
 Linux supports Browser and Writer. Cell and Plate currently have Windows heads only,
 including when a custom executable is configured. Discovery uses custom override,
 local directory, ordered workspace ancestors (base folder first, then current
-folder), then PATH. Managed user/machine discovery is reserved for P1.
+folder), then PATH. Managed Office user/machine installations are discovered before
+portable/workspace copies, after an explicit custom override.
 
 CLI argument tokens are preserved verbatim. Settings arguments use whitespace
 separators and double quotes for grouping, including empty arguments. Backslashes

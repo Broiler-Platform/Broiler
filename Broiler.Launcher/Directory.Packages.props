@@ -20,6 +20,9 @@
     <PackageVersion Include="Broiler.UI.AboutDialog.Standard" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.UI.Edit" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.UI.Edit.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.CheckBox.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.ComboBox.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.ScrollView.Standard" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.UI.FileDialog" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.UI.FileDialog.Standard" Version="$(BroilerUiVersion)" />
     <!-- Hosting's transitive UI controls follow the same candidate family. -->

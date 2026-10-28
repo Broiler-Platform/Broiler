@@ -26,7 +26,7 @@ public class SettingsViewTests
     public void SettingsView_MeasuresAndArrangesWithoutError()
     {
         var store = new FakeSettingsStore();
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var view = new SettingsView(service);
 
         view.Measure(new BSize(840, 560));
@@ -39,7 +39,7 @@ public class SettingsViewTests
     public void SettingsView_AutoDetectAll_UpdatesFields()
     {
         var store = new FakeSettingsStore();
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var view = new SettingsView(service);
 
         // Run auto-detect all
@@ -54,7 +54,7 @@ public class SettingsViewTests
     public void SettingsView_EscapeKey_FiresBackRequested()
     {
         var store = new FakeSettingsStore();
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var view = new SettingsView(service);
 
         bool backFired = false;
@@ -83,7 +83,7 @@ public class SettingsViewTests
     public void LauncherShellView_NavigatesBetweenDashboardAndSettings()
     {
         var store = new FakeSettingsStore();
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var shell = new LauncherShellView(service);
 
         shell.Measure(new BSize(840, 560));
@@ -111,7 +111,7 @@ public class SettingsViewTests
     public void LauncherView_CtrlComma_FiresSettingsRequested()
     {
         var store = new FakeSettingsStore();
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var shell = new LauncherShellView(service);
 
         shell.Measure(new BSize(840, 560));

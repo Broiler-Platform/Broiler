@@ -1,6 +1,8 @@
 using System;
 using Broiler.Graphics.Geometry;
 using Broiler.Launcher.Services;
+using Broiler.Launcher.Installation;
+using Broiler.Launcher.Services.Boss;
 using Broiler.UI;
 using Broiler.UI.Window;
 
@@ -15,11 +17,13 @@ public sealed class LauncherShellView : UiElement
     private readonly SettingsView _settingsView;
     private UiWindow? _ownerWindow;
 
-    public LauncherShellView(IAppLauncherService? launcherService = null, UiWindow? ownerWindow = null)
+    public LauncherShellView(IAppLauncherService? launcherService = null, UiWindow? ownerWindow = null, IProductInstallationService? installationService = null, IBossController? bossController = null, IMachineUpdateBroker? machineUpdateBroker = null)
     {
         var service = launcherService ?? new AppLauncherService();
-        _launcherView = new LauncherView(service);
-        _settingsView = new SettingsView(service);
+        var boss = bossController ?? BossController.CreateDefault(service);
+        _launcherView = new LauncherView(service, installationService, boss, updateService:
+            new ProductUpdateService(OfficeInstallPaths.CreateDefault(), OfficeReleaseVerifier.CreateDefault(), boss, machineUpdateBroker));
+        _settingsView = new SettingsView(service, _launcherView.ReleaseCatalog);
 
         _ownerWindow = ownerWindow;
         _launcherView.OwnerWindow = ownerWindow;
@@ -27,6 +31,7 @@ public sealed class LauncherShellView : UiElement
 
         _launcherView.SettingsRequested += (_, _) => ShowSettings();
         _settingsView.BackRequested += (_, _) => ShowDashboard();
+        _settingsView.ReleasesChecked += check => _launcherView.AcceptReleaseCheck(check);
         _settingsView.Saved += (_, _) =>
         {
             _launcherView.RefreshApps();
@@ -66,6 +71,7 @@ public sealed class LauncherShellView : UiElement
 
     public void ShowSettings()
     {
+        if (_launcherView.IsOperationInProgress) { _launcherView.ReportSettingsBusy(); return; }
         _settingsView.LoadCurrentSettings();
         _launcherView.Visibility = UiVisibility.Collapsed;
         _settingsView.Visibility = UiVisibility.Visible;

@@ -13,6 +13,7 @@ using Broiler.Input;
 using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
 using Broiler.Launcher.UI;
+using Broiler.Launcher.Installation;
 using Broiler.UI;
 using Broiler.UI.Standard;
 using Broiler.UI.Window;
@@ -49,9 +50,11 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
 
     public LauncherWindow() : base(new BWindowOptions
     {
-        Title = "Broiler Launcher",
+        Title = OfficeBuild.IsDemo ? "Broiler Office Demo (unsigned)" : "Broiler Launcher",
         ClientWidth = 840,
         ClientHeight = 560,
+        MinClientWidth = 640,
+        MinClientHeight = 480,
         ClearColor = LauncherView.CanvasColor,
         RenderOptions = new BRenderOptions(Antialias: true, VSync: true, SubpixelText: true),
     })
@@ -66,7 +69,8 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
             Background = LauncherView.CanvasColor,
         };
 
-        _shell = new LauncherShellView(ownerWindow: _rootWindow);
+        _shell = new LauncherShellView(ownerWindow: _rootWindow,
+            installationService: ProductInstallationService.CreateDefault(new WindowsMachineInstallBroker()), machineUpdateBroker: new WindowsMachineInstallBroker());
         _rootWindow.AddChild(_shell);
         _shell.LauncherView.ExitRequested += (_, _) => Close();
 

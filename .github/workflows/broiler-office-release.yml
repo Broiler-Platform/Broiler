@@ -1,0 +1,174 @@
+name: Broiler Office demo release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Committed ref to package (resolved once to a full SHA).
+        default: main
+        required: true
+      version:
+        description: Demo version, for example 0.1.0-demo.1; empty uses run number.
+        required: false
+        default: ''
+      create_draft:
+        description: Create a draft GitHub prerelease after validation.
+        type: boolean
+        default: true
+  push:
+    tags: ['office-v*-demo.*']
+  pull_request:
+    paths:
+      - 'Broiler.Launcher/**'
+      - 'Broiler.Office.Server/**'
+      - 'eng/office-products.json'
+      - 'scripts/*office*.ps1'
+      - 'scripts/tests/office-package.tests.ps1'
+      - '.github/workflows/broiler-office-release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: office-demo-${{ github.ref }}-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.identity.outputs.sha }}
+      version: ${{ steps.identity.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - id: identity
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:REQUESTED_VERSION
+          if ($env:GITHUB_REF -like 'refs/tags/office-v*') { $version = $env:GITHUB_REF.Substring('refs/tags/office-v'.Length) }
+          if (!$version) { $version = "0.1.0-demo.$env:GITHUB_RUN_NUMBER" }
+          if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+-demo\.[1-9][0-9]*\z') { throw 'This workflow requires an explicit demo prerelease version. Production signing is a final-release gate.' }
+          $sha = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot resolve source SHA.' }
+          $tag = "office-v$version"
+          if (@(git tag --list $tag).Count) {
+            $tagSha = (git rev-parse "$tag^{commit}").Trim()
+            if ($tagSha -ne $sha) { throw 'The requested Office version tag points at a different commit.' }
+          }
+          "sha=$sha" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+  validate:
+    needs: resolve
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          submodules: recursive
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test production verification boundary
+        run: dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows
+      - name: Test demo build
+        run: dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows -p:BroilerOfficeDemo=true
+      - name: Exercise package fixtures and checksum failures
+        shell: pwsh
+        run: ./scripts/tests/office-package.tests.ps1
+
+  build:
+    if: github.event_name != 'pull_request'
+    needs: [resolve, validate]
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          submodules: recursive
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - name: Install Writer WebAssembly build workload
+        run: dotnet workload install wasm-tools
+      - name: Build complete independent product payloads
+        shell: pwsh
+        env:
+          OFFICE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: ./scripts/build-office.ps1 -Version $env:OFFICE_VERSION -OutputRoot "$env:RUNNER_TEMP/office-build" -RequireClean
+      - name: Verify exact extracted archives
+        shell: pwsh
+        env:
+          OFFICE_VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          ./scripts/smoke-test-office.ps1 -Archive "$env:RUNNER_TEMP/office-build/package/assets/Broiler-Office-$($env:OFFICE_VERSION)-win-x64.zip" -OutputDirectory "$env:RUNNER_TEMP/office-smoke"
+          ./scripts/verify-office-assets.ps1 -Directory "$env:RUNNER_TEMP/office-build/package/assets"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: office-demo-assets-${{ needs.resolve.outputs.version }}
+          path: ${{ runner.temp }}/office-build/package/assets/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: office-demo-smoke-${{ needs.resolve.outputs.version }}
+          path: |
+            ${{ runner.temp }}/office-smoke/smoke-results.json
+            ${{ runner.temp }}/office-smoke/boss-lifecycle/boss-lifecycle-results.json
+            ${{ runner.temp }}/office-smoke/boss-lifecycle/logs/*.log
+            ${{ runner.temp }}/office-smoke/update-lifecycle/office-update-results.json
+            ${{ runner.temp }}/office-smoke/update-lifecycle/logs/*.log
+            ${{ runner.temp }}/office-smoke/settings-render/settings-render-results.json
+            ${{ runner.temp }}/office-smoke/settings-render/*.png
+          if-no-files-found: warn
+
+  draft-release:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.create_draft)
+    needs: [resolve, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+      - uses: actions/download-artifact@v7
+        with:
+          name: office-demo-assets-${{ needs.resolve.outputs.version }}
+          path: release-assets
+      - name: Verify and create draft prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OFFICE_VERSION: ${{ needs.resolve.outputs.version }}
+          OFFICE_SHA: ${{ needs.resolve.outputs.sha }}
+        run: |
+          ./scripts/verify-office-assets.ps1 -Directory ./release-assets
+          $tag = "office-v$env:OFFICE_VERSION"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'This Office release already exists; never overwrite release bytes. Use a new demo version.' }
+          $notes = @(
+            "Unsigned Broiler Office demo $env:OFFICE_VERSION for Windows x64.",
+            "Source commit: $env:OFFICE_SHA",
+            '',
+            'Includes Launcher, Browser, Writer, Cell, Plate and BOSS with independent dependency closures.',
+            'Extract the full Office archive and open Start-Broiler-Office.cmd. Local install actions work in the explicitly marked demo launcher without signing keys.',
+            'Checksums detect corruption; this demo is not authenticated by a publisher signature. Production signing is deferred to the final release gate.',
+            'Automated startup and BOSS HTTP checks passed. Human desktop interaction remains part of demo review.',
+            'Linux and ARM64 support are deferred. See the packaged README, BUILD-INFO.json and SBOM.cdx.json.'
+          ) -join "`n"
+          $notesPath = Join-Path $env:RUNNER_TEMP 'office-release-notes.md'
+          Set-Content -LiteralPath $notesPath -Value $notes -Encoding utf8NoBOM
+          $assets = @(Get-ChildItem -LiteralPath ./release-assets -File | ForEach-Object FullName)
+          gh release create $tag @assets --target $env:OFFICE_SHA --draft --prerelease --title "Broiler Office Demo $env:OFFICE_VERSION" --notes-file $notesPath
+          if ($LASTEXITCODE -ne 0) { throw 'Office draft release creation failed.' }

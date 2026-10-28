@@ -10,6 +10,8 @@ public sealed record AppResolution(
     string StatusText,
     bool IsCustom = false)
 {
+    public Broiler.Launcher.Installation.InstallScope? InstallScope { get; init; }
+    public string? InstalledVersion { get; init; }
     public static AppResolution Available(string path, bool launchWithDotnet = false, string statusText = "Ready", bool isCustom = false) =>
         new(IsAvailable: true, ResolvedPath: path, LaunchWithDotnet: launchWithDotnet, StatusText: statusText, IsCustom: isCustom);
 

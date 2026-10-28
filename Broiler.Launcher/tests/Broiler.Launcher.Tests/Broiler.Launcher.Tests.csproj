@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(BroilerOfficeDemo)' == 'true'">
+    <DefineConstants>$(DefineConstants);EXPECT_OFFICE_DEMO</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Broiler.Launcher.Core\Broiler.Launcher.Core.csproj" />

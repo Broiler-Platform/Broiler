@@ -5,12 +5,14 @@ using Broiler.Input.Mouse;
 using Broiler.Launcher.Models;
 using Broiler.Launcher.Services;
 using Broiler.Launcher.UI;
+using Broiler.Launcher.Installation;
+using Broiler.Launcher.Services.Boss;
 using Broiler.UI;
 using Xunit;
 
 namespace Broiler.Launcher.Tests;
 
-public class LauncherViewTests
+public partial class LauncherViewTests
 {
     private sealed class MockLauncherService : IAppLauncherService
     {
@@ -150,9 +152,123 @@ public class LauncherViewTests
             Assert.Equal("Install for user", split.Menu.Items[0].Text);
             Assert.Equal("Install for all", split.Menu.Items[1].Text);
             Assert.Equal("Start BOSS", split.Menu.Items[2].Text);
-            Assert.All(System.Linq.Enumerable.Take(split.Menu.Items, 3), item => Assert.False(item.IsEnabled));
-            Assert.Equal("launcher.settings", split.Menu.Items[4].CommandName);
-            Assert.True(split.Menu.Items[4].IsEnabled);
+            Assert.All(System.Linq.Enumerable.Take(split.Menu.Items, 2), item => Assert.False(item.IsEnabled));
+            Assert.True(split.Menu.Items[2].IsEnabled);
+            Assert.Equal("launcher.settings", split.Menu.Items[5].CommandName);
+            Assert.True(split.Menu.Items[5].IsEnabled);
+        }
+    }
+
+    [Fact]
+    public async Task InstallationLocksOnlySelectedProductAndAllowsCancellation()
+    {
+        var launcher = new MockLauncherService();
+        var installation = new ControlledInstaller();
+        using var view = new LauncherView(launcher, installation);
+        await view.RefreshInstallationActionsAsync();
+        var splits = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.OfType<Broiler.UI.Button.Standard.StandardSplitButton>(view.Children));
+        Assert.True(splits[0].Menu.Items[0].IsEnabled);
+        var operation = view.InstallProductAsync(BroilerAppId.Browser, InstallScope.User);
+        Assert.False(splits[0].IsPrimaryEnabled);
+        Assert.False(splits[0].Menu.Items[1].IsEnabled);
+        Assert.True(splits[0].Menu.Items[3].IsEnabled);
+        Assert.True(splits[1].IsPrimaryEnabled);
+        view.LaunchById(BroilerAppId.Browser);
+        Assert.Equal(0, launcher.LaunchCount);
+        await view.InstallProductAsync(BroilerAppId.Browser, InstallScope.Machine);
+        Assert.Equal(1, installation.Calls);
+        view.CancelInstallation(BroilerAppId.Browser);
+        await operation;
+        Assert.True(splits[0].IsPrimaryEnabled);
+        Assert.False(splits[0].Menu.Items[3].IsEnabled);
+    }
+
+    [Fact]
+    public async Task AdministratorHandoffDisablesCancellationAndRefreshesAfterCompletion()
+    {
+        var launcher = new MockLauncherService { IsAvailable = false };
+        var installation = new ControlledInstaller();
+        using var view = new LauncherView(launcher, installation);
+        var split = System.Linq.Enumerable.First(System.Linq.Enumerable.OfType<Broiler.UI.Button.Standard.StandardSplitButton>(view.Children));
+        var operation = view.InstallProductAsync(BroilerAppId.Browser, InstallScope.Machine);
+        installation.Progress!.Report(new("Administrator installation", null, false));
+        Assert.False(split.Menu.Items[3].IsEnabled);
+        view.CancelInstallation(BroilerAppId.Browser);
+        Assert.False(installation.Token.IsCancellationRequested);
+        launcher.IsAvailable = true;
+        installation.Completion.SetResult(new(true, "Installed for all users."));
+        await operation;
+        Assert.True(split.IsPrimaryEnabled);
+    }
+
+    [Fact]
+    public async Task SharedBossActionWorksWhenSelectedProductsAreMissingAndChangesToOpen()
+    {
+        var boss = new FakeBossController();
+        using var view = new LauncherView(new MockLauncherService { IsAvailable = false }, new ControlledInstaller(), boss);
+        await view.StartBossAsync();
+        Assert.Equal(1, boss.Starts);
+        foreach (var split in System.Linq.Enumerable.OfType<Broiler.UI.Button.Standard.StandardSplitButton>(view.Children))
+        {
+            Assert.False(split.IsPrimaryEnabled);
+            Assert.Equal("Open BOSS", split.Menu.Items[2].Text);
+            Assert.Equal("office.boss.open", split.Menu.Items[2].CommandName);
+            Assert.True(split.Menu.Items[2].IsEnabled);
+        }
+        await view.StopBossAsync();
+        Assert.Equal(1, boss.Stops);
+    }
+
+    [Fact]
+    public async Task BossInstallationTargetsBossRatherThanTheSelectedDesktopApp()
+    {
+        var installation = new ControlledInstaller();
+        using var view = new LauncherView(new MockLauncherService(), installation, new FakeBossController());
+        var pending = view.InstallBossAsync(InstallScope.Machine);
+        Assert.Equal("boss", installation.ProductId);
+        Assert.Equal(InstallScope.Machine, installation.Scope);
+        installation.Completion.SetResult(new(true, "Installed BOSS."));
+        await pending;
+    }
+
+    private sealed class FakeBossController : IBossController
+    {
+        public int Starts, Stops;
+        public BossState Current { get; private set; } = new(BossStatus.Stopped, "Stopped");
+        public event Action<BossState>? StateChanged;
+        public Task<BossState> StartAsync(CancellationToken token = default)
+        {
+            Starts++; Current = new(BossStatus.Running, "Ready", new Uri("http://127.0.0.1:5555/"), true);
+            StateChanged?.Invoke(Current); return Task.FromResult(Current);
+        }
+        public Task<BossState> StopAsync(CancellationToken token = default)
+        {
+            Stops++; Current = new(BossStatus.Stopped, "Stopped"); StateChanged?.Invoke(Current); return Task.FromResult(Current);
+        }
+        public Task<BossState> RefreshAsync(CancellationToken token = default) => Task.FromResult(Current);
+        public Task<BossState> OpenBrowserAsync(CancellationToken token = default) => Task.FromResult(Current);
+        public void OpenLog() { }
+        public void Dispose() { }
+    }
+
+    private sealed class ControlledInstaller : IProductInstallationService
+    {
+        public int Calls;
+        public IProgress<InstallProgress>? Progress;
+        public CancellationToken Token;
+        public string? ProductId;
+        public InstallScope Scope;
+        public TaskCompletionSource<InstallResult> Completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<InstallAvailability> GetAvailabilityAsync(string productId, InstallScope scope, CancellationToken token = default) =>
+            Task.FromResult(new InstallAvailability(true, "Install", new(productId, scope, InstallationState.NotInstalled)));
+        public Task<InstallResult> InstallAsync(string productId, InstallScope scope, IProgress<InstallProgress>? progress = null, CancellationToken token = default)
+        {
+            Calls++;
+            ProductId = productId;
+            Scope = scope;
+            Progress = progress;
+            Token = token;
+            return Completion.Task.WaitAsync(token);
         }
     }
 }

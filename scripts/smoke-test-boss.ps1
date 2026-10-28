@@ -67,7 +67,9 @@ function Invoke-BossRequest {
 }
 
 Write-Host "==> starting BOSS from $PackageDirectory on $baseUrl"
-$server = Start-Process -FilePath $executable `
+$bossStartOptions = @{}
+if ($IsWindows) { $bossStartOptions.WindowStyle = 'Hidden' }
+$server = Start-Process @bossStartOptions -FilePath $executable `
     -ArgumentList '--urls', $baseUrl `
     -WorkingDirectory $foreignWorkingDirectory `
     -RedirectStandardOutput $stdout `

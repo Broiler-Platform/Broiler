@@ -1,4 +1,8 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Broiler.Launcher.Installation;
 
 namespace Broiler.Launcher.Models;
 
@@ -7,6 +11,11 @@ namespace Broiler.Launcher.Models;
 /// </summary>
 public sealed class AppCustomSettings
 {
+    public InstallScope PreferredInstalledScope { get; set; } = InstallScope.User;
+    public bool ShowInstallActions { get; set; } = true;
+    public bool ShowUpdateActions { get; set; } = true;
+    public bool ShowBossAction { get; set; } = true;
+    [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
     /// <summary>
     /// Custom path to the application executable or assembly on disk.
     /// When specified and <see cref="UseAutoDetect"/> is false, this path takes precedence.
@@ -29,6 +38,11 @@ public sealed class AppCustomSettings
         ExecutablePath = ExecutablePath,
         Arguments = Arguments,
         UseAutoDetect = UseAutoDetect,
+        PreferredInstalledScope = PreferredInstalledScope,
+        ShowInstallActions = ShowInstallActions,
+        ShowUpdateActions = ShowUpdateActions,
+        ShowBossAction = ShowBossAction,
+        Extra = Extra?.ToDictionary(x => x.Key, x => x.Value.Clone()),
     };
 }
 
@@ -37,6 +51,13 @@ public sealed class AppCustomSettings
 /// </summary>
 public sealed class LauncherSettings
 {
+    public const int CurrentSchemaVersion = 2;
+    public int SchemaVersion { get; set; } = CurrentSchemaVersion;
+    public InstallScope PreferredInstallScope { get; set; } = InstallScope.User;
+    [JsonExtensionData] public Dictionary<string, JsonElement>? Extra { get; set; }
+    [JsonIgnore] public Dictionary<string, JsonElement> UnknownApps { get; set; } = new();
+    public BossSettings Boss { get; set; } = new();
+    public UpdateSettings Updates { get; set; } = new();
     /// <summary>
     /// Per-application settings keyed by application identifier.
     /// </summary>
@@ -61,7 +82,9 @@ public sealed class LauncherSettings
     /// </summary>
     public LauncherSettings Clone()
     {
-        var clone = new LauncherSettings();
+        var clone = new LauncherSettings { SchemaVersion = SchemaVersion, PreferredInstallScope = PreferredInstallScope,
+            Extra = Extra?.ToDictionary(x => x.Key, x => x.Value.Clone()), UnknownApps = UnknownApps.ToDictionary(x => x.Key, x => x.Value.Clone()),
+            Boss = (Boss ?? new BossSettings()).Clone(), Updates = (Updates ?? new UpdateSettings()).Clone() };
         foreach (var (key, value) in Apps)
         {
             clone.Apps[key] = value.Clone();

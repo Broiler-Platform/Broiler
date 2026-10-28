@@ -34,7 +34,7 @@ public sealed class P0LaunchTests : IDisposable
         var store = new Store();
         store.Value.Apps[app.Id] = new() { UseAutoDetect = false, ExecutablePath = binary, Arguments = "--profile \"two words\"" };
         ProcessStartInfo? captured = null;
-        var service = new AppLauncherService([app], store, startProcess: info => { captured = info; return 42; });
+        var service = new AppLauncherService([app], store, startProcess: info => { captured = info; return 42; }, inventory: new EmptyInstallationInventory());
         string[] tokens = ["a b", "", "quote\"value", @"C:\folder with spaces\", "Ünicode"];
         Assert.True(LauncherCliHandler.TryHandleCli(["--app", "browser", .. tokens], out int code, service));
         Assert.Equal(0, code);
@@ -57,7 +57,7 @@ public sealed class P0LaunchTests : IDisposable
     public void InvalidQuotesFailWithoutStartingProcess()
     {
         bool started = false;
-        var service = new AppLauncherService(settingsStore: new Store(), startProcess: _ => { started = true; return 1; });
+        var service = new AppLauncherService(settingsStore: new Store(), startProcess: _ => { started = true; return 1; }, inventory: new EmptyInstallationInventory());
         Assert.False(service.LaunchApp(service.Apps[0], "\"unterminated").Succeeded);
         Assert.False(started);
     }
@@ -72,7 +72,7 @@ public sealed class P0LaunchTests : IDisposable
         File.WriteAllText(binary, "fixture");
         var store = new Store();
         store.Value.Apps[id] = new() { UseAutoDetect = false, ExecutablePath = binary };
-        var service = new AppLauncherService([app], store, isWindows: false);
+        var service = new AppLauncherService([app], store, isWindows: false, inventory: new EmptyInstallationInventory());
         Assert.Null(app.GetPlatform(false));
         Assert.False(service.ResolveApp(app, _root).IsAvailable);
         Assert.False(service.AutoDetect(app, _root).IsAvailable);
@@ -91,7 +91,7 @@ public sealed class P0LaunchTests : IDisposable
             File.WriteAllText(file, "fixture");
         }
         Directory.CreateDirectory(Path.Combine(_root, ".git"));
-        var service = new AppLauncherService([app], new Store(), isWindows: windows, environment: _ => null, currentDirectory: _root);
+        var service = new AppLauncherService([app], new Store(), isWindows: windows, environment: _ => null, currentDirectory: _root, inventory: new EmptyInstallationInventory());
         var resolution = service.AutoDetect(app, _root);
         Assert.True(resolution.IsAvailable);
         Assert.Contains(windows ? ".Windows" : ".Linux", resolution.ResolvedPath);
@@ -101,7 +101,7 @@ public sealed class P0LaunchTests : IDisposable
     public void FailedSaveDoesNotReplaceActiveSettings()
     {
         var store = new Store();
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var original = service.Settings;
         store.Fail = true;
         Assert.Throws<IOException>(() => service.UpdateSettings(new LauncherSettings()));

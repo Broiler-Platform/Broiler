@@ -33,7 +33,7 @@ public class AppLauncherServiceSettingsTests
             appSetting.ExecutablePath = dummyExe;
             appSetting.UseAutoDetect = false;
 
-            var service = new AppLauncherService(settingsStore: store);
+            var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
             var writerApp = BroilerAppInfo.CreateDefaultSuite()[1]; // Writer
 
             var resolution = service.ResolveApp(writerApp);
@@ -60,7 +60,7 @@ public class AppLauncherServiceSettingsTests
         appSetting.ExecutablePath = "C:\\NonExistentDirectory\\DoesNotExist.exe";
         appSetting.UseAutoDetect = false;
 
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var writerApp = BroilerAppInfo.CreateDefaultSuite()[1]; // Writer
 
         var resolution = service.ResolveApp(writerApp);
@@ -83,7 +83,7 @@ public class AppLauncherServiceSettingsTests
             appSetting.ExecutablePath = "C:\\IgnoredPath\\browser.exe";
             appSetting.UseAutoDetect = true;
 
-            var service = new AppLauncherService(settingsStore: store);
+            var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
             var browserApp = BroilerAppInfo.CreateDefaultSuite()[0]; // Browser
 
             var resolution = service.ResolveApp(browserApp, baseDirectory: tempDir);
@@ -109,7 +109,7 @@ public class AppLauncherServiceSettingsTests
         appSetting.ExecutablePath = "C:\\Custom\\Cell.exe";
         appSetting.UseAutoDetect = false;
 
-        var service = new AppLauncherService(settingsStore: store);
+        var service = new AppLauncherService(settingsStore: store, inventory: new EmptyInstallationInventory());
         var cellApp = BroilerAppInfo.CreateDefaultSuite()[2]; // Cell
 
         // AutoDetect ignores custom path overrides completely

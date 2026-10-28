@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "rid": "win-x64",
+  "products": [
+    { "id": "launcher", "project": "Broiler.Launcher/src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj", "entryPoint": "Broiler.Launcher.Windows.exe" },
+    { "id": "browser", "project": "Broiler.Browser/src/Broiler.Browser.Windows/Broiler.Browser.Windows.csproj", "entryPoint": "Broiler.Browser.Windows.exe" },
+    { "id": "writer", "project": "Broiler.Writer/src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj", "entryPoint": "Broiler.Writer.Windows.exe" },
+    { "id": "cell", "project": "Broiler.Cells/src/Broiler.Cells.Windows/Broiler.Cells.Windows.csproj", "entryPoint": "Broiler.Cells.Windows.exe" },
+    { "id": "plate", "project": "Broiler.Plate/src/Broiler.Plate.Windows/Broiler.Plate.Windows.csproj", "entryPoint": "Broiler.Plate.Windows.exe" },
+    { "id": "boss", "project": "Broiler.Office.Server/Broiler.Office.Server.csproj", "entryPoint": "Broiler.Office.Server.exe" }
+  ]
+}

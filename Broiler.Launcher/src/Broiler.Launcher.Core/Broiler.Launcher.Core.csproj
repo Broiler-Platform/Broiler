@@ -6,8 +6,12 @@
     <RootNamespace>Broiler.Launcher</RootNamespace>
     <AssemblyName>Broiler.Launcher.Core</AssemblyName>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(BroilerOfficeDemo)' == 'true'">
+    <DefineConstants>$(DefineConstants);BROILER_OFFICE_DEMO</DefineConstants>
+  </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="ReleaseTrust/office-release-keys.json" LogicalName="Broiler.Launcher.OfficeReleaseKeys.json" />
     <PackageReference Include="Broiler.UI" />
     <PackageReference Include="Broiler.UI.Standard" />
     <PackageReference Include="Broiler.UI.Button.Standard" />
@@ -18,6 +22,9 @@
     <PackageReference Include="Broiler.UI.Dialog.Standard" />
     <PackageReference Include="Broiler.UI.AboutDialog.Standard" />
     <PackageReference Include="Broiler.UI.Edit.Standard" />
+    <PackageReference Include="Broiler.UI.CheckBox.Standard" />
+    <PackageReference Include="Broiler.UI.ComboBox.Standard" />
+    <PackageReference Include="Broiler.UI.ScrollView.Standard" />
     <PackageReference Include="Broiler.UI.FileDialog.Standard" />
     <PackageReference Include="Broiler.Graphics" />
   </ItemGroup>

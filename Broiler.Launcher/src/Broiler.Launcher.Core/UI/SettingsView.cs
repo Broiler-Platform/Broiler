@@ -1,513 +1,292 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
-using Broiler.Graphics;
-using Broiler.Graphics.Color;
 using Broiler.Graphics.Geometry;
-using Broiler.Graphics.RenderList;
-using Broiler.Graphics.Text;
 using Broiler.Input.Keyboard;
-using Broiler.Input.Mouse;
+using Broiler.Launcher.Installation;
 using Broiler.Launcher.Models;
 using Broiler.Launcher.Services;
+using Broiler.Launcher.Services.Boss;
 using Broiler.UI;
 using Broiler.UI.Button.Standard;
+using Broiler.UI.CheckBox;
+using Broiler.UI.CheckBox.Standard;
+using Broiler.UI.ComboBox;
+using Broiler.UI.ComboBox.Standard;
 using Broiler.UI.Dialog;
 using Broiler.UI.Edit.Standard;
 using Broiler.UI.FileDialog;
 using Broiler.UI.FileDialog.Standard;
-using Broiler.UI.Label;
 using Broiler.UI.Label.Standard;
+using Broiler.UI.ScrollView;
+using Broiler.UI.ScrollView.Standard;
 using Broiler.UI.Standard;
+using Broiler.UI.Label;
 using Broiler.UI.Window;
 
 namespace Broiler.Launcher.UI;
 
-/// <summary>
-/// Settings view for configuring executable paths, launch arguments, and auto-detection
-/// for applications in the Broiler suite.
-/// </summary>
+/// <summary>One settings page with a draft, explicit modes and scrollable sections.</summary>
 public sealed class SettingsView : UiElement
 {
     private readonly IAppLauncherService _launcherService;
-    private readonly StandardButton _backButton;
-    private readonly StandardLabel _titleLabel;
-    private readonly StandardLabel _subtitleLabel;
-
-    private readonly List<StandardLabel> _appTitles = [];
-    private readonly List<StandardLabel> _appBadges = [];
-    private readonly List<StandardLabel> _pathLabels = [];
-    private readonly List<StandardEdit> _pathEdits = [];
-    private readonly List<StandardButton> _browseButtons = [];
-    private readonly List<StandardButton> _detectButtons = [];
-    private readonly List<StandardLabel> _argLabels = [];
-    private readonly List<StandardEdit> _argEdits = [];
+    private readonly IReleaseCatalogClient? _catalog;
+    private LauncherSettings _draft = new();
+    private readonly StandardButton _backButton, _saveButton, _cancelButton, _checkNow;
+    private readonly StandardLabel _titleLabel, _footerStatusLabel, _updateStatus, _bossStatus;
+    private readonly StandardScrollView _scroll = new() { ConstrainContentWidth = true, HorizontalScrollBarVisibility = UiScrollBarVisibility.Hidden, Focusable = true, AccessibleName = "Scrollable settings; Page Up and Page Down" };
+    private readonly List<SettingsForm> _forms = [];
+    private readonly List<StandardButton> _sections = [];
+    private readonly List<StandardEdit> _pathEdits = [], _argEdits = [];
+    private readonly List<StandardComboBox> _appModes = [], _appScopes = [];
+    private readonly List<StandardCheckBox> _installActions = [], _updateActions = [], _bossActions = [];
     private readonly List<StandardLabel> _appStatusLabels = [];
-    private readonly List<BRect> _cardRects = [];
+    private readonly StandardComboBox _preferredInstallScope, _bossMode, _channel;
+    private readonly StandardEdit _bossPath, _bossUrl, _bossTimeout, _bossArgs, _interval;
+    private readonly StandardCheckBox _bossBrowser, _bossKeepRunning, _startupCheck;
+    private readonly CancellationTokenSource _lifetime = new();
+    private bool _checking;
 
-    private readonly StandardButton _autoDetectAllButton;
-    private readonly StandardButton _saveButton;
-    private readonly StandardButton _cancelButton;
-    private readonly StandardLabel _footerStatusLabel;
-
-    public SettingsView(IAppLauncherService? launcherService = null)
+    public SettingsView(IAppLauncherService? launcherService = null, IReleaseCatalogClient? catalog = null)
     {
-        _launcherService = launcherService ?? new AppLauncherService();
-        AccessibleName = "Broiler Launcher Settings";
-
-        _backButton = new StandardButton
+        _launcherService = launcherService ?? new AppLauncherService(); _catalog = catalog;
+        AccessibleName = "Broiler Office settings";
+        _backButton = Button("Back (discard)", Discard); _titleLabel = StandardLabel.Title("Office settings");
+        _saveButton = Button("Save settings", SaveCurrentSettings); _cancelButton = Button("Cancel", Discard);
+        _footerStatusLabel = StandardLabel.Muted("Save applies all sections. Back, Cancel and Escape discard edits.");
+        _footerStatusLabel.Wrapping = UiTextWrapping.Wrap;
+        foreach (var child in new UiElement[] { _backButton, _titleLabel, _scroll, _saveButton, _cancelButton, _footerStatusLabel }) AddChild(child);
+        foreach (string name in new[] { "Products", "Installation", "BOSS", "Updates" })
         {
-            Text = "← Back",
-            PreferredSize = new BSize(80, 28),
-            CornerRadius = 4,
-        };
-        _backButton.Clicked += (_, _) => BackRequested?.Invoke(this, EventArgs.Empty);
-        AddChild(_backButton);
-
-        _titleLabel = StandardLabel.Title("Launcher Settings");
-        _subtitleLabel = StandardLabel.Muted("Configure custom executable paths, arguments, and auto-detection");
-        AddChild(_titleLabel);
-        AddChild(_subtitleLabel);
-
-        int count = _launcherService.Apps.Count;
-        for (int i = 0; i < count; i++)
-        {
-            BroilerAppInfo app = _launcherService.Apps[i];
-            AppCustomSettings custom = _launcherService.Settings.GetOrCreate(app.Id);
-            AppResolution currentRes = _launcherService.ResolveApp(app);
-
-            var title = StandardLabel.Subtitle(app.Title);
-            var badge = StandardLabel.Caption(app.BadgeText);
-
-            var pathLabel = StandardLabel.Muted("Path:");
-            var pathEdit = new StandardEdit
-            {
-                PlaceholderText = $"Auto-detect or path to {app.WindowsExeName} / {app.LinuxBinaryName}",
-                Text = custom.ExecutablePath ?? currentRes.ResolvedPath ?? string.Empty,
-                Font = new BFontStyle("Segoe UI", 11),
-                PaddingX = 8,
-                PaddingY = 4,
-            };
-
-            var browseBtn = new StandardButton
-            {
-                Text = "Browse...",
-                PreferredSize = new BSize(75, 26),
-                CornerRadius = 4,
-            };
-            int captureIndex = i;
-            browseBtn.Clicked += (_, _) => _ = BrowseForAppAsync(captureIndex);
-
-            var detectBtn = new StandardButton
-            {
-                Text = "Auto-Detect",
-                PreferredSize = new BSize(85, 26),
-                CornerRadius = 4,
-            };
-            detectBtn.Clicked += (_, _) => AutoDetectApp(captureIndex);
-
-            var argLabel = StandardLabel.Muted("Args:");
-            var argEdit = new StandardEdit
-            {
-                PlaceholderText = "Optional command-line arguments (e.g. --profile default)",
-                Text = custom.Arguments ?? string.Empty,
-                Font = new BFontStyle("Segoe UI", 11),
-                PaddingX = 8,
-                PaddingY = 4,
-            };
-
-            var status = new StandardLabel(
-                currentRes.IsAvailable ? $"Detected: {currentRes.StatusText}" : "Not Built / Missing",
-                currentRes.IsAvailable ? StandardLabelRole.Success : StandardLabelRole.Muted)
-            {
-                Font = new BFontStyle("Segoe UI", 10),
-            };
-
-            _appTitles.Add(title);
-            _appBadges.Add(badge);
-            _pathLabels.Add(pathLabel);
-            _pathEdits.Add(pathEdit);
-            _browseButtons.Add(browseBtn);
-            _detectButtons.Add(detectBtn);
-            _argLabels.Add(argLabel);
-            _argEdits.Add(argEdit);
-            _appStatusLabels.Add(status);
-            _cardRects.Add(BRect.Empty);
-
-            AddChild(title);
-            AddChild(badge);
-            AddChild(pathLabel);
-            AddChild(pathEdit);
-            AddChild(browseBtn);
-            AddChild(detectBtn);
-            AddChild(argLabel);
-            AddChild(argEdit);
-            AddChild(status);
+            int index = _forms.Count; var form = new SettingsForm(); _forms.Add(form); _scroll.AddChild(form);
+            var tab = Button(name, () => ShowSection(index)); tab.AccessibleName = name + " settings section";
+            _sections.Add(tab); AddChild(tab);
         }
-
-        _autoDetectAllButton = new StandardButton
+        var products = _forms[0];
+        foreach (var app in _launcherService.Apps)
         {
-            Text = "Auto-Detect All",
-            PreferredSize = new BSize(120, 30),
-            CornerRadius = 4,
-        };
-        _autoDetectAllButton.Clicked += (_, _) => AutoDetectAll();
-        AddChild(_autoDetectAllButton);
-
-        _saveButton = new StandardButton
-        {
-            Text = "Save Settings",
-            PreferredSize = new BSize(110, 30),
-            CornerRadius = 4,
-        };
-        _saveButton.Clicked += (_, _) => SaveCurrentSettings();
-        AddChild(_saveButton);
-
-        _cancelButton = new StandardButton
-        {
-            Text = "Cancel",
-            PreferredSize = new BSize(80, 30),
-            CornerRadius = 4,
-        };
-        _cancelButton.Clicked += (_, _) => BackRequested?.Invoke(this, EventArgs.Empty);
-        AddChild(_cancelButton);
-
-        _footerStatusLabel = StandardLabel.Muted("Ready");
-        AddChild(_footerStatusLabel);
+            int index = _pathEdits.Count; products.Heading(app.Title);
+            var mode = Choice(app.Title + " discovery mode", "Auto-detect", "Custom path");
+            var scope = Choice(app.Title + " preferred installed scope", "Prefer user installation", "Prefer machine installation");
+            _appModes.Add(mode); _appScopes.Add(scope); products.Row(mode, scope);
+            var path = Edit(app.Title + " executable path"); _pathEdits.Add(path);
+            products.Field("Custom path (retained in Auto-detect mode)", path);
+            products.Row(Button("Browse...", () => _ = BrowseAsync(path, () => { mode.SelectedIndex = 1; UpdateModeState(index); })), Button("Auto-detect", () => AutoDetectApp(index)));
+            var args = Edit(app.Title + " launch arguments"); _argEdits.Add(args); products.Field("Arguments (double quotes group tokens; no shell expansion)", args);
+            var install = Check("Install actions"); var update = Check("Update actions"); var boss = Check("BOSS action");
+            install.AccessibleName = app.Title + " install actions"; update.AccessibleName = app.Title + " update actions"; boss.AccessibleName = app.Title + " BOSS action";
+            _installActions.Add(install); _updateActions.Add(update); _bossActions.Add(boss); products.Row(install, update, boss);
+            var status = StandardLabel.Muted(""); status.AccessibleName = app.Title + " resolved source, path and version";
+            _appStatusLabels.Add(status); products.Row(status); mode.SelectionChanged += (_, _) => UpdateModeState(index);
+            path.TextChanged += (_, _) => { if (mode.SelectedIndex == 1) UpdateModeState(index); };
+        }
+        products.Row(Button("Auto-detect all products", AutoDetectAll));
+        var installation = _forms[1]; installation.Heading("Installation defaults");
+        _preferredInstallScope = Choice("Preferred install scope", "User profile", "All users (administrator approval)");
+        installation.Field("Preferred scope (grants no administrator privileges)", _preferredInstallScope);
+        var paths = OfficeInstallPaths.CreateDefault();
+        installation.Field("Computed user installation root", ReadOnly(paths.UserRoot));
+        installation.Field("Computed machine installation root", ReadOnly(paths.MachineRoot));
+        installation.Row(StandardLabel.Muted("Every operation names its actual scope. Existing receipts and data are retained."));
+        installation.Row(StandardLabel.Muted("Shortcut creation is not included in this demo. Destinations are fixed."));
+        var bossForm = _forms[2]; bossForm.Heading("BOSS process and listener");
+        _bossMode = Choice("BOSS discovery mode", "Auto-detect", "Custom path"); bossForm.Row(_bossMode);
+        _bossPath = Edit("BOSS executable path"); bossForm.Field("Custom BOSS executable path", _bossPath);
+        bossForm.Row(Button("Browse BOSS...", () => _ = BrowseAsync(_bossPath, () => { _bossMode.SelectedIndex = 1; UpdateBossMode(); })), Button("Auto-detect BOSS", () => { _bossMode.SelectedIndex = 0; UpdateBossMode(); }));
+        _bossUrl = Edit("BOSS loopback HTTP listener URL"); bossForm.Field("Listener URL (loopback HTTP root, including port)", _bossUrl);
+        _bossTimeout = Edit("BOSS startup timeout in seconds"); bossForm.Field("Startup timeout (1–120 seconds)", _bossTimeout);
+        _bossArgs = Edit("BOSS logging arguments"); bossForm.Field("Logging args, e.g. --Logging:LogLevel:Default Warning", _bossArgs);
+        _bossBrowser = Check("Open browser when ready"); _bossKeepRunning = Check("Keep running on launcher exit"); bossForm.Row(_bossBrowser, _bossKeepRunning);
+        bossForm.Field("Computed log directory", ReadOnly(Path.Combine(paths.UserRoot, "boss")));
+        _bossStatus = StandardLabel.Muted(""); bossForm.Row(_bossStatus);
+        bossForm.Row(StandardLabel.Muted("Path/listener changes apply on the next start. Stop owned BOSS first; external services stay externally managed."));
+        _bossMode.SelectionChanged += (_, _) => UpdateBossMode();
+        _bossPath.TextChanged += (_, _) => UpdateBossMode();
+        var updates = _forms[3]; updates.Heading("Release checks");
+        _channel = Choice("Office release channel", "Stable", "Preview (includes prereleases)"); updates.Field("Release channel", _channel);
+        _startupCheck = Check("Check for updates on launcher startup"); updates.Row(_startupCheck);
+        _interval = Edit("Release check interval in hours"); updates.Field("Check interval (1–168 hours)", _interval);
+        _checkNow = Button("Check now", () => _ = CheckNowAsync()); updates.Row(_checkNow);
+        _updateStatus = StandardLabel.Muted(""); updates.Row(_updateStatus);
+        updates.Row(StandardLabel.Muted("Checks never install updates. Check now uses this draft's channel; Save persists preferences."));
+        updates.Row(StandardLabel.Muted("Unsigned demos use a selected local bundle. Production signing remains the final gate."));
+        LoadCurrentSettings(); ShowSection(0);
     }
-
     public UiWindow? OwnerWindow { get; set; }
-
     public event EventHandler? BackRequested;
-
     public event EventHandler? Saved;
-
+    public event Action<ReleaseCheck>? ReleasesChecked;
+    public int CurrentSection { get; private set; }
+    public void ShowSection(int index)
+    {
+        if (index < 0 || index >= _forms.Count) return;
+        CurrentSection = index;
+        for (int i = 0; i < _forms.Count; i++)
+        {
+            _forms[i].Visibility = i == index ? UiVisibility.Visible : UiVisibility.Collapsed;
+            _sections[i].Text = (i == index ? "• " : "") + new[] { "Products", "Installation", "BOSS", "Updates" }[i];
+            _sections[i].AccessibleName = new[] { "Products", "Installation", "BOSS", "Updates" }[i] + (i == index ? " settings, current section" : " settings section");
+        }
+        _scroll.SetOffset(new BPoint(0, 0)); Invalidate(UiInvalidationKind.Measure | UiInvalidationKind.Arrange | UiInvalidationKind.Render);
+    }
+    private void Discard() { LoadCurrentSettings(); BackRequested?.Invoke(this, EventArgs.Empty); }
     public void LoadCurrentSettings()
     {
+        _draft = _launcherService.Settings.Clone();
         for (int i = 0; i < _launcherService.Apps.Count; i++)
         {
-            BroilerAppInfo app = _launcherService.Apps[i];
-            AppCustomSettings custom = _launcherService.Settings.GetOrCreate(app.Id);
-            AppResolution currentRes = _launcherService.ResolveApp(app);
-
-            _pathEdits[i].Text = custom.ExecutablePath ?? currentRes.ResolvedPath ?? string.Empty;
-            _argEdits[i].Text = custom.Arguments ?? string.Empty;
-
-            if (currentRes.IsAvailable)
-            {
-                _appStatusLabels[i].Text = currentRes.IsCustom ? "Custom Path Verified" : $"Auto-detected: {currentRes.StatusText}";
-                _appStatusLabels[i].Role = currentRes.IsCustom ? StandardLabelRole.Accent : StandardLabelRole.Success;
-            }
-            else
-            {
-                _appStatusLabels[i].Text = currentRes.StatusText;
-                _appStatusLabels[i].Role = StandardLabelRole.Muted;
-            }
+            var custom = _draft.GetOrCreate(_launcherService.Apps[i].Id);
+            _pathEdits[i].Text = custom.ExecutablePath ?? ""; _argEdits[i].Text = custom.Arguments ?? "";
+            _appModes[i].SelectedIndex = custom.UseAutoDetect ? 0 : 1; _appScopes[i].SelectedIndex = (int)custom.PreferredInstalledScope;
+            Set(_installActions[i], custom.ShowInstallActions); Set(_updateActions[i], custom.ShowUpdateActions); Set(_bossActions[i], custom.ShowBossAction); UpdateModeState(i);
         }
-
-        _footerStatusLabel.Text = "Settings loaded";
-        _footerStatusLabel.Role = StandardLabelRole.Muted;
-        Invalidate(UiInvalidationKind.Render);
+        _preferredInstallScope.SelectedIndex = (int)_draft.PreferredInstallScope;
+        _bossPath.Text = _draft.Boss.ExecutablePath ?? ""; _bossUrl.Text = _draft.Boss.ListenUrl; _bossTimeout.Text = _draft.Boss.StartupTimeoutSeconds.ToString();
+        _bossArgs.Text = _draft.Boss.AdditionalArguments ?? ""; _bossMode.SelectedIndex = _draft.Boss.UseAutoDetect ? 0 : 1;
+        Set(_bossBrowser, _draft.Boss.OpenBrowserOnStart); Set(_bossKeepRunning, _draft.Boss.KeepRunningOnLauncherExit); UpdateBossMode();
+        _channel.SelectedIndex = _draft.Updates.Channel == "preview" ? 1 : 0; Set(_startupCheck, _draft.Updates.CheckOnStartup); _interval.Text = _draft.Updates.CheckIntervalHours.ToString();
+        ShowUpdateStatus(); _footerStatusLabel.Text = _launcherService.SettingsLoadError ?? "Save applies all sections. Back, Cancel and Escape discard edits.";
+        _footerStatusLabel.Role = _launcherService.SettingsLoadError is null ? StandardLabelRole.Muted : StandardLabelRole.Warning;
     }
-
     public void SaveCurrentSettings()
     {
-        LauncherSettings settings = _launcherService.Settings.Clone();
-
-        for (int i = 0; i < _launcherService.Apps.Count; i++)
-        {
-            BroilerAppInfo app = _launcherService.Apps[i];
-            AppCustomSettings appSetting = settings.GetOrCreate(app.Id);
-
-            string path = _pathEdits[i].Text.Trim();
-            string args = _argEdits[i].Text.Trim();
-
-            appSetting.Arguments = string.IsNullOrEmpty(args) ? null : args;
-
-            // Check if path differs from auto-detection or is empty
-            AppResolution detected = _launcherService.AutoDetect(app);
-            if (string.IsNullOrEmpty(path))
-            {
-                appSetting.ExecutablePath = null;
-                appSetting.UseAutoDetect = true;
-            }
-            else if (detected.IsAvailable && string.Equals(path, detected.ResolvedPath, (OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)))
-            {
-                // Matches auto-detected path; keep as auto-detect
-                appSetting.ExecutablePath = path;
-                appSetting.UseAutoDetect = true;
-            }
-            else
-            {
-                // Explicit custom path
-                appSetting.ExecutablePath = path;
-                appSetting.UseAutoDetect = false;
-            }
-        }
-
+        var settings = _draft.Clone();
+        int errorSection = 0;
         try
         {
-            foreach (var value in settings.Apps.Values) LaunchArguments.Parse(value.Arguments);
-            _launcherService.UpdateSettings(settings);
+            for (int i = 0; i < _launcherService.Apps.Count; i++)
+            {
+                var app = settings.GetOrCreate(_launcherService.Apps[i].Id);
+                app.UseAutoDetect = _appModes[i].SelectedIndex == 0; app.ExecutablePath = Null(_pathEdits[i].Text);
+                ValidateCustom(app.UseAutoDetect, app.ExecutablePath, _launcherService.Apps[i].Title);
+                app.Arguments = Null(_argEdits[i].Text); app.PreferredInstalledScope = (InstallScope)_appScopes[i].SelectedIndex;
+                _ = LaunchArguments.Parse(app.Arguments);
+                app.ShowInstallActions = IsChecked(_installActions[i]); app.ShowUpdateActions = IsChecked(_updateActions[i]); app.ShowBossAction = IsChecked(_bossActions[i]);
+            }
+            settings.PreferredInstallScope = (InstallScope)_preferredInstallScope.SelectedIndex;
+            errorSection = 2;
+            settings.Boss.UseAutoDetect = _bossMode.SelectedIndex == 0; settings.Boss.ExecutablePath = Null(_bossPath.Text);
+            ValidateCustom(settings.Boss.UseAutoDetect, settings.Boss.ExecutablePath, "BOSS"); settings.Boss.ListenUrl = _bossUrl.Text.Trim();
+            if (!int.TryParse(_bossTimeout.Text, out int timeout)) throw new ArgumentException("BOSS timeout must be a whole number from 1 to 120.");
+            settings.Boss.StartupTimeoutSeconds = timeout; settings.Boss.AdditionalArguments = Null(_bossArgs.Text);
+            settings.Boss.OpenBrowserOnStart = IsChecked(_bossBrowser); settings.Boss.KeepRunningOnLauncherExit = IsChecked(_bossKeepRunning);
+            settings.Boss.Validate(); errorSection = 3;
+            settings.Updates.Channel = _channel.SelectedIndex == 1 ? "preview" : "stable"; settings.Updates.CheckOnStartup = IsChecked(_startupCheck);
+            if (!int.TryParse(_interval.Text, out int interval)) throw new ArgumentException("Update interval must be a whole number from 1 to 168 hours.");
+            settings.Updates.CheckIntervalHours = interval; LauncherSettingsValidation.Validate(settings); _launcherService.UpdateSettings(settings);
+            _draft = settings.Clone(); _footerStatusLabel.Text = "Settings saved."; _footerStatusLabel.Role = StandardLabelRole.Success; Saved?.Invoke(this, EventArgs.Empty);
         }
-        catch (Exception ex)
-        {
-            _footerStatusLabel.Text = $"Settings could not be saved: {ex.Message}";
-            _footerStatusLabel.Role = StandardLabelRole.Danger;
-            Invalidate(UiInvalidationKind.Render);
-            return;
-        }
-        _footerStatusLabel.Text = "Settings saved successfully";
-        _footerStatusLabel.Role = StandardLabelRole.Success;
-
-        Saved?.Invoke(this, EventArgs.Empty);
-    }
-
-    public void AutoDetectApp(int index)
-    {
-        if (index < 0 || index >= _launcherService.Apps.Count)
-            return;
-
-        BroilerAppInfo app = _launcherService.Apps[index];
-        AppResolution resolution = _launcherService.AutoDetect(app);
-
-        if (resolution.IsAvailable && !string.IsNullOrEmpty(resolution.ResolvedPath))
-        {
-            _pathEdits[index].Text = resolution.ResolvedPath;
-            _appStatusLabels[index].Text = $"Auto-detected: {resolution.StatusText}";
-            _appStatusLabels[index].Role = StandardLabelRole.Success;
-        }
-        else
-        {
-            _appStatusLabels[index].Text = "Not detected in workspace or PATH";
-            _appStatusLabels[index].Role = StandardLabelRole.Warning;
-        }
-
+        catch (Exception ex) { ShowSection(errorSection); _footerStatusLabel.Text = "Could not save: " + ex.Message; _footerStatusLabel.Role = StandardLabelRole.Danger; }
         Invalidate(UiInvalidationKind.Render);
     }
-
-    public void AutoDetectAll()
+    private static void ValidateCustom(bool auto, string? path, string name)
     {
-        int detectedCount = 0;
-        for (int i = 0; i < _launcherService.Apps.Count; i++)
-        {
-            BroilerAppInfo app = _launcherService.Apps[i];
-            AppResolution resolution = _launcherService.AutoDetect(app);
-
-            if (resolution.IsAvailable && !string.IsNullOrEmpty(resolution.ResolvedPath))
-            {
-                _pathEdits[i].Text = resolution.ResolvedPath;
-                _appStatusLabels[i].Text = $"Auto-detected: {resolution.StatusText}";
-                _appStatusLabels[i].Role = StandardLabelRole.Success;
-                detectedCount++;
-            }
-            else
-            {
-                _appStatusLabels[i].Text = "Not detected in workspace or PATH";
-                _appStatusLabels[i].Role = StandardLabelRole.Warning;
-            }
-        }
-
-        _footerStatusLabel.Text = $"Auto-detection complete: {detectedCount} of {_launcherService.Apps.Count} found";
-        _footerStatusLabel.Role = detectedCount > 0 ? StandardLabelRole.Success : StandardLabelRole.Warning;
-        Invalidate(UiInvalidationKind.Render);
+        if (!auto && (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(Environment.ExpandEnvironmentVariables(path)))) throw new ArgumentException(name + ": Custom mode requires an absolute path.");
+        if (!auto && !File.Exists(Environment.ExpandEnvironmentVariables(path!))) throw new ArgumentException(name + ": custom executable does not exist.");
     }
-
-    private async Task BrowseForAppAsync(int appIndex)
+    public void AutoDetectApp(int index) { if (index < 0 || index >= _appModes.Count) return; _appModes[index].SelectedIndex = 0; UpdateModeState(index); }
+    public void AutoDetectAll() { for (int i = 0; i < _appModes.Count; i++) AutoDetectApp(i); }
+    private void UpdateModeState(int index)
     {
-        if (OwnerWindow is null)
-            return;
-
-        var app = _launcherService.Apps[appIndex];
-        bool isWindows = OperatingSystem.IsWindows();
-
-        var dialog = new StandardFileDialog
-        {
-            Mode = UiFileDialogMode.Open,
-            PreferredSize = new BSize(640, 420),
-        };
-
-        string currentText = _pathEdits[appIndex].Text;
-        if (!string.IsNullOrWhiteSpace(currentText))
-        {
-            try
-            {
-                string? dir = Path.GetDirectoryName(currentText);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                {
-                    dialog.CurrentDirectory = dir;
-                }
-            }
-            catch
-            {
-                // Ignore path syntax exceptions
-            }
-        }
-
-        dialog.SetFileTypeFilters(
-        [
-            new UiFileDialogFilter(
-                isWindows ? "Executables (*.exe;*.dll)" : "Executables and Binaries (*;*.dll)",
-                isWindows ? "*.exe;*.dll" : "*"),
-            new UiFileDialogFilter("All Files (*.*)", "*.*")
-        ]);
-
-        BSize hostSize = OwnerWindow.Bounds.Size;
-        double width = Math.Min(640, Math.Max(400, hostSize.Width - 40));
-        double height = Math.Min(420, Math.Max(300, hostSize.Height - 40));
-        double x = Math.Max(10, (hostSize.Width - width) / 2);
-        double y = Math.Max(10, (hostSize.Height - height) / 2);
-        var placement = new BRect(x, y, width, height);
-
-        var result = await dialog.ShowOpenModal(OwnerWindow, placement);
-        if (result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(result.Value))
-        {
-            _pathEdits[appIndex].Text = result.Value;
-            _appStatusLabels[appIndex].Text = "Custom path selected";
-            _appStatusLabels[appIndex].Role = StandardLabelRole.Accent;
-            Invalidate(UiInvalidationKind.Render);
-        }
+        bool auto = _appModes[index].SelectedIndex == 0; _pathEdits[index].IsEnabled = !auto;
+        var resolution = auto ? _launcherService.AutoDetect(_launcherService.Apps[index]) : null;
+        _appStatusLabels[index].Text = auto ? $"{resolution!.StatusText} · {resolution.ResolvedPath ?? "No executable"}" : "Custom: " + _pathEdits[index].Text;
+        _appStatusLabels[index].ToolTipText = _appStatusLabels[index].Text;
     }
-
+    private void UpdateBossMode()
+    {
+        bool auto = _bossMode.SelectedIndex == 0; _bossPath.IsEnabled = !auto;
+        var options = _draft.Boss.Clone(); options.UseAutoDetect = auto; options.ExecutablePath = _bossPath.Text;
+        var resolution = BossResolver.CreateDefault().Resolve(options);
+        _bossStatus.Text = resolution.Available ? $"{resolution.Origin}: {resolution.Path}" : resolution.Error ?? "BOSS missing"; _bossStatus.ToolTipText = _bossStatus.Text;
+    }
+    private async Task BrowseAsync(StandardEdit edit, Action selected)
+    {
+        if (OwnerWindow is null) return;
+        var dialog = new StandardFileDialog { Mode = UiFileDialogMode.Open, PreferredSize = new BSize(640, 420) };
+        dialog.SetFileTypeFilters([new UiFileDialogFilter("Executable (*.exe;*.dll)", "*.exe;*.dll"), new UiFileDialogFilter("All files", "*.*")]);
+        var size = OwnerWindow.Bounds.Size;
+        var result = await dialog.ShowOpenModal(OwnerWindow, new BRect(20, 20, Math.Min(640, size.Width - 40), Math.Min(420, size.Height - 40)));
+        if (result.Kind == UiDialogResultKind.Accepted && !string.IsNullOrWhiteSpace(result.Value)) { edit.Text = result.Value; selected(); }
+    }
+    public async Task CheckNowAsync()
+    {
+        if (_checking || _catalog is null) return; _checking = true; _checkNow.IsEnabled = false;
+        try
+        {
+            if (!int.TryParse(_interval.Text, out int hours) || hours is < 1 or > 168) throw new ArgumentException("Check interval must be 1–168 hours.");
+            var prefs = new UpdateSettings { Channel = _channel.SelectedIndex == 1 ? "preview" : "stable", CheckIntervalHours = hours };
+            var result = await Task.Run(() => _catalog.CheckAsync(prefs, true, _lifetime.Token)); Post(() => { ShowUpdateStatus(result.Message + $" {result.Releases.Count} release(s)."); ReleasesChecked?.Invoke(result); });
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { Post(() => ShowUpdateStatus(ex.Message)); }
+        finally { Post(() => { _checking = false; _checkNow.IsEnabled = true; }); }
+    }
+    private void ShowUpdateStatus(string? message = null)
+    {
+        var status = _catalog?.Status;
+        _updateStatus.Text = message ?? status?.LastError ?? "No release check yet.";
+        _updateStatus.ToolTipText = $"Last attempt: {status?.LastAttempt?.ToLocalTime().ToString("g") ?? "never"}; last success: {status?.LastSuccess?.ToLocalTime().ToString("g") ?? "never"}. {message ?? status?.LastError}";
+        _updateStatus.Text += $"\nLast attempt: {status?.LastAttempt?.ToLocalTime().ToString("g") ?? "never"}. Last success: {status?.LastSuccess?.ToLocalTime().ToString("g") ?? "never"}.";
+    }
+    private void Post(Action action) { if (IsDisposed) return; if (Session is { } session) session.Dispatcher.Post(() => { if (!IsDisposed) action(); }); else action(); }
+    private static StandardButton Button(string text, Action clicked) { var button = new StandardButton { Text = text, AccessibleName = text }; button.Clicked += (_, _) => clicked(); return button; }
+    private static StandardEdit Edit(string name) => new() { AccessibleName = name, PlaceholderText = name };
+    private static StandardEdit ReadOnly(string value) => new() { Text = value, IsReadOnly = true, AccessibleName = value, ToolTipText = value };
+    private static StandardCheckBox Check(string text) => new() { Text = text, AccessibleName = text };
+    private static bool IsChecked(StandardCheckBox check) => check.CheckState == UiCheckState.Checked;
+    private static void Set(StandardCheckBox check, bool value) => check.CheckState = value ? UiCheckState.Checked : UiCheckState.Unchecked;
+    private static string? Null(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+    private static StandardComboBox Choice(string name, params string[] choices)
+    {
+        var combo = new StandardComboBox { AccessibleName = name }; combo.SetItems(choices.Select((x, i) => new UiComboBoxItem(i.ToString(), x))); combo.SelectedIndex = 0; return combo;
+    }
     protected override bool OnInput(UiInputEvent input)
     {
-        if (input.Kind == UiInputEventKind.KeyboardKey && input.KeyTransition == KeyboardKeyTransition.Down)
-        {
-            if (input.KeyName == "Escape")
-            {
-                BackRequested?.Invoke(this, EventArgs.Empty);
-                return true;
-            }
-        }
-
+        if (input.Kind == UiInputEventKind.KeyboardKey && input.KeyTransition == KeyboardKeyTransition.Down && input.KeyName == "Escape") { Discard(); return true; }
         return base.OnInput(input);
     }
-
-    protected override BSize MeasureCore(BSize availableSize)
+    protected override BSize MeasureCore(BSize size) { foreach (var child in Children) child.Measure(new BSize(Math.Max(1, size.Width - 32), Math.Max(1, size.Height - 170))); return size; }
+    protected override void ArrangeCore(BRect rect)
     {
-        double width = availableSize.Width;
-        _backButton.Measure(new BSize(80, 28));
-        _titleLabel.Measure(new BSize(width - 120, 28));
-        _subtitleLabel.Measure(new BSize(width - 48, 20));
-
-        for (int i = 0; i < _appTitles.Count; i++)
-        {
-            _appTitles[i].Measure(new BSize(200, 20));
-            _appBadges[i].Measure(new BSize(60, 18));
-            _pathLabels[i].Measure(new BSize(40, 24));
-            _pathEdits[i].Measure(new BSize(width - 250, 26));
-            _browseButtons[i].Measure(new BSize(75, 26));
-            _detectButtons[i].Measure(new BSize(85, 26));
-            _argLabels[i].Measure(new BSize(40, 24));
-            _argEdits[i].Measure(new BSize(width - 250, 26));
-            _appStatusLabels[i].Measure(new BSize(220, 18));
-        }
-
-        _autoDetectAllButton.Measure(new BSize(120, 30));
-        _saveButton.Measure(new BSize(110, 30));
-        _cancelButton.Measure(new BSize(80, 30));
-        _footerStatusLabel.Measure(new BSize(width - 340, 24));
-
-        return availableSize;
+        double x = rect.X + 16, width = Math.Max(1, rect.Width - 32);
+        _backButton.Arrange(new BRect(x, rect.Y + 12, 128, 30)); _titleLabel.Arrange(new BRect(x + 140, rect.Y + 12, Math.Max(1, width - 140), 30));
+        for (int i = 0; i < _sections.Count; i++) _sections[i].Arrange(new BRect(x + i * width / 4, rect.Y + 50, width / 4 - 4, 32));
+        _scroll.Arrange(new BRect(x, rect.Y + 90, width, Math.Max(1, rect.Height - 180)));
+        _saveButton.Arrange(new BRect(x, rect.Bottom - 82, 130, 32)); _cancelButton.Arrange(new BRect(x + 140, rect.Bottom - 82, 90, 32));
+        _footerStatusLabel.Arrange(new BRect(x, rect.Bottom - 44, width, 38));
     }
-
-    protected override void ArrangeCore(BRect finalRect)
+    protected override void RenderCore(UiRenderContext context) { context.RenderList.FillRect(Bounds, LauncherView.CanvasColor); base.RenderCore(context); }
+    protected override void Dispose(bool disposing) { if (disposing) _lifetime.Cancel(); base.Dispose(disposing); }
+    private sealed class SettingsForm : UiElement
     {
-        double marginX = 24;
-        double headerY = finalRect.Y + 14;
-        double contentWidth = Math.Max(0, finalRect.Width - marginX * 2);
-
-        // Header
-        _backButton.Arrange(new BRect(finalRect.X + marginX, headerY, 80, 28));
-        _titleLabel.Arrange(new BRect(finalRect.X + marginX + 92, headerY, contentWidth - 92, 28));
-        _subtitleLabel.Arrange(new BRect(finalRect.X + marginX + 92, headerY + 28, contentWidth - 92, 18));
-
-        double cardsTop = headerY + 54;
-        double footerHeight = 44;
-        double availableCardsHeight = Math.Max(100, finalRect.Bottom - footerHeight - cardsTop);
-
-        int count = _appTitles.Count;
-        double cardGap = 8;
-        double cardHeight = Math.Clamp((availableCardsHeight - (count - 1) * cardGap) / Math.Max(1, count), 72, 90);
-
-        for (int i = 0; i < count; i++)
+        private readonly List<UiElement[]> _rows = [];
+        public void Heading(string text) => Row(StandardLabel.Subtitle(text));
+        public void Field(string text, UiElement control) { Row(StandardLabel.Muted(text)); Row(control); }
+        public void Row(params UiElement[] elements) { _rows.Add(elements); foreach (var element in elements) { if (element is StandardLabel label) label.Wrapping = UiTextWrapping.Wrap; AddChild(element); } }
+        protected override BSize MeasureCore(BSize size)
         {
-            double cardY = cardsTop + i * (cardHeight + cardGap);
-            BRect cardRect = new(finalRect.X + marginX, cardY, contentWidth, cardHeight);
-            _cardRects[i] = cardRect;
-
-            double innerX = cardRect.X + 12;
-            double innerY = cardRect.Y + 6;
-            double innerW = cardRect.Width - 24;
-
-            // Row 1: Title, Badge, Status
-            _appTitles[i].Arrange(new BRect(innerX, innerY, 150, 18));
-            _appBadges[i].Arrange(new BRect(innerX + 155, innerY, 60, 18));
-            _appStatusLabels[i].Arrange(new BRect(cardRect.Right - 230, innerY, 218, 18));
-
-            // Row 2: Path label, Path edit, Browse, Auto-Detect
-            double pathY = innerY + 22;
-            double btnBrowseW = 75;
-            double btnDetectW = 85;
-            double labelW = 40;
-            double editW = Math.Max(100, innerW - labelW - btnBrowseW - btnDetectW - 16);
-
-            _pathLabels[i].Arrange(new BRect(innerX, pathY + 3, labelW, 20));
-            _pathEdits[i].Arrange(new BRect(innerX + labelW, pathY, editW, 26));
-            _browseButtons[i].Arrange(new BRect(innerX + labelW + editW + 6, pathY, btnBrowseW, 26));
-            _detectButtons[i].Arrange(new BRect(innerX + labelW + editW + btnBrowseW + 12, pathY, btnDetectW, 26));
-
-            // Row 3: Arguments label, Arguments edit
-            double argY = pathY + 29;
-            if (argY + 24 <= cardRect.Bottom)
+            double width = double.IsFinite(size.Width) ? Math.Max(1, size.Width) : 700, height = 12;
+            foreach (var row in _rows)
             {
-                _argLabels[i].Arrange(new BRect(innerX, argY + 3, labelW, 20));
-                _argEdits[i].Arrange(new BRect(innerX + labelW, argY, editW, 26));
+                bool stack = width < 600 && row.Length > 1;
+                foreach (var child in row) child.Measure(new BSize(stack ? width - 32 : (width - 24) / row.Length - 8, child is StandardLabel ? double.PositiveInfinity : 32));
+                height += stack ? row.Sum(x => Math.Max(38, x.DesiredSize.Height + 6)) : row.Max(x => Math.Max(38, x.DesiredSize.Height + 6));
             }
-            else
+            return new BSize(width, height + 12);
+        }
+        protected override void ArrangeCore(BRect rect)
+        {
+            double y = rect.Y + 12;
+            foreach (var row in _rows)
             {
-                _argLabels[i].Arrange(BRect.Empty);
-                _argEdits[i].Arrange(BRect.Empty);
+                bool stack = rect.Width < 600 && row.Length > 1; double width = stack ? rect.Width - 24 : (rect.Width - 24) / row.Length;
+                double rowHeight = row.Max(x => Math.Max(38, x.DesiredSize.Height + 6));
+                for (int i = 0; i < row.Length; i++)
+                {
+                    double height = Math.Max(32, row[i].DesiredSize.Height);
+                    row[i].Arrange(new BRect(rect.X + 12 + (stack ? 0 : i * width), y, Math.Max(1, width - 8), height));
+                    if (stack) y += Math.Max(38, height + 6);
+                }
+                if (!stack) y += rowHeight;
             }
         }
-
-        // Footer
-        double footerY = finalRect.Bottom - footerHeight + 6;
-        _autoDetectAllButton.Arrange(new BRect(finalRect.X + marginX, footerY, 120, 30));
-        _saveButton.Arrange(new BRect(finalRect.X + marginX + 128, footerY, 110, 30));
-        _cancelButton.Arrange(new BRect(finalRect.X + marginX + 246, footerY, 80, 30));
-        _footerStatusLabel.Arrange(new BRect(finalRect.X + marginX + 338, footerY + 5, Math.Max(0, contentWidth - 338), 22));
-    }
-
-    protected override void RenderCore(UiRenderContext context)
-    {
-        BRenderList list = context.RenderList;
-        list.PushClip(Bounds);
-        list.FillRect(Bounds, LauncherView.CanvasColor);
-
-        // Draw card backgrounds with left accent stripes
-        for (int i = 0; i < _cardRects.Count; i++)
-        {
-            BRect cardRect = _cardRects[i];
-            if (cardRect.IsEmpty)
-                continue;
-
-            // Fill card surface
-            list.FillRoundedRect(cardRect, LauncherView.CardSurfaceColor, 6, 6);
-            list.StrokeRoundedRect(cardRect, LauncherView.CardBorderColor, 6, 6, 1);
-
-            // Left accent stripe
-            BroilerAppInfo app = _launcherService.Apps[i];
-            BRect stripeRect = new(cardRect.X, cardRect.Y + 6, 4, Math.Max(0, cardRect.Height - 12));
-            list.FillRoundedRect(stripeRect, app.AccentColor, 2, 2);
-        }
-
-        // Footer separator line
-        double footerLineY = Bounds.Bottom - 44;
-        list.FillRect(new BRect(Bounds.X, footerLineY, Bounds.Width, 1), LauncherView.StatusDividerColor);
-
-        base.RenderCore(context);
-        list.PopClip();
     }
 }

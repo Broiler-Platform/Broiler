@@ -11,6 +11,7 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (WindowsMachineInstallBroker.TryHandle(args, out int machineExitCode)) return machineExitCode;
         _ = SetProcessDpiAwarenessContext(new nint(-4)); // PER_MONITOR_AWARE_V2
 
         // CLI support for directly launching apps or listing apps

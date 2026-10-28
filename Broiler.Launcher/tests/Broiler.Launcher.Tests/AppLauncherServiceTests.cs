@@ -17,7 +17,7 @@ public class AppLauncherServiceTests
 
         try
         {
-            var service = new AppLauncherService();
+            var service = new AppLauncherService(inventory: new EmptyInstallationInventory());
             var app = service.Apps.First(a => a.Id == BroilerAppId.Browser);
 
             var resolution = service.ResolveApp(app, emptyTempDir);
@@ -77,7 +77,7 @@ public class AppLauncherServiceTests
                 LinuxDllName: "FakeApp.dll",
                 RelativeProbePaths: Array.Empty<string>());
 
-            var service = new AppLauncherService([customApp]);
+            var service = new AppLauncherService([customApp], inventory: new EmptyInstallationInventory());
             var resolution = service.ResolveApp(customApp, tempDir);
 
             Assert.True(resolution.IsAvailable);
@@ -117,7 +117,7 @@ public class AppLauncherServiceTests
                 LinuxDllName: "FakeApp.dll",
                 RelativeProbePaths: Array.Empty<string>());
 
-            var service = new AppLauncherService([customApp]);
+            var service = new AppLauncherService([customApp], inventory: new EmptyInstallationInventory());
             var resolution = service.ResolveApp(customApp, tempDir);
 
             Assert.True(resolution.IsAvailable);

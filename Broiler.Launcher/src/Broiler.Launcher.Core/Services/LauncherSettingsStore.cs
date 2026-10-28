@@ -2,6 +2,10 @@ using System;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
+using System.Linq;
+using System.Collections.Generic;
+using Broiler.Launcher.Installation;
 using Broiler.Launcher.Models;
 
 namespace Broiler.Launcher.Services;
@@ -15,10 +19,21 @@ public sealed class LauncherSettingsStore : ILauncherSettingsStore
     {
         WriteIndented = true,
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter<BroilerAppId>() },
+        Converters = { new JsonStringEnumConverter<BroilerAppId>(), new ScopeConverter() },
     };
 
     private readonly string _settingsFilePath;
+    private sealed class ScopeConverter : JsonConverter<InstallScope>
+    {
+        public override InstallScope Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options)
+        {
+            if (reader.TokenType == JsonTokenType.String && Enum.TryParse<InstallScope>(reader.GetString(), true, out var scope)) return scope;
+            if (reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out int value)) return (InstallScope)value;
+            using var ignored = JsonDocument.ParseValue(ref reader);
+            return (InstallScope)(-1);
+        }
+        public override void Write(Utf8JsonWriter writer, InstallScope value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString());
+    }
 
     public LauncherSettingsStore(string? customPath = null)
     {
@@ -40,11 +55,25 @@ public sealed class LauncherSettingsStore : ILauncherSettingsStore
             }
 
             string json = File.ReadAllText(_settingsFilePath);
-            var loaded = JsonSerializer.Deserialize<LauncherSettings>(json, JsonOptions);
+            var root = JsonNode.Parse(json) as JsonObject;
+            var unknown = new Dictionary<string, JsonElement>();
+            string? appsKey = root?.Select(x => x.Key).FirstOrDefault(x => x.Equals("Apps", StringComparison.OrdinalIgnoreCase));
+            if (appsKey is not null && root![appsKey] is JsonObject apps)
+                foreach (string key in apps.Select(x => x.Key).ToArray())
+                    if (!Enum.TryParse<BroilerAppId>(key, true, out var id) || !Enum.IsDefined(id))
+                    {
+                        unknown[key] = JsonSerializer.SerializeToElement(apps[key]);
+                        apps.Remove(key);
+                    }
+            var loaded = JsonSerializer.Deserialize<LauncherSettings>(root?.ToJsonString() ?? json, JsonOptions);
             loaded ??= new LauncherSettings();
+            loaded.UnknownApps = unknown;
+            loaded.Boss ??= new BossSettings();
+            loaded.Updates ??= new UpdateSettings();
             loaded.Apps ??= new();
             foreach (var key in new System.Collections.Generic.List<BroilerAppId>(loaded.Apps.Keys))
                 loaded.Apps[key] ??= new AppCustomSettings();
+            LastLoadError = LauncherSettingsValidation.Normalize(loaded);
             return loaded;
         }
         catch (Exception ex)
@@ -59,6 +88,7 @@ public sealed class LauncherSettingsStore : ILauncherSettingsStore
     public void Save(LauncherSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
+        LauncherSettingsValidation.Validate(settings);
 
         try
         {
@@ -68,7 +98,10 @@ public sealed class LauncherSettingsStore : ILauncherSettingsStore
                 Directory.CreateDirectory(directory);
             }
 
-            string json = JsonSerializer.Serialize(settings, JsonOptions);
+            var root = JsonSerializer.SerializeToNode(settings, JsonOptions)!.AsObject();
+            foreach (var (key, value) in settings.UnknownApps)
+                root["Apps"]!.AsObject()[key] = JsonNode.Parse(value.GetRawText());
+            string json = root.ToJsonString(JsonOptions);
             string temporary = _settingsFilePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {

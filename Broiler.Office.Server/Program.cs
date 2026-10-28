@@ -13,6 +13,12 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     Args = args,
     ContentRootPath = ResolveContentRoot(args),
 });
+using var launcherIntegration = LauncherIntegration.FromEnvironment();
+if (launcherIntegration is not null)
+{
+    builder.Logging.ClearProviders(); // No inherited console/pipe can tie this server to the launcher's lifetime.
+    builder.Logging.AddProvider(launcherIntegration.Logs);
+}
 
 // Kestrel is the default (and only) server here; make the intent explicit.
 builder.WebHost.UseKestrel();
@@ -28,6 +34,7 @@ builder.Host.UseSystemd();
 builder.Host.UseWindowsService();
 
 var app = builder.Build();
+launcherIntegration?.Start(app.Lifetime);
 
 // The apps this server hosts. Extend this list as more Office web clients come online.
 var hostedApps = new[]
@@ -94,6 +101,7 @@ app.MapGet("/api/info", () => Results.Json(new
     server = "BOSS",
     product = "Broiler Office Standalone Server",
     version = serverVersion,
+    launcherInstanceId = launcherIntegration?.InstanceId,
     apps = hostedApps,
 }));
 
