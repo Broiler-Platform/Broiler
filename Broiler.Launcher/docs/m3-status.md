@@ -1,5 +1,10 @@
 # M3: Windows Office demo packaging and release workflow
 
+Historical delivery record: regular publishing now follows
+[artifact-first integration](../../docs/broiler-office-artifact-first.md).
+The source-building path described below remains available explicitly through
+`build-office-from-source.ps1` or `build-office.ps1 -FromSource`.
+
 Signing is deferred to the final production-release gate at the user's request.
 M3 can build and demonstrate the suite without a signing key or certificate.
 Linux remains deferred. Existing BPP/Android publishing remains unchanged.

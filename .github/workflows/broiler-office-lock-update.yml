@@ -1,0 +1,82 @@
+name: Propose Office component pin
+on:
+  workflow_dispatch:
+    inputs:
+      product:
+        type: choice
+        options: [launcher, browser, writer, cell, plate, boss]
+        required: true
+      tag:
+        description: Explicit published component tag; latest is never selected
+        required: true
+      asset:
+        description: Exact release ZIP filename
+        required: true
+      publish_mode:
+        type: choice
+        options: [self-contained, native-aot, framework-dependent]
+        required: true
+      suite_version:
+        description: Next Office suite version; blank retains the current unpublished candidate
+        default: ''
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: office-lock-${{ inputs.product }}
+  cancel-in-progress: false
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.proposal.outputs.branch }}
+      complete: ${{ steps.proposal.outputs.complete }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Resolve explicit release to immutable asset and commit pins
+        env:
+          PRODUCT: ${{ inputs.product }}
+          COMPONENT_TAG: ${{ inputs.tag }}
+          COMPONENT_ASSET: ${{ inputs.asset }}
+          PUBLISH_MODE: ${{ inputs.publish_mode }}
+          SUITE_VERSION: ${{ inputs.suite_version }}
+        run: |
+          args=()
+          if [ -n "$SUITE_VERSION" ]; then args+=(--suite-version "$SUITE_VERSION"); fi
+          python scripts/office_artifacts.py pin office.lock.json --product "$PRODUCT" --tag "$COMPONENT_TAG" --asset "$COMPONENT_ASSET" --publish-mode "$PUBLISH_MODE" "${args[@]}"
+      - name: Validate proposal
+        run: |
+          python scripts/office_artifacts.py validate-lock office.lock.json --allow-incomplete
+          python -m unittest discover -s scripts/tests -p test_office_artifacts.py
+      - name: Open reviewable pin pull request
+        id: proposal
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRODUCT: ${{ inputs.product }}
+        run: |
+          if git diff --quiet -- office.lock.json; then exit 0; fi
+          branch="codex/office-pin-$PRODUCT-$GITHUB_RUN_ID"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- office.lock.json
+          git commit -m "Pin Office $PRODUCT release artifact"
+          git push origin "$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          python -c 'import json,os; lock=json.load(open("office.lock.json")); print("complete="+str(len(lock["components"])==6).lower(), file=open(os.environ["GITHUB_OUTPUT"],"a"))'
+          printf '%s\n' 'Pins one explicitly selected published component by repository, release ID, asset ID, source commit, archive digest, RID and publish mode. Suite compatibility must pass before this combination is published; no merge or release is automatic. With the default GITHUB_TOKEN, trigger the Office integration workflow explicitly after merge because token-created events do not start further workflows.' > "$RUNNER_TEMP/office-pin-pr.md"
+          gh pr create --head "$branch" --title "Pin Office $PRODUCT component" --body-file "$RUNNER_TEMP/office-pin-pr.md"
+  compatibility:
+    needs: propose
+    if: needs.propose.outputs.complete == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/broiler-office-release.yml
+    with:
+      ref: ${{ needs.propose.outputs.branch }}
+      create_draft: false

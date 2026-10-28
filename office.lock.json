@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "suite": "0.1.0-demo.5",
+  "channel": "preview",
+  "minimumLauncherVersion": "0.1.0-demo.1",
+  "components": [
+    {
+      "id": "browser",
+      "version": "0.1.0-preview.3",
+      "repository": "Broiler-Platform/Broiler.Browser",
+      "tag": "browser-v0.1.0-preview.3",
+      "commit": "e2a15b4d8d093f18f536dd180673129edbefe178",
+      "releaseId": 409853034,
+      "assetId": 631517867,
+      "asset": "Broiler.Browser-0.1.0-preview.3-win-x64-self-contained.zip",
+      "size": 49104368,
+      "sha256": "72be4f56c8cd41924fdedf3d3532038002433ad7e369da070604cde122c71cdf",
+      "rid": "win-x64",
+      "archive": "zip",
+      "entryPoint": "Broiler.Browser.Windows.exe",
+      "invocation": "native",
+      "publishMode": "self-contained",
+      "prerelease": true
+    },
+    {
+      "id": "writer",
+      "version": "0.1.0-preview.8",
+      "repository": "Broiler-Platform/Broiler.Writer",
+      "tag": "writer-v0.1.0-preview.8",
+      "commit": "4b1468db3fd15c5a999025690b177fc4df00485c",
+      "releaseId": 425516681,
+      "assetId": 681721723,
+      "asset": "Broiler.Writer-0.1.0-preview.8-win-x64-self-contained.zip",
+      "size": 5719347,
+      "sha256": "7bfc2527cd53b43ee9cb4ea4b7ee4f37d966d14acd8e9043f819c2bed77ce93f",
+      "rid": "win-x64",
+      "archive": "zip",
+      "entryPoint": "Broiler.Writer.Windows.exe",
+      "invocation": "native",
+      "publishMode": "native-aot",
+      "prerelease": true
+    },
+    {
+      "id": "plate",
+      "version": "0.1.0-preview.2",
+      "repository": "Broiler-Platform/Broiler.Plate",
+      "tag": "plate-v0.1.0-preview.2",
+      "commit": "21c132033203039686fb7d3b9e806501939eef1b",
+      "releaseId": 393932391,
+      "assetId": 581787194,
+      "asset": "Broiler.Plate-0.1.0-preview.2-win-x64.zip",
+      "size": 4410303,
+      "sha256": "926c10eec70d5b160cb25ba7c602674b0dd7e07ad33dceb1fcbcf71b96d18b86",
+      "rid": "win-x64",
+      "archive": "zip",
+      "entryPoint": "Broiler.Plate.Windows.exe",
+      "invocation": "native",
+      "publishMode": "self-contained",
+      "prerelease": true
+    }
+  ],
+  "pendingComponents": [
+    "launcher",
+    "cell",
+    "boss"
+  ]
+}

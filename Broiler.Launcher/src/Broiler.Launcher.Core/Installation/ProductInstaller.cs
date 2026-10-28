@@ -45,6 +45,8 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
             using var operationLock = AcquireLock(root, item.Id);
             var inventory = new InstallationInventory(paths);
             var installed = inventory.Find(item.Id, scope);
+            string? incompatible = OfficeCompatibility.BlockingReason(package.Release, item.Id, scope, inventory);
+            if (incompatible is not null) throw new InvalidOperationException(incompatible);
             if (expected is not null && (installed.State != InstallationState.Installed || installed.Receipt != expected ||
                 expected.Rid != item.Rid || OfficeVersion.Parse(item.Version).CompareTo(OfficeVersion.Parse(expected.Version)) <= 0))
                 throw new InvalidOperationException("The installation changed or this is not a newer compatible update. Check for updates again.");
@@ -88,6 +90,11 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
             access.ValidateDestination(destination);
             Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
             cancellationToken.ThrowIfCancellationRequested();
+            // Extractions remain independent. Serialize only the final activation
+            // across products so stable cohort checks cannot race another commit.
+            using var scopeActivation = AcquireLock(root, "suite-activation");
+            incompatible = OfficeCompatibility.BlockingReason(package.Release, item.Id, scope, inventory);
+            if (incompatible is not null) throw new InvalidOperationException(incompatible);
             string? activationBlocked = activationGuard?.Invoke();
             if (activationBlocked is not null) throw new InvalidOperationException(activationBlocked);
             progress?.Report(new("Activating installation", 100, false));
@@ -137,15 +144,18 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    public InstallResult Rollback(string id, InstallScope scope, InstallReceipt? expected = null)
+    public InstallResult Rollback(string id, InstallScope scope, InstallReceipt? expected = null, IReadOnlyDictionary<string, InstallReceipt?>? expectedPeers = null)
     {
         try
         {
             OfficeCatalog.ValidateId(id);
             access.Prepare(scope, paths);
             using var operationLock = AcquireLock(paths.Root(scope), id);
+            using var scopeActivation = AcquireLock(paths.Root(scope), "suite-activation");
             var inventory = new InstallationInventory(paths);
             var active = inventory.ReadActive(id, scope);
+            string? peersChanged = expectedPeers is null ? null : OfficeCompatibility.PeersChanged(expectedPeers, scope, inventory);
+            if (peersChanged is not null) throw new InvalidOperationException(peersChanged);
             if (expected is not null && active.Current != expected) throw new InvalidOperationException("Installation changed; rollback was deferred.");
             if (active.Previous is null) throw new InvalidOperationException("No previous version is registered.");
             inventory.ValidateReceipt(active.Previous, id, scope);
@@ -163,6 +173,7 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
             access.Prepare(scope, paths);
             using var operationLock = AcquireLock(paths.Root(scope), id);
             string path = paths.Record(id, scope);
+            using var scopeActivation = AcquireLock(paths.Root(scope), "suite-activation");
             OfficeInstallPaths.RejectLinks(path);
             File.Delete(path);
             return new(true, "Installation unregistered. Version files and user data were retained for recovery.");

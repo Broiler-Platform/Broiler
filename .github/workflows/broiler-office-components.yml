@@ -1,0 +1,78 @@
+name: Office-owned component release
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        type: choice
+        options: [launcher, boss]
+        required: true
+      version:
+        description: Independent component version (demo.N for demo builds)
+        required: true
+      demo:
+        type: boolean
+        default: true
+      writer_web_lock:
+        description: Reviewed Writer web pin JSON; required for BOSS
+        default: eng/boss-writer-web.lock.json
+      create_draft:
+        type: boolean
+        default: true
+permissions:
+  contents: read
+concurrency:
+  group: office-component-${{ inputs.component }}-${{ inputs.version }}
+  cancel-in-progress: false
+jobs:
+  component:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Test owned component contracts
+        run: dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows
+      - name: Test explicit demo verification boundary
+        if: inputs.demo
+        run: dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows -p:BroilerOfficeDemo=true
+      - name: Publish only the selected component
+        shell: pwsh
+        env:
+          COMPONENT: ${{ inputs.component }}
+          VERSION: ${{ inputs.version }}
+          DEMO: ${{ inputs.demo }}
+          WEB_LOCK: ${{ inputs.writer_web_lock }}
+        run: |
+          ./scripts/package-office-component.ps1 -Product $env:COMPONENT -Version $env:VERSION -OutputRoot "$env:RUNNER_TEMP/component" -Demo:($env:DEMO -eq 'true') -WriterWebLock $env:WEB_LOCK -RequireClean
+      - uses: actions/upload-artifact@v6
+        with:
+          name: office-${{ inputs.component }}-${{ inputs.version }}
+          path: ${{ runner.temp }}/component/assets/*
+          if-no-files-found: error
+      - name: Create component draft without overwriting any release
+        if: inputs.create_draft
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPONENT: ${{ inputs.component }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          $tag = "$env:COMPONENT-v$env:VERSION"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'Component release exists; never overwrite its bytes.' }
+          $assets = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/component/assets" -File | ForEach-Object FullName)
+          $notes = Join-Path $env:RUNNER_TEMP 'component-notes.md'
+          "Independent $env:COMPONENT release. Office consumes the immutable assets through its reviewed lockfile. Source: $env:GITHUB_SHA" | Set-Content -LiteralPath $notes
+          $releaseArgs = @('release', 'create', $tag, '--target', $env:GITHUB_SHA, '--draft', '--title', "$env:COMPONENT $env:VERSION", '--notes-file', $notes)
+          if ($env:VERSION.Contains('-')) { $releaseArgs += '--prerelease' }
+          & gh @releaseArgs @assets
+          if ($LASTEXITCODE -ne 0) { throw 'Component draft creation failed.' }

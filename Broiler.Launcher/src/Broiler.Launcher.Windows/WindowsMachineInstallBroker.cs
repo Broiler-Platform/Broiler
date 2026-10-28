@@ -18,6 +18,8 @@ internal sealed class WindowsMachineInstallBroker : IMachineInstallBroker, IMach
     }
 
     public Task<InstallResult> RollbackAsync(InstallReceipt expected) => RunUpdateHelper("update-rollback", expected, "", "", null);
+    public Task<InstallResult> RollbackAsync(InstallReceipt expected, IReadOnlyDictionary<string, InstallReceipt?> peers) =>
+        RunUpdateHelper("update-rollback", expected, Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(peers, OfficeJson.Options)), "", null);
 
     private static async Task<InstallResult> RunUpdateHelper(string operation, InstallReceipt expected, string directory, string archive, IProgress<InstallProgress>? progress)
     {
@@ -85,7 +87,14 @@ internal sealed class WindowsMachineInstallBroker : IMachineInstallBroker, IMach
                 if (expected.ProductId != productId || expected.Scope != InstallScope.Machine) throw new InvalidDataException("Receipt scope mismatch.");
                 var installed = new InstallationInventory(OfficeInstallPaths.CreateDefault()).Find(productId, InstallScope.Machine);
                 if (installed.Receipt != expected) throw new InvalidDataException("Installation changed.");
-                if (operation == "update-rollback") result = installer.Rollback(productId, InstallScope.Machine, expected);
+                if (operation == "update-rollback")
+                {
+                    if (args[3].Length > 16384) throw new InvalidDataException("Peer snapshot exceeds limits.");
+                    var peers = args[3].Length == 0 ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, InstallReceipt?>>(Convert.FromBase64String(args[3]), OfficeJson.Options);
+                    if (peers is not null && (peers.Count != OfficeCatalog.ProductIds.Length - 1 || OfficeCatalog.ProductIds.Where(id => id != productId).Any(id => !peers.ContainsKey(id))))
+                        throw new InvalidDataException("Peer snapshot must cover the other Office products.");
+                    result = installer.Rollback(productId, InstallScope.Machine, expected, peers);
+                }
                 else
                 {
                     if (!Path.IsPathFullyQualified(args[3]) || !Path.IsPathFullyQualified(args[4])) throw new InvalidDataException("Absolute package paths required.");

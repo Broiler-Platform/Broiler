@@ -3,6 +3,11 @@
 Date: 2026-10-28. Status: Windows demo implementation delivered through M6;
 manual desktop/machine acceptance and production signing remain release gates.
 
+Publishing revision: [artifact-first Office integration](broiler-office-artifact-first.md)
+supersedes M3's source-build publishing design below. Regular Office releases
+assemble independently published artifacts selected by `office.lock.json`.
+Source publishing remains an explicit development-only path.
+
 Delivery records: [P0 Windows acceptance](../Broiler.Launcher/docs/p0-status.md)
 and [M1 split-button/package handoff](../Broiler.Launcher/docs/m1-status.md),
 plus [M2 Windows installation](../Broiler.Launcher/docs/m2-status.md).

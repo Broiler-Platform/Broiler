@@ -13,6 +13,7 @@ public interface IMachineUpdateBroker
 {
     Task<InstallResult> UpdateAsync(ProductUpdate update, IProgress<InstallProgress>? progress, CancellationToken token);
     Task<InstallResult> RollbackAsync(InstallReceipt expected);
+    Task<InstallResult> RollbackAsync(InstallReceipt expected, IReadOnlyDictionary<string, InstallReceipt?> peers) => RollbackAsync(expected);
 }
 public interface IProductActivityGuard { string? BlockingReason(InstallationInfo installation); }
 
@@ -87,6 +88,9 @@ public sealed class ProductUpdateService(OfficeInstallPaths paths, OfficeRelease
             var inventory = installationInventory ?? new InstallationInventory(paths);
             var installed = inventory.Find(update.Component.Id, update.Expected.Scope);
             if (installed.Receipt != update.Expected) return new(false, "Installation changed. Check for updates again.");
+            string? incompatible = OfficeCompatibility.BlockingReason(package.Release, update.Component.Id, update.Expected.Scope, inventory);
+            if (incompatible is not null) return new(false, incompatible);
+            var peers = package.Release.Channel == "stable" ? OfficeCompatibility.CapturePeers(update.Component.Id, update.Expected.Scope, inventory) : null;
             if (update.Component.Id == "boss" && boss is not null)
             {
                 var state = await boss.RefreshAsync(token).ConfigureAwait(false);
@@ -120,9 +124,11 @@ public sealed class ProductUpdateService(OfficeInstallPaths paths, OfficeRelease
                     var current = inventory.Find("boss", update.Expected.Scope).Receipt;
                     if (current is null || current.Version != update.Component.Version || current.Sha256 != update.Component.Sha256)
                         return new(false, "BOSS readiness failed; installation changed, so automatic rollback was deferred.");
+                    string? peerChange = peers is null ? null : OfficeCompatibility.PeersChanged(peers, update.Expected.Scope, inventory);
+                    if (peerChange is not null) return new(false, peerChange);
                     var rollback = update.Expected.Scope == InstallScope.Machine
-                        ? await machine!.RollbackAsync(current).ConfigureAwait(false)
-                        : new ProductInstaller(paths, new UserInstallAccess()).Rollback("boss", update.Expected.Scope, current);
+                        ? peers is null ? await machine!.RollbackAsync(current).ConfigureAwait(false) : await machine!.RollbackAsync(current, peers).ConfigureAwait(false)
+                        : new ProductInstaller(paths, new UserInstallAccess()).Rollback("boss", update.Expected.Scope, current, peers);
                     if (!rollback.Succeeded) return new(false, "BOSS readiness failed. " + rollback.Message);
                     var restored = await boss!.StartAsync(CancellationToken.None).ConfigureAwait(false);
                     return new(false, "BOSS readiness failed; previous version restored. " + restored.Message);

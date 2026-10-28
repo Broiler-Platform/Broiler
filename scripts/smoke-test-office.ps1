@@ -27,7 +27,8 @@ if ($IsWindows) {
     try {
         if (!$infoProcess.WaitForExit(15000)) { $infoProcess.Kill($true); throw 'Launcher build identity check timed out.' }
         $info = $infoProcess.StandardOutput.ReadToEnd() | ConvertFrom-Json
-        if ($infoProcess.ExitCode -ne 0 -or !$info.demo -or ($info.version -split '\+')[0] -ne $manifest.officeVersion) { throw 'Launcher is not the matching demo build.' }
+        $launcherComponent = @($manifest.components | Where-Object id -eq 'launcher')[0]
+        if ($infoProcess.ExitCode -ne 0 -or !$info.demo -or ($info.version -split '\+')[0] -ne $launcherComponent.version) { throw 'Launcher is not the pinned demo component build.' }
     } finally { $infoProcess.Dispose() }
     & (Join-Path $PSScriptRoot 'smoke-test-office-settings.ps1') -LauncherDirectory (Join-Path $bundle 'launcher') -OutputDirectory (Join-Path $OutputDirectory 'settings-render')
 }

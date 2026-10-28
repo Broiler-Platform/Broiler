@@ -44,6 +44,8 @@
          against the client project directory rather than this one. BaseIntermediateOutputPath (obj\)
          is set early and reliably; IntermediateOutputPath is not yet populated at this point. -->
     <WriterClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)writer-client\</WriterClientStage>
+    <!-- Component releases consume an already released Writer web artifact. -->
+    <WriterClientStage Condition="'$(WriterClientArtifactDirectory)' != ''">$([MSBuild]::EnsureTrailingSlash('$(WriterClientArtifactDirectory)'))</WriterClientStage>
   </PropertyGroup>
 
   <ItemGroup>
@@ -58,7 +60,7 @@
        stage. Skipped once staged, so the dev inner loop stays fast; force a refresh after changing the
        Writer with -p:ForceWriterClientPublish=true (or delete obj/). -->
   <Target Name="PublishWriterClient"
-          Condition="!Exists('$(WriterClientStage)wwwroot\index.html') Or '$(ForceWriterClientPublish)' == 'true'">
+          Condition="'$(WriterClientArtifactDirectory)' == '' And (!Exists('$(WriterClientStage)wwwroot\index.html') Or '$(ForceWriterClientPublish)' == 'true')">
     <Message Importance="high" Text="BOSS: publishing the Broiler Writer WASM client into $(WriterClientStage)…" />
     <RemoveDir Directories="$(WriterClientStage)" />
     <!--
@@ -84,6 +86,9 @@
        stale, browser-cached index.html/dotnet.<hash>.js) can be loaded against the freshly-vendored,
        stable-named broiler.graphics.webassembly.js — and a replay op-stream layout change then desyncs
        ("Unknown replay op …"). A clean vendor guarantees the served tree is exactly one consistent set. -->
+  <Target Name="ValidateWriterClientArtifact" BeforeTargets="VendorWriterClientForRun;VendorWriterClientForPublish" Condition="'$(WriterClientArtifactDirectory)' != ''">
+    <Error Condition="!Exists('$(WriterClientStage)wwwroot\index.html')" Text="Pinned Writer web artifact is missing; BOSS component releases never rebuild it as a fallback." />
+  </Target>
   <Target Name="VendorWriterClientForRun" DependsOnTargets="PublishWriterClient" BeforeTargets="Build">
     <RemoveDir Directories="$(MSBuildProjectDirectory)\wwwroot" />
     <ItemGroup>

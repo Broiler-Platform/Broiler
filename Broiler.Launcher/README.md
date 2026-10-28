@@ -138,6 +138,9 @@ See [M1 delivery](docs/m1-status.md) and [M2 installation/signing/recovery](docs
 The [M3 demo package and workflow](docs/m3-status.md) can be built without signing
 keys. Its launcher is visibly marked as an unsigned demo. Production signing is
 deferred to the final release gate, allowing M4–M6 to continue for demonstration.
+Regular Office publishing now uses [artifact-first integration](../docs/broiler-office-artifact-first.md):
+`office.lock.json` selects independently released product archives; Office never
+rebuilds them. The original source build is explicitly development-only.
 
 See [M4 BOSS lifecycle and demo](docs/m4-status.md) for server start, readiness,
 ownership, shutdown, logs and current JSON/CLI options.
