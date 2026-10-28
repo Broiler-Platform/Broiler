@@ -66,8 +66,11 @@ Current implementation precedence: explicit custom override, local payload, orde
 | R03 | P1 inventory implementation required; contract above selected. |
 | R06 | P1 split-button integration must remove card launch fall-through before new interactive regions ship. |
 | R08 | P1 isolated publish closure and BOSS adapter required; existing preview packaging remains unchanged. |
-| R10 | Release blocker: launcher is currently untracked in the aggregate checkout; UI/Writer contain existing local content. No automatic commit, staging of unrelated files, or submodule pointer change was performed. Required launcher sources must be committed before clean-checkout release validation. |
+| R10 | User confirmed P0 sources committed and pushed before M1. Launcher sources are now tracked. Existing unrelated submodule content is preserved. An isolated public-feed restore of the new M1 package pin remains a publication gate. |
 
 Baseline: 35 existing tests. Current shared-core suite: 49 passing tests on Windows. Windows Release-Windows project and Linux Release-Linux solution builds succeeded with restore. Compilation on Windows does not establish Linux runtime behavior. A fresh checkout with an empty dependency cache, Linux process/permission behavior, and graphical host interaction are not yet verified.
 
-P0 code stabilization and the P1 design contract are delivered; source publication/clean-checkout and native Linux validation gates remain open. Do not mark the aggregate P0 exit gate complete until those have evidence.
+The user confirmed a successful Windows graphical build test and committed/pushed
+sources before M1. P0 is accepted for the Windows-first scope; Linux runtime
+validation is deferred. A fresh checkout with an empty dependency cache remains
+a distribution validation task, including the new UI package publication in M1.

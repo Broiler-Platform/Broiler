@@ -1,7 +1,8 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <BroilerUiVersion>0.1.0-preview.22</BroilerUiVersion>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    <BroilerUiVersion>0.1.0-preview.24</BroilerUiVersion>
     <BroilerHostingVersion>0.1.0-preview.10</BroilerHostingVersion>
     <BroilerGraphicsVersion>0.1.0-preview.12</BroilerGraphicsVersion>
     <BroilerGraphicsCoreVersion>0.1.0-preview.13</BroilerGraphicsCoreVersion>
@@ -21,6 +22,12 @@
     <PackageVersion Include="Broiler.UI.Edit.Standard" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.UI.FileDialog" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.UI.FileDialog.Standard" Version="$(BroilerUiVersion)" />
+    <!-- Hosting's transitive UI controls follow the same candidate family. -->
+    <PackageVersion Include="Broiler.UI.RichEdit" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.TabView" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.TabView.Standard" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.TreeView" Version="$(BroilerUiVersion)" />
+    <PackageVersion Include="Broiler.UI.TreeView.Standard" Version="$(BroilerUiVersion)" />
     <PackageVersion Include="Broiler.Graphics" Version="$(BroilerGraphicsCoreVersion)" />
     <PackageVersion Include="Broiler.Graphics.Windows" Version="$(BroilerGraphicsVersion)" />
     <PackageVersion Include="Broiler.Graphics.Linux" Version="$(BroilerGraphicsVersion)" />

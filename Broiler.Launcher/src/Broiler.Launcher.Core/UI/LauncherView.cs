@@ -56,7 +56,7 @@ public sealed class LauncherView : UiElement
     private readonly List<StandardLabel> _cardBadges = [];
     private readonly List<StandardLabel> _cardDescriptions = [];
     private readonly List<StandardLabel> _cardStatusLabels = [];
-    private readonly List<StandardButton> _cardLaunchButtons = [];
+    private readonly List<StandardSplitButton> _cardLaunchButtons = [];
     private readonly List<BRect> _cardRects = [];
     private readonly Dictionary<BroilerAppId, DateTimeOffset> _lastLaunchTime = [];
     private static readonly TimeSpan LaunchDebounceWindow = TimeSpan.FromMilliseconds(750);
@@ -141,14 +141,24 @@ public sealed class LauncherView : UiElement
                 Font = new BFontStyle("Segoe UI", 11),
             };
 
-            var button = new StandardButton
+            var button = new StandardSplitButton
             {
                 Text = $"Launch {app.ShortName}",
-                PreferredSize = new BSize(130, 32),
-                CornerRadius = 4,
-                CommandName = $"app.launch.{app.ShortName.ToLowerInvariant()}",
-                CommandDispatcher = _commands,
+                IsPrimaryEnabled = resolution.IsAvailable,
             };
+            button.Primary.CornerRadius = 4;
+            button.Trigger.CornerRadius = 4;
+            button.Primary.CommandName = $"app.launch.{app.ShortName.ToLowerInvariant()}";
+            button.Primary.CommandDispatcher = _commands;
+            button.PopupMenu.CommandDispatcher = _commands;
+            button.PopupMenu.PopupWidth = 210;
+            button.Menu.SetItems([
+                new UiMenuItem($"app.install.user.{app.Id}", "Install for user") { IsEnabled = false },
+                new UiMenuItem($"app.install.machine.{app.Id}", "Install for all") { IsEnabled = false },
+                new UiMenuItem("office.boss.start", "Start BOSS") { IsEnabled = false },
+                new UiMenuItem("actions.separator", "") { IsSeparator = true },
+                new UiMenuItem("launcher.settings", "Settings...") { CommandName = "launcher.settings" },
+            ]);
 
             _cardTitles.Add(title);
             _cardBadges.Add(badge);
@@ -185,6 +195,7 @@ public sealed class LauncherView : UiElement
         {
             BroilerAppInfo app = _launcherService.Apps[i];
             AppResolution resolution = _launcherService.ResolveApp(app);
+            _cardLaunchButtons[i].IsPrimaryEnabled = resolution.IsAvailable;
             _cardStatusLabels[i].Text = resolution.IsAvailable
                 ? (resolution.IsCustom ? "Ready (Custom)" : "Ready")
                 : (resolution.StatusText ?? "Not Built");
@@ -307,20 +318,6 @@ public sealed class LauncherView : UiElement
             }
         }
 
-        if (input.Kind == UiInputEventKind.PointerButton &&
-            input.MouseButton == MouseButton.Left &&
-            input.MouseButtonTransition == MouseButtonTransition.Up)
-        {
-            for (int i = 0; i < _cardRects.Count; i++)
-            {
-                if (_cardRects[i].Contains(input.Position) && !_cardLaunchButtons[i].Bounds.Contains(input.Position))
-                {
-                    LaunchByIndex(i);
-                    return true;
-                }
-            }
-        }
-
         return base.OnInput(input);
     }
 
@@ -342,7 +339,7 @@ public sealed class LauncherView : UiElement
             _cardBadges[i].Measure(new BSize(80, 20));
             _cardDescriptions[i].Measure(new BSize(320, 50));
             _cardStatusLabels[i].Measure(new BSize(120, 24));
-            _cardLaunchButtons[i].Measure(new BSize(140, 34));
+            _cardLaunchButtons[i].Measure(new BSize(180, 34));
         }
 
         _statusLabel.Measure(new BSize(width / 2, 22));
@@ -408,7 +405,7 @@ public sealed class LauncherView : UiElement
 
             // Bottom controls: Status on left, Launch button on right
             double bottomControlsY = cardY + cardHeight - 38;
-            double buttonWidth = Math.Min(130, Math.Max(90, innerWidth * 0.4));
+            double buttonWidth = Math.Min(innerWidth, Math.Min(180, Math.Max(130, innerWidth * 0.55)));
             double statusWidth = Math.Max(0, innerWidth - buttonWidth - 10);
 
             _cardStatusLabels[i].Arrange(new BRect(innerX, bottomControlsY + 6, statusWidth, 22));

@@ -126,6 +126,12 @@ To open Settings:
 
 ## Platform and argument contracts
 
+Product launch buttons have a separate down-arrow menu. Launch is disabled when
+the product cannot be found; the menu remains available. Settings opens the
+existing settings page. Install for user, Install for all, and Start BOSS are
+shown disabled until their service milestones are delivered. Card background
+clicks no longer launch products. See [M1 delivery and package handoff](docs/m1-status.md).
+
 Linux supports Browser and Writer. Cell and Plate currently have Windows heads only,
 including when a custom executable is configured. Discovery uses custom override,
 local directory, ordered workspace ancestors (base folder first, then current
