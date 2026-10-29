@@ -105,3 +105,6 @@
 [submodule "Broiler.Cells"]
 	path = Broiler.Cells
 	url = https://github.com/Broiler-Platform/Broiler.Cells.git
+[submodule "broiler-platform.github.io"]
+	path = broiler-platform.github.io
+	url = https://github.com/Broiler-Platform/broiler-platform.github.io

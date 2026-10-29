@@ -1,0 +1,19 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Supply released versions after publishing W1. Local verification overrides these explicitly. -->
+    <BroilerWebHostingVersion Condition="'$(BroilerWebHostingVersion)' == ''">0.0.0-unconfigured</BroilerWebHostingVersion>
+    <BroilerWebGraphicsVersion Condition="'$(BroilerWebGraphicsVersion)' == ''">0.0.0-unconfigured</BroilerWebGraphicsVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Broiler.Hosting.Contracts" Version="$(BroilerWebHostingVersion)" />
+    <PackageVersion Include="Broiler.Hosting.WebAssembly" Version="$(BroilerWebHostingVersion)" />
+    <PackageVersion Include="Broiler.Graphics" Version="$(BroilerWebGraphicsVersion)" />
+    <PackageVersion Include="Broiler.Graphics.WebAssembly" Version="$(BroilerWebGraphicsVersion)" />
+    <PackageVersion Include="Broiler.UI" Version="0.1.0-preview.24" />
+    <PackageVersion Include="Broiler.UI.Standard" Version="0.1.0-preview.24" />
+    <PackageVersion Include="Broiler.UI.Button.Standard" Version="0.1.0-preview.24" />
+    <PackageVersion Include="Broiler.UI.Label.Standard" Version="0.1.0-preview.24" />
+    <PackageVersion Include="Broiler.UI.Window.Standard" Version="0.1.0-preview.24" />
+  </ItemGroup>
+</Project>

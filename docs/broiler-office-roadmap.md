@@ -1,5 +1,10 @@
 # Broiler Office package roadmap
 
+For the browser-only Launcher/Writer/Cell edition and the requested subdomains,
+see the separate [Broiler Office web roadmap](broiler-office-web-roadmap.md).
+That plan keeps Browser/Plate visible but disabled and does not replace the
+desktop installation/release roadmap below.
+
 Date: 2026-10-28. Status: Windows demo implementation delivered through M6;
 manual desktop/machine acceptance and production signing remain release gates.
 

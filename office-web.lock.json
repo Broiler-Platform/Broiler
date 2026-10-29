@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "broiler-office-web-lock",
+  "status": "pending-producer-releases",
+  "catalogVersion": "pending",
+  "channel": "preview",
+  "components": [],
+  "blockedBy": [
+    "Publish W1 Hosting and Graphics NuGet packages and commit the reviewed producer locks.",
+    "Commit and publish the three independently tested web producer releases.",
+    "Generate a reviewed lock from their real GitHub release and asset identities."
+  ]
+}

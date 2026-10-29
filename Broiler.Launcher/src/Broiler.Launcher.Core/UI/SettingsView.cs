@@ -46,7 +46,7 @@ public sealed class SettingsView : UiElement
 
     public SettingsView(IAppLauncherService? launcherService = null, IReleaseCatalogClient? catalog = null)
     {
-        _launcherService = launcherService ?? new AppLauncherService(); _catalog = catalog;
+        _launcherService = NativeLauncherServices.ResolveLauncher(launcherService); _catalog = catalog;
         AccessibleName = "Broiler Office settings";
         _backButton = Button("Back (discard)", Discard); _titleLabel = StandardLabel.Title("Office settings");
         _saveButton = Button("Save settings", SaveCurrentSettings); _cancelButton = Button("Cancel", Discard);

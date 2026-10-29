@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+    <PublishTrimmed>true</PublishTrimmed><IsPackable>false</IsPackable><TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
+    <PackageReference Include="Broiler.Hosting.WebAssembly" />
+    <PackageReference Include="Broiler.Hosting.Contracts" />
+    <PackageReference Include="Broiler.Graphics.WebAssembly" />
+    <PackageReference Include="Broiler.Graphics" />
+    <PackageReference Include="Broiler.UI" /><PackageReference Include="Broiler.UI.Standard" />
+    <PackageReference Include="Broiler.UI.Button.Standard" /><PackageReference Include="Broiler.UI.Label.Standard" />
+    <PackageReference Include="Broiler.UI.Window.Standard" />
+    <StaticWebAssetFingerprintPattern Include="MainJs" Pattern="main.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+  <Target Name="RequireReleasedWebPackages" BeforeTargets="CollectPackageReferences">
+    <Error Condition="'$(BroilerWebHostingVersion)' == '0.0.0-unconfigured' Or '$(BroilerWebGraphicsVersion)' == '0.0.0-unconfigured'" Text="Publish the W1 Hosting/Graphics packages, then supply BroilerWebHostingVersion and BroilerWebGraphicsVersion. For isolated pre-release verification use tests/office-web/publish-w2.ps1 -LocalPackages." />
+  </Target>
+</Project>

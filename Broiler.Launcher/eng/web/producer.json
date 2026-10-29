@@ -1,0 +1,7 @@
+{
+  "product": "launcher",
+  "productName": "Launcher",
+  "repository": "Broiler-Platform/Broiler",
+  "project": "src/Broiler.Launcher.WebAssembly/Broiler.Launcher.WebAssembly.csproj",
+  "versionProperty": "Version"
+}

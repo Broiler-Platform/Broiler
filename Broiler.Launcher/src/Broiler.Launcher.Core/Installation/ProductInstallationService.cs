@@ -22,8 +22,11 @@ public sealed class ProductInstallationService(BundledOfficePackageSource source
         IProgress<InstallProgress>? progress, CancellationToken token) =>
         new OfficePackageDownloader(DownloadClient, Path.Combine(paths.UserRoot, "cache", "downloads")).EnsureArchiveAsync(package, progress, token);
     private bool PlatformSupported => platformSupported ?? (OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X64);
-    public static ProductInstallationService CreateDefault(IMachineInstallBroker? machineBroker = null) =>
-        new(BundledOfficePackageSource.CreateDefault(), OfficeInstallPaths.CreateDefault(), machineBroker);
+    public static ProductInstallationService CreateDefault(IMachineInstallBroker? machineBroker = null)
+    {
+        Broiler.Launcher.Services.NativeLauncherServices.EnsureAvailable();
+        return new(BundledOfficePackageSource.CreateDefault(), OfficeInstallPaths.CreateDefault(), machineBroker);
+    }
 
     public Task<InstallAvailability> GetAvailabilityAsync(string productId, InstallScope scope, CancellationToken token = default) => Task.Run(() =>
     {

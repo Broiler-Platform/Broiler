@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><PublishTrimmed>true</PublishTrimmed><OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders><IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../Broiler.Hosting/src/Broiler.Hosting.WebAssembly/Broiler.Hosting.WebAssembly.csproj" />
+    <ProjectReference Include="../../../Broiler.Launcher/src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
+    <ProjectReference Include="../../../Broiler.Graphics/src/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj" />
+    <Content Include="../../../Broiler.Hosting/src/Broiler.Hosting.WebAssembly/wwwroot/broiler.hosting.webassembly.js" Link="wwwroot/broiler.hosting.webassembly.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../../Broiler.Graphics/src/Broiler.Graphics.WebAssembly/wwwroot/broiler.graphics.webassembly.js" Link="wwwroot/broiler.graphics.webassembly.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <StaticWebAssetFingerprintPattern Include="MainJs" Pattern="main.js" Expression="#[.{fingerprint}]!" />
+  </ItemGroup>
+</Project>

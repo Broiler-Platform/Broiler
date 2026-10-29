@@ -4,6 +4,21 @@ Unified workspace launcher application for the Broiler Platform suite: **Broiler
 
 Built entirely on Broiler platform components (`Broiler.UI`, `Broiler.Hosting`, `Broiler.Graphics`, and `Broiler.Input`) with a multi-target architecture supporting **Windows** and **Linux**.
 
+The separate [WebAssembly launcher](docs/web-launcher.md) opens Writer and Cell
+at their browser origins and keeps Browser/Plate disabled. It uses browser-only
+services and has no native installation or BOSS actions. See its build guide for
+the W1 package publication prerequisite and local integration verification.
+
+The default **Office-owned component release** workflow (`component: launcher`)
+publishes both the native Launcher and WebAssembly ZIP at the same component
+version under `launcher-v<version>`. Supply the published W1 `hosting_version`
+and `graphics_version` matching the committed Launcher web package lock. Its web
+producer must pass archive verification and the three-engine browser checks
+before the component draft can be created. The draft includes the original web
+ZIP, `.web-artifact.json` descriptor and `.SHA256SUMS.txt`; the website discovers
+them after the release is published. The standalone web-only workflow remains
+available for independent browser releases.
+
 ---
 
 ## Supported Applications

@@ -12,6 +12,12 @@ on:
       demo:
         type: boolean
         default: true
+      hosting_version:
+        description: Published W1 Hosting version matching the Launcher web lock; required for launcher.
+        default: ''
+      graphics_version:
+        description: Published W1 Graphics version matching the Launcher web lock; required for launcher.
+        default: ''
       writer_web_lock:
         description: Reviewed Writer web pin JSON; required for BOSS
         default: eng/boss-writer-web.lock.json
@@ -24,7 +30,19 @@ concurrency:
   group: office-component-${{ inputs.component }}-${{ inputs.version }}
   cancel-in-progress: false
 jobs:
+  web:
+    name: Publish reusable Launcher WebAssembly artifact
+    if: inputs.component == 'launcher'
+    uses: ./.github/workflows/broiler-launcher-web-artifact.yml
+    with:
+      version: ${{ inputs.version }}
+      source_tag: launcher-v${{ inputs.version }}
+      hosting_version: ${{ inputs.hosting_version }}
+      graphics_version: ${{ inputs.graphics_version }}
+
   component:
+    needs: web
+    if: ${{ !cancelled() && (inputs.component == 'boss' || needs.web.result == 'success') }}
     runs-on: windows-latest
     timeout-minutes: 60
     permissions:
@@ -53,6 +71,27 @@ jobs:
           WEB_LOCK: ${{ inputs.writer_web_lock }}
         run: |
           ./scripts/package-office-component.ps1 -Product $env:COMPONENT -Version $env:VERSION -OutputRoot "$env:RUNNER_TEMP/component" -Demo:($env:DEMO -eq 'true') -WriterWebLock $env:WEB_LOCK -RequireClean
+      - name: Download the verified Launcher web artifact
+        if: inputs.component == 'launcher'
+        uses: actions/download-artifact@v8
+        with:
+          name: broiler-launcher-web-${{ inputs.version }}
+          path: ${{ runner.temp }}/launcher-web
+      - name: Verify and attach the original Launcher web release assets
+        if: inputs.component == 'launcher'
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP 'launcher-web'
+          $stem = "Broiler.Launcher-$env:VERSION-browser-wasm"
+          $archive = Join-Path $source "$stem.zip"
+          $metadata = Join-Path $source "$stem.web-artifact.json"
+          python Broiler.Launcher/eng/web/artifact.py verify --archive $archive --metadata $metadata --require-release --product launcher --version $env:VERSION --tag "launcher-v$env:VERSION" --commit $env:GITHUB_SHA --repository $env:GITHUB_REPOSITORY
+          if ($LASTEXITCODE -ne 0) { throw 'Launcher web artifact verification failed.' }
+          foreach ($name in @("$stem.zip", "$stem.web-artifact.json", "$stem.SHA256SUMS.txt")) {
+            Copy-Item -LiteralPath (Join-Path $source $name) -Destination "$env:RUNNER_TEMP/component/assets/$name" -ErrorAction Stop
+          }
       - uses: actions/upload-artifact@v6
         with:
           name: office-${{ inputs.component }}-${{ inputs.version }}
@@ -72,6 +111,9 @@ jobs:
           $assets = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/component/assets" -File | ForEach-Object FullName)
           $notes = Join-Path $env:RUNNER_TEMP 'component-notes.md'
           "Independent $env:COMPONENT release. Office consumes the immutable assets through its reviewed lockfile. Source: $env:GITHUB_SHA" | Set-Content -LiteralPath $notes
+          if ($env:COMPONENT -eq 'launcher') {
+            'Includes the native Launcher and its independently verified browser-wasm ZIP, producer descriptor and SHA-256 checksum. The website consumes the original web archive.' | Add-Content -LiteralPath $notes
+          }
           $releaseArgs = @('release', 'create', $tag, '--target', $env:GITHUB_SHA, '--draft', '--title', "$env:COMPONENT $env:VERSION", '--notes-file', $notes)
           if ($env:VERSION.Contains('-')) { $releaseArgs += '--prerelease' }
           & gh @releaseArgs @assets

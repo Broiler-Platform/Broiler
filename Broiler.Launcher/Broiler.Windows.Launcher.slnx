@@ -6,6 +6,7 @@
     <BuildType Name="Release-Windows" />
   </Configurations>
   <Folder Name="/src/">
+    <Project Path="src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
     <Project Path="src/Broiler.Launcher.Core/Broiler.Launcher.Core.csproj" />
     <Project Path="src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj" />
   </Folder>

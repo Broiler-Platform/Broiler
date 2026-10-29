@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Broiler.Graphics.Geometry;
@@ -24,7 +23,6 @@ public sealed partial class LauncherView
     public void AcceptReleaseCheck(ReleaseCheck check) { _releaseCandidates = check.Releases; RefreshUpdateActions(); }
     public bool IsOperationInProgress => _updating || _bossBusy || _bossInstall is not null || _installOperations.Count != 0;
     public void ReportSettingsBusy() => _statusLabel.Text = "Finish or cancel the current Office operation before editing settings.";
-    private static readonly HttpClient UpdateHttp = new() { Timeout = TimeSpan.FromSeconds(45) };
     private readonly IReleaseCatalogClient _releaseCatalog;
     private readonly IUpdateService _updateService;
     private readonly List<StandardButton> _updateButtons = [];

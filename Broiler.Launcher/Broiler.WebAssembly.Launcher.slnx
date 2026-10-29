@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
+    <Project Path="src/Broiler.Launcher.WebAssembly/Broiler.Launcher.WebAssembly.csproj" />
+  </Folder>
+</Solution>

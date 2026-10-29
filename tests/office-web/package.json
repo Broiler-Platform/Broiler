@@ -1,0 +1,7 @@
+{
+  "name": "broiler-office-web-baseline",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node baseline.mjs", "test:contracts": "node contract.mjs", "test:launcher": "node launcher.mjs", "test:writer": "node writer.mjs", "test:cells": "node cells.mjs", "test:recovery": "node recovery.mjs" },
+  "devDependencies": { "playwright": "1.64.1" }
+}

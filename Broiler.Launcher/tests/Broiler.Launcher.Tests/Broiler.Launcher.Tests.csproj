@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Broiler.Launcher.Core\Broiler.Launcher.Core.csproj" />
+    <ProjectReference Include="..\..\src\Broiler.Launcher.Browser\Broiler.Launcher.Browser.csproj" />
   </ItemGroup>
 
   <ItemGroup>

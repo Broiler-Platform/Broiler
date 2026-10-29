@@ -1,0 +1,67 @@
+name: Verify Office web suite
+on:
+  workflow_dispatch:
+    inputs:
+      suite_tag:
+        description: Published suite release containing the reviewed office-web.lock.json.
+        type: string
+        required: true
+      lock_sha256:
+        description: Reviewed SHA-256 of office-web.lock.json.
+        type: string
+        required: true
+permissions:
+  contents: read
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Download reviewed suite lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SUITE_TAG: ${{ inputs.suite_tag }}
+          LOCK_SHA: ${{ inputs.lock_sha256 }}
+        run: |
+          mkdir -p lock
+          gh release download "$SUITE_TAG" --repo "$GITHUB_REPOSITORY" --pattern office-web.lock.json --dir lock
+          python - <<'PY'
+          import hashlib, os, pathlib, re
+          expected = os.environ['LOCK_SHA']
+          assert re.fullmatch('[0-9a-f]{64}', expected)
+          assert hashlib.sha256(pathlib.Path('lock/office-web.lock.json').read_bytes()).hexdigest() == expected
+          PY
+      - name: Download and verify complete producer closures
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m unittest discover -s tests/office-web -p 'test_web_deploy.py' -v
+          for product in launcher writer cell; do
+            python scripts/office_web.py stage --lock lock/office-web.lock.json --product "$product" --site "staged/$product" --cache "cache/$product"
+          done
+      - name: Test extracted producer applications
+        run: |
+          npm ci --prefix eng/web-producer
+          npx --prefix eng/web-producer playwright install --with-deps chromium firefox webkit
+          python - <<'PY'
+          import json, subprocess
+          lock=json.load(open('lock/office-web.lock.json'))
+          for row in lock['components']:
+              subprocess.run(['node','eng/web-producer/smoke.mjs',f"staged/{row['product']}/releases/{row['version']}",row['product'],f"evidence/{row['product']}.json"], check=True)
+          PY
+          node eng/web-producer/suite-smoke.mjs lock/office-web.lock.json staged evidence/suite.json
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: office-web-integration-evidence
+          path: |
+            lock
+            evidence
+            staged/*/receipts
+          if-no-files-found: error

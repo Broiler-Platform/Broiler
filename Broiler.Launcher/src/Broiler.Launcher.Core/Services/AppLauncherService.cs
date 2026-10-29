@@ -31,6 +31,7 @@ public sealed class AppLauncherService : IAppLauncherService
         Func<ProcessStartInfo, int?>? startProcess = null,
         IInstallationInventory? inventory = null)
     {
+        NativeLauncherServices.EnsureAvailable();
         _isWindows = isWindows ?? OperatingSystem.IsWindows();
         _inventory = inventory ?? new InstallationInventory(OfficeInstallPaths.CreateDefault());
         _environment = environment ?? Environment.GetEnvironmentVariable;

@@ -79,12 +79,12 @@ public sealed partial class LauncherView : UiElement
     public LauncherView(IAppLauncherService? launcherService = null, IProductInstallationService? installationService = null, IBossController? bossController = null,
         IReleaseCatalogClient? releaseCatalog = null, IUpdateService? updateService = null)
     {
-        _launcherService = launcherService ?? new AppLauncherService();
-        _installationService = installationService ?? ProductInstallationService.CreateDefault();
-        _bossController = bossController ?? BossController.CreateDefault(_launcherService);
-        var paths = OfficeInstallPaths.CreateDefault();
-        _releaseCatalog = releaseCatalog ?? new OfficeReleaseCatalog(UpdateHttp, System.IO.Path.Combine(paths.UserRoot, "cache", "releases"), OfficeReleaseVerifier.CreateDefault());
-        _updateService = updateService ?? new ProductUpdateService(paths, OfficeReleaseVerifier.CreateDefault(), _bossController);
+        var services = NativeLauncherServices.Create(launcherService, installationService, bossController, releaseCatalog, updateService);
+        _launcherService = services.Launcher;
+        _installationService = services.Installation;
+        _bossController = services.Boss;
+        _releaseCatalog = services.Catalog;
+        _updateService = services.Updates;
         AccessibleName = "Broiler Launcher";
 
         _commands = new StandardCommandDispatcher();

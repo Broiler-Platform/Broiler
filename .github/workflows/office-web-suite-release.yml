@@ -1,0 +1,49 @@
+name: Prepare Office web suite release
+on:
+  workflow_dispatch:
+    inputs:
+      catalog_version:
+        description: Independent Office web suite version.
+        type: string
+        required: true
+      launcher_tag:
+        description: Published Launcher producer release tag.
+        type: string
+        required: true
+      writer_tag:
+        description: Published Writer producer release tag.
+        type: string
+        required: true
+      cell_tag:
+        description: Published Cells producer release tag.
+        type: string
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: office-web-suite-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Resolve released producer identities and create a reviewable draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CATALOG_VERSION: ${{ inputs.catalog_version }}
+          LAUNCHER_TAG: ${{ inputs.launcher_tag }}
+          WRITER_TAG: ${{ inputs.writer_tag }}
+          CELL_TAG: ${{ inputs.cell_tag }}
+        run: |
+          python scripts/office_web.py lock --catalog-version "$CATALOG_VERSION" --launcher-tag "$LAUNCHER_TAG" --writer-tag "$WRITER_TAG" --cell-tag "$CELL_TAG" --output release/office-web.lock.json
+          sha256sum release/office-web.lock.json > release/office-web.lock.SHA256SUMS.txt
+          tag="office-web-v$CATALOG_VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo 'Suite release already exists; refusing replacement'; exit 1
+          fi
+          printf 'Artifact-only Office web suite. Review the attached lock and its SHA-256, then publish this draft. Run Verify Office web suite, stage all three Pages sites, and promote the approved catalog last.\n' > release/notes.md
+          gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --title "Broiler Office web $CATALOG_VERSION" --notes-file release/notes.md release/office-web.lock.json release/office-web.lock.SHA256SUMS.txt

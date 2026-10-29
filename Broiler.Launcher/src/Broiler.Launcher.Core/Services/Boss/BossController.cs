@@ -35,9 +35,12 @@ public sealed class BossController(Func<BossSettings> settings, IBossResolver re
     private BossState _state = new(BossStatus.Stopped, "BOSS has not been started.");
     public BossState Current => Volatile.Read(ref _state);
     public event Action<BossState>? StateChanged;
-    public static BossController CreateDefault(IAppLauncherService service) => new(
-        () => (service.Settings.Boss ?? new BossSettings()).Clone(), BossResolver.CreateDefault(), BossHealthProbe.CreateDefault(),
-        new BossProcessRunner(), Path.Combine(OfficeInstallPaths.CreateDefault().UserRoot, "boss"));
+    public static BossController CreateDefault(IAppLauncherService service)
+    {
+        NativeLauncherServices.EnsureAvailable();
+        return new(() => (service.Settings.Boss ?? new BossSettings()).Clone(), BossResolver.CreateDefault(), BossHealthProbe.CreateDefault(),
+            new BossProcessRunner(), Path.Combine(OfficeInstallPaths.CreateDefault().UserRoot, "boss"));
+    }
 
     private BossState Set(BossStatus status, string message, Uri? uri = null, bool owned = false, string? log = null)
     {

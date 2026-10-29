@@ -67,6 +67,8 @@ node_modules/
 package*.json
 !tests/wpt/package.json
 !tests/wpt/package-lock.json
+!tests/office-web/package.json
+!tests/office-web/package-lock.json
 *.log
 capture.png
 
@@ -105,3 +107,11 @@ __pycache__
 # directory it was launched from, so a run at the repository root leaves one here.
 # Published benchmark numbers belong under tests/*/results/, checked in by hand.
 BenchmarkDotNet.Artifacts/
+
+# Reviewed browser test/producer dependency locks are source files.
+!tests/office-web/package.json
+!tests/office-web/package-lock.json
+!eng/web-producer/package.json
+!eng/web-producer/package-lock.json
+!Broiler.Launcher/eng/web/package.json
+!Broiler.Launcher/eng/web/package-lock.json

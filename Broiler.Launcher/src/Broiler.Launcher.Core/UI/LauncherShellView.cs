@@ -19,11 +19,9 @@ public sealed class LauncherShellView : UiElement
 
     public LauncherShellView(IAppLauncherService? launcherService = null, UiWindow? ownerWindow = null, IProductInstallationService? installationService = null, IBossController? bossController = null, IMachineUpdateBroker? machineUpdateBroker = null)
     {
-        var service = launcherService ?? new AppLauncherService();
-        var boss = bossController ?? BossController.CreateDefault(service);
-        _launcherView = new LauncherView(service, installationService, boss, updateService:
-            new ProductUpdateService(OfficeInstallPaths.CreateDefault(), OfficeReleaseVerifier.CreateDefault(), boss, machineUpdateBroker));
-        _settingsView = new SettingsView(service, _launcherView.ReleaseCatalog);
+        var services = NativeLauncherServices.Create(launcherService, installationService, bossController, broker: machineUpdateBroker);
+        _launcherView = new LauncherView(services.Launcher, services.Installation, services.Boss, services.Catalog, services.Updates);
+        _settingsView = new SettingsView(services.Launcher, services.Catalog);
 
         _ownerWindow = ownerWindow;
         _launcherView.OwnerWindow = ownerWindow;

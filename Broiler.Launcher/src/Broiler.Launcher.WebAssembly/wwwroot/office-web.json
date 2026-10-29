@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "status": "local-preview",
+  "channel": "preview",
+  "catalogVersion": null,
+  "products": [
+    { "id": "writer", "url": "https://writer.broiler.app/", "version": null },
+    { "id": "cell", "url": "https://cell.broiler.app/", "version": null }
+  ]
+}
