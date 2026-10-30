@@ -109,7 +109,7 @@ env:
 jobs:
   # ── Resolve the shard matrix and whether to run incrementally ────────────
   plan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       shard-matrix: ${{ steps.resolve.outputs.shard-matrix }}
       rerun-failed: ${{ steps.resolve.outputs.rerun-failed }}
@@ -160,7 +160,7 @@ jobs:
 
   # ── Clone + cache the WPT checkout once (shared by all shards) ────────────
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -180,7 +180,7 @@ jobs:
   # ── Run one shard of the suite ───────────────────────────────────────────
   run:
     needs: [plan, prepare]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -226,7 +226,7 @@ jobs:
     # shard looks incomplete and retrying them all is the opposite of what was
     # asked. A single evicted shard does not cancel the run, so it still retries.
     if: ${{ !cancelled() && needs.run.result != 'skipped' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       retry-matrix: ${{ steps.detect.outputs.incomplete_shard_matrix }}
       retry-shards: ${{ steps.detect.outputs.incomplete_shard_indexes }}
@@ -281,7 +281,7 @@ jobs:
   retry:
     needs: [plan, prepare, retry-plan]
     if: ${{ !cancelled() && needs.retry-plan.outputs.has-retries == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     strategy:
       fail-fast: false
@@ -316,7 +316,7 @@ jobs:
   report:
     needs: [plan, run, retry]
     if: always() && needs.run.result != 'skipped'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
 
@@ -461,7 +461,7 @@ jobs:
     if: >-
       always()
       && (needs.run.result == 'success' || needs.run.result == 'failure')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:

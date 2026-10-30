@@ -13,10 +13,10 @@ on:
         type: boolean
         default: true
       hosting_version:
-        description: Published W1 Hosting version matching the Launcher web lock; required for launcher.
+        description: Published W1 Hosting version for the selected Launcher cohort; required for launcher.
         default: ''
       graphics_version:
-        description: Published W1 Graphics version matching the Launcher web lock; required for launcher.
+        description: Published W1 Graphics version for the selected Launcher cohort; required for launcher.
         default: ''
       writer_web_lock:
         description: Reviewed Writer web pin JSON; required for BOSS

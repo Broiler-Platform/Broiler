@@ -1,5 +1,10 @@
 # Broiler Office web — W6 delivery and operations
 
+**Restore update:** NuGet `packages.lock.json` files and locked-restore requirements
+were removed on 2026-10-29. Current builds use ordinary restore with central
+dependency versions; older lock-generation instructions below are historical.
+Office release artifact manifests and their integrity checks remain separate.
+
 **Hosting update:** the user's subsequent website configuration hosts all three
 apps at `broiler-platform.github.io/demo/`, `/writer/` and `/cell/`, with HTTP
 forwarding from the short domains. The website workflow resolves current

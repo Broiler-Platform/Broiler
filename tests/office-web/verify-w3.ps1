@@ -18,7 +18,7 @@ try {
     Invoke-Checked dotnet @('build', (Join-Path $repo 'Broiler.Writer/src/Broiler.Writer.Windows/Broiler.Writer.Windows.csproj'), '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false')
     Invoke-Checked dotnet @('run', '--project', 'writer-fixtures/WriterFixtures.csproj', '-c', 'Release', '-p:UseBroilerUiSource=false', '--', 'generate', (Join-Path $output 'fixtures'))
     $project = Join-Path $repo 'Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj'
-    Invoke-Checked dotnet @('publish', $project, '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-p:RestorePackagesWithLockFile=true', '-p:RestoreLockedMode=true', '-o', (Join-Path $output 'writer'))
+    Invoke-Checked dotnet @('publish', $project, '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-o', (Join-Path $output 'writer'))
     Copy-Item -LiteralPath (Join-Path (Split-Path $project) 'obj/project.assets.json') -Destination (Join-Path $output 'writer-project.assets.json')
     Invoke-Checked npm @('run', 'test:writer')
     Invoke-Checked dotnet @('run', '--project', 'writer-fixtures/WriterFixtures.csproj', '-c', 'Release', '-p:UseBroilerUiSource=false', '--', 'inspect', (Join-Path $output 'browser'), (Join-Path $output 'contents.json'))

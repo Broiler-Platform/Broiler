@@ -92,7 +92,7 @@ jobs:
   # the RID-to-runner mapping is written once, in one readable place.
   select-platforms:
     name: Select platforms
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
     steps:
@@ -105,10 +105,10 @@ jobs:
 
           # The release matrix of Broiler.JS/docs/roadmap/Measurement.md §3.1. linux-arm64
           # is a GitHub-hosted Arm runner; the label is a distinct image, not a
-          # ubuntu-latest variant, so it is spelled out rather than derived.
+          # ubuntu-24.04 variant, so it is spelled out rather than derived.
           runner_for() {
             case "$1" in
-              linux-x64)   echo 'ubuntu-latest' ;;
+              linux-x64)   echo 'ubuntu-24.04' ;;
               win-x64)     echo 'windows-latest' ;;
               linux-arm64) echo 'ubuntu-24.04-arm' ;;
               *) echo "Unknown platform: $1" >&2; exit 1 ;;

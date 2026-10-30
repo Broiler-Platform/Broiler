@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   propose:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       branch: ${{ steps.proposal.outputs.branch }}
       complete: ${{ steps.proposal.outputs.complete }}

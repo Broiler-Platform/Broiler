@@ -11,11 +11,11 @@ on:
         type: boolean
         default: true
       hosting_version:
-        description: Published W1 Hosting package version matching the committed Launcher lock.
+        description: Published W1 Hosting package version for the selected Launcher cohort.
         type: string
         required: true
       graphics_version:
-        description: Published W1 Graphics package version matching the committed Launcher lock.
+        description: Published W1 Graphics package version for the selected Launcher cohort.
         type: string
         required: true
 permissions:

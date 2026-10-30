@@ -103,7 +103,7 @@ env:
 jobs:
   evaluate:
     name: Evaluate the privacy test pages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
 
     steps:

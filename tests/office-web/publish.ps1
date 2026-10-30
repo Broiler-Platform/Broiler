@@ -14,7 +14,7 @@ try {
         @{ Name = 'writer'; Project = 'Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj' },
         @{ Name = 'cell'; Project = 'Broiler.Cells/src/Broiler.Cells.WebAssembly/Broiler.Cells.WebAssembly.csproj' }
     )) {
-        & dotnet publish (Join-Path $repo $product.Project) -c Release -m:1 -p:RunAOTCompilation=false -p:UseBroilerUiSource=false -p:RestorePackagesWithLockFile=true -p:RestoreLockedMode=true -o (Join-Path $output $product.Name)
+        & dotnet publish (Join-Path $repo $product.Project) -c Release -m:1 -p:RunAOTCompilation=false -p:UseBroilerUiSource=false -o (Join-Path $output $product.Name)
         if ($LASTEXITCODE -ne 0) { throw "Publish failed: $($product.Name)" }
         $assets = Join-Path (Split-Path (Join-Path $repo $product.Project)) 'obj/project.assets.json'
         Copy-Item -LiteralPath $assets -Destination (Join-Path $output "$($product.Name)-project.assets.json")

@@ -1,0 +1,1476 @@
+{
+  "packageCount": 195,
+  "graph": {
+    "Broiler.SDK": [],
+    "Broiler.CSS": [],
+    "Broiler.CSS.Dom": [
+      "Broiler.CSS",
+      "Broiler.Dom"
+    ],
+    "Broiler.DateTime": [],
+    "Broiler.Documents": [
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Csv": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Docx": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.FormatCodes": [
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Html": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model",
+      "Broiler.Dom",
+      "Broiler.Dom.Html"
+    ],
+    "Broiler.Documents.Markdown": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Model": [
+      "Broiler.Graphics"
+    ],
+    "Broiler.Documents.Ods": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Odt": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Pagination": [
+      "Broiler.Documents.Model",
+      "Broiler.Graphics"
+    ],
+    "Broiler.Documents.Pdf": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Pdf.Fonts": [
+      "Broiler.Documents.Pdf",
+      "Broiler.Graphics"
+    ],
+    "Broiler.Documents.Pdf.Images": [
+      "Broiler.Documents.Pdf",
+      "Broiler.Media.Image.Managed"
+    ],
+    "Broiler.Documents.Rtf": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Documents.Xlsx": [
+      "Broiler.Documents",
+      "Broiler.Documents.Model"
+    ],
+    "Broiler.Dom": [],
+    "Broiler.Dom.Html": [
+      "Broiler.Dom"
+    ],
+    "Broiler.Graphics": [
+      "Broiler.Media.Image"
+    ],
+    "Broiler.Graphics.Android": [
+      "Broiler.Graphics",
+      "Broiler.Native.Android"
+    ],
+    "Broiler.Graphics.Linux": [
+      "Broiler.Graphics",
+      "Broiler.Native.Linux"
+    ],
+    "Broiler.Graphics.Linux.OpenGL": [
+      "Broiler.Graphics",
+      "Broiler.Graphics.Linux"
+    ],
+    "Broiler.Graphics.Linux.Vulkan": [
+      "Broiler.Graphics",
+      "Broiler.Graphics.Linux"
+    ],
+    "Broiler.Graphics.WebAssembly": [
+      "Broiler.Graphics"
+    ],
+    "Broiler.Graphics.Windows": [
+      "Broiler.Graphics",
+      "Broiler.Media.Video",
+      "Broiler.Media.Video.Windows",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.Hosting.Android": [
+      "Broiler.Graphics",
+      "Broiler.Input.Android",
+      "Broiler.Input.Keyboard.Android",
+      "Broiler.Input.Pen.Android",
+      "Broiler.Input.Text.Android",
+      "Broiler.Input.Touch.Android",
+      "Broiler.UI"
+    ],
+    "Broiler.Hosting.Contracts": [],
+    "Broiler.Hosting.Linux": [
+      "Broiler.Graphics",
+      "Broiler.Graphics.Linux",
+      "Broiler.Graphics.Linux.OpenGL",
+      "Broiler.Input",
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Keyboard.Linux",
+      "Broiler.Input.Linux",
+      "Broiler.Input.Mouse",
+      "Broiler.Input.Mouse.Linux",
+      "Broiler.Native",
+      "Broiler.Native.Linux",
+      "Broiler.UI",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.Hosting.WebAssembly": [
+      "Broiler.Hosting.Contracts"
+    ],
+    "Broiler.Hosting.Windows": [
+      "Broiler.Graphics",
+      "Broiler.Graphics.Windows",
+      "Broiler.Input",
+      "Broiler.Input.Keyboard",
+      "Broiler.Native.Windows",
+      "Broiler.UI",
+      "Broiler.UI.Button",
+      "Broiler.UI.ComboBox",
+      "Broiler.UI.Edit",
+      "Broiler.UI.ListView",
+      "Broiler.UI.ListView.Standard",
+      "Broiler.UI.RichEdit",
+      "Broiler.UI.Standard",
+      "Broiler.UI.TabView",
+      "Broiler.UI.TabView.Standard",
+      "Broiler.UI.TreeView",
+      "Broiler.UI.TreeView.Standard"
+    ],
+    "Broiler.HTML.Core": [
+      "Broiler.CSS",
+      "Broiler.Graphics",
+      "Broiler.Layout",
+      "Broiler.Net"
+    ],
+    "Broiler.HTML.Dom": [
+      "Broiler.Dom.Html",
+      "Broiler.HTML.Core"
+    ],
+    "Broiler.HTML.Graphics": [
+      "Broiler.HTML.Core",
+      "Broiler.HTML.Image",
+      "Broiler.HTML.Image.Compat",
+      "Broiler.Media.Image.Managed"
+    ],
+    "Broiler.HTML.Image": [
+      "Broiler.HTML.Orchestration",
+      "Broiler.Media.Image.Managed"
+    ],
+    "Broiler.HTML.Image.Compat": [
+      "Broiler.HTML.Image"
+    ],
+    "Broiler.HTML.Orchestration": [
+      "Broiler.CSS.Dom",
+      "Broiler.HTML.Core",
+      "Broiler.HTML.Dom"
+    ],
+    "Broiler.HtmlBridge.Core": [
+      "Broiler.CSS.Dom",
+      "Broiler.Dom.Html",
+      "Broiler.JavaScript.Engine",
+      "Broiler.Layout",
+      "Broiler.Net"
+    ],
+    "Broiler.HtmlBridge.Dom": [
+      "Broiler.HtmlBridge.Core",
+      "Broiler.HtmlBridge.DomBridgeUtils",
+      "Broiler.JSeal",
+      "Broiler.JavaScript.Modules"
+    ],
+    "Broiler.HtmlBridge.DomBridgeUtils": [
+      "Broiler.HtmlBridge.Core",
+      "Broiler.JSeal"
+    ],
+    "Broiler.HtmlBridge.Scripting": [
+      "Broiler.HtmlBridge.Core",
+      "Broiler.HtmlBridge.Dom",
+      "Broiler.JSeal.BroilerJs"
+    ],
+    "Broiler.HtmlBridge.Scripting.Vm": [
+      "Broiler.HtmlBridge.Core",
+      "Broiler.HtmlBridge.Scripting",
+      "Broiler.JSeal.Vm"
+    ],
+    "Broiler.Input": [],
+    "Broiler.Input.All": [
+      "Broiler.Input",
+      "Broiler.Input.Camera",
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Legacy",
+      "Broiler.Input.Microphone",
+      "Broiler.Input.Mouse",
+      "Broiler.Input.Pen",
+      "Broiler.Input.Text",
+      "Broiler.Input.Touch"
+    ],
+    "Broiler.Input.Android": [
+      "Broiler.Input",
+      "Broiler.Input.Keyboard"
+    ],
+    "Broiler.Input.Camera": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Camera.Windows": [
+      "Broiler.Input.Camera",
+      "Broiler.Input.Windows",
+      "Broiler.Media.Video.MediaFoundation",
+      "Broiler.Media.Video.Windows"
+    ],
+    "Broiler.Input.Keyboard": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Keyboard.Android": [
+      "Broiler.Input.Android",
+      "Broiler.Input.Keyboard"
+    ],
+    "Broiler.Input.Keyboard.Linux": [
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Linux"
+    ],
+    "Broiler.Input.Keyboard.Windows": [
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Windows",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.Input.Legacy": [
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Mouse"
+    ],
+    "Broiler.Input.Linux": [
+      "Broiler.Input",
+      "Broiler.Native.Linux"
+    ],
+    "Broiler.Input.Microphone": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Microphone.Windows": [
+      "Broiler.Input.Microphone",
+      "Broiler.Input.Windows",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.Input.Mouse": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Mouse.Linux": [
+      "Broiler.Input.Linux",
+      "Broiler.Input.Mouse"
+    ],
+    "Broiler.Input.Mouse.Windows": [
+      "Broiler.Input.Mouse",
+      "Broiler.Input.Windows"
+    ],
+    "Broiler.Input.Pen": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Pen.Android": [
+      "Broiler.Input.Android",
+      "Broiler.Input.Pen"
+    ],
+    "Broiler.Input.Text": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Text.Android": [
+      "Broiler.Input.Android",
+      "Broiler.Input.Text"
+    ],
+    "Broiler.Input.Touch": [
+      "Broiler.Input"
+    ],
+    "Broiler.Input.Touch.Android": [
+      "Broiler.Input.Android",
+      "Broiler.Input.Touch"
+    ],
+    "Broiler.Input.Windows": [
+      "Broiler.Input",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.ECMAScript.Algorithms": [],
+    "Broiler.ECMAScript.Generation": [],
+    "Broiler.JavaScript.All": [
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Clr",
+      "Broiler.JavaScript.Compiler",
+      "Broiler.JavaScript.Debugger",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.Extensions",
+      "Broiler.JavaScript.Globals",
+      "Broiler.JavaScript.LinqExpressions",
+      "Broiler.JavaScript.ModuleExtensions",
+      "Broiler.JavaScript.Modules"
+    ],
+    "Broiler.JavaScript.Ast": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.JavaScript.Expressions",
+      "Broiler.Unicode.Algorithms"
+    ],
+    "Broiler.JavaScript.BuiltIns": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.Extensions",
+      "Broiler.JavaScript.LinqExpressions",
+      "Broiler.Regex",
+      "Broiler.Unicode.Cldr.LocaleData",
+      "Broiler.Unicode.Segmentation"
+    ],
+    "Broiler.JavaScript.Clr": [
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.Extensions",
+      "Broiler.JavaScript.LinqExpressions"
+    ],
+    "Broiler.JavaScript.Compiler": [
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.LinqExpressions"
+    ],
+    "Broiler.JavaScript.Debugger": [
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Engine"
+    ],
+    "Broiler.JavaScript.Engine": [
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.Expressions",
+      "Broiler.JavaScript.Parser",
+      "Broiler.JavaScript.Runtime",
+      "Broiler.JavaScript.Storage"
+    ],
+    "Broiler.JavaScript.ExpressionCompiler": [
+      "Broiler.JavaScript.Expressions"
+    ],
+    "Broiler.JavaScript.Expressions": [
+      "Broiler.ECMAScript.Algorithms"
+    ],
+    "Broiler.JavaScript.Extensions": [
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.LinqExpressions"
+    ],
+    "Broiler.JavaScript.Globals": [
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Compiler",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.Extensions"
+    ],
+    "Broiler.JavaScript.LinqExpressions": [
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.ExpressionCompiler",
+      "Broiler.JavaScript.Expressions",
+      "Broiler.JavaScript.Runtime",
+      "Broiler.JavaScript.Storage"
+    ],
+    "Broiler.JavaScript.Minimal": [
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Compiler",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.Extensions",
+      "Broiler.JavaScript.Globals"
+    ],
+    "Broiler.JavaScript.ModuleExtensions": [
+      "Broiler.JavaScript.Clr",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.ExpressionCompiler",
+      "Broiler.JavaScript.Extensions",
+      "Broiler.JavaScript.Modules"
+    ],
+    "Broiler.JavaScript.Modules": [
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Engine",
+      "Broiler.JavaScript.LinqExpressions"
+    ],
+    "Broiler.JavaScript.Parser": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.Expressions"
+    ],
+    "Broiler.JavaScript.Portable": [],
+    "Broiler.JavaScript.Portable.Compiler": [
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.Parser",
+      "Broiler.JavaScript.Portable"
+    ],
+    "Broiler.JavaScript.Runtime": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.Expressions",
+      "Broiler.JavaScript.Storage"
+    ],
+    "Broiler.JavaScript.Storage": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.Expressions"
+    ],
+    "Broiler.JSeal": [],
+    "Broiler.JSeal.BroilerJs": [
+      "Broiler.JSeal",
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.JavaScript.Globals",
+      "Broiler.JavaScript.Modules",
+      "Broiler.JavaScript.Storage"
+    ],
+    "Broiler.JSeal.Vm": [
+      "Broiler.JSeal",
+      "Broiler.VM.Profile.JavaScript",
+      "Broiler.VM.Profile.JavaScript.Compiler",
+      "Broiler.VM.Runtime"
+    ],
+    "Broiler.Layout": [
+      "Broiler.CSS",
+      "Broiler.CSS.Dom",
+      "Broiler.Dom",
+      "Broiler.Graphics"
+    ],
+    "Broiler.Media": [],
+    "Broiler.Media.All": [
+      "Broiler.Media",
+      "Broiler.Media.Audio",
+      "Broiler.Media.Audio.Managed",
+      "Broiler.Media.Image",
+      "Broiler.Media.Image.Managed",
+      "Broiler.Media.Video",
+      "Broiler.Media.Video.MediaFoundation",
+      "Broiler.Media.Video.Windows"
+    ],
+    "Broiler.Media.Audio": [
+      "Broiler.Media"
+    ],
+    "Broiler.Media.Audio.Managed": [
+      "Broiler.Media.Audio"
+    ],
+    "Broiler.Media.Image": [
+      "Broiler.Media"
+    ],
+    "Broiler.Media.Image.Managed": [
+      "Broiler.Media.Image",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.Media.Video": [
+      "Broiler.Media"
+    ],
+    "Broiler.Media.Video.MediaFoundation": [
+      "Broiler.Media.Video",
+      "Broiler.Media.Video.Windows",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.Media.Video.Windows": [
+      "Broiler.Media.Video"
+    ],
+    "Broiler.Native": [],
+    "Broiler.Native.All": [
+      "Broiler.Native",
+      "Broiler.Native.Android",
+      "Broiler.Native.Linux",
+      "Broiler.Native.Windows"
+    ],
+    "Broiler.Native.Android": [
+      "Broiler.Native"
+    ],
+    "Broiler.Native.Linux": [
+      "Broiler.Native"
+    ],
+    "Broiler.Native.Windows": [
+      "Broiler.Native"
+    ],
+    "Broiler.Net": [],
+    "Broiler.Regex": [
+      "Broiler.Unicode.Algorithms"
+    ],
+    "Broiler.UI.Button": [
+      "Broiler.Graphics",
+      "Broiler.UI",
+      "Broiler.UI.Menu"
+    ],
+    "Broiler.UI.Menu": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.ToggleButton": [
+      "Broiler.Graphics",
+      "Broiler.UI.Button"
+    ],
+    "Broiler.UI.Toolbar": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.ImageView": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Label": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.PrintPreview": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.ProgressBar": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Forms": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Panel": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.ScrollView": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Splitter": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.TabView": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.AboutDialog": [
+      "Broiler.Graphics",
+      "Broiler.UI.Dialog"
+    ],
+    "Broiler.UI.Dialog": [
+      "Broiler.Graphics",
+      "Broiler.UI.Window"
+    ],
+    "Broiler.UI.FileDialog": [
+      "Broiler.Graphics",
+      "Broiler.UI.Dialog"
+    ],
+    "Broiler.UI.FontDialog": [
+      "Broiler.Graphics",
+      "Broiler.UI.Dialog"
+    ],
+    "Broiler.UI.PrintDialog": [
+      "Broiler.Graphics",
+      "Broiler.UI.Dialog"
+    ],
+    "Broiler.UI.Tooltip": [
+      "Broiler.Graphics",
+      "Broiler.UI.Window"
+    ],
+    "Broiler.UI.Window": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.CodeEditor": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Edit": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.FormatCodeView": [
+      "Broiler.Documents.FormatCodes",
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.RichEdit": [
+      "Broiler.Documents.Model",
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.CheckBox": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.ComboBox": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.ListView": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.RadioButton": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Slider": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.SpinBox": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.TreeView": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.All": [
+      "Broiler.UI",
+      "Broiler.UI.AboutDialog",
+      "Broiler.UI.AboutDialog.Standard",
+      "Broiler.UI.Button",
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.CheckBox",
+      "Broiler.UI.CheckBox.Standard",
+      "Broiler.UI.CodeEditor",
+      "Broiler.UI.CodeEditor.Standard",
+      "Broiler.UI.ComboBox",
+      "Broiler.UI.ComboBox.Standard",
+      "Broiler.UI.Dialog",
+      "Broiler.UI.Dialog.Standard",
+      "Broiler.UI.Edit",
+      "Broiler.UI.Edit.Standard",
+      "Broiler.UI.FileDialog",
+      "Broiler.UI.FileDialog.Standard",
+      "Broiler.UI.FontDialog",
+      "Broiler.UI.FontDialog.Standard",
+      "Broiler.UI.FormatCodeView",
+      "Broiler.UI.FormatCodeView.Standard",
+      "Broiler.UI.Forms",
+      "Broiler.UI.Forms.Standard",
+      "Broiler.UI.ImageView",
+      "Broiler.UI.ImageView.Standard",
+      "Broiler.UI.Label",
+      "Broiler.UI.Label.Standard",
+      "Broiler.UI.ListView",
+      "Broiler.UI.ListView.Standard",
+      "Broiler.UI.Menu",
+      "Broiler.UI.Menu.Standard",
+      "Broiler.UI.Panel",
+      "Broiler.UI.Panel.Standard",
+      "Broiler.UI.PrintDialog",
+      "Broiler.UI.PrintDialog.Standard",
+      "Broiler.UI.PrintPreview",
+      "Broiler.UI.PrintPreview.Standard",
+      "Broiler.UI.ProgressBar",
+      "Broiler.UI.ProgressBar.Standard",
+      "Broiler.UI.RadioButton",
+      "Broiler.UI.RadioButton.Standard",
+      "Broiler.UI.RichEdit",
+      "Broiler.UI.RichEdit.Rtf",
+      "Broiler.UI.RichEdit.Standard",
+      "Broiler.UI.ScrollView",
+      "Broiler.UI.ScrollView.Standard",
+      "Broiler.UI.Slider",
+      "Broiler.UI.Slider.Standard",
+      "Broiler.UI.SpinBox",
+      "Broiler.UI.SpinBox.Standard",
+      "Broiler.UI.Splitter",
+      "Broiler.UI.Splitter.Standard",
+      "Broiler.UI.Standard",
+      "Broiler.UI.TabView",
+      "Broiler.UI.TabView.Standard",
+      "Broiler.UI.ToggleButton",
+      "Broiler.UI.ToggleButton.Standard",
+      "Broiler.UI.Toolbar",
+      "Broiler.UI.Toolbar.Standard",
+      "Broiler.UI.Tooltip",
+      "Broiler.UI.Tooltip.Standard",
+      "Broiler.UI.TreeView",
+      "Broiler.UI.TreeView.Standard",
+      "Broiler.UI.Window",
+      "Broiler.UI.Window.Standard"
+    ],
+    "Broiler.UI": [
+      "Broiler.Graphics",
+      "Broiler.Input",
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Mouse",
+      "Broiler.Input.Pen",
+      "Broiler.Input.Text",
+      "Broiler.Input.Touch"
+    ],
+    "Broiler.UI.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI"
+    ],
+    "Broiler.UI.Button.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Button",
+      "Broiler.UI.Menu.Standard",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Menu.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Menu",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.ToggleButton.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Standard",
+      "Broiler.UI.ToggleButton"
+    ],
+    "Broiler.UI.Toolbar.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Standard",
+      "Broiler.UI.Toolbar"
+    ],
+    "Broiler.UI.ImageView.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.ImageView",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Label.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Label",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.PrintPreview.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.PrintPreview",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.ProgressBar.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.ProgressBar",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Forms.Standard": [
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.Edit.Standard",
+      "Broiler.UI.Forms",
+      "Broiler.UI.Label.Standard",
+      "Broiler.UI.Panel.Standard",
+      "Broiler.UI.ScrollView.Standard",
+      "Broiler.UI.Toolbar.Standard"
+    ],
+    "Broiler.UI.Panel.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Panel",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.ScrollView.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.ScrollView",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Splitter.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Splitter",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.TabView.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Standard",
+      "Broiler.UI.TabView"
+    ],
+    "Broiler.UI.AboutDialog.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.AboutDialog",
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.Label.Standard",
+      "Broiler.UI.ListView.Standard",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Dialog.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Dialog",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.FileDialog.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.ComboBox.Standard",
+      "Broiler.UI.Edit.Standard",
+      "Broiler.UI.FileDialog",
+      "Broiler.UI.ListView.Standard",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.FontDialog.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.ComboBox.Standard",
+      "Broiler.UI.FontDialog",
+      "Broiler.UI.ListView.Standard",
+      "Broiler.UI.SpinBox.Standard",
+      "Broiler.UI.Standard",
+      "Broiler.UI.ToggleButton.Standard"
+    ],
+    "Broiler.UI.PrintDialog.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.ComboBox.Standard",
+      "Broiler.UI.Edit.Standard",
+      "Broiler.UI.PrintDialog",
+      "Broiler.UI.PrintPreview.Standard",
+      "Broiler.UI.SpinBox.Standard",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Tooltip.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Standard",
+      "Broiler.UI.Tooltip"
+    ],
+    "Broiler.UI.Window.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Standard",
+      "Broiler.UI.Window"
+    ],
+    "Broiler.UI.CodeEditor.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.CodeEditor",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Edit.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Edit",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.FormatCodeView.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.FormatCodeView",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.RichEdit.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.RichEdit",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.CheckBox.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.CheckBox",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.ComboBox.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.ComboBox",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.ListView.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.ListView",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.RadioButton.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.RadioButton",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.Slider.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Slider",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.SpinBox.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Edit.Standard",
+      "Broiler.UI.SpinBox",
+      "Broiler.UI.Standard"
+    ],
+    "Broiler.UI.TreeView.Standard": [
+      "Broiler.Graphics",
+      "Broiler.UI.Standard",
+      "Broiler.UI.TreeView"
+    ],
+    "Broiler.UI.RichEdit.Rtf": [
+      "Broiler.Documents.Rtf",
+      "Broiler.UI.RichEdit"
+    ],
+    "Broiler.Unicode.Algorithms": [],
+    "Broiler.Unicode.Generation": [
+      "Broiler.Unicode.Algorithms"
+    ],
+    "Broiler.Unicode.Segmentation": [
+      "Broiler.Unicode.Algorithms"
+    ],
+    "Broiler.Unicode.Tables": [
+      "Broiler.Unicode.Algorithms"
+    ],
+    "Broiler.Unicode.Cldr.LocaleData": [],
+    "Broiler.Unicode.Emoji.StringProperties": [],
+    "Broiler.Unicode.Properties": [],
+    "Broiler.VM.Abstractions": [],
+    "Broiler.VM.Binary": [],
+    "Broiler.VM.Emitter.Bytecode": [
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary",
+      "Broiler.VM.Ubc"
+    ],
+    "Broiler.VM.HyperV": [],
+    "Broiler.VM.Profile.JavaScript": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.Unicode.Algorithms",
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary",
+      "Broiler.VM.Profile.JavaScript.Format"
+    ],
+    "Broiler.VM.Profile.JavaScript.Compiler": [
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.Unicode.Algorithms",
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Profile.JavaScript.Format"
+    ],
+    "Broiler.VM.Profile.JavaScript.Format": [
+      "Broiler.Unicode.Algorithms"
+    ],
+    "Broiler.VM.Profile.JavaScript.Intl": [
+      "Broiler.Unicode.Algorithms",
+      "Broiler.Unicode.Segmentation",
+      "Broiler.VM.Profile.JavaScript.Format"
+    ],
+    "Broiler.VM.Profile.MachineCode": [
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary"
+    ],
+    "Broiler.VM.Profile.WebAssembly": [
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary",
+      "Broiler.VM.Ubc"
+    ],
+    "Broiler.VM.Runtime": [
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary"
+    ],
+    "Broiler.VM.Ubc": [
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary"
+    ],
+    "Broiler.Writer.FormatCodes": [
+      "Broiler.Documents.FormatCodes",
+      "Broiler.Media.Image"
+    ]
+  },
+  "packageLayers": [
+    [
+      "Broiler.CSS",
+      "Broiler.DateTime",
+      "Broiler.Dom",
+      "Broiler.ECMAScript.Algorithms",
+      "Broiler.ECMAScript.Generation",
+      "Broiler.Hosting.Contracts",
+      "Broiler.Input",
+      "Broiler.JSeal",
+      "Broiler.JavaScript.Portable",
+      "Broiler.Media",
+      "Broiler.Native",
+      "Broiler.Net",
+      "Broiler.SDK",
+      "Broiler.Unicode.Algorithms",
+      "Broiler.Unicode.Cldr.LocaleData",
+      "Broiler.Unicode.Emoji.StringProperties",
+      "Broiler.Unicode.Properties",
+      "Broiler.VM.Abstractions",
+      "Broiler.VM.Binary",
+      "Broiler.VM.HyperV"
+    ],
+    [
+      "Broiler.CSS.Dom",
+      "Broiler.Dom.Html",
+      "Broiler.Hosting.WebAssembly",
+      "Broiler.Input.Camera",
+      "Broiler.Input.Keyboard",
+      "Broiler.Input.Microphone",
+      "Broiler.Input.Mouse",
+      "Broiler.Input.Pen",
+      "Broiler.Input.Text",
+      "Broiler.Input.Touch",
+      "Broiler.JavaScript.Expressions",
+      "Broiler.Media.Audio",
+      "Broiler.Media.Image",
+      "Broiler.Media.Video",
+      "Broiler.Native.Android",
+      "Broiler.Native.Linux",
+      "Broiler.Native.Windows",
+      "Broiler.Regex",
+      "Broiler.Unicode.Generation",
+      "Broiler.Unicode.Segmentation",
+      "Broiler.Unicode.Tables",
+      "Broiler.VM.Profile.JavaScript.Format",
+      "Broiler.VM.Profile.MachineCode",
+      "Broiler.VM.Runtime",
+      "Broiler.VM.Ubc"
+    ],
+    [
+      "Broiler.Graphics",
+      "Broiler.Input.Android",
+      "Broiler.Input.Legacy",
+      "Broiler.Input.Linux",
+      "Broiler.Input.Windows",
+      "Broiler.JavaScript.Ast",
+      "Broiler.JavaScript.ExpressionCompiler",
+      "Broiler.Media.Audio.Managed",
+      "Broiler.Media.Image.Managed",
+      "Broiler.Media.Video.Windows",
+      "Broiler.Native.All",
+      "Broiler.VM.Emitter.Bytecode",
+      "Broiler.VM.Profile.JavaScript",
+      "Broiler.VM.Profile.JavaScript.Compiler",
+      "Broiler.VM.Profile.JavaScript.Intl",
+      "Broiler.VM.Profile.WebAssembly"
+    ],
+    [
+      "Broiler.Documents.Model",
+      "Broiler.Graphics.Android",
+      "Broiler.Graphics.Linux",
+      "Broiler.Graphics.WebAssembly",
+      "Broiler.Graphics.Windows",
+      "Broiler.Input.All",
+      "Broiler.Input.Keyboard.Android",
+      "Broiler.Input.Keyboard.Linux",
+      "Broiler.Input.Keyboard.Windows",
+      "Broiler.Input.Microphone.Windows",
+      "Broiler.Input.Mouse.Linux",
+      "Broiler.Input.Mouse.Windows",
+      "Broiler.Input.Pen.Android",
+      "Broiler.Input.Text.Android",
+      "Broiler.Input.Touch.Android",
+      "Broiler.JSeal.Vm",
+      "Broiler.JavaScript.Parser",
+      "Broiler.JavaScript.Storage",
+      "Broiler.Layout",
+      "Broiler.Media.Video.MediaFoundation",
+      "Broiler.UI"
+    ],
+    [
+      "Broiler.Documents",
+      "Broiler.Documents.FormatCodes",
+      "Broiler.Documents.Pagination",
+      "Broiler.Graphics.Linux.OpenGL",
+      "Broiler.Graphics.Linux.Vulkan",
+      "Broiler.HTML.Core",
+      "Broiler.Hosting.Android",
+      "Broiler.Input.Camera.Windows",
+      "Broiler.JavaScript.Portable.Compiler",
+      "Broiler.JavaScript.Runtime",
+      "Broiler.Media.All",
+      "Broiler.UI.CheckBox",
+      "Broiler.UI.CodeEditor",
+      "Broiler.UI.ComboBox",
+      "Broiler.UI.Edit",
+      "Broiler.UI.Forms",
+      "Broiler.UI.ImageView",
+      "Broiler.UI.Label",
+      "Broiler.UI.ListView",
+      "Broiler.UI.Menu",
+      "Broiler.UI.Panel",
+      "Broiler.UI.PrintPreview",
+      "Broiler.UI.ProgressBar",
+      "Broiler.UI.RadioButton",
+      "Broiler.UI.RichEdit",
+      "Broiler.UI.ScrollView",
+      "Broiler.UI.Slider",
+      "Broiler.UI.SpinBox",
+      "Broiler.UI.Splitter",
+      "Broiler.UI.Standard",
+      "Broiler.UI.TabView",
+      "Broiler.UI.Toolbar",
+      "Broiler.UI.TreeView",
+      "Broiler.UI.Window"
+    ],
+    [
+      "Broiler.Documents.Csv",
+      "Broiler.Documents.Docx",
+      "Broiler.Documents.Html",
+      "Broiler.Documents.Markdown",
+      "Broiler.Documents.Ods",
+      "Broiler.Documents.Odt",
+      "Broiler.Documents.Pdf",
+      "Broiler.Documents.Rtf",
+      "Broiler.Documents.Xlsx",
+      "Broiler.HTML.Dom",
+      "Broiler.Hosting.Linux",
+      "Broiler.JavaScript.Engine",
+      "Broiler.UI.Button",
+      "Broiler.UI.CheckBox.Standard",
+      "Broiler.UI.CodeEditor.Standard",
+      "Broiler.UI.ComboBox.Standard",
+      "Broiler.UI.Dialog",
+      "Broiler.UI.Edit.Standard",
+      "Broiler.UI.FormatCodeView",
+      "Broiler.UI.ImageView.Standard",
+      "Broiler.UI.Label.Standard",
+      "Broiler.UI.ListView.Standard",
+      "Broiler.UI.Menu.Standard",
+      "Broiler.UI.Panel.Standard",
+      "Broiler.UI.PrintPreview.Standard",
+      "Broiler.UI.ProgressBar.Standard",
+      "Broiler.UI.RadioButton.Standard",
+      "Broiler.UI.RichEdit.Standard",
+      "Broiler.UI.ScrollView.Standard",
+      "Broiler.UI.Slider.Standard",
+      "Broiler.UI.Splitter.Standard",
+      "Broiler.UI.TabView.Standard",
+      "Broiler.UI.Toolbar.Standard",
+      "Broiler.UI.Tooltip",
+      "Broiler.UI.TreeView.Standard",
+      "Broiler.UI.Window.Standard",
+      "Broiler.Writer.FormatCodes"
+    ],
+    [
+      "Broiler.Documents.Pdf.Fonts",
+      "Broiler.Documents.Pdf.Images",
+      "Broiler.HTML.Orchestration",
+      "Broiler.Hosting.Windows",
+      "Broiler.HtmlBridge.Core",
+      "Broiler.JavaScript.LinqExpressions",
+      "Broiler.UI.AboutDialog",
+      "Broiler.UI.Button.Standard",
+      "Broiler.UI.Dialog.Standard",
+      "Broiler.UI.FileDialog",
+      "Broiler.UI.FontDialog",
+      "Broiler.UI.FormatCodeView.Standard",
+      "Broiler.UI.PrintDialog",
+      "Broiler.UI.RichEdit.Rtf",
+      "Broiler.UI.SpinBox.Standard",
+      "Broiler.UI.ToggleButton",
+      "Broiler.UI.Tooltip.Standard"
+    ],
+    [
+      "Broiler.HTML.Image",
+      "Broiler.HtmlBridge.DomBridgeUtils",
+      "Broiler.JavaScript.Compiler",
+      "Broiler.JavaScript.Extensions",
+      "Broiler.UI.AboutDialog.Standard",
+      "Broiler.UI.FileDialog.Standard",
+      "Broiler.UI.Forms.Standard",
+      "Broiler.UI.PrintDialog.Standard",
+      "Broiler.UI.ToggleButton.Standard"
+    ],
+    [
+      "Broiler.HTML.Image.Compat",
+      "Broiler.JavaScript.BuiltIns",
+      "Broiler.UI.FontDialog.Standard"
+    ],
+    [
+      "Broiler.HTML.Graphics",
+      "Broiler.JavaScript.Clr",
+      "Broiler.JavaScript.Debugger",
+      "Broiler.JavaScript.Globals",
+      "Broiler.JavaScript.Modules",
+      "Broiler.UI.All"
+    ],
+    [
+      "Broiler.HtmlBridge.Dom",
+      "Broiler.JSeal.BroilerJs",
+      "Broiler.JavaScript.Minimal",
+      "Broiler.JavaScript.ModuleExtensions"
+    ],
+    [
+      "Broiler.HtmlBridge.Scripting",
+      "Broiler.JavaScript.All"
+    ],
+    [
+      "Broiler.HtmlBridge.Scripting.Vm"
+    ]
+  ],
+  "blockedPackages": {},
+  "packageProjects": {
+    "Broiler.SDK": "Broiler.Code/src/Broiler.Code.Review.Cli/Broiler.Code.Review.Cli.csproj",
+    "Broiler.CSS": "Broiler.CSS/Broiler.CSS/Broiler.CSS.csproj",
+    "Broiler.CSS.Dom": "Broiler.CSS/Broiler.CSS.Dom/Broiler.CSS.Dom.csproj",
+    "Broiler.DateTime": "Broiler.DateTime/src/Broiler.DateTime/Broiler.DateTime.csproj",
+    "Broiler.Documents": "Broiler.Documents/src/Broiler.Documents/Broiler.Documents.csproj",
+    "Broiler.Documents.Csv": "Broiler.Documents/src/Broiler.Documents.Csv/Broiler.Documents.Csv.csproj",
+    "Broiler.Documents.Docx": "Broiler.Documents/src/Broiler.Documents.Docx/Broiler.Documents.Docx.csproj",
+    "Broiler.Documents.FormatCodes": "Broiler.Documents/src/Broiler.Documents.FormatCodes/Broiler.Documents.FormatCodes.csproj",
+    "Broiler.Documents.Html": "Broiler.Documents/src/Broiler.Documents.Html/Broiler.Documents.Html.csproj",
+    "Broiler.Documents.Markdown": "Broiler.Documents/src/Broiler.Documents.Markdown/Broiler.Documents.Markdown.csproj",
+    "Broiler.Documents.Model": "Broiler.Documents/src/Broiler.Documents.Model/Broiler.Documents.Model.csproj",
+    "Broiler.Documents.Ods": "Broiler.Documents/src/Broiler.Documents.Ods/Broiler.Documents.Ods.csproj",
+    "Broiler.Documents.Odt": "Broiler.Documents/src/Broiler.Documents.Odt/Broiler.Documents.Odt.csproj",
+    "Broiler.Documents.Pagination": "Broiler.Documents/src/Broiler.Documents.Pagination/Broiler.Documents.Pagination.csproj",
+    "Broiler.Documents.Pdf": "Broiler.Documents/src/Broiler.Documents.Pdf/Broiler.Documents.Pdf.csproj",
+    "Broiler.Documents.Pdf.Fonts": "Broiler.Documents/src/Broiler.Documents.Pdf.Fonts/Broiler.Documents.Pdf.Fonts.csproj",
+    "Broiler.Documents.Pdf.Images": "Broiler.Documents/src/Broiler.Documents.Pdf.Images/Broiler.Documents.Pdf.Images.csproj",
+    "Broiler.Documents.Rtf": "Broiler.Documents/src/Broiler.Documents.Rtf/Broiler.Documents.Rtf.csproj",
+    "Broiler.Documents.Xlsx": "Broiler.Documents/src/Broiler.Documents.Xlsx/Broiler.Documents.Xlsx.csproj",
+    "Broiler.Dom": "Broiler.DOM/Broiler.Dom/Broiler.Dom.csproj",
+    "Broiler.Dom.Html": "Broiler.DOM/Broiler.Dom.Html/Broiler.Dom.Html.csproj",
+    "Broiler.Graphics": "Broiler.Graphics/src/Broiler.Graphics/Broiler.Graphics.csproj",
+    "Broiler.Graphics.Android": "Broiler.Graphics/src/Broiler.Graphics.Android/Broiler.Graphics.Android.csproj",
+    "Broiler.Graphics.Linux": "Broiler.Graphics/src/Broiler.Graphics.Linux/Broiler.Graphics.Linux.csproj",
+    "Broiler.Graphics.Linux.OpenGL": "Broiler.Graphics/src/Broiler.Graphics.Linux.OpenGL/Broiler.Graphics.Linux.OpenGL.csproj",
+    "Broiler.Graphics.Linux.Vulkan": "Broiler.Graphics/src/Broiler.Graphics.Linux.Vulkan/Broiler.Graphics.Linux.Vulkan.csproj",
+    "Broiler.Graphics.WebAssembly": "Broiler.Graphics/src/Broiler.Graphics.WebAssembly/Broiler.Graphics.WebAssembly.csproj",
+    "Broiler.Graphics.Windows": "Broiler.Graphics/src/Broiler.Graphics.Windows/Broiler.Graphics.Direct2D.csproj",
+    "Broiler.Hosting.Android": "Broiler.Hosting/src/Broiler.Hosting.Android/Broiler.Hosting.Android.csproj",
+    "Broiler.Hosting.Contracts": "Broiler.Hosting/src/Broiler.Hosting.Contracts/Broiler.Hosting.Contracts.csproj",
+    "Broiler.Hosting.Linux": "Broiler.Hosting/src/Broiler.Hosting.Linux/Broiler.Hosting.Linux.csproj",
+    "Broiler.Hosting.WebAssembly": "Broiler.Hosting/src/Broiler.Hosting.WebAssembly/Broiler.Hosting.WebAssembly.csproj",
+    "Broiler.Hosting.Windows": "Broiler.Hosting/src/Broiler.Hosting.Windows/Broiler.Hosting.Windows.csproj",
+    "Broiler.HTML.Core": "Broiler.HTML/Source/Broiler.HTML.Core/Broiler.HTML.Core.csproj",
+    "Broiler.HTML.Dom": "Broiler.HTML/Source/Broiler.HTML.Dom/Broiler.HTML.Dom.csproj",
+    "Broiler.HTML.Graphics": "Broiler.HTML/Source/Broiler.HTML.Graphics/Broiler.HTML.Graphics.csproj",
+    "Broiler.HTML.Image": "Broiler.HTML/Source/Broiler.HTML.Image/Broiler.HTML.Image.csproj",
+    "Broiler.HTML.Image.Compat": "Broiler.HTML/Source/Broiler.HTML.Image.Compat/Broiler.HTML.Image.Compat.csproj",
+    "Broiler.HTML.Orchestration": "Broiler.HTML/Source/Broiler.HTML.Orchestration/Broiler.HTML.Orchestration.csproj",
+    "Broiler.HtmlBridge.Core": "Broiler.HtmlBridge/src/Broiler.HtmlBridge.Core/Broiler.HtmlBridge.Core.csproj",
+    "Broiler.HtmlBridge.Dom": "Broiler.HtmlBridge/src/Broiler.HtmlBridge.Dom/Broiler.HtmlBridge.Dom.csproj",
+    "Broiler.HtmlBridge.DomBridgeUtils": "Broiler.HtmlBridge/src/Broiler.HtmlBridge.DomBridgeUtils/Broiler.HtmlBridge.DomBridgeUtils.csproj",
+    "Broiler.HtmlBridge.Scripting": "Broiler.HtmlBridge/src/Broiler.HtmlBridge.Scripting/Broiler.HtmlBridge.Scripting.csproj",
+    "Broiler.HtmlBridge.Scripting.Vm": "Broiler.HtmlBridge/src/Broiler.HtmlBridge.Scripting.Vm/Broiler.HtmlBridge.Scripting.Vm.csproj",
+    "Broiler.Input": "Broiler.Input/src/Broiler.Input/Broiler.Input.csproj",
+    "Broiler.Input.All": "Broiler.Input/src/Broiler.Input.All/Broiler.Input.All.csproj",
+    "Broiler.Input.Android": "Broiler.Input/src/Broiler.Input.Android/Broiler.Input.Android.csproj",
+    "Broiler.Input.Camera": "Broiler.Input/src/Broiler.Input.Camera/Broiler.Input.Camera.csproj",
+    "Broiler.Input.Camera.Windows": "Broiler.Input/src/Broiler.Input.Camera.Windows/Broiler.Input.Camera.Windows.csproj",
+    "Broiler.Input.Keyboard": "Broiler.Input/src/Broiler.Input.Keyboard/Broiler.Input.Keyboard.csproj",
+    "Broiler.Input.Keyboard.Android": "Broiler.Input/src/Broiler.Input.Keyboard.Android/Broiler.Input.Keyboard.Android.csproj",
+    "Broiler.Input.Keyboard.Linux": "Broiler.Input/src/Broiler.Input.Keyboard.Linux/Broiler.Input.Keyboard.Linux.csproj",
+    "Broiler.Input.Keyboard.Windows": "Broiler.Input/src/Broiler.Input.Keyboard.Windows/Broiler.Input.Keyboard.Windows.csproj",
+    "Broiler.Input.Legacy": "Broiler.Input/src/Broiler.Input.Legacy/Broiler.Input.Legacy.csproj",
+    "Broiler.Input.Linux": "Broiler.Input/src/Broiler.Input.Linux/Broiler.Input.Linux.csproj",
+    "Broiler.Input.Microphone": "Broiler.Input/src/Broiler.Input.Microphone/Broiler.Input.Microphone.csproj",
+    "Broiler.Input.Microphone.Windows": "Broiler.Input/src/Broiler.Input.Microphone.Windows/Broiler.Input.Microphone.Windows.csproj",
+    "Broiler.Input.Mouse": "Broiler.Input/src/Broiler.Input.Mouse/Broiler.Input.Mouse.csproj",
+    "Broiler.Input.Mouse.Linux": "Broiler.Input/src/Broiler.Input.Mouse.Linux/Broiler.Input.Mouse.Linux.csproj",
+    "Broiler.Input.Mouse.Windows": "Broiler.Input/src/Broiler.Input.Mouse.Windows/Broiler.Input.Mouse.Windows.csproj",
+    "Broiler.Input.Pen": "Broiler.Input/src/Broiler.Input.Pen/Broiler.Input.Pen.csproj",
+    "Broiler.Input.Pen.Android": "Broiler.Input/src/Broiler.Input.Pen.Android/Broiler.Input.Pen.Android.csproj",
+    "Broiler.Input.Text": "Broiler.Input/src/Broiler.Input.Text/Broiler.Input.Text.csproj",
+    "Broiler.Input.Text.Android": "Broiler.Input/src/Broiler.Input.Text.Android/Broiler.Input.Text.Android.csproj",
+    "Broiler.Input.Touch": "Broiler.Input/src/Broiler.Input.Touch/Broiler.Input.Touch.csproj",
+    "Broiler.Input.Touch.Android": "Broiler.Input/src/Broiler.Input.Touch.Android/Broiler.Input.Touch.Android.csproj",
+    "Broiler.Input.Windows": "Broiler.Input/src/Broiler.Input.Windows/Broiler.Input.Windows.csproj",
+    "Broiler.ECMAScript.Algorithms": "Broiler.JS/Broiler.ECMAScript/Broiler.ECMAScript.Algorithms/Broiler.ECMAScript.Algorithms.csproj",
+    "Broiler.ECMAScript.Generation": "Broiler.JS/Broiler.ECMAScript/Broiler.ECMAScript.Generation/Broiler.ECMAScript.Generation.csproj",
+    "Broiler.JavaScript.All": "Broiler.JS/Broiler.JS/Broiler.JavaScript.All/Broiler.JavaScript.All.csproj",
+    "Broiler.JavaScript.Ast": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Ast/Broiler.JavaScript.Ast.csproj",
+    "Broiler.JavaScript.BuiltIns": "Broiler.JS/Broiler.JS/Broiler.JavaScript.BuiltIns/Broiler.JavaScript.BuiltIns.csproj",
+    "Broiler.JavaScript.Clr": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Clr/Broiler.JavaScript.Clr.csproj",
+    "Broiler.JavaScript.Compiler": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Compiler/Broiler.JavaScript.Compiler.csproj",
+    "Broiler.JavaScript.Debugger": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Debugger/Broiler.JavaScript.Debugger.csproj",
+    "Broiler.JavaScript.Engine": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Engine/Broiler.JavaScript.Engine.csproj",
+    "Broiler.JavaScript.ExpressionCompiler": "Broiler.JS/Broiler.JS/Broiler.JavaScript.ExpressionCompiler/Broiler.JavaScript.ExpressionCompiler.csproj",
+    "Broiler.JavaScript.Expressions": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Expressions/Broiler.JavaScript.Expressions.csproj",
+    "Broiler.JavaScript.Extensions": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Extensions/Broiler.JavaScript.Extensions.csproj",
+    "Broiler.JavaScript.Globals": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Globals/Broiler.JavaScript.Globals.csproj",
+    "Broiler.JavaScript.LinqExpressions": "Broiler.JS/Broiler.JS/Broiler.JavaScript.LinqExpressions/Broiler.JavaScript.LinqExpressions.csproj",
+    "Broiler.JavaScript.Minimal": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Minimal/Broiler.JavaScript.Minimal.csproj",
+    "Broiler.JavaScript.ModuleExtensions": "Broiler.JS/Broiler.JS/Broiler.JavaScript.ModuleExtensions/Broiler.JavaScript.ModuleExtensions.csproj",
+    "Broiler.JavaScript.Modules": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Modules/Broiler.JavaScript.Modules.csproj",
+    "Broiler.JavaScript.Parser": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Parser/Broiler.JavaScript.Parser.csproj",
+    "Broiler.JavaScript.Portable": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Portable/Broiler.JavaScript.Portable.csproj",
+    "Broiler.JavaScript.Portable.Compiler": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Portable.Compiler/Broiler.JavaScript.Portable.Compiler.csproj",
+    "Broiler.JavaScript.Runtime": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Runtime/Broiler.JavaScript.Runtime.csproj",
+    "Broiler.JavaScript.Storage": "Broiler.JS/Broiler.JS/Broiler.JavaScript.Storage/Broiler.JavaScript.Storage.csproj",
+    "Broiler.JSeal": "Broiler.JSeal/Broiler.JSeal/Broiler.JSeal.csproj",
+    "Broiler.JSeal.BroilerJs": "Broiler.JSeal/Broiler.JSeal.BroilerJs/Broiler.JSeal.BroilerJs.csproj",
+    "Broiler.JSeal.Vm": "Broiler.JSeal/Broiler.JSeal.Vm/Broiler.JSeal.Vm.csproj",
+    "Broiler.Layout": "Broiler.Layout/Broiler.Layout/Broiler.Layout.csproj",
+    "Broiler.Media": "Broiler.Media/src/Broiler.Media/Broiler.Media.csproj",
+    "Broiler.Media.All": "Broiler.Media/src/Broiler.Media.All/Broiler.Media.All.csproj",
+    "Broiler.Media.Audio": "Broiler.Media/src/Broiler.Media.Audio/Broiler.Media.Audio.csproj",
+    "Broiler.Media.Audio.Managed": "Broiler.Media/src/Broiler.Media.Audio.Managed/Broiler.Media.Audio.Managed.csproj",
+    "Broiler.Media.Image": "Broiler.Media/src/Broiler.Media.Image/Broiler.Media.Image.csproj",
+    "Broiler.Media.Image.Managed": "Broiler.Media/src/Broiler.Media.Image.Managed/Broiler.Media.Image.Managed.csproj",
+    "Broiler.Media.Video": "Broiler.Media/src/Broiler.Media.Video/Broiler.Media.Video.csproj",
+    "Broiler.Media.Video.MediaFoundation": "Broiler.Media/src/Broiler.Media.Video.MediaFoundation/Broiler.Media.Video.MediaFoundation.csproj",
+    "Broiler.Media.Video.Windows": "Broiler.Media/src/Broiler.Media.Video.Windows/Broiler.Media.Video.Windows.csproj",
+    "Broiler.Native": "Broiler.Native/src/Broiler.Native/Broiler.Native.csproj",
+    "Broiler.Native.All": "Broiler.Native/src/Broiler.Native.All/Broiler.Native.All.csproj",
+    "Broiler.Native.Android": "Broiler.Native/src/Broiler.Native.Android/Broiler.Native.Android.csproj",
+    "Broiler.Native.Linux": "Broiler.Native/src/Broiler.Native.Linux/Broiler.Native.Linux.csproj",
+    "Broiler.Native.Windows": "Broiler.Native/src/Broiler.Native.Windows/Broiler.Native.Windows.csproj",
+    "Broiler.Net": "Broiler.Net/src/Broiler.Net/Broiler.Net.csproj",
+    "Broiler.Regex": "Broiler.RegEx/Broiler.Regex/Broiler.Regex.csproj",
+    "Broiler.UI.Button": "Broiler.UI/src/Abstractions/Commands/Broiler.UI.Button/Broiler.UI.Button.csproj",
+    "Broiler.UI.Menu": "Broiler.UI/src/Abstractions/Commands/Broiler.UI.Menu/Broiler.UI.Menu.csproj",
+    "Broiler.UI.ToggleButton": "Broiler.UI/src/Abstractions/Commands/Broiler.UI.ToggleButton/Broiler.UI.ToggleButton.csproj",
+    "Broiler.UI.Toolbar": "Broiler.UI/src/Abstractions/Commands/Broiler.UI.Toolbar/Broiler.UI.Toolbar.csproj",
+    "Broiler.UI.ImageView": "Broiler.UI/src/Abstractions/Content/Broiler.UI.ImageView/Broiler.UI.ImageView.csproj",
+    "Broiler.UI.Label": "Broiler.UI/src/Abstractions/Content/Broiler.UI.Label/Broiler.UI.Label.csproj",
+    "Broiler.UI.PrintPreview": "Broiler.UI/src/Abstractions/Content/Broiler.UI.PrintPreview/Broiler.UI.PrintPreview.csproj",
+    "Broiler.UI.ProgressBar": "Broiler.UI/src/Abstractions/Content/Broiler.UI.ProgressBar/Broiler.UI.ProgressBar.csproj",
+    "Broiler.UI.Forms": "Broiler.UI/src/Abstractions/Layout/Broiler.UI.Forms/Broiler.UI.Forms.csproj",
+    "Broiler.UI.Panel": "Broiler.UI/src/Abstractions/Layout/Broiler.UI.Panel/Broiler.UI.Panel.csproj",
+    "Broiler.UI.ScrollView": "Broiler.UI/src/Abstractions/Layout/Broiler.UI.ScrollView/Broiler.UI.ScrollView.csproj",
+    "Broiler.UI.Splitter": "Broiler.UI/src/Abstractions/Layout/Broiler.UI.Splitter/Broiler.UI.Splitter.csproj",
+    "Broiler.UI.TabView": "Broiler.UI/src/Abstractions/Layout/Broiler.UI.TabView/Broiler.UI.TabView.csproj",
+    "Broiler.UI.AboutDialog": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.AboutDialog/Broiler.UI.AboutDialog.csproj",
+    "Broiler.UI.Dialog": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.Dialog/Broiler.UI.Dialog.csproj",
+    "Broiler.UI.FileDialog": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.FileDialog/Broiler.UI.FileDialog.csproj",
+    "Broiler.UI.FontDialog": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.FontDialog/Broiler.UI.FontDialog.csproj",
+    "Broiler.UI.PrintDialog": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.PrintDialog/Broiler.UI.PrintDialog.csproj",
+    "Broiler.UI.Tooltip": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.Tooltip/Broiler.UI.Tooltip.csproj",
+    "Broiler.UI.Window": "Broiler.UI/src/Abstractions/Shell/Broiler.UI.Window/Broiler.UI.Window.csproj",
+    "Broiler.UI.CodeEditor": "Broiler.UI/src/Abstractions/Text/Broiler.UI.CodeEditor/Broiler.UI.CodeEditor.csproj",
+    "Broiler.UI.Edit": "Broiler.UI/src/Abstractions/Text/Broiler.UI.Edit/Broiler.UI.Edit.csproj",
+    "Broiler.UI.FormatCodeView": "Broiler.UI/src/Abstractions/Text/Broiler.UI.FormatCodeView/Broiler.UI.FormatCodeView.csproj",
+    "Broiler.UI.RichEdit": "Broiler.UI/src/Abstractions/Text/Broiler.UI.RichEdit/Broiler.UI.RichEdit.csproj",
+    "Broiler.UI.CheckBox": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.CheckBox/Broiler.UI.CheckBox.csproj",
+    "Broiler.UI.ComboBox": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.ComboBox/Broiler.UI.ComboBox.csproj",
+    "Broiler.UI.ListView": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.ListView/Broiler.UI.ListView.csproj",
+    "Broiler.UI.RadioButton": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.RadioButton/Broiler.UI.RadioButton.csproj",
+    "Broiler.UI.Slider": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.Slider/Broiler.UI.Slider.csproj",
+    "Broiler.UI.SpinBox": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.SpinBox/Broiler.UI.SpinBox.csproj",
+    "Broiler.UI.TreeView": "Broiler.UI/src/Abstractions/ValueAndSelection/Broiler.UI.TreeView/Broiler.UI.TreeView.csproj",
+    "Broiler.UI.All": "Broiler.UI/src/Bundles/Broiler.UI.All/Broiler.UI.All.csproj",
+    "Broiler.UI": "Broiler.UI/src/Foundation/Broiler.UI/Broiler.UI.csproj",
+    "Broiler.UI.Standard": "Broiler.UI/src/Foundation/Broiler.UI.Standard/Broiler.UI.Standard.csproj",
+    "Broiler.UI.Button.Standard": "Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Button.Standard/Broiler.UI.Button.Standard.csproj",
+    "Broiler.UI.Menu.Standard": "Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Menu.Standard/Broiler.UI.Menu.Standard.csproj",
+    "Broiler.UI.ToggleButton.Standard": "Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.ToggleButton.Standard/Broiler.UI.ToggleButton.Standard.csproj",
+    "Broiler.UI.Toolbar.Standard": "Broiler.UI/src/Implementations/Standard/Commands/Broiler.UI.Toolbar.Standard/Broiler.UI.Toolbar.Standard.csproj",
+    "Broiler.UI.ImageView.Standard": "Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.ImageView.Standard/Broiler.UI.ImageView.Standard.csproj",
+    "Broiler.UI.Label.Standard": "Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.Label.Standard/Broiler.UI.Label.Standard.csproj",
+    "Broiler.UI.PrintPreview.Standard": "Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.PrintPreview.Standard/Broiler.UI.PrintPreview.Standard.csproj",
+    "Broiler.UI.ProgressBar.Standard": "Broiler.UI/src/Implementations/Standard/Content/Broiler.UI.ProgressBar.Standard/Broiler.UI.ProgressBar.Standard.csproj",
+    "Broiler.UI.Forms.Standard": "Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.Forms.Standard/Broiler.UI.Forms.Standard.csproj",
+    "Broiler.UI.Panel.Standard": "Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.Panel.Standard/Broiler.UI.Panel.Standard.csproj",
+    "Broiler.UI.ScrollView.Standard": "Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.ScrollView.Standard/Broiler.UI.ScrollView.Standard.csproj",
+    "Broiler.UI.Splitter.Standard": "Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.Splitter.Standard/Broiler.UI.Splitter.Standard.csproj",
+    "Broiler.UI.TabView.Standard": "Broiler.UI/src/Implementations/Standard/Layout/Broiler.UI.TabView.Standard/Broiler.UI.TabView.Standard.csproj",
+    "Broiler.UI.AboutDialog.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.AboutDialog.Standard/Broiler.UI.AboutDialog.Standard.csproj",
+    "Broiler.UI.Dialog.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.Dialog.Standard/Broiler.UI.Dialog.Standard.csproj",
+    "Broiler.UI.FileDialog.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.FileDialog.Standard/Broiler.UI.FileDialog.Standard.csproj",
+    "Broiler.UI.FontDialog.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.FontDialog.Standard/Broiler.UI.FontDialog.Standard.csproj",
+    "Broiler.UI.PrintDialog.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.PrintDialog.Standard/Broiler.UI.PrintDialog.Standard.csproj",
+    "Broiler.UI.Tooltip.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.Tooltip.Standard/Broiler.UI.Tooltip.Standard.csproj",
+    "Broiler.UI.Window.Standard": "Broiler.UI/src/Implementations/Standard/Shell/Broiler.UI.Window.Standard/Broiler.UI.Window.Standard.csproj",
+    "Broiler.UI.CodeEditor.Standard": "Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.CodeEditor.Standard/Broiler.UI.CodeEditor.Standard.csproj",
+    "Broiler.UI.Edit.Standard": "Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.Edit.Standard/Broiler.UI.Edit.Standard.csproj",
+    "Broiler.UI.FormatCodeView.Standard": "Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.FormatCodeView.Standard/Broiler.UI.FormatCodeView.Standard.csproj",
+    "Broiler.UI.RichEdit.Standard": "Broiler.UI/src/Implementations/Standard/Text/Broiler.UI.RichEdit.Standard/Broiler.UI.RichEdit.Standard.csproj",
+    "Broiler.UI.CheckBox.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.CheckBox.Standard/Broiler.UI.CheckBox.Standard.csproj",
+    "Broiler.UI.ComboBox.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.ComboBox.Standard/Broiler.UI.ComboBox.Standard.csproj",
+    "Broiler.UI.ListView.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.ListView.Standard/Broiler.UI.ListView.Standard.csproj",
+    "Broiler.UI.RadioButton.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.RadioButton.Standard/Broiler.UI.RadioButton.Standard.csproj",
+    "Broiler.UI.Slider.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.Slider.Standard/Broiler.UI.Slider.Standard.csproj",
+    "Broiler.UI.SpinBox.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.SpinBox.Standard/Broiler.UI.SpinBox.Standard.csproj",
+    "Broiler.UI.TreeView.Standard": "Broiler.UI/src/Implementations/Standard/ValueAndSelection/Broiler.UI.TreeView.Standard/Broiler.UI.TreeView.Standard.csproj",
+    "Broiler.UI.RichEdit.Rtf": "Broiler.UI/src/Integrations/RichEdit/Broiler.UI.RichEdit.Rtf/Broiler.UI.RichEdit.Rtf.csproj",
+    "Broiler.Unicode.Algorithms": "Broiler.Unicode/src/Unicode.Algorithms/Unicode.Algorithms.csproj",
+    "Broiler.Unicode.Generation": "Broiler.Unicode/src/Unicode.Generation/Unicode.Generation.csproj",
+    "Broiler.Unicode.Segmentation": "Broiler.Unicode/src/Unicode.Segmentation/Unicode.Segmentation.csproj",
+    "Broiler.Unicode.Tables": "Broiler.Unicode/src/Unicode.Tables/Unicode.Tables.csproj",
+    "Broiler.Unicode.Cldr.LocaleData": "Broiler.Unicode/src/UnicodeCldr.LocaleData/UnicodeCldr.LocaleData.csproj",
+    "Broiler.Unicode.Emoji.StringProperties": "Broiler.Unicode/src/UnicodeEmoji.StringProperties/UnicodeEmoji.StringProperties.csproj",
+    "Broiler.Unicode.Properties": "Broiler.Unicode/src/UnicodeProperties/UnicodeProperties.csproj",
+    "Broiler.VM.Abstractions": "Broiler.VM/src/Broiler.VM.Abstractions/Broiler.VM.Abstractions.csproj",
+    "Broiler.VM.Binary": "Broiler.VM/src/Broiler.VM.Binary/Broiler.VM.Binary.csproj",
+    "Broiler.VM.Emitter.Bytecode": "Broiler.VM/src/Broiler.VM.Emitter.Bytecode/Broiler.VM.Emitter.Bytecode.csproj",
+    "Broiler.VM.HyperV": "Broiler.VM/src/Broiler.VM.HyperV/src/Broiler.VM.HyperV/Broiler.VM.HyperV.csproj",
+    "Broiler.VM.Profile.JavaScript": "Broiler.VM/src/Broiler.VM.Profile.JavaScript/Broiler.VM.Profile.JavaScript.csproj",
+    "Broiler.VM.Profile.JavaScript.Compiler": "Broiler.VM/src/Broiler.VM.Profile.JavaScript.Compiler/Broiler.VM.Profile.JavaScript.Compiler.csproj",
+    "Broiler.VM.Profile.JavaScript.Format": "Broiler.VM/src/Broiler.VM.Profile.JavaScript.Format/Broiler.VM.Profile.JavaScript.Format.csproj",
+    "Broiler.VM.Profile.JavaScript.Intl": "Broiler.VM/src/Broiler.VM.Profile.JavaScript.Intl/Broiler.VM.Profile.JavaScript.Intl.csproj",
+    "Broiler.VM.Profile.MachineCode": "Broiler.VM/src/Broiler.VM.Profile.MachineCode/Broiler.VM.Profile.MachineCode.csproj",
+    "Broiler.VM.Profile.WebAssembly": "Broiler.VM/src/Broiler.VM.Profile.WebAssembly/Broiler.VM.Profile.WebAssembly.csproj",
+    "Broiler.VM.Runtime": "Broiler.VM/src/Broiler.VM.Runtime/Broiler.VM.Runtime.csproj",
+    "Broiler.VM.Ubc": "Broiler.VM/src/Broiler.VM.Ubc/Broiler.VM.Ubc.csproj",
+    "Broiler.Writer.FormatCodes": "Broiler.Writer/src/Broiler.Writer.FormatCodes/Broiler.Writer.FormatCodes.csproj"
+  },
+  "componentDependencies": {
+    "Broiler.Code": [],
+    "Broiler.CSS": [
+      "Broiler.DOM"
+    ],
+    "Broiler.DateTime": [],
+    "Broiler.Documents": [
+      "Broiler.DOM",
+      "Broiler.Graphics",
+      "Broiler.Media"
+    ],
+    "Broiler.DOM": [],
+    "Broiler.Graphics": [
+      "Broiler.Media",
+      "Broiler.Native"
+    ],
+    "Broiler.Hosting": [
+      "Broiler.Graphics",
+      "Broiler.Input",
+      "Broiler.Native",
+      "Broiler.UI"
+    ],
+    "Broiler.HTML": [
+      "Broiler.CSS",
+      "Broiler.DOM",
+      "Broiler.Graphics",
+      "Broiler.Layout",
+      "Broiler.Media",
+      "Broiler.Net"
+    ],
+    "Broiler.HtmlBridge": [
+      "Broiler.CSS",
+      "Broiler.DOM",
+      "Broiler.JS",
+      "Broiler.JSeal",
+      "Broiler.Layout",
+      "Broiler.Net"
+    ],
+    "Broiler.Input": [
+      "Broiler.Media",
+      "Broiler.Native"
+    ],
+    "Broiler.JS": [
+      "Broiler.RegEx",
+      "Broiler.Unicode"
+    ],
+    "Broiler.JSeal": [
+      "Broiler.JS",
+      "Broiler.VM"
+    ],
+    "Broiler.Layout": [
+      "Broiler.CSS",
+      "Broiler.DOM",
+      "Broiler.Graphics"
+    ],
+    "Broiler.Media": [
+      "Broiler.Native"
+    ],
+    "Broiler.Native": [],
+    "Broiler.Net": [],
+    "Broiler.RegEx": [
+      "Broiler.Unicode"
+    ],
+    "Broiler.UI": [
+      "Broiler.Documents",
+      "Broiler.Graphics",
+      "Broiler.Input"
+    ],
+    "Broiler.Unicode": [],
+    "Broiler.VM": [
+      "Broiler.JS",
+      "Broiler.Unicode"
+    ],
+    "Broiler.Writer": [
+      "Broiler.Documents",
+      "Broiler.Media"
+    ]
+  },
+  "componentLayers": [
+    [
+      "Broiler.Code",
+      "Broiler.DOM",
+      "Broiler.DateTime",
+      "Broiler.Native",
+      "Broiler.Net",
+      "Broiler.Unicode"
+    ],
+    [
+      "Broiler.CSS",
+      "Broiler.Media",
+      "Broiler.RegEx"
+    ],
+    [
+      "Broiler.Graphics",
+      "Broiler.Input",
+      "Broiler.JS"
+    ],
+    [
+      "Broiler.Documents",
+      "Broiler.Layout",
+      "Broiler.VM"
+    ],
+    [
+      "Broiler.HTML",
+      "Broiler.JSeal",
+      "Broiler.UI",
+      "Broiler.Writer"
+    ],
+    [
+      "Broiler.Hosting",
+      "Broiler.HtmlBridge"
+    ]
+  ],
+  "blockedComponents": {},
+  "missingPackageOwners": [],
+  "evaluationErrors": []
+}

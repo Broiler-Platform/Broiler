@@ -20,7 +20,7 @@ try {
     Invoke-Checked dotnet @('test', (Join-Path $repo 'Broiler.Writer/src/Broiler.Writer.FormatCodes.Tests/Broiler.Writer.FormatCodes.Tests.csproj'), '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false')
     Invoke-Checked dotnet @('run', '--project', (Join-Path $repo 'Broiler.Cells/tests/Broiler.Cells.Tests/Broiler.Cells.Tests.csproj'), '-c', 'Release', '-p:UseBroilerUiSource=false')
     foreach ($item in @(@{ Path=$writer; Name='writer'; Project='Broiler.Writer.WebAssembly.csproj' }, @{ Path=$cells; Name='cell'; Project='Broiler.Cells.WebAssembly.csproj' })) {
-        Invoke-Checked dotnet @('publish', (Join-Path $item.Path $item.Project), '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-p:RestoreLockedMode=true', '-o', (Join-Path $output $item.Name))
+        Invoke-Checked dotnet @('publish', (Join-Path $item.Path $item.Project), '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-o', (Join-Path $output $item.Name))
         Copy-Item -LiteralPath (Join-Path $item.Path 'obj/project.assets.json') -Destination (Join-Path $output ($item.Name + '-project.assets.json'))
     }
     Invoke-Checked npm @('run', 'test:recovery')

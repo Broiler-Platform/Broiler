@@ -17,7 +17,7 @@ try {
     # Cells uses xUnit v3's executable runner / Microsoft.Testing.Platform.
     Invoke-Checked dotnet @('run', '--project', (Join-Path $repo 'Broiler.Cells/tests/Broiler.Cells.Tests/Broiler.Cells.Tests.csproj'), '-c', 'Release', '-p:UseBroilerUiSource=false')
     $project = Join-Path $repo 'Broiler.Cells/src/Broiler.Cells.WebAssembly/Broiler.Cells.WebAssembly.csproj'
-    Invoke-Checked dotnet @('publish', $project, '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-p:RestoreLockedMode=true', '-o', (Join-Path $output 'cell'))
+    Invoke-Checked dotnet @('publish', $project, '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-o', (Join-Path $output 'cell'))
     Copy-Item -LiteralPath (Join-Path (Split-Path $project) 'obj/project.assets.json') -Destination (Join-Path $output 'cell-project.assets.json')
     Invoke-Checked npm @('run', 'test:cells')
 } finally { $env:W4_ENGINES = $previousEngines; Pop-Location }
