@@ -12,7 +12,7 @@ the W1 package publication prerequisite and local integration verification.
 The default **Office-owned component release** workflow (`component: launcher`)
 publishes both the native Launcher and WebAssembly ZIP at the same component
 version under `launcher-v<version>`. Supply the published W1 `hosting_version`
-and `graphics_version` matching the committed Launcher web package lock. Its web
+and `graphics_version` for the selected Launcher browser cohort. Its web
 producer must pass archive verification and the three-engine browser checks
 before the component draft can be created. The draft includes the original web
 ZIP, `.web-artifact.json` descriptor and `.SHA256SUMS.txt`; the website discovers

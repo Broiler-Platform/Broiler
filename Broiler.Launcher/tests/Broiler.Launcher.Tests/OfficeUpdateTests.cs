@@ -117,7 +117,7 @@ public sealed partial class OfficeInstallationTests
             installationInventory: new ScopeInventory(user, machine));
         var plans = service.FindUpdates([Candidate()]);
         Assert.Equal(2, plans.Count);
-        var plan = Assert.Single(plans.Where(x => x.Expected.Scope == InstallScope.Machine));
+        var plan = Assert.Single(plans, x => x.Expected.Scope == InstallScope.Machine);
         Assert.True((await service.ApplyAsync(plan)).Canceled);
         Assert.Equal(plan, broker.Requested);
         Assert.Equal(user.Receipt, Installed().Receipt);

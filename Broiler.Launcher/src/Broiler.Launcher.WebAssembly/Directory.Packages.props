@@ -3,7 +3,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <!-- Supply released versions after publishing W1. Local verification overrides these explicitly. -->
     <BroilerWebHostingVersion Condition="'$(BroilerWebHostingVersion)' == ''">0.0.0-unconfigured</BroilerWebHostingVersion>
-    <BroilerWebGraphicsVersion Condition="'$(BroilerWebGraphicsVersion)' == ''">0.0.0-unconfigured</BroilerWebGraphicsVersion>
+    <BroilerWebGraphicsVersion Condition="'$(BroilerWebGraphicsVersion)' == ''">0.1.0-preview.14</BroilerWebGraphicsVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Broiler.Hosting.Contracts" Version="$(BroilerWebHostingVersion)" />

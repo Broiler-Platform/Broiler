@@ -4,9 +4,9 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
     <BroilerUiVersion>0.1.0-preview.24</BroilerUiVersion>
     <BroilerHostingVersion>0.1.0-preview.10</BroilerHostingVersion>
-    <BroilerGraphicsVersion>0.1.0-preview.12</BroilerGraphicsVersion>
-    <BroilerGraphicsCoreVersion>0.1.0-preview.13</BroilerGraphicsCoreVersion>
-    <BroilerInputVersion>0.1.0-preview.6</BroilerInputVersion>
+    <BroilerGraphicsVersion>0.1.0-preview.14</BroilerGraphicsVersion>
+    <BroilerGraphicsCoreVersion>0.1.0-preview.14</BroilerGraphicsCoreVersion>
+    <BroilerInputVersion>0.1.0-preview.7</BroilerInputVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Broiler.UI" Version="$(BroilerUiVersion)" />
@@ -45,8 +45,8 @@
     <PackageVersion Include="Broiler.Input.Linux" Version="$(BroilerInputVersion)" />
     <PackageVersion Include="Broiler.Input.Keyboard.Linux" Version="$(BroilerInputVersion)" />
     <PackageVersion Include="Broiler.Input.Mouse.Linux" Version="$(BroilerInputVersion)" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageVersion Include="xunit" Version="2.5.3" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.3" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
   </ItemGroup>
 </Project>

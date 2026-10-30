@@ -31,7 +31,7 @@ public sealed partial class OfficeInstallationTests
         WritePackage("1.1.0");
         var nextWriter = _release.Components[0];
         _release = _release with { Components = [nextWriter, boss with { Version = "1.1.0" }] }; Sign();
-        var updater = Updater(); var plan = Assert.Single(updater.FindUpdates([Candidate()]).Where(p => p.Component.Id == "writer"));
+        var updater = Updater(); var plan = Assert.Single(updater.FindUpdates([Candidate()]), p => p.Component.Id == "writer");
         var blocked = await updater.ApplyAsync(plan);
         Assert.False(blocked.Succeeded); Assert.Contains("Office-approved", blocked.Message);
         Assert.Equal("1.0.0", Installed().Receipt!.Version);
