@@ -67,7 +67,8 @@ jobs:
           latest() {
             common=""
             for id in "$@"; do
-              versions=$(curl -fsSL "https://api.nuget.org/v3-flatcontainer/$id/index.json" | jq -r '.versions[]')
+              versions=$(curl -fsSL "https://api.nuget.org/v3-flatcontainer/$id/index.json" | jq -r '.versions[]') \
+                || { echo "::error::Package '$id' is not published on nuget.org; publish it first or pass an explicit version." >&2; exit 1; }
               if [ -z "$common" ]; then common="$versions"; else common=$(grep -Fxf <(printf '%s\n' "$versions") <<<"$common" || true); fi
             done
             v=$(printf '%s\n' "$common" | tail -n1)
