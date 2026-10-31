@@ -3,37 +3,93 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Explicit independent web component version (for example 0.1.0-preview.1).
+        description: Web component version. Leave empty to auto-increment the latest preview (for example 0.1.0-preview.3 -> 0.1.0-preview.4; 0.1.0-preview.1 when none exists).
         type: string
-        required: true
+        default: ''
       create_draft:
         description: Create a draft GitHub prerelease after extracted-archive browser checks pass.
         type: boolean
         default: true
       hosting_version:
-        description: Published W1 Hosting package version for the selected Launcher cohort.
+        description: Published Hosting package version. 'latest' resolves the newest version published on nuget.org.
         type: string
-        required: true
+        default: latest
       graphics_version:
-        description: Published W1 Graphics package version for the selected Launcher cohort.
+        description: Published Graphics package version. 'latest' resolves the newest version published on nuget.org.
         type: string
-        required: true
+        default: latest
 permissions:
   contents: read
 concurrency:
-  group: launcher-web-${{ inputs.version }}
+  group: launcher-web-release
   cancel-in-progress: false
 jobs:
+  resolve:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # draft releases are only listed for writers
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      hosting_version: ${{ steps.components.outputs.hosting }}
+      graphics_version: ${{ steps.components.outputs.graphics }}
+    steps:
+      - name: Resolve the release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED: ${{ inputs.version }}
+          PREFIX: launcher-web-v
+        run: |
+          set -euo pipefail
+          if [ -n "$REQUESTED" ]; then
+            version="$REQUESTED"
+          else
+            # Consider pushed tags and (draft) releases, which have no tag until published.
+            tags=$( { git ls-remote --tags --refs "https://github.com/$GITHUB_REPOSITORY.git" "refs/tags/${PREFIX}*" | sed 's#.*refs/tags/##'
+                      gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 --json tagName --jq '.[].tagName'; } || true)
+            latest=$(printf '%s\n' "$tags" | sed -nE "s/^${PREFIX}([0-9]+\.[0-9]+\.[0-9]+)-preview\.([0-9]+)$/\1 \2/p" | sort -t' ' -k1,1V -k2,2n | tail -n1)
+            if [ -z "$latest" ]; then
+              version="0.1.0-preview.1"
+            else
+              version="${latest% *}-preview.$(( ${latest#* } + 1 ))"
+            fi
+          fi
+          echo "Release version: $version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Resolve component versions
+        id: components
+        env:
+          HOSTING: ${{ inputs.hosting_version }}
+          GRAPHICS: ${{ inputs.graphics_version }}
+        run: |
+          set -euo pipefail
+          # Newest version published for every package of a component (nuget.org lists versions in SemVer order).
+          latest() {
+            common=""
+            for id in "$@"; do
+              versions=$(curl -fsSL "https://api.nuget.org/v3-flatcontainer/$id/index.json" | jq -r '.versions[]')
+              if [ -z "$common" ]; then common="$versions"; else common=$(grep -Fxf <(printf '%s\n' "$versions") <<<"$common" || true); fi
+            done
+            v=$(printf '%s\n' "$common" | tail -n1)
+            [ -n "$v" ] || { echo "No common published version for: $*" >&2; exit 1; }
+            echo "$v"
+          }
+          if [ -z "$HOSTING" ] || [ "$HOSTING" = latest ]; then HOSTING=$(latest broiler.hosting.contracts broiler.hosting.webassembly); fi
+          if [ -z "$GRAPHICS" ] || [ "$GRAPHICS" = latest ]; then GRAPHICS=$(latest broiler.graphics broiler.graphics.webassembly); fi
+          echo "Hosting: $HOSTING; Graphics: $GRAPHICS"
+          echo "hosting=$HOSTING" >> "$GITHUB_OUTPUT"
+          echo "graphics=$GRAPHICS" >> "$GITHUB_OUTPUT"
   produce:
+    needs: resolve
     uses: ./.github/workflows/broiler-launcher-web-artifact.yml
     with:
-      version: ${{ inputs.version }}
-      source_tag: launcher-web-v${{ inputs.version }}
-      hosting_version: ${{ inputs.hosting_version }}
-      graphics_version: ${{ inputs.graphics_version }}
+      version: ${{ needs.resolve.outputs.version }}
+      source_tag: launcher-web-v${{ needs.resolve.outputs.version }}
+      hosting_version: ${{ needs.resolve.outputs.hosting_version }}
+      graphics_version: ${{ needs.resolve.outputs.graphics_version }}
   draft:
     if: inputs.create_draft
-    needs: produce
+    needs: [resolve, produce]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -47,12 +103,12 @@ jobs:
           python-version: '3.11'
       - uses: actions/download-artifact@v8
         with:
-          name: broiler-launcher-web-${{ inputs.version }}
+          name: broiler-launcher-web-${{ needs.resolve.outputs.version }}
           path: artifacts/web-release
       - name: Verify and draft the exact producer bytes
         shell: pwsh
         env:
-          WEB_VERSION: ${{ inputs.version }}
+          WEB_VERSION: ${{ needs.resolve.outputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "launcher-web-v$env:WEB_VERSION"
@@ -67,7 +123,7 @@ jobs:
           if ($LASTEXITCODE -eq 0 -and $existing.Trim() -ne $env:GITHUB_SHA) { throw 'Tag already names different source.' }
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) { throw 'This web release already exists; never replace release bytes.' }
-          "Complete wwwroot; trimmed interpreter; SDK 10.0.403; source $env:GITHUB_SHA. See the attached web-artifact descriptor and checksums. Signing remains deferred." | Set-Content artifacts/web-release-notes.md
+          "Complete wwwroot; trimmed interpreter; SDK 10.0.x; source $env:GITHUB_SHA. See the attached web-artifact descriptor and checksums. Signing remains deferred." | Set-Content artifacts/web-release-notes.md
           $files = @(Get-ChildItem artifacts/web-release -File | ForEach-Object FullName)
           gh release create $tag @files --target $env:GITHUB_SHA --draft --prerelease --title "Broiler Launcher web $env:WEB_VERSION" --notes-file artifacts/web-release-notes.md
           if ($LASTEXITCODE -ne 0) { throw 'Creating the draft web release failed.' }
