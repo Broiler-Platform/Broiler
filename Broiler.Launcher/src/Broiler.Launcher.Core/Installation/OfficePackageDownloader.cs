@@ -9,7 +9,7 @@ public sealed class OfficePackageDownloader(HttpClient client, string cacheDirec
     public async Task<VerifiedPackage> EnsureArchiveAsync(VerifiedPackage package, IProgress<InstallProgress>? progress = null, CancellationToken token = default)
     {
         if (File.Exists(package.ArchivePath)) return package; // Installer rehashes the protected snapshot.
-        if (package.Release.Demo) throw new InvalidDataException("Unsigned demo packages are local-only and cannot be downloaded automatically.");
+        if (package.Release.Demo && !OfficeBuild.IsBootstrapDemo) throw new InvalidDataException("Unsigned demo packages are local-only and cannot be downloaded automatically.");
         CancellationToken callerToken = token;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
         timeout.CancelAfter(TimeSpan.FromMinutes(10));

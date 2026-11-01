@@ -7,14 +7,26 @@ public static class OfficeInstallCli
     public static bool TryHandle(string[] args, out int exitCode)
     {
         exitCode = 0;
+        if (args.Length == 2 && args[0] == "--office-test-bundle") {
+            try { NativeLauncherSelfTest.RunBundle(Path.GetFullPath(args[1])); }
+            catch (Exception error) { Console.Error.WriteLine(error); exitCode = 1; }
+            return true;
+        }
+        if (args.Length == 1 && args[0] == "--office-self-test") {
+            try { NativeLauncherSelfTest.Run(); }
+            catch (Exception error) { Console.Error.WriteLine(error); exitCode = 1; }
+            return true;
+        }
         if (args.Length == 1 && args[0] == "--office-package-info")
         {
-            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
-            {
-                demo = OfficeBuild.IsDemo,
-                version = typeof(OfficeBuild).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            var info = new System.Text.Json.Nodes.JsonObject {
+                ["demo"] = OfficeBuild.IsDemo,
+                ["bootstrapDemo"] = OfficeBuild.IsBootstrapDemo,
+                ["nativeAot"] = !System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported,
+                ["version"] = typeof(OfficeBuild).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
                     .Cast<System.Reflection.AssemblyInformationalVersionAttribute>().Single().InformationalVersion,
-            }));
+            };
+            Console.WriteLine(info.ToJsonString());
             return true;
         }
         if (args.Length == 0 || args[0] is not ("--office-install" or "--office-repair" or "--office-rollback" or "--office-unregister")) return false;

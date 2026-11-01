@@ -160,7 +160,7 @@ public sealed partial class LauncherView : UiElement
         if (OfficeBuild.IsDemo)
         {
             _titleLabel.Text = "Broiler Office Demo";
-            _subtitleLabel.Text = "Unsigned demo · install only the trusted local bundle";
+            _subtitleLabel.Text = OfficeBuild.IsBootstrapDemo ? "Unsigned demo · download and install apps for this user" : "Unsigned demo · install only the trusted local bundle";
         }
         _settingsHeaderButton = new StandardButton
         {
@@ -278,13 +278,16 @@ public sealed partial class LauncherView : UiElement
 
     public event EventHandler? SettingsRequested;
 
+    private readonly HashSet<BroilerAppId> _bootstrapAvailable = [];
+
     public void RefreshApps()
     {
         for (int i = 0; i < _launcherService.Apps.Count; i++)
         {
             BroilerAppInfo app = _launcherService.Apps[i];
             AppResolution resolution = _launcherService.ResolveApp(app);
-            _cardLaunchButtons[i].IsPrimaryEnabled = resolution.IsAvailable && !_updating && !_installOperations.ContainsKey(app.Id);
+            _cardLaunchButtons[i].IsPrimaryEnabled = (resolution.IsAvailable || (OfficeBuild.IsBootstrapDemo && _bootstrapAvailable.Contains(app.Id))) && !_updating && !_installOperations.ContainsKey(app.Id);
+            _cardLaunchButtons[i].Text = OfficeBuild.IsBootstrapDemo && !resolution.IsAvailable ? "Download & start" : $"Launch {app.ShortName}";
             _cardStatusLabels[i].Text = resolution.IsAvailable
                 ? resolution.StatusText
                 : (resolution.StatusText ?? "Not Built");
@@ -425,6 +428,13 @@ public sealed partial class LauncherView : UiElement
                     item.Text = state.Availability.Installation.State == InstallationState.Installed
                         ? state.Availability.Reason : menuIndex == 0 ? "Install for user" : "Install for all";
                     if (menuIndex == 0) split.Trigger.ToolTipText = state.Availability.Reason;
+                    if (menuIndex == 0 && OfficeBuild.IsBootstrapDemo) {
+                        if (state.Availability.CanInstall) _bootstrapAvailable.Add(app.Id); else _bootstrapAvailable.Remove(app.Id);
+                        bool present = _launcherService.ResolveApp(app).IsAvailable;
+                        split.Text = present ? $"Launch {app.ShortName}" : "Download & start";
+                        split.IsPrimaryEnabled = (present || state.Availability.CanInstall) && !_updating && !_installOperations.ContainsKey(app.Id);
+                        if (!present && state.Availability.CanInstall) _cardStatusLabels[state.Index].Text = "Downloads and installs for this user";
+                    }
                     split.Menu.Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
                 }
             });
@@ -437,7 +447,7 @@ public sealed partial class LauncherView : UiElement
         if (!_nonCancellableInstalls.Contains(id) && _installOperations.TryGetValue(id, out var cancellation)) cancellation.Cancel();
     }
 
-    public async Task InstallProductAsync(BroilerAppId id, InstallScope scope)
+    public async Task InstallProductAsync(BroilerAppId id, InstallScope scope, bool startAfterInstall = false)
     {
         int index = -1;
         for (int i = 0; i < _launcherService.Apps.Count; i++) if (_launcherService.Apps[i].Id == id) index = i;
@@ -472,6 +482,7 @@ public sealed partial class LauncherView : UiElement
             RefreshApps();
             _statusLabel.Text = result.Message;
             _statusLabel.Role = result.Succeeded ? StandardLabelRole.Success : result.Canceled ? StandardLabelRole.Muted : StandardLabelRole.Danger;
+            if (result.Succeeded && startAfterInstall && !IsDisposed) LaunchById(id);
         });
     }
 
@@ -515,6 +526,10 @@ public sealed partial class LauncherView : UiElement
 
         BroilerAppInfo app = _launcherService.Apps[index];
         if (_installOperations.ContainsKey(app.Id)) return;
+        if (OfficeBuild.IsBootstrapDemo && !_launcherService.ResolveApp(app).IsAvailable) {
+            _ = InstallProductAsync(app.Id, InstallScope.User, startAfterInstall: true);
+            return;
+        }
         DateTimeOffset now = DateTimeOffset.UtcNow;
         if (_lastLaunchTime.TryGetValue(app.Id, out DateTimeOffset lastTime) &&
             now - lastTime < LaunchDebounceWindow)

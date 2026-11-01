@@ -33,12 +33,22 @@ public sealed record InstallAvailability(bool CanInstall, string Reason, Install
 
 public static class OfficeJson
 {
+    private static System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> Type<T>() =>
+        (System.Text.Json.Serialization.Metadata.JsonTypeInfo<T>)(Context.GetTypeInfo(typeof(T))
+            ?? throw new NotSupportedException("Unregistered Office JSON type: " + typeof(T)));
+    public static T? Deserialize<T>(byte[] bytes) => JsonSerializer.Deserialize(bytes, Type<T>());
+    public static T? Deserialize<T>(Stream stream) => JsonSerializer.Deserialize(stream, Type<T>());
+    public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Type<T>());
+    public static void Serialize<T>(Stream stream, T value) => JsonSerializer.Serialize(stream, value, Type<T>());
+    public static byte[] SerializeToUtf8Bytes<T>(T value) => JsonSerializer.SerializeToUtf8Bytes(value, Type<T>());
+
     public static readonly JsonSerializerOptions Options = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter<InstallScope>(JsonNamingPolicy.CamelCase) },
     };
+    private static readonly OfficeJsonContext Context = new(Options);
 }
 
 public static class OfficeCatalog
@@ -115,7 +125,7 @@ public sealed class OfficeReleaseVerifier(IReadOnlyDictionary<string, string> pu
     public static OfficeReleaseVerifier CreateDefault()
     {
         using var stream = typeof(OfficeReleaseVerifier).Assembly.GetManifestResourceStream("Broiler.Launcher.OfficeReleaseKeys.json")!;
-        var keys = JsonSerializer.Deserialize<Dictionary<string, string>>(stream, OfficeJson.Options)!;
+        var keys = OfficeJson.Deserialize<Dictionary<string, string>>(stream)!;
         string version = typeof(OfficeReleaseVerifier).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "0.1.0-preview.1";
         return new(keys, version, OfficeBuild.IsDemo);
     }
@@ -125,7 +135,7 @@ public sealed class OfficeReleaseVerifier(IReadOnlyDictionary<string, string> pu
         if (manifest.Length > 1024 * 1024 || signatureBytes.Length > 16 * 1024) throw new InvalidDataException("Release metadata exceeds limits.");
         if (allowUnsignedDemo && signatureBytes.Length == 0) return ValidateManifest(manifest, unsigned: true, allowNewerLauncher);
         if (!HasTrustedKeys) throw new InvalidDataException("No trusted Office release key is configured in this launcher.");
-        var signature = JsonSerializer.Deserialize<ReleaseSignature>(signatureBytes, OfficeJson.Options) ?? throw new InvalidDataException("Missing release signature.");
+        var signature = OfficeJson.Deserialize<ReleaseSignature>(signatureBytes) ?? throw new InvalidDataException("Missing release signature.");
         if (signature.SchemaVersion != 1 || !publicKeys.TryGetValue(signature.KeyId, out var pem)) throw new InvalidDataException("Untrusted release signature key.");
         using var rsa = RSA.Create();
         rsa.ImportFromPem(pem);
@@ -135,7 +145,7 @@ public sealed class OfficeReleaseVerifier(IReadOnlyDictionary<string, string> pu
     }
     private OfficeRelease ValidateManifest(byte[] manifest, bool unsigned, bool allowNewerLauncher)
     {
-        var release = JsonSerializer.Deserialize<OfficeRelease>(manifest, OfficeJson.Options) ?? throw new InvalidDataException("Missing release manifest.");
+        var release = OfficeJson.Deserialize<OfficeRelease>(manifest) ?? throw new InvalidDataException("Missing release manifest.");
         if ((unsigned && !release.Demo) || (release.Demo && (!allowUnsignedDemo || release.Channel != "preview" ||
             !Regex.IsMatch(release.OfficeVersion, @"^[0-9]+\.[0-9]+\.[0-9]+-demo\.[1-9][0-9]*\z"))))
             throw new InvalidDataException("Unsigned packages require a demo launcher and an explicitly marked demo prerelease.");
@@ -154,6 +164,11 @@ public sealed class OfficeReleaseVerifier(IReadOnlyDictionary<string, string> pu
 
 public static class OfficeBuild
 {
+#if BROILER_OFFICE_BOOTSTRAP_DEMO
+    public static bool IsBootstrapDemo => true;
+#else
+    public static bool IsBootstrapDemo => false;
+#endif
 #if BROILER_OFFICE_DEMO
     public static bool IsDemo => true;
 #else

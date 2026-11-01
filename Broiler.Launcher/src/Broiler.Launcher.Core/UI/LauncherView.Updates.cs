@@ -51,13 +51,14 @@ public sealed partial class LauncherView
             if (prefs.ShowInstallActions)
             {
                 bool machineFirst = _launcherService.Settings.PreferredInstallScope == InstallScope.Machine;
-                shown.Add(all[machineFirst ? 1 : 0]); shown.Add(all[machineFirst ? 0 : 1]);
+                if (OfficeBuild.IsBootstrapDemo) shown.Add(all[0]);
+                else { shown.Add(all[machineFirst ? 1 : 0]); shown.Add(all[machineFirst ? 0 : 1]); }
             }
-            if (prefs.ShowBossAction) shown.Add(all[2]);
+            if (prefs.ShowBossAction && !OfficeBuild.IsBootstrapDemo) shown.Add(all[2]);
             if (prefs.ShowInstallActions || _installOperations.ContainsKey(_launcherService.Apps[i].Id)) shown.Add(all[3]);
             if (shown.Count != 0) shown.Add(all[4]);
             shown.Add(all[5]);
-            if (prefs.ShowUpdateActions) { shown.Add(all[6]); shown.Add(all[7]); }
+            if (prefs.ShowUpdateActions && !OfficeBuild.IsBootstrapDemo) { shown.Add(all[6]); shown.Add(all[7]); }
             var menu = _cardLaunchButtons[i].Menu;
             if (!menu.Items.SequenceEqual(shown)) menu.SetItems(shown);
         }

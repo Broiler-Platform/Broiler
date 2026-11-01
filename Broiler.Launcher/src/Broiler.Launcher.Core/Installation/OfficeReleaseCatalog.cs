@@ -27,8 +27,8 @@ public sealed class OfficeReleaseCatalog(HttpClient client, string cacheDirector
     private const string Endpoint = "https://api.github.com/repos/Broiler-Platform/Broiler/releases";
     private readonly SemaphoreSlim _gate = new(1, 1);
     private DateTimeOffset Now => clock?.Invoke() ?? DateTimeOffset.UtcNow;
-    private sealed record CachePage(string? Etag, string Body, string? Next);
-    private sealed record CheckState(DateTimeOffset LastSuccess, DateTimeOffset RetryAfter, string? Channel = null, DateTimeOffset? LastAttempt = null, string? LastError = null);
+    internal sealed record CachePage(string? Etag, string Body, string? Next);
+    internal sealed record CheckState(DateTimeOffset LastSuccess, DateTimeOffset RetryAfter, string? Channel = null, DateTimeOffset? LastAttempt = null, string? LastError = null);
     public UpdateCheckStatus Status
     {
         get { var state = ReadJson<CheckState>("state.json"); return new(state?.LastAttempt, state?.LastSuccess > DateTimeOffset.MinValue ? state.LastSuccess : null, state?.LastError); }
@@ -218,10 +218,10 @@ public sealed class OfficeReleaseCatalog(HttpClient client, string cacheDirector
     }
     private T? ReadJson<T>(string name)
     {
-        try { return JsonSerializer.Deserialize<T>(OfficeInstallPaths.ReadBounded(Path.Combine(cacheDirectory, name), 6 * 1024 * 1024), OfficeJson.Options); }
+        try { return OfficeJson.Deserialize<T>(OfficeInstallPaths.ReadBounded(Path.Combine(cacheDirectory, name), 6 * 1024 * 1024)); }
         catch { return default; }
     }
-    private void Save<T>(string name, T value) => AtomicBytes(Path.Combine(cacheDirectory, name), JsonSerializer.SerializeToUtf8Bytes(value, OfficeJson.Options));
+    private void Save<T>(string name, T value) => AtomicBytes(Path.Combine(cacheDirectory, name), OfficeJson.SerializeToUtf8Bytes(value));
     private static void AtomicBytes(string path, byte[] bytes)
     {
         OfficeInstallPaths.RejectLinks(path);

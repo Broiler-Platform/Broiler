@@ -5,6 +5,15 @@ import { readFile, mkdir, writeFile, mkdtemp, rm } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
+// New apps expose navigation through the Office menu; retained releases use a link.
+async function returnToOffice(page) {
+    if (await page.locator('body').evaluate(body => body.classList.contains('office-menu-ready'))) {
+        await page.evaluate(() => window.dispatchEvent(new CustomEvent('broiler-open-office-panel', { detail: 'home' })));
+    } else {
+        await page.getByRole('link', { name: 'Return to Office' }).click({ noWaitAfter: true });
+    }
+}
+
 const [lockFile, directory, reportFile] = process.argv.slice(2);
 const lock = JSON.parse(await readFile(lockFile,'utf8'));
 const rows = lock.components;
@@ -43,7 +52,7 @@ for (const [name,engine] of Object.entries({chromium,firefox,webkit})) {
             assert.equal(await link.getAttribute('href'),row.entryUrl);
             await link.click({noWaitAfter:true}); await page.waitForURL(row.entryUrl,{waitUntil:'domcontentloaded'});
             await page.waitForFunction(id=>document.getElementById(id+'-status')?.hidden,row.product==='cell'?'cells':'writer');
-            await page.getByRole('link',{name:'Return to Office'}).click({noWaitAfter:true});
+            await returnToOffice(page);
             await page.waitForURL(catalog.launcherUrl,{waitUntil:'domcontentloaded'});
             await page.waitForFunction(()=>document.body.dataset.ready==='true');
         }

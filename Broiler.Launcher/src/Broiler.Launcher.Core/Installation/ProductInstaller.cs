@@ -83,7 +83,7 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
                 throw new InvalidDataException("The BOSS web bundle is missing.");
             var receipt = new InstallReceipt(1, item.Id, scope, item.Version, item.Rid, package.Release.Tag,
                 item.Asset, item.Sha256, item.EntryPoint, item.Invocation, Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow) { Demo = package.Release.Demo };
-            await File.WriteAllTextAsync(Path.Combine(payload, ".office-receipt.json"), JsonSerializer.Serialize(receipt, OfficeJson.Options), cancellationToken);
+            await File.WriteAllTextAsync(Path.Combine(payload, ".office-receipt.json"), OfficeJson.Serialize(receipt), cancellationToken);
             access.PrepareActivation(payload);
             string destination = paths.VersionDirectory(receipt);
             OfficeInstallPaths.RejectLinks(destination);
@@ -136,7 +136,7 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
         {
             using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, FileOptions.WriteThrough))
             {
-                JsonSerializer.Serialize(stream, active, OfficeJson.Options);
+                OfficeJson.Serialize(stream, active);
                 stream.Flush(true);
             }
             File.Move(temporary, record, true);

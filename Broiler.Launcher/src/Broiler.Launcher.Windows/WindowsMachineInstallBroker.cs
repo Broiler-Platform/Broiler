@@ -19,14 +19,14 @@ internal sealed class WindowsMachineInstallBroker : IMachineInstallBroker, IMach
 
     public Task<InstallResult> RollbackAsync(InstallReceipt expected) => RunUpdateHelper("update-rollback", expected, "", "", null);
     public Task<InstallResult> RollbackAsync(InstallReceipt expected, IReadOnlyDictionary<string, InstallReceipt?> peers) =>
-        RunUpdateHelper("update-rollback", expected, Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(peers, OfficeJson.Options)), "", null);
+        RunUpdateHelper("update-rollback", expected, Convert.ToBase64String(OfficeJson.SerializeToUtf8Bytes(peers)), "", null);
 
     private static async Task<InstallResult> RunUpdateHelper(string operation, InstallReceipt expected, string directory, string archive, IProgress<InstallProgress>? progress)
     {
         try
         {
             // The helper accepts an expected receipt value, never arbitrary destinations or commands.
-            string receipt = Convert.ToBase64String(System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(expected, OfficeJson.Options));
+            string receipt = Convert.ToBase64String(OfficeJson.SerializeToUtf8Bytes(expected));
             var info = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "Broiler.Launcher.Windows.exe"))
                 { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden };
             foreach (string arg in new[] { "--office-machine", operation, expected.ProductId, directory, archive, receipt }) info.ArgumentList.Add(arg);
@@ -82,7 +82,7 @@ internal sealed class WindowsMachineInstallBroker : IMachineInstallBroker, IMach
             if (operation is "update" or "update-rollback" && args.Length == 6)
             {
                 if (args[5].Length > 8192) throw new InvalidDataException("Invalid expected receipt.");
-                var expected = System.Text.Json.JsonSerializer.Deserialize<InstallReceipt>(Convert.FromBase64String(args[5]), OfficeJson.Options)
+                var expected = OfficeJson.Deserialize<InstallReceipt>(Convert.FromBase64String(args[5]))
                     ?? throw new InvalidDataException("Missing expected receipt.");
                 if (expected.ProductId != productId || expected.Scope != InstallScope.Machine) throw new InvalidDataException("Receipt scope mismatch.");
                 var installed = new InstallationInventory(OfficeInstallPaths.CreateDefault()).Find(productId, InstallScope.Machine);
@@ -90,7 +90,7 @@ internal sealed class WindowsMachineInstallBroker : IMachineInstallBroker, IMach
                 if (operation == "update-rollback")
                 {
                     if (args[3].Length > 16384) throw new InvalidDataException("Peer snapshot exceeds limits.");
-                    var peers = args[3].Length == 0 ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, InstallReceipt?>>(Convert.FromBase64String(args[3]), OfficeJson.Options);
+                    var peers = args[3].Length == 0 ? null : OfficeJson.Deserialize<Dictionary<string, InstallReceipt?>>(Convert.FromBase64String(args[3]));
                     if (peers is not null && (peers.Count != OfficeCatalog.ProductIds.Length - 1 || OfficeCatalog.ProductIds.Where(id => id != productId).Any(id => !peers.ContainsKey(id))))
                         throw new InvalidDataException("Peer snapshot must cover the other Office products.");
                     result = installer.Rollback(productId, InstallScope.Machine, expected, peers);

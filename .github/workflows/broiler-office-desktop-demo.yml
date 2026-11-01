@@ -1,0 +1,101 @@
+name: Publish Office Desktop Demo
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Unused Office demo version, for example 0.1.0-demo.6.
+        required: true
+        type: string
+      product_tags:
+        description: Optional JSON tag overrides keyed by browser, writer, cell, plate. Empty selects newest eligible published previews.
+        default: '{}'
+        type: string
+      create_draft:
+        description: Create a draft prerelease after validation.
+        default: true
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: office-desktop-demo
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      OFFICE_VERSION: ${{ inputs.version }}
+      PRODUCT_TAGS: ${{ inputs.product_tags }}
+      GH_TOKEN: ${{ github.token }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: ga
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Initialize temporary output
+        shell: pwsh
+        run: '"DEMO_DIRECTORY=$env:RUNNER_TEMP/office-desktop-demo" >> $env:GITHUB_ENV'
+      - name: Resolve published product releases once
+        shell: pwsh
+        run: |
+          if ($env:OFFICE_VERSION -notmatch '^\d+\.\d+\.\d+-demo\.[1-9]\d*$') { throw 'Explicit demo.N version required.' }
+          gh release view "office-v$env:OFFICE_VERSION" *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'Office version already exists; choose a new demo version.' }
+          python scripts/office_desktop_demo.py resolve --directory $env:DEMO_DIRECTORY --version $env:OFFICE_VERSION --overrides $env:PRODUCT_TAGS
+          if ($LASTEXITCODE -ne 0) { throw 'Product selection or verification failed.' }
+      - name: Regression tests
+        shell: pwsh
+        run: |
+          python -m unittest discover -s scripts/tests -p test_office_desktop_demo.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop release tests failed.' }
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows
+          if ($LASTEXITCODE -ne 0) { throw 'Production boundary tests failed.' }
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows -p:BroilerOfficeDemo=true
+          if ($LASTEXITCODE -ne 0) { throw 'Demo launcher tests failed.' }
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows -p:BroilerOfficeDemo=true -p:BroilerOfficeBootstrapDemo=true --filter FullyQualifiedName~DesktopBootstrapTests
+          if ($LASTEXITCODE -ne 0) { throw 'Online demo profile tests failed.' }
+      - name: Publish NativeAOT demo launcher
+        shell: pwsh
+        run: |
+          dotnet publish Broiler.Launcher/src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj -c Release-Windows -r win-x64 --self-contained true -p:PublishAot=true -p:PublishReadyToRun=false -p:BroilerOfficeDemo=true -p:BroilerOfficeBootstrapDemo=true "-p:Version=$env:OFFICE_VERSION" -p:ILLinkTreatWarningsAsErrors=true -p:IlcTreatWarningsAsErrors=true -o "$env:DEMO_DIRECTORY/launcher"
+          if ($LASTEXITCODE -ne 0) { throw 'NativeAOT publish failed.' }
+      - name: Exercise native executable and four products
+        shell: pwsh
+        run: ./scripts/smoke-test-desktop-demo.ps1 -Directory $env:DEMO_DIRECTORY -TestProducts
+      - name: Package small bootstrap and original product ZIPs
+        shell: pwsh
+        run: |
+          python scripts/office_desktop_demo.py package --directory $env:DEMO_DIRECTORY
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop packaging failed.' }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: office-desktop-demo-${{ inputs.version }}
+          path: ${{ env.DEMO_DIRECTORY }}/release-assets/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: office-desktop-demo-evidence-${{ inputs.version }}
+          path: ${{ env.DEMO_DIRECTORY }}/evidence/*
+          if-no-files-found: warn
+      - name: Create draft prerelease
+        if: inputs.create_draft
+        shell: pwsh
+        run: |
+          $notes = Join-Path $env:RUNNER_TEMP 'office-desktop-notes.md'
+          @"
+          Unsigned Windows x64 Office demo. Download the small bootstrap ZIP, extract it completely, and open Broiler.Launcher.Windows.exe.
+          Download & start installs each selected product for the current user and starts it. No installed .NET runtime is required.
+          Product versions, origins and SHA-256 hashes are pinned in selection.lock.json; original product ZIPs are reattached unchanged.
+          Publisher signing, machine-scope acceptance, Linux and BOSS remain deferred. Process-start checks do not replace human GUI acceptance.
+          "@ | Set-Content -LiteralPath $notes
+          $assets = @(Get-ChildItem "$env:DEMO_DIRECTORY/release-assets" -File | ForEach-Object FullName)
+          gh release create "office-v$env:OFFICE_VERSION" @assets --target $env:GITHUB_SHA --draft --prerelease --title "Broiler Office Desktop Demo $env:OFFICE_VERSION" --notes-file $notes
+          if ($LASTEXITCODE -ne 0) { throw 'Draft creation failed.' }

@@ -10,6 +10,12 @@
     <DefineConstants>$(DefineConstants);BROILER_OFFICE_DEMO</DefineConstants>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(BroilerOfficeBootstrapDemo)' == 'true'">
+    <DefineConstants>$(DefineConstants);BROILER_OFFICE_BOOTSTRAP_DEMO</DefineConstants>
+  </PropertyGroup>
+  <Target Name="ValidateBootstrapDemo" BeforeTargets="CoreCompile" Condition="'$(BroilerOfficeBootstrapDemo)' == 'true'">
+    <Error Condition="'$(BroilerOfficeDemo)' != 'true'" Text="Online bootstrap is only available in explicit demo builds." />
+  </Target>
   <ItemGroup>
     <EmbeddedResource Include="ReleaseTrust/office-release-keys.json" LogicalName="Broiler.Launcher.OfficeReleaseKeys.json" />
     <PackageReference Include="Broiler.UI" />

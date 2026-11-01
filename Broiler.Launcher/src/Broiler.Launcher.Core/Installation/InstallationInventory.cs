@@ -90,7 +90,7 @@ public sealed class InstallationInventory(OfficeInstallPaths paths, Func<string,
     }
 
     internal ActiveInstallation ReadActive(string id, InstallScope scope) =>
-        JsonSerializer.Deserialize<ActiveInstallation>(OfficeInstallPaths.ReadBounded(paths.Record(id, scope), 64 * 1024), OfficeJson.Options)
+        OfficeJson.Deserialize<ActiveInstallation>(OfficeInstallPaths.ReadBounded(paths.Record(id, scope), 64 * 1024))
         ?? throw new InvalidDataException("Missing active Office receipt.");
 
     internal string ValidateReceipt(InstallReceipt receipt, string id, InstallScope scope)
@@ -102,7 +102,7 @@ public sealed class InstallationInventory(OfficeInstallPaths paths, Func<string,
             receipt.Sha256, "zip", receipt.EntryPoint, receipt.Invocation, "self-contained"));
         string versionDir = paths.VersionDirectory(receipt);
         OfficeInstallPaths.RejectLinks(versionDir);
-        var saved = JsonSerializer.Deserialize<InstallReceipt>(OfficeInstallPaths.ReadBounded(Path.Combine(versionDir, ".office-receipt.json"), 64 * 1024), OfficeJson.Options);
+        var saved = OfficeJson.Deserialize<InstallReceipt>(OfficeInstallPaths.ReadBounded(Path.Combine(versionDir, ".office-receipt.json"), 64 * 1024));
         if (saved != receipt) throw new InvalidDataException("The active record and version receipt disagree.");
         string executable = Path.Combine(versionDir, receipt.EntryPoint);
         OfficeInstallPaths.RejectLinks(executable);
@@ -140,7 +140,7 @@ public sealed class BundledOfficePackageSource(string directory, OfficeReleaseVe
             ?? throw new InvalidDataException("This Office package does not contain the selected product.");
         string archive = Path.Combine(DirectoryPath, "packages", component.Asset);
         OfficeInstallPaths.RejectLinks(archive);
-        if (release.Demo && !File.Exists(archive)) throw new InvalidDataException("Demo installation requires the bundled local archive.");
+        if (release.Demo && !OfficeBuild.IsBootstrapDemo && !File.Exists(archive)) throw new InvalidDataException("Demo installation requires the bundled local archive.");
         return new(release, component, archive);
     }
 }
