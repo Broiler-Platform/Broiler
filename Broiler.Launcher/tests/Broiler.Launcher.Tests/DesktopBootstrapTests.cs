@@ -43,11 +43,28 @@ public sealed class DesktopBootstrapTests
         finally { Directory.Delete(root, recursive: true); }
     }
 
+    [Fact]
+    public void Product_URL_uses_pinned_provenance_and_legacy_manifest_defaults()
+    {
+        var component = new OfficeComponent("writer", "0.1.0-preview.16", "win-x64",
+            "Broiler.Writer-0.1.0-preview.16-win-x64-self-contained.zip", 1, new string('a', 64), "zip", "Broiler.Writer.Windows.exe", "native", "self-contained");
+        var release = new OfficeRelease(1, "0.1.0-demo.6", "preview", "office-v0.1.0-demo.6", new string('b', 40), "0.1.0-demo.1", [component]) { Demo = true };
+        string expected = OfficeBuild.IsBootstrapDemo
+            ? "https://github.com/Broiler-Platform/Broiler.Writer/releases/download/writer-v0.1.0-preview.16/" + component.Asset
+            : "https://github.com/Broiler-Platform/Broiler/releases/download/office-v0.1.0-demo.6/" + component.Asset;
+        Assert.Equal(expected, OfficePackageDownloader.DownloadUri(release, component).AbsoluteUri);
+        var pinned = component with { SourceRepository = "Broiler-Platform/Broiler.Writer", SourceTag = "writer-v0.1.0-preview.16" };
+        Assert.Equal(expected, OfficePackageDownloader.DownloadUri(release, pinned).AbsoluteUri);
+        Assert.Throws<InvalidDataException>(() => OfficePackageDownloader.DownloadUri(release, pinned with { SourceRepository = "Other/Repo" }));
+        Assert.Throws<InvalidDataException>(() => OfficePackageDownloader.DownloadUri(release, pinned with { SourceTag = "writer-v0.1.0-preview.17" }));
+        Assert.Contains("/Broiler/releases/download/office-v", OfficePackageDownloader.DownloadUri(release with { Demo = false }, pinned).AbsoluteUri);
+    }
+
     private sealed class BytesHandler(byte[] payload) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
-            Assert.StartsWith("https://github.com/Broiler-Platform/Broiler/releases/download/office-v0.1.0-demo.6/", request.RequestUri!.AbsoluteUri);
+            Assert.StartsWith("https://github.com/Broiler-Platform/Broiler.Writer/releases/download/writer-v0.1.0-preview.16/", request.RequestUri!.AbsoluteUri);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(payload) });
         }
     }

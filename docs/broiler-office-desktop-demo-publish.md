@@ -23,11 +23,12 @@ Output:
 - `Broiler-Office-<version>-win-x64-bootstrap.zip`: native launcher executable,
   `office-release.json`, README and license. PDBs and the .NET runtime are omitted.
 - Original Browser, Writer, Cells and Plate Windows archives, reattached unchanged
-  to this Office release for the launcher's existing download URL contract.
+  for provenance and offline reuse. The online demo downloads from the pinned
+  product repository/tag, rather than depending on the Office reattachment.
 - Selection lock and checksums; native smoke evidence is also a workflow artifact.
 
-After reviewing the draft and evidence, publish the draft. Downloads cannot work
-from an unpublished GitHub release. Extract the small bootstrap ZIP completely
+After reviewing the draft and evidence, publish the draft. The selected product releases must already be public. The corrected bootstrap
+can also be reviewed from workflow artifacts before publishing the Office draft. Extract the small bootstrap ZIP completely
 and run its EXE. For an absent app, **Download & start** installs it under
 `%LocalAppData%/Broiler/Office` and starts it. **Install for user** is available
 without starting it. Existing detected/custom apps continue to launch. Installed
@@ -47,3 +48,14 @@ A clean-account GUI review without an installed .NET runtime remains required.
 The workflow includes hidden process-start smoke checks; those do not establish
 that all interactions, file formats or UAC paths work. User-scope is the first
 demo path; signing, machine-scope acceptance, Linux and BOSS remain deferred.
+
+## Bootstrap download URL correction
+
+The initial bootstrap constructed URLs under the Office release repository even
+when the desired file was only published under its producer. Corrected builds use
+sourceRepository/sourceTag fields in the generated manifest, restricted to each
+known product repository and the component version. Older manifests without those
+fields derive the same fixed mapping from product ID and version. SHA-256 and
+size checks remain unchanged. Normal signed Office releases still use Office
+release assets. Rebuild the bootstrap executable; editing an old binary's JSON
+alone cannot change its download logic.

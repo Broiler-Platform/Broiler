@@ -6,6 +6,22 @@ namespace Broiler.Launcher.Installation;
 /// <summary>Downloads only a component named by an already verified Office release.</summary>
 public sealed class OfficePackageDownloader(HttpClient client, string cacheDirectory)
 {
+    public static Uri DownloadUri(OfficeRelease release, OfficeComponent component)
+    {
+        OfficeCatalog.ValidateComponent(component);
+        if (release.Tag != "office-v" + release.OfficeVersion) throw new InvalidDataException("Invalid Office release identity.");
+        string repository = "Broiler-Platform/Broiler", tag = release.Tag;
+        if (OfficeBuild.IsBootstrapDemo && release.Demo) {
+            // Old bootstrap manifests omitted provenance fields. The four known
+            // product IDs/version pairs still resolve to the same fixed sources.
+            var source = OfficeCatalog.ProductSource(component);
+            repository = component.SourceRepository ?? source.Repository;
+            tag = component.SourceTag ?? source.Tag;
+        }
+        return new Uri("https://github.com/" + repository + "/releases/download/" +
+            Uri.EscapeDataString(tag) + "/" + Uri.EscapeDataString(component.Asset));
+    }
+
     public async Task<VerifiedPackage> EnsureArchiveAsync(VerifiedPackage package, IProgress<InstallProgress>? progress = null, CancellationToken token = default)
     {
         if (File.Exists(package.ArchivePath)) return package; // Installer rehashes the protected snapshot.
@@ -30,10 +46,10 @@ public sealed class OfficePackageDownloader(HttpClient client, string cacheDirec
         string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".part";
         try
         {
-            var uri = new Uri("https://github.com/Broiler-Platform/Broiler/releases/download/" +
-                Uri.EscapeDataString(package.Release.Tag) + "/" + Uri.EscapeDataString(package.Component.Asset));
+            var uri = DownloadUri(package.Release, package.Component);
             using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+                throw new HttpRequestException($"Download failed for {package.Component.Id} at {uri} (HTTP {(int)response.StatusCode}).", null, response.StatusCode);
             if (response.Content.Headers.ContentLength is long length && length != package.Component.Size)
                 throw new InvalidDataException("Downloaded package size does not match the signed manifest.");
             await using (var input = await response.Content.ReadAsStreamAsync(token))

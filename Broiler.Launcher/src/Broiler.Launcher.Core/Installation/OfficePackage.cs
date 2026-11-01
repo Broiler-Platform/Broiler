@@ -10,7 +10,11 @@ public enum InstallScope { User, Machine }
 public enum InstallationState { NotInstalled, Installed, Invalid }
 
 public sealed record OfficeComponent(string Id, string Version, string Rid, string Asset, long Size,
-    string Sha256, string Archive, string EntryPoint, string Invocation, string PublishMode);
+    string Sha256, string Archive, string EntryPoint, string Invocation, string PublishMode)
+{
+    public string? SourceRepository { get; init; }
+    public string? SourceTag { get; init; }
+}
 public sealed record OfficeRelease(int SchemaVersion, string OfficeVersion, string Channel, string Tag,
     string Commit, string MinimumLauncherVersion, OfficeComponent[] Components)
 {
@@ -71,10 +75,24 @@ public static class OfficeCatalog
         return name + (invocation == "dotnet" ? ".dll" : ".exe");
     }
 
+    public static (string Repository, string Tag) ProductSource(OfficeComponent item) => item.Id switch
+    {
+        "browser" => ("Broiler-Platform/Broiler.Browser", "browser-v" + item.Version),
+        "writer" => ("Broiler-Platform/Broiler.Writer", "writer-v" + item.Version),
+        "cell" => ("Broiler-Platform/Broiler.Cells", "cells-v" + item.Version),
+        "plate" => ("Broiler-Platform/Broiler.Plate", "plate-v" + item.Version),
+        _ => throw new InvalidDataException("No direct product release source for " + item.Id),
+    };
+
     public static void ValidateComponent(OfficeComponent item)
     {
         if (item.Id != "launcher") ValidateId(item.Id);
         _ = OfficeVersion.Parse(item.Version);
+        if (item.SourceRepository is not null || item.SourceTag is not null) {
+            var expected = ProductSource(item);
+            if (item.SourceRepository != expected.Repository || item.SourceTag != expected.Tag)
+                throw new InvalidDataException("Product source does not match its approved repository and version.");
+        }
         if (item.Version.Length > 100 || item.Rid != "win-x64" || item.Archive != "zip" ||
             item.Invocation is not ("native" or "dotnet") || item.EntryPoint != EntryPoint(item.Id, item.Invocation) ||
             item.PublishMode is not ("self-contained" or "framework-dependent" or "native-aot") ||

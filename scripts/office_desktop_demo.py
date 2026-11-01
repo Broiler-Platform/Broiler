@@ -97,7 +97,7 @@ def resolve(directory, version, overrides, verification_only=False):
     source_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     manifest = dict(schemaVersion=1, officeVersion=version, channel="preview", tag="office-v" + version,
                     commit=source_sha, minimumLauncherVersion=version, demo=True,
-                    components=[{key: p[key] for key in FIELDS} for p in lock["components"]])
+                    components=[dict({key: p[key] for key in FIELDS}, sourceRepository=p["repository"], sourceTag=p["tag"]) for p in lock["components"]])
     artifacts.write_json(assets / "office-release.json", manifest)
     shutil.copyfile(lock_path, assets / lock_path.name)
 

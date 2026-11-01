@@ -26,7 +26,9 @@ Windows account without .NET and human GUI/UAC acceptance remain release checks.
 No workflow has been dispatched and no GitHub release has been created.
 
 Runbook: [broiler-office-desktop-demo-publish.md](broiler-office-desktop-demo-publish.md).
-The investigation below describes the original baseline and the rationale.
+The investigation below describes the original baseline and rationale. The
+bootstrap download path has since been corrected to use pinned product release
+repositories/tags directly; reattached Office ZIPs are retained for offline reuse.
 
 ## Recommended first deliverable
 
