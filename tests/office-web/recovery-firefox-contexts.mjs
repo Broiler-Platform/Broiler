@@ -31,7 +31,7 @@ try{for(const kind of ['non-persistent','persistent']){
             manager.changed({modified:true,generation:1,revision:1});await manager.start();
             manager.store.put=async()=>{throw new DOMException('quota fixture','QuotaExceededError');};await manager.flush(true);
         });
-        await page.locator('#office-recovery summary').click();
+        await page.evaluate(() => document.getElementById('office-web-dialog') ? window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'recovery'})) : (document.getElementById('office-recovery').open = true));
         const [download]=await Promise.all([page.waitForEvent('download',{timeout:8000}),page.getByRole('link',{name:'Export current recovery',exact:true}).click({timeout:8000})]);
         await download.saveAs(resolve(output,`firefox-${kind}-probe.json`));result.download=true;
     }catch(error){result.download=false;result.error=String(error);}

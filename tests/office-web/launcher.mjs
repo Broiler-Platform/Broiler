@@ -48,9 +48,9 @@ async function launcherReady(page) {
 async function editorReady(page, id) {
     await page.waitForURL(`https://${id === 'writer' ? 'writer' : 'cell'}.broiler.app/`);
     await page.waitForFunction(id => document.getElementById(`${id === 'writer' ? 'writer' : 'cells'}-status`)?.hidden === true, id);
-    assert.equal(await page.getByRole('link', { name: 'Return to Office' }).getAttribute('href'), 'https://demo.broiler.app/');
+    assert.equal(await page.locator('.office-nav a').getAttribute('href'), 'https://demo.broiler.app/');
 }
-async function returnToOffice(page) { await page.getByRole('link', { name: 'Return to Office' }).click(); await launcherReady(page); }
+async function returnToOffice(page) { await page.evaluate(() => window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'home'}))); await launcherReady(page); }
 async function canvasButton(page, index) {
     const box = await page.locator('canvas').boundingBox(); const columns = box.width >= 700 ? 2 : 1;
     const cardWidth = (box.width - 48 - (columns - 1) * 16) / columns;

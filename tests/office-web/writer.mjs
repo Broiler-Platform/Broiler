@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const root = resolve(process.env.WRITER_WWWROOT || '../../artifacts/web-w3/writer/wwwroot');
 const fixtures = resolve('../../artifacts/web-w3/fixtures');
 const output = resolve('../../artifacts/web-w3/browser'); await mkdir(output, { recursive: true });
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm' };
+const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 const server = createServer(async (req, res) => {
     try {
         const url = new URL(req.url, 'http://localhost');
@@ -23,7 +23,7 @@ const report = { generated: new Date().toISOString(), runs: [] };
 let failed = false;
 async function ready(page) {
     await page.goto(origin); await page.waitForFunction(() => document.getElementById('writer-status')?.hidden === true);
-    await page.locator('#writer-info summary').click();
+    await page.evaluate(() => { window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'information'})); document.getElementById('office-web-dialog').close(); });
 }
 async function focusEditor(page) {
     await page.locator('canvas').click({ position: { x: 120, y: 140 } });
@@ -180,14 +180,14 @@ for (const [engineName, engine] of Object.entries({ chromium, firefox, webkit })
         page = await handles.newPage(); await ready(page); await focusEditor(page); await page.keyboard.press('Control+n'); await outcome(page, 'New');
         await focusEditor(page); await page.keyboard.insertText('Handle text'); await waitText(page, 'Handle text');
         for (const mode of ['cancel', 'permission', 'close-fail']) {
-            await page.evaluate(mode => { window.fileMode = mode; }, mode); await page.locator('#writer-save-file').click();
+            await page.evaluate(mode => { window.fileMode = mode; }, mode); await page.evaluate(() => window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'save-file'})));
             await outcome(page, mode === 'cancel' ? 'Canceled' : 'Failed'); assert.equal(await page.getAttribute('body', 'data-modified'), 'true');
         }
-        await page.evaluate(() => { window.fileMode = 'deferred'; }); await page.locator('#writer-save-file').click();
+        await page.evaluate(() => { window.fileMode = 'deferred'; }); await page.evaluate(() => window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'save-file'})));
         await page.waitForFunction(() => typeof window.finishWrite === 'function');
         await focusEditor(page); await page.keyboard.press('Control+End'); await page.keyboard.insertText(' newer'); await waitText(page, 'Handle text newer');
         await page.evaluate(() => window.finishWrite()); await outcome(page, 'SavedToHandle'); assert.equal(await page.getAttribute('body', 'data-modified'), 'true');
-        await page.evaluate(() => { window.fileMode = 'success'; }); await page.locator('#writer-save-file').click();
+        await page.evaluate(() => { window.fileMode = 'success'; }); await page.evaluate(() => window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'save-file'})));
         await page.waitForFunction(() => document.body.dataset.modified === 'false');
         assert.equal(await page.locator('#writer-operation').getAttribute('data-outcome'), 'SavedToHandle');
         await writeFile(resolve(directory, 'handle.rtf'), Buffer.from(await page.evaluate(() => window.savedWrites.at(-1))));

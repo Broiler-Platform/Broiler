@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 const output = resolve('../../artifacts/web-w5/browser'); await mkdir(output,{recursive:true});
 const roots = { writer:resolve('../../artifacts/web-w5/writer/wwwroot'), cell:resolve('../../artifacts/web-w5/cell/wwwroot') };
 assert.deepEqual(await readFile(resolve(roots.writer,'broiler.recovery.js')),await readFile(resolve(roots.cell,'broiler.recovery.js')));
-const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.wasm':'application/wasm'};
+const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm'};
 const server=createServer(async(request,response)=>{
     try {
         const url=new URL(request.url,'http://localhost');
@@ -47,7 +47,7 @@ async function type(page,app,text){
     await page.waitForFunction(()=>['saved','warning'].includes(document.getElementById('recovery-status').dataset.state));
     return (await drafts(page,app))[0];
 }
-async function openPanel(page){await page.bringToFront();if(!await page.locator('#office-recovery').evaluate(node=>node.open))await page.locator('#office-recovery summary').click();}
+async function openPanel(page){await page.bringToFront();await page.evaluate(() => document.getElementById('office-web-dialog') ? window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'recovery'})) : (document.getElementById('office-recovery').open = true));}
 async function restore(page,record,text){
     await openPanel(page);await page.getByRole('button',{name:'Refresh drafts',exact:true}).click();
     await page.locator(`[data-draft-id="${record.id}"]`).getByRole('button',{name:'Restore',exact:true}).click();

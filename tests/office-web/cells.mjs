@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 
 const root = resolve(process.env.CELL_WWWROOT || '../../artifacts/web-w4/cell/wwwroot');
 const output = resolve('../../artifacts/web-w4/browser'); await mkdir(output, { recursive: true });
-const mime = { '.html':'text/html', '.js':'text/javascript', '.json':'application/json', '.wasm':'application/wasm' };
+const mime = { '.html':'text/html', '.js':'text/javascript','.css':'text/css', '.json':'application/json', '.wasm':'application/wasm' };
 const server = createServer(async (request,response) => {
     try {
         const path = resolve(root, decodeURIComponent(new URL(request.url,'http://localhost').pathname).slice(1) || 'index.html');
@@ -137,7 +137,7 @@ for (const [name,engine] of Object.entries({chromium,firefox,webkit})) {
         await page.locator('canvas').dispatchEvent('pointercancel',{pointerId:1});
         await page.locator('canvas').dispatchEvent('wheel',{deltaY:100,deltaMode:0});
         await page.waitForTimeout(150); assert.ok(Number(await page.locator('canvas').getAttribute('data-frame'))>1);
-        await page.locator('.limits summary').click();
+        await page.evaluate(() => window.dispatchEvent(new CustomEvent('broiler-open-office-panel', {detail:'information'})));
         await page.screenshot({path:resolve(output,name+'.png')});
         assert.deepEqual(errors,[]); result.pass=true;
         await context.close();

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 const root = resolve('../../artifacts/web-w1/sample/wwwroot');
 const output = resolve('../../artifacts/web-w1/contracts');
 await mkdir(output, { recursive: true });
-const mime = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.wasm': 'application/wasm' };
+const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm' };
 const server = createServer(async (req, res) => {
     try {
         const url = new URL(req.url, 'http://localhost');
