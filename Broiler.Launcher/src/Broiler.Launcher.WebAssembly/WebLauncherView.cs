@@ -14,9 +14,9 @@ internal sealed class WebLauncherView : UiElement
     private readonly StandardLabel _title = StandardLabel.Title("Choose your app");
     private readonly StandardLabel _subtitle = StandardLabel.Muted("Documents and spreadsheets in your browser.");
     private readonly StandardButton _theme, _tabs;
-    private readonly List<(StandardLabel Name, StandardLabel Detail, StandardLabel Version, StandardButton Open)> _cards = [];
+    private readonly List<(StandardLabel Name, StandardLabel Detail, StandardLabel Version, StandardButton Open, bool CanLaunch, bool HasArtwork)> _cards = [];
     private readonly List<BRect> _bounds = [];
-    private bool _dark;
+    private bool _dark, _showDetails;
 
     internal WebLauncherView(BrowserLauncher launcher, BrowserDeploymentInfo deployment, Action toggleTheme)
     {
@@ -25,9 +25,9 @@ internal sealed class WebLauncherView : UiElement
         _theme = Button("", toggleTheme);
         _tabs = Button("", () => { launcher.SetOpenInNewTab(!launcher.OpenInNewTab); UpdatePreferences(); });
         AddChild(_theme); AddChild(_tabs);
-        foreach (var product in launcher.Products) {
+        foreach (var product in launcher.Products.OrderByDescending(product => product.CanLaunch)) {
             string detail = product.Id switch {
-                "writer" => "Create and edit documents.", "cell" => "Work with CSV spreadsheets.",
+                "writer" => "Create and edit documents.", "cell" => "Create and edit spreadsheets.",
                 _ => "Available in the desktop edition.",
             };
             string version = product.Id switch { "writer" => deployment.WriterVersion, "cell" => deployment.CellVersion, _ => "Desktop app" };
@@ -36,7 +36,8 @@ internal sealed class WebLauncherView : UiElement
             var release = StandardLabel.Caption(version);
             var open = Button(product.CanLaunch ? "Open " + product.Name.Replace("Broiler ", "") : "Desktop edition", () => launcher.Launch(product.Id));
             open.IsEnabled = product.CanLaunch;
-            _cards.Add((name, description, release, open)); _bounds.Add(default);
+            release.Visibility = UiVisibility.Collapsed;
+            _cards.Add((name, description, release, open, product.CanLaunch, product.Id is "writer" or "cell" or "browser")); _bounds.Add(default);
             AddChild(name); AddChild(description); AddChild(release); AddChild(open);
         }
         UpdatePreferences();
@@ -54,6 +55,14 @@ internal sealed class WebLauncherView : UiElement
         _tabs.AccessibleName = _tabs.Text;
         Invalidate(UiInvalidationKind.Render);
     }
+    internal void SetDetails(bool show)
+    {
+        _showDetails = show;
+        foreach (var card in _cards)
+            card.Version.Visibility = show ? UiVisibility.Visible : UiVisibility.Collapsed;
+        InvalidateMeasure();
+        Invalidate(UiInvalidationKind.Render);
+    }
     internal void SetTheme(bool dark) { _dark = dark; UpdatePreferences(); }
     protected override BSize MeasureCore(BSize availableSize)
     {
@@ -69,19 +78,20 @@ internal sealed class WebLauncherView : UiElement
         int columns = width >= 700 ? 2 : 1;
         double cardWidth = (width - 48 - (columns - 1) * 16) / columns;
         for (int index = 0; index < _cards.Count; index++) {
-            var card = new BRect(x + index % columns * (cardWidth + 16), y + 162 + index / columns * 182, cardWidth, 166);
+            var card = new BRect(x + index % columns * (cardWidth + 16), y + 154 + index / columns * 174, cardWidth, 158);
             _bounds[index] = card;
             var controls = _cards[index];
-            controls.Name.Arrange(new(card.X + 20, card.Y + 14, cardWidth - 40, 28));
-            controls.Detail.Arrange(new(card.X + 20, card.Y + 48, cardWidth - 40, 24));
+            double textWidth = cardWidth - (controls.HasArtwork ? 128 : 40);
+            controls.Name.Arrange(new(card.X + 20, card.Y + 14, textWidth, 28));
+            controls.Detail.Arrange(new(card.X + 20, card.Y + 48, textWidth, 24));
             controls.Version.Arrange(new(card.X + 20, card.Y + 78, cardWidth - 40, 20));
-            controls.Open.Arrange(new(card.X + 20, card.Y + 114, Math.Min(170, cardWidth - 40), 34));
+            controls.Open.Arrange(new(card.X + 20, card.Y + (_showDetails ? 110 : 92), Math.Min(170, cardWidth - 40), 34));
         }
     }
     protected override void RenderCore(UiRenderContext context)
     {
         for (int index = 0; index < _bounds.Count; index++) {
-            bool enabled = _launcher.Products[index].CanLaunch;
+            bool enabled = _cards[index].CanLaunch;
             BColor surface = _dark ? BColor.FromArgb(255, enabled ? (byte)29 : (byte)21, enabled ? (byte)41 : (byte)29, enabled ? (byte)57 : (byte)40)
                 : enabled ? BColor.White : BColor.FromArgb(255, 235, 239, 244);
             context.RenderList.FillRoundedRect(_bounds[index], surface, 10, 10);

@@ -1,5 +1,10 @@
 // Deliberately independent of WASM and module imports: links and retry survive a broken runtime.
 (() => {
+    try {
+        const theme = localStorage.getItem('office.web.theme') === 'dark' ? 'dark' : 'light';
+        document.documentElement.dataset.theme = theme;
+        document.body.dataset.theme = theme;
+    } catch { /* Storage may be unavailable. */ }
     const fail = () => {
         document.body.dataset.failed = 'true';
         document.getElementById('error').hidden = false;

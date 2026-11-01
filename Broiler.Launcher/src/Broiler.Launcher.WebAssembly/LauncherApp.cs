@@ -70,8 +70,8 @@ internal static class LauncherApp
     {
         bool dark = _launcher!.Theme == "dark";
         _host!.Background = dark ? BColor.FromArgb(255, 15, 23, 36) : BColor.FromArgb(255, 244, 247, 251);
-        _root!.Background = _host.Background;
         StandardThemeController.Apply(_session!, dark ? StandardThemeTokens.Dark : StandardThemeTokens.Light);
+        _root!.Background = _host.Background;
         _view!.SetTheme(dark); BrowserInterop.ApplyTheme(dark ? "dark" : "light");
     }
     internal static void Frame() { _frames?.Drain(); _session?.RenderFrame(); }
@@ -105,6 +105,7 @@ internal static class LauncherApp
     internal static void Launch(string id) => _launcher?.Launch(id);
     internal static void SetTheme(bool dark) { _launcher?.SetTheme(dark ? "dark" : "light"); ApplyTheme(); }
     internal static void SetNewTab(bool enabled) { _launcher?.SetOpenInNewTab(enabled); _view?.SetTheme(_launcher?.Theme == "dark"); }
+    internal static void SetDetails(bool enabled) => _view?.SetDetails(enabled);
     internal static void Dispose() { _session?.Dispose(); _frames?.Dispose(); _renderer?.Dispose(); _session = null; _frames = null; _renderer = null; }
 }
 [SupportedOSPlatform("browser")]
@@ -118,6 +119,7 @@ public static partial class LauncherExports
     [JSExport] public static void Launch(string id) => LauncherApp.Launch(id);
     [JSExport] public static void SetTheme(bool dark) => LauncherApp.SetTheme(dark);
     [JSExport] public static void SetNewTab(bool enabled) => LauncherApp.SetNewTab(enabled);
+    [JSExport] public static void SetDetails(bool enabled) => LauncherApp.SetDetails(enabled);
     [JSExport] public static void Dispose() => LauncherApp.Dispose();
 }
 

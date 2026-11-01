@@ -54,7 +54,7 @@ async function returnToOffice(page) { await page.getByRole('link', { name: 'Retu
 async function canvasButton(page, index) {
     const box = await page.locator('canvas').boundingBox(); const columns = box.width >= 700 ? 2 : 1;
     const cardWidth = (box.width - 48 - (columns - 1) * 16) / columns;
-    await page.locator('canvas').click({ position: { x: 24 + index % columns * (cardWidth + 16) + 70, y: 162 + Math.floor(index / columns) * 182 + 130 } });
+    await page.locator('canvas').click({ position: { x: 24 + index % columns * (cardWidth + 16) + 70, y: 154 + Math.floor(index / columns) * 174 + 109 } });
 }
 const report = { generated: new Date().toISOString(), deployment: 'local artifact routes; public DNS/hosting not changed', runs: [] };
 let failed = false;
@@ -76,14 +76,21 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
         page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
         await page.goto(home); await launcherReady(page);
         assert.equal(await page.locator('#deployment').textContent(), 'Local preview');
+        assert.equal(await page.locator('#technical-details').isVisible(), false);
+        assert.equal(await page.locator('.app-artwork img').evaluateAll(images => images.length === 3 && images.every(image => image.complete && image.naturalWidth > 0)), true);
+        await page.getByText('Preferences', { exact: true }).click();
+        await page.locator('#show-details').check();
+        assert.equal(await page.locator('#technical-details').isVisible(), true);
+        await page.locator('#show-details').uncheck();
+        await page.getByText('Preferences', { exact: true }).click();
         await page.screenshot({ path: resolve(output, `${name}-desktop.png`) });
         const original = page.url();
-        await canvasButton(page, 0); await canvasButton(page, 3);
+        await canvasButton(page, 2); await canvasButton(page, 3);
         await page.locator('canvas').focus(); await page.keyboard.press('Control+1'); await page.keyboard.press('Control+4');
         assert.equal(page.url(), original); assert.equal(context.pages().length, 1);
         result.checks.push('version-prefix boot; native services absent; Browser/Plate mouse and shortcuts inert');
-        await canvasButton(page, 1); await editorReady(page, 'writer'); await returnToOffice(page);
-        await canvasButton(page, 2); await editorReady(page, 'cell'); await returnToOffice(page);
+        await canvasButton(page, 0); await editorReady(page, 'writer'); await returnToOffice(page);
+        await canvasButton(page, 1); await editorReady(page, 'cell'); await returnToOffice(page);
         result.checks.push('Canvas mouse opens actual published Writer/Cell; both return to Office');
         for (const [key, id] of [['2', 'writer'], ['3', 'cell']]) {
             await page.locator('canvas').focus(); await page.keyboard.press(`Control+${key}`); await editorReady(page, id); await returnToOffice(page);
@@ -123,7 +130,7 @@ for (const [name, engine] of Object.entries({ chromium, firefox, webkit })) {
         const small = await approved.newPage(); await small.goto(home); await launcherReady(small);
         assert.match(await small.locator('#deployment').textContent(), /Writer writer-test-8 · Cell cell-test-2/);
         await small.screenshot({ path: resolve(output, `${name}-narrow.png`), fullPage: true });
-        await canvasButton(small, 1); await editorReady(small, 'writer'); await approved.close();
+        await canvasButton(small, 0); await editorReady(small, 'writer'); await approved.close();
         result.checks.push('narrow layout; approved fixture has independently versioned metadata');
 
         const storageDenied = await createContext();

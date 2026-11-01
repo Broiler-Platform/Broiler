@@ -38,6 +38,17 @@ for (const link of document.querySelectorAll('[data-product]')) link.addEventLis
     if (!ready || document.body.dataset.failed === 'true' || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); managed.Launch(link.dataset.product);
 });
+function applyDetails(enabled) {
+    document.getElementById('show-details').checked = enabled;
+    document.getElementById('technical-details').hidden = !enabled;
+    if (ready) managed.SetDetails(enabled);
+}
+document.getElementById('show-details').addEventListener('change', event => {
+    writePreference('office.web.showDetails', String(event.target.checked));
+    applyDetails(event.target.checked);
+});
+applyDetails(preference('office.web.showDetails') === 'true');
+
 document.getElementById('dark-theme').addEventListener('change', event => { if (ready) managed.SetTheme(event.target.checked); });
 document.getElementById('new-tab').addEventListener('change', event => { if (ready) managed.SetNewTab(event.target.checked); });
 try {
@@ -85,12 +96,13 @@ try {
             });
             ready = true; document.body.dataset.ready = 'true';
             document.getElementById('deployment').textContent = summary;
-            document.getElementById('launch-status').textContent = 'Choose an app to begin.';
+            document.getElementById('launch-status').textContent = '';
+            applyDetails(preference('office.web.showDetails') === 'true');
             document.getElementById('new-tab').checked = preference('office.web.openNewTab') === 'true';
             window.dispatchEvent(new Event('broiler-ready')); host.invalidate();
         },
         failed: fail, navigate, readPreference: preference, writePreference,
-        applyTheme: theme => { document.body.dataset.theme = theme; document.getElementById('dark-theme').checked = theme === 'dark'; },
+        applyTheme: theme => { document.documentElement.dataset.theme = theme; document.body.dataset.theme = theme; document.getElementById('dark-theme').checked = theme === 'dark'; },
         metadata: () => metadata,
     } });
     window.addEventListener('pagehide', () => { ready = false; host?.dispose(); managed.Dispose(); }, { once: true });
