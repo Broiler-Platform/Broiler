@@ -13,6 +13,8 @@ public interface IAppLauncherService
     /// </summary>
     IReadOnlyList<BroilerAppInfo> Apps { get; }
 
+       bool IsWindows => OperatingSystem.IsWindows();
+
     /// <summary>
     /// Gets the current launcher settings and customization rules.
     /// </summary>

@@ -44,6 +44,7 @@ public sealed class AppLauncherService : IAppLauncherService
 
     public IReadOnlyList<BroilerAppInfo> Apps => _apps;
 
+    public bool IsWindows => _isWindows;
     public LauncherSettings Settings => _settings;
 
     public string? SettingsLoadError => _settingsStore.LastLoadError;
@@ -100,7 +101,8 @@ public sealed class AppLauncherService : IAppLauncherService
         foreach (var scope in new[] { preferredScope, preferredScope == InstallScope.User ? InstallScope.Machine : InstallScope.User })
         {
             var installed = _inventory.Find(app.Id.ToString().ToLowerInvariant(), scope);
-            if (_isWindows && installed.State == InstallationState.Installed && installed.Receipt?.Rid == "win-x64")
+            string expectedRid = _isWindows ? "win-x64" : "linux-x64";
+            if (installed.State == InstallationState.Installed && installed.Receipt?.Rid == expectedRid)
                 return AppResolution.Available(installed.ExecutablePath!, installed.Receipt!.Invocation == "dotnet",
                     $"Installed for {(scope == InstallScope.User ? "user" : "all users")} ({installed.Receipt.Version})") with
                 { InstallScope = scope, InstalledVersion = installed.Receipt.Version };

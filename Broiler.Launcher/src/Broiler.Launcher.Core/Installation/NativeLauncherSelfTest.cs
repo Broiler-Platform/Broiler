@@ -20,7 +20,7 @@ internal static class NativeLauncherSelfTest
             var inventory = new InstallationInventory(paths);
             System.Diagnostics.ProcessStartInfo? start = null;
             var launcher = new AppLauncherService(settingsStore: new LauncherSettingsStore(Path.Combine(root, "settings.json")),
-                isWindows: true, environment: _ => null, currentDirectory: root, inventory: inventory,
+                isWindows: OperatingSystem.IsWindows(), environment: _ => null, currentDirectory: root, inventory: inventory,
                 startProcess: info => { start = info; return 1; });
             foreach (var app in launcher.Apps)
             {
@@ -52,11 +52,14 @@ internal static class NativeLauncherSelfTest
             if (settings.LastLoadError is not null) throw new InvalidDataException(settings.LastLoadError);
             const string version = "0.1.0-demo.1";
             string archive = Path.Combine(root, "Writer.zip");
+            bool isWindows = OperatingSystem.IsWindows();
+            string entryPoint = isWindows ? "Broiler.Writer.Windows.exe" : "Broiler.Writer.Linux";
+            string rid = isWindows ? "win-x64" : "linux-x64";
             using (var zip = ZipFile.Open(archive, ZipArchiveMode.Create))
-            using (var writer = new StreamWriter(zip.CreateEntry("Broiler.Writer.Windows.exe").Open()))
+            using (var writer = new StreamWriter(zip.CreateEntry(entryPoint).Open()))
                 writer.Write("Test payload only; never executed.");
-            var component = new OfficeComponent("writer", version, "win-x64", "Writer.zip", new FileInfo(archive).Length,
-                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(archive))), "zip", "Broiler.Writer.Windows.exe", "native", "self-contained");
+            var component = new OfficeComponent("writer", version, rid, "Writer.zip", new FileInfo(archive).Length,
+                Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(archive))), "zip", entryPoint, "native", "self-contained");
             var release = new OfficeRelease(1, version, "preview", "office-v" + version, new string('a', 40), version, [component]) { Demo = true };
             byte[] manifest = OfficeJson.SerializeToUtf8Bytes(release);
             _ = new OfficeReleaseVerifier(new Dictionary<string, string>(), version, allowUnsignedDemo: true).Verify(manifest, []);

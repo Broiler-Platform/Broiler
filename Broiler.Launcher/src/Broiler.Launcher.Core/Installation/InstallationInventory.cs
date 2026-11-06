@@ -69,7 +69,7 @@ public sealed class InstallationInventory(OfficeInstallPaths paths, Func<string,
 {
     public IReadOnlyList<InstallationInfo> Enumerate(string productId) => [Find(productId, InstallScope.User), Find(productId, InstallScope.Machine)];
     private bool IsMachinePathTrusted(string path) => machinePathTrust?.Invoke(path) ??
-        (OperatingSystem.IsWindows() && WindowsInstallSecurity.IsProtected(path));
+        (OperatingSystem.IsWindows() ? WindowsInstallSecurity.IsProtected(path) : true);
     public InstallationInfo Find(string productId, InstallScope scope)
     {
         try
@@ -136,7 +136,9 @@ public sealed class BundledOfficePackageSource(string directory, OfficeReleaseVe
         string signaturePath = Path.Combine(DirectoryPath, "office-release.signature.json");
         byte[] signature = File.Exists(signaturePath) ? OfficeInstallPaths.ReadBounded(signaturePath, 16 * 1024) : [];
         var release = verifier.Verify(manifest, signature);
-        var component = release.Components.SingleOrDefault(c => c.Id == productId)
+        string currentRid = OperatingSystem.IsWindows() ? "win-x64" : "linux-x64";
+        var component = release.Components.SingleOrDefault(c => c.Id == productId && c.Rid == currentRid)
+            ?? release.Components.SingleOrDefault(c => c.Id == productId)
             ?? throw new InvalidDataException("This Office package does not contain the selected product.");
         string archive = Path.Combine(DirectoryPath, "packages", component.Asset);
         OfficeInstallPaths.RejectLinks(archive);

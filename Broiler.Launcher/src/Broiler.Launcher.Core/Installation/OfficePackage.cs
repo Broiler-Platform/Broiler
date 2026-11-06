@@ -63,16 +63,23 @@ public static class OfficeCatalog
         if (!ProductIds.Contains(id, StringComparer.Ordinal)) throw new InvalidDataException("Unknown Office product.");
     }
 
-    public static string EntryPoint(string id, string invocation)
+    public static string EntryPoint(string id, string invocation) => EntryPoint(id, invocation, "win-x64");
+
+    public static string EntryPoint(string id, string invocation, string rid)
     {
         if (id != "launcher") ValidateId(id);
+        bool isLinux = rid == "linux-x64";
         string name = id switch
         {
-            "browser" => "Broiler.Browser.Windows", "writer" => "Broiler.Writer.Windows",
-            "cell" => "Broiler.Cells.Windows", "plate" => "Broiler.Plate.Windows",
-            "launcher" => "Broiler.Launcher.Windows", _ => "Broiler.Office.Server",
+            "browser" => isLinux ? "Broiler.Browser.Linux" : "Broiler.Browser.Windows",
+            "writer" => isLinux ? "Broiler.Writer.Linux" : "Broiler.Writer.Windows",
+            "cell" => isLinux ? "Broiler.Cells.Linux" : "Broiler.Cells.Windows",
+            "plate" => isLinux ? "Broiler.Plate.Linux" : "Broiler.Plate.Windows",
+            "launcher" => isLinux ? "Broiler.Launcher.Linux" : "Broiler.Launcher.Windows",
+            _ => "Broiler.Office.Server",
         };
-        return name + (invocation == "dotnet" ? ".dll" : ".exe");
+        if (invocation == "dotnet") return name + ".dll";
+        return isLinux ? name : name + ".exe";
     }
 
     public static (string Repository, string Tag) ProductSource(OfficeComponent item) => item.Id switch
@@ -93,13 +100,13 @@ public static class OfficeCatalog
             if (item.SourceRepository != expected.Repository || item.SourceTag != expected.Tag)
                 throw new InvalidDataException("Product source does not match its approved repository and version.");
         }
-        if (item.Version.Length > 100 || item.Rid != "win-x64" || item.Archive != "zip" ||
-            item.Invocation is not ("native" or "dotnet") || item.EntryPoint != EntryPoint(item.Id, item.Invocation) ||
+        if (item.Version.Length > 100 || (item.Rid != "win-x64" && item.Rid != "linux-x64") || item.Archive != "zip" ||
+            item.Invocation is not ("native" or "dotnet") || item.EntryPoint != EntryPoint(item.Id, item.Invocation, item.Rid) ||
             item.PublishMode is not ("self-contained" or "framework-dependent" or "native-aot") ||
             item.Size <= 0 || item.Size > 2L * 1024 * 1024 * 1024 ||
             !Regex.IsMatch(item.Sha256, @"^[a-f0-9]{64}\z") ||
             !Regex.IsMatch(item.Asset, @"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,180}\.zip\z"))
-            throw new InvalidDataException("Invalid or unsupported Office component metadata (M2 supports Windows x64 ZIPs).");
+            throw new InvalidDataException("Invalid or unsupported Office component metadata.");
     }
 }
 

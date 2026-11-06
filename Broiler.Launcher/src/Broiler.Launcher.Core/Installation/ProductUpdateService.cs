@@ -76,8 +76,8 @@ public sealed class ProductUpdateService(OfficeInstallPaths paths, OfficeRelease
         bool activated = false;
         try
         {
-            if (!(platformSupported ?? (OperatingSystem.IsWindows() && System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.X64)))
-                return new(false, "Office updates currently support Windows x64.");
+            if (!(platformSupported ?? ((OperatingSystem.IsWindows() || OperatingSystem.IsLinux()) && System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.X64)))
+                return new(false, "Office updates currently support Windows x64 and Linux x64.");
             if (!update.Candidate.Compatible) return new(false, "Update the launcher from the verified Office bundle first.");
             if (update.Expected.Scope == InstallScope.Machine && machine is null) return new(false, "Machine updates require the Windows administrator helper.");
             // Re-read metadata now; an earlier catalog result is not an authorization to install different bytes.

@@ -21,7 +21,7 @@ public sealed class ProductInstallationService(BundledOfficePackageSource source
     public static Task<VerifiedPackage> PrepareArchiveAsync(VerifiedPackage package, OfficeInstallPaths paths,
         IProgress<InstallProgress>? progress, CancellationToken token) =>
         new OfficePackageDownloader(DownloadClient, Path.Combine(paths.UserRoot, "cache", "downloads")).EnsureArchiveAsync(package, progress, token);
-    private bool PlatformSupported => platformSupported ?? (OperatingSystem.IsWindows() && RuntimeInformation.ProcessArchitecture == Architecture.X64);
+    private bool PlatformSupported => platformSupported ?? ((OperatingSystem.IsWindows() || OperatingSystem.IsLinux()) && RuntimeInformation.ProcessArchitecture == Architecture.X64);
     public static ProductInstallationService CreateDefault(IMachineInstallBroker? machineBroker = null)
     {
         Broiler.Launcher.Services.NativeLauncherServices.EnsureAvailable();
@@ -36,7 +36,7 @@ public sealed class ProductInstallationService(BundledOfficePackageSource source
             return new InstallAvailability(false, $"Installed for {(scope == InstallScope.User ? "user" : "all users")} ({installed.Receipt!.Version})", installed);
         if (installed.State == InstallationState.Invalid)
             return new InstallAvailability(false, $"Installation needs repair: {installed.Diagnostic}", installed);
-        if (!PlatformSupported) return new InstallAvailability(false, "Office installation currently supports Windows x64.", installed);
+        if (!PlatformSupported) return new InstallAvailability(false, "Office installation currently supports Windows x64 and Linux x64.", installed);
         if (scope == InstallScope.Machine && machineBroker is null)
             return new InstallAvailability(false, "Machine installation requires the Windows administrator helper.", installed);
         try

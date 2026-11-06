@@ -475,6 +475,51 @@ public sealed partial class OfficeInstallationTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("launcher", "Broiler.Launcher.Linux")]
+    [InlineData("browser", "Broiler.Browser.Linux")]
+    [InlineData("writer", "Broiler.Writer.Linux")]
+    [InlineData("cell", "Broiler.Cells.Linux")]
+    [InlineData("boss", "Broiler.Office.Server")]
+    public void LinuxComponentEntryPointsAndRidAreValidated(string id, string entryPoint)
+    {
+        var component = new OfficeComponent(id, "1.0.0", "linux-x64", id + ".zip", 1024,
+            new string('a', 64), "zip", entryPoint, "native", "self-contained");
+        OfficeCatalog.ValidateComponent(component);
+        Assert.Equal(entryPoint, OfficeCatalog.EntryPoint(id, "native", "linux-x64"));
+    }
+
+    [Fact]
+    public void LinuxComponentRejectsWindowsEntryPoint()
+    {
+        var component = new OfficeComponent("writer", "1.0.0", "linux-x64", "writer.zip", 1024,
+            new string('a', 64), "zip", "Broiler.Writer.Windows.exe", "native", "self-contained");
+        Assert.Throws<InvalidDataException>(() => OfficeCatalog.ValidateComponent(component));
+    }
+
+    [Fact]
+    public void LinuxManagedAppResolutionDiscoversInstalledLinuxApp()
+    {
+        var app = BroilerAppInfo.CreateDefaultSuite().Single(a => a.Id == BroilerAppId.Writer);
+        var inventory = new InstallationInventory(_paths);
+        var receipt = new InstallReceipt(1, "writer", InstallScope.User, "1.0.0", "linux-x64",
+            "office-v1.0.0", "writer.zip", new string('a', 64), "Broiler.Writer.Linux", "native",
+            Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow);
+        string versionDir = _paths.VersionDirectory(receipt);
+        Directory.CreateDirectory(versionDir);
+        File.WriteAllText(Path.Combine(versionDir, ".office-receipt.json"), OfficeJson.Serialize(receipt));
+        File.WriteAllText(Path.Combine(versionDir, "Broiler.Writer.Linux"), "fixture");
+        Directory.CreateDirectory(Path.GetDirectoryName(_paths.Record("writer", InstallScope.User))!);
+        File.WriteAllText(_paths.Record("writer", InstallScope.User), OfficeJson.Serialize(new ActiveInstallation(receipt, null)));
+
+        var service = new AppLauncherService([app], new MemoryStore(), isWindows: false, inventory: inventory);
+        var res = service.ResolveApp(app);
+        Assert.True(res.IsAvailable);
+        Assert.Equal("1.0.0", res.InstalledVersion);
+        Assert.Equal(InstallScope.User, res.InstallScope);
+        Assert.Equal(Path.Combine(versionDir, "Broiler.Writer.Linux"), res.ResolvedPath);
+    }
+
     private sealed class DownloadHandler(byte[] bytes) : HttpMessageHandler
     {
         public Uri? RequestedUri;

@@ -123,8 +123,8 @@ public sealed record BroilerAppInfo(
             AccentColor: BColor.FromArgb(255, 230, 81, 0), // Deep Orange
             WindowsExeName: "Broiler.Plate.Windows.exe",
             WindowsDllName: "Broiler.Plate.Windows.dll",
-            LinuxBinaryName: "", // no Linux head
-            LinuxDllName: "",
+            LinuxBinaryName: "Broiler.Plate.Linux",
+            LinuxDllName: "Broiler.Plate.Linux.dll",
             RelativeProbePaths:
             [
                 "Broiler.Plate/src/Broiler.Plate.Windows/bin/Release/net10.0-windows/Broiler.Plate.Windows.exe",
@@ -132,7 +132,10 @@ public sealed record BroilerAppInfo(
                 "Broiler.Plate/src/Broiler.Plate.Windows/bin/Release-Windows/net10.0-windows/win-x64/native/Broiler.Plate.Windows.exe",
                 "Broiler.Plate/src/Broiler.Plate.Windows/bin/Release/net10.0-windows/Broiler.Plate.Windows.dll",
                 "Broiler.Plate/src/Broiler.Plate.Windows/bin/Debug/net10.0-windows/Broiler.Plate.Windows.dll",
-            ]) { SupportsLinux = false },
+                "Broiler.Plate/src/Broiler.Plate.Linux/bin/Release/net10.0/Broiler.Plate.Linux",
+                "Broiler.Plate/src/Broiler.Plate.Linux/bin/Debug/net10.0/Broiler.Plate.Linux",
+                "Broiler.Plate/src/Broiler.Plate.Linux/bin/Release-Linux/net10.0/linux-x64/Broiler.Plate.Linux",
+            ]),
     ];
 }
 

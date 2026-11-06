@@ -76,6 +76,15 @@ public sealed class ProductInstaller(OfficeInstallPaths paths, IInstallAccess ac
             string payload = Path.Combine(staging, "product");
             Directory.CreateDirectory(payload);
             await ExtractAsync(snapshot, payload, progress, cancellationToken);
+            if ((OperatingSystem.IsLinux() || !OperatingSystem.IsWindows()) && File.Exists(Path.Combine(payload, item.EntryPoint)))
+            {
+                try
+                {
+                    var currentMode = File.GetUnixFileMode(Path.Combine(payload, item.EntryPoint));
+                    File.SetUnixFileMode(Path.Combine(payload, item.EntryPoint), currentMode | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+                }
+                catch { }
+            }
             if (!File.Exists(Path.Combine(payload, item.EntryPoint)) ||
                 (item.Invocation == "dotnet" && !File.Exists(Path.Combine(payload, Path.ChangeExtension(item.EntryPoint, ".runtimeconfig.json")))))
                 throw new InvalidDataException("The product entry point or .NET runtime configuration is missing.");

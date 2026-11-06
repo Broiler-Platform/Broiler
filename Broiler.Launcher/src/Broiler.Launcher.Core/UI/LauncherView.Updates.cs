@@ -121,7 +121,8 @@ public sealed partial class LauncherView
         _updates.AddRange(_updateService.FindUpdates(_releaseCandidates));
         string version = typeof(OfficeBuild).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .Cast<System.Reflection.AssemblyInformationalVersionAttribute>().Single().InformationalVersion;
-        _launcherUpdatePage = _releaseCandidates.FirstOrDefault(c => c.Release.Components.Any(x => x.Id == "launcher" && x.Rid == "win-x64" &&
+        string currentRid = _launcherService.IsWindows ? "win-x64" : "linux-x64";
+        _launcherUpdatePage = _releaseCandidates.FirstOrDefault(c => c.Release.Components.Any(x => x.Id == "launcher" && x.Rid == currentRid &&
             OfficeVersion.Parse(x.Version).CompareTo(OfficeVersion.Parse(version)) > 0))?.ReleasePage;
         foreach (var (key, menu) in _updateMenuItems)
         {

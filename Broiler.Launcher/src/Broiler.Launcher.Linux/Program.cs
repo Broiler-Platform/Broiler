@@ -2,6 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Broiler.Launcher.Cli;
+using Broiler.Launcher.Installation;
 
 namespace Broiler.Launcher.Linux;
 
@@ -12,6 +13,9 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+        if (OfficeInstallCli.TryHandle(args, out int officeExitCode))
+            return officeExitCode;
+
         LinuxLauncherOptions options = LinuxLauncherOptions.Parse(args);
         if (options.ShowHelp)
         {

@@ -32,8 +32,8 @@ public static class OfficeInstallCli
         if (args.Length == 0 || args[0] is not ("--office-install" or "--office-repair" or "--office-rollback" or "--office-unregister")) return false;
         try
         {
-            if (!OperatingSystem.IsWindows() || RuntimeInformation.ProcessArchitecture != Architecture.X64)
-                throw new PlatformNotSupportedException("Office installation currently supports Windows x64.");
+            if ((!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux()) || RuntimeInformation.ProcessArchitecture != Architecture.X64)
+                throw new PlatformNotSupportedException("Office installation currently supports Windows x64 and Linux x64.");
             bool needsPackage = args[0] is "--office-install" or "--office-repair";
             if (args.Length != 2 && !(needsPackage && args.Length == 4 && args[2] == "--package-directory" && Path.IsPathFullyQualified(args[3])))
                 throw new ArgumentException("Usage: --office-install|--office-repair <product> [--package-directory <absolute-directory>]; --office-rollback|--office-unregister <product>. These commands target user scope.");
