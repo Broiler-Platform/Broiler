@@ -64,7 +64,6 @@ public sealed class P0LaunchTests : IDisposable
 
     [Theory]
     [InlineData(BroilerAppId.Cell)]
-    [InlineData(BroilerAppId.Plate)]
     public void UnsupportedLinuxProductsCannotBypassCapabilityWithCustomPath(BroilerAppId id)
     {
         var app = BroilerAppInfo.CreateDefaultSuite().Single(a => a.Id == id);

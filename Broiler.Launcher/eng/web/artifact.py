@@ -105,7 +105,7 @@ def tree(root):
 
 
 def pack(root, output, identity):
-    if identity["product"] not in ("writer", "cell", "launcher") or identity["productName"] != {"writer":"Writer", "cell":"Cells", "launcher":"Launcher"}[identity["product"]]:
+    if identity["product"] not in ("writer", "cell", "launcher", "plate") or identity["productName"] != {"writer":"Writer", "cell":"Cells", "launcher":"Launcher", "plate":"Plate"}[identity["product"]]:
         raise ValueError("Unknown producer identity")
     if not re.fullmatch(r"\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?", identity["version"]):
         raise ValueError("Semantic producer version required")

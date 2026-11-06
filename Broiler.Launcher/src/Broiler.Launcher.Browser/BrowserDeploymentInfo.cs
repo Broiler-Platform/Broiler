@@ -4,24 +4,41 @@ using System.Text.Json.Serialization;
 namespace Broiler.Launcher.Browser;
 
 /// <summary>Validated same-origin catalog metadata and allowlisted product release URLs.</summary>
-public sealed record BrowserDeploymentInfo(string Channel, string CatalogVersion, string WriterVersion, string CellVersion, bool Approved)
+public sealed record BrowserDeploymentInfo(string Channel, string CatalogVersion, string WriterVersion, string CellVersion, string PlateVersion, bool Approved)
 {
+    public BrowserDeploymentInfo(string Channel, string CatalogVersion, string WriterVersion, string CellVersion, bool Approved)
+        : this(Channel, CatalogVersion, WriterVersion, CellVersion, "Preview", Approved)
+    {
+    }
+
     public string WriterUrl { get; init; } = "https://writer.broiler.app/";
     public string CellUrl { get; init; } = "https://cell.broiler.app/";
-    public static BrowserDeploymentInfo LocalPreview { get; } = new("preview", "Local preview", "Preview", "Preview", false);
+    public string PlateUrl { get; init; } = "https://plate.broiler.app/";
+    public static BrowserDeploymentInfo LocalPreview { get; } = new("preview", "Local preview", "Preview", "Preview", "Preview", false);
     public static BrowserDeploymentInfo Read(string json)
     {
         try {
             var data = JsonSerializer.Deserialize(json, DeploymentJsonContext.Default.DeploymentDocument);
             if (data is null || data.SchemaVersion != 1 || data.Status != "approved" ||
-                !Label(data.CatalogVersion) || data.Channel is not ("preview" or "stable") || data.Products?.Length != 2)
+                !Label(data.CatalogVersion) || data.Channel is not ("preview" or "stable") ||
+                data.Products is null || (data.Products.Length != 2 && data.Products.Length != 3))
                 return LocalPreview;
             if (data.Products.Any(item => item is null)) return LocalPreview;
             var writer = data.Products.SingleOrDefault(item => item.Id == "writer");
             var cell = data.Products.SingleOrDefault(item => item.Id == "cell");
+            var plate = data.Products.SingleOrDefault(item => item.Id == "plate");
             if (writer is null || cell is null || !Destination(writer.Url, "writer", writer.Version) || !Destination(cell.Url, "cell", cell.Version) || !Label(writer.Version) || !Label(cell.Version))
                 return LocalPreview;
-            return new(data.Channel, data.CatalogVersion!, writer.Version!, cell.Version!, true) { WriterUrl = writer.Url!, CellUrl = cell.Url! };
+            if (data.Products.Length == 3 && plate is null)
+                return LocalPreview;
+            if (plate is not null && (!Destination(plate.Url, "plate", plate.Version) || !Label(plate.Version)))
+                return LocalPreview;
+            return new(data.Channel, data.CatalogVersion!, writer.Version!, cell.Version!, plate?.Version ?? "Preview", true)
+            {
+                WriterUrl = writer.Url!,
+                CellUrl = cell.Url!,
+                PlateUrl = plate?.Url ?? "https://plate.broiler.app/"
+            };
         } catch (Exception error) when (error is JsonException or InvalidOperationException) { return LocalPreview; }
     }
     private static bool Label(string? value) => !string.IsNullOrWhiteSpace(value) && value.Length <= 80 && !value.Any(char.IsControl);

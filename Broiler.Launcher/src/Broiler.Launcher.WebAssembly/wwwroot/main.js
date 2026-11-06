@@ -2,7 +2,7 @@ import { dotnet } from './_framework/dotnet.js';
 export const officeInputProtocolVersion = 1;
 import { createCanvasHost, hostProtocolVersion } from './broiler.hosting.webassembly.js';
 
-const allowed = new Set(['https://writer.broiler.app/', 'https://cell.broiler.app/']);
+const allowed = new Set(['https://writer.broiler.app/', 'https://cell.broiler.app/', 'https://plate.broiler.app/']);
 const memory = new Map();
 let managed, host, metadata = '{}', ready = false;
 function fail(error) {
@@ -62,13 +62,14 @@ try {
             if (text.length <= 65536) {
                 const catalog = JSON.parse(text);
                 const products = catalog.products;
-                if (catalog.schemaVersion === 1 && catalog.status === 'approved' && Array.isArray(products) && products.length === 2 &&
-                    ['writer', 'cell'].every(id => products.filter(p => p?.id === id && typeof p.version === 'string' && /^[A-Za-z0-9.+-]{1,80}$/.test(p.version) &&
-                        (p.url === `https://${id}.broiler.app/` || p.url === `https://${id}.broiler.app/releases/${p.version}/` || p.url === `https://broiler-platform.github.io/${id}/releases/${p.version}/`)).length === 1)) {
+                if (catalog.schemaVersion === 1 && catalog.status === 'approved' && Array.isArray(products) && (products.length === 2 || products.length === 3) &&
+                    products.every(p => ['writer', 'cell', 'plate'].includes(p?.id) && typeof p.version === 'string' && /^[A-Za-z0-9.+-]{1,80}$/.test(p.version) &&
+                        (p.url === `https://${p.id}.broiler.app/` || p.url === `https://${p.id}.broiler.app/releases/${p.version}/` || p.url === `https://broiler-platform.github.io/${p.id}/releases/${p.version}/`))) {
                     metadata = text;
                     for (const p of products) {
                         allowed.add(p.url);
-                        document.querySelector(`[data-product="${p.id}"]`).href = p.url;
+                        const link = document.querySelector(`[data-product="${p.id}"]`);
+                        if (link) link.href = p.url;
                     }
                 }
             }

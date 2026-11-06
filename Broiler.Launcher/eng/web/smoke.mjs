@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 
 const [directory,product,reportFile]=process.argv.slice(2);
-assert.ok(directory && ['writer','cell','launcher'].includes(product) && reportFile);
+assert.ok(directory && ['writer','cell','launcher','plate'].includes(product) && reportFile);
 const root=resolve(directory),prefix='/producer/verified-version/';
 await mkdir(resolve(reportFile,'..'),{recursive:true});
 const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.wasm':'application/wasm','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'};
@@ -35,6 +35,7 @@ try{for(const [name,engine]of Object.entries({chromium,firefox,webkit})){
         if(product==='launcher'){
             await page.waitForFunction(()=>document.body.dataset.ready==='true');
             assert.equal(await page.getByRole('link',{name:'Open Writer',exact:true}).getAttribute('href'),'https://writer.broiler.app/');
+            assert.equal(await page.getByRole('link',{name:'Open Plate',exact:true}).getAttribute('href'),'https://plate.broiler.app/');
         }else{
             const id=product==='cell'?'cells':'writer';
             await page.waitForFunction(id=>document.getElementById(id+'-status')?.hidden,id);

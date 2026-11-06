@@ -25,7 +25,7 @@ public sealed class BrowserLauncher(Action<Uri> navigate, IBrowserPreferences pr
         new BrowserProduct("browser", "Broiler Browser", null),
         new BrowserProduct("writer", "Broiler Writer", new Uri(deployment is { Approved: true } ? deployment.WriterUrl : "https://writer.broiler.app/")),
         new BrowserProduct("cell", "Broiler Cell", new Uri(deployment is { Approved: true } ? deployment.CellUrl : "https://cell.broiler.app/")),
-        new BrowserProduct("plate", "Broiler Plate", null),
+        new BrowserProduct("plate", "Broiler Plate", new Uri(deployment is { Approved: true } ? deployment.PlateUrl : "https://plate.broiler.app/")),
     });
 
     public bool Launch(string id)
@@ -45,4 +45,3 @@ public sealed class BrowserLauncher(Action<Uri> navigate, IBrowserPreferences pr
         preferences.Write("office.web.theme", theme);
     }
 }
-

@@ -5,6 +5,7 @@
   "catalogVersion": null,
   "products": [
     { "id": "writer", "url": "https://writer.broiler.app/", "version": null },
-    { "id": "cell", "url": "https://cell.broiler.app/", "version": null }
+    { "id": "cell", "url": "https://cell.broiler.app/", "version": null },
+    { "id": "plate", "url": "https://plate.broiler.app/", "version": null }
   ]
 }

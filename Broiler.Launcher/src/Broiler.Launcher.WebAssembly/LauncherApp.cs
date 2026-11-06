@@ -64,7 +64,7 @@ internal static class LauncherApp
         _root = new() { Title = "Broiler Office", Chrome = UiWindowChrome.None, BorderThickness = 0 };
         _root.AddChild(_view); _session.AddRoot(_root);
         ApplyTheme(); Frame();
-        BrowserInterop.Ready(deployment.Approved ? $"{deployment.Channel} · Office {deployment.CatalogVersion} · Writer {deployment.WriterVersion} · Cell {deployment.CellVersion}" : "Local preview");
+        BrowserInterop.Ready(deployment.Approved ? $"{deployment.Channel} · Office {deployment.CatalogVersion} · Writer {deployment.WriterVersion} · Cell {deployment.CellVersion} · Plate {deployment.PlateVersion}" : "Local preview");
     }
     private static void ApplyTheme()
     {

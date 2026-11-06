@@ -58,17 +58,17 @@ they do not prove that the public sites have been deployed.
 
 ## Behavior and navigation
 
-- Writer opens `https://writer.broiler.app/`; Cell opens `https://cell.broiler.app/`.
+- Writer opens `https://writer.broiler.app/`; Cell opens `https://cell.broiler.app/`; Plate opens `https://plate.broiler.app/`.
   Neither destination is resolved from query parameters or deployment metadata.
-- Browser and Plate remain visible as disabled desktop-only cards. No native
+- Browser remains visible as a disabled desktop-only card. No native
   install, update, BOSS, administrator or executable-path action is registered.
 - Same-tab navigation is the default. New tabs are opt-in, have no opener, and a
   denied popup exposes an ordinary same-tab link instead of losing the action.
-- Canvas mouse, managed keyboard navigation and Ctrl/Cmd+2/3 launch the apps.
-  Ctrl/Cmd+1/4 do nothing. Escape moves focus to the accessible HTML app links.
+- Canvas mouse, managed keyboard navigation and Ctrl/Cmd+2/3/4 launch the apps.
+  Ctrl/Cmd+1 does nothing. Escape moves focus to the accessible HTML app links.
 - Theme and new-tab preferences use only `office.web.*` browser-storage keys.
   Storage failures leave working in-memory preferences for the current visit.
-- Writer and Cell have static **Return to Office** links, available independently
+- Writer, Cell and Plate have static **Return to Office** links, available independently
   of their runtime. Their canvas layout reserves the navigation strip.
 - Returning from a browser history cache reloads a disposed launcher runtime.
 

@@ -17,9 +17,12 @@ public class BrowserLauncherTests
         var launcher = new BrowserLauncher(_ => throw new Exception("disabled product navigated"), new Preferences());
         Assert.False(launcher.Capabilities.CanInstall); Assert.False(launcher.Capabilities.CanStartServer);
         Assert.False(launcher.Capabilities.CanUpdateNativeProducts); Assert.False(launcher.Capabilities.CanConfigureExecutablePaths);
-        Assert.False(launcher.Launch("browser")); Assert.False(launcher.Launch("plate")); Assert.False(launcher.Launch("unknown"));
+        Assert.False(launcher.Launch("browser")); Assert.False(launcher.Launch("unknown"));
     }
-    [Theory] [InlineData("writer", "https://writer.broiler.app/")] [InlineData("cell", "https://cell.broiler.app/")]
+    [Theory]
+    [InlineData("writer", "https://writer.broiler.app/")]
+    [InlineData("cell", "https://cell.broiler.app/")]
+    [InlineData("plate", "https://plate.broiler.app/")]
     public void BrowserLaunchUsesExplicitOrigin(string id, string expected)
     {
         Uri? address = null; var launcher = new BrowserLauncher(uri => address = uri, new Preferences());

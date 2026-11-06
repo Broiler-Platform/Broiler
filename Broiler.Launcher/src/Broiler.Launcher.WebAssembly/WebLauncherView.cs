@@ -27,17 +27,24 @@ internal sealed class WebLauncherView : UiElement
         AddChild(_theme); AddChild(_tabs);
         foreach (var product in launcher.Products.OrderByDescending(product => product.CanLaunch)) {
             string detail = product.Id switch {
-                "writer" => "Create and edit documents.", "cell" => "Create and edit spreadsheets.",
+                "writer" => "Create and edit documents.",
+                "cell" => "Create and edit spreadsheets.",
+                "plate" => "View documents and graphics.",
                 _ => "Available in the desktop edition.",
             };
-            string version = product.Id switch { "writer" => deployment.WriterVersion, "cell" => deployment.CellVersion, _ => "Desktop app" };
+            string version = product.Id switch {
+                "writer" => deployment.WriterVersion,
+                "cell" => deployment.CellVersion,
+                "plate" => deployment.PlateVersion,
+                _ => "Desktop app"
+            };
             var name = StandardLabel.Subtitle(product.Name);
             var description = new StandardLabel(detail) { Font = new BFontStyle("Segoe UI", 13) };
             var release = StandardLabel.Caption(version);
             var open = Button(product.CanLaunch ? "Open " + product.Name.Replace("Broiler ", "") : "Desktop edition", () => launcher.Launch(product.Id));
             open.IsEnabled = product.CanLaunch;
             release.Visibility = UiVisibility.Collapsed;
-            _cards.Add((name, description, release, open, product.CanLaunch, product.Id is "writer" or "cell" or "browser")); _bounds.Add(default);
+            _cards.Add((name, description, release, open, product.CanLaunch, product.Id is "writer" or "cell" or "browser" or "plate")); _bounds.Add(default);
             AddChild(name); AddChild(description); AddChild(release); AddChild(open);
         }
         UpdatePreferences();

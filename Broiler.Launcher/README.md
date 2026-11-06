@@ -4,8 +4,8 @@ Unified workspace launcher application for the Broiler Platform suite: **Broiler
 
 Built entirely on Broiler platform components (`Broiler.UI`, `Broiler.Hosting`, `Broiler.Graphics`, and `Broiler.Input`) with a multi-target architecture supporting **Windows** and **Linux**.
 
-The separate [WebAssembly launcher](docs/web-launcher.md) opens Writer and Cell
-at their browser origins and keeps Browser/Plate disabled. It uses browser-only
+The separate [WebAssembly launcher](docs/web-launcher.md) opens Writer, Cell, and Plate
+at their browser origins and keeps Browser disabled. It uses browser-only
 services and has no native installation or BOSS actions. See its build guide for
 the W1 package publication prerequisite and local integration verification.
 
