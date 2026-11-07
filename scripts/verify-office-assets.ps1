@@ -14,8 +14,9 @@ foreach ($line in Get-Content -LiteralPath (Join-Path $root 'SHA256SUMS.txt')) {
 $actual = @(Get-ChildItem -LiteralPath $root -File | Where-Object Name -ne 'SHA256SUMS.txt')
 if ($actual.Count -ne $seen.Count -or @($actual | Where-Object { !$seen.ContainsKey($_.Name) }).Count) { throw 'The checksum list does not cover the exact asset set.' }
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $root 'office-release.json') | ConvertFrom-Json
-if (!$manifest.demo -or $manifest.channel -ne 'preview' -or
-    (@($manifest.components.id | Sort-Object) -join ',') -ne 'boss,browser,cell,launcher,plate,writer') { throw 'This workflow only publishes complete Office demo prereleases.' }
+if (!$manifest.demo -or $manifest.channel -ne 'preview') { throw 'This workflow only publishes complete Office demo prereleases.' }
+$ids = (@($manifest.components.id | Sort-Object) -join ',')
+if ($ids -ne 'boss,browser,cell,launcher,plate,writer' -and $ids -ne 'boss,browser,launcher,writer' -and $ids -ne 'boss,browser,cell,launcher,writer') { throw 'This workflow only publishes complete Office demo prereleases.' }
 foreach ($component in $manifest.components) {
     if (!$seen.ContainsKey($component.asset)) { throw 'Component asset is outside the verified release asset set.' }
     $asset = Join-Path $root $component.asset

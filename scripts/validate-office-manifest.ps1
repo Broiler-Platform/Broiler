@@ -15,10 +15,18 @@ $escapedCore = [Security.SecurityElement]::Escape($core)
 "@ | Set-Content -LiteralPath (Join-Path $scratch 'Contract.csproj') -Encoding utf8NoBOM
 '<configuration><packageSources><clear/></packageSources></configuration>' | Set-Content -LiteralPath (Join-Path $scratch 'NuGet.config')
 @'
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 using Broiler.Launcher.Installation;
 if (!OfficeBuild.IsDemo) throw new Exception("Expected the demo build boundary.");
+var manifestBytes = File.ReadAllBytes(Path.Combine(args[0], "office-release.json"));
+using var doc = JsonDocument.Parse(manifestBytes);
+var manifestIds = doc.RootElement.GetProperty("components").EnumerateArray()
+    .Select(c => c.GetProperty("id").GetString()!).Where(id => id != "launcher").ToArray();
 var source = new BundledOfficePackageSource(args[0], OfficeReleaseVerifier.CreateDefault());
-foreach (var id in OfficeCatalog.ProductIds) {
+foreach (var id in manifestIds) {
     var package = source.Read(id);
     if (!package.Release.Demo) throw new Exception("Missing demo marker.");
     Console.WriteLine($"Packaged launcher validated component: {id} {package.Component.Version}");

@@ -1,4 +1,4 @@
-# Publish the Windows x64 Office desktop demo
+# Publish the Windows x64 or Linux x64 Office desktop demo
 
 Commit/push the launcher, scripts and new workflow, then run **Publish Office
 Desktop Demo** (`.github/workflows/broiler-office-desktop-demo.yml`) in Broiler.
@@ -9,6 +9,7 @@ Inputs:
 - `product_tags`: `{}` selects the newest eligible published Windows product
   versions, including previews. Optional overrides are a JSON object such as
   `{"writer":"writer-v0.1.0-preview.16","cell":"cells-v0.1.0-preview.5"}`.
+- `platform`: target platform RID (`win-x64` or `linux-x64`, default `win-x64`).
 - `create_draft`: true creates a draft prerelease. False uploads workflow artifacts
   only; it does not publish automatically.
 
@@ -47,7 +48,7 @@ root and verifies discovery/launch dispatch without starting those apps.
 A clean-account GUI review without an installed .NET runtime remains required.
 The workflow includes hidden process-start smoke checks; those do not establish
 that all interactions, file formats or UAC paths work. User-scope is the first
-demo path; signing, machine-scope acceptance, Linux and BOSS remain deferred.
+demo path; signing, machine-scope acceptance, and BOSS remain deferred.
 
 ## Bootstrap download URL correction
 

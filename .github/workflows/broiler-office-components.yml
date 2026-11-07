@@ -58,10 +58,14 @@ jobs:
         with:
           python-version: '3.11'
       - name: Test owned component contracts
-        run: dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows
+        run: |
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Linux
       - name: Test explicit demo verification boundary
         if: inputs.demo
-        run: dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows -p:BroilerOfficeDemo=true
+        run: |
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Windows -p:BroilerOfficeDemo=true
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests -c Release-Linux -p:BroilerOfficeDemo=true
       - name: Publish only the selected component
         shell: pwsh
         env:
@@ -110,9 +114,9 @@ jobs:
           if ($LASTEXITCODE -eq 0) { throw 'Component release exists; never overwrite its bytes.' }
           $assets = @(Get-ChildItem -LiteralPath "$env:RUNNER_TEMP/component/assets" -File | ForEach-Object FullName)
           $notes = Join-Path $env:RUNNER_TEMP 'component-notes.md'
-          "Independent $env:COMPONENT release. Office consumes the immutable assets through its reviewed lockfile. Source: $env:GITHUB_SHA" | Set-Content -LiteralPath $notes
+          "Independent $env:COMPONENT release for Windows and Linux. Office consumes the immutable assets through its reviewed lockfile. Source: $env:GITHUB_SHA" | Set-Content -LiteralPath $notes
           if ($env:COMPONENT -eq 'launcher') {
-            'Includes the native Launcher and its independently verified browser-wasm ZIP, producer descriptor and SHA-256 checksum. The website consumes the original web archive.' | Add-Content -LiteralPath $notes
+            'Includes native Windows and Linux Launchers and its independently verified browser-wasm ZIP, producer descriptor and SHA-256 checksum. The website consumes the original web archive.' | Add-Content -LiteralPath $notes
           }
           $releaseArgs = @('release', 'create', $tag, '--target', $env:GITHUB_SHA, '--draft', '--title', "$env:COMPONENT $env:VERSION", '--notes-file', $notes)
           if ($env:VERSION.Contains('-')) { $releaseArgs += '--prerelease' }

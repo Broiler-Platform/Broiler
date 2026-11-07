@@ -2,8 +2,9 @@
 param(
     [string] $Version,
     [Parameter(Mandatory = $true)][string] $OutputRoot,
+    [ValidateSet('win-x64', 'linux-x64')][string] $Rid = $(if ($IsWindows) { 'win-x64' } else { 'linux-x64' }),
     [switch] $RequireClean,
-    [string] $LockFile = (Join-Path (Split-Path $PSScriptRoot -Parent) 'office.lock.json'),
+    [string] $LockFile,
     [string] $CacheDirectory = (Join-Path ([IO.Path]::GetTempPath()) 'broiler-office-artifacts'),
     [switch] $Offline,
     [switch] $FromSource
@@ -13,9 +14,13 @@ Set-StrictMode -Version Latest
 $repoRoot = Split-Path $PSScriptRoot -Parent
 if ($FromSource) {
     if (!$Version) { throw 'An explicit demo version is required for a development source build.' }
-    & (Join-Path $PSScriptRoot 'build-office-from-source.ps1') -Version $Version -OutputRoot $OutputRoot -RequireClean:$RequireClean
+    & (Join-Path $PSScriptRoot 'build-office-from-source.ps1') -Version $Version -OutputRoot $OutputRoot -Rid $Rid -RequireClean:$RequireClean
     if ($LASTEXITCODE -ne 0) { throw 'Development source build failed.' }
     return
+}
+if (!$LockFile) {
+    $linuxLock = Join-Path $repoRoot 'office.lock.linux.json'
+    $LockFile = if ($Rid -eq 'linux-x64' -and (Test-Path -LiteralPath $linuxLock)) { $linuxLock } else { Join-Path $repoRoot 'office.lock.json' }
 }
 $output = [IO.Path]::GetFullPath($OutputRoot)
 if (Test-Path -LiteralPath $output) { throw 'Office build output must be a new directory.' }

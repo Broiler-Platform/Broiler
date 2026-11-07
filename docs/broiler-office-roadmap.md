@@ -23,7 +23,7 @@ The [M5 update delivery record](../Broiler.Launcher/docs/m5-status.md) covers
 release discovery, scoped updates, demo bundle updates and BOSS recovery.
 The [M6 settings delivery record](../Broiler.Launcher/docs/m6-status.md) covers
 the integrated settings page, migration and final Windows demo verification.
-Linux runtime support is deferred by the user for this delivery sequence.
+Linux runtime support (linux-x64) is implemented alongside Windows (win-x64) for Launcher, Browser, Writer, and BOSS. ARM64 and macOS remain deferred.
 
 The user has deferred signing credentials to the final production-release gate.
 M3–M6 can be demonstrated using an explicitly marked unsigned demo build with

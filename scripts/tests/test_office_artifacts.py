@@ -43,6 +43,34 @@ class OfficeArtifactsTests(unittest.TestCase):
         self.assertTrue(self.root.name.startswith("broiler-artifact-test-"))
         self.temp.cleanup()
 
+    def test_assembles_linux_office_suite_with_linux_artifacts(self):
+        linux_lock = dict(schemaVersion=1, suite="1.0.0-demo.9", channel="preview",
+                          minimumLauncherVersion="0.1.0-demo.1", rid="linux-x64", components=[])
+        for index, product in enumerate(["launcher", "boss", "browser", "writer", "cell"], 1):
+            entry = office.LINUX_ENTRY_POINTS[product]
+            archive = self.root / (product + "-linux.zip")
+            with zipfile.ZipFile(archive, "w") as output:
+                output.writestr(entry, ("linux-" + product).encode())
+                if product == "boss":
+                    output.writestr("wwwroot/index.html", "fixture")
+            sha = office.digest(archive)
+            archive.rename(self.cache / (sha + ".zip"))
+            linux_lock["components"].append(dict(id=product, version=f"0.{index}.0-preview.1",
+                repository="Broiler-Platform/" + office.PRODUCTS[product][0], tag=product + "-v0.1.0-preview.1",
+                commit="a" * 40, releaseId=index + 200, assetId=index + 300,
+                asset=product + "-linux.zip", size=(self.cache / (sha + ".zip")).stat().st_size,
+                sha256=sha, rid="linux-x64", archive="zip", entryPoint=entry, invocation="native",
+                publishMode="self-contained", prerelease=True))
+        lock_path = self.root / "office.lock.linux.json"
+        office.write_json(lock_path, linux_lock)
+        with patch.object(office, "api", side_effect=AssertionError("offline fixtures must not use the network")):
+            archive = office.assemble(lock_path, self.root / "out-linux", self.cache, "c" * 40, offline=True)
+        self.assertTrue(archive.is_file())
+        self.assertEqual("Broiler-Office-1.0.0-demo.9-linux-x64.zip", archive.name)
+        with zipfile.ZipFile(archive) as bundle:
+            start_script = bundle.read("Broiler-Office-1.0.0-demo.9-linux-x64/start-broiler-office.sh").decode()
+            self.assertIn("Broiler.Launcher.Linux", start_script)
+
     def test_assembles_independent_versions_and_preserves_every_archive_byte(self):
         with patch.object(office, "api", side_effect=AssertionError("offline fixtures must not use the network")):
             archive = office.assemble(self.lock_path, self.root / "out", self.cache, "b" * 40, offline=True)

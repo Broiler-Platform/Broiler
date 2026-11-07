@@ -42,7 +42,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python -m unittest discover -s tests/office-web -p 'test_web_deploy.py' -v
-          for product in launcher writer cell; do
+          for product in launcher writer cell plate; do
             python scripts/office_web.py stage --lock lock/office-web.lock.json --product "$product" --site "staged/$product" --cache "cache/$product"
           done
       - name: Test extracted producer applications

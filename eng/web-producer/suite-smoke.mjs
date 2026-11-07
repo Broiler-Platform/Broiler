@@ -17,7 +17,7 @@ async function returnToOffice(page) {
 const [lockFile, directory, reportFile] = process.argv.slice(2);
 const lock = JSON.parse(await readFile(lockFile,'utf8'));
 const rows = lock.components;
-assert.deepEqual(new Set(rows.map(r=>r.product)), new Set(['launcher','writer','cell']));
+assert.deepEqual(new Set(rows.map(r=>r.product)), new Set(['launcher','writer','cell','plate']));
 const catalog = {schemaVersion:1,status:'approved',channel:lock.channel,catalogVersion:lock.catalogVersion,
     launcherUrl:rows.find(r=>r.product==='launcher').entryUrl,
     products:rows.filter(r=>r.product!=='launcher').map(r=>({id:r.product,version:r.version,url:r.entryUrl}))};
@@ -51,7 +51,7 @@ for (const [name,engine] of Object.entries({chromium,firefox,webkit})) {
             const link=page.locator(`[data-product="${row.product}"]`);
             assert.equal(await link.getAttribute('href'),row.entryUrl);
             await link.click({noWaitAfter:true}); await page.waitForURL(row.entryUrl,{waitUntil:'domcontentloaded'});
-            await page.waitForFunction(id=>document.getElementById(id+'-status')?.hidden,row.product==='cell'?'cells':'writer');
+            await page.waitForFunction(id=>document.getElementById(id+'-status')?.hidden,row.product==='cell'?'cells':row.product==='plate'?'plate':'writer');
             await returnToOffice(page);
             await page.waitForURL(catalog.launcherUrl,{waitUntil:'domcontentloaded'});
             await page.waitForFunction(()=>document.body.dataset.ready==='true');

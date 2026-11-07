@@ -22,6 +22,14 @@ PRODUCTS = {
     "cell": ("Broiler.Cells", "Broiler.Cells.Windows.exe"),
     "plate": ("Broiler.Plate", "Broiler.Plate.Windows.exe"),
 }
+LINUX_ENTRY_POINTS = {
+    "launcher": "Broiler.Launcher.Linux",
+    "boss": "Broiler.Office.Server",
+    "browser": "Broiler.Browser.Linux",
+    "writer": "Broiler.Writer.Linux",
+    "cell": "Broiler.Cells.Linux",
+    "plate": "Broiler.Plate.Linux",
+}
 SEMVER = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?\Z")
 HEX = re.compile(r"[a-f0-9]{64}\Z")
 SHA = re.compile(r"[a-f0-9]{40}\Z")
@@ -91,7 +99,11 @@ def validate_pin(pin, suite_channel):
     for key in ("releaseId", "assetId"):
         if not isinstance(pin[key], int) or isinstance(pin[key], bool) or pin[key] <= 0:
             raise ValueError("Pins require numeric GitHub release and asset IDs")
-    if pin["rid"] != "win-x64" or pin["archive"] != "zip" or pin["invocation"] != "native" or pin["entryPoint"] != PRODUCTS[product][1]:
+    rid = pin.get("rid", "win-x64")
+    if rid not in ("win-x64", "linux-x64"):
+        raise ValueError("Unsupported Office component RID")
+    expected_entry = PRODUCTS[product][1] if rid == "win-x64" else LINUX_ENTRY_POINTS[product]
+    if pin["archive"] != "zip" or pin["invocation"] != "native" or pin["entryPoint"] != expected_entry:
         raise ValueError("Unsupported Office component platform/entry point")
     if pin["publishMode"] not in ("self-contained", "native-aot", "framework-dependent"):
         raise ValueError("Unsupported publishing mode")
@@ -115,7 +127,10 @@ def validate_lock(lock, allow_incomplete=False):
         raise ValueError("Duplicate component pin")
     if len({p["asset"].casefold() for p in pins}) != len(pins):
         raise ValueError("Component asset filenames must be unique across the suite")
-    missing = sorted(set(PRODUCTS) - set(ids))
+    expected = set(PRODUCTS)
+    if lock.get("rid") == "linux-x64":
+        expected = {"launcher", "boss", "browser", "writer", "cell"}
+    missing = sorted(expected - set(ids))
     if missing and not allow_incomplete:
         raise ValueError("Publish component releases and pin them first; missing: " + ", ".join(missing))
     launcher = next((p for p in pins if p["id"] == "launcher"), None)
@@ -270,8 +285,9 @@ def assemble(lock_path, output, cache, commit, offline=False):
     if output.exists():
         raise ValueError("Office output must be new")
     archives = {p["id"]: acquire(p, cache, offline) for p in lock["components"]}
+    bundle_rid = lock.get("rid", next((p.get("rid") for p in lock["components"]), "win-x64"))
     assets = output / "assets"
-    bundle = output / "bundle" / ("Broiler-Office-" + lock["suite"] + "-win-x64")
+    bundle = output / "bundle" / ("Broiler-Office-" + lock["suite"] + "-" + bundle_rid)
     (bundle / "packages").mkdir(parents=True)
     assets.mkdir()
     components = []
@@ -299,7 +315,7 @@ def assemble(lock_path, output, cache, commit, offline=False):
     # discovery still consumes only Office manifests, never arbitrary product releases.
     shutil.copyfile(lock_path, bundle / "office.lock.json")
     write_json(bundle / "BUILD-INFO.json", dict(version=lock["suite"], commit=commit,
-        demo=True, rid="win-x64", artifactFirst=True, offlineRehearsal=offline,
+        demo=True, rid=bundle_rid, artifactFirst=True, offlineRehearsal=offline,
         lockSha256=digest(lock_path), sources=lock["components"]))
     write_json(bundle / "SBOM.cdx.json", dict(bomFormat="CycloneDX", specVersion="1.6", version=1,
         components=[dict(type="application", name=p["id"], version=p["version"],
@@ -309,7 +325,10 @@ def assemble(lock_path, output, cache, commit, offline=False):
     shutil.copyfile(root / "Broiler.Launcher/packaging/README-demo.md", bundle / "README.md")
     (bundle / "licenses").mkdir()
     shutil.copyfile(root / "LICENSE", bundle / "licenses/LICENSE")
-    (bundle / "Start-Broiler-Office.cmd").write_text('@echo off\nstart "Broiler Office Demo" "%~dp0launcher\\Broiler.Launcher.Windows.exe"\n', encoding="ascii")
+    if bundle_rid == "win-x64":
+        (bundle / "Start-Broiler-Office.cmd").write_text('@echo off\nstart "Broiler Office Demo" "%~dp0launcher\\Broiler.Launcher.Windows.exe"\n', encoding="ascii")
+    else:
+        (bundle / "start-broiler-office.sh").write_text('#!/bin/sh\nexec "$(dirname "$0")/launcher/Broiler.Launcher.Linux" "$@"\n', encoding="utf-8")
     for name in ("office-release.json", "office.lock.json", "BUILD-INFO.json", "SBOM.cdx.json", "README.md"):
         shutil.copyfile(bundle / name, assets / name)
     # Reconstruct the suite envelope deterministically; original component ZIPs
@@ -336,7 +355,7 @@ def assemble(lock_path, output, cache, commit, offline=False):
     return assets / (bundle.name + ".zip")
 
 
-def pin_release(lock_path, product, tag, asset_name, publish_mode, suite_version=None):
+def pin_release(lock_path, product, tag, asset_name, publish_mode, suite_version=None, rid="win-x64"):
     lock = validate_lock(read_json(lock_path), allow_incomplete=True)
     if suite_version:
         lock["suite"] = version(suite_version)
@@ -350,10 +369,11 @@ def pin_release(lock_path, product, tag, asset_name, publish_mode, suite_version
     prefix = {"launcher": "launcher-v", "boss": "boss-v", "browser": "browser-v", "writer": "writer-v", "cell": "cells-v", "plate": "plate-v"}[product]
     if not tag.startswith(prefix):
         raise ValueError("Unexpected product tag")
+    expected_entry = PRODUCTS[product][1] if rid == "win-x64" else LINUX_ENTRY_POINTS[product]
     pin = dict(id=product, version=version(tag[len(prefix):]), repository=repository,
         tag=tag, commit=resolve_commit(repository, tag), releaseId=release["id"], assetId=asset["id"],
-        asset=asset_name, size=asset["size"], sha256=asset["digest"][7:], rid="win-x64", archive="zip",
-        entryPoint=PRODUCTS[product][1], invocation="native", publishMode=publish_mode, prerelease=release["prerelease"])
+        asset=asset_name, size=asset["size"], sha256=asset["digest"][7:], rid=rid, archive="zip",
+        entryPoint=expected_entry, invocation="native", publishMode=publish_mode, prerelease=release["prerelease"])
     validate_pin(pin, lock["channel"])
     metadata = next((a for a in release["assets"] if a["name"] == "component-release.json"), None)
     if metadata is not None:
@@ -420,7 +440,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     check = sub.add_parser("validate-lock"); check.add_argument("lock"); check.add_argument("--allow-incomplete", action="store_true")
     build = sub.add_parser("assemble"); build.add_argument("lock"); build.add_argument("--output", required=True); build.add_argument("--cache", required=True); build.add_argument("--commit", required=True); build.add_argument("--offline", action="store_true")
-    pin = sub.add_parser("pin"); pin.add_argument("lock"); pin.add_argument("--product", choices=PRODUCTS, required=True); pin.add_argument("--tag", required=True); pin.add_argument("--asset", required=True); pin.add_argument("--publish-mode", choices=("self-contained", "framework-dependent", "native-aot"), required=True); pin.add_argument("--suite-version")
+    pin = sub.add_parser("pin"); pin.add_argument("lock"); pin.add_argument("--product", choices=PRODUCTS, required=True); pin.add_argument("--tag", required=True); pin.add_argument("--asset", required=True); pin.add_argument("--publish-mode", choices=("self-contained", "framework-dependent", "native-aot"), required=True); pin.add_argument("--suite-version"); pin.add_argument("--rid", choices=("win-x64", "linux-x64"), default="win-x64")
     web = sub.add_parser("pin-web"); web.add_argument("--tag", required=True); web.add_argument("--asset", required=True); web.add_argument("--output", required=True)
     fetch = sub.add_parser("fetch-web"); fetch.add_argument("lock"); fetch.add_argument("--cache", required=True); fetch.add_argument("--output", required=True); fetch.add_argument("--offline", action="store_true")
     args = parser.parse_args()
@@ -429,7 +449,7 @@ def main():
     elif args.command == "assemble":
         print(assemble(args.lock, args.output, args.cache, args.commit, args.offline))
     elif args.command == "pin":
-        print(json.dumps(pin_release(args.lock, args.product, args.tag, args.asset, args.publish_mode, args.suite_version), indent=2))
+        print(json.dumps(pin_release(args.lock, args.product, args.tag, args.asset, args.publish_mode, args.suite_version, args.rid), indent=2))
     elif args.command == "pin-web":
         write_json(args.output, pin_web(args.tag, args.asset)); print(args.output)
     else:

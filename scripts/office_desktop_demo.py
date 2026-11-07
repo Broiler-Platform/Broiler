@@ -1,4 +1,4 @@
-"""Resolve four immutable Windows product assets and package a small demo bootstrapper."""
+"""Resolve four immutable product assets (Windows or Linux) and package a small demo bootstrapper."""
 import argparse
 from functools import cmp_to_key
 import json
@@ -18,7 +18,7 @@ def api(path):
     return json.loads(subprocess.check_output(["gh", "api", "repos/" + path]))
 
 
-def candidate(product, releases, tag=None):
+def candidate(product, releases, tag=None, rid="win-x64"):
     prefix = PRODUCTS[product]
     found = []
     for release in releases:
@@ -31,20 +31,24 @@ def candidate(product, releases, tag=None):
         except ValueError:
             continue
         stem = "Broiler." + artifacts.PRODUCTS[product][0].split(".", 1)[1] + "-" + version
-        names = [stem + "-win-x64-self-contained.zip"]
-        if product == "plate":
-            names.append(stem + "-win-x64.zip")
+        if rid == "win-x64":
+            names = [stem + "-win-x64-self-contained.zip"]
+            if product == "plate":
+                names.append(stem + "-win-x64.zip")
+        else:
+            names = [stem + "-linux-x64-self-contained.zip", stem + "-linux-x64.zip"]
         assets = [a for a in release["assets"] if a["name"] in names]
         if assets:
             if len(assets) != 1:
                 raise ValueError("Ambiguous native product asset: " + name)
             found.append((version, release, assets[0]))
     if not found:
-        raise ValueError("No published Windows runtime-independent artifact for " + product)
+        platform_name = "Windows" if rid == "win-x64" else "Linux"
+        raise ValueError(f"No published {platform_name} runtime-independent artifact for " + product)
     return max(found, key=cmp_to_key(lambda a, b: artifacts.compare_versions(a[0], b[0])))
 
 
-def resolve(directory, version, overrides, verification_only=False):
+def resolve(directory, version, overrides, verification_only=False, rid="win-x64"):
     if not re.fullmatch(r"\d+\.\d+\.\d+-demo\.[1-9]\d*", version):
         raise ValueError("An explicit demo.N suite version is required")
     if set(overrides) - set(PRODUCTS) or not all(isinstance(v, str) for v in overrides.values()):
@@ -72,7 +76,7 @@ def resolve(directory, version, overrides, verification_only=False):
                 break
         else:
             raise ValueError("Release scan exceeds bounds")
-        _, release, asset = candidate(product, rows, overrides.get(product))
+        _, release, asset = candidate(product, rows, overrides.get(product), rid=rid)
         mode = "self-contained"
         metadata = next((a for a in release["assets"] if a["name"] == "component-release.json"), None)
         if metadata:
@@ -81,7 +85,7 @@ def resolve(directory, version, overrides, verification_only=False):
             if len(matching) != 1:
                 raise ValueError("Product descriptor omits the selected native asset")
             mode = matching[0]["publishMode"]
-        artifacts.pin_release(lock_path, product, release["tag_name"], asset["name"], mode)
+        artifacts.pin_release(lock_path, product, release["tag_name"], asset["name"], mode, rid=rid)
         lock = artifacts.read_json(lock_path)
         pin = next(p for p in lock["components"] if p["id"] == product)
         archive = artifacts.acquire(pin, directory / "cache")
@@ -92,6 +96,7 @@ def resolve(directory, version, overrides, verification_only=False):
         print(product, pin["tag"], pin["sha256"])
     lock["profile"] = "desktop-bootstrap-demo"
     lock["verificationOnly"] = verification_only
+    lock["rid"] = rid
     lock["pendingComponents"] = []
     artifacts.write_json(lock_path, lock)
     source_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
@@ -102,26 +107,30 @@ def resolve(directory, version, overrides, verification_only=False):
     shutil.copyfile(lock_path, assets / lock_path.name)
 
 
-def package(directory):
+def package(directory, rid=None):
     directory = Path(directory)
     assets = directory / "release-assets"
     manifest = artifacts.read_json(assets / "office-release.json")
     lock = artifacts.read_json(directory / "selection.lock.json")
+    rid = rid or lock.get("rid", "win-x64")
     if {p["id"] for p in manifest["components"]} != set(PRODUCTS) or len(manifest["components"]) != 4:
         raise ValueError("The demo must contain exactly four products")
     for pin in lock["components"]:
         artifacts.verify_archive(assets / pin["asset"], pin)
-    exe = directory / "launcher/Broiler.Launcher.Windows.exe"
-    if not exe.is_file() or list(exe.parent.glob("*.dll")):
+    exe_name = "Broiler.Launcher.Windows.exe" if rid == "win-x64" else "Broiler.Launcher.Linux"
+    exe = directory / "launcher" / exe_name
+    if not exe.is_file() or (rid == "win-x64" and list(exe.parent.glob("*.dll"))):
         raise ValueError("Expected a NativeAOT launcher without managed/runtime DLLs")
-    readme = ("Broiler Office Windows x64 demo\n\nExtract this ZIP completely and open Broiler.Launcher.Windows.exe.\n"
+    platform_name = "Windows x64" if rid == "win-x64" else "Linux x64"
+    run_inst = "open Broiler.Launcher.Windows.exe" if rid == "win-x64" else "run ./Broiler.Launcher.Linux"
+    readme = (f"Broiler Office {platform_name} demo\n\nExtract this ZIP completely and {run_inst}.\n"
               "Download & start installs the selected app for your current user and starts it.\n"
               "Internet is required for first installation; installed apps can be started offline.\n"
               "This is an unsigned demonstration. Publisher signing is deferred.\n"
               "Keep office-release.json beside the launcher. No .NET runtime is required.\n")
     if lock.get("verificationOnly"):
         readme = "LOCAL VERIFICATION BUILD — not a published release.\n\n" + readme
-    target = assets / ("Broiler-Office-" + manifest["officeVersion"] + "-win-x64-bootstrap.zip")
+    target = assets / ("Broiler-Office-" + manifest["officeVersion"] + f"-{rid}-bootstrap.zip")
     with zipfile.ZipFile(target, "x", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.write(exe, exe.name)
         archive.write(assets / "office-release.json", "office-release.json")
@@ -139,8 +148,9 @@ if __name__ == "__main__":
     parser.add_argument("--version")
     parser.add_argument("--verification-only", action="store_true")
     parser.add_argument("--overrides", default="{}")
+    parser.add_argument("--rid", choices=("win-x64", "linux-x64"), default="win-x64")
     args = parser.parse_args()
     if args.operation == "resolve":
-        resolve(args.directory, args.version or "", json.loads(args.overrides or "{}"), args.verification_only)
+        resolve(args.directory, args.version or "", json.loads(args.overrides or "{}"), args.verification_only, rid=args.rid)
     else:
-        package(args.directory)
+        package(args.directory, rid=args.rid)

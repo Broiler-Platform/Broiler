@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "rid": "linux-x64",
+  "products": [
+    { "id": "launcher", "project": "Broiler.Launcher/src/Broiler.Launcher.Linux/Broiler.Launcher.Linux.csproj", "entryPoint": "Broiler.Launcher.Linux" },
+    { "id": "browser", "project": "Broiler.Browser/src/Broiler.Browser.Linux/Broiler.Browser.Linux.csproj", "entryPoint": "Broiler.Browser.Linux" },
+    { "id": "writer", "project": "Broiler.Writer/src/Broiler.Writer.Linux/Broiler.Writer.Linux.csproj", "entryPoint": "Broiler.Writer.Linux" },
+    { "id": "boss", "project": "Broiler.Office.Server/Broiler.Office.Server.csproj", "entryPoint": "Broiler.Office.Server" }
+  ]
+}

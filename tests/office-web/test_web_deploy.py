@@ -20,7 +20,7 @@ def lock(version="0.1.0-preview.1", catalog="office-demo-1"):
     rows = []
     for index, (product, (repo, host)) in enumerate(web.PRODUCTS.items()):
         rows.append(dict(product=product, repository=repo, version=version, tag=product + "-web-v" + version,
-                         sdk=web.producer.SDK, workload=web.producer.WORKLOAD, workloadSet="10.403.0", runtimeMode=web.producer.MODE,
+                         sdk="10.0.403", workload="10.0.114/10.0.100", workloadSet="10.0.100", runtimeMode=web.producer.MODE,
                          replayProtocol="broiler.canvas/1", inputProtocol="broiler.host/1" if product=="launcher" else product+".browser/1",
                          commit="a" * 40, releaseId=index + 1, entryUrl=f"https://{host}/releases/{version}/",
                          archive=dict(id=10 + index, name=product + ".zip", size=1, sha256="b" * 64),
@@ -39,7 +39,7 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             web.validate({"schemaVersion": 1, "artifactKind": "broiler-office-web-lock", "status": "pending-producer-releases", "components": []})
 
-    def test_exact_three_products_and_origins(self):
+    def test_exact_suite_products_and_origins(self):
         self.assertEqual(web.validate(lock())["channel"], "preview")
         for change in (lambda l: l["components"].pop(),
                        lambda l: l["components"][0].update(entryUrl="https://evil.example/"),
@@ -89,7 +89,7 @@ class DeploymentTests(unittest.TestCase):
             return manager
         with patch.object(web, "fetch", side_effect=fetch), patch.object(web, "obtain", return_value={"files": inventory}), patch.object(web.urllib.request,'urlopen',side_effect=head):
             ledger = web.health(candidate)
-            self.assertEqual(ledger["disabledProducts"], ["browser", "plate"])
+            self.assertEqual(ledger["disabledProducts"], ["browser"])
             receipts[candidate["components"][1]["entryUrl"] + "index.html"] = b"tampered"
             with self.assertRaises(ValueError):
                 web.health(candidate)
@@ -141,12 +141,12 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(web.read(receipt), {"different": "source"})
 
     def test_deployment_tools_and_workflows_are_vendored_identically(self):
-        for directory in ('eng/web-deploy', 'Broiler.Writer/eng/web-deploy', 'Broiler.Cells/eng/web-deploy'):
+        for directory in ('eng/web-deploy', 'Broiler.Writer/eng/web-deploy', 'Broiler.Cells/eng/web-deploy', 'Broiler.Plate/eng/web-deploy'):
             if not (ROOT / directory).exists():
                 continue  # Artifact-only CI deliberately does not initialize application submodules.
             self.assertEqual((ROOT / directory / 'office_web.py').read_bytes(), (ROOT / 'scripts/office_web.py').read_bytes())
             self.assertEqual((ROOT / directory / 'artifact.py').read_bytes(), (ROOT / 'eng/web-producer/artifact.py').read_bytes())
-        for prefix in ('', 'Broiler.Writer/', 'Broiler.Cells/'):
+        for prefix in ('', 'Broiler.Writer/', 'Broiler.Cells/', 'Broiler.Plate/'):
             if prefix and not (ROOT / prefix / '.github/workflows').exists():
                 continue
             self.assertEqual((ROOT / prefix / '.github/workflows/office-web-pages.yml').read_bytes(), (ROOT / 'eng/web-producer/pages.yml').read_bytes())
@@ -162,7 +162,7 @@ class DeploymentTests(unittest.TestCase):
         mapping={'imports':{'./main.js':'./main.hash.js'},'integrity':{'./main.js':'sha256-'+base64.b64encode(__import__('hashlib').sha256(entry).digest()).decode()}}
         (source/'index.html').write_text('<script type="importmap">'+json.dumps(mapping)+'</script><script type="module" src="main.hash.js"></script>')
         identity=dict(product='writer',productName='Writer',repository=web.PRODUCTS['writer'][0],version='0.1.0-preview.1',tag='writer-web-v0.1.0-preview.1',commit='a'*40,
-                      sdk=web.producer.SDK,workload=web.producer.WORKLOAD,workloadSet='10.403.0',runtimeMode=web.producer.MODE,publishTrimmed=True,runAotCompilation=False,dirty=False,verificationOnly=False,
+                      sdk='10.0.403',workload='10.0.114/10.0.100',workloadSet='10.0.100',runtimeMode=web.producer.MODE,publishTrimmed=True,runAotCompilation=False,dirty=False,verificationOnly=False,
                       inputProtocol='writer.browser/1',replayProtocol='broiler.canvas/legacy-preview14',dependencies=['Broiler.Graphics.WebAssembly/0.1.0-preview.14'])
         metadata=web.producer.pack(source,Path(self.temp.name)/'release',identity)
         manifest=web.read(metadata)

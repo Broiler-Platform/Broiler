@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 
 const [directory,product,reportFile]=process.argv.slice(2);
-assert.ok(directory && ['writer','cell','launcher'].includes(product) && reportFile);
+assert.ok(directory && ['writer','cell','launcher','plate'].includes(product) && reportFile);
 const root=resolve(directory),prefix='/producer/verified-version/';
 await mkdir(resolve(reportFile,'..'),{recursive:true});
 const mime={'.html':'text/html','.js':'text/javascript','.json':'application/json','.wasm':'application/wasm','.css':'text/css','.svg':'image/svg+xml','.woff2':'font/woff2'};
@@ -35,24 +35,27 @@ try{for(const [name,engine]of Object.entries({chromium,firefox,webkit})){
         if(product==='launcher'){
             await page.waitForFunction(()=>document.body.dataset.ready==='true');
             assert.equal(await page.getByRole('link',{name:'Open Writer',exact:true}).getAttribute('href'),'https://writer.broiler.app/');
+            assert.equal(await page.getByRole('link',{name:'Open Plate',exact:true}).getAttribute('href'),'https://plate.broiler.app/');
         }else{
-            const id=product==='cell'?'cells':'writer';
+            const id=product==='cell'?'cells':product;
             await page.waitForFunction(id=>document.getElementById(id+'-status')?.hidden,id);
             await page.locator('canvas').click({position:{x:130,y:160}});
-            await page.keyboard.press('Control+n');
-            await page.waitForFunction(id=>document.getElementById(id+'-operation').dataset.outcome==='New',id);
-            await page.locator('#'+id+'-text-input').focus();await page.keyboard.insertText('Archive smoke ÄΩ');
-            const entry=await page.evaluate(()=>document.querySelector('script[type=module][src]').src);
-            const text=await page.evaluate(async({entry,product})=>{
-                const app=await import(entry);
-                for(let i=0;i<100;i++){
-                    const value=product==='writer'?app.documentPreview():JSON.parse(app.recoverySnapshot().payload)[0][0];
-                    if(value==='Archive smoke ÄΩ')return value;
-                    await new Promise(resolve=>setTimeout(resolve,50));
-                }
-                return '';
-            },{entry,product});
-            assert.equal(text,'Archive smoke ÄΩ');
+            if(product!=='plate'){
+                await page.keyboard.press('Control+n');
+                await page.waitForFunction(id=>document.getElementById(id+'-operation').dataset.outcome==='New',id);
+                await page.locator('#'+id+'-text-input').focus();await page.keyboard.insertText('Archive smoke ÄΩ');
+                const entry=await page.evaluate(()=>document.querySelector('script[type=module][src]').src);
+                const text=await page.evaluate(async({entry,product})=>{
+                    const app=await import(entry);
+                    for(let i=0;i<100;i++){
+                        const value=product==='writer'?app.documentPreview():JSON.parse(app.recoverySnapshot().payload)[0][0];
+                        if(value==='Archive smoke ÄΩ')return value;
+                        await new Promise(resolve=>setTimeout(resolve,50));
+                    }
+                    return '';
+                },{entry,product});
+                assert.equal(text,'Archive smoke ÄΩ');
+            }
         }
         assert.deepEqual(errors,[]);run.pass=true;
         await page.screenshot({path:resolve(reportFile+'.'+name+'.png')});

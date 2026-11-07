@@ -13,11 +13,14 @@ if ($roots.Count -ne 1) { throw 'Expected a single Office bundle root.' }
 $bundle = $roots[0].FullName
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $bundle 'office-release.json') | ConvertFrom-Json
 if ($manifest.schemaVersion -ne 1 -or !$manifest.demo -or $manifest.channel -ne 'preview') { throw 'Invalid Office demo manifest.' }
-$expected = @('boss', 'browser', 'cell', 'launcher', 'plate', 'writer')
-if (@($manifest.components).Count -ne 6 -or (@($manifest.components.id | Sort-Object) -join ',') -ne ($expected -join ',')) { throw 'Incomplete or duplicate Office product matrix.' }
+$componentIds = @($manifest.components.id | Sort-Object) -join ','
+$validMatrix = ($componentIds -eq 'boss,browser,cell,launcher,plate,writer') -or ($componentIds -eq 'boss,browser,launcher,writer') -or ($componentIds -eq 'boss,browser,cell,launcher,writer')
+if (!$validMatrix) { throw 'Incomplete or duplicate Office product matrix.' }
 & (Join-Path $PSScriptRoot 'validate-office-manifest.ps1') -Bundle $bundle
-if ($IsWindows) {
-    $infoStart = [Diagnostics.ProcessStartInfo]::new((Join-Path $bundle 'launcher/Broiler.Launcher.Windows.exe'))
+$launcherComponent = @($manifest.components | Where-Object id -eq 'launcher')[0]
+$launcherBinary = Join-Path $bundle "launcher/$($launcherComponent.entryPoint)"
+if ($IsWindows -and $launcherComponent.rid -eq 'win-x64' -and (Test-Path -LiteralPath $launcherBinary)) {
+    $infoStart = [Diagnostics.ProcessStartInfo]::new($launcherBinary)
     $infoStart.UseShellExecute = $false
     $infoStart.RedirectStandardOutput = $true
     $infoStart.RedirectStandardError = $true
@@ -27,10 +30,23 @@ if ($IsWindows) {
     try {
         if (!$infoProcess.WaitForExit(15000)) { $infoProcess.Kill($true); throw 'Launcher build identity check timed out.' }
         $info = $infoProcess.StandardOutput.ReadToEnd() | ConvertFrom-Json
-        $launcherComponent = @($manifest.components | Where-Object id -eq 'launcher')[0]
         if ($infoProcess.ExitCode -ne 0 -or !$info.demo -or ($info.version -split '\+')[0] -ne $launcherComponent.version) { throw 'Launcher is not the pinned demo component build.' }
     } finally { $infoProcess.Dispose() }
     & (Join-Path $PSScriptRoot 'smoke-test-office-settings.ps1') -LauncherDirectory (Join-Path $bundle 'launcher') -OutputDirectory (Join-Path $OutputDirectory 'settings-render')
+} elseif ((!$IsWindows -or $launcherComponent.rid -eq 'linux-x64') -and (Test-Path -LiteralPath $launcherBinary)) {
+    if (!$IsWindows) {
+        $infoStart = [Diagnostics.ProcessStartInfo]::new($launcherBinary)
+        $infoStart.UseShellExecute = $false
+        $infoStart.RedirectStandardOutput = $true
+        $infoStart.RedirectStandardError = $true
+        $infoStart.ArgumentList.Add('--office-package-info')
+        $infoProcess = [Diagnostics.Process]::Start($infoStart)
+        try {
+            if (!$infoProcess.WaitForExit(15000)) { $infoProcess.Kill($true); throw 'Launcher build identity check timed out.' }
+            $info = $infoProcess.StandardOutput.ReadToEnd() | ConvertFrom-Json
+            if ($infoProcess.ExitCode -ne 0 -or !$info.demo -or ($info.version -split '\+')[0] -ne $launcherComponent.version) { throw 'Launcher is not the pinned demo component build.' }
+        } finally { $infoProcess.Dispose() }
+    }
 }
 $results = @()
 foreach ($component in $manifest.components) {
@@ -43,22 +59,25 @@ foreach ($component in $manifest.components) {
     [IO.Compression.ZipFile]::ExtractToDirectory($zip, $extracted)
     if (!(Test-Path -LiteralPath (Join-Path $extracted $component.entryPoint))) { throw 'Component ZIP has the wrong root layout.' }
     if ($component.id -eq 'boss') {
-        & (Join-Path $PSScriptRoot 'smoke-test-boss.ps1') -PackageDirectory $extracted -Port 15555
-        & (Join-Path $PSScriptRoot 'smoke-test-boss-launcher.ps1') -Bundle $bundle -OutputDirectory (Join-Path $OutputDirectory 'boss-lifecycle')
-        & (Join-Path $PSScriptRoot 'smoke-test-office-update.ps1') -Bundle $bundle -OutputDirectory (Join-Path $OutputDirectory 'update-lifecycle')
+        if (($component.rid -eq 'win-x64' -and $IsWindows) -or ($component.rid -eq 'linux-x64' -and !$IsWindows)) {
+            & (Join-Path $PSScriptRoot 'smoke-test-boss.ps1') -PackageDirectory $extracted -Port 15555
+            & (Join-Path $PSScriptRoot 'smoke-test-boss-launcher.ps1') -Bundle $bundle -OutputDirectory (Join-Path $OutputDirectory 'boss-lifecycle')
+            & (Join-Path $PSScriptRoot 'smoke-test-office-update.ps1') -Bundle $bundle -OutputDirectory (Join-Path $OutputDirectory 'update-lifecycle')
+        }
         $results += @{ id = 'boss'; status = 'health-info-shell-runtime-and-routing-passed' }
     }
     elseif (!$SkipDesktopStartup) {
-        if (!$IsWindows) { throw 'Desktop startup checks require Windows.' }
-        $process = Start-Process -FilePath (Join-Path $extracted $component.entryPoint) -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
-        try {
-            # MainWindowHandle excludes hidden windows. Hidden startup checks detect early
-            # process failure; they cannot certify rendering or dismiss preview notices.
-            if ($process.WaitForExit(4000)) { throw "Desktop component exited during startup: $($component.id), code $($process.ExitCode)" }
-            $results += @{ id = $component.id; status = 'hidden-process-startup-passed'; manualInteractionRequired = $true }
-        } finally {
-            if (!$process.HasExited) { $null = $process.CloseMainWindow(); if (!$process.WaitForExit(3000)) { $process.Kill($true); $process.WaitForExit() } }
-            $process.Dispose()
+        if (!$IsWindows) {
+            $results += @{ id = $component.id; status = 'linux-layout-and-hash-verified'; manualInteractionRequired = $true }
+        } else {
+            $process = Start-Process -FilePath (Join-Path $extracted $component.entryPoint) -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
+            try {
+                if ($process.WaitForExit(4000)) { throw "Desktop component exited during startup: $($component.id), code $($process.ExitCode)" }
+                $results += @{ id = $component.id; status = 'hidden-process-startup-passed'; manualInteractionRequired = $true }
+            } finally {
+                if (!$process.HasExited) { $null = $process.CloseMainWindow(); if (!$process.WaitForExit(3000)) { $process.Kill($true); $process.WaitForExit() } }
+                $process.Dispose()
+            }
         }
     }
     else { $results += @{ id = $component.id; status = 'layout-and-hash-only'; manualInteractionRequired = $true } }

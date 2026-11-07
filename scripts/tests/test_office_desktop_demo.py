@@ -42,3 +42,17 @@ class DesktopSelectionTests(unittest.TestCase):
             dict(name="Broiler.Plate-0.1.0-preview.2-win-x64-self-contained.zip")])
         with self.assertRaises(ValueError):
             demo.candidate("plate", [row])
+    def test_linux_candidate_selection(self):
+        def linux_release(version, draft=False):
+            suffix = "linux-x64-self-contained.zip"
+            return dict(tag_name="writer-v" + version, draft=draft,
+                        assets=[dict(name=f"Broiler.Writer-{version}-{suffix}")])
+
+        rows = [linux_release("0.1.0-preview.9"), linux_release("0.1.0-preview.10")]
+        self.assertEqual(demo.candidate("writer", rows, rid="linux-x64")[0], "0.1.0-preview.10")
+
+    def test_linux_rejects_missing_linux_artifact(self):
+        rows = [self.release("0.1.0-preview.10")]
+        with self.assertRaises(ValueError):
+            demo.candidate("writer", rows, rid="linux-x64")
+
