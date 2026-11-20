@@ -52,24 +52,11 @@ public sealed class CssExtractionPhaseZeroTests
     }
 
     [Fact(Timeout = 600000)]
-    public void Phase7_CssData_Is_Only_An_Obsolete_StyleSet_Wrapper()
+    public void Phase7_CssData_Compatibility_Wrapper_Is_Removed()
     {
-#pragma warning disable CS0618
-        var type = typeof(CssData);
-#pragma warning restore CS0618
-        Assert.NotNull(type.GetCustomAttribute<ObsoleteAttribute>());
-
-        var members = type
-            .GetMembers(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
-            .Where(static member => member.MemberType is MemberTypes.Method or MemberTypes.Property)
-            .Where(static member => member is not MethodInfo { IsSpecialName: true })
-            .Select(static member => $"{member.MemberType}:{member.Name}")
-            .OrderBy(static member => member, StringComparer.Ordinal)
-            .ToArray();
-
-        // Clone and Combine went with the compatibility window they were kept open for; what is
-        // left is the wrapper this asserts CssData is, and nothing may be added back to it.
-        Assert.Equal(["Property:StyleSet", "Property:StyleSheet"], members);
+        var root = FindRepositoryRoot();
+        Assert.False(File.Exists(Path.Combine(root, "Broiler.HTML", "Source", "Broiler.HTML.Core", "CssData.cs")));
+        Assert.Null(typeof(HtmlStyleSet).Assembly.GetType("Broiler.HTML.Core.CssData"));
     }
 
     [Fact(Timeout = 600000)]

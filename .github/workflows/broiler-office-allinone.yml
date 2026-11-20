@@ -1,0 +1,109 @@
+name: Broiler Office All-In-One NativeAOT
+
+on:
+  workflow_dispatch:
+    inputs:
+      include_browser:
+        description: Include Broiler Browser (experimental; disabled for initial release)
+        type: boolean
+        default: false
+      create_draft:
+        description: Create a draft prerelease with Windows and Linux single-executable archives
+        type: boolean
+        default: false
+      version:
+        description: Optional prerelease version (for example 0.1.0-office.1)
+        type: string
+        default: '0.1.0-preview.1'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Publish ${{ matrix.rid }} (All-In-One NativeAOT)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            os: windows-latest
+            project: Broiler.Launcher/src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj
+            configuration: Office-Windows
+            binary: Broiler.Office.exe
+          - rid: linux-x64
+            os: ubuntu-24.04
+            project: Broiler.Launcher/src/Broiler.Launcher.Linux/Broiler.Launcher.Linux.csproj
+            configuration: Office-Linux
+            binary: Broiler.Office
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Linux NativeAOT prerequisites
+        if: matrix.rid == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev xvfb
+
+      - name: Run Launcher unit tests
+        run: |
+          dotnet test Broiler.Launcher/tests/Broiler.Launcher.Tests/Broiler.Launcher.Tests.csproj -c ${{ matrix.configuration }} -p:BroilerIncludeBrowser=${{ inputs.include_browser }}
+
+      - name: Publish All-In-One NativeAOT executable
+        shell: pwsh
+        run: |
+          $outDir = Join-Path $env:RUNNER_TEMP "broiler-office-${{ matrix.rid }}"
+          dotnet publish "${{ matrix.project }}" `
+            -c "${{ matrix.configuration }}" `
+            -r "${{ matrix.rid }}" `
+            -p:BroilerIncludeBrowser=${{ inputs.include_browser }} `
+            "-p:Version=${{ inputs.version }}" `
+            -o "$outDir"
+          if ($LASTEXITCODE -ne 0) { throw 'All-In-One NativeAOT publish failed.' }
+          if (-not (Test-Path (Join-Path $outDir "${{ matrix.binary }}"))) {
+            throw "Expected output binary ${{ matrix.binary }} was not produced."
+          }
+
+      - name: Smoke test NativeAOT executable
+        shell: pwsh
+        run: |
+          $outDir = Join-Path $env:RUNNER_TEMP "broiler-office-${{ matrix.rid }}"
+          $exe = Join-Path $outDir "${{ matrix.binary }}"
+          if ('${{ matrix.rid }}' -eq 'linux-x64') {
+            chmod +x "$exe"
+          }
+          & "$exe" --office-package-info
+          if ($LASTEXITCODE -ne 0) { throw '--office-package-info failed.' }
+          & "$exe" --list
+          if ($LASTEXITCODE -ne 0) { throw '--list failed.' }
+          foreach ($app in @('mail', 'writer', 'cell', 'plate')) {
+            & "$exe" --app $app --help
+            if ($LASTEXITCODE -ne 0) { throw "--app $app --help failed." }
+          }
+
+      - name: Package NativeAOT archive
+        shell: pwsh
+        run: |
+          $outDir = Join-Path $env:RUNNER_TEMP "broiler-office-${{ matrix.rid }}"
+          $stage = Join-Path $env:RUNNER_TEMP "broiler-office-stage-${{ matrix.rid }}"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Get-ChildItem -LiteralPath $outDir -File | Where-Object { $_.Extension -ne '.pdb' -and $_.Extension -ne '.dbg' } | ForEach-Object {
+            Copy-Item -LiteralPath $_.FullName -Destination $stage
+          }
+          $zip = Join-Path $env:RUNNER_TEMP "Broiler-Office-${{ inputs.version }}-${{ matrix.rid }}-nativeaot.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $zip -Force
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: broiler-office-allinone-${{ matrix.rid }}
+          path: ${{ runner.temp }}/Broiler-Office-${{ inputs.version }}-${{ matrix.rid }}-nativeaot.zip
+          if-no-files-found: error

@@ -19,6 +19,7 @@ using Broiler.Input.Keyboard;
 using Broiler.Mail.Application;
 using Broiler.Mail.Application.ViewModels;
 using Broiler.Mail.Application.Views;
+using Broiler.Mail.Windows.Preview;
 using Broiler.UI;
 using Broiler.UI.Standard;
 
@@ -35,6 +36,7 @@ internal sealed class OfficeMailWindow : Direct2DWindow, IUiHost, IUiClipboardHo
     private readonly MailShellView _shell;
     private readonly MailKeyboardNavigation _keyboard;
     private readonly AppearanceController _appearance;
+    private readonly WindowsHtmlPreviewHost _htmlPreview;
     private readonly List<OfficeHostWindow> _hostWindows = [];
     private WindowsClipboard? _clipboard;
     private WindowsAutomationBridge? _automationBridge;
@@ -62,7 +64,13 @@ internal sealed class OfficeMailWindow : Direct2DWindow, IUiHost, IUiClipboardHo
         _session = new StandardUiSessionBuilder().WithDispatcher(_dispatcher).Build(this);
         MailShellViewModel model = application.CreateViewModel(_dispatcher);
         StandardControlPaint.ApplyTheme(AppearancePolicy.Resolve(model.Settings.Settings.Theme, UiSystemSettings.Default));
-        _shell = new MailShellView(model);
+        _htmlPreview = new WindowsHtmlPreviewHost(() => _appearance?.Current)
+        {
+            RendererProvider = () => Renderer,
+            ScaleProvider = () => DpiScale,
+            UseBackgroundRaster = true,
+        };
+        _shell = new MailShellView(model, _htmlPreview);
         _shell.Attach(_session);
         _keyboard = _shell.CreateKeyboardNavigation(_session);
         _session.SetFocus(_shell.NavigationFocus);
@@ -71,6 +79,7 @@ internal sealed class OfficeMailWindow : Direct2DWindow, IUiHost, IUiClipboardHo
         {
             if (NativeHandle != 0)
                 WindowsTitleBar.ApplyDarkMode(NativeHandle, _appearance.Current?.IsDark ?? false);
+            _htmlPreview.ApplyTheme(_appearance.Current ?? StandardThemeTokens.Light);
             Invalidate();
         };
 
@@ -220,6 +229,7 @@ internal sealed class OfficeMailWindow : Direct2DWindow, IUiHost, IUiClipboardHo
                 hostWindow.Dispose();
             _hostWindows.Clear();
             _shell.Dispose();
+            _htmlPreview.Dispose();
             _appearance.Dispose();
             _session.Dispose();
         }

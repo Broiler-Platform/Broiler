@@ -34,6 +34,7 @@ internal static class OfficeComposition
         if (System.Threading.Interlocked.Exchange(ref _codecsInitialized, 1) == 0)
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            Broiler.Mail.Windows.Preview.HtmlRuntime.Initialize();
             try
             {
                 BImageCodecs.Use(new MediaCodecCatalog(ManagedImageCodecs.CreateCodecs()));

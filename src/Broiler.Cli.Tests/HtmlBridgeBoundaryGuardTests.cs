@@ -168,8 +168,8 @@ public class HtmlBridgeBoundaryGuardTests
     public void Phase_Five_Renderer_Exposes_A_Canonical_Document_Entry_Point()
     {
         var setDocument = typeof(Broiler.HTML.Image.HtmlContainer).GetMethod(
-            "SetDocument",
-            [typeof(Broiler.Dom.DomDocument), typeof(Broiler.HTML.Core.CssData), typeof(string)]);
+            "SetDocumentWithStyleSet",
+            [typeof(Broiler.Dom.DomDocument), typeof(Broiler.HTML.Core.HtmlStyleSet), typeof(string)]);
 
         Assert.NotNull(setDocument);
         Assert.True(typeof(ITypedScriptEngine).IsAssignableFrom(typeof(ScriptEngine)));

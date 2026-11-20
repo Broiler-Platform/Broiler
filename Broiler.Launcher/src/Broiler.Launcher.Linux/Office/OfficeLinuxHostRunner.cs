@@ -19,6 +19,7 @@ using Broiler.Launcher.Office;
 using Broiler.Mail.Application;
 using Broiler.Mail.Application.ViewModels;
 using Broiler.Mail.Application.Views;
+using Broiler.Mail.Windows.Preview;
 using Broiler.Plate;
 using Broiler.UI;
 using Broiler.UI.Standard;
@@ -223,15 +224,23 @@ internal static class OfficeLinuxHostRunner
         LinuxX11Clipboard? clipboard)
     {
         var host = new LinuxMailUiHost(renderer, surface, clipboard);
-        var dispatcher = new ImmediateUiDispatcher();
+        var dispatcher = new StandardQueuedUiDispatcher();
         var session = new StandardUiSessionBuilder().WithDispatcher(dispatcher).Build(host);
         MailShellViewModel model = application.CreateViewModel(dispatcher);
         StandardControlPaint.ApplyTheme(AppearancePolicy.Resolve(model.Settings.Settings.Theme, UiSystemSettings.Default));
-        var shell = new MailShellView(model);
+        AppearanceController? appearance = null;
+        var htmlPreview = new WindowsHtmlPreviewHost(() => appearance?.Current)
+        {
+            RendererProvider = () => renderer,
+            ScaleProvider = () => surface.DpiScale,
+            UseBackgroundRaster = true,
+        };
+        var shell = new MailShellView(model, htmlPreview);
         shell.Attach(session);
         var keyboard = shell.CreateKeyboardNavigation(session);
         session.SetFocus(shell.NavigationFocus);
-        var appearance = new AppearanceController(session, model.Settings, null);
+        appearance = new AppearanceController(session, model.Settings, null);
+        appearance.Applied += (_, _) => htmlPreview.ApplyTheme(appearance.Current ?? StandardThemeTokens.Light);
 
         return new AppCallbacks(
             IsInvalidated: () => host.IsInvalidated,
@@ -240,11 +249,12 @@ internal static class OfficeLinuxHostRunner
                 if (!keyboard.Handle(evt))
                     session.DispatchInput(evt);
             },
-            Tick: static () => { },
+            Tick: () => dispatcher.Drain(),
             RenderFrame: () => session.RenderFrame(),
             Dispose: () =>
             {
                 shell.Dispose();
+                htmlPreview.Dispose();
                 appearance.Dispose();
                 session.Dispose();
             });
