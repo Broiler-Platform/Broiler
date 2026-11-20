@@ -4,6 +4,7 @@
     <BuildType Name="Release" />
     <BuildType Name="Debug-Windows" />
     <BuildType Name="Release-Windows" />
+    <BuildType Name="Office-Windows" />
   </Configurations>
   <Project Path="src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
   <Project Path="src/Broiler.Launcher.Core/Broiler.Launcher.Core.csproj" />

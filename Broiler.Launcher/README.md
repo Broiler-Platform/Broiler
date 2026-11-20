@@ -1,6 +1,24 @@
 # Broiler Launcher
 
-Unified workspace launcher application for the Broiler Platform suite: **Broiler Browser**, **Broiler Writer**, **Broiler Cell**, and **Broiler Plate**.
+Unified workspace launcher application for the Broiler Platform suite: **Broiler Browser**, **Broiler Mail**, **Broiler Writer**, **Broiler Cell**, and **Broiler Plate**.
+
+## All-In-One Single NativeAOT ("Broiler Office")
+
+The `Office-Windows` and `Office-Linux` configurations build **Broiler Office** as a single self-contained NativeAOT executable (`Broiler.Office.exe` on Windows, `Broiler.Office` on Linux) bundling **Mail**, **Writer**, **Cells**, and **Plate** via their `*.Core` / shared UI projects:
+
+```shell
+# Publish single NativeAOT executable for Windows (win-x64)
+dotnet publish Broiler.Launcher/src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj -c Office-Windows -o artifacts/broiler-office-win-x64
+# Or using the Visual Studio Publish profile:
+dotnet publish Broiler.Launcher/src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj -p:PublishProfile=Office-Windows-NativeAOT
+
+# Publish single NativeAOT executable for Linux (linux-x64, run on Linux with clang + zlib1g-dev)
+dotnet publish Broiler.Launcher/src/Broiler.Launcher.Linux/Broiler.Launcher.Linux.csproj -c Office-Linux -o artifacts/broiler-office-linux-x64
+```
+
+Browser is excluded by default (`BroilerIncludeBrowser=false`) until Browser NativeAOT stabilizes; pass `-p:BroilerIncludeBrowser=true` to opt in.
+
+When launched with no arguments, `Broiler.Office` opens the Broiler Office dashboard. Individual applications can also be started directly from the single binary via `--app mail`, `--app writer`, `--app cell`, or `--app plate`.
 
 Built entirely on Broiler platform components (`Broiler.UI`, `Broiler.Hosting`, `Broiler.Graphics`, and `Broiler.Input`) with a multi-target architecture supporting **Windows** and **Linux**.
 

@@ -199,4 +199,14 @@ public static class OfficeBuild
 #else
     public static bool IsDemo => false;
 #endif
+#if BROILER_OFFICE_ALL_IN_ONE
+    public static bool IsAllInOne => true;
+#else
+    public static bool IsAllInOne => false;
+#endif
+#if BROILER_INCLUDE_BROWSER
+    public static bool IncludesBrowser => true;
+#else
+    public static bool IncludesBrowser => false;
+#endif
 }

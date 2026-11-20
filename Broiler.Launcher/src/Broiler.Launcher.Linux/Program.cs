@@ -13,8 +13,18 @@ internal static class Program
 {
     private static int Main(string[] args)
     {
+#if BROILER_OFFICE_ALL_IN_ONE
+        Broiler.Launcher.Linux.Office.OfficeAllInOneBootstrap.Register();
+#endif
+
         if (OfficeInstallCli.TryHandle(args, out int officeExitCode))
             return officeExitCode;
+
+        if (args.Length > 0 && args[0] is "--app" or "-a" or "--launch" &&
+            LauncherCliHandler.TryHandleCli(args, out int appExitCode))
+        {
+            return appExitCode;
+        }
 
         LinuxLauncherOptions options = LinuxLauncherOptions.Parse(args);
         if (options.ShowHelp)

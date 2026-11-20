@@ -14,6 +14,10 @@ internal static class Program
         if (WindowsMachineInstallBroker.TryHandle(args, out int machineExitCode)) return machineExitCode;
         _ = SetProcessDpiAwarenessContext(new nint(-4)); // PER_MONITOR_AWARE_V2
 
+#if BROILER_OFFICE_ALL_IN_ONE
+        Broiler.Launcher.Windows.Office.OfficeAllInOneBootstrap.Register();
+#endif
+
         // CLI support for directly launching apps or listing apps
         if (args.Length > 0 && LauncherCliHandler.TryHandleCli(args, out int exitCode))
         {
@@ -22,8 +26,13 @@ internal static class Program
 
         try
         {
+#if BROILER_OFFICE_ALL_IN_ONE
+            return Broiler.Launcher.Windows.Office.OfficeWindowCoordinator.Run(
+                static () => new LauncherWindow(ownsMessageLoop: false));
+#else
             using var window = new LauncherWindow();
             return window.Run();
+#endif
         }
         catch (Exception error)
         {

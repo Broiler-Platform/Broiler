@@ -1,5 +1,13 @@
 <Project>
   <PropertyGroup>
+    <_BroilerPubProfileFile Condition="'$(WebPublishProfileFile)' != '' And Exists('$(WebPublishProfileFile)')">$(WebPublishProfileFile)</_BroilerPubProfileFile>
+    <_BroilerPubProfileFile Condition="'$(_BroilerPubProfileFile)' == '' And '$(PublishProfileFullPath)' != '' And Exists('$(PublishProfileFullPath)')">$(PublishProfileFullPath)</_BroilerPubProfileFile>
+    <_BroilerPubProfileFile Condition="'$(_BroilerPubProfileFile)' == '' And '$(PublishProfile)' != '' And Exists('$(MSBuildProjectDirectory)\Properties\PublishProfiles\$(PublishProfile).pubxml')">$(MSBuildProjectDirectory)\Properties\PublishProfiles\$(PublishProfile).pubxml</_BroilerPubProfileFile>
+    <_BroilerPubProfileFile Condition="'$(_BroilerPubProfileFile)' == '' And '$(PublishProfile)' != '' And Exists('$(MSBuildProjectDirectory)\Properties\PublishProfiles\$(PublishProfile)')">$(MSBuildProjectDirectory)\Properties\PublishProfiles\$(PublishProfile)</_BroilerPubProfileFile>
+    <_BroilerPubProfileText Condition="'$(_BroilerPubProfileFile)' != '' And $([System.String]::Copy('$(_BroilerPubProfileFile)').StartsWith('$(MSBuildProjectDirectory)', System.StringComparison.OrdinalIgnoreCase))">$([System.IO.File]::ReadAllText('$(_BroilerPubProfileFile)'))</_BroilerPubProfileText>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -10,15 +18,26 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows'">
+  <PropertyGroup>
+    <BroilerOfficeAllInOne Condition="'$(BroilerOfficeAllInOne)' == '' And ('$(Configuration)' == 'Office-Windows' Or '$(Configuration)' == 'Office-Linux')">true</BroilerOfficeAllInOne>
+    <BroilerOfficeAllInOne Condition="'$(BroilerOfficeAllInOne)' == '' And '$(_BroilerPubProfileText)' != '' And ($(_BroilerPubProfileText.Contains('&lt;Configuration&gt;Office-Windows&lt;/Configuration&gt;')) Or $(_BroilerPubProfileText.Contains('&lt;Configuration&gt;Office-Linux&lt;/Configuration&gt;')) Or $(_BroilerPubProfileText.Contains('&lt;BroilerOfficeAllInOne&gt;true&lt;/BroilerOfficeAllInOne&gt;')))">true</BroilerOfficeAllInOne>
+    <BroilerIncludeBrowser Condition="'$(BroilerIncludeBrowser)' == ''">false</BroilerIncludeBrowser>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows' Or '$(Configuration)' == 'Office-Windows' Or $(_BroilerPubProfileText.Contains('&lt;Configuration&gt;Office-Windows&lt;/Configuration&gt;'))">
     <BroilerTargetOperatingSystem>Windows</BroilerTargetOperatingSystem>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Release-Linux'">
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Release-Linux' Or '$(Configuration)' == 'Office-Linux' Or $(_BroilerPubProfileText.Contains('&lt;Configuration&gt;Office-Linux&lt;/Configuration&gt;'))">
     <BroilerTargetOperatingSystem>Linux</BroilerTargetOperatingSystem>
   </PropertyGroup>
 
   <PropertyGroup>
     <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Debug-Linux' Or '$(Configuration)' == 'Debug-Windows'">Debug</BroilerBaseConfiguration>
-    <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Release-Linux' Or '$(Configuration)' == 'Release-Windows'">Release</BroilerBaseConfiguration>
+    <BroilerBaseConfiguration Condition="'$(Configuration)' == 'Release-Linux' Or '$(Configuration)' == 'Release-Windows' Or '$(Configuration)' == 'Office-Linux' Or '$(Configuration)' == 'Office-Windows' Or '$(BroilerOfficeAllInOne)' == 'true'">Release</BroilerBaseConfiguration>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BroilerOfficeAllInOne)' == 'true'">
+    <DefineConstants>$(DefineConstants);BROILER_OFFICE_ALL_IN_ONE</DefineConstants>
+    <DefineConstants Condition="'$(BroilerIncludeBrowser)' == 'true'">$(DefineConstants);BROILER_INCLUDE_BROWSER</DefineConstants>
   </PropertyGroup>
 </Project>

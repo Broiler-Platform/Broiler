@@ -1,0 +1,25 @@
+<Project>
+  <!--
+    Ensure every project under Broiler.Launcher declares the solution configurations
+    used by Broiler.Launcher.slnx, Broiler.Windows.Launcher.slnx, and Broiler.Linux.Launcher.slnx
+    so Visual Studio configuration mapping succeeds for all projects (Core, Browser, Tests, heads).
+  -->
+  <PropertyGroup>
+    <Configurations Condition="'$(Configurations)' == ''">Debug;Release</Configurations>
+
+    <BroilerLauncherConfigurationsProbe>;$(Configurations);</BroilerLauncherConfigurationsProbe>
+    <BroilerDeclaresDebugWindows>$(BroilerLauncherConfigurationsProbe.Contains(';Debug-Windows;'))</BroilerDeclaresDebugWindows>
+    <BroilerDeclaresReleaseWindows>$(BroilerLauncherConfigurationsProbe.Contains(';Release-Windows;'))</BroilerDeclaresReleaseWindows>
+    <BroilerDeclaresOfficeWindows>$(BroilerLauncherConfigurationsProbe.Contains(';Office-Windows;'))</BroilerDeclaresOfficeWindows>
+    <BroilerDeclaresDebugLinux>$(BroilerLauncherConfigurationsProbe.Contains(';Debug-Linux;'))</BroilerDeclaresDebugLinux>
+    <BroilerDeclaresReleaseLinux>$(BroilerLauncherConfigurationsProbe.Contains(';Release-Linux;'))</BroilerDeclaresReleaseLinux>
+    <BroilerDeclaresOfficeLinux>$(BroilerLauncherConfigurationsProbe.Contains(';Office-Linux;'))</BroilerDeclaresOfficeLinux>
+
+    <Configurations Condition="'$(BroilerDeclaresDebugWindows)' != 'true'">$(Configurations);Debug-Windows</Configurations>
+    <Configurations Condition="'$(BroilerDeclaresReleaseWindows)' != 'true'">$(Configurations);Release-Windows</Configurations>
+    <Configurations Condition="'$(BroilerDeclaresOfficeWindows)' != 'true'">$(Configurations);Office-Windows</Configurations>
+    <Configurations Condition="'$(BroilerDeclaresDebugLinux)' != 'true'">$(Configurations);Debug-Linux</Configurations>
+    <Configurations Condition="'$(BroilerDeclaresReleaseLinux)' != 'true'">$(Configurations);Release-Linux</Configurations>
+    <Configurations Condition="'$(BroilerDeclaresOfficeLinux)' != 'true'">$(Configurations);Office-Linux</Configurations>
+  </PropertyGroup>
+</Project>

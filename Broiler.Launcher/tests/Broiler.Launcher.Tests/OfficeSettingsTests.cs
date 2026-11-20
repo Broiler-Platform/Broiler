@@ -31,7 +31,7 @@ public sealed class OfficeSettingsTests : IDisposable
         public LauncherSettings Load() => Value.Clone();
         public void Save(LauncherSettings settings) { if (Fail) throw new IOException("fixture save denied"); Saves++; Value = settings.Clone(); }
     }
-    private static AppLauncherService Service(Store store) => new(settingsStore: store, inventory: new EmptyInstallationInventory());
+    private static AppLauncherService Service(Store store) => new(apps: BroilerAppInfo.CreateDefaultSuite(), settingsStore: store, inventory: new EmptyInstallationInventory());
     private string Binary() { string path = Path.Combine(_root, "product.exe"); File.WriteAllText(path, "fixture"); return path; }
     private sealed class Catalog : IReleaseCatalogClient
     {

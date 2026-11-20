@@ -11,12 +11,25 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Configurations>Debug;Release;Debug-Windows;Release-Windows</Configurations>
-    <RuntimeIdentifier Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows'">win-x64</RuntimeIdentifier>
+    <Configurations>Debug;Release;Debug-Windows;Release-Windows;Office-Windows</Configurations>
+    <RuntimeIdentifier Condition="'$(Configuration)' == 'Debug-Windows' Or '$(Configuration)' == 'Release-Windows' Or '$(Configuration)' == 'Office-Windows'">win-x64</RuntimeIdentifier>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(BroilerOfficeAllInOne)' == 'true'">
+    <AssemblyName>Broiler.Office</AssemblyName>
+    <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Broiler.Launcher.Core\Broiler.Launcher.Core.csproj" />
+    <ProjectReference Include="..\Broiler.Launcher.Core\Broiler.Launcher.Core.csproj"
+                      AdditionalProperties="BroilerOfficeAllInOne=true;BroilerIncludeBrowser=$(BroilerIncludeBrowser)"
+                      Condition="'$(BroilerOfficeAllInOne)' == 'true' And '$(Configuration)' != 'Office-Windows'" />
+    <ProjectReference Include="..\Broiler.Launcher.Core\Broiler.Launcher.Core.csproj"
+                      Condition="'$(BroilerOfficeAllInOne)' != 'true' Or '$(Configuration)' == 'Office-Windows'" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,5 +38,23 @@
     <PackageReference Include="Broiler.Input" />
     <PackageReference Include="Broiler.Input.Keyboard" />
     <PackageReference Include="Broiler.Input.Mouse" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(BroilerOfficeAllInOne)' == 'true'">
+    <Compile Include="..\Broiler.Launcher.Office\*.cs" Link="Office\Shared\%(Filename)%(Extension)" />
+    <ProjectReference Include="..\..\..\Broiler.Mail\src\Broiler.Mail.Core\Broiler.Mail.Core.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Mail\src\Broiler.Mail.Application\Broiler.Mail.Application.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Mail\src\Broiler.Mail.Infrastructure\Broiler.Mail.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Writer\src\Broiler.Writer\Broiler.Writer.Core.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Cells\src\Broiler.Cells.Core\Broiler.Cells.Core.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Cells\src\Broiler.Cells.Controls\Broiler.Cells.Controls.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Cells\src\Broiler.Cells.UI\Broiler.Cells.UI.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Plate\src\Broiler.Plate\Broiler.Plate.Core.csproj" />
+    <ProjectReference Include="..\..\..\Broiler.Browser\src\Broiler.Browser.Core\Broiler.Browser.Core.csproj" Condition="'$(BroilerIncludeBrowser)' == 'true'" />
+    <PackageReference Include="Broiler.Documents.Pdf" />
+    <PackageReference Include="Broiler.Documents.Pdf.Fonts" />
+    <PackageReference Include="Broiler.Documents.Pdf.Images" />
+    <PackageReference Include="Broiler.Media.Image.Managed" />
+    <PackageReference Include="Broiler.UI.Tooltip.Standard" />
   </ItemGroup>
 </Project>
