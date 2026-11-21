@@ -4,7 +4,14 @@ Unified workspace launcher application for the Broiler Platform suite: **Broiler
 
 ## All-In-One Single NativeAOT ("Broiler Office")
 
-The `Office-Windows` and `Office-Linux` configurations build **Broiler Office** as a single self-contained NativeAOT executable (`Broiler.Office.exe` on Windows, `Broiler.Office` on Linux) bundling **Mail**, **Writer**, **Cells**, and **Plate** via their `*.Core` / shared UI projects:
+The `Office-Windows` and `Office-Linux` configurations build **Broiler Office** as a single self-contained NativeAOT executable (`Broiler.Office.exe` on Windows, `Broiler.Office` on Linux) bundling **Mail**, **Writer**, **Cells**, and **Plate** via their `*.Core` / shared UI projects.
+
+Before restoring an Office build in a fresh checkout, run the following command from the repository root.
+It packs the required `Broiler.Documents` and `Broiler.Documents.Codecs` libraries into `artifacts/local-feed`.
+
+```powershell
+pwsh -File Broiler.Launcher/eng/pack-office-document-dependencies.ps1
+```
 
 ```shell
 # Publish single NativeAOT executable for Windows (win-x64)

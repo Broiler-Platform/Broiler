@@ -54,7 +54,7 @@
     <PackageVersion Include="Broiler.Documents.Ods" Version="0.1.0-preview.52" />
     <PackageVersion Include="Broiler.Documents.Odt" Version="0.1.0-preview.37" />
     <PackageVersion Include="Broiler.Documents.Pagination" Version="0.1.0-preview.52" />
-    <PackageVersion Include="Broiler.Documents.Pdf" Version="0.1.0-preview.37" />
+    <PackageVersion Include="Broiler.Documents.Pdf" Version="0.1.0-preview.52" />
     <PackageVersion Include="Broiler.Documents.Pdf.Fonts" Version="0.1.0-preview.37" />
     <PackageVersion Include="Broiler.Documents.Pdf.Images" Version="0.1.0-preview.37" />
     <PackageVersion Include="Broiler.Documents.Rtf" Version="0.1.0-preview.37" />

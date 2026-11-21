@@ -6,6 +6,51 @@
     <BuildType Name="Release-Windows" />
     <BuildType Name="Office-Windows" />
   </Configurations>
+  <Project Path="../Broiler.Cells/src/Broiler.Cells.Controls/Broiler.Cells.Controls.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Cells/src/Broiler.Cells.Core/Broiler.Cells.Core.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Cells/src/Broiler.Cells.UI/Broiler.Cells.UI.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Mail/src/Broiler.Mail.Application/Broiler.Mail.Application.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Mail/src/Broiler.Mail.Core/Broiler.Mail.Core.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Mail/src/Broiler.Mail.Infrastructure/Broiler.Mail.Infrastructure.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Plate/src/Broiler.Plate/Broiler.Plate.Core.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Writer/src/Broiler.Writer.FormatCodes/Broiler.Writer.FormatCodes.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
+  <Project Path="../Broiler.Writer/src/Broiler.Writer/Broiler.Writer.Core.csproj">
+    <BuildType Solution="Debug-Windows|*" Project="Debug" />
+    <BuildType Solution="Office-Windows|*" Project="Release" />
+    <BuildType Solution="Release-Windows|*" Project="Release" />
+  </Project>
   <Project Path="src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
   <Project Path="src/Broiler.Launcher.Core/Broiler.Launcher.Core.csproj" />
   <Project Path="src/Broiler.Launcher.Windows/Broiler.Launcher.Windows.csproj" />
