@@ -108,3 +108,12 @@
 [submodule "broiler-platform.github.io"]
 	path = broiler-platform.github.io
 	url = https://github.com/Broiler-Platform/broiler-platform.github.io
+[submodule "Broiler.Documents.Codecs"]
+	path = Broiler.Documents.Codecs
+	url = https://github.com/Broiler-Platform/Broiler.Documents.Codecs.git
+[submodule "Broiler.UI.Extended"]
+	path = Broiler.UI.Extended
+	url = https://github.com/Broiler-Platform/Broiler.UI.Extended.git
+[submodule "Broiler.UI.Shell"]
+	path = Broiler.UI.Shell
+	url = https://github.com/Broiler-Platform/Broiler.UI.Shell.git

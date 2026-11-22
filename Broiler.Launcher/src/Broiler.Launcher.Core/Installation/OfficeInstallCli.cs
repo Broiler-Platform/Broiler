@@ -22,6 +22,8 @@ public static class OfficeInstallCli
             var info = new System.Text.Json.Nodes.JsonObject {
                 ["demo"] = OfficeBuild.IsDemo,
                 ["bootstrapDemo"] = OfficeBuild.IsBootstrapDemo,
+                ["allInOne"] = OfficeBuild.IsAllInOne,
+                ["includesBrowser"] = OfficeBuild.IncludesBrowser,
                 ["nativeAot"] = !System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported,
                 ["version"] = typeof(OfficeBuild).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
                     .Cast<System.Reflection.AssemblyInformationalVersionAttribute>().Single().InformationalVersion,

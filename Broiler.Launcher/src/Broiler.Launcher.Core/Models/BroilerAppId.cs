@@ -8,6 +8,9 @@ public enum BroilerAppId
     /// <summary>Broiler Browser (Web browser).</summary>
     Browser,
 
+    /// <summary>Broiler Mail (Email client).</summary>
+    Mail,
+
     /// <summary>Broiler Writer (Word processor / document editor).</summary>
     Writer,
 

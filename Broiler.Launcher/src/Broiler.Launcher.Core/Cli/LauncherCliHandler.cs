@@ -54,12 +54,21 @@ public static class LauncherCliHandler
                 BroilerAppInfo? targetApp = FindAppByName(launcherService, targetName);
                 if (targetApp is null)
                 {
-                    Console.Error.WriteLine($"Error: Unknown application '{targetName}'. Available: browser, writer, cell, plate.");
+                    string available = string.Join(", ", System.Linq.Enumerable.Select(launcherService.Apps, a => a.ShortName.ToLowerInvariant()));
+                    Console.Error.WriteLine($"Error: Unknown application '{targetName}'. Available: {available}.");
                     exitCode = 1;
                     return true;
                 }
 
-                LaunchResult result = launcherService.LaunchAppWithArguments(targetApp, args[(i + 2)..]);
+                string[] appArgs = args[(i + 2)..];
+                if (BuiltInAppRegistry.TryGetRunner(targetApp.Id, out var builtInRunner) &&
+                    launcherService.ResolveApp(targetApp).IsBuiltIn)
+                {
+                    exitCode = builtInRunner(appArgs);
+                    return true;
+                }
+
+                LaunchResult result = launcherService.LaunchAppWithArguments(targetApp, appArgs);
                 if (result.Succeeded)
                 {
                     Console.WriteLine(result.Message);
@@ -84,7 +93,8 @@ public static class LauncherCliHandler
         {
             if (string.Equals(app.ShortName, name, StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(app.Id.ToString(), name, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(app.Title, name, StringComparison.OrdinalIgnoreCase))
+                string.Equals(app.Title, name, StringComparison.OrdinalIgnoreCase) ||
+                (app.Id == BroilerAppId.Cell && string.Equals(name, "cells", StringComparison.OrdinalIgnoreCase)))
             {
                 return app;
             }

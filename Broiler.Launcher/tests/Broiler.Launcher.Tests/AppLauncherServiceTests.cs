@@ -17,7 +17,7 @@ public class AppLauncherServiceTests
 
         try
         {
-            var service = new AppLauncherService(inventory: new EmptyInstallationInventory());
+            var service = new AppLauncherService(apps: BroilerAppInfo.CreateDefaultSuite(), inventory: new EmptyInstallationInventory());
             var app = service.Apps.First(a => a.Id == BroilerAppId.Browser);
 
             var resolution = service.ResolveApp(app, emptyTempDir);

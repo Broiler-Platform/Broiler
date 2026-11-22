@@ -133,6 +133,12 @@ public sealed partial class LauncherView
         }
         for (int i = 0; i < _updateButtons.Count; i++)
         {
+            if (_launcherService.ResolveApp(_launcherService.Apps[i]).IsBuiltIn)
+            {
+                _updateButtons[i].Visibility = UiVisibility.Collapsed;
+                _cardStatusLabels[i].Visibility = UiVisibility.Visible;
+                continue;
+            }
             string id = _launcherService.Apps[i].ShortName.ToLowerInvariant();
             var plan = _launcherService.Settings.GetOrCreate(_launcherService.Apps[i].Id).ShowUpdateActions ? PreferredUpdate(id) : null;
             _updateButtons[i].Visibility = plan is null ? UiVisibility.Collapsed : UiVisibility.Visible;

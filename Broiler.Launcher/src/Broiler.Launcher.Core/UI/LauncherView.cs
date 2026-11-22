@@ -88,10 +88,11 @@ public sealed partial class LauncherView : UiElement
         AccessibleName = "Broiler Launcher";
 
         _commands = new StandardCommandDispatcher();
-        _commands.Add(new StandardCommand("app.launch.browser", () => LaunchById(BroilerAppId.Browser)));
-        _commands.Add(new StandardCommand("app.launch.writer", () => LaunchById(BroilerAppId.Writer)));
-        _commands.Add(new StandardCommand("app.launch.cell", () => LaunchById(BroilerAppId.Cell)));
-        _commands.Add(new StandardCommand("app.launch.plate", () => LaunchById(BroilerAppId.Plate)));
+        foreach (BroilerAppInfo app in _launcherService.Apps)
+        {
+            BroilerAppId appId = app.Id;
+            _commands.Add(new StandardCommand($"app.launch.{app.ShortName.ToLowerInvariant()}", () => LaunchById(appId)));
+        }
         _commands.Add(new StandardCommand("launcher.settings", () => SettingsRequested?.Invoke(this, EventArgs.Empty)));
         _commands.Add(new StandardCommand("launcher.refresh", RefreshApps));
         _commands.Add(new StandardCommand("office.updates.check", () => _ = CheckUpdatesAsync(true)));
@@ -117,10 +118,18 @@ public sealed partial class LauncherView : UiElement
         };
 
         var fileMenu = new UiMenuItem("menu.file", "File") { AccessKey = 'F' };
-        fileMenu.Children.Add(new UiMenuItem("app.launch.browser", "Launch Browser") { AccessKey = 'B', Accelerator = "Ctrl+1", CommandName = "app.launch.browser" });
-        fileMenu.Children.Add(new UiMenuItem("app.launch.writer", "Launch Writer") { AccessKey = 'W', Accelerator = "Ctrl+2", CommandName = "app.launch.writer" });
-        fileMenu.Children.Add(new UiMenuItem("app.launch.cell", "Launch Cell") { AccessKey = 'C', Accelerator = "Ctrl+3", CommandName = "app.launch.cell" });
-        fileMenu.Children.Add(new UiMenuItem("app.launch.plate", "Launch Plate") { AccessKey = 'P', Accelerator = "Ctrl+4", CommandName = "app.launch.plate" });
+        for (int i = 0; i < _launcherService.Apps.Count; i++)
+        {
+            BroilerAppInfo app = _launcherService.Apps[i];
+            string commandName = $"app.launch.{app.ShortName.ToLowerInvariant()}";
+            string accelerator = i < 9 ? $"Ctrl+{i + 1}" : string.Empty;
+            fileMenu.Children.Add(new UiMenuItem(commandName, $"Launch {app.ShortName}")
+            {
+                AccessKey = app.ShortName[0],
+                Accelerator = accelerator,
+                CommandName = commandName,
+            });
+        }
         fileMenu.Children.Add(new UiMenuItem("menu.file.sep", "") { IsSeparator = true });
         fileMenu.Children.Add(new UiMenuItem("launcher.exit", "Exit") { AccessKey = 'X', Accelerator = "Alt+F4", CommandName = "launcher.exit" });
 
@@ -155,8 +164,10 @@ public sealed partial class LauncherView : UiElement
         _menu.SetItems([fileMenu, toolsMenu, helpMenu]);
         AddChild(_menu);
 
-        _titleLabel = StandardLabel.Title("Broiler Launcher");
-        _subtitleLabel = StandardLabel.Muted("Unified workspace launcher for native Broiler applications");
+        _titleLabel = StandardLabel.Title(OfficeBuild.IsAllInOne ? "Broiler Office" : "Broiler Launcher");
+        _subtitleLabel = StandardLabel.Muted(OfficeBuild.IsAllInOne
+            ? "All-in-one native workspace suite"
+            : "Unified workspace launcher for native Broiler applications");
         if (OfficeBuild.IsDemo)
         {
             _titleLabel.Text = "Broiler Office Demo";
@@ -404,9 +415,20 @@ public sealed partial class LauncherView : UiElement
         try
         {
             var states = new List<(int Index, InstallScope Scope, InstallAvailability Availability)>();
+            var builtInIndices = new HashSet<int>();
             for (int i = 0; i < _launcherService.Apps.Count; i++)
+            {
+                if (_launcherService.ResolveApp(_launcherService.Apps[i]).IsBuiltIn)
+                {
+                    builtInIndices.Add(i);
+                    continue;
+                }
+                string productId = _launcherService.Apps[i].Id.ToString().ToLowerInvariant();
+                if (!OfficeCatalog.ProductIds.Contains(productId, StringComparer.Ordinal))
+                    continue;
                 foreach (var scope in new[] { InstallScope.User, InstallScope.Machine })
-                    states.Add((i, scope, await _installationService.GetAvailabilityAsync(_launcherService.Apps[i].Id.ToString().ToLowerInvariant(), scope).ConfigureAwait(false)));
+                    states.Add((i, scope, await _installationService.GetAvailabilityAsync(productId, scope).ConfigureAwait(false)));
+            }
             var bossUser = await _installationService.GetAvailabilityAsync("boss", InstallScope.User).ConfigureAwait(false);
             var bossMachine = await _installationService.GetAvailabilityAsync("boss", InstallScope.Machine).ConfigureAwait(false);
             PostUi(() =>
@@ -418,6 +440,16 @@ public sealed partial class LauncherView : UiElement
                 _bossMenu.Children[5].Text = bossUser.Installation.State == InstallationState.Installed ? "BOSS " + bossUser.Reason : "Install BOSS for user";
                 _bossMenu.Children[6].Text = bossMachine.Installation.State == InstallationState.Installed ? "BOSS " + bossMachine.Reason : "Install BOSS for all";
                 _menu.Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+                foreach (int builtInIndex in builtInIndices)
+                {
+                    var split = _cardLaunchButtons[builtInIndex];
+                    _cardActionItems[builtInIndex][0].IsEnabled = false;
+                    _cardActionItems[builtInIndex][0].Text = "Built-in";
+                    _cardActionItems[builtInIndex][1].IsEnabled = false;
+                    _cardActionItems[builtInIndex][1].Text = "Built-in";
+                    split.Trigger.ToolTipText = "Included in Broiler Office";
+                    split.Menu.Invalidate(UiInvalidationKind.Render | UiInvalidationKind.Semantic);
+                }
                 foreach (var state in states)
                 {
                     var app = _launcherService.Apps[state.Index];
@@ -561,7 +593,7 @@ public sealed partial class LauncherView : UiElement
 
         var dialog = new StandardAboutDialog
         {
-            ProductName = "Broiler Launcher",
+            ProductName = OfficeBuild.IsAllInOne ? "Broiler Office" : "Broiler Launcher",
             ProductVersion = "0.1.0-preview.1",
         };
         await dialog.ShowModal(OwnerWindow);
@@ -594,28 +626,20 @@ public sealed partial class LauncherView : UiElement
                     return true;
                 }
 
-                switch (input.KeyName)
+                int? shortcutIndex = input.KeyName switch
                 {
-                    case "1":
-                    case "D1":
-                    case "NumPad1":
-                        LaunchById(BroilerAppId.Browser);
-                        return true;
-                    case "2":
-                    case "D2":
-                    case "NumPad2":
-                        LaunchById(BroilerAppId.Writer);
-                        return true;
-                    case "3":
-                    case "D3":
-                    case "NumPad3":
-                        LaunchById(BroilerAppId.Cell);
-                        return true;
-                    case "4":
-                    case "D4":
-                    case "NumPad4":
-                        LaunchById(BroilerAppId.Plate);
-                        return true;
+                    "1" or "D1" or "NumPad1" => 0,
+                    "2" or "D2" or "NumPad2" => 1,
+                    "3" or "D3" or "NumPad3" => 2,
+                    "4" or "D4" or "NumPad4" => 3,
+                    "5" or "D5" or "NumPad5" => 4,
+                    "6" or "D6" or "NumPad6" => 5,
+                    _ => null,
+                };
+                if (shortcutIndex is int idx && idx < _launcherService.Apps.Count)
+                {
+                    LaunchByIndex(idx);
+                    return true;
                 }
             }
         }
@@ -672,7 +696,7 @@ public sealed partial class LauncherView : UiElement
 
         bool useTwoColumns = contentWidth >= 560;
         int columns = useTwoColumns ? 2 : 1;
-        int rows = useTwoColumns ? 2 : 4;
+        int rows = Math.Max(1, (_cardTitles.Count + columns - 1) / columns);
         double gap = 14;
 
         double cardWidth = useTwoColumns

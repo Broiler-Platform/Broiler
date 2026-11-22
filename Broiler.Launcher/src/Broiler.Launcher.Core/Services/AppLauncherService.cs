@@ -21,6 +21,8 @@ public sealed class AppLauncherService : IAppLauncherService
     private readonly string _currentDirectory;
     private readonly Func<ProcessStartInfo, int?> _startProcess;
     private readonly IInstallationInventory _inventory;
+    private readonly IReadOnlyDictionary<BroilerAppId, Func<string[], int>> _builtInApps;
+    private readonly IReadOnlyDictionary<BroilerAppId, Action<string[]>> _builtInWindowOpeners;
 
     public AppLauncherService(
         IReadOnlyList<BroilerAppInfo>? apps = null,
@@ -29,7 +31,9 @@ public sealed class AppLauncherService : IAppLauncherService
         Func<string, string?>? environment = null,
         string? currentDirectory = null,
         Func<ProcessStartInfo, int?>? startProcess = null,
-        IInstallationInventory? inventory = null)
+        IInstallationInventory? inventory = null,
+        IReadOnlyDictionary<BroilerAppId, Func<string[], int>>? builtInApps = null,
+        IReadOnlyDictionary<BroilerAppId, Action<string[]>>? builtInWindowOpeners = null)
     {
         NativeLauncherServices.EnsureAvailable();
         _isWindows = isWindows ?? OperatingSystem.IsWindows();
@@ -37,9 +41,13 @@ public sealed class AppLauncherService : IAppLauncherService
         _environment = environment ?? Environment.GetEnvironmentVariable;
         _currentDirectory = currentDirectory ?? Environment.CurrentDirectory;
         _startProcess = startProcess ?? (info => { using var process = Process.Start(info); return process?.Id; });
-        _apps = apps ?? BroilerAppInfo.CreateDefaultSuite();
+        _apps = apps ?? (OfficeBuild.IsAllInOne
+            ? BroilerAppInfo.CreateOfficeSuite(OfficeBuild.IncludesBrowser)
+            : BroilerAppInfo.CreateDefaultSuite());
         _settingsStore = settingsStore ?? new LauncherSettingsStore();
         _settings = _settingsStore.Load();
+        _builtInApps = builtInApps ?? BuiltInAppRegistry.Snapshot();
+        _builtInWindowOpeners = builtInWindowOpeners ?? BuiltInAppRegistry.SnapshotWindowOpeners();
     }
 
     public IReadOnlyList<BroilerAppInfo> Apps => _apps;
@@ -95,6 +103,16 @@ public sealed class AppLauncherService : IAppLauncherService
         bool isWindows = _isWindows;
         var platform = app.GetPlatform(isWindows);
         if (platform is null) return AppResolution.NotFound("Unsupported on this platform");
+
+        if (_builtInApps.ContainsKey(app.Id) || _builtInWindowOpeners.ContainsKey(app.Id))
+        {
+            string selfPath = Environment.ProcessPath
+                ?? Path.Combine(searchBase, platform.BinaryName);
+            return AppResolution.Available(selfPath, launchWithDotnet: false, statusText: "Ready (Built-in)") with
+            {
+                IsBuiltIn = true,
+            };
+        }
 
         // Managed scope identity comes from receipts, independently of portable/workspace discovery.
         var preferredScope = _settings.GetOrCreate(app.Id).PreferredInstalledScope;
@@ -190,13 +208,33 @@ public sealed class AppLauncherService : IAppLauncherService
             AppResolution resolution = ResolveApp(app, baseDirectory);
             if (!resolution.IsAvailable || string.IsNullOrEmpty(resolution.ResolvedPath))
                 return LaunchResult.Failure($"Cannot launch {app.Title}: {resolution.StatusText}.");
+            if (resolution.IsBuiltIn)
+            {
+                if (_builtInWindowOpeners.TryGetValue(app.Id, out Action<string[]>? openWindow))
+                {
+                    var combinedArgs = new List<string>();
+                    foreach (var token in LaunchArguments.Parse(_settings.GetOrCreate(app.Id).Arguments))
+                        combinedArgs.Add(token);
+                    foreach (var token in arguments)
+                        combinedArgs.Add(token);
+
+                    openWindow(combinedArgs.ToArray());
+                    return LaunchResult.Success(Environment.ProcessId, $"Opened {app.Title}", resolution.ResolvedPath);
+                }
+
+                return LaunchResult.Failure($"No in-process window opener is registered for {app.Title}.");
+            }
+
             var info = new ProcessStartInfo
             {
                 FileName = resolution.LaunchWithDotnet ? "dotnet" : resolution.ResolvedPath,
                 UseShellExecute = false,
                 WorkingDirectory = Path.GetDirectoryName(resolution.ResolvedPath) ?? string.Empty,
             };
-            if (resolution.LaunchWithDotnet) info.ArgumentList.Add(resolution.ResolvedPath);
+            if (resolution.LaunchWithDotnet)
+            {
+                info.ArgumentList.Add(resolution.ResolvedPath);
+            }
             foreach (var token in LaunchArguments.Parse(_settings.GetOrCreate(app.Id).Arguments)) info.ArgumentList.Add(token);
             foreach (var token in arguments) info.ArgumentList.Add(token);
             int? pid = _startProcess(info);

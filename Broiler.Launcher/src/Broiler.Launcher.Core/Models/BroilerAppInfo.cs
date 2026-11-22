@@ -137,6 +137,50 @@ public sealed record BroilerAppInfo(
                 "Broiler.Plate/src/Broiler.Plate.Linux/bin/Release-Linux/net10.0/linux-x64/Broiler.Plate.Linux",
             ]),
     ];
+
+    /// <summary>
+    /// Gets the descriptor for Broiler Mail.
+    /// </summary>
+    public static BroilerAppInfo CreateMailAppInfo() =>
+        new(
+            Id: BroilerAppId.Mail,
+            Title: "Broiler Mail",
+            ShortName: "Mail",
+            Tagline: "Email & offline archive",
+            Description: "Desktop IMAP/SMTP email client with offline search, drafts, and multi-account profiles.",
+            Category: "Communication",
+            BadgeText: "MAIL",
+            AccentColor: BColor.FromArgb(255, 0, 121, 107), // Teal
+            WindowsExeName: "Broiler.Mail.Windows.exe",
+            WindowsDllName: "Broiler.Mail.Windows.dll",
+            LinuxBinaryName: "Broiler.Mail.Linux",
+            LinuxDllName: "Broiler.Mail.Linux.dll",
+            RelativeProbePaths:
+            [
+                "Broiler.Mail/src/Broiler.Mail.Windows/bin/Release/net10.0-windows/Broiler.Mail.Windows.exe",
+                "Broiler.Mail/src/Broiler.Mail.Windows/bin/Debug/net10.0-windows/Broiler.Mail.Windows.exe",
+                "Broiler.Mail/src/Broiler.Mail.Linux/bin/Release/net10.0/Broiler.Mail.Linux",
+                "Broiler.Mail/src/Broiler.Mail.Linux/bin/Debug/net10.0/Broiler.Mail.Linux",
+            ]);
+
+    /// <summary>
+    /// Gets the all-in-one Broiler Office suite of applications bundled into a single executable.
+    /// Browser is excluded by default until Browser NativeAOT support stabilizes.
+    /// </summary>
+    public static IReadOnlyList<BroilerAppInfo> CreateOfficeSuite(bool includeBrowser = false)
+    {
+        var defaultSuite = CreateDefaultSuite();
+        var apps = new List<BroilerAppInfo>(includeBrowser ? 5 : 4);
+        if (includeBrowser)
+        {
+            apps.Add(defaultSuite[0]); // Browser
+        }
+        apps.Add(CreateMailAppInfo());
+        apps.Add(defaultSuite[1]); // Writer
+        apps.Add(defaultSuite[2] with { SupportsLinux = true }); // Cell (supported on Linux in All-In-One)
+        apps.Add(defaultSuite[3]); // Plate
+        return apps;
+    }
 }
 
 public sealed record AppPlatformInfo(string BinaryName, string DllName, IReadOnlyList<string> ProbePaths);

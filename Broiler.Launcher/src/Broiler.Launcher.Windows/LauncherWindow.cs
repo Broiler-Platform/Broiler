@@ -26,6 +26,9 @@ namespace Broiler.Launcher.Windows;
 /// Dispatches graphics, pointer, and keyboard input events from Direct2D into the Broiler.UI session.
 /// </summary>
 internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
+#if BROILER_OFFICE_ALL_IN_ONE
+    , Broiler.Launcher.Windows.Office.IOfficeUiThreadTarget
+#endif
 {
     [DllImport("user32.dll", ExactSpelling = true)]
     private static extern nint LoadCursorW(nint hInstance, nint lpCursorName);
@@ -48,17 +51,23 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
     private readonly StandardLegacyGraphicsInputAdapter _input = new("broiler-launcher");
 #pragma warning restore CS0618
 
-    public LauncherWindow() : base(new BWindowOptions
+    public LauncherWindow(bool ownsMessageLoop = true) : base(new BWindowOptions
     {
-        Title = OfficeBuild.IsDemo ? "Broiler Office Demo (unsigned)" : "Broiler Launcher",
+        Title = OfficeBuild.IsDemo
+            ? "Broiler Office Demo (unsigned)"
+            : OfficeBuild.IsAllInOne ? "Broiler Office" : "Broiler Launcher",
         ClientWidth = 840,
         ClientHeight = 560,
         MinClientWidth = 640,
         MinClientHeight = 480,
         ClearColor = LauncherView.CanvasColor,
         RenderOptions = new BRenderOptions(Antialias: true, VSync: true, SubpixelText: true),
+        OwnsMessageLoop = ownsMessageLoop,
     })
     {
+        if (!ownsMessageLoop)
+            CloseRequested += (_, _) => Close();
+
         _dispatcher = new StandardQueuedUiDispatcher(() => PostToUiThread(DrainDispatcher));
         _session = new StandardUiSessionBuilder().WithDispatcher(_dispatcher).Build(this);
 
@@ -72,7 +81,11 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
         _shell = new LauncherShellView(ownerWindow: _rootWindow,
             installationService: ProductInstallationService.CreateDefault(new WindowsMachineInstallBroker()), machineUpdateBroker: new WindowsMachineInstallBroker());
         _rootWindow.AddChild(_shell);
-        _shell.LauncherView.ExitRequested += (_, _) => Close();
+        _shell.LauncherView.ExitRequested += (_, _) =>
+        {
+            if (!PostToUiThread(Close))
+                Close();
+        };
 
         _session.AddRoot(_rootWindow);
         StandardThemeController.Apply(_session, LauncherView.Theme);
@@ -83,6 +96,9 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
     BRenderList IUiHost.CreateRenderList(int capacity) => new(capacity);
     void IUiHost.Invalidate(UiInvalidation invalidation) => Invalidate();
     void IUiHost.Present(BRenderList renderList) { }
+#if BROILER_OFFICE_ALL_IN_ONE
+    bool Broiler.Launcher.Windows.Office.IOfficeUiThreadTarget.PostUiAction(Action callback) => PostToUiThread(callback);
+#endif
 
     protected override void OnCreated()
     {
@@ -98,6 +114,8 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
 
     protected override BRenderList? BuildRenderList(BSize clientSize)
     {
+        if (_session.IsDisposed)
+            return null;
         DrainDispatcher();
         return _session.RenderFrame();
     }
@@ -162,7 +180,10 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
 
     private void Dispatch(UiInputEvent input)
     {
-        if (_session.DispatchInput(input))
+        if (_session.IsDisposed)
+            return;
+
+        if (_session.DispatchInput(input) && !IsDisposed && NativeHandle != 0)
             Invalidate();
     }
 
