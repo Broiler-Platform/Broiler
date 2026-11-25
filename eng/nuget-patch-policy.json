@@ -1,0 +1,9 @@
+{
+  "pilots": {
+    "Broiler.CSS": "Broiler-Platform/Broiler.CSS",
+    "Broiler.DOM": "Broiler-Platform/Broiler.DOM",
+    "Broiler.DateTime": "Broiler-Platform/Broiler.DateTime"
+  },
+  "previewPackages": ["broiler.dom"],
+  "guardedDirectories": ["ReferenceArms", "fixtures", "testdata", "witnesses"]
+}

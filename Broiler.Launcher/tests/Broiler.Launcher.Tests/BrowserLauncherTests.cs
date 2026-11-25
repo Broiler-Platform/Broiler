@@ -41,4 +41,21 @@ public class BrowserLauncherTests
         launcher.SetOpenInNewTab(true);
         Assert.True(new BrowserLauncher(_ => { }, preferences).OpenInNewTab);
     }
+    [Theory]
+    [InlineData("writer", "/writer/")]
+    [InlineData("cell", "/cell/")]
+    [InlineData("plate", "/plate/")]
+    public void BrowserLaunchSupportsSameOriginLocalBossPaths(string id, string expected)
+    {
+        var deployment = new BrowserDeploymentInfo("preview", "1.0.0", "1.0.0", "1.0.0", "1.0.0", true)
+        {
+            WriterUrl = "/writer/",
+            CellUrl = "/cell/",
+            PlateUrl = "/plate/",
+        };
+        Uri? address = null; var launcher = new BrowserLauncher(uri => address = uri, new Preferences(), deployment);
+        Assert.True(launcher.Launch(id));
+        Assert.False(address!.IsAbsoluteUri);
+        Assert.Equal(expected, address.OriginalString);
+    }
 }

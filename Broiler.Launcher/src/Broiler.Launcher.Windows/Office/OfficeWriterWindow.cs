@@ -13,6 +13,7 @@ using Broiler.Graphics.Windowing;
 using Broiler.Graphics.Windows;
 using Broiler.Hosting.Windows;
 using Broiler.Input.Keyboard;
+using Broiler.Native.Windows;
 using Broiler.UI;
 using Broiler.UI.Standard;
 using Broiler.Writer;
@@ -128,7 +129,7 @@ internal sealed class OfficeWriterWindow : Direct2DWindow, IOfficeUiThreadTarget
     private void CloseNativeWindowNow()
     {
         if (NativeHandle != 0)
-            _ = DestroyWindow(NativeHandle);
+            _ = WindowNative.DestroyWindow(NativeHandle);
     }
 
     protected override void OnNativeWindowMessage(nint hwnd, uint message, nint wParam, nint lParam)
@@ -140,17 +141,10 @@ internal sealed class OfficeWriterWindow : Direct2DWindow, IOfficeUiThreadTarget
             if ((message == 0x0006 && wParam.ToInt64() != 0) || message == 0x0007)
             {
                 if (RenderNativeHandle != 0)
-                    _ = SetFocus(RenderNativeHandle);
+                    _ = WindowNative.SetFocus(RenderNativeHandle);
             }
         }
     }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DestroyWindow(nint hwnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint SetFocus(nint hWnd);
 
     private sealed class WriterWindowUiHost : WriterUiHost, IUiWindowHost
     {
@@ -206,7 +200,7 @@ internal sealed class OfficeWriterWindow : Direct2DWindow, IOfficeUiThreadTarget
     private sealed class CloseGuard : IDisposable
     {
         private readonly Action _requestClose;
-        private readonly SubclassProc _callback;
+        private readonly WindowNative.SubclassProc _callback;
         private nint _window;
 
         public CloseGuard(nint window, Action requestClose)
@@ -214,7 +208,7 @@ internal sealed class OfficeWriterWindow : Direct2DWindow, IOfficeUiThreadTarget
             _window = window;
             _requestClose = requestClose;
             _callback = HandleMessage;
-            if (!SetWindowSubclass(window, _callback, 1, 0))
+            if (!WindowNative.SetWindowSubclass(window, _callback, 1, 0))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
         }
 
@@ -222,7 +216,7 @@ internal sealed class OfficeWriterWindow : Direct2DWindow, IOfficeUiThreadTarget
         {
             if (_window == 0)
                 return;
-            RemoveWindowSubclass(_window, _callback, 1);
+            WindowNative.RemoveWindowSubclass(_window, _callback, 1);
             _window = 0;
         }
 
@@ -235,22 +229,8 @@ internal sealed class OfficeWriterWindow : Direct2DWindow, IOfficeUiThreadTarget
             }
             if (message == 0x0082)
                 Dispose();
-            return DefSubclassProc(window, message, wParam, lParam);
+            return WindowNative.DefSubclassProc(window, message, wParam, lParam);
         }
-
-        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-        private delegate nint SubclassProc(nint window, uint message, nint wParam, nint lParam, nuint subclassId, nuint referenceData);
-
-        [DllImport("comctl32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetWindowSubclass(nint window, SubclassProc callback, nuint id, nuint data);
-
-        [DllImport("comctl32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool RemoveWindowSubclass(nint window, SubclassProc callback, nuint id);
-
-        [DllImport("comctl32.dll")]
-        private static extern nint DefSubclassProc(nint window, uint message, nint wParam, nint lParam);
     }
 }
 #endif

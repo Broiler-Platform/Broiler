@@ -23,9 +23,9 @@ public sealed class BrowserLauncher(Action<Uri> navigate, IBrowserPreferences pr
     public BrowserCapabilities Capabilities { get; } = new();
     public IReadOnlyList<BrowserProduct> Products { get; } = Array.AsReadOnly(new[] {
         new BrowserProduct("browser", "Broiler Browser", null),
-        new BrowserProduct("writer", "Broiler Writer", new Uri(deployment is { Approved: true } ? deployment.WriterUrl : "https://writer.broiler.app/")),
-        new BrowserProduct("cell", "Broiler Cell", new Uri(deployment is { Approved: true } ? deployment.CellUrl : "https://cell.broiler.app/")),
-        new BrowserProduct("plate", "Broiler Plate", new Uri(deployment is { Approved: true } ? deployment.PlateUrl : "https://plate.broiler.app/")),
+        new BrowserProduct("writer", "Broiler Writer", new Uri(deployment is { Approved: true } ? deployment.WriterUrl : "https://writer.broiler.app/", UriKind.RelativeOrAbsolute)),
+        new BrowserProduct("cell", "Broiler Cell", new Uri(deployment is { Approved: true } ? deployment.CellUrl : "https://cell.broiler.app/", UriKind.RelativeOrAbsolute)),
+        new BrowserProduct("plate", "Broiler Plate", new Uri(deployment is { Approved: true } ? deployment.PlateUrl : "https://plate.broiler.app/", UriKind.RelativeOrAbsolute)),
     });
 
     public bool Launch(string id)

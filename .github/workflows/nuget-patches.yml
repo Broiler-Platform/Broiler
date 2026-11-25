@@ -1,0 +1,126 @@
+name: Broiler NuGet patch audit
+
+on:
+  schedule:
+    - cron: '17 8 * * 1'
+      timezone: Europe/Berlin
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Repository to audit and validate
+        type: choice
+        options:
+          - All
+          - Broiler.CSS
+          - Broiler.DOM
+          - Broiler.DateTime
+        default: All
+      draft_prs:
+        description: Open or refresh draft PRs for the selected pilot
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nuget-patches-${{ inputs.repository || 'All' }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    outputs:
+      validated: ${{ steps.audit.outputs.validated }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Select component release commits
+        shell: bash
+        run: bash scripts/nuget_select_component_heads.sh
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Check patch policy and draft reuse
+        run: python -m unittest discover -s scripts/tests -p test_nuget_patches.py
+      - name: Evaluate package references
+        run: python scripts/nuget_publish_order.py --component-heads
+      - name: Scan dependency versions and validate pilot patches
+        id: audit
+        env:
+          TARGET: ${{ inputs.repository || 'All' }}
+        shell: pwsh
+        run: |
+          $arguments = @()
+          if ($env:TARGET -eq 'All') {
+            $arguments = @('--validate', 'Broiler.DateTime', '--validate', 'Broiler.DOM', '--validate', 'Broiler.CSS')
+          } else {
+            $arguments = @('--repository', $env:TARGET, '--validate', $env:TARGET)
+          }
+          python scripts/nuget_patches.py @arguments
+          $auditExit = $LASTEXITCODE
+          foreach ($name in @('patch-summary.md', 'patch-blockers.md')) {
+            $summary = Join-Path 'artifacts/nuget-patches' $name
+            if (Test-Path -LiteralPath $summary) {
+              Get-Content -Raw -LiteralPath $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+            }
+          }
+          exit $auditExit
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: nuget-patch-plan
+          path: |
+            artifacts/nuget-patches/patch-plan.json
+            artifacts/nuget-patches/patch-summary.md
+            artifacts/nuget-patches/patch-blockers.json
+            artifacts/nuget-patches/patch-blockers.md
+            artifacts/nuget-patches/*.patch
+          if-no-files-found: error
+          retention-days: 90
+
+  draft:
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.draft_prs && inputs.repository != 'All' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      needs.audit.outputs.validated == 'true'
+    needs: audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: nuget-patch-prs
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v7
+        with:
+          name: nuget-patch-plan
+          path: patch-plan
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          client-id: ${{ vars.NUGET_PATCH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NUGET_PATCH_APP_PRIVATE_KEY }}
+          owner: Broiler-Platform
+          repositories: ${{ inputs.repository }}
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Open or refresh draft PRs
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TARGET: ${{ inputs.repository }}
+        shell: bash
+        run: |
+          gh auth setup-git --hostname github.com
+          python scripts/nuget_patch_drafts.py "$TARGET" patch-plan

@@ -58,7 +58,7 @@ internal static class LauncherApp
         _renderer = new(); _renderer.Initialize("#launcher-canvas");
         _frames = new(BrowserInterop.Invalidate); _host = new(_renderer);
         var deployment = BrowserDeploymentInfo.Read(BrowserInterop.Metadata());
-        _launcher = new(uri => BrowserInterop.Navigate(uri.AbsoluteUri, _launcher!.OpenInNewTab), new Preferences(), deployment);
+        _launcher = new(uri => BrowserInterop.Navigate(uri.IsAbsoluteUri ? uri.AbsoluteUri : uri.OriginalString, _launcher!.OpenInNewTab), new Preferences(), deployment);
         _session = new StandardUiSessionBuilder().WithDispatcher(new LauncherDispatcher(_frames)).Build(_host);
         _view = new(_launcher, deployment, () => { _launcher.SetTheme(_launcher.Theme == "dark" ? "light" : "dark"); ApplyTheme(); });
         _root = new() { Title = "Broiler Office", Chrome = UiWindowChrome.None, BorderThickness = 0 };

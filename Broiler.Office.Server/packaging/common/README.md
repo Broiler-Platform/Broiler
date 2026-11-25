@@ -1,11 +1,12 @@
 # BOSS — Broiler Office Standalone Server
 
-A single Kestrel web server that hosts the **Broiler Office** web apps. Today that is **Broiler
-Writer**, the word processor, compiled to WebAssembly and served from this folder — no external web
-server, no Node, no Python `http.server`.
+A single Kestrel web server and local WebAssembly launcher that hosts the **Broiler Office** web
+suite — **Broiler Office Launcher** (`/`), **Broiler Writer** (`/writer/`), **Broiler Cell**
+(`/cell/`), and **Broiler Plate** (`/plate/`) — compiled to WebAssembly and served from this folder
+with no external web server, no Node, and no Python `http.server`.
 
 Everything the server needs is in this directory: the executable, `appsettings.json`, and `wwwroot/`
-holding the complete Writer bundle (the mono-wasm runtime and its content-hashed assets).
+holding the complete Broiler Office bundles (the mono-wasm runtimes and their content-hashed assets).
 
 This is the root of a Broiler Preview Package, so `Broiler.Browser` and `Broiler.Writer` — the
 desktop applications — sit here too and share the runtime files around them. They are independent of
@@ -86,7 +87,11 @@ variables → command-line arguments. So a command-line `--urls` always wins.
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Broiler Writer. Any unknown path also returns the app shell, so client-side routes survive a refresh. |
+| `/` | Broiler Office Launcher. Any unknown root path returns the launcher shell. |
+| `/writer/` | Broiler Writer (word processor). |
+| `/cell/` | Broiler Cell (spreadsheet). |
+| `/plate/` | Broiler Plate (document and graphics viewer). |
+| `/office-web.json` | Local same-origin Office catalog consumed by the WebAssembly Launcher. |
 | `/healthz` | Liveness probe. Returns `200 OK` with the body `OK` — point your load balancer or monitoring here. |
 | `/api/info` | JSON: server name, version, and the list of hosted apps. |
 

@@ -55,4 +55,17 @@ public class BrowserDeploymentTests
         Assert.False(BrowserDeploymentInfo.Read(json.Replace("broiler-platform.github.io", "other.github.io")).Approved);
     }
     [Fact] public void NullProductFailsClosed() => Assert.False(BrowserDeploymentInfo.Read(Approved.Replace("{\"id\":\"cell\",\"url\":\"https://cell.broiler.app/\",\"version\":\"cell-2\"}", "null")).Approved);
+    [Fact] public void SameOriginLocalBossDestinationsAreAllowed()
+    {
+        var json = Approved.Replace("https://writer.broiler.app/", "/writer/")
+            .Replace("https://cell.broiler.app/", "/cell/")
+            .Replace("https://plate.broiler.app/", "/plate/");
+        var info = BrowserDeploymentInfo.Read(json);
+        Assert.True(info.Approved);
+        Assert.Equal("/writer/", info.WriterUrl);
+        Assert.Equal("/cell/", info.CellUrl);
+        Assert.Equal("/plate/", info.PlateUrl);
+        Assert.False(BrowserDeploymentInfo.Read(json.Replace("/writer/", "/other/")).Approved);
+        Assert.False(BrowserDeploymentInfo.Read(json.Replace("/writer/", "//other.example/writer/")).Approved);
+    }
 }

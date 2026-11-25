@@ -1,40 +1,54 @@
 # BOSS — Broiler Office Standalone Server
 
-A self-contained **ASP.NET Core / Kestrel** web server that hosts the Broiler Office web apps. It
-serves the **Broiler Writer** WebAssembly word processor (`Broiler.Writer.WebAssembly`) directly from
-Kestrel — no external static file server (Python `http.server`, nginx, …) required.
+A self-contained **ASP.NET Core / Kestrel** web server and local WebAssembly launcher that hosts
+the **Broiler Office** web suite directly from Kestrel — no external static file server (Python
+`http.server`, nginx, …) required:
+
+- **`/`** — **Broiler Office Launcher** (`Broiler.Launcher.WebAssembly`)
+- **`/writer/`** — **Broiler Writer** (`Broiler.Writer.WebAssembly`)
+- **`/cell/`** — **Broiler Cell** (`Broiler.Cells.WebAssembly`)
+- **`/plate/`** — **Broiler Plate** (`Broiler.Plate.WebAssembly`)
 
 ## Hosting model — vendored publish
 
-The Writer is a `Microsoft.NET.Sdk.WebAssembly` app (not Blazor). The classic Blazor *hosted* model
-(`Microsoft.AspNetCore.Components.WebAssembly.Server` + a `ProjectReference`) serves it fine in
-development but, on **publish**, never bakes the WebAssembly SDK's transformed `index.html` (the
-import map + content-hashed script references) into the output — it ships the raw placeholder
-`index.html` and the app cannot boot.
+Each Broiler Office web app is a `Microsoft.NET.Sdk.WebAssembly` app (not Blazor). The classic
+Blazor *hosted* model (`Microsoft.AspNetCore.Components.WebAssembly.Server` + a `ProjectReference`)
+serves it fine in development but, on **publish**, never bakes the WebAssembly SDK's transformed
+`index.html` (the import map + content-hashed script references) into the output — it ships the raw
+placeholder `index.html` and the app cannot boot.
 
-So BOSS instead **vendors the Writer's *published* `wwwroot`** — the transformed `index.html`, the
-`_framework/` mono-wasm runtime, and every content-hashed asset — and serves it as plain static files.
-That is exactly the bundle the standalone `python -m http.server` flow serves, just hosted by Kestrel,
-and it behaves identically under `dotnet run` and `dotnet publish`.
+So BOSS instead **vendors each client's *published* `wwwroot`** — the transformed `index.html`, the
+`_framework/` mono-wasm runtime, and every content-hashed asset — and serves them as plain static
+files. It behaves identically under `dotnet run` and `dotnet publish`.
 
-How the bundle gets here (see [`Broiler.Office.Server.csproj`](Broiler.Office.Server.csproj)):
+How the bundles get here (see [`Broiler.Office.Server.csproj`](Broiler.Office.Server.csproj)):
 
-1. `PublishWriterClient` publishes `Broiler.Writer.WebAssembly` **trimmed** (untrimmed crashes mono at
-   boot) into `obj/writer-client/`. It is skipped once staged; force a refresh with
-   `-p:ForceWriterClientPublish=true` after changing the Writer.
-2. `VendorWriterClientForRun` copies that bundle into this project's `wwwroot/` for `dotnet run`.
-3. `VendorWriterClientForPublish` copies it into the publish output `wwwroot/` for `dotnet publish`.
+1. `PublishOfficeClients` publishes `Broiler.Launcher.WebAssembly`, `Broiler.Writer.WebAssembly`,
+   `Broiler.Cells.WebAssembly`, and `Broiler.Plate.WebAssembly` **trimmed** (untrimmed crashes mono
+   at boot) into `obj/<app>-client/`. Each is skipped once staged; force a refresh with
+   `-p:ForceOfficeClientsPublish=true` (or per-client `ForceLauncherClientPublish`,
+   `ForceWriterClientPublish`, `ForceCellClientPublish`, `ForcePlateClientPublish`).
+2. `VendorOfficeClientsForRun` copies those bundles into this project's `wwwroot/` (`wwwroot/`,
+   `wwwroot/writer/`, `wwwroot/cell/`, `wwwroot/plate/`) for `dotnet run`.
+3. `VendorOfficeClientsForPublish` copies them into the publish output `wwwroot/` for
+   `dotnet publish`.
 
 `wwwroot/` is generated and git-ignored. [`Program.cs`](Program.cs) serves it with a content-type
-provider that covers the `_framework` runtime blobs (`.wasm` → `application/wasm`, ICU `.dat`, …).
+provider that covers the `_framework` runtime blobs (`.wasm` → `application/wasm`, ICU `.dat`, …),
+provides local same-origin catalog metadata at `/office-web.json`, and adapts the HTML shell links
+so the Launcher and every Office app navigate locally without modifying any SRI-hashed asset.
 
 ## Endpoints
 
-| Route        | Purpose                                                            |
-| ------------ | ----------------------------------------------------------------- |
-| `/`          | Broiler Writer (WebAssembly).                                      |
-| `/healthz`   | Liveness probe — returns `OK`.                                     |
-| `/api/info`  | JSON: server identity, version, and the list of hosted apps.      |
+| Route              | Purpose                                                                |
+| ------------------ | ---------------------------------------------------------------------- |
+| `/`                | Broiler Office Launcher (WebAssembly).                                 |
+| `/writer/`         | Broiler Writer — word processor (WebAssembly).                         |
+| `/cell/`           | Broiler Cell — spreadsheet (WebAssembly).                              |
+| `/plate/`          | Broiler Plate — document & graphics viewer (WebAssembly).              |
+| `/office-web.json` | Local same-origin Office catalog consumed by the WebAssembly Launcher. |
+| `/healthz`         | Liveness probe — returns `OK`.                                         |
+| `/api/info`        | JSON: server identity, version, and the list of hosted apps.           |
 
 ## Run (development)
 

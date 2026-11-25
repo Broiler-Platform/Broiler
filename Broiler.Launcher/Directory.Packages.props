@@ -63,8 +63,8 @@
     <PackageVersion Include="Broiler.HTML.Image" Version="0.1.0-preview.35" />
     <PackageVersion Include="Broiler.HTML.Image.Compat" Version="0.1.0-preview.35" />
     <PackageVersion Include="Broiler.Media.Image.Managed" Version="0.1.0-preview.19" />
-    <PackageVersion Include="Broiler.Native.Windows" Version="0.1.0-preview.11" />
-    <PackageVersion Include="Broiler.Native.Linux" Version="0.1.0-preview.11" />
+    <PackageVersion Include="Broiler.Native.Windows" Version="0.1.0-preview.12" />
+    <PackageVersion Include="Broiler.Native.Linux" Version="0.1.0-preview.12" />
     <PackageVersion Include="Broiler.Net" Version="0.1.0-preview.4" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="11.0.0" />
     <PackageVersion Include="Broiler.Input" Version="0.1.0-preview.9" />

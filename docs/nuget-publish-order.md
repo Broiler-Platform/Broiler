@@ -352,8 +352,10 @@ Each wave contains packages whose Broiler prerequisites occur in earlier waves. 
 
 ## Recalculate
 
+The graph above is the October snapshot. For current package classifications, publisher ownership, and the manual GitHub Actions workflow, see the [phase 1 inventory and publisher reconciliation](nuget-maintenance-roadmap.md#phase-1-inventory-and-publisher-reconciliation).
+
 ```powershell
-python scripts/nuget_publish_order.py
+python scripts/nuget_publish_order.py --check-feed
 ```
 
-The script reads MSBuild metadata without restoring/building and writes the evaluated project snapshot plus `publish-order.json` under `artifacts/nuget-publish-order/`. Its `--reuse-evaluation` option recomputes graphs from that snapshot and must not be used after source dependency changes. The checked-in [machine-readable graph](nuget-package-publish-order.json) includes package-to-project ownership, every direct prerequisite, all waves and cycle/error results.
+The script reads MSBuild metadata without restoring or building. It writes `evaluated-projects.json`, `publish-order.json`, and `inventory-summary.md` under `artifacts/nuget-publish-order/`. Use `--reuse-evaluation` only on the same host and an unchanged source tree. The checked-in [machine-readable October graph](nuget-package-publish-order.json) remains the comparison baseline.

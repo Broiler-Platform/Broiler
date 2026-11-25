@@ -45,7 +45,8 @@ public sealed record BrowserDeploymentInfo(string Channel, string CatalogVersion
     private static bool Destination(string? url, string product, string? version) =>
         Label(version) && version!.All(c => char.IsAsciiLetterOrDigit(c) || c is '.' or '-' or '+') &&
         (url == $"https://{product}.broiler.app/" || url == $"https://{product}.broiler.app/releases/{version}/" ||
-         url == $"https://broiler-platform.github.io/{product}/releases/{version}/");
+         url == $"https://broiler-platform.github.io/{product}/releases/{version}/" ||
+         url == $"/{product}/");
 }
 internal sealed class DeploymentDocument
 {

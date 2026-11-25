@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Broiler.Mail.Core.Accounts;
 using Broiler.Mail.Core.Services;
+using Broiler.Native.Windows.Credentials;
 
 namespace Broiler.Launcher.Windows.Office;
 
@@ -16,38 +17,33 @@ namespace Broiler.Launcher.Windows.Office;
 [SupportedOSPlatform("windows7.0")]
 internal sealed class OfficeWindowsCredentialStore : ICredentialStore
 {
-    private const uint Generic = 1;
-    private const uint PersistLocalMachine = 2;
-    private const int NotFound = 1168;
-    private const int MaximumBlobBytes = 2560;
-
     public Task<string?> ReadAsync(CredentialKey key, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(key);
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!CredRead(Target(key), Generic, 0, out nint pointer))
+            if (!CredentialNative.CredRead(Target(key), CredentialNative.CredTypeGeneric, 0, out nint pointer))
             {
                 int error = Marshal.GetLastWin32Error();
-                if (error == NotFound) return null;
+                if (error == CredentialNative.ErrorNotFound) return null;
                 throw Failure("read", error);
             }
 
-            NativeCredential credential = default;
+            CredentialNative.CREDENTIAL credential = default;
             try
             {
-                credential = Marshal.PtrToStructure<NativeCredential>(pointer);
+                credential = Marshal.PtrToStructure<CredentialNative.CREDENTIAL>(pointer);
                 if (credential.UserName != key.Binding) return null;
-                if (credential.BlobSize > MaximumBlobBytes || credential.BlobSize % 2 != 0 || credential.Blob == 0)
+                if (credential.CredentialBlobSize > CredentialNative.CredMaxCredentialBlobSize || credential.CredentialBlobSize % 2 != 0 || credential.CredentialBlob == 0)
                     throw new InvalidDataException("The saved credential is invalid. Save the password again.");
-                return Marshal.PtrToStringUni(credential.Blob, checked((int)credential.BlobSize / 2));
+                return Marshal.PtrToStringUni(credential.CredentialBlob, checked((int)credential.CredentialBlobSize / 2));
             }
             finally
             {
-                if (credential.Blob != 0 && credential.BlobSize <= MaximumBlobBytes)
-                    Marshal.Copy(new byte[credential.BlobSize], 0, credential.Blob, (int)credential.BlobSize);
-                CredFree(pointer);
+                if (credential.CredentialBlob != 0 && credential.CredentialBlobSize <= CredentialNative.CredMaxCredentialBlobSize)
+                    Marshal.Copy(new byte[credential.CredentialBlobSize], 0, credential.CredentialBlob, (int)credential.CredentialBlobSize);
+                CredentialNative.CredFree(pointer);
             }
         }, cancellationToken);
     }
@@ -56,7 +52,7 @@ internal sealed class OfficeWindowsCredentialStore : ICredentialStore
     {
         ArgumentNullException.ThrowIfNull(key);
         ArgumentNullException.ThrowIfNull(secret);
-        if (secret.Length is 0 or > MaximumBlobBytes / 2 || secret.Contains('\0'))
+        if (secret.Length is 0 or > CredentialNative.CredMaxCredentialBlobSize / 2 || secret.Contains('\0'))
             throw new ArgumentException("Enter a password of 1–1280 characters without null characters.");
 
         return Task.Run(() =>
@@ -65,16 +61,16 @@ internal sealed class OfficeWindowsCredentialStore : ICredentialStore
             nint blob = Marshal.StringToCoTaskMemUni(secret);
             try
             {
-                var credential = new NativeCredential
+                var credential = new CredentialNative.CREDENTIAL
                 {
-                    Type = Generic,
+                    Type = CredentialNative.CredTypeGeneric,
                     TargetName = Target(key),
                     UserName = key.Binding,
-                    Blob = blob,
-                    BlobSize = checked((uint)secret.Length * 2),
-                    Persist = PersistLocalMachine,
+                    CredentialBlob = blob,
+                    CredentialBlobSize = checked((uint)secret.Length * 2),
+                    Persist = CredentialNative.CredPersistLocalMachine,
                 };
-                if (!CredWrite(ref credential, 0))
+                if (!CredentialNative.CredWrite(ref credential, 0))
                     throw Failure("save", Marshal.GetLastWin32Error());
             }
             finally
@@ -90,10 +86,10 @@ internal sealed class OfficeWindowsCredentialStore : ICredentialStore
         return Task.Run(() =>
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!CredDelete(Target(key), Generic, 0))
+            if (!CredentialNative.CredDelete(Target(key), CredentialNative.CredTypeGeneric, 0))
             {
                 int error = Marshal.GetLastWin32Error();
-                if (error != NotFound)
+                if (error != CredentialNative.ErrorNotFound)
                     throw Failure("delete", error);
             }
         }, cancellationToken);
@@ -103,37 +99,5 @@ internal sealed class OfficeWindowsCredentialStore : ICredentialStore
 
     private static IOException Failure(string operation, int error) =>
         new($"Windows Credential Manager could not {operation} the password (error {error}).");
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct NativeCredential
-    {
-        public uint Flags;
-        public uint Type;
-        public string TargetName;
-        public string? Comment;
-        public long LastWritten;
-        public uint BlobSize;
-        public nint Blob;
-        public uint Persist;
-        public uint AttributeCount;
-        public nint Attributes;
-        public string? TargetAlias;
-        public string? UserName;
-    }
-
-    [DllImport("advapi32.dll", EntryPoint = "CredReadW", CharSet = CharSet.Unicode, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CredRead(string target, uint type, int reservedFlag, out nint credentialPtr);
-
-    [DllImport("advapi32.dll", EntryPoint = "CredWriteW", CharSet = CharSet.Unicode, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CredWrite(ref NativeCredential userCredential, uint flags);
-
-    [DllImport("advapi32.dll", EntryPoint = "CredDeleteW", CharSet = CharSet.Unicode, SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CredDelete(string target, uint type, int flags);
-
-    [DllImport("advapi32.dll")]
-    private static extern void CredFree(nint cred);
 }
 #endif

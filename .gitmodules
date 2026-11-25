@@ -117,3 +117,6 @@
 [submodule "Broiler.UI.Shell"]
 	path = Broiler.UI.Shell
 	url = https://github.com/Broiler-Platform/Broiler.UI.Shell.git
+[submodule "Broiler.Broadplay"]
+	path = Broiler.Broadplay
+	url = https://github.com/Broiler-Platform/Broiler.Broadplay.git

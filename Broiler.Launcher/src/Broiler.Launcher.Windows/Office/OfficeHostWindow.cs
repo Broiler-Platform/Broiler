@@ -16,6 +16,7 @@ using Broiler.Hosting.Windows;
 using Broiler.Hosting.Windows.Accessibility;
 using Broiler.Hosting.Windows.Input;
 using Broiler.Input.Keyboard;
+using Broiler.Native.Windows;
 using Broiler.UI;
 using Broiler.UI.Standard;
 
@@ -75,8 +76,8 @@ internal sealed class OfficeHostWindow : Direct2DWindow, IUiHostWindow, IUiWindo
         if (ownerHandle == 0)
             return request;
 
-        var origin = default(NativePoint);
-        if (!ClientToScreen(ownerHandle, ref origin))
+        var origin = default(WindowNative.POINT);
+        if (!WindowNative.ClientToScreen(ownerHandle, ref origin))
             return request;
 
         double resolvedScale = scale > 0 ? scale : 1;
@@ -132,7 +133,7 @@ internal sealed class OfficeHostWindow : Direct2DWindow, IUiHostWindow, IUiWindo
     {
         if (IsDisposed || NativeHandle == 0)
             return;
-        _ = SetForegroundWindow(NativeHandle);
+        _ = WindowNative.SetForegroundWindow(NativeHandle);
         InvalidateIfAlive();
     }
 
@@ -223,7 +224,7 @@ internal sealed class OfficeHostWindow : Direct2DWindow, IUiHostWindow, IUiWindo
             if ((message == 0x0006 && wParam.ToInt64() != 0) || message == 0x0007)
             {
                 if (RenderNativeHandle != 0)
-                    _ = SetFocus(RenderNativeHandle);
+                    _ = WindowNative.SetFocus(RenderNativeHandle);
             }
         }
     }
@@ -284,23 +285,5 @@ internal sealed class OfficeHostWindow : Direct2DWindow, IUiHostWindow, IUiWindo
 
     private static int ToClientExtent(double extent, int fallback) =>
         double.IsFinite(extent) && extent > 0 ? Math.Max(120, (int)Math.Ceiling(extent)) : fallback;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct NativePoint
-    {
-        public int X;
-        public int Y;
-    }
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool ClientToScreen(nint hwnd, ref NativePoint point);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(nint hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern nint SetFocus(nint hWnd);
 }
 #endif

@@ -35,6 +35,7 @@
   <ItemGroup>
     <PackageReference Include="Broiler.Graphics.Windows" />
     <PackageReference Include="Broiler.Hosting.Windows" />
+    <PackageReference Include="Broiler.Native.Windows" />
     <PackageReference Include="Broiler.Input" />
     <PackageReference Include="Broiler.Input.Keyboard" />
     <PackageReference Include="Broiler.Input.Mouse" />

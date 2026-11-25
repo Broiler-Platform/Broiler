@@ -2,10 +2,13 @@
   "solutions": [
     {
       "path": "Broiler.Office.Server.slnx",
-      "description": "Office server and its property-driven Writer WebAssembly client dependency.",
+      "description": "Office server and its property-driven Broiler Office WebAssembly client dependencies.",
       "roots": [
         "Broiler.Office.Server/Broiler.Office.Server.csproj",
-        "Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj"
+        "Broiler.Launcher/src/Broiler.Launcher.WebAssembly/Broiler.Launcher.WebAssembly.csproj",
+        "Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj",
+        "Broiler.Cells/src/Broiler.Cells.WebAssembly/Broiler.Cells.WebAssembly.csproj",
+        "Broiler.Plate/src/Broiler.Plate.WebAssembly/Broiler.Plate.WebAssembly.csproj"
       ],
       "forbiddenProjectPatterns": [
         "(?i)(^|[./])[^/]*(Windows|Win32|MediaFoundation|Linux)[^/]*\\.csproj$"

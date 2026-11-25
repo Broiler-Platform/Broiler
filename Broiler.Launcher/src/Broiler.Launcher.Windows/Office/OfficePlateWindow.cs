@@ -13,6 +13,7 @@ using Broiler.Graphics.Windows;
 using Broiler.Hosting.Windows;
 using Broiler.Input.Keyboard;
 using Broiler.Launcher.Office;
+using Broiler.Native.Windows;
 using Broiler.Plate;
 using Broiler.UI;
 using Broiler.UI.Standard;
@@ -129,7 +130,7 @@ internal sealed class OfficePlateWindow : Direct2DWindow, IOfficeUiThreadTarget
     private void CloseNativeWindowNow()
     {
         if (NativeHandle != 0)
-            _ = DestroyWindow(NativeHandle);
+            _ = WindowNative.DestroyWindow(NativeHandle);
     }
 
     protected override void OnNativeWindowMessage(nint hwnd, uint message, nint wParam, nint lParam)
@@ -141,17 +142,10 @@ internal sealed class OfficePlateWindow : Direct2DWindow, IOfficeUiThreadTarget
             if ((message == 0x0006 && wParam.ToInt64() != 0) || message == 0x0007)
             {
                 if (RenderNativeHandle != 0)
-                    _ = SetFocus(RenderNativeHandle);
+                    _ = WindowNative.SetFocus(RenderNativeHandle);
             }
         }
     }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool DestroyWindow(nint hwnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern nint SetFocus(nint hWnd);
 
     private sealed class PlateWindowUiHost : PlateUiHost, IUiWindowHost
     {

@@ -1,0 +1,178 @@
+name: Broiler NuGet pilot matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      patch_run_id:
+        description: Optional Phase 2 run ID with a validated DateTime Test SDK patch
+        type: string
+        default: ''
+      datetime_release_ordinal:
+        description: Optional DateTime preview ordinal to stage for protected publication
+        type: string
+        default: ''
+      datetime_commit:
+        description: Optional exact DateTime source SHA (defaults to the producer's main HEAD)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  select:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Resolve the pilot commits once
+        shell: bash
+        env:
+          DATETIME_COMMIT: ${{ inputs.datetime_commit }}
+        run: |
+          for repo in Broiler.DateTime Broiler.DOM Broiler.CSS; do
+            url=$(git config -f .gitmodules --get "submodule.$repo.url")
+            remote=$(git ls-remote --exit-code "$url" HEAD)
+            sha=${remote%%$'\t'*}
+            if [[ "$repo" == Broiler.DateTime && -n "$DATETIME_COMMIT" ]]; then
+              sha="$DATETIME_COMMIT"
+            fi
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+            printf '%s %s\n' "$repo" "$sha" >> pilot-commits.txt
+          done
+      - uses: actions/upload-artifact@v6
+        with:
+          name: nuget-pilot-commits
+          path: pilot-commits.txt
+          if-no-files-found: error
+          overwrite: true
+
+  dry_run:
+    name: Dry run (${{ matrix.os }})
+    needs: select
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    permissions:
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v7
+        with:
+          name: nuget-pilot-commits
+          path: artifacts/pilot-input
+      - name: Check out the selected producers
+        shell: bash
+        run: |
+          git submodule update --init --depth 1 -- Broiler.DateTime Broiler.DOM Broiler.CSS
+          while read -r repo sha; do
+            git -C "$repo" fetch --depth=1 origin "$sha"
+            git -C "$repo" checkout --detach "$sha"
+            git -C "$repo" submodule update --init --recursive
+          done < artifacts/pilot-input/pilot-commits.txt
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v7
+        if: inputs.patch_run_id != ''
+        with:
+          name: nuget-patch-plan
+          run-id: ${{ inputs.patch_run_id }}
+          github-token: ${{ github.token }}
+          path: artifacts/pilot-patch-input
+      - name: Build, stage, and validate pilot packages
+        id: matrix
+        shell: pwsh
+        env:
+          PATCH_RUN: ${{ inputs.patch_run_id }}
+          DATETIME_RELEASE_ORDINAL: ${{ inputs.datetime_release_ordinal }}
+        run: |
+          $arguments = @('--output', 'artifacts/nuget-pilots/current', '--candidate-number', $env:GITHUB_RUN_ID)
+          if ($env:PATCH_RUN) {
+            $arguments += @('--patch-plan', 'artifacts/pilot-patch-input/patch-plan.json')
+          }
+          if ($env:DATETIME_RELEASE_ORDINAL) {
+            $arguments += @('--datetime-release-ordinal', $env:DATETIME_RELEASE_ORDINAL)
+          }
+          python scripts/nuget_pilot_matrix.py @arguments
+          $pilotExit = $LASTEXITCODE
+          $summary = 'artifacts/nuget-pilots/current/summary.md'
+          if (Test-Path -LiteralPath $summary) {
+            Get-Content -Raw -LiteralPath $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }
+          exit $pilotExit
+      - uses: actions/upload-artifact@v6
+        if: always() && steps.matrix.outcome != 'skipped'
+        with:
+          name: nuget-pilot-evidence-${{ matrix.os }}
+          path: |
+            artifacts/nuget-pilots/current/matrix.json
+            artifacts/nuget-pilots/current/summary.md
+            artifacts/nuget-pilots/current/logs/
+          if-no-files-found: error
+          overwrite: true
+      - uses: actions/upload-artifact@v6
+        if: success()
+        with:
+          name: nuget-pilot-packages-${{ matrix.os }}
+          path: artifacts/nuget-pilots/current/candidate-feed/
+          if-no-files-found: error
+          overwrite: true
+
+  gate:
+    name: Verify both pilot profiles
+    needs: dry_run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: nuget-pilot-evidence-*
+          path: evidence
+      - name: Reconcile package manifests across profiles
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          reports = [json.loads(path.read_text()) for path in Path("evidence").glob("*/matrix.json")]
+          if len(reports) != 2 or {report["profile"]["os"] for report in reports} != {"Windows", "Linux"}:
+              raise SystemExit("Expected exactly one Windows and one Linux report")
+
+          def contract(report):
+              if (report["status"] != "passed" or len(report["negativeControls"]) != 4 or
+                      not all(row["rejected"] for row in report["negativeControls"]) or
+                      len(report["packageConsumers"]) != 5 or
+                      not all(row["status"] == "passed" for row in report["packageConsumers"]) or
+                      len(report["producers"]) != 3 or
+                      not all(row["tests"] > 0 for row in report["producers"].values())):
+                  raise SystemExit("A required pilot gate failed")
+              return {name: (producer["commit"], producer["version"], producer["expectedGroups"])
+                      for name, producer in report["producers"].items()}
+
+          if (contract(reports[0]) != contract(reports[1]) or reports[0]["edits"] != reports[1]["edits"] or
+                  reports[0]["dateTimeReleaseIntent"] != reports[1]["dateTimeReleaseIntent"]):
+              raise SystemExit("Producer commits, dependency ranges or proposed edits differ across profiles")
+          Path("pilot-matrix.json").write_text(json.dumps(reports, indent=2) + "\n")
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: nuget-pilot-matrix
+          path: pilot-matrix.json
+          if-no-files-found: error
+          overwrite: true

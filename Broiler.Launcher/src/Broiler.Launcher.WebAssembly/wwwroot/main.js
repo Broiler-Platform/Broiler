@@ -64,7 +64,7 @@ try {
                 const products = catalog.products;
                 if (catalog.schemaVersion === 1 && catalog.status === 'approved' && Array.isArray(products) && (products.length === 2 || products.length === 3) &&
                     products.every(p => ['writer', 'cell', 'plate'].includes(p?.id) && typeof p.version === 'string' && /^[A-Za-z0-9.+-]{1,80}$/.test(p.version) &&
-                        (p.url === `https://${p.id}.broiler.app/` || p.url === `https://${p.id}.broiler.app/releases/${p.version}/` || p.url === `https://broiler-platform.github.io/${p.id}/releases/${p.version}/`))) {
+                        (p.url === `https://${p.id}.broiler.app/` || p.url === `https://${p.id}.broiler.app/releases/${p.version}/` || p.url === `https://broiler-platform.github.io/${p.id}/releases/${p.version}/` || p.url === `/${p.id}/`))) {
                     metadata = text;
                     for (const p of products) {
                         allowed.add(p.url);

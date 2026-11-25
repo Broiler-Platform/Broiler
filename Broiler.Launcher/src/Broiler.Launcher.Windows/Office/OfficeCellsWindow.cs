@@ -22,6 +22,7 @@ using Broiler.Input.Keyboard;
 using Broiler.Input.Mouse;
 using Broiler.UI;
 using Broiler.UI.Standard;
+using Broiler.Native.Windows;
 using Broiler.UI.Tooltip.Standard;
 using Broiler.UI.Window;
 using Broiler.UI.Window.Standard;
@@ -34,15 +35,6 @@ namespace Broiler.Launcher.Windows.Office;
 [SupportedOSPlatform("windows7.0")]
 internal sealed class OfficeCellsWindow : Direct2DWindow, IUiHost, IUiCursorHost, IUiImageHost, IUiWindowHost, IUiClipboardHost, IOfficeUiThreadTarget
 {
-    [DllImport("user32.dll", ExactSpelling = true)]
-    private static extern nint LoadCursorW(nint hInstance, nint lpCursorName);
-
-    [DllImport("user32.dll", ExactSpelling = true)]
-    private static extern nint SetCursor(nint hCursor);
-
-    [DllImport("user32.dll", ExactSpelling = true)]
-    private static extern short GetKeyState(int virtualKey);
-
     private nint _activeCursorHandle;
     private readonly List<OfficeHostWindow> _dialogWindows = [];
     private WindowsClipboard? _clipboard;
@@ -225,9 +217,9 @@ internal sealed class OfficeCellsWindow : Direct2DWindow, IUiHost, IUiCursorHost
     {
         var input = _input.FromPointerButton(e);
         InputModifiers modifiers = InputModifiers.None;
-        if (GetKeyState(0x11) < 0) modifiers |= InputModifiers.Control;
-        if (GetKeyState(0x10) < 0) modifiers |= InputModifiers.Shift;
-        if (GetKeyState(0x12) < 0) modifiers |= InputModifiers.Alt;
+        if (WindowNative.GetKeyState(0x11) < 0) modifiers |= InputModifiers.Control;
+        if (WindowNative.GetKeyState(0x10) < 0) modifiers |= InputModifiers.Shift;
+        if (WindowNative.GetKeyState(0x12) < 0) modifiers |= InputModifiers.Alt;
 
         MouseButtons buttons = MouseButtons.None;
         if (e.Buttons.HasFlag(BMouseButtons.Left)) buttons |= MouseButtons.Left;
@@ -262,21 +254,21 @@ internal sealed class OfficeCellsWindow : Direct2DWindow, IUiHost, IUiCursorHost
     {
         nint cursor = shape switch
         {
-            UiCursorShape.ResizeHorizontal => LoadCursorW(0, 32644),
-            UiCursorShape.ResizeVertical => LoadCursorW(0, 32645),
-            UiCursorShape.Hand => LoadCursorW(0, 32649),
-            UiCursorShape.Text => LoadCursorW(0, 32513),
-            UiCursorShape.Wait => LoadCursorW(0, 32514),
-            _ => LoadCursorW(0, 32512),
+            UiCursorShape.ResizeHorizontal => WindowNative.LoadCursor(0, 32644),
+            UiCursorShape.ResizeVertical => WindowNative.LoadCursor(0, 32645),
+            UiCursorShape.Hand => WindowNative.LoadCursor(0, 32649),
+            UiCursorShape.Text => WindowNative.LoadCursor(0, 32513),
+            UiCursorShape.Wait => WindowNative.LoadCursor(0, 32514),
+            _ => WindowNative.LoadCursor(0, 32512),
         };
         _activeCursorHandle = cursor;
-        SetCursor(cursor);
+        WindowNative.SetCursor(cursor);
     }
 
     protected override void OnNativeWindowMessage(nint hwnd, uint message, nint wParam, nint lParam)
     {
         if (message == 0x0020 && _activeCursorHandle != 0)
-            SetCursor(_activeCursorHandle);
+            WindowNative.SetCursor(_activeCursorHandle);
 
         base.OnNativeWindowMessage(hwnd, message, wParam, lParam);
         if (hwnd == NativeHandle)

@@ -1,0 +1,128 @@
+name: Broiler NuGet cohort admission
+on:
+  workflow_dispatch:
+    inputs:
+      owner_runs:
+        description: JSON map of cohort keys to CI, PR, and optional promotion run IDs
+        type: string
+        default: '{}'
+      through_wave:
+        description: Last wave to verify (empty checks all supplied runs)
+        type: string
+        default: ''
+      source_commits:
+        description: Optional JSON map from producer repositories to exact reviewed SHAs
+        type: string
+        default: '{}'
+      require_admission:
+        description: Fail when a selected cohort cannot be admitted
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  admission:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+          persist-credentials: false
+      - name: Select component revisions
+        shell: bash
+        run: bash scripts/nuget_select_component_heads.sh
+      - name: Select any recorded release revisions
+        shell: pwsh
+        env:
+          SOURCE_COMMITS: ${{ inputs.source_commits }}
+        run: |
+          $selected = ConvertFrom-Json -InputObject $env:SOURCE_COMMITS -AsHashtable
+          $registry = Get-Content -Raw eng/nuget-publishers.json | ConvertFrom-Json -AsHashtable
+          foreach ($repo in $selected.Keys) {
+            $commit = $selected[$repo]
+            if ($repo -eq '.' -or !$registry.publishers.Contains($repo) -or $commit -cnotmatch '^[0-9a-f]{40}$') {
+              throw "Invalid release revision for $repo"
+            }
+            git -C $repo fetch --depth=1 origin $commit
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            git -C $repo checkout --detach $commit
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            git -C $repo submodule update --init --recursive
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Check inventory and NuGet.org
+        run: python scripts/nuget_publish_order.py --component-heads --check-feed
+      - name: Audit the selected source revisions
+        run: python scripts/nuget_patches.py --output artifacts/nuget-cohorts/audit
+      - name: Scope the evidence token
+        id: scopes
+        shell: pwsh
+        env:
+          OWNER_RUNS: ${{ inputs.owner_runs }}
+        run: |
+          $request = ConvertFrom-Json -InputObject $env:OWNER_RUNS -AsHashtable
+          $registry = Get-Content -Raw eng/nuget-publishers.json | ConvertFrom-Json -AsHashtable
+          $repos = @()
+          foreach ($cohort in $request.Keys) {
+            $repo, $workflow = $cohort.Split('/', 2)
+            if ($repo -eq '.' -or !$registry.publishers.Contains($repo) -or
+                !$registry.publishers[$repo].Contains($workflow)) {
+              throw "Unknown producer cohort $cohort"
+            }
+            $repos += $repo
+          }
+          "repositories=$($repos | Sort-Object -Unique | Join-String -Separator ',')" >> $env:GITHUB_OUTPUT
+      - uses: actions/create-github-app-token@v3
+        if: steps.scopes.outputs.repositories != ''
+        id: evidence-token
+        with:
+          client-id: ${{ vars.NUGET_COHORT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NUGET_COHORT_APP_PRIVATE_KEY }}
+          owner: Broiler-Platform
+          repositories: ${{ steps.scopes.outputs.repositories }}
+          permission-actions: read
+          permission-pull-requests: read
+      - name: Install the Android restore workload
+        if: contains(steps.scopes.outputs.repositories, 'Broiler.Hosting')
+        run: dotnet workload install android
+      - name: Verify packages in dependency order
+        id: verify
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ steps.evidence-token.outputs.token }}
+          OWNER_RUNS: ${{ inputs.owner_runs }}
+          THROUGH_WAVE: ${{ inputs.through_wave }}
+          REQUIRE_ADMISSION: ${{ inputs.require_admission }}
+        run: |
+          $arguments = @('plan', '--patch-plan', 'artifacts/nuget-cohorts/audit/patch-plan.json',
+                         '--owner-runs', $env:OWNER_RUNS)
+          if ($env:THROUGH_WAVE) { $arguments += @('--through-wave', $env:THROUGH_WAVE) }
+          if ($env:REQUIRE_ADMISSION -eq 'true') { $arguments += '--require-admission' }
+          python scripts/nuget_cohorts.py @arguments
+          $result = $LASTEXITCODE
+          $summary = 'artifacts/nuget-cohorts/cohort-summary.md'
+          if (Test-Path -LiteralPath $summary) {
+            Get-Content -Raw -LiteralPath $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }
+          exit $result
+      - uses: actions/upload-artifact@v6
+        if: always() && steps.verify.outcome != 'skipped'
+        with:
+          name: nuget-cohort-admission
+          path: |
+            artifacts/nuget-cohorts/cohort-admission.json
+            artifacts/nuget-cohorts/cohort-summary.md
+            artifacts/nuget-cohorts/audit/patch-plan.json
+          if-no-files-found: error
+          overwrite: true

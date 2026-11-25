@@ -17,6 +17,7 @@ using Broiler.Launcher.Installation;
 using Broiler.UI;
 using Broiler.UI.Standard;
 using Broiler.UI.Window;
+using Broiler.Native.Windows;
 using Broiler.UI.Window.Standard;
 
 namespace Broiler.Launcher.Windows;
@@ -30,15 +31,6 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
     , Broiler.Launcher.Windows.Office.IOfficeUiThreadTarget
 #endif
 {
-    [DllImport("user32.dll", ExactSpelling = true)]
-    private static extern nint LoadCursorW(nint hInstance, nint lpCursorName);
-
-    [DllImport("user32.dll", ExactSpelling = true)]
-    private static extern nint SetCursor(nint hCursor);
-
-    [DllImport("user32.dll", ExactSpelling = true)]
-    private static extern short GetKeyState(int virtualKey);
-
     private nint _activeCursorHandle;
     private readonly UiSession _session;
     private readonly LauncherShellView _shell;
@@ -156,11 +148,11 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
     {
         var input = _input.FromPointerButton(e);
         InputModifiers modifiers = InputModifiers.None;
-        if (GetKeyState(0x11) < 0)
+        if (WindowNative.GetKeyState(0x11) < 0)
             modifiers |= InputModifiers.Control;
-        if (GetKeyState(0x10) < 0)
+        if (WindowNative.GetKeyState(0x10) < 0)
             modifiers |= InputModifiers.Shift;
-        if (GetKeyState(0x12) < 0)
+        if (WindowNative.GetKeyState(0x12) < 0)
             modifiers |= InputModifiers.Alt;
 
         MouseButtons buttons = MouseButtons.None;
@@ -191,20 +183,20 @@ internal sealed class LauncherWindow : Direct2DWindow, IUiHost, IUiCursorHost
     {
         nint cursor = shape switch
         {
-            UiCursorShape.Hand => LoadCursorW(0, 32649),
-            UiCursorShape.Text => LoadCursorW(0, 32513),
-            UiCursorShape.Wait => LoadCursorW(0, 32514),
-            _ => LoadCursorW(0, 32512),
+            UiCursorShape.Hand => WindowNative.LoadCursor(0, 32649),
+            UiCursorShape.Text => WindowNative.LoadCursor(0, 32513),
+            UiCursorShape.Wait => WindowNative.LoadCursor(0, 32514),
+            _ => WindowNative.LoadCursor(0, 32512),
         };
         _activeCursorHandle = cursor;
-        SetCursor(cursor);
+        WindowNative.SetCursor(cursor);
     }
 
     protected override void OnNativeWindowMessage(nint hwnd, uint message, nint wParam, nint lParam)
     {
         if (message == 0x0020 /* WM_SETCURSOR */ && _activeCursorHandle != 0)
         {
-            SetCursor(_activeCursorHandle);
+            WindowNative.SetCursor(_activeCursorHandle);
         }
 
         base.OnNativeWindowMessage(hwnd, message, wParam, lParam);

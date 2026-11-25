@@ -33,7 +33,7 @@ class ProducerTests(unittest.TestCase):
         self.html = '<script type="importmap">'+json.dumps(mapping)+'</script><script type="module" src="main.hash.js"></script>'
         (self.web / "index.html").write_text(self.html)
         self.identity = dict(product="writer",productName="Writer",repository="Broiler-Platform/Broiler.Writer",version="0.1.0-preview.1",tag="writer-web-v0.1.0-preview.1",commit="a"*40,
-            sdk="10.0.403",workload="10.0.114/10.0.100",workloadSet="10.0.100",runtimeMode=artifact.MODE,publishTrimmed=True,runAotCompilation=False,dirty=False,verificationOnly=False)
+            sdk="10.0.403",workload="10.0.114/10.0.100",workloadSet="10.0.100",runtimeMode=artifact.MODE,publishTrimmed=True,runAotCompilation=True,dirty=False,verificationOnly=False)
 
     def test_stable_toolchain_versions_and_legacy_output(self):
         for sdk in ("10.0.100", "10.0.403", "10.0.999"):
@@ -118,7 +118,7 @@ class ProducerTests(unittest.TestCase):
         with self.assertRaises(ValueError): artifact.verify(archive,metadata)
 
     def test_aot_cannot_masquerade_as_initial_cohort(self):
-        self.identity["runAotCompilation"]=True
+        self.identity["runAotCompilation"]=False
         with self.assertRaises(ValueError): self.package()
 
     def test_dirty_release_fails_but_local_verification_is_explicit(self):

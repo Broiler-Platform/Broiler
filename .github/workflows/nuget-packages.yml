@@ -9,12 +9,9 @@ name: NuGet Packages
 #   * Tag  nuget-v*   -> pack, then publish to NuGet.org (gated by human review).
 #   * Manual dispatch -> the same, for re-running a release.
 #
-# Every component except Broiler.Layout is now a submodule. This workflow still packs
-# the same set — Layout, Documents, Media, Input, UI plus their meta-packages — but it
-# reads four of them out of their submodule checkouts, which is why the checkout step
-# below needs submodules. Broiler.DOM, Broiler.CSS, Broiler.Graphics, Broiler.HTML and
-# Broiler.JS publish from their own repositories and are packed here only behind
-# scripts/pack-all.ps1 -IncludeSubmodules.
+# The aggregate compatibility entry point packs Layout, Documents, Media, Input,
+# UI and their bundles. A reviewed cohort admission receipt routes verified
+# overlapping package IDs to their designated component workflows.
 
 on:
   push:
@@ -71,29 +68,90 @@ jobs:
     needs: pack
     environment: nuget-release
     timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+    env:
+      COHORT_ADMISSION_RUN: ${{ vars.NUGET_COHORT_ADMISSION_RUN_ID }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Human-review gate
-        shell: pwsh
-        run: ./scripts/check-publish-approval.ps1
+          submodules: true
 
       - uses: actions/download-artifact@v7
         with:
           name: nuget-packages
           path: nupkg
 
+      - name: Verify the admission receipt provenance
+        if: env.COHORT_ADMISSION_RUN != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          [[ "$COHORT_ADMISSION_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$COHORT_ADMISSION_RUN" |
+            jq -e --arg repo "$GITHUB_REPOSITORY" '
+              .conclusion == "success" and .event == "workflow_dispatch" and
+              .head_branch == "main" and .head_repository.full_name == $repo and
+              (.path | split("@")[0]) == ".github/workflows/nuget-cohorts.yml"
+            ' >/dev/null
+
+      - uses: actions/download-artifact@v7
+        if: env.COHORT_ADMISSION_RUN != ''
+        with:
+          name: nuget-cohort-admission
+          run-id: ${{ env.COHORT_ADMISSION_RUN }}
+          github-token: ${{ github.token }}
+          path: cohort-receipt
+
+      - uses: actions/setup-python@v6
+        if: env.COHORT_ADMISSION_RUN != ''
+        with:
+          python-version: '3.11'
+
+      - name: Route admitted package IDs to their owners
+        if: env.COHORT_ADMISSION_RUN != ''
+        id: route
+        shell: pwsh
+        run: |
+          $receipts = @(Get-ChildItem -LiteralPath cohort-receipt -Recurse -File -Filter cohort-admission.json)
+          if ($receipts.Count -ne 1) { throw 'Expected one cohort admission receipt' }
+          python scripts/nuget_cohorts.py route --archives nupkg --receipt $receipts[0].FullName --output legacy-route.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $route = Get-Content -Raw legacy-route.json | ConvertFrom-Json
+          foreach ($item in $route.redirected) {
+            "- $($item.id) is published by $($item.publisher)" | Add-Content $env:GITHUB_STEP_SUMMARY
+          }
+          "remaining=$($route.retain.Count)" >> $env:GITHUB_OUTPUT
+
+      - name: Human-review gate
+        if: steps.route.outputs.remaining != '0'
+        shell: pwsh
+        run: ./scripts/check-publish-approval.ps1
+
       - name: Setup .NET
+        if: steps.route.outputs.remaining != '0'
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
 
       - name: Push to NuGet.org
+        if: steps.route.outputs.remaining != '0'
         shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          dotnet nuget push "nupkg/*.nupkg" `
-            --source "https://api.nuget.org/v3/index.json" `
-            --api-key "${{ secrets.NUGET_API_KEY }}" `
-            --skip-duplicate
+          $names = if (Test-Path -LiteralPath legacy-route.json) {
+            (Get-Content -Raw legacy-route.json | ConvertFrom-Json).retain
+          } else {
+            (Get-ChildItem -LiteralPath nupkg -File -Filter *.nupkg).Name
+          }
+          foreach ($name in $names) {
+            dotnet nuget push (Join-Path nupkg $name) `
+              --source 'https://api.nuget.org/v3/index.json' `
+              --api-key $env:NUGET_API_KEY `
+              --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }

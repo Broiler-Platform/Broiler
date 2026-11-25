@@ -1,4 +1,11 @@
 <Solution>
-  <Project Path="src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj" />
+  <Configurations>
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
+    <BuildType Name="WebPublish-Release" />
+  </Configurations>
+  <Project Path="src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj">
+    <BuildType Solution="WebPublish-Release|*" Project="Release" />
+  </Project>
   <Project Path="src/Broiler.Launcher.WebAssembly/Broiler.Launcher.WebAssembly.csproj" />
 </Solution>

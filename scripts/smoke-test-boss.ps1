@@ -1,18 +1,19 @@
-<#
+﻿<#
 .SYNOPSIS
-    Starts a packaged BOSS and verifies it actually serves the Broiler Writer.
+    Starts a packaged BOSS and verifies it serves the Broiler Office WebAssembly suite.
 
 .DESCRIPTION
     Launches the published server on a loopback port and checks the things that have historically
     broken a BOSS package:
 
       * /healthz answers                     — the host starts at all
-      * /api/info reports server "BOSS"      — the API routes are mapped
-      * / returns the transformed index.html — the vendored Writer bundle is present and is the
-                                               WebAssembly SDK's rewritten shell, not the raw
-                                               placeholder that cannot boot
-      * the fingerprinted runtime module is served as JavaScript from _framework/
-      * an unknown path falls back to the shell — client-side routes survive a refresh
+      * /api/info reports server "BOSS"      — the API routes are mapped and report Office apps
+      * /office-web.json returns approved    — local same-origin catalog for the Office Launcher
+      * /, /writer/, /cell/, /plate/ return  — all four vendored Office bundles are present and are
+        transformed index.html shells          the WebAssembly SDK's rewritten shells, not placeholders
+      * every fingerprinted runtime module in each app's import map is served as HTTP 200
+      * /writer, /cell, /plate redirect to trailing-slash mount paths
+      * unknown paths fall back to the corresponding app shell — client-side routes survive refresh
 
     The server is deliberately started from a *different* working directory, because a service
     manager does the same: it proves the content root resolves to the executable's own folder rather
@@ -109,58 +110,79 @@ try {
         Write-Host "    /api/info           OK (v$($info.version), apps: $($info.apps.name -join ', '))"
     }
 
-    $index = Invoke-BossRequest '/'
-    if ($index.StatusCode -ne 200) {
-        $failures.Add("/ returned HTTP $($index.StatusCode) — the vendored Writer bundle is missing or unreadable.")
-    }
-    elseif ($index.Content -notmatch '<script type="importmap">') {
-        $failures.Add('/ served an index.html without an import map — the raw placeholder shell was packaged instead of the transformed one, and the Writer cannot boot.')
+    $catalogResponse = Invoke-BossRequest '/office-web.json'
+    if ($catalogResponse.StatusCode -ne 200) {
+        $failures.Add("/office-web.json returned HTTP $($catalogResponse.StatusCode).")
     }
     else {
-        Write-Host "    /                   OK ($($index.Content.Length) bytes, import map present)"
+        $catalog = $catalogResponse.Content | ConvertFrom-Json
+        if ($catalog.status -ne 'approved' -or @($catalog.products).Count -lt 3) {
+            $failures.Add('/office-web.json did not report an approved local Broiler Office catalog.')
+        }
+        else {
+            Write-Host "    /office-web.json    OK (status=$($catalog.status), products=$($catalog.products.id -join ', '))"
+        }
     }
 
-    # Follow the import map and fetch every module the app boots from — a wwwroot that lost
-    # _framework/ still returns a perfectly good index.html.
-    #
-    # Walk the map's *values*, never scan the document for a module-shaped name: the keys are the
-    # unfingerprinted aliases (./_framework/dotnet.native.js, …/dotnet.runtime.js) and name no file
-    # on disk, so any pattern loose enough to match a hash can match a key instead — and the two
-    # platforms do not agree on which comes first. Only the values point at published files.
-    $importMapMatch = [regex]::Match($index.Content, '(?s)<script type="importmap">(?<json>.*?)</script>')
-    if (-not $importMapMatch.Success) {
-        $failures.Add('The import map in index.html could not be read.')
-    }
-    else {
-        $imports = $importMapMatch.Groups['json'].Value | ConvertFrom-Json
-        $modules = @()
-        if ($imports.PSObject.Properties.Name -contains 'imports') {
-            $modules = @($imports.imports.PSObject.Properties | ForEach-Object { $_.Value })
-        }
+    $apps = @(
+        @{ Name = 'Office'; BasePath = '/';        Fallback = '/documents/untitled';        ExpectedLink = 'href="/writer/"' }
+        @{ Name = 'Writer'; BasePath = '/writer/'; Fallback = '/writer/documents/untitled'; ExpectedLink = 'href="/"' }
+        @{ Name = 'Cell';   BasePath = '/cell/';   Fallback = '/cell/sheet/1';              ExpectedLink = 'href="/"' }
+        @{ Name = 'Plate';  BasePath = '/plate/';  Fallback = '/plate/view/1';              ExpectedLink = 'href="/"' }
+    )
 
-        if ($modules.Count -eq 0) {
-            $failures.Add('The import map lists no modules — the Writer bundle cannot boot from this shell.')
+    foreach ($app in $apps) {
+        $basePath = $app.BasePath
+        $index = Invoke-BossRequest $basePath
+        if ($index.StatusCode -ne 200) {
+            $failures.Add("$basePath returned HTTP $($index.StatusCode) — the vendored $($app.Name) bundle is missing or unreadable.")
+            continue
         }
+        if ($index.Content -notmatch '<script type="importmap">') {
+            $failures.Add("$basePath served an index.html without an import map — the raw placeholder shell was packaged instead of the transformed one.")
+            continue
+        }
+        if ($index.Content -notmatch [regex]::Escape($app.ExpectedLink)) {
+            $failures.Add("$basePath did not contain expected local Office link ($($app.ExpectedLink)).")
+        }
+        Write-Host "    $($basePath.PadRight(20))OK ($($index.Content.Length) bytes, import map present)"
 
-        foreach ($module in $modules) {
-            $modulePath = '/' + ($module -replace '^\./', '')
-            $response = Invoke-BossRequest $modulePath
-            if ($response.StatusCode -ne 200) {
-                $failures.Add("$modulePath returned HTTP $($response.StatusCode) — a module the app boots from is not being served.")
+        # Follow the import map and fetch every module the app boots from — a wwwroot that lost
+        # _framework/ still returns a perfectly good index.html.
+        $importMapMatch = [regex]::Match($index.Content, '(?s)<script type="importmap">(?<json>.*?)</script>')
+        if (-not $importMapMatch.Success) {
+            $failures.Add("The import map in $basePath index.html could not be read.")
+        }
+        else {
+            $imports = $importMapMatch.Groups['json'].Value | ConvertFrom-Json
+            $modules = @()
+            if ($imports.PSObject.Properties.Name -contains 'imports') {
+                $modules = @($imports.imports.PSObject.Properties | ForEach-Object { $_.Value })
             }
-            else {
-                Write-Host "    $modulePath  OK"
+
+            if ($modules.Count -eq 0) {
+                $failures.Add("The import map in $basePath lists no modules — the $($app.Name) bundle cannot boot from this shell.")
+            }
+
+            foreach ($module in $modules) {
+                $modulePath = $basePath + ($module -replace '^\./', '')
+                $response = Invoke-BossRequest $modulePath
+                if ($response.StatusCode -ne 200) {
+                    $failures.Add("$modulePath returned HTTP $($response.StatusCode) — a module the $($app.Name) app boots from is not being served.")
+                }
+                else {
+                    Write-Host "    $modulePath  OK"
+                }
             }
         }
-    }
 
-    # MapFallbackToFile: an in-app route must return the shell, not a 404.
-    $fallback = Invoke-BossRequest '/documents/untitled'
-    if ($fallback.StatusCode -ne 200) {
-        $failures.Add("A client-routed path returned HTTP $($fallback.StatusCode); the SPA fallback is not working.")
-    }
-    else {
-        Write-Host '    client-side route   OK (falls back to the app shell)'
+        $fallback = Invoke-BossRequest $app.Fallback
+        if ($fallback.StatusCode -ne 200) {
+            $failures.Add("Client-routed path $($app.Fallback) returned HTTP $($fallback.StatusCode); the SPA fallback is not working.")
+        }
+        else {
+            Write-Host "    $($app.Fallback)  OK (falls back to the $($app.Name) shell)"
+        }
     }
 }
 finally {

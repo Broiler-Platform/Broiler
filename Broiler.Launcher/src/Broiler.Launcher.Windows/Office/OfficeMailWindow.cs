@@ -22,6 +22,7 @@ using Broiler.Mail.Application.Views;
 using Broiler.Mail.Windows.Preview;
 using Broiler.UI;
 using Broiler.UI.Standard;
+using static Broiler.Native.Windows.WindowNative;
 
 namespace Broiler.Launcher.Windows.Office;
 
@@ -235,30 +236,5 @@ internal sealed class OfficeMailWindow : Direct2DWindow, IUiHost, IUiClipboardHo
         }
         base.Dispose(disposing);
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MSG
-    {
-        public nint Hwnd;
-        public uint Message;
-        public nint WParam;
-        public nint LParam;
-        public uint Time;
-        public int PtX;
-        public int PtY;
-    }
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern int GetMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool TranslateMessage(ref MSG lpMsg);
-
-    [DllImport("user32.dll")]
-    private static extern nint DispatchMessage(ref MSG lpMsg);
-
-    [DllImport("user32.dll")]
-    private static extern void PostQuitMessage(int nExitCode);
 }
 #endif

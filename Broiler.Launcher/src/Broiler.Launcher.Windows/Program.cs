@@ -2,6 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Broiler.Launcher.Cli;
+using Broiler.Native.Windows;
 
 namespace Broiler.Launcher.Windows;
 
@@ -12,7 +13,7 @@ internal static class Program
     private static int Main(string[] args)
     {
         if (WindowsMachineInstallBroker.TryHandle(args, out int machineExitCode)) return machineExitCode;
-        _ = SetProcessDpiAwarenessContext(new nint(-4)); // PER_MONITOR_AWARE_V2
+        _ = WindowNative.SetProcessDpiAwarenessContext(new nint(-4)); // PER_MONITOR_AWARE_V2
 
 #if BROILER_OFFICE_ALL_IN_ONE
         Broiler.Launcher.Windows.Office.OfficeAllInOneBootstrap.Register();
@@ -36,15 +37,8 @@ internal static class Program
         }
         catch (Exception error)
         {
-            _ = MessageBox(0, error.ToString(), "Broiler Launcher", 0x10);
+            _ = WindowNative.MessageBox(0, error.ToString(), "Broiler Launcher", 0x10);
             return 1;
         }
     }
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetProcessDpiAwarenessContext(nint context);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern int MessageBox(nint owner, string text, string caption, uint type);
 }

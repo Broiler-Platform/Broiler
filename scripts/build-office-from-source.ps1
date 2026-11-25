@@ -19,16 +19,23 @@ $publish = Join-Path $output 'publish'
 $catalogFile = if ($Rid -eq 'linux-x64') { Join-Path $repoRoot 'eng/office-products-linux.json' } else { Join-Path $repoRoot 'eng/office-products.json' }
 $catalog = Get-Content -Raw -LiteralPath $catalogFile | ConvertFrom-Json
 $configuration = if ($Rid -eq 'win-x64') { 'Release-Windows' } else { 'Release-Linux' }
-# BOSS invokes the WASM client through MSBuild, not ProjectReference. Restore it
+# BOSS invokes the WASM clients through MSBuild, not ProjectReference. Restore them
 # separately without a host RID, and force a fresh content-hashed client stage.
-& dotnet restore (Join-Path $repoRoot 'Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj') -p:Configuration=$configuration
-if ($LASTEXITCODE -ne 0) { throw 'Writer WebAssembly restore failed.' }
+foreach ($wasmClient in @(
+    'Broiler.Launcher/src/Broiler.Launcher.WebAssembly/Broiler.Launcher.WebAssembly.csproj',
+    'Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj',
+    'Broiler.Cells/src/Broiler.Cells.WebAssembly/Broiler.Cells.WebAssembly.csproj',
+    'Broiler.Plate/src/Broiler.Plate.WebAssembly/Broiler.Plate.WebAssembly.csproj'
+)) {
+    & dotnet restore (Join-Path $repoRoot $wasmClient) -p:Configuration=$configuration
+    if ($LASTEXITCODE -ne 0) { throw "WebAssembly client restore failed: $wasmClient" }
+}
 foreach ($product in $catalog.products) {
     Write-Output "Publishing Office component: $($product.id) ($Rid)"
     $destination = Join-Path $publish $product.id
     & dotnet publish (Join-Path $repoRoot $product.project) -c $configuration -r $Rid --self-contained true --output $destination `
         -p:Version=$Version -p:BroilerOfficeDemo=true -p:UseAppHost=true -p:PublishAot=false -p:PublishSingleFile=false `
-        -p:PublishReadyToRun=true -p:ForceWriterClientPublish=true
+        -p:PublishReadyToRun=true -p:ForceOfficeClientsPublish=true
     if ($LASTEXITCODE -ne 0) { throw "Office publish failed: $($product.id)" }
     if ($product.id -eq 'boss') {
         & (Join-Path $PSScriptRoot 'package-boss.ps1') -PackageDirectory $destination -Platform (if ($Rid -eq 'win-x64') { 'windows' } else { 'linux' })

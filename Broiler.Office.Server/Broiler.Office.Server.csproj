@@ -3,29 +3,35 @@
   <!--
     BOSS — the Broiler Office Standalone Server.
 
-    A self-contained ASP.NET Core / Kestrel host for the Broiler Office web apps. It serves the
-    Broiler Writer WebAssembly word processor (Broiler.Writer.WebAssembly).
+    A self-contained ASP.NET Core / Kestrel host and local WebAssembly launcher for the Broiler
+    Office web suite:
+      - /        Broiler Office Launcher (Broiler.Launcher.WebAssembly)
+      - /writer/ Broiler Writer          (Broiler.Writer.WebAssembly)
+      - /cell/   Broiler Cell            (Broiler.Cells.WebAssembly)
+      - /plate/  Broiler Plate           (Broiler.Plate.WebAssembly)
 
     Hosting model — "vendored publish", not Blazor-hosted:
-      The Writer is a Microsoft.NET.Sdk.WebAssembly app (not Blazor). The Blazor hosted model
-      (Components.WebAssembly.Server + ProjectReference) serves it fine in development but, on publish,
-      never bakes the WebAssembly SDK's transformed index.html (the import map + fingerprinted script
-      references) into the output — it ships the raw placeholder index.html and the app can't boot.
-      So instead this server VENDORS the Writer's *published* wwwroot (transformed index.html, the
-      _framework mono-wasm runtime, and every content-hashed asset) and serves it as plain static
-      files. That is exactly the bundle the standalone `python -m http.server` flow serves, just hosted
-      by Kestrel — identical in `dotnet run` and `dotnet publish`.
+      Each Broiler Office web app is a Microsoft.NET.Sdk.WebAssembly app (not Blazor). The Blazor
+      hosted model (Components.WebAssembly.Server + ProjectReference) serves it fine in development
+      but, on publish, never bakes the WebAssembly SDK's transformed index.html (the import map +
+      fingerprinted script references) into the output — it ships the raw placeholder index.html
+      and the app can't boot. So instead this server VENDORS each client's *published* wwwroot
+      (transformed index.html, the _framework mono-wasm runtime, and every content-hashed asset)
+      and serves it as plain static files — identical in `dotnet run` and `dotnet publish`.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <Configurations>Debug;Release;Publish-Release</Configurations>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <RootNamespace>Broiler.Office.Server</RootNamespace>
     <AssemblyName>Broiler.Office.Server</AssemblyName>
     <IsPackable>false</IsPackable>
+    <RunAOTCompilation Condition="'$(RunAOTCompilation)' == ''">false</RunAOTCompilation>
+    <PublishAot>true</PublishAot>
 
-    <!-- The vendored wwwroot is already content-hashed by the WebAssembly SDK and its transformed
+    <!-- The vendored wwwroot is already content-hashed by the WebAssembly SDK and each transformed
          index.html points at those exact names. Leave it untouched: don't let the Web SDK's static
          web assets pipeline re-fingerprint or rewrite it. -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
@@ -39,13 +45,37 @@
          RID-named folders match the default `dotnet publish -r <rid>` output when no -o is given. -->
     <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**;publish\**;linux-*\**;win-*\**;osx-*\**</DefaultItemExcludes>
 
+    <LauncherClientProject>..\Broiler.Launcher\src\Broiler.Launcher.WebAssembly\Broiler.Launcher.WebAssembly.csproj</LauncherClientProject>
     <WriterClientProject>..\Broiler.Writer\src\Broiler.Writer.WebAssembly\Broiler.Writer.WebAssembly.csproj</WriterClientProject>
-    <!-- Absolute: this PublishDir is handed to the client's build, where a relative path would resolve
-         against the client project directory rather than this one. BaseIntermediateOutputPath (obj\)
-         is set early and reliably; IntermediateOutputPath is not yet populated at this point. -->
-    <WriterClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)writer-client\</WriterClientStage>
-    <!-- Component releases consume an already released Writer web artifact. -->
+    <CellClientProject>..\Broiler.Cells\src\Broiler.Cells.WebAssembly\Broiler.Cells.WebAssembly.csproj</CellClientProject>
+    <PlateClientProject>..\Broiler.Plate\src\Broiler.Plate.WebAssembly\Broiler.Plate.WebAssembly.csproj</PlateClientProject>
+
+    <!-- Absolute: each PublishDir is handed to the client's build, where a relative path would
+         resolve against the client project directory rather than this one. BaseIntermediateOutputPath
+         (obj\) is set early and reliably; IntermediateOutputPath is not yet populated at this point.
+         Segment by $(Configuration) so Publish-Release (AOT) and Debug/Release (non-AOT) stages
+         never overwrite or shadow each other. -->
+    <LauncherClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Configuration)\launcher-client\</LauncherClientStage>
+    <WriterClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Configuration)\writer-client\</WriterClientStage>
+    <CellClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Configuration)\cell-client\</CellClientStage>
+    <PlateClientStage>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)$(Configuration)\plate-client\</PlateClientStage>
+
+    <!-- Component releases can supply already-released web artifacts per client. -->
+    <LauncherClientStage Condition="'$(LauncherClientArtifactDirectory)' != ''">$([MSBuild]::EnsureTrailingSlash('$(LauncherClientArtifactDirectory)'))</LauncherClientStage>
     <WriterClientStage Condition="'$(WriterClientArtifactDirectory)' != ''">$([MSBuild]::EnsureTrailingSlash('$(WriterClientArtifactDirectory)'))</WriterClientStage>
+    <CellClientStage Condition="'$(CellClientArtifactDirectory)' != ''">$([MSBuild]::EnsureTrailingSlash('$(CellClientArtifactDirectory)'))</CellClientStage>
+    <PlateClientStage Condition="'$(PlateClientArtifactDirectory)' != ''">$([MSBuild]::EnsureTrailingSlash('$(PlateClientArtifactDirectory)'))</PlateClientStage>
+
+    <_BossClientConfiguration Condition="'$(Configuration)' == 'Publish-Release'">Release</_BossClientConfiguration>
+    <_BossClientConfiguration Condition="'$(_BossClientConfiguration)' == ''">$(Configuration)</_BossClientConfiguration>
+    <_BossClientRemoveProperties>RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun;PublishAot;UseAppHost;TargetFramework;OutputPath;OutDir;BaseOutputPath;IntermediateOutputPath;BaseIntermediateOutputPath</_BossClientRemoveProperties>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Publish-Release'">
+    <Optimize>true</Optimize>
+    <DebugType>portable</DebugType>
+    <DefineConstants>$(DefineConstants);RELEASE</DefineConstants>
+    <RunAOTCompilation>true</RunAOTCompilation>
   </PropertyGroup>
 
   <ItemGroup>
@@ -56,56 +86,111 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
   </ItemGroup>
 
-  <!-- Publish the Writer WASM client (trimmed — untrimmed crashes mono at boot) into an intermediate
-       stage. Skipped once staged, so the dev inner loop stays fast; force a refresh after changing the
-       Writer with -p:ForceWriterClientPublish=true (or delete obj/). -->
+  <!--
+    Publish each Broiler Office WASM client (trimmed — untrimmed crashes mono at boot) into its
+    intermediate stage. Each is skipped once staged, so the dev inner loop stays fast; force a
+    refresh after changing clients with -p:ForceOfficeClientsPublish=true (or per-client
+    ForceLauncherClientPublish / ForceWriterClientPublish / ForceCellClientPublish /
+    ForcePlateClientPublish, or delete obj/).
+
+    We strip this project's publish shape before crossing into each client via RemoveProperties so
+    a self-contained / single-file / RID-specific publish of THIS project never forces a
+    browser-wasm client to publish as, say, linux-x64 (MSB4057 / NETSDK1099).
+  -->
+  <Target Name="PublishLauncherClient"
+          Condition="'$(LauncherClientArtifactDirectory)' == '' And (!Exists('$(LauncherClientStage)wwwroot\index.html') Or '$(ForceOfficeClientsPublish)' == 'true' Or '$(ForceLauncherClientPublish)' == 'true')">
+    <Message Importance="high" Text="BOSS: publishing the Broiler Office Launcher WASM client (RunAOTCompilation=$(RunAOTCompilation)) into $(LauncherClientStage)…" />
+    <RemoveDir Directories="$(LauncherClientStage)" />
+    <MSBuild Projects="$(LauncherClientProject)"
+             Targets="Publish"
+             Properties="Configuration=$(_BossClientConfiguration);PublishDir=$(LauncherClientStage);RunAOTCompilation=$(RunAOTCompilation);WasmBuildOnlyAfterPublish=true"
+             RemoveProperties="$(_BossClientRemoveProperties)" />
+  </Target>
+
   <Target Name="PublishWriterClient"
-          Condition="'$(WriterClientArtifactDirectory)' == '' And (!Exists('$(WriterClientStage)wwwroot\index.html') Or '$(ForceWriterClientPublish)' == 'true')">
-    <Message Importance="high" Text="BOSS: publishing the Broiler Writer WASM client into $(WriterClientStage)…" />
+          Condition="'$(WriterClientArtifactDirectory)' == '' And (!Exists('$(WriterClientStage)wwwroot\index.html') Or '$(ForceOfficeClientsPublish)' == 'true' Or '$(ForceWriterClientPublish)' == 'true')">
+    <Message Importance="high" Text="BOSS: publishing the Broiler Writer WASM client (RunAOTCompilation=$(RunAOTCompilation)) into $(WriterClientStage)…" />
     <RemoveDir Directories="$(WriterClientStage)" />
-    <!--
-      Strip this project's publish shape before crossing into the client. The MSBuild task hands the
-      caller's *global* properties to the child, so a self-contained / single-file / RID-specific
-      publish of THIS project would otherwise force the browser-wasm client to publish as, say,
-      linux-x64: the WebAssembly SDK then never imports its browser targets and the build dies with
-      "MSB4057: The target 'Publish' does not exist in the project" (or NETSDK1099 for a single-file
-      publish). The client always publishes for browser-wasm with its own settings — its .csproj
-      pins PublishTrimmed, and RunAOTCompilation is turned off here. Properties listed above still
-      apply: an explicit `Properties` entry outranks a global of the same name, which is what keeps
-      Configuration and the staging PublishDir flowing through.
-    -->
     <MSBuild Projects="$(WriterClientProject)"
              Targets="Publish"
-             Properties="Configuration=$(Configuration);PublishDir=$(WriterClientStage);RunAOTCompilation=false"
-             RemoveProperties="RuntimeIdentifier;RuntimeIdentifiers;SelfContained;PublishSingleFile;PublishTrimmed;PublishReadyToRun;PublishAot;UseAppHost;TargetFramework;OutputPath;OutDir;BaseOutputPath;IntermediateOutputPath;BaseIntermediateOutputPath" />
+             Properties="Configuration=$(_BossClientConfiguration);PublishDir=$(WriterClientStage);RunAOTCompilation=$(RunAOTCompilation);WasmBuildOnlyAfterPublish=true"
+             RemoveProperties="$(_BossClientRemoveProperties)" />
   </Target>
 
-  <!-- Dev / `dotnet run`: vendor the staged bundle into this project's web root so Kestrel serves it.
-       Purge the destination web root first: the mono-wasm runtime is content-hashed, so a leftover
-       asset from a prior build (e.g. an older Broiler.Graphics.WebAssembly.<hash>.wasm reachable via a
-       stale, browser-cached index.html/dotnet.<hash>.js) can be loaded against the freshly-vendored,
-       stable-named broiler.graphics.webassembly.js — and a replay op-stream layout change then desyncs
-       ("Unknown replay op …"). A clean vendor guarantees the served tree is exactly one consistent set. -->
-  <Target Name="ValidateWriterClientArtifact" BeforeTargets="VendorWriterClientForRun;VendorWriterClientForPublish" Condition="'$(WriterClientArtifactDirectory)' != ''">
-    <Error Condition="!Exists('$(WriterClientStage)wwwroot\index.html')" Text="Pinned Writer web artifact is missing; BOSS component releases never rebuild it as a fallback." />
+  <Target Name="PublishCellClient"
+          Condition="'$(CellClientArtifactDirectory)' == '' And (!Exists('$(CellClientStage)wwwroot\index.html') Or '$(ForceOfficeClientsPublish)' == 'true' Or '$(ForceCellClientPublish)' == 'true')">
+    <Message Importance="high" Text="BOSS: publishing the Broiler Cell WASM client (RunAOTCompilation=$(RunAOTCompilation)) into $(CellClientStage)…" />
+    <RemoveDir Directories="$(CellClientStage)" />
+    <MSBuild Projects="$(CellClientProject)"
+             Targets="Publish"
+             Properties="Configuration=$(_BossClientConfiguration);PublishDir=$(CellClientStage);RunAOTCompilation=$(RunAOTCompilation);WasmBuildOnlyAfterPublish=true"
+             RemoveProperties="$(_BossClientRemoveProperties)" />
   </Target>
-  <Target Name="VendorWriterClientForRun" DependsOnTargets="PublishWriterClient" BeforeTargets="Build">
+
+  <Target Name="PublishPlateClient"
+          Condition="'$(PlateClientArtifactDirectory)' == '' And (!Exists('$(PlateClientStage)wwwroot\index.html') Or '$(ForceOfficeClientsPublish)' == 'true' Or '$(ForcePlateClientPublish)' == 'true')">
+    <Message Importance="high" Text="BOSS: publishing the Broiler Plate WASM client (RunAOTCompilation=$(RunAOTCompilation)) into $(PlateClientStage)…" />
+    <RemoveDir Directories="$(PlateClientStage)" />
+    <MSBuild Projects="$(PlateClientProject)"
+             Targets="Publish"
+             Properties="Configuration=$(_BossClientConfiguration);PublishDir=$(PlateClientStage);RunAOTCompilation=$(RunAOTCompilation);WasmBuildOnlyAfterPublish=true"
+             RemoveProperties="$(_BossClientRemoveProperties)" />
+  </Target>
+
+  <Target Name="PublishOfficeClients"
+          DependsOnTargets="PublishLauncherClient;PublishWriterClient;PublishCellClient;PublishPlateClient" />
+
+  <Target Name="ValidateOfficeClientArtifacts"
+          BeforeTargets="VendorOfficeClientsForRun;VendorOfficeClientsForPublish">
+    <Error Condition="'$(LauncherClientArtifactDirectory)' != '' And !Exists('$(LauncherClientStage)wwwroot\index.html')"
+           Text="Pinned Launcher web artifact is missing; BOSS component releases never rebuild it as a fallback." />
+    <Error Condition="'$(WriterClientArtifactDirectory)' != '' And !Exists('$(WriterClientStage)wwwroot\index.html')"
+           Text="Pinned Writer web artifact is missing; BOSS component releases never rebuild it as a fallback." />
+    <Error Condition="'$(CellClientArtifactDirectory)' != '' And !Exists('$(CellClientStage)wwwroot\index.html')"
+           Text="Pinned Cell web artifact is missing; BOSS component releases never rebuild it as a fallback." />
+    <Error Condition="'$(PlateClientArtifactDirectory)' != '' And !Exists('$(PlateClientStage)wwwroot\index.html')"
+           Text="Pinned Plate web artifact is missing; BOSS component releases never rebuild it as a fallback." />
+  </Target>
+
+  <!-- Dev / `dotnet run`: vendor all staged bundles into this project's web root so Kestrel serves
+       them. Purge the destination web root first: each mono-wasm runtime is content-hashed, so a
+       leftover asset from a prior build can desync against a freshly-vendored stable-named replay
+       module ("Unknown replay op …"). A clean vendor guarantees the served tree is consistent. -->
+  <Target Name="VendorOfficeClientsForRun" DependsOnTargets="PublishOfficeClients" BeforeTargets="Build">
     <RemoveDir Directories="$(MSBuildProjectDirectory)\wwwroot" />
     <ItemGroup>
+      <_LauncherClientFile Include="$(LauncherClientStage)wwwroot\**\*" />
       <_WriterClientFile Include="$(WriterClientStage)wwwroot\**\*" />
+      <_CellClientFile Include="$(CellClientStage)wwwroot\**\*" />
+      <_PlateClientFile Include="$(PlateClientStage)wwwroot\**\*" />
     </ItemGroup>
+    <Copy SourceFiles="@(_LauncherClientFile)"
+          DestinationFiles="@(_LauncherClientFile->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(_WriterClientFile)"
-          DestinationFiles="@(_WriterClientFile->'$(MSBuildProjectDirectory)\wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+          DestinationFiles="@(_WriterClientFile->'$(MSBuildProjectDirectory)\wwwroot\writer\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(_CellClientFile)"
+          DestinationFiles="@(_CellClientFile->'$(MSBuildProjectDirectory)\wwwroot\cell\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(_PlateClientFile)"
+          DestinationFiles="@(_PlateClientFile->'$(MSBuildProjectDirectory)\wwwroot\plate\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
-  <!-- Publish: vendor the staged bundle into the publish output web root (clean-vendored, as above). -->
-  <Target Name="VendorWriterClientForPublish" DependsOnTargets="PublishWriterClient" AfterTargets="Publish">
+  <!-- Publish: vendor all staged bundles into the publish output web root (clean-vendored, as above). -->
+  <Target Name="VendorOfficeClientsForPublish" DependsOnTargets="PublishOfficeClients" AfterTargets="Publish">
     <RemoveDir Directories="$(PublishDir)wwwroot" />
     <ItemGroup>
+      <_LauncherClientPublishFile Include="$(LauncherClientStage)wwwroot\**\*" />
       <_WriterClientPublishFile Include="$(WriterClientStage)wwwroot\**\*" />
+      <_CellClientPublishFile Include="$(CellClientStage)wwwroot\**\*" />
+      <_PlateClientPublishFile Include="$(PlateClientStage)wwwroot\**\*" />
     </ItemGroup>
+    <Copy SourceFiles="@(_LauncherClientPublishFile)"
+          DestinationFiles="@(_LauncherClientPublishFile->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(_WriterClientPublishFile)"
-          DestinationFiles="@(_WriterClientPublishFile->'$(PublishDir)wwwroot\%(RecursiveDir)%(Filename)%(Extension)')" />
+          DestinationFiles="@(_WriterClientPublishFile->'$(PublishDir)wwwroot\writer\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(_CellClientPublishFile)"
+          DestinationFiles="@(_CellClientPublishFile->'$(PublishDir)wwwroot\cell\%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(_PlateClientPublishFile)"
+          DestinationFiles="@(_PlateClientPublishFile->'$(PublishDir)wwwroot\plate\%(RecursiveDir)%(Filename)%(Extension)')" />
   </Target>
 
 </Project>

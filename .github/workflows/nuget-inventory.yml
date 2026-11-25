@@ -1,0 +1,54 @@
+name: Broiler NuGet inventory
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    name: Inventory (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Select component release commits
+        shell: bash
+        run: bash scripts/nuget_select_component_heads.sh
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Evaluate package ownership and dependencies
+        shell: pwsh
+        run: |
+          python scripts/nuget_publish_order.py --component-heads --check-feed
+          $inventoryExit = $LASTEXITCODE
+          $summary = 'artifacts/nuget-publish-order/inventory-summary.md'
+          if (Test-Path -LiteralPath $summary) {
+            Get-Content -Raw -LiteralPath $summary | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+          }
+          exit $inventoryExit
+
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: nuget-inventory-${{ matrix.os }}
+          path: artifacts/nuget-publish-order/
+          if-no-files-found: error

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Lays the BOSS packaging assets around a published Broiler.Office.Server.
 
@@ -53,16 +53,23 @@ if (-not (Test-Path -LiteralPath $executable)) {
 
 # The whole point of the vendored-publish hosting model: without wwwroot the server starts, answers
 # /healthz, and 404s every page. Fail here rather than shipping that.
-$indexHtml = Join-Path $PackageDirectory 'wwwroot/index.html'
-if (-not (Test-Path -LiteralPath $indexHtml)) {
-    throw "The Writer bundle is missing from the publish output: $indexHtml"
-}
+foreach ($bundle in @(
+    @{ Name = 'Office Launcher'; Path = 'wwwroot/index.html' }
+    @{ Name = 'Writer';          Path = 'wwwroot/writer/index.html' }
+    @{ Name = 'Cell';            Path = 'wwwroot/cell/index.html' }
+    @{ Name = 'Plate';           Path = 'wwwroot/plate/index.html' }
+)) {
+    $indexHtml = Join-Path $PackageDirectory $bundle.Path
+    if (-not (Test-Path -LiteralPath $indexHtml)) {
+        throw "The $($bundle.Name) bundle is missing from the publish output: $indexHtml"
+    }
 
-# The WebAssembly SDK rewrites index.html with an import map pointing at the fingerprinted runtime.
-# The raw placeholder from the project's wwwroot has neither, and an app built from it cannot boot —
-# which is exactly what a hosted (non-vendored) publish would have produced.
-if ((Get-Content -LiteralPath $indexHtml -Raw) -notmatch '<script type="importmap">') {
-    throw "The vendored index.html has no import map — the Writer bundle was not published/transformed correctly: $indexHtml"
+    # The WebAssembly SDK rewrites index.html with an import map pointing at the fingerprinted runtime.
+    # The raw placeholder from the project's wwwroot has neither, and an app built from it cannot boot —
+    # which is exactly what a hosted (non-vendored) publish would have produced.
+    if ((Get-Content -LiteralPath $indexHtml -Raw) -notmatch '<script type="importmap">') {
+        throw "The vendored $($bundle.Name) index.html has no import map — the bundle was not published/transformed correctly: $indexHtml"
+    }
 }
 
 Write-Host "==> laying BOSS packaging assets into $PackageDirectory ($Platform)"
@@ -99,4 +106,4 @@ Get-ChildItem -LiteralPath (Join-Path $PackageDirectory 'service') -Recurse -Fil
 
 $bundleSize = (Get-ChildItem -LiteralPath (Join-Path $PackageDirectory 'wwwroot') -Recurse -File |
     Measure-Object -Property Length -Sum).Sum
-Write-Host ("    wwwroot/ ({0:N1} MB Writer bundle)" -f ($bundleSize / 1MB))
+Write-Host ("    wwwroot/ ({0:N1} MB Broiler Office bundle)" -f ($bundleSize / 1MB))

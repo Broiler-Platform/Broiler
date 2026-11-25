@@ -48,9 +48,11 @@ try {
     if (Test-Path -LiteralPath $output) { throw 'Output directory must be new; release assets cannot be overwritten.' }
     New-Item -ItemType Directory -Path $output | Out-Null
     $project = Join-Path $root $config.project
-    $trimmed = (& dotnet msbuild $project -nologo -p:Configuration=Release -getProperty:PublishTrimmed).Trim()
-    if ($LASTEXITCODE -ne 0 -or $trimmed -ne 'true') { throw 'The browser head must explicitly enable PublishTrimmed.' }
-    Invoke-Checked dotnet (@('publish', $project, '-c', 'Release', '-m:1', '-p:UseBroilerUiSource=false', '-p:RunAOTCompilation=false', '-o', (Join-Path $output 'publish')) + $properties)
+    $trimmed = (& dotnet msbuild $project -nologo -p:Configuration=WebPublish-Release -getProperty:PublishTrimmed).Trim()
+    if ($LASTEXITCODE -ne 0 -or $trimmed -ne 'true') { throw 'The browser head must explicitly enable PublishTrimmed in WebPublish-Release.' }
+    $aot = (& dotnet msbuild $project -nologo -p:Configuration=WebPublish-Release -getProperty:RunAOTCompilation).Trim()
+    if ($LASTEXITCODE -ne 0 -or $aot -ne 'true') { throw 'The browser head must explicitly enable RunAOTCompilation in WebPublish-Release.' }
+    Invoke-Checked dotnet (@('publish', $project, '-c', 'WebPublish-Release', '-m:1', '-p:UseBroilerUiSource=false', '-o', (Join-Path $output 'publish')) + $properties)
     $assets = Get-Content -Raw -LiteralPath (Join-Path (Split-Path $project) 'obj/project.assets.json') | ConvertFrom-Json
     $packages = @($assets.libraries.PSObject.Properties | Where-Object { $_.Value.type -eq 'package' } | ForEach-Object { $_.Name } | Sort-Object)
     if ($config.product -eq 'launcher') {
@@ -73,7 +75,7 @@ try {
     $inputProtocol = if ($config.product -eq 'launcher') { 'broiler.host/1' } else { "$($config.product).browser/1" }
     $identity = @{
         product=$config.product; productName=$config.productName; repository=$(if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { $config.repository }); version=$Version; tag=$Tag; commit=$commit
-        sdk=$sdk; workload=$workload; workloadSet=$workloadSet; runtimeMode='trimmed-interpreter'; publishTrimmed=$true; runAotCompilation=$false
+        sdk=$sdk; workload=$workload; workloadSet=$workloadSet; runtimeMode='trimmed-aot'; publishTrimmed=$true; runAotCompilation=$true
         dirty=[bool]$dirty; verificationOnly=[bool]$VerificationOnly; releaseEligible=(!$dirty -and !$VerificationOnly); dependencies=$packages
         replayProtocol=$replayProtocol; inputProtocol=$inputProtocol
     }

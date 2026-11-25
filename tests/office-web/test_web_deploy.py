@@ -162,7 +162,7 @@ class DeploymentTests(unittest.TestCase):
         mapping={'imports':{'./main.js':'./main.hash.js'},'integrity':{'./main.js':'sha256-'+base64.b64encode(__import__('hashlib').sha256(entry).digest()).decode()}}
         (source/'index.html').write_text('<script type="importmap">'+json.dumps(mapping)+'</script><script type="module" src="main.hash.js"></script>')
         identity=dict(product='writer',productName='Writer',repository=web.PRODUCTS['writer'][0],version='0.1.0-preview.1',tag='writer-web-v0.1.0-preview.1',commit='a'*40,
-                      sdk='10.0.403',workload='10.0.114/10.0.100',workloadSet='10.0.100',runtimeMode=web.producer.MODE,publishTrimmed=True,runAotCompilation=False,dirty=False,verificationOnly=False,
+                      sdk='10.0.403',workload='10.0.114/10.0.100',workloadSet='10.0.100',runtimeMode=web.producer.MODE,publishTrimmed=True,runAotCompilation=True,dirty=False,verificationOnly=False,
                       inputProtocol='writer.browser/1',replayProtocol='broiler.canvas/legacy-preview14',dependencies=['Broiler.Graphics.WebAssembly/0.1.0-preview.14'])
         metadata=web.producer.pack(source,Path(self.temp.name)/'release',identity)
         manifest=web.read(metadata)

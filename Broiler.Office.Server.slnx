@@ -3,13 +3,50 @@
   <Configurations>
     <BuildType Name="Debug" />
     <BuildType Name="Release" />
+    <BuildType Name="Publish-Release" />
   </Configurations>
   <Folder Name="/Entry points/">
     <Project Path="Broiler.Office.Server/Broiler.Office.Server.csproj" />
-    <Project Path="Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj" />
+    <Project Path="Broiler.Launcher/src/Broiler.Launcher.WebAssembly/Broiler.Launcher.WebAssembly.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.Writer/src/Broiler.Writer.WebAssembly/Broiler.Writer.WebAssembly.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.Cells/src/Broiler.Cells.WebAssembly/Broiler.Cells.WebAssembly.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.Plate/src/Broiler.Plate.WebAssembly/Broiler.Plate.WebAssembly.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Launcher/">
+    <Project Path="Broiler.Launcher/src/Broiler.Launcher.Browser/Broiler.Launcher.Browser.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
   </Folder>
   <Folder Name="/Dependencies/Broiler.Writer/">
-    <Project Path="Broiler.Writer/src/Broiler.Writer.FormatCodes/Broiler.Writer.FormatCodes.csproj" />
-    <Project Path="Broiler.Writer/src/Broiler.Writer/Broiler.Writer.Core.csproj" />
+    <Project Path="Broiler.Writer/src/Broiler.Writer.FormatCodes/Broiler.Writer.FormatCodes.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.Writer/src/Broiler.Writer/Broiler.Writer.Core.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Cells/">
+    <Project Path="Broiler.Cells/src/Broiler.Cells.Controls/Broiler.Cells.Controls.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.Cells/src/Broiler.Cells.Core/Broiler.Cells.Core.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+    <Project Path="Broiler.Cells/src/Broiler.Cells.UI/Broiler.Cells.UI.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
+  </Folder>
+  <Folder Name="/Dependencies/Broiler.Plate/">
+    <Project Path="Broiler.Plate/src/Broiler.Plate/Broiler.Plate.Core.csproj">
+      <BuildType Solution="Publish-Release|*" Project="Release" />
+    </Project>
   </Folder>
 </Solution>

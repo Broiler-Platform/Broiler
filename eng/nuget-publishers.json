@@ -1,0 +1,210 @@
+{
+  "publishers": {
+    ".": {
+      "nuget-packages.yml": {
+        "legacy": true,
+        "test": "nuget-pack.yml",
+        "targets": [
+          "Broiler.Layout/Broiler.Layout.slnx",
+          "Broiler.Documents/Broiler.Documents.slnx",
+          "Broiler.Media/Broiler.Media.slnx",
+          "Broiler.Input/Broiler.Input.slnx",
+          "Broiler.UI/Broiler.UI.slnx",
+          "Broiler.Media/src/Broiler.Media.All/Broiler.Media.All.csproj",
+          "Broiler.Input/src/Broiler.Input.All/Broiler.Input.All.csproj",
+          "Broiler.UI/src/Bundles/Broiler.UI.All/Broiler.UI.All.csproj"
+        ]
+      }
+    },
+    "Broiler.CSS": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.CSS.slnx"
+        ]
+      }
+    },
+    "Broiler.DateTime": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "promotion": "pilot-publish.yml",
+        "targets": [
+          "Broiler.DateTime.slnx"
+        ]
+      }
+    },
+    "Broiler.Documents": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Documents.slnx"
+        ]
+      }
+    },
+    "Broiler.Documents.Codecs": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Documents.Codecs.slnx"
+        ]
+      }
+    },
+    "Broiler.DOM": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Dom.slnx"
+        ]
+      }
+    },
+    "Broiler.Graphics": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Graphics.slnx"
+        ]
+      }
+    },
+    "Broiler.Hosting": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Hosting.slnx"
+        ]
+      }
+    },
+    "Broiler.HTML": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.HTML.slnx"
+        ]
+      }
+    },
+    "Broiler.HtmlBridge": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.HtmlBridge.slnx"
+        ]
+      }
+    },
+    "Broiler.Input": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Input.slnx"
+        ]
+      }
+    },
+    "Broiler.JS": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.JS.slnx"
+        ],
+        "excludeTargets": [
+          "Broiler.ECMAScript.slnf"
+        ]
+      },
+      "publish-shared.yml": {
+        "test": "shared-libraries.yml",
+        "targets": [
+          "Broiler.ECMAScript.slnf"
+        ]
+      }
+    },
+    "Broiler.JSeal": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.JSeal.slnx"
+        ],
+        "configurations": [
+          "Release-VM"
+        ]
+      }
+    },
+    "Broiler.Layout": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Layout.slnx"
+        ]
+      }
+    },
+    "Broiler.Media": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Media.slnx"
+        ]
+      }
+    },
+    "Broiler.Native": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Native.slnx"
+        ]
+      }
+    },
+    "Broiler.Net": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Net.slnx"
+        ]
+      }
+    },
+    "Broiler.RegEx": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Regex.slnx"
+        ]
+      }
+    },
+    "Broiler.UI": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.UI.slnx"
+        ]
+      }
+    },
+    "Broiler.UI.Extended": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.UI.Extended.slnx"
+        ]
+      }
+    },
+    "Broiler.UI.Shell": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.UI.Shell.slnx"
+        ]
+      }
+    },
+    "Broiler.Unicode": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.Unicode.slnx"
+        ]
+      }
+    },
+    "Broiler.VM": {
+      "publish.yml": {
+        "test": "ci.yml",
+        "targets": [
+          "Broiler.VM.slnx"
+        ]
+      }
+    }
+  },
+  "exceptions": {}
+}

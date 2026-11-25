@@ -12,7 +12,8 @@ import zipfile
 
 SDK = "10.0."  # .NET 10 SDK band prefix; no pinned subversion
 WORKLOAD = "10.0."  # wasm-tools manifest prefix; no pinned subversion
-MODE = "trimmed-interpreter"
+MODE = "trimmed-aot"
+SUPPORTED_MODES = {"trimmed-aot": True, "trimmed-interpreter": False}
 
 
 def stable_net10(value):
@@ -113,11 +114,11 @@ def pack(root, output, identity):
         raise ValueError("Full actual source commit required")
     validate_toolchain(identity)
     if identity["runtimeMode"] != MODE:
-        raise ValueError("Producer cohort differs from pinned trimmed interpreter configuration")
+        raise ValueError("Producer cohort differs from pinned trimmed AOT configuration")
     if not identity["verificationOnly"] and identity["dirty"]:
         raise ValueError("Release archives require committed clean sources")
-    if identity["publishTrimmed"] is not True or identity["runAotCompilation"] is not False:
-        raise ValueError("Only the trimmed interpreter configuration is supported")
+    if identity["publishTrimmed"] is not True or identity["runAotCompilation"] is not True:
+        raise ValueError("Only the trimmed AOT (WebPublish-Release) configuration is supported for new producer archives")
     identity["releaseEligible"] = not identity["verificationOnly"] and not identity["dirty"]
     files = tree(root)
     entry = graph(files)
@@ -146,10 +147,10 @@ def pack(root, output, identity):
 
 def verify(archive, metadata, extract=None, require_release=False, expected=None):
     manifest = json.loads(metadata.read_text(encoding="utf-8-sig"))
-    if manifest["schemaVersion"] != 1 or manifest["artifactKind"] != "broiler-web-static" or manifest["runtimeMode"] != MODE:
+    if manifest["schemaVersion"] != 1 or manifest["artifactKind"] != "broiler-web-static" or manifest.get("runtimeMode") not in SUPPORTED_MODES:
         raise ValueError("Unsupported web artifact")
     validate_toolchain(manifest)
-    if manifest["publishTrimmed"] is not True or manifest["runAotCompilation"] is not False:
+    if manifest["publishTrimmed"] is not True or manifest["runAotCompilation"] is not SUPPORTED_MODES[manifest["runtimeMode"]]:
         raise ValueError("Web producer cohort mismatch")
     if require_release and (not manifest["releaseEligible"] or manifest["verificationOnly"] or manifest["dirty"]):
         raise ValueError("Local verification assets cannot be released")
